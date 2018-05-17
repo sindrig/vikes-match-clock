@@ -1,0 +1,43 @@
+.App {
+  position: absolute;
+  height: 176px;
+  width: 240px;
+}
+
+.team {
+    top: 10px;
+    text-align: center;
+    width: 50%;
+    display: inline-block;
+}
+
+.team.home {
+    left: 10px;
+}
+
+.team.away {
+    right: 10px;
+}
+
+.clock {
+    position: absolute;
+    bottom: 10px;
+    left: 82px;
+    font-size: 30px;
+}
+
+.team img {
+    height: 100px;
+    display: block;
+    margin: 0 auto;
+}
+
+.team button {
+    border:none;
+    background-color: transparent;
+    font-size: 30px;
+}
+
+.team button:focus {
+    outline:0;
+}
