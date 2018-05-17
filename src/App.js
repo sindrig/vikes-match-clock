@@ -1,6 +1,6 @@
 import React, { Component } from 'react';
 
-import api from './api';
+import { getMatch, startMatch, updateScore } from './api';
 import Team from './Team';
 import Clock from './Clock';
 
@@ -30,14 +30,14 @@ class App extends Component {
     }
 
     componentDidMount() {
-        api.getMatch()
-            .then(res => this.setState(res.data))
+        getMatch()
+            .then(match => this.setState({ match }))
             .catch(err => console.log(err));
     }
 
     start() {
-        api.startMatch()
-            .then(res => this.setState(res.data))
+        startMatch()
+            .then(match => this.setState({ match }))
             .catch(err => console.log(err));
     }
 
@@ -48,20 +48,21 @@ class App extends Component {
             [`${id}Score`]: newScore,
         };
         console.log('payload', payload);
-        api.updateScore(payload)
-            .then(res => this.setState(res.data))
+        updateScore(payload)
+            .then(match => this.setState({ match }))
             .catch(err => console.log(err));
     }
 
     render() {
+        console.log('this.state', this.state);
         if (!this.state.match) {
             return null;
         }
         const { match: { homeScore, awayScore, started } } = this.state;
         return (
             <div className="App">
-                <Team className="home" team={this.home} score={homeScore} updateScore={this.updateScore}/>
-                <Team className="away" team={this.away} score={awayScore} updateScore={this.updateScore}/>
+                <Team className="home" team={this.home} score={homeScore} updateScore={this.updateScore} />
+                <Team className="away" team={this.away} score={awayScore} updateScore={this.updateScore} />
                 <Clock onStart={this.start} started={started} className="clock" />
             </div>
         );
