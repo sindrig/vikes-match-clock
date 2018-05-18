@@ -2,18 +2,18 @@ import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 import { Shortcuts } from 'react-shortcuts';
 
-import { getMatch, startMatch, update, resetClock } from './api';
-import Team from './Team';
-import Clock from './Clock';
+import { getState, updateMatch, updateView } from './api';
 import ShortcutManager from './ShortcutManager';
 import Controller from './Controller';
 
-import vikesImage from './images/vikes.png';
-import grindavikImage from './images/grindavik.png';
+import ScoreBoard from './ScoreBoard';
+import Idle from './Idle';
 import backgroundImage from './images/background.png';
-import adImage from './images/borgun.jpg';
 
 import './App.css';
+
+const IDLE = 'IDLE';
+const MATCH = 'MATCH';
 
 const backgrounds = [
     { backgroundImage: `url(${backgroundImage})` },
@@ -29,25 +29,12 @@ class App extends Component {
     constructor(props) {
         super(props);
         this.state = {
-            match: null,
-            background: 0,
+            match: {},
+            view: IDLE,
         };
-        this.start = this.start.bind(this);
-        this.updateScore = this.updateScore.bind(this);
-        this.update = this.update.bind(this);
-        this.resetClock = this.resetClock.bind(this);
+        this.updateMatch = this.updateMatch.bind(this);
         this.handleShortcuts = this.handleShortcuts.bind(this);
-        this.changeBackground = this.changeBackground.bind(this);
-        this.home = {
-            image: vikesImage,
-            name: 'Víkingur',
-            id: 'home',
-        };
-        this.away = {
-            image: grindavikImage,
-            name: 'Grindavík',
-            id: 'away',
-        };
+        this.selectView = this.selectView.bind(this);
     }
 
     getChildContext() {
@@ -55,85 +42,57 @@ class App extends Component {
     }
 
     componentDidMount() {
-        getMatch()
-            .then(match => this.setState({ match }))
+        getState()
+            .then(state => this.setState(state))
             .catch(err => console.log(err));
     }
 
-    handleShortcuts(action) {
-        switch (action) {
-        case 'BACKGROUND':
-            this.changeBackground();
-            break;
+    handleShortcuts() {
+        // TODO do we need something?
+        // handleShorcuts accepts (action (string), event (Event))
+        return this;
+    }
+
+    updateMatch(partial) {
+        updateMatch(partial)
+            .then(state => this.setState(state))
+            .catch(err => console.log(err));
+    }
+
+    selectView(event) {
+        const { target: { value } } = event;
+        updateView(value)
+            .then(state => this.setState(state))
+            .catch(err => console.log(err));
+    }
+
+    renderCurrentView() {
+        const { view } = this.state;
+        console.log('this.state', this.state);
+
+        switch (view) {
+        case MATCH:
+            return <ScoreBoard match={this.state.match} update={this.updateMatch} />;
+        case IDLE:
         default:
-            console.log('no');
-            break;
+            return <Idle />;
         }
-    }
-
-    start() {
-        startMatch()
-            .then(match => this.setState({ match }))
-            .catch(err => console.log(err));
-    }
-
-    changeBackground() {
-        let background = this.state.background + 1;
-        if (background >= backgrounds.length) {
-            background = 0;
-        }
-        this.setState({ background });
-    }
-
-    updateScore(id, newScore) {
-        const { match } = this.state;
-        const payload = {
-            ...match,
-            [`${id}Score`]: newScore,
-        };
-        update(payload)
-            .then(updated => this.setState({ match: updated }))
-            .catch(err => console.log(err));
-    }
-
-    update(partial) {
-        update(partial)
-            .then(updated => this.setState({ match: updated }))
-            .catch(err => console.log(err));
-    }
-
-    resetClock() {
-        resetClock()
-            .then((match) => {
-                this.setState({ match });
-            })
-            .catch(err => console.log(err));
     }
 
     render() {
-        if (!this.state.match) {
-            return null;
-        }
-        const {
-            match: {
-                homeScore, awayScore, started, half,
-            }, background,
-        } = this.state;
         return (
             <Shortcuts
                 name="MAIN"
                 handler={this.handleShortcuts}
             >
-                <div className="App" style={backgrounds[background]}>
-                    <img src={adImage} className="ad" alt="Ad" />
-                    <Team className="home" team={this.home} score={homeScore} updateScore={this.updateScore} />
-                    <Team className="away" team={this.away} score={awayScore} updateScore={this.updateScore} />
-                    <Clock onStart={this.start} started={started} className="clock" reset={this.resetClock} half={half} />
+                <div className="App" style={backgrounds[0]}>
+                    {this.renderCurrentView()}
                 </div>
                 <Controller
-                    match={this.state.match}
-                    update={this.update}
-                    changeBackground={this.changeBackground}
+                    state={this.state}
+                    updateMatch={this.updateMatch}
+                    selectView={this.selectView}
+                    views={[IDLE, MATCH]}
                 />
             </Shortcuts>
         );

@@ -1,49 +1,49 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 
+import MatchActions from './MatchActions';
 
-const Controller = ({ update, match, changeBackground }) => {
-    const action = (attr, fn) => () => update({ ...match, [attr]: fn(match[attr]) });
+const Controller = ({
+    updateMatch, state, selectView, views,
+}) => {
+    const matchAction = (attr, fn) => () => updateMatch({
+        ...state.match,
+        [attr]: fn(state.match[attr]),
+    });
     return (
         <div className="controller">
+            {state.view === 'MATCH' ? <MatchActions matchAction={matchAction} state={state} /> : null}
             <div>
-                <button onClick={action('homeScore', x => x + 1)}>Heima +1</button>
-                <button onClick={action('homeScore', x => x - 1)}>Heima -1</button>
+                <select onChange={selectView}>
+                    {views.map(view => (
+                        <option
+                            value={view}
+                            key={view}
+                            selected={view === state.view}
+                        >
+                            {view}
+                        </option>
+                    ))}
+                </select>
             </div>
             <div>
-                <button onClick={action('awayScore', x => x + 1)}>Úti +1</button>
-                <button onClick={action('awayScore', x => x - 1)}>Úti -1</button>
-            </div>
-            <div>
-                <button onClick={action('started', () => Date.now())} disabled={!!match.started}>Byrja</button>
-                <button onClick={action('started', () => null)} disabled={!match.started}>Núllstilla klukku</button>
-            </div>
-            <div>
-                <button onClick={action('started', x => x - (60 * 1000))} disabled={!match.started}>Klukka +1 mín</button>
-                <button onClick={action('started', x => x + (60 * 1000))} disabled={!match.started}>Klukka -1 mín</button>
-            </div>
-            <div>
-                <button onClick={action('started', x => x - (5 * 1000))} disabled={!match.started}>Klukka +5 sek</button>
-                <button onClick={action('started', x => x + (5 * 1000))} disabled={!match.started}>Klukka -5 sek</button>
-            </div>
-            <div>
-                <button onClick={action('half', () => 1)} disabled={match.half === 1}>Fyrri hálfleikur</button>
-                <button onClick={action('half', () => 2)} disabled={match.half === 2}>Seinni hálfleikur</button>
-            </div>
-            <div>
-                <button onClick={changeBackground}>Breyta bakgrunni</button>
+                <button onClick={() => window.location.reload()}>Refresh!</button>
             </div>
         </div>
     );
 };
 
 Controller.propTypes = {
-    update: PropTypes.func.isRequired,
-    changeBackground: PropTypes.func.isRequired,
-    match: PropTypes.shape({
-        homeScore: PropTypes.number,
-        awayScore: PropTypes.number,
-        started: PropTypes.number,
+    updateMatch: PropTypes.func.isRequired,
+    selectView: PropTypes.func.isRequired,
+    views: PropTypes.arrayOf(PropTypes.string).isRequired,
+    state: PropTypes.shape({
+        match: PropTypes.shape({
+            homeScore: PropTypes.number,
+            awayScore: PropTypes.number,
+            started: PropTypes.number,
+            half: PropTypes.number,
+        }).isRequired,
     }).isRequired,
 };
 

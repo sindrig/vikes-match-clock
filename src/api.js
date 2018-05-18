@@ -1,60 +1,53 @@
 const store = window.localStorage;
 
-const defaultMatch = {
-    homeScore: 0,
-    awayScore: 0,
-    started: null,
-    half: 1,
+const defaultState = {
+    match: {
+        homeScore: 0,
+        awayScore: 0,
+        started: null,
+        half: 1,
+    },
 };
 
-const save = (match) => {
-    store.setItem('match', JSON.stringify(match));
-    return match;
+const saveState = (newState) => {
+    store.setItem('state', JSON.stringify(newState));
+    return newState;
 };
 
-export const getMatch = () => new Promise((resolve) => {
-    const matchText = store.getItem('match');
-    if (!matchText) {
-        save(defaultMatch);
-        return resolve(defaultMatch);
+export const getState = () => new Promise((resolve) => {
+    const stateText = store.getItem('state');
+    if (!stateText) {
+        return resolve(saveState(defaultState));
     }
     try {
-        return resolve({ ...defaultMatch, ...JSON.parse(matchText) });
+        return resolve(JSON.parse(stateText));
     } catch (e) {
-        store.removeItem('match');
-        return getMatch();
+        store.removeItem('state');
+        return getState();
     }
 });
 
-export const startMatch = () => getMatch().then((match) => {
-    const updated = { ...match, started: Date.now() };
-    return save(updated);
-});
-
-const positiveNumber = score => (
-    score < 0 ? 0 : score
-);
+const positiveNumber = (score) => {
+    if (Number.isNaN(score)) {
+        return 0;
+    }
+    return score < 0 ? 0 : score;
+};
 
 const notBeforeNow = timestamp => (
     timestamp > Date.now() ? Date.now() : timestamp
 );
 
-export const update = ({
+export const updateMatch = ({
     homeScore, awayScore, started, half,
-}) => new Promise((resolve) => {
-    const updated = {
+}) => getState().then((state) => {
+    const match = {
         homeScore: positiveNumber(homeScore),
         awayScore: positiveNumber(awayScore),
         started: notBeforeNow(started),
         half,
     };
-    return resolve(save(updated));
+    return saveState({ ...state, match });
 });
 
-export const resetClock = () => getMatch().then((match) => {
-    const updated = {
-        ...match,
-        started: null,
-    };
-    return save(updated);
-});
+export const updateView = view => getState().then(state => saveState({ ...state, view }));
