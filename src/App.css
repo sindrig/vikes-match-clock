@@ -4,32 +4,53 @@
   width: 240px;
 }
 
-.team {
-    top: 10px;
-    text-align: center;
-    width: 50%;
-    display: inline-block;
-}
-
-.team.home {
+.team.home span {
     left: 10px;
 }
 
-.team.away {
-    right: 10px;
+.team.away span {
+    left: 170px;
 }
 
-.clock {
-    position: absolute;
-    bottom: 10px;
-    left: 82px;
-    font-size: 30px;
+.team span {
+    position:absolute;
+    background-color: black;
+    font-family: 'Anton', sans-serif;
+    font-size: 40px;
+    color: white;
+    top: 100px;
+    height: 60px;
+    width: 60px;
+    line-height:60px;
+    text-align: center;
 }
 
 .team img {
-    height: 100px;
-    display: block;
-    margin: 0 auto;
+    position:absolute;
+    top: 20px;
+    height: 70px;
+}
+
+.team.home img {
+    left: 10px;
+}
+
+.team.away img {
+    left: 174px;
+}
+
+.clock {
+    position:absolute;
+    background-color: black;
+    font-family: 'Anton', sans-serif;
+    font-size: 30px;
+    color: white;
+    top: 100px;
+    left: 80px;
+    height: 40px;
+    width: 80px;
+    line-height:40px;
+    text-align: center;
 }
 
 button {
