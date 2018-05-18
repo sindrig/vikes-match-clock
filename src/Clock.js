@@ -33,6 +33,10 @@ export default class Clock extends Component {
         setInterval(this.updateTime, 100);
     }
 
+    static getDerivedStateFromProps() {
+        return { done: false };
+    }
+
     componentWillUnmount() {
         clearInterval(this.interval);
     }
