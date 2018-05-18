@@ -114,7 +114,11 @@ class App extends Component {
         if (!this.state.match) {
             return null;
         }
-        const { match: { homeScore, awayScore, started }, background } = this.state;
+        const {
+            match: {
+                homeScore, awayScore, started, half,
+            }, background,
+        } = this.state;
         return (
             <Shortcuts
                 name="MAIN"
@@ -124,9 +128,13 @@ class App extends Component {
                     <img src={adImage} className="ad" alt="Ad" />
                     <Team className="home" team={this.home} score={homeScore} updateScore={this.updateScore} />
                     <Team className="away" team={this.away} score={awayScore} updateScore={this.updateScore} />
-                    <Clock onStart={this.start} started={started} className="clock" reset={this.resetClock} />
+                    <Clock onStart={this.start} started={started} className="clock" reset={this.resetClock} half={half} />
                 </div>
-                <Controller match={this.state.match} update={this.update} changeBackground={this.changeBackground} />
+                <Controller
+                    match={this.state.match}
+                    update={this.update}
+                    changeBackground={this.changeBackground}
+                />
             </Shortcuts>
         );
     }
