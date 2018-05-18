@@ -82,7 +82,7 @@ export default class Clock extends Component {
     render() {
         const { started, onStart, className } = this.props;
         if (!started) {
-            return <button onClick={onStart} className={className}>Start</button>;
+            return <button onClick={onStart} className={className}>00:00</button>;
         }
         const { time } = this.state;
         return (
