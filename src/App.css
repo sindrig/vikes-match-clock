@@ -62,3 +62,10 @@ button {
 button:focus {
     outline:0;
 }
+
+img.ad {
+    width: 80px;
+    left: 81px;
+    top: 15px;
+    position: absolute;
+}
