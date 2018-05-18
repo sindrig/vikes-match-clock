@@ -2,10 +2,11 @@ import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 import { Shortcuts } from 'react-shortcuts';
 
-import { getMatch, startMatch, updateScore, resetClock } from './api';
+import { getMatch, startMatch, update, resetClock } from './api';
 import Team from './Team';
 import Clock from './Clock';
 import ShortcutManager from './ShortcutManager';
+import Controller from './Controller';
 
 import vikesImage from './images/vikes.png';
 import grindavikImage from './images/grindavik.png';
@@ -33,6 +34,7 @@ class App extends Component {
         };
         this.start = this.start.bind(this);
         this.updateScore = this.updateScore.bind(this);
+        this.update = this.update.bind(this);
         this.resetClock = this.resetClock.bind(this);
         this.handleShortcuts = this.handleShortcuts.bind(this);
         this.home = {
@@ -88,7 +90,13 @@ class App extends Component {
             ...match,
             [`${id}Score`]: newScore,
         };
-        updateScore(payload)
+        update(payload)
+            .then(updated => this.setState({ match: updated }))
+            .catch(err => console.log(err));
+    }
+
+    update(partial) {
+        update(partial)
             .then(updated => this.setState({ match: updated }))
             .catch(err => console.log(err));
     }
@@ -97,7 +105,6 @@ class App extends Component {
         resetClock()
             .then((match) => {
                 this.setState({ match });
-                console.log('match', match);
             })
             .catch(err => console.log(err));
     }
@@ -118,6 +125,7 @@ class App extends Component {
                     <Team className="away" team={this.away} score={awayScore} updateScore={this.updateScore} />
                     <Clock onStart={this.start} started={started} className="clock" reset={this.resetClock} />
                 </div>
+                <Controller match={this.state.match} update={this.update} />
             </Shortcuts>
         );
     }

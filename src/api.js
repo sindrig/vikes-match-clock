@@ -30,17 +30,21 @@ export const startMatch = () => getMatch().then((match) => {
     return save(updated);
 });
 
-const sanitizeScore = score => (
+const positiveNumber = score => (
     score < 0 ? 0 : score
 );
 
-export const updateScore = ({ homeScore, awayScore }) => getMatch().then((match) => {
+const notBeforeNow = timestamp => (
+    timestamp > Date.now() ? Date.now() : timestamp
+);
+
+export const update = ({ homeScore, awayScore, started }) => new Promise((resolve) => {
     const updated = {
-        ...match,
-        homeScore: sanitizeScore(homeScore),
-        awayScore: sanitizeScore(awayScore),
+        homeScore: positiveNumber(homeScore),
+        awayScore: positiveNumber(awayScore),
+        started: notBeforeNow(started),
     };
-    return save(updated);
+    return resolve(save(updated));
 });
 
 export const resetClock = () => getMatch().then((match) => {

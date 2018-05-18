@@ -23,6 +23,7 @@
     width: 60px;
     line-height:60px;
     text-align: center;
+    border: 1px solid white;
 }
 
 .team img {
@@ -51,6 +52,7 @@
     width: 80px;
     line-height:40px;
     text-align: center;
+    border: 1px solid white;
 }
 
 button {
@@ -63,9 +65,31 @@ button:focus {
     outline:0;
 }
 
+.controller button {
+    background-color: #C0C0C0;
+    border: 1px solid black;
+    font-size: 20px;
+}
+
+.controller {
+    position: absolute;
+    left: 300px;
+}
+
+.controller > div {
+    margin: 20px;
+    float: left;
+}
+
+.controller > div > button {
+    margin: 10px;
+    float: left;
+    clear: both;
+}
+
 img.ad {
     width: 80px;
-    left: 81px;
-    top: 15px;
+    left: 80px;
+    top: 145px;
     position: absolute;
 }
