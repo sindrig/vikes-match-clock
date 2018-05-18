@@ -10,13 +10,14 @@ import ShortcutManager from './ShortcutManager';
 import vikesImage from './images/vikes.png';
 import grindavikImage from './images/grindavik.png';
 import backgroundImage from './images/background.png';
+import adImage from './images/borgun.jpg';
 
 import './App.css';
 
 const backgrounds = [
-    {},
-    { backgroundColor: 'black' },
     { backgroundImage: `url(${backgroundImage})` },
+    { backgroundColor: 'black' },
+    {},
 ];
 
 class App extends Component {
@@ -112,6 +113,7 @@ class App extends Component {
                 handler={this.handleShortcuts}
             >
                 <div className="App" style={backgrounds[background]}>
+                    <img src={adImage} className="ad" alt="Ad" />
                     <Team className="home" team={this.home} score={homeScore} updateScore={this.updateScore} />
                     <Team className="away" team={this.away} score={awayScore} updateScore={this.updateScore} />
                     <Clock onStart={this.start} started={started} className="clock" reset={this.resetClock} />
