@@ -1,6 +1,6 @@
 import React, { Component } from 'react';
 
-import { getMatch, startMatch, updateScore } from './api';
+import { getMatch, startMatch, updateScore, resetClock } from './api';
 import Team from './Team';
 import Clock from './Clock';
 
@@ -17,6 +17,7 @@ class App extends Component {
         };
         this.start = this.start.bind(this);
         this.updateScore = this.updateScore.bind(this);
+        this.resetClock = this.resetClock.bind(this);
         this.home = {
             image: vikesImage,
             name: 'Víkingur',
@@ -47,9 +48,17 @@ class App extends Component {
             ...match,
             [`${id}Score`]: newScore,
         };
-        console.log('payload', payload);
         updateScore(payload)
-            .then(match => this.setState({ match }))
+            .then(updated => this.setState({ match: updated }))
+            .catch(err => console.log(err));
+    }
+
+    resetClock() {
+        resetClock()
+            .then(match => {
+                this.setState({ match })
+                console.log('match', match);
+            })
             .catch(err => console.log(err));
     }
 
@@ -59,11 +68,12 @@ class App extends Component {
             return null;
         }
         const { match: { homeScore, awayScore, started } } = this.state;
+        console.log('started', started);
         return (
             <div className="App">
                 <Team className="home" team={this.home} score={homeScore} updateScore={this.updateScore} />
                 <Team className="away" team={this.away} score={awayScore} updateScore={this.updateScore} />
-                <Clock onStart={this.start} started={started} className="clock" />
+                <Clock onStart={this.start} started={started} className="clock" reset={this.resetClock} />
             </div>
         );
     }

@@ -32,12 +32,12 @@
     margin: 0 auto;
 }
 
-.team button {
+button {
     border:none;
     background-color: transparent;
     font-size: 30px;
 }
 
-.team button:focus {
+button:focus {
     outline:0;
 }

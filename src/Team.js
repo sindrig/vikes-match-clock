@@ -29,7 +29,7 @@ Team.propTypes = {
     score: PropTypes.number.isRequired,
     className: PropTypes.string.isRequired,
     team: PropTypes.shape({
-        img: PropTypes.string.isRequired,
+        image: PropTypes.string.isRequired,
         name: PropTypes.string.isRequired,
     }).isRequired,
     updateScore: PropTypes.func.isRequired,
