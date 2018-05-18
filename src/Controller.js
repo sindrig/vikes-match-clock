@@ -2,7 +2,7 @@ import React from 'react';
 import PropTypes from 'prop-types';
 
 
-const Controller = ({ update, match }) => {
+const Controller = ({ update, match, changeBackground }) => {
     const action = (attr, fn) => () => update({ ...match, [attr]: fn(match[attr]) });
     return (
         <div className="controller">
@@ -26,12 +26,16 @@ const Controller = ({ update, match }) => {
                 <button onClick={action('started', x => x - (5 * 1000))}>Klukka +5 sek</button>
                 <button onClick={action('started', x => x + (5 * 1000))}>Klukka -5 sek</button>
             </div>
+            <div>
+                <button onClick={changeBackground}>Breyta bakgrunni</button>
+            </div>
         </div>
     );
 };
 
 Controller.propTypes = {
     update: PropTypes.func.isRequired,
+    changeBackground: PropTypes.func.isRequired,
     match: PropTypes.shape({
         homeScore: PropTypes.number,
         awayScore: PropTypes.number,

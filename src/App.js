@@ -37,6 +37,7 @@ class App extends Component {
         this.update = this.update.bind(this);
         this.resetClock = this.resetClock.bind(this);
         this.handleShortcuts = this.handleShortcuts.bind(this);
+        this.changeBackground = this.changeBackground.bind(this);
         this.home = {
             image: vikesImage,
             name: 'Víkingur',
@@ -125,7 +126,7 @@ class App extends Component {
                     <Team className="away" team={this.away} score={awayScore} updateScore={this.updateScore} />
                     <Clock onStart={this.start} started={started} className="clock" reset={this.resetClock} />
                 </div>
-                <Controller match={this.state.match} update={this.update} />
+                <Controller match={this.state.match} update={this.update} changeBackground={this.changeBackground} />
             </Shortcuts>
         );
     }
