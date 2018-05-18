@@ -16,15 +16,19 @@ const Controller = ({ update, match, changeBackground }) => {
             </div>
             <div>
                 <button onClick={action('started', () => Date.now())} disabled={!!match.started}>Byrja</button>
-                <button onClick={action('started', () => null)}>Núllstilla klukku</button>
+                <button onClick={action('started', () => null)} disabled={!match.started}>Núllstilla klukku</button>
             </div>
             <div>
-                <button onClick={action('started', x => x - (60 * 1000))}>Klukka +1 mín</button>
-                <button onClick={action('started', x => x + (60 * 1000))}>Klukka -1 mín</button>
+                <button onClick={action('started', x => x - (60 * 1000))} disabled={!match.started}>Klukka +1 mín</button>
+                <button onClick={action('started', x => x + (60 * 1000))} disabled={!match.started}>Klukka -1 mín</button>
             </div>
             <div>
-                <button onClick={action('started', x => x - (5 * 1000))}>Klukka +5 sek</button>
-                <button onClick={action('started', x => x + (5 * 1000))}>Klukka -5 sek</button>
+                <button onClick={action('started', x => x - (5 * 1000))} disabled={!match.started}>Klukka +5 sek</button>
+                <button onClick={action('started', x => x + (5 * 1000))} disabled={!match.started}>Klukka -5 sek</button>
+            </div>
+            <div>
+                <button onClick={action('half', () => 1)} disabled={match.half === 1}>Fyrri hálfleikur</button>
+                <button onClick={action('half', () => 2)} disabled={match.half === 2}>Seinni hálfleikur</button>
             </div>
             <div>
                 <button onClick={changeBackground}>Breyta bakgrunni</button>

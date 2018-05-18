@@ -61,17 +61,20 @@ export default class Clock extends Component {
     }
 
     updateTime() {
-        const { started } = this.props;
+        const { started, half } = this.props;
         const { done } = this.state;
         if (!done && started) {
             const secondsElapsed = Math.floor((Date.now() - started) / 1000);
-            const minutes = Math.min(Math.floor(secondsElapsed / 60), 45);
+            let minutes = Math.min(Math.floor(secondsElapsed / 60), 45);
             let seconds;
             if (minutes >= 45) {
                 seconds = 0;
                 this.setState({ done: true });
             } else {
                 seconds = secondsElapsed % 60;
+            }
+            if (half === 2) {
+                minutes += 45;
             }
             const time = `${pad(minutes)}:${pad(seconds)}`;
             this.setState({ time });
@@ -80,9 +83,11 @@ export default class Clock extends Component {
     }
 
     render() {
-        const { started, onStart, className } = this.props;
+        const {
+            started, onStart, className, half,
+        } = this.props;
         if (!started) {
-            return <button onClick={onStart} className={className}>00:00</button>;
+            return <button onClick={onStart} className={className}>{half === 2 ? '45:00' : '00:00'}</button>;
         }
         const { time } = this.state;
         return (

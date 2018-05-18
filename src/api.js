@@ -4,6 +4,7 @@ const defaultMatch = {
     homeScore: 0,
     awayScore: 0,
     started: null,
+    half: 1,
 };
 
 const save = (match) => {
@@ -18,7 +19,7 @@ export const getMatch = () => new Promise((resolve) => {
         return resolve(defaultMatch);
     }
     try {
-        return resolve(JSON.parse(matchText));
+        return resolve({ ...defaultMatch, ...JSON.parse(matchText) });
     } catch (e) {
         store.removeItem('match');
         return getMatch();
@@ -38,11 +39,14 @@ const notBeforeNow = timestamp => (
     timestamp > Date.now() ? Date.now() : timestamp
 );
 
-export const update = ({ homeScore, awayScore, started }) => new Promise((resolve) => {
+export const update = ({
+    homeScore, awayScore, started, half,
+}) => new Promise((resolve) => {
     const updated = {
         homeScore: positiveNumber(homeScore),
         awayScore: positiveNumber(awayScore),
         started: notBeforeNow(started),
+        half,
     };
     return resolve(save(updated));
 });
