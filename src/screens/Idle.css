@@ -1,0 +1,22 @@
+img.ad {
+    width: 80px;
+    left: 80px;
+    top: 150px;
+    position: absolute;
+}
+
+
+.idle .idle-clock {
+    position: absolute;
+    left: 81px;
+    top: 115px;
+    color: white;
+    font-size: 30px;
+    font-weight: bold;
+}
+
+.idle .idle-vikes {
+    position: absolute;
+    left: 80px;
+    top: 20px;
+}

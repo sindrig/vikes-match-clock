@@ -3,11 +3,12 @@ import PropTypes from 'prop-types';
 import { Shortcuts } from 'react-shortcuts';
 
 import { getState, updateMatch, updateView } from './api';
-import ShortcutManager from './ShortcutManager';
-import Controller from './Controller';
+import ShortcutManager from './utils/ShortcutManager';
 
-import ScoreBoard from './ScoreBoard';
-import Idle from './Idle';
+import Controller from './controller/Controller';
+
+import ScoreBoard from './screens/ScoreBoard';
+import Idle from './screens/Idle';
 import backgroundImage from './images/background.png';
 
 import './App.css';
@@ -35,6 +36,7 @@ class App extends Component {
         this.updateMatch = this.updateMatch.bind(this);
         this.handleShortcuts = this.handleShortcuts.bind(this);
         this.selectView = this.selectView.bind(this);
+        this.onFileUpload = this.onFileUpload.bind(this);
     }
 
     getChildContext() {
@@ -45,6 +47,11 @@ class App extends Component {
         getState()
             .then(state => this.setState(state))
             .catch(err => console.log(err));
+    }
+
+    onFileUpload(event, a) {
+        console.log('event', event.target.files);
+        console.log('a', a);
     }
 
     handleShortcuts() {
@@ -93,6 +100,7 @@ class App extends Component {
                     updateMatch={this.updateMatch}
                     selectView={this.selectView}
                     views={[IDLE, MATCH]}
+                    onFileUpload={this.onFileUpload}
                 />
             </Shortcuts>
         );
