@@ -1,0 +1,28 @@
+.controller button {
+    background-color: #C0C0C0;
+    border: 1px solid black;
+    font-size: 15px;
+}
+
+.controller {
+    position: absolute;
+    top: 50px;
+    left: 300px;
+}
+
+.controller div {
+    margin: 20px;
+    float: left;
+}
+
+.controller div > button {
+    margin: 10px;
+    float: left;
+    clear: both;
+}
+
+.controller .page-actions {
+    position: absolute;
+    top: 100px;
+    left: -300px;
+}

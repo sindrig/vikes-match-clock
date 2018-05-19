@@ -1,12 +1,14 @@
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 
-import Team from './Team';
-import Clock from './Clock';
-import AdImage from './AdImage';
+import Team from '../match/Team';
+import Clock from '../match/Clock';
+import AdImage from '../utils/AdImage';
 
-import vikesImage from './images/vikes.png';
-import grindavikImage from './images/grindavik.png';
+import vikesImage from '../images/vikes.png';
+import grindavikImage from '../images/grindavik.png';
+
+import './ScoreBoard.css';
 
 const home = {
     image: vikesImage,

@@ -4,57 +4,6 @@
   width: 240px;
 }
 
-.team.home span {
-    left: 10px;
-}
-
-.team.away span {
-    left: 170px;
-}
-
-.team span {
-    position:absolute;
-    background-color: black;
-    font-family: 'Anton', sans-serif;
-    font-size: 40px;
-    color: white;
-    top: 100px;
-    height: 60px;
-    width: 60px;
-    line-height:60px;
-    text-align: center;
-    border: 1px solid white;
-}
-
-.team img {
-    position:absolute;
-    top: 20px;
-    height: 70px;
-}
-
-.team.home img {
-    left: 10px;
-}
-
-.team.away img {
-    left: 174px;
-}
-
-.clock {
-    position:absolute;
-    background-color: black;
-    font-family: 'Anton', sans-serif;
-    font-size: 30px;
-    color: white;
-    top: 100px;
-    left: 80px;
-    height: 40px;
-    width: 80px;
-    line-height:40px;
-    text-align: center;
-    border: 1px solid white;
-}
-
 button {
     border:none;
     background-color: transparent;
@@ -63,50 +12,4 @@ button {
 
 button:focus {
     outline:0;
-}
-
-.controller button {
-    background-color: #C0C0C0;
-    border: 1px solid black;
-    font-size: 20px;
-}
-
-.controller {
-    position: absolute;
-    top: 100px;
-    left: 300px;
-}
-
-.controller div {
-    margin: 20px;
-    float: left;
-}
-
-.controller div > button {
-    margin: 10px;
-    float: left;
-    clear: both;
-}
-
-img.ad {
-    width: 80px;
-    left: 80px;
-    top: 150px;
-    position: absolute;
-}
-
-
-.idle .idle-clock {
-    position: absolute;
-    left: 81px;
-    top: 115px;
-    color: white;
-    font-size: 30px;
-    font-weight: bold;
-}
-
-.idle .idle-vikes {
-    position: absolute;
-    left: 80px;
-    top: 20px;
 }

@@ -1,7 +1,9 @@
 import React from 'react';
 import Clock from 'react-live-clock';
-import vikesImage from './images/vikes.png';
-import AdImage from './AdImage';
+import vikesImage from '../images/vikes.png';
+import AdImage from '../utils/AdImage';
+
+import './Idle.css';
 
 export default () => (
     <div className="idle">
