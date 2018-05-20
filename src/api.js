@@ -7,6 +7,13 @@ const defaultState = {
         started: null,
         half: 1,
     },
+    controller: {
+        assets: {
+            selectedAssets: [],
+            cycle: false,
+            imageSeconds: 3,
+        },
+    },
 };
 
 const saveState = (newState) => {
@@ -20,8 +27,14 @@ export const getState = () => new Promise((resolve) => {
         return resolve(saveState(defaultState));
     }
     try {
-        return resolve(JSON.parse(stateText));
+        const result = JSON.parse(stateText);
+        const allExists = Object.keys(defaultState).every(key => result[key]);
+        if (!allExists) {
+            throw new Error('Missing some keys');
+        }
+        return resolve(result);
     } catch (e) {
+        console.log('e', e);
         store.removeItem('state');
         return getState();
     }
@@ -51,3 +64,4 @@ export const updateMatch = ({
 });
 
 export const updateView = view => getState().then(state => saveState({ ...state, view }));
+export const updateController = controller => getState().then(state => saveState({ ...state, controller }));

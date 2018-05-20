@@ -2,7 +2,7 @@ import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 import { Shortcuts } from 'react-shortcuts';
 
-import { getState, updateMatch, updateView } from './api';
+import { getState, updateMatch, updateView, updateController } from './api';
 import ShortcutManager from './utils/ShortcutManager';
 
 import Controller from './controller/Controller';
@@ -33,11 +33,13 @@ class App extends Component {
             match: {},
             view: IDLE,
             overlay: null,
+            controller: null,
         };
         this.updateMatch = this.updateMatch.bind(this);
         this.handleShortcuts = this.handleShortcuts.bind(this);
         this.selectView = this.selectView.bind(this);
         this.setOverlay = this.setOverlay.bind(this);
+        this.updateController = this.updateController.bind(this);
     }
 
     getChildContext() {
@@ -62,8 +64,13 @@ class App extends Component {
             .catch(err => console.log(err));
     }
 
+    updateController(partial) {
+        updateController(partial)
+            .then(state => this.setState(state))
+            .catch(err => console.log(err));
+    }
+
     selectView(event) {
-        event.preventDefault();
         const { target: { value } } = event;
         updateView(value)
             .then(state => this.setState(state))
@@ -90,7 +97,6 @@ class App extends Component {
 
     renderCurrentView() {
         const { view } = this.state;
-        console.log('this.state', this.state);
 
         switch (view) {
         case MATCH:
@@ -111,13 +117,17 @@ class App extends Component {
                 <div className="App" style={backgrounds[0]}>
                     {this.renderCurrentView()}
                 </div>
-                <Controller
-                    state={this.state}
-                    updateMatch={this.updateMatch}
-                    selectView={this.selectView}
-                    views={[IDLE, MATCH]}
-                    renderAsset={this.setOverlay}
-                />
+                {this.state.controller &&
+                    <Controller
+                        state={this.state}
+                        updateMatch={this.updateMatch}
+                        selectView={this.selectView}
+                        views={[IDLE, MATCH]}
+                        renderAsset={this.setOverlay}
+                        controllerState={this.state.controller}
+                        updateState={this.updateController}
+                    />
+                }
                 {this.renderOverlay(overlay)}
             </Shortcuts>
         );

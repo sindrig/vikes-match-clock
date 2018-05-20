@@ -18,9 +18,12 @@ button:focus {
     position: absolute;
     height: 176px;
     width: 240px;
+    background-color: black;
 }
 
 .overlay-container * {
     margin: 0 auto;
     display: block;
+    max-height: 100%;
+    max-width: 100%;
 }
