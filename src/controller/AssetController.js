@@ -71,14 +71,19 @@ export default class AssetController extends Component {
         const {
             renderAsset, cycle, selectedAssets, imageSeconds,
         } = this.props;
-        const nextAsset = this.deleteNextAsset();
-        renderAsset(assetKeyToComponent(nextAsset));
-        this.setState({
-            playing: true,
-            playingTimeout: setTimeout(this.showNextAsset, imageSeconds * 1000),
-        });
-        if (cycle) {
-            this.updateState({ selectedAssets: [...selectedAssets, nextAsset] });
+        if (!selectedAssets.length) {
+            this.pause();
+            this.clearCurrentAsset();
+        } else {
+            const nextAsset = this.deleteNextAsset();
+            renderAsset(assetKeyToComponent(nextAsset));
+            this.setState({
+                playing: true,
+                playingTimeout: setTimeout(this.showNextAsset, imageSeconds * 1000),
+            });
+            if (cycle) {
+                this.updateState({ selectedAssets: [...selectedAssets, nextAsset] });
+            }
         }
     }
 

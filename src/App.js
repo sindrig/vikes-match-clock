@@ -81,7 +81,7 @@ class App extends Component {
         this.setState({ overlay: component });
     }
 
-    renderOverlay(component) {
+    renderOverlay() {
         // TODO move to separate container.
         // TODO fade out.
         const { overlay } = this.state;
@@ -90,7 +90,7 @@ class App extends Component {
         }
         return (
             <div className="overlay-container">
-                {component}
+                {overlay}
             </div>
         );
     }
@@ -108,7 +108,6 @@ class App extends Component {
     }
 
     render() {
-        const { overlay } = this.state;
         return (
             <Shortcuts
                 name="MAIN"
@@ -128,7 +127,7 @@ class App extends Component {
                         updateState={this.updateController}
                     />
                 }
-                {this.renderOverlay(overlay)}
+                {this.renderOverlay()}
             </Shortcuts>
         );
     }
