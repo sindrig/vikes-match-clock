@@ -15,7 +15,10 @@ update-deps:
 unpack-deps:
 	tar zxf node_modules.tar.gz
 
-all: unpack-deps build deploy
+check-master:
+	./check-master.sh
+
+all: check-master unpack-deps build deploy
 
 windows:
 	./package.sh http://vikes-match.irdn.is --platform windows

@@ -6,7 +6,7 @@ import AssetController from './AssetController';
 import './Controller.css';
 
 const Controller = ({
-    updateMatch, state, selectView, views, renderAsset
+    updateMatch, state, selectView, views, renderAsset, controllerState, updateState,
 }) => {
     const matchAction = (attr, fn) => () => updateMatch({
         ...state.match,
@@ -15,7 +15,11 @@ const Controller = ({
     return (
         <div className="controller">
             {state.view === 'MATCH' ? <MatchActions matchAction={matchAction} state={state} /> : null}
-            <AssetController renderAsset={renderAsset} />
+            <AssetController
+                renderAsset={renderAsset}
+                updateState={updateState}
+                {...controllerState.assets}
+            />
             <div className="page-actions">
                 <div className="view-selector">
                     {views.map(view => (
@@ -52,6 +56,10 @@ Controller.propTypes = {
             half: PropTypes.number,
         }).isRequired,
     }).isRequired,
+    controllerState: PropTypes.shape({
+        assets: PropTypes.any.isRequired,
+    }).isRequired,
+    updateState: PropTypes.func.isRequired,
 };
 
 export default Controller;
