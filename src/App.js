@@ -32,11 +32,12 @@ class App extends Component {
         this.state = {
             match: {},
             view: IDLE,
+            overlay: null,
         };
         this.updateMatch = this.updateMatch.bind(this);
         this.handleShortcuts = this.handleShortcuts.bind(this);
         this.selectView = this.selectView.bind(this);
-        this.onFileUpload = this.onFileUpload.bind(this);
+        this.setOverlay = this.setOverlay.bind(this);
     }
 
     getChildContext() {
@@ -47,11 +48,6 @@ class App extends Component {
         getState()
             .then(state => this.setState(state))
             .catch(err => console.log(err));
-    }
-
-    onFileUpload(event, a) {
-        console.log('event', event.target.files);
-        console.log('a', a);
     }
 
     handleShortcuts() {
@@ -67,10 +63,29 @@ class App extends Component {
     }
 
     selectView(event) {
+        event.preventDefault();
         const { target: { value } } = event;
         updateView(value)
             .then(state => this.setState(state))
             .catch(err => console.log(err));
+    }
+
+    setOverlay(component) {
+        this.setState({ overlay: component });
+    }
+
+    renderOverlay(component) {
+        // TODO move to separate container.
+        // TODO fade out.
+        const { overlay } = this.state;
+        if (!overlay) {
+            return null;
+        }
+        return (
+            <div className="overlay-container">
+                {component}
+            </div>
+        );
     }
 
     renderCurrentView() {
@@ -87,6 +102,7 @@ class App extends Component {
     }
 
     render() {
+        const { overlay } = this.state;
         return (
             <Shortcuts
                 name="MAIN"
@@ -100,8 +116,9 @@ class App extends Component {
                     updateMatch={this.updateMatch}
                     selectView={this.selectView}
                     views={[IDLE, MATCH]}
-                    onFileUpload={this.onFileUpload}
+                    renderAsset={this.setOverlay}
                 />
+                {this.renderOverlay(overlay)}
             </Shortcuts>
         );
     }

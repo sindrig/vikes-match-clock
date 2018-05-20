@@ -13,3 +13,14 @@ button {
 button:focus {
     outline:0;
 }
+
+.overlay-container {
+    position: absolute;
+    height: 176px;
+    width: 240px;
+}
+
+.overlay-container * {
+    margin: 0 auto;
+    display: block;
+}
