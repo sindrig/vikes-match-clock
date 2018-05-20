@@ -33,8 +33,12 @@ export default class Clock extends Component {
         setInterval(this.updateTime, 100);
     }
 
-    static getDerivedStateFromProps() {
-        return { done: false };
+    static getDerivedStateFromProps(nextProps) {
+        const newState = { done: false };
+        if (!nextProps.started) {
+            newState.time = null;
+        }
+        return newState;
     }
 
     componentWillUnmount() {
@@ -86,8 +90,9 @@ export default class Clock extends Component {
         const {
             started, onStart, className, half,
         } = this.props;
+        const zeroTime = half === 2 ? '45:00' : '00:00';
         if (!started) {
-            return <button onClick={onStart} className={className}>{half === 2 ? '45:00' : '00:00'}</button>;
+            return <button onClick={onStart} className={className}>{zeroTime}</button>;
         }
         const { time } = this.state;
         return (
@@ -96,7 +101,7 @@ export default class Clock extends Component {
                 onClick={this.addClick}
                 onContextMenu={this.addSuperClick}
             >
-                {time}
+                {time || zeroTime}
             </button>
         );
     }

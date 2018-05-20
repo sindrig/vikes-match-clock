@@ -11,18 +11,22 @@
 }
 
 .controller div {
-    margin: 20px;
+    margin: 5px;
     float: left;
 }
 
 .controller div > button {
-    margin: 10px;
+    margin: 2px;
     float: left;
     clear: both;
 }
 
 .controller .page-actions {
     position: absolute;
-    top: 100px;
+    top: 140px;
     left: -300px;
+}
+
+.controller .asset-controller {
+    clear: both;
 }
