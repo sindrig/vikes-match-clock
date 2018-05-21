@@ -8,9 +8,9 @@ import './Controller.css';
 const Controller = ({
     updateMatch, state, selectView, views, renderAsset, controllerState, updateState,
 }) => {
-    const matchAction = (attr, fn) => () => updateMatch({
+    const matchAction = (attr, fn) => event => updateMatch({
         ...state.match,
-        [attr]: fn(state.match[attr]),
+        [attr]: fn(state.match[attr], event),
     });
     return (
         <div className="controller">

@@ -1,6 +1,34 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 
+import clubLogos from '../images/clubLogos';
+
+const TeamSelector = ({ teamAttrName, selected, matchAction }) => (
+    <select
+        value={selected || ''}
+        onChange={matchAction(
+            teamAttrName,
+            (current, event) => event.target.value,
+        )}
+    >
+        {
+            Object.keys(clubLogos).map(key => (
+                <option value={key} key={key}>{key}</option>
+            ))
+        }
+    </select>
+);
+
+TeamSelector.propTypes = {
+    teamAttrName: PropTypes.string.isRequired,
+    selected: PropTypes.string,
+    matchAction: PropTypes.func.isRequired,
+};
+const defaultTeam = 'Víkingur R';
+TeamSelector.defaultProps = {
+    selected: defaultTeam,
+};
+
 const MatchActions = ({ state, matchAction }) => (
     <div>
         <div>
@@ -26,6 +54,10 @@ const MatchActions = ({ state, matchAction }) => (
         <div>
             <button onClick={matchAction('half', () => 1)} disabled={state.match.half === 1}>Fyrri hálfleikur</button>
             <button onClick={matchAction('half', () => 2)} disabled={state.match.half === 2}>Seinni hálfleikur</button>
+        </div>
+        <div>
+            <span>Heima: <TeamSelector matchAction={matchAction} teamAttrName="homeTeam" selected={state.match.homeTeam || defaultTeam} /></span>
+            <span>Úti: <TeamSelector matchAction={matchAction} teamAttrName="awayTeam" selected={state.match.awayTeam || defaultTeam} /></span>
         </div>
     </div>
 );

@@ -1,0 +1,30 @@
+.removable-asset {
+    position: relative;
+    background-color: #000000;
+}
+
+.removable-asset button.removeButton {
+    background-color: transparent;
+    border: none;
+    position: absolute;
+    top: 0px;
+    display: block;
+    padding: 0;
+    right: 0;
+    margin: 0;
+}
+
+.removable-asset span {
+    display: block;
+    font-size: 10px;
+    max-width: 100px;
+    color: #FFFFFF;
+}
+
+.removable-asset img {
+    max-width: 50px;
+    max-height: 100px;
+    margin: 0 auto;
+    display: block;
+}
+

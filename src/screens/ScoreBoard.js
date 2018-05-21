@@ -5,20 +5,20 @@ import Team from '../match/Team';
 import Clock from '../match/Clock';
 import AdImage from '../utils/AdImage';
 
-import vikesImage from '../images/vikes.png';
-import grindavikImage from '../images/grindavik.png';
+import clubLogos from '../images/clubLogos';
 
 import './ScoreBoard.css';
 
-const home = {
-    image: vikesImage,
-    name: 'Víkingur',
-    id: 'home',
-};
-const away = {
-    image: grindavikImage,
-    name: 'Grindavík',
-    id: 'away',
+const getTeam = (id, match) => {
+    let name = match[`${id}Team`];
+    if (!name) {
+        name = 'Víkingur R';
+    }
+    return {
+        image: clubLogos[name],
+        name,
+        id,
+    };
 };
 
 export default class ScoreBoard extends Component {
@@ -35,18 +35,7 @@ export default class ScoreBoard extends Component {
     constructor(props) {
         super(props);
         this.start = this.start.bind(this);
-        this.updateScore = this.updateScore.bind(this);
         this.resetClock = this.resetClock.bind(this);
-    }
-
-    updateScore(id, newScore) {
-        const { update } = this.props;
-        const { match } = this.state;
-        const payload = {
-            ...match,
-            [`${id}Score`]: newScore,
-        };
-        update({ match: payload });
     }
 
     resetClock() {
@@ -63,8 +52,8 @@ export default class ScoreBoard extends Component {
         return (
             <div>
                 <AdImage />
-                <Team className="home" team={home} score={this.props.match.homeScore} updateScore={this.updateScore} />
-                <Team className="away" team={away} score={this.props.match.awayScore} updateScore={this.updateScore} />
+                <Team className="home" team={getTeam('home', this.props.match)} score={this.props.match.homeScore} />
+                <Team className="away" team={getTeam('away', this.props.match)} score={this.props.match.awayScore} />
                 <Clock onStart={this.start} started={this.props.match.started} className="clock" reset={this.resetClock} half={this.props.match.half} />
             </div>
         );

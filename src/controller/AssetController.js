@@ -1,6 +1,7 @@
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 
+import RemovableAsset from './RemovableAsset';
 import * as assets from '../assets';
 import './AssetController.css';
 
@@ -14,6 +15,7 @@ export default class AssetController extends Component {
         updateState: PropTypes.func.isRequired,
         selectedAssets: PropTypes.arrayOf(PropTypes.string).isRequired,
         cycle: PropTypes.bool.isRequired,
+        autoPlay: PropTypes.bool.isRequired,
         imageSeconds: PropTypes.number.isRequired,
     };
 
@@ -28,6 +30,7 @@ export default class AssetController extends Component {
         this.showNextAsset = this.showNextAsset.bind(this);
         this.clearCurrentAsset = this.clearCurrentAsset.bind(this);
         this.onCycleChange = this.onCycleChange.bind(this);
+        this.onAutoPlayChange = this.onAutoPlayChange.bind(this);
         this.onImageSecondsChange = this.onImageSecondsChange.bind(this);
         this.pause = this.pause.bind(this);
     }
@@ -44,19 +47,27 @@ export default class AssetController extends Component {
         this.updateState({ cycle: !cycle });
     }
 
+    onAutoPlayChange() {
+        const { autoPlay } = this.props;
+        this.updateState({ autoPlay: !autoPlay });
+        if (!autoPlay) {
+            this.pause();
+        }
+    }
+
     onImageSecondsChange(event) {
         event.preventDefault();
         const { target: { value } } = event;
-        this.updateState({ imageSeconds: value });
+        this.updateState({ imageSeconds: Math.max(parseInt(value, 10), 1) });
     }
 
     updateState(newState) {
         const {
-            updateState, selectedAssets, cycle, imageSeconds,
+            updateState, selectedAssets, cycle, imageSeconds, autoPlay,
         } = this.props;
         updateState({
             assets: {
-                selectedAssets, cycle, imageSeconds, ...newState,
+                selectedAssets, cycle, imageSeconds, autoPlay, ...newState,
             },
         });
     }
@@ -69,7 +80,7 @@ export default class AssetController extends Component {
 
     showNextAsset() {
         const {
-            renderAsset, cycle, selectedAssets, imageSeconds,
+            renderAsset, cycle, selectedAssets, imageSeconds, autoPlay,
         } = this.props;
         if (!selectedAssets.length) {
             this.pause();
@@ -77,10 +88,12 @@ export default class AssetController extends Component {
         } else {
             const nextAsset = this.deleteNextAsset();
             renderAsset(assetKeyToComponent(nextAsset));
-            this.setState({
-                playing: true,
-                playingTimeout: setTimeout(this.showNextAsset, imageSeconds * 1000),
-            });
+            if (autoPlay) {
+                this.setState({
+                    playing: true,
+                    playingTimeout: setTimeout(this.showNextAsset, imageSeconds * 1000),
+                });
+            }
             if (cycle) {
                 this.updateState({ selectedAssets: [...selectedAssets, nextAsset] });
             }
@@ -94,6 +107,18 @@ export default class AssetController extends Component {
         return asset;
     }
 
+    removeAsset(key) {
+        return () => {
+            const { selectedAssets } = this.props;
+            const idx = selectedAssets.indexOf(key);
+            if (idx > -1) {
+                const newAssets = [...selectedAssets];
+                newAssets.splice(idx, 1);
+                this.updateState({ selectedAssets: newAssets });
+            }
+        };
+    }
+
     clearCurrentAsset() {
         const { renderAsset } = this.props;
         renderAsset(null);
@@ -103,45 +128,67 @@ export default class AssetController extends Component {
         const { selectedAssets } = this.props;
         return (
             <div>
-                {selectedAssets.slice(0, 3).map(assetKeyToComponent)}
+                {selectedAssets.map(key => (
+                    <RemovableAsset remove={this.removeAsset(key)} key={key}>
+                        {assetKeyToComponent(key)}
+                        <span>{key}</span>
+                    </RemovableAsset>
+                ))}
             </div>
         );
     }
 
     render() {
-        const { selectedAssets, cycle, imageSeconds } = this.props;
+        const {
+            selectedAssets, cycle, imageSeconds, autoPlay,
+        } = this.props;
         const { playing } = this.state;
         return (
             <div className="asset-controller">
-                <div>
+                <div className="controls">
                     <select onChange={this.onAddAsset} value="null">
-                        <option value="null">Bæta við asset</option>
+                        <option value="null">Bæta í röð</option>
                         {Object
                             .keys(assets)
                             .filter(key => selectedAssets.indexOf(key) === -1)
                             .map(key => <option value={key} key={key}>{key}</option>)
                         }
                     </select>
-                    <button onClick={this.clearCurrentAsset}>Hreinsa</button>
-                </div>
-                <div className="upcoming-assets">
+                    <button onClick={this.clearCurrentAsset}>Hreinsa núverandi mynd</button>
                     <span>{selectedAssets.length} í biðröð</span>
                     {playing ?
                         <button onClick={this.pause}>Pause</button> :
                         <button onClick={this.showNextAsset}>Birta</button>
                     }
                     <button onClick={this.deleteNextAsset}>Hætta við</button>
-                    <input
-                        type="checkbox"
-                        onChange={this.onCycleChange}
-                        checked={cycle}
-                    />Loop
-                    <input
-                        type="number"
-                        onChange={this.onImageSecondsChange}
-                        value={imageSeconds}
-                        style={{ width: '33px' }}
-                    />sek
+                    <div>
+                        <input
+                            type="checkbox"
+                            onChange={this.onAutoPlayChange}
+                            checked={autoPlay}
+                        />Autoplay
+                    </div>
+                    {autoPlay &&
+                        <div>
+                            <input
+                                type="checkbox"
+                                onChange={this.onCycleChange}
+                                checked={cycle}
+                            />Loop
+                        </div>
+                    }
+                    {autoPlay &&
+                        <div>
+                            <input
+                                type="number"
+                                onChange={this.onImageSecondsChange}
+                                value={imageSeconds}
+                                style={{ width: '33px' }}
+                            />sek
+                        </div>
+                    }
+                </div>
+                <div className="upcoming-assets">
                     {this.renderNextAsset()}
                 </div>
             </div>
