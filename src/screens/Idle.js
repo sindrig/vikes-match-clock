@@ -28,6 +28,9 @@ export default class Idle extends Component {
     }
 
     updateTemp() {
+        if (!useRealTemperature) {
+            return;
+        }
         const options = {
             params: {
                 stations: '1',
