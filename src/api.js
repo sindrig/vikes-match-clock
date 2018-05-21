@@ -6,17 +6,40 @@ const defaultState = {
         awayScore: 0,
         started: null,
         half: 1,
+        homeTeam: null,
+        awayTeam: null,
     },
     controller: {
         assets: {
             selectedAssets: [],
             cycle: false,
             imageSeconds: 3,
+            autoPlay: false,
+            test: 'asdf',
         },
     },
+    view: 'IDLE',
+};
+
+const checkObjectKeys = (newState, against = defaultState) => {
+    const newStateKeys = Object.keys(newState);
+    const againstKeys = Object.keys(against);
+    if (newStateKeys.length === againstKeys.length) {
+        againstKeys.forEach((key) => {
+            if (newState[key] === undefined) {
+                console.error(`Missing ${key} in newState`);
+            }
+            if (against[key] && typeof against[key] === 'object') {
+                checkObjectKeys(newState[key], against[key]);
+            }
+        });
+    } else {
+        console.error('Key count differs', newState, against);
+    }
 };
 
 const saveState = (newState) => {
+    checkObjectKeys(newState);
     store.setItem('state', JSON.stringify(newState));
     return newState;
 };
@@ -34,7 +57,7 @@ export const getState = () => new Promise((resolve) => {
         }
         return resolve(result);
     } catch (e) {
-        console.log('e', e);
+        console.error('e', e);
         store.removeItem('state');
         return getState();
     }
@@ -52,16 +75,19 @@ const notBeforeNow = timestamp => (
 );
 
 export const updateMatch = ({
-    homeScore, awayScore, started, half,
+    homeScore, awayScore, started, half, homeTeam, awayTeam,
 }) => getState().then((state) => {
     const match = {
         homeScore: positiveNumber(homeScore),
         awayScore: positiveNumber(awayScore),
         started: notBeforeNow(started),
         half,
+        homeTeam,
+        awayTeam,
     };
     return saveState({ ...state, match });
 });
 
 export const updateView = view => getState().then(state => saveState({ ...state, view }));
-export const updateController = controller => getState().then(state => saveState({ ...state, controller }));
+export const updateController = controller => getState()
+    .then(state => saveState({ ...state, controller }));

@@ -1,4 +1,22 @@
-.upcoming-assets img {
-    max-width: 100px;
-    max-height: 50px;
+.asset-controller .controls div {
+    float: none;
+    clear: both;
+}
+
+.asset-controller > div {
+    display: inline-block;
+}
+
+.asset-controller {
+    height: 300px;
+    overflow: scroll;
+}
+
+.asset-controller .controls {
+    width: 130px;
+}
+
+.asset-controller .upcoming-assets {
+    overflow: hidden;
+    width: 500px;
 }

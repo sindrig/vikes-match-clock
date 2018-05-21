@@ -3,7 +3,7 @@
 }
 
 .team.away span {
-    left: 170px;
+    right: 10px;
 }
 
 .team span {
@@ -23,7 +23,8 @@
 .team img {
     position:absolute;
     top: 20px;
-    height: 70px;
+    max-height: 75px;
+    max-width: 62px;
 }
 
 .team.home img {
@@ -31,7 +32,7 @@
 }
 
 .team.away img {
-    left: 174px;
+    right: 10px;
 }
 
 .clock {
