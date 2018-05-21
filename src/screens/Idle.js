@@ -1,14 +1,21 @@
 import React from 'react';
 import Clock from 'react-live-clock';
-import vikesImage from '../images/vikes.png';
+import clubLogos from '../images/clubLogos';
 import AdImage from '../utils/AdImage';
 
 import './Idle.css';
 
 export default () => (
     <div className="idle">
-        <img src={vikesImage} alt="Vikes" className="idle-vikes" />
-        <Clock format="HH:mm" className="idle-clock" ticking />
+        <img src={clubLogos['Víkingur R']} alt="Vikes" className="idle-vikes" />
+        <div className="idle-text-container">
+            <div className="idle-text-box idle-clock">
+                <Clock format="HH:mm" className="idle-clock" ticking />
+            </div>
+            <div className="idle-text-box idle-temp">
+                <span className="idle-temperature">17°</span>
+            </div>
+        </div>
         <AdImage />
     </div>
 );

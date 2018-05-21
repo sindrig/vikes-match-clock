@@ -1,22 +1,37 @@
 img.ad {
     width: 80px;
     left: 80px;
-    top: 150px;
+    top: 140px;
     position: absolute;
 }
 
 
 .idle .idle-clock {
+    text-align: right;
+}
+
+
+.idle .idle-temperature {
+    text-align: left;
+}
+
+.idle .idle-text-container {
     position: absolute;
-    left: 81px;
-    top: 115px;
-    color: white;
-    font-size: 30px;
+    top: 110px;
+}
+
+.idle .idle-text-box {
+    float: left;
+    width: 80px;
+    font-size: 20px;
     font-weight: bold;
+    color: #FFFFFF;
+    padding: 0 20px 0 20px;
 }
 
 .idle .idle-vikes {
     position: absolute;
-    left: 80px;
+    left: 85px;
     top: 20px;
+    width: 70px;
 }
