@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 
 import RemovableAsset from './RemovableAsset';
 import Asset, { checkKey } from './Asset';
+import { fillStarting } from '../api';
 import * as assets from '../assets';
 import './AssetController.css';
 
@@ -16,6 +17,7 @@ export default class AssetController extends Component {
         autoPlay: PropTypes.bool.isRequired,
         imageSeconds: PropTypes.number.isRequired,
         freeTextAsset: PropTypes.string.isRequired,
+        currentView: PropTypes.oneOf(['MATCH', 'IDLE']).isRequired,
     };
 
     constructor(props) {
@@ -27,7 +29,6 @@ export default class AssetController extends Component {
         this.onAddAsset = this.onAddAsset.bind(this);
         this.deleteNextAsset = this.deleteNextAsset.bind(this);
         this.showNextAsset = this.showNextAsset.bind(this);
-        this.clearCurrentAsset = this.clearCurrentAsset.bind(this);
         this.onCycleChange = this.onCycleChange.bind(this);
         this.onAutoPlayChange = this.onAutoPlayChange.bind(this);
         this.onImageSecondsChange = this.onImageSecondsChange.bind(this);
@@ -108,7 +109,7 @@ export default class AssetController extends Component {
         } = this.props;
         if (!selectedAssets.length) {
             this.pause();
-            this.clearCurrentAsset();
+            renderAsset(null);
         } else {
             const nextAsset = this.deleteNextAsset();
             renderAsset(<Asset
@@ -144,11 +145,6 @@ export default class AssetController extends Component {
         };
     }
 
-    clearCurrentAsset() {
-        const { renderAsset } = this.props;
-        renderAsset(null);
-    }
-
     renderNextAsset() {
         const { selectedAssets } = this.props;
         return (
@@ -174,6 +170,7 @@ export default class AssetController extends Component {
     render() {
         const {
             selectedAssets, cycle, imageSeconds, autoPlay, freeTextAsset,
+            currentView,
         } = this.props;
         const { playing } = this.state;
         return (
@@ -187,14 +184,16 @@ export default class AssetController extends Component {
                             .map(key => <option value={key} key={key}>{key}</option>)
                         }
                     </select>
-                    <button onClick={this.clearCurrentAsset}>Hreinsa núverandi mynd</button>
                     <span>{selectedAssets.length} í biðröð</span>
                     {playing ? <button onClick={this.pause}>Pause</button> : null}
                     {!playing && selectedAssets.length ?
                         <button onClick={this.showNextAsset}>Birta</button> :
                         null
                     }
-                    <button onClick={this.deleteNextAsset}>Hætta við</button>
+                    {currentView === 'MATCH' ?
+                        <button onClick={fillStarting}>Sækja byrjunarlið</button> :
+                        null
+                    }
                     <div>
                         <input
                             type="checkbox"
