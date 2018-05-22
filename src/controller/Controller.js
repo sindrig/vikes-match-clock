@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 
 import MatchActions from './MatchActions';
 import AssetController from './AssetController';
+import { clearState } from '../api';
 import './Controller.css';
 
 const Controller = ({
@@ -37,7 +38,7 @@ const Controller = ({
                         </label>
                     ))}
                 </div>
-                <button onClick={() => window.location.reload()}>Refresh!</button>
+                <button onClick={() => clearState().then(() => window.location.reload())}>Hard refresh</button>
             </div>
         </div>
     );
