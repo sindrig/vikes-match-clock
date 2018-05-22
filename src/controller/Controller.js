@@ -19,6 +19,7 @@ const Controller = ({
             <AssetController
                 renderAsset={renderAsset}
                 updateState={updateState}
+                currentView={state.view}
                 {...controllerState.assets}
             />
             <div className="page-actions">
@@ -38,7 +39,10 @@ const Controller = ({
                         </label>
                     ))}
                 </div>
-                <button onClick={() => clearState().then(() => window.location.reload())}>Hard refresh</button>
+                <button onClick={() => clearState().then(() => window.location.reload())}>
+                    Hard refresh
+                </button>
+                <button onClick={() => renderAsset(null)}>Hreinsa núverandi mynd</button>
             </div>
         </div>
     );

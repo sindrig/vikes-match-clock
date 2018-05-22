@@ -1,3 +1,8 @@
+body {
+    /* prevent scrolling */
+    overflow: hidden;
+}
+
 .App {
   position: absolute;
   height: 176px;
