@@ -15,7 +15,7 @@ const defaultState = {
             cycle: false,
             imageSeconds: 3,
             autoPlay: false,
-            test: 'asdf',
+            freeTextAsset: '',
         },
     },
     view: 'IDLE',
@@ -29,7 +29,7 @@ const checkObjectKeys = (newState, against = defaultState) => {
             if (newState[key] === undefined) {
                 console.error(`Missing ${key} in newState`);
             }
-            if (against[key] && typeof against[key] === 'object') {
+            if (against[key] && Object.prototype.toString.call(against[key]) === '[object Object]') {
                 checkObjectKeys(newState[key], against[key]);
             }
         });
@@ -43,6 +43,8 @@ const saveState = (newState) => {
     store.setItem('state', JSON.stringify(newState));
     return newState;
 };
+
+export const clearState = () => new Promise(resolve => resolve(saveState(defaultState)));
 
 export const getState = () => new Promise((resolve) => {
     const stateText = store.getItem('state');

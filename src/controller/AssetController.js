@@ -2,11 +2,9 @@ import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 
 import RemovableAsset from './RemovableAsset';
+import Asset, { checkKey } from './Asset';
 import * as assets from '../assets';
 import './AssetController.css';
-
-// TODO more types?
-const assetKeyToComponent = key => <img src={assets[key]} alt={key} key={key} />;
 
 export default class AssetController extends Component {
     // TODO save state in localstorage
@@ -17,13 +15,14 @@ export default class AssetController extends Component {
         cycle: PropTypes.bool.isRequired,
         autoPlay: PropTypes.bool.isRequired,
         imageSeconds: PropTypes.number.isRequired,
+        freeTextAsset: PropTypes.string.isRequired,
     };
 
     constructor(props) {
         super(props);
         this.state = {
             playing: false,
-            playingTimeout: null,
+            error: '',
         };
         this.onAddAsset = this.onAddAsset.bind(this);
         this.deleteNextAsset = this.deleteNextAsset.bind(this);
@@ -33,13 +32,8 @@ export default class AssetController extends Component {
         this.onAutoPlayChange = this.onAutoPlayChange.bind(this);
         this.onImageSecondsChange = this.onImageSecondsChange.bind(this);
         this.pause = this.pause.bind(this);
-    }
-
-    onAddAsset(event) {
-        event.preventDefault();
-        const { target: { value } } = event;
-        const { selectedAssets } = this.props;
-        this.updateState({ selectedAssets: [...selectedAssets, value] });
+        this.onTextChange = this.onTextChange.bind(this);
+        this.addUrlAsset = this.addUrlAsset.bind(this);
     }
 
     onCycleChange() {
@@ -61,21 +55,51 @@ export default class AssetController extends Component {
         this.updateState({ imageSeconds: Math.max(parseInt(value, 10), 1) });
     }
 
+    onTextChange(event) {
+        event.preventDefault();
+        const { target: { value } } = event;
+        this.updateState({ freeTextAsset: value });
+    }
+
+
+    onAddAsset(event) {
+        event.preventDefault();
+        const { target: { value } } = event;
+        return this.addAssetKey(value);
+    }
+
+    addUrlAsset() {
+        const { freeTextAsset } = this.props;
+        return this.addAssetKey(freeTextAsset, { freeTextAsset: '' });
+    }
+
+    addAssetKey(key, extra = {}) {
+        if (checkKey(key)) {
+            const { selectedAssets } = this.props;
+            if (selectedAssets.indexOf(key) === -1) {
+                this.setState({ error: '' });
+                this.updateState({ selectedAssets: [...selectedAssets, key], ...extra });
+            } else {
+                this.setState({ error: `Key ${key} already in asset list.` });
+            }
+        } else {
+            this.setState({ error: `Unknown key ${key}` });
+        }
+    }
+
     updateState(newState) {
         const {
-            updateState, selectedAssets, cycle, imageSeconds, autoPlay,
+            updateState, selectedAssets, cycle, imageSeconds, autoPlay, freeTextAsset,
         } = this.props;
         updateState({
             assets: {
-                selectedAssets, cycle, imageSeconds, autoPlay, ...newState,
+                selectedAssets, cycle, imageSeconds, autoPlay, freeTextAsset, ...newState,
             },
         });
     }
 
     pause() {
-        const { playingTimeout } = this.state;
-        clearTimeout(playingTimeout);
-        this.setState({ playing: false, playingTimeout: null });
+        this.setState({ playing: false });
     }
 
     showNextAsset() {
@@ -87,12 +111,13 @@ export default class AssetController extends Component {
             this.clearCurrentAsset();
         } else {
             const nextAsset = this.deleteNextAsset();
-            renderAsset(assetKeyToComponent(nextAsset));
+            renderAsset(<Asset
+                assetKey={nextAsset}
+                remove={this.showNextAsset}
+                time={autoPlay ? imageSeconds : null}
+            />);
             if (autoPlay) {
-                this.setState({
-                    playing: true,
-                    playingTimeout: setTimeout(this.showNextAsset, imageSeconds * 1000),
-                });
+                this.setState({ playing: true });
             }
             if (cycle) {
                 this.updateState({ selectedAssets: [...selectedAssets, nextAsset] });
@@ -130,7 +155,7 @@ export default class AssetController extends Component {
             <div>
                 {selectedAssets.map(key => (
                     <RemovableAsset remove={this.removeAsset(key)} key={key}>
-                        {assetKeyToComponent(key)}
+                        <Asset assetKey={key} thumbnail />
                         <span>{key}</span>
                     </RemovableAsset>
                 ))}
@@ -138,9 +163,17 @@ export default class AssetController extends Component {
         );
     }
 
+    renderError() {
+        const { error } = this.state;
+        if (error) {
+            return error;
+        }
+        return null;
+    }
+
     render() {
         const {
-            selectedAssets, cycle, imageSeconds, autoPlay,
+            selectedAssets, cycle, imageSeconds, autoPlay, freeTextAsset,
         } = this.props;
         const { playing } = this.state;
         return (
@@ -156,9 +189,10 @@ export default class AssetController extends Component {
                     </select>
                     <button onClick={this.clearCurrentAsset}>Hreinsa núverandi mynd</button>
                     <span>{selectedAssets.length} í biðröð</span>
-                    {playing ?
-                        <button onClick={this.pause}>Pause</button> :
-                        <button onClick={this.showNextAsset}>Birta</button>
+                    {playing ? <button onClick={this.pause}>Pause</button> : null}
+                    {!playing && selectedAssets.length ?
+                        <button onClick={this.showNextAsset}>Birta</button> :
+                        null
                     }
                     <button onClick={this.deleteNextAsset}>Hætta við</button>
                     <div>
@@ -187,6 +221,14 @@ export default class AssetController extends Component {
                             />sek
                         </div>
                     }
+                    Url: <input
+                        type="text"
+                        onChange={this.onTextChange}
+                        value={freeTextAsset}
+                        style={{ width: '95px' }}
+                    />
+                    <button onClick={this.addUrlAsset}>Bæta við</button>
+                    {this.renderError()}
                 </div>
                 <div className="upcoming-assets">
                     {this.renderNextAsset()}
