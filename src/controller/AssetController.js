@@ -184,11 +184,12 @@ export default class AssetController extends Component {
             <div className="asset-controller">
                 <div className="controls">
                     <select onChange={this.onAddAsset} value="null">
-                        <option value="null">Bæta í röð</option>
+                        <option value="null">Myndir</option>
                         {Object
                             .keys(assets)
                             .filter(key => selectedAssets.indexOf(key) === -1)
-                            .map(key => <option value={key} key={key}>{key}</option>)
+                            .map(key => ({ key, name: key.split('/')[key.split('/').length - 1] }))
+                            .map(({ key, name }) => <option value={key} key={key}>{name}</option>)
                         }
                     </select>
                     <span>{selectedAssets.length} í biðröð</span>
