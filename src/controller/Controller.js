@@ -19,7 +19,6 @@ const Controller = ({
             <AssetController
                 renderAsset={renderAsset}
                 updateState={updateState}
-                currentView={state.view}
                 match={state.match}
                 {...controllerState.assets}
             />

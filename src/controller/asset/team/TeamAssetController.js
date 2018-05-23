@@ -2,12 +2,12 @@ import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 import AWS from 'aws-sdk';
 import { RingLoader } from 'react-spinners';
-import { matchPropType } from '../../propTypes';
-import clubIds from '../../club-ids';
+import { matchPropType } from '../../../propTypes';
+import clubIds from '../../../club-ids';
 
 
-import lambda from '../../lambda';
-import * as assets from '../../assets';
+import lambda from '../../../lambda';
+import Team, { Player } from './Team';
 
 const awsConf = {
     region: lambda.region,
@@ -33,11 +33,8 @@ const ensureCredentials = () => new Promise((resolve, reject) => {
     }
 });
 
-const comparableName = name => name.replace('.').toLowerCase();
-const nameComp = (n1, n2) => comparableName(n1) === comparableName(n2);
 
-
-export default class AutoFiller extends Component {
+export default class TeamAssetController extends Component {
     // TODO save state in localstorage
     static propTypes = {
         addAsset: PropTypes.func.isRequired,
@@ -49,17 +46,22 @@ export default class AutoFiller extends Component {
         this.state = {
             loading: false,
             error: '',
+            homeTeam: [new Player({ name: '', number: 1, role: '' })],
+            awayTeam: [new Player({ name: '', number: 1, role: '' })],
         };
         this.autoFill = this.autoFill.bind(this);
     }
 
     handleTeams(data) {
-        const { match, addAsset } = this.props;
-        console.log('data', data);
+        const { match: { homeTeam, awayTeam } } = this.props;
+        this.setState({
+            homeTeam: data[clubIds[homeTeam]].map(p => new Player(p)),
+            awayTeam: data[clubIds[awayTeam]].map(p => new Player(p)),
+        });
     }
 
     autoFill() {
-        const { match: { homeTeam, awayTeam }} = this.props;
+        const { match: { homeTeam, awayTeam } } = this.props;
         this.setState({ loading: true });
         ensureCredentials().then(() => {
             const fn = new AWS.Lambda({
@@ -79,7 +81,11 @@ export default class AutoFiller extends Component {
                     this.setState({ error });
                 } else {
                     const json = JSON.parse(data.Payload);
-                    this.handleTeams(json);
+                    if (json.error) {
+                        this.setState({ error: json.error });
+                    } else {
+                        this.handleTeams(json);
+                    }
                 }
                 this.setState({ loading: false });
             });
@@ -87,12 +93,20 @@ export default class AutoFiller extends Component {
     }
 
     render() {
-        const { loading, error } = this.state;
+        const {
+            loading, error, homeTeam, awayTeam,
+        } = this.state;
         return (
-            <div className="auto-filler">
+            <div className="team-asset-controller">
                 <RingLoader loading={loading} />
                 {!loading ? <button onClick={this.autoFill}>Sækja lið</button> : null}
                 <span className="error">{error}</span>
+                <div className="team-asset-controller-home-team">
+                    <Team team={homeTeam} />
+                </div>
+                <div className="team-asset-controller-away-team">
+                    <Team team={awayTeam} />
+                </div>
             </div>
         );
     }
