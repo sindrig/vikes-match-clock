@@ -150,9 +150,8 @@ export default class AssetController extends Component {
         return (
             <div>
                 {selectedAssets.map(key => (
-                    <RemovableAsset remove={this.removeAsset(key)} key={key}>
+                    <RemovableAsset remove={this.removeAsset(key)} key={key} assetKey={key}>
                         <Asset assetKey={key} thumbnail />
-                        <span>{key}</span>
                     </RemovableAsset>
                 ))}
             </div>
@@ -201,15 +200,13 @@ export default class AssetController extends Component {
                             checked={autoPlay}
                         />Autoplay
                     </div>
-                    {autoPlay &&
-                        <div>
-                            <input
-                                type="checkbox"
-                                onChange={this.onCycleChange}
-                                checked={cycle}
-                            />Loop
-                        </div>
-                    }
+                    <div>
+                        <input
+                            type="checkbox"
+                            onChange={this.onCycleChange}
+                            checked={cycle}
+                        />Loop
+                    </div>
                     {autoPlay &&
                         <div>
                             <input

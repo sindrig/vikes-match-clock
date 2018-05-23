@@ -2,11 +2,16 @@ import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 import YouTube from 'react-youtube';
 
+import PlayerAsset from './PlayerAsset';
+
 import * as assets from '../assets';
 
+import './Asset.css';
+
 const assetKeyTests = {
-    IMAGE: key => /\.jpg$/.test(key),
+    IMAGE: key => /\.((jpg)|(png))$/.test(key) && key.startsWith('assets/'),
     YOUTUBE: key => /^http/.test(key) && key.indexOf('youtube') > 0,
+    PLAYER: key => /\.((jpg)|(png))$/.test(key) && key.startsWith('players/'),
 };
 
 export const checkKey = key => Object.values(assetKeyTests).some(keyTest => keyTest(key));
@@ -37,12 +42,12 @@ export default class Asset extends Component {
         this.setTimeoutIfNecessary();
     }
 
-    componentDidUpdate(prevProps) {
-        const { assetKey } = this.props;
-        const prevAssetKey = prevProps.assetKey;
-        if (prevAssetKey !== assetKey) {
-            this.setTimeoutIfNecessary();
-        }
+    componentDidUpdate() { // prevProps) {
+        // const { assetKey } = this.props;
+        // const prevAssetKey = prevProps.assetKey;
+        // if (prevAssetKey !== assetKey) {
+        this.setTimeoutIfNecessary();
+        // }
     }
 
     componentWillUnmount() {
@@ -55,7 +60,7 @@ export default class Asset extends Component {
         } = this.props;
         clearTimeout(this.timeout);
         const type = getType(assetKey);
-        const typeNeedsManualRemove = type === 'IMAGE';
+        const typeNeedsManualRemove = type === 'IMAGE' || type === 'PLAYER';
         if (time && !thumbnail && remove && typeNeedsManualRemove) {
             this.timeout = setTimeout(remove, time * 1000);
         }
@@ -97,6 +102,8 @@ export default class Asset extends Component {
                     />
                 );
             }
+        } else if (type === 'PLAYER') {
+            return <PlayerAsset assetKey={assetKey} thumbnail={thumbnail} asset={assets[assetKey]} />;
         }
         console.error('No type for key ', assetKey);
         return null;
