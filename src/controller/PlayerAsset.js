@@ -45,7 +45,7 @@ export default class PlayerAsset extends Component {
     static getDerivedStateFromProps(nextProps) {
         const { assetKey } = nextProps;
         const key = assetKey.replace('players/', '').split('.')[0];
-        const parts = key.split(/_(.+)/);
+        const parts = key.split(/[ _](.+)/);
         let playerNumber = parseInt(parts[0], 10);
         if (Number.isNaN(playerNumber)) {
             [playerNumber] = parts;
