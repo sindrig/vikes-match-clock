@@ -5,8 +5,13 @@ import { matchPropType } from '../../propTypes';
 import RemovableAsset from './RemovableAsset';
 import Asset, { checkKey } from './Asset';
 import * as assets from '../../assets';
-import TeamAssetController from './TeamAssetController';
+import TeamAssetController from './team/TeamAssetController';
 import './AssetController.css';
+
+const ASSET_VIEWS = {
+    assets: 'assets',
+    team: 'team',
+};
 
 export default class AssetController extends Component {
     // TODO save state in localstorage
@@ -19,7 +24,6 @@ export default class AssetController extends Component {
         imageSeconds: PropTypes.number.isRequired,
         freeTextAsset: PropTypes.string.isRequired,
         match: matchPropType.isRequired,
-        currentView: PropTypes.oneOf(['MATCH', 'IDLE']).isRequired,
     };
 
     constructor(props) {
@@ -27,6 +31,7 @@ export default class AssetController extends Component {
         this.state = {
             playing: false,
             error: '',
+            assetView: ASSET_VIEWS.assets,
         };
         this.onAddAsset = this.onAddAsset.bind(this);
         this.deleteNextAsset = this.deleteNextAsset.bind(this);
@@ -176,14 +181,13 @@ export default class AssetController extends Component {
         return null;
     }
 
-    render() {
+    renderAssetController() {
         const {
             selectedAssets, cycle, imageSeconds, autoPlay, freeTextAsset,
-            currentView, match,
         } = this.props;
         const { playing } = this.state;
         return (
-            <div className="asset-controller">
+            <div>
                 <div className="controls">
                     <select onChange={this.onAddAsset} value="null">
                         <option value="null">Myndir</option>
@@ -232,11 +236,31 @@ export default class AssetController extends Component {
                     />
                     <button onClick={this.addUrlAsset}>Bæta við</button>
                     {this.renderError()}
-                    {currentView === 'MATCH' ? <TeamAssetController addAsset={this.addAssetKey} match={match} /> : null}
                 </div>
                 <div className="upcoming-assets">
                     {this.renderNextAsset()}
                 </div>
+            </div>
+        );
+    }
+
+    render() {
+        const { match } = this.props;
+        const { assetView } = this.state;
+        return (
+            <div className="asset-controller">
+                <div className="view-selector">
+                    <button onClick={() => this.setState({ assetView: ASSET_VIEWS.assets })}>
+                        Biðröð
+                    </button>
+                    <button onClick={() => this.setState({ assetView: ASSET_VIEWS.teams })}>
+                        Lið
+                    </button>
+                </div>
+                {assetView === ASSET_VIEWS.assets && this.renderAssetController()}
+                {assetView === ASSET_VIEWS.teams && (
+                    <TeamAssetController addAsset={this.addAssetKey} match={match} />
+                )}
             </div>
         );
     }
