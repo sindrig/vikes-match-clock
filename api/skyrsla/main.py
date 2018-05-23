@@ -12,7 +12,7 @@ client = Client(WSDL_URL)
 
 def get_player(player):
     return {
-        'number': player.TreyjuNumer,
+        'number': player.TreyjuNumer and int(player.TreyjuNumer),
         'name': player.LeikmadurNafn.strip(),
         'role': player.StadaNafn,
     }
@@ -63,8 +63,20 @@ def handler(json_input, context, date=None):
         return match_id
     game = client.service.LeikurLeikmenn(LeikurNumer=match_id)
     result = defaultdict(list)
+    captains = {}
     for player in game.ArrayLeikurLeikmenn.LeikurLeikmenn:
-        result[player.FelagNafn].append(get_player(player))
+        club_id = str(player.FelagNumer)
+        player_dict = get_player(player)
+        if (
+            club_id in captains and
+            captains[club_id]['number'] < player_dict['number']
+        ):
+            result[club_id].append(captains[club_id])
+            del captains[club_id]
+        if player_dict['role'] == 'Fyrirliði':
+            captains[club_id] = player_dict
+        else:
+            result[club_id].append(player_dict)
     return dict(result)
 
 
