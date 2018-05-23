@@ -1,3 +1,4 @@
+
 const store = window.localStorage;
 
 const defaultState = {
@@ -6,7 +7,7 @@ const defaultState = {
         awayScore: 0,
         started: null,
         half: 1,
-        homeTeam: null,
+        homeTeam: 'Víkingur R',
         awayTeam: null,
     },
     controller: {
@@ -93,5 +94,3 @@ export const updateMatch = ({
 export const updateView = view => getState().then(state => saveState({ ...state, view }));
 export const updateController = controller => getState()
     .then(state => saveState({ ...state, controller }));
-
-export const fillStarting = () => {};

@@ -8,16 +8,40 @@
             "Default": "vikes-match.irdn.is"
         }
     },
-    "Mappings" : {
-        "RegionMap" : {
-            "us-east-1" : { "S3hostedzoneID" : "Z3AQBSTGFYJSTF", "websiteendpoint" : "s3-website-us-east-1.amazonaws.com" },
-            "us-west-1" : { "S3hostedzoneID" : "Z2F56UZL2M1ACD", "websiteendpoint" : "s3-website-us-west-1.amazonaws.com" },
-            "us-west-2" : { "S3hostedzoneID" : "Z3BJ6K6RIION7M", "websiteendpoint" : "s3-website-us-west-2.amazonaws.com" },            
-            "eu-west-1" : { "S3hostedzoneID" : "Z1BKCTXD74EZPE", "websiteendpoint" : "s3-website-eu-west-1.amazonaws.com" },
-            "ap-southeast-1" : { "S3hostedzoneID" : "Z3O0J2DXBE1FTB", "websiteendpoint" : "s3-website-ap-southeast-1.amazonaws.com" },
-            "ap-southeast-2" : { "S3hostedzoneID" : "Z1WCIGYICN2BYD", "websiteendpoint" : "s3-website-ap-southeast-2.amazonaws.com" },
-            "ap-northeast-1" : { "S3hostedzoneID" : "Z2M4EHUR26P7ZW", "websiteendpoint" : "s3-website-ap-northeast-1.amazonaws.com" },
-            "sa-east-1" : { "S3hostedzoneID" : "Z31GFT0UA1I2HV", "websiteendpoint" : "s3-website-sa-east-1.amazonaws.com" }
+    "Mappings": {
+        "RegionMap": {
+            "us-east-1": {
+                "S3hostedzoneID": "Z3AQBSTGFYJSTF",
+                "websiteendpoint": "s3-website-us-east-1.amazonaws.com"
+            },
+            "us-west-1": {
+                "S3hostedzoneID": "Z2F56UZL2M1ACD",
+                "websiteendpoint": "s3-website-us-west-1.amazonaws.com"
+            },
+            "us-west-2": {
+                "S3hostedzoneID": "Z3BJ6K6RIION7M",
+                "websiteendpoint": "s3-website-us-west-2.amazonaws.com"
+            },
+            "eu-west-1": {
+                "S3hostedzoneID": "Z1BKCTXD74EZPE",
+                "websiteendpoint": "s3-website-eu-west-1.amazonaws.com"
+            },
+            "ap-southeast-1": {
+                "S3hostedzoneID": "Z3O0J2DXBE1FTB",
+                "websiteendpoint": "s3-website-ap-southeast-1.amazonaws.com"
+            },
+            "ap-southeast-2": {
+                "S3hostedzoneID": "Z1WCIGYICN2BYD",
+                "websiteendpoint": "s3-website-ap-southeast-2.amazonaws.com"
+            },
+            "ap-northeast-1": {
+                "S3hostedzoneID": "Z2M4EHUR26P7ZW",
+                "websiteendpoint": "s3-website-ap-northeast-1.amazonaws.com"
+            },
+            "sa-east-1": {
+                "S3hostedzoneID": "Z31GFT0UA1I2HV",
+                "websiteendpoint": "s3-website-sa-east-1.amazonaws.com"
+            }
         }
     },
     "Resources": {
@@ -30,7 +54,7 @@
                 },
                 "BucketName": {
                     "Ref": "Domain"
-                },
+                }
             }
         },
         "PublicReadPlicy": {
@@ -74,9 +98,118 @@
                 },
                 "Type": "A",
                 "AliasTarget": {
-                    "HostedZoneId": {"Fn::FindInMap" : [ "RegionMap", { "Ref" : "AWS::Region" }, "S3hostedzoneID"]},
-                    "DNSName": {"Fn::FindInMap" : [ "RegionMap", { "Ref" : "AWS::Region" }, "websiteendpoint"]}
+                    "HostedZoneId": {
+                        "Fn::FindInMap": [
+                            "RegionMap",
+                            {
+                                "Ref": "AWS::Region"
+                            },
+                            "S3hostedzoneID"
+                        ]
+                    },
+                    "DNSName": {
+                        "Fn::FindInMap": [
+                            "RegionMap",
+                            {
+                                "Ref": "AWS::Region"
+                            },
+                            "websiteendpoint"
+                        ]
+                    }
                 }
+            }
+        },
+        "SkyrslaFunction": {
+            "Type": "AWS::Lambda::Function",
+            "Properties": {
+                "Description": "Fetch report from ksi.is",
+                "Handler": "main.handler",
+                "Role": {
+                    "Fn::GetAtt": [
+                        "ExecutionRole",
+                        "Arn"
+                    ]
+                },
+                "MemorySize": "512",
+                "Timeout": "300",
+                "Code": {
+                    "ZipFile": "print('Not configured')"
+                },
+                "Runtime": "python3.6"
+            }
+        },
+        "ExecutionRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Statement": {
+                        "Effect": "Allow",
+                        "Principal": {
+                            "Service": "lambda.amazonaws.com"
+                        },
+                        "Action": "sts:AssumeRole"
+                    }
+                },
+                "Policies": [
+                    {
+                        "PolicyName": "LogStuff",
+                        "PolicyDocument": {
+                            "Statement": {
+                                "Effect": "Allow",
+                                "Action": [
+                                    "logs:CreateLogGroup",
+                                    "logs:CreateLogStream",
+                                    "logs:PutLogEvents",
+                                    "logs:DescribeLogStreams"
+                                ],
+                                "Resource": [
+                                    "arn:aws:logs:*:*:*"
+                                ]
+                            }
+                        }
+                    }
+                ]
+            }
+        },
+        "CognitoRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Statement": {
+                        "Effect": "Allow",
+                        "Principal": {
+                            "Federated": "cognito-identity.amazonaws.com"
+                        },
+                        "Action": "sts:AssumeRoleWithWebIdentity"
+                    }
+                },
+                "Policies": [
+                    {
+                        "PolicyName": "InvokeLambda",
+                        "PolicyDocument": {
+                            "Statement": {
+                                "Effect": "Allow",
+                                "Action": [
+                                    "lambda:InvokeFunction"
+                                ],
+                                "Resource": [
+                                    {
+                                        "Fn::GetAtt": [
+                                            "SkyrslaFunction",
+                                            "Arn"
+                                        ]
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                ]
+            }
+        },
+        "CognitoPool": {
+            "Type": "AWS::Cognito::IdentityPool",
+            "Properties": {
+                "AllowUnauthenticatedIdentities": true
             }
         }
     },
@@ -91,6 +224,27 @@
             "Description": "Domain of the webpage",
             "Value": {
                 "Ref": "Domain"
+            }
+        },
+        "SkyrslaFunctionName": {
+            "Description": "Name of the lambda function to fetch match report",
+            "Value": {
+                "Ref": "SkyrslaFunction"
+            }
+        },
+        "CognitoPool": {
+            "Description": "Name of the cognito pool to use",
+            "Value": {
+                "Ref": "CognitoPool"
+            }
+        },
+        "CognitoRole": {
+            "Description": "ARN of the cognito role",
+            "Value": {
+                "Fn::GetAtt": [
+                    "CognitoRole",
+                    "Arn"
+                ]
             }
         }
     }
