@@ -7,7 +7,7 @@ import AdImage from '../utils/AdImage';
 import './Idle.css';
 
 // Change this to true touse real temp
-const useRealTemperature = false;
+const useRealTemperature = true;
 
 export default class Idle extends Component {
     constructor(props) {
