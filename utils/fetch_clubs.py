@@ -48,7 +48,7 @@ def main(out_folder):
     with open(os.path.join(BASE, 'src', 'club-ids.js'), 'w') as f:
         f.write('export default {\n')
         for name, _id in name_id_map.items():
-            f.write("    '%s': '%s'\n" % (name, _id))
+            f.write("    '%s': '%s',\n" % (name, _id))
         f.write('}\n')
 
 
