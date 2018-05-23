@@ -35,6 +35,7 @@ export default class AssetController extends Component {
         this.pause = this.pause.bind(this);
         this.onTextChange = this.onTextChange.bind(this);
         this.addUrlAsset = this.addUrlAsset.bind(this);
+        this.requestRemoval = this.requestRemoval.bind(this);
     }
 
     onCycleChange() {
@@ -103,6 +104,13 @@ export default class AssetController extends Component {
         this.setState({ playing: false });
     }
 
+    requestRemoval() {
+        const { playing } = this.state;
+        if (playing) {
+            this.showNextAsset();
+        }
+    }
+
     showNextAsset() {
         const {
             renderAsset, cycle, selectedAssets, imageSeconds, autoPlay,
@@ -114,7 +122,7 @@ export default class AssetController extends Component {
             const nextAsset = this.deleteNextAsset();
             renderAsset(<Asset
                 assetKey={nextAsset}
-                remove={this.showNextAsset}
+                remove={this.requestRemoval}
                 time={autoPlay ? imageSeconds : null}
             />);
             if (autoPlay) {
