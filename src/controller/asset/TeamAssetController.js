@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import AWS from 'aws-sdk';
 import { RingLoader } from 'react-spinners';
 import { matchPropType } from '../../propTypes';
+import clubIds from '../../club-ids';
 
 
 import lambda from '../../lambda';
@@ -54,10 +55,11 @@ export default class AutoFiller extends Component {
 
     handleTeams(data) {
         const { match, addAsset } = this.props;
-         
+        console.log('data', data);
     }
 
     autoFill() {
+        const { match: { homeTeam, awayTeam }} = this.props;
         this.setState({ loading: true });
         ensureCredentials().then(() => {
             const fn = new AWS.Lambda({
@@ -67,7 +69,10 @@ export default class AutoFiller extends Component {
             const fnParams = {
                 FunctionName: lambda.skyrslaFunction,
                 InvocationType: 'RequestResponse',
-                Payload: JSON.stringify({ matchId: '427941' }),
+                Payload: JSON.stringify({
+                    homeTeam: clubIds[homeTeam],
+                    awayTeam: clubIds[awayTeam],
+                }),
             };
             fn.invoke(fnParams, (error, data) => {
                 if (error) {
