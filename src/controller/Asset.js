@@ -95,15 +95,23 @@ export default class Asset extends Component {
                     opts.width = '240';
                 }
                 return (
-                    <YouTube
-                        videoId={videoId}
-                        opts={opts}
-                        onEnd={remove}
-                    />
+                    <div style={{ backgroundColor: '#000000' }}>
+                        <YouTube
+                            videoId={videoId}
+                            opts={opts}
+                            onEnd={remove}
+                        />
+                    </div>
                 );
             }
         } else if (type === 'PLAYER') {
-            return <PlayerAsset assetKey={assetKey} thumbnail={thumbnail} asset={assets[assetKey]} />;
+            return (
+                <PlayerAsset
+                    assetKey={assetKey}
+                    thumbnail={thumbnail}
+                    asset={assets[assetKey]}
+                />
+            );
         }
         console.error('No type for key ', assetKey);
         return null;
