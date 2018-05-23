@@ -1,5 +1,6 @@
 import React from 'react';
 import PropTypes from 'prop-types';
+import { matchPropType } from '../propTypes';
 
 import clubLogos from '../images/clubLogos';
 
@@ -65,12 +66,7 @@ const MatchActions = ({ state, matchAction }) => (
 MatchActions.propTypes = {
     matchAction: PropTypes.func.isRequired,
     state: PropTypes.shape({
-        match: PropTypes.shape({
-            homeScore: PropTypes.number,
-            awayScore: PropTypes.number,
-            started: PropTypes.number,
-            half: PropTypes.number,
-        }).isRequired,
+        match: matchPropType.isRequired,
     }).isRequired,
 };
 

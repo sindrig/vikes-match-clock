@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 
-import redXImage from '../images/red-x.png';
+import redXImage from '../../images/red-x.png';
 import './RemovableAsset.css';
 
 export default class RemovableAsset extends Component {

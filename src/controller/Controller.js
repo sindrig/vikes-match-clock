@@ -2,7 +2,7 @@ import React from 'react';
 import PropTypes from 'prop-types';
 
 import MatchActions from './MatchActions';
-import AssetController from './AssetController';
+import AssetController from './asset/AssetController';
 import { clearState } from '../api';
 import './Controller.css';
 
@@ -20,6 +20,7 @@ const Controller = ({
                 renderAsset={renderAsset}
                 updateState={updateState}
                 currentView={state.view}
+                match={state.match}
                 {...controllerState.assets}
             />
             <div className="page-actions">

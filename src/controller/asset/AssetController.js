@@ -1,10 +1,11 @@
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
+import { matchPropType } from '../../propTypes';
 
 import RemovableAsset from './RemovableAsset';
 import Asset, { checkKey } from './Asset';
-import { fillStarting } from '../api';
-import * as assets from '../assets';
+import * as assets from '../../assets';
+import TeamAssetController from './TeamAssetController';
 import './AssetController.css';
 
 export default class AssetController extends Component {
@@ -17,6 +18,7 @@ export default class AssetController extends Component {
         autoPlay: PropTypes.bool.isRequired,
         imageSeconds: PropTypes.number.isRequired,
         freeTextAsset: PropTypes.string.isRequired,
+        match: matchPropType.isRequired,
         currentView: PropTypes.oneOf(['MATCH', 'IDLE']).isRequired,
     };
 
@@ -177,7 +179,7 @@ export default class AssetController extends Component {
     render() {
         const {
             selectedAssets, cycle, imageSeconds, autoPlay, freeTextAsset,
-            currentView,
+            currentView, match,
         } = this.props;
         const { playing } = this.state;
         return (
@@ -196,10 +198,6 @@ export default class AssetController extends Component {
                     {playing ? <button onClick={this.pause}>Pause</button> : null}
                     {!playing && selectedAssets.length ?
                         <button onClick={this.showNextAsset}>Birta</button> :
-                        null
-                    }
-                    {currentView === 'MATCH' ?
-                        <button onClick={fillStarting}>Sækja byrjunarlið</button> :
                         null
                     }
                     <div>
@@ -234,6 +232,7 @@ export default class AssetController extends Component {
                     />
                     <button onClick={this.addUrlAsset}>Bæta við</button>
                     {this.renderError()}
+                    {currentView === 'MATCH' ? <TeamAssetController addAsset={this.addAssetKey} match={match} /> : null}
                 </div>
                 <div className="upcoming-assets">
                     {this.renderNextAsset()}
