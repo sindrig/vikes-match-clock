@@ -6,6 +6,7 @@ import PlayerAsset from './PlayerAsset';
 import PlayerCard from './PlayerCard';
 
 import * as assets from '../../assets';
+import clubLogos from '../../images/clubLogos';
 
 import './Asset.css';
 
@@ -13,7 +14,7 @@ const assetKeyTests = {
     IMAGE: key => /\.((jpg)|(png))$/.test(key) && key.startsWith('assets/'),
     YOUTUBE: key => /^http/.test(key) && key.indexOf('youtube') > 0,
     PLAYER_IMG: key => /\.((jpg)|(png))$/.test(key) && key.startsWith('players/'),
-    CUSTOM_PLAYER: key => /^customPlayer\/\d+\/[\S ]+$/.test(key),
+    CUSTOM_PLAYER: key => /^customPlayer\/\d+\/[\S ]+\/[\S ]+$/.test(key),
 };
 
 export const checkKey = key => Object.values(assetKeyTests).some(keyTest => keyTest(key));
@@ -118,14 +119,19 @@ export default class Asset extends Component {
             const parts = assetKey.split('/');
             // Get rid of "customPlayer"
             parts.shift();
-            const [playerNumber, playerName] = parts;
+            const [playerNumber, playerName, teamName] = parts;
             return (
                 <PlayerCard
                     playerNumber={parseInt(playerNumber, 10)}
                     playerName={playerName}
                     assetKey={assetKey}
                     thumbnail={thumbnail}
-                />
+                >
+                    {clubLogos[teamName] ?
+                        <img src={clubLogos[teamName]} alt="teamName" /> :
+                        null
+                    }
+                </PlayerCard>
             );
         }
         console.error('No type for key ', assetKey);
