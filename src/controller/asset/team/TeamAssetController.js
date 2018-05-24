@@ -79,8 +79,8 @@ export default class TeamAssetController extends Component {
             addAssets,
         } = this.props;
         const teamAssets = [
-            { team: homeTeam, vikes: match.homeTeam === VIKES },
             { team: awayTeam, vikes: match.awayTeam === VIKES },
+            { team: homeTeam, vikes: match.homeTeam === VIKES },
         ].map(({ team, vikes }) => team.filter(p => p.show).map(p => getPlayerAsset(p, vikes)));
         const flattened = [].concat(...teamAssets);
         addAssets(flattened);
