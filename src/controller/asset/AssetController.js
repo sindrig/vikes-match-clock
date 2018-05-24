@@ -18,11 +18,6 @@ export default class AssetController extends Component {
     static propTypes = {
         renderAsset: PropTypes.func.isRequired,
         updateState: PropTypes.func.isRequired,
-        // selectedAssets: PropTypes.arrayOf(PropTypes.string).isRequired,
-        // cycle: PropTypes.bool.isRequired,
-        // autoPlay: PropTypes.bool.isRequired,
-        // imageSeconds: PropTypes.number.isRequired,
-        // freeTextAsset: PropTypes.string.isRequired,
         match: matchPropType.isRequired,
         state: controllerPropType.isRequired,
     };
