@@ -10,7 +10,7 @@
     left: 300px;
 }
 
-.controller div {
+.controller .control-item {
     margin: 5px;
     float: left;
 }
