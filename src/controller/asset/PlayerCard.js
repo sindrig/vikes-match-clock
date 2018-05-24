@@ -57,7 +57,9 @@ export default class PlayerCard extends Component {
     }
 
     render() {
-        const { playerNumber, playerName, thumbnail, assetKey, children } = this.props;
+        const {
+            playerNumber, playerName, thumbnail, assetKey, children,
+        } = this.props;
         const { fontSizes } = this.state;
         const nameStyle = {
             fontSize: `${thumbnail ? fontSizes.thumbnail : fontSizes.regular}px`,

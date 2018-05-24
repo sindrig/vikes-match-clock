@@ -44,12 +44,5 @@ export default class PlayerAsset extends Component {
                 <img src={asset} alt={assetKey} />
             </PlayerCard>
         );
-        // return (
-        //     <div className="asset-player-icon" key={assetKey} style={{ backgroundImage: `url(${backgroundImage})` }}>
-        //         <img src={asset} alt={assetKey} />
-        //         <span className="asset-player-number">{playerNumber}</span>
-        //         <span className="asset-player-name" style={nameStyle}>{playerName}</span>
-        //     </div>
-        // );
     }
 }
