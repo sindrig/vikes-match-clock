@@ -45,10 +45,13 @@ test() {
 
 all() {
     if check-master; then
-        exit $(main unpack-deps lint test build deploy)
+        main unpack-deps lint test build deploy
+        EXIT_CODE=$?
     else
-        exit $(main unpack-deps lint test)
+        main unpack-deps lint test
+        EXIT_CODE=$?
     fi
+    exit $EXIT_CODE
 }
 
 main() {
@@ -93,7 +96,7 @@ main() {
         esac
         EXIT_CODE=$?
         if [ $EXIT_CODE -ne 0 ]; then
-            echo "Exiting func with $EXIT_CODE"
+            echo "Exiting $ACTION with $EXIT_CODE"
             exit $EXIT_CODE
         fi
     done
