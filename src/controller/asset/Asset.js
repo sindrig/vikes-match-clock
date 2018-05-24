@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import YouTube from 'react-youtube';
 
 import PlayerAsset from './PlayerAsset';
+import PlayerCard from './PlayerCard';
 
 import * as assets from '../../assets';
 
@@ -11,7 +12,8 @@ import './Asset.css';
 const assetKeyTests = {
     IMAGE: key => /\.((jpg)|(png))$/.test(key) && key.startsWith('assets/'),
     YOUTUBE: key => /^http/.test(key) && key.indexOf('youtube') > 0,
-    PLAYER: key => /\.((jpg)|(png))$/.test(key) && key.startsWith('players/'),
+    PLAYER_IMG: key => /\.((jpg)|(png))$/.test(key) && key.startsWith('players/'),
+    CUSTOM_PLAYER: key => /^customPlayer\/\d+\/[\S ]+$/.test(key),
 };
 
 export const checkKey = key => Object.values(assetKeyTests).some(keyTest => keyTest(key));
@@ -60,7 +62,7 @@ export default class Asset extends Component {
         } = this.props;
         clearTimeout(this.timeout);
         const type = getType(assetKey);
-        const typeNeedsManualRemove = type === 'IMAGE' || type === 'PLAYER';
+        const typeNeedsManualRemove = type !== 'YOUTUBE';
         if (time && !thumbnail && remove && typeNeedsManualRemove) {
             this.timeout = setTimeout(remove, time * 1000);
         }
@@ -104,12 +106,25 @@ export default class Asset extends Component {
                     </div>
                 );
             }
-        } else if (type === 'PLAYER') {
+        } else if (type === 'PLAYER_IMG') {
             return (
                 <PlayerAsset
                     assetKey={assetKey}
                     thumbnail={thumbnail}
                     asset={assets[assetKey]}
+                />
+            );
+        } else if (type === 'CUSTOM_PLAYER') {
+            const parts = assetKey.split('/');
+            // Get rid of "customPlayer"
+            parts.shift();
+            const [playerNumber, playerName] = parts;
+            return (
+                <PlayerCard
+                    playerNumber={playerNumber}
+                    playerName={playerName}
+                    assetKey={assetKey}
+                    thumbnail={thumbnail}
                 />
             );
         }

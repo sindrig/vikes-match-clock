@@ -1,26 +1,6 @@
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
-
-import backgroundImage from '../../images/background.png';
-import { VP, THUMB_VP } from '../../constants';
-
-
-const getTextWidth = (text, font) => {
-    // re-use canvas object for better performance
-    const canvas = getTextWidth.canvas || (getTextWidth.canvas = document.createElement('canvas'));
-    const context = canvas.getContext('2d');
-    context.font = font;
-    const metrics = context.measureText(text);
-    return metrics.width;
-};
-
-const getMaxFontSize = (text, width, max) => {
-    let regular = max;
-    while (regular > 5 && getTextWidth(text.replace(' ', '_'), `${regular}px 'Anton'`) > width - 20) {
-        regular -= 1;
-    }
-    return regular;
-};
+import PlayerCard from './PlayerCard';
 
 export default class PlayerAsset extends Component {
     static propTypes = {
@@ -34,10 +14,6 @@ export default class PlayerAsset extends Component {
     };
 
     state = {
-        fontSizes: {
-            thumbnail: 1,
-            regular: 1,
-        },
         playerName: '',
         playerNumber: '',
     }
@@ -51,26 +27,29 @@ export default class PlayerAsset extends Component {
             [playerNumber] = parts;
         }
         const playerName = parts[1].split('_').join(' ');
-        const fontSizes = {
-            thumbnail: getMaxFontSize(playerName, THUMB_VP.width, 12),
-            regular: getMaxFontSize(playerName, VP.width, 30),
-        };
 
-        return { fontSizes, playerName, playerNumber };
+        return { playerName, playerNumber };
     }
 
     render() {
         const { assetKey, thumbnail, asset } = this.props;
-        const { fontSizes, playerName, playerNumber } = this.state;
-        const nameStyle = {
-            fontSize: `${thumbnail ? fontSizes.thumbnail : fontSizes.regular}px`,
-        };
+        const { playerName, playerNumber } = this.state;
         return (
-            <div className="asset-player-icon" key={assetKey} style={{ backgroundImage: `url(${backgroundImage})` }}>
+            <PlayerCard
+                playerNumber={playerNumber}
+                playerName={playerName}
+                assetKey={assetKey}
+                thumbnail={thumbnail}
+            >
                 <img src={asset} alt={assetKey} />
-                <span className="asset-player-number">{playerNumber}</span>
-                <span className="asset-player-name" style={nameStyle}>{playerName}</span>
-            </div>
+            </PlayerCard>
         );
+        // return (
+        //     <div className="asset-player-icon" key={assetKey} style={{ backgroundImage: `url(${backgroundImage})` }}>
+        //         <img src={asset} alt={assetKey} />
+        //         <span className="asset-player-number">{playerNumber}</span>
+        //         <span className="asset-player-name" style={nameStyle}>{playerName}</span>
+        //     </div>
+        // );
     }
 }
