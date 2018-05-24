@@ -26,7 +26,7 @@ const getMaxFontSize = (text, width, max) => {
 export default class PlayerCard extends Component {
     static propTypes = {
         playerName: PropTypes.string.isRequired,
-        playerNumber: PropTypes.string.isRequired,
+        playerNumber: PropTypes.number.isRequired,
         thumbnail: PropTypes.bool,
         assetKey: PropTypes.string.isRequired,
         children: PropTypes.oneOfType([

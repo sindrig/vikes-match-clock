@@ -121,7 +121,7 @@ export default class Asset extends Component {
             const [playerNumber, playerName] = parts;
             return (
                 <PlayerCard
-                    playerNumber={playerNumber}
+                    playerNumber={parseInt(playerNumber, 10)}
                     playerName={playerName}
                     assetKey={assetKey}
                     thumbnail={thumbnail}
