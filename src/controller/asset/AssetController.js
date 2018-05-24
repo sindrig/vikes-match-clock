@@ -41,6 +41,7 @@ export default class AssetController extends Component {
         this.requestRemoval = this.requestRemoval.bind(this);
         this.updateTeams = this.updateTeams.bind(this);
         this.addMultipleAssets = this.addMultipleAssets.bind(this);
+        this.clearQueue = this.clearQueue.bind(this);
     }
 
     onCycleChange() {
@@ -105,6 +106,10 @@ export default class AssetController extends Component {
         } else {
             this.setState({ error: '' });
         }
+    }
+
+    clearQueue() {
+        return this.updateAssets({ selectedAssets: [] });
     }
 
     updateAssets(newState) {
@@ -236,6 +241,10 @@ export default class AssetController extends Component {
                         }
                     </select>
                     <span>{selectedAssets.length} í biðröð</span>
+                    {selectedAssets.length ?
+                        <button onClick={this.clearQueue}>Hreinsa biðröð</button> :
+                        null
+                    }
                     {playing ? <button onClick={this.pause}>Pause</button> : null}
                     {!playing && selectedAssets.length ?
                         <button onClick={this.showNextAsset}>Birta</button> :
@@ -301,6 +310,7 @@ export default class AssetController extends Component {
                         match={match}
                         updateTeams={this.updateTeams}
                         controllerState={state}
+                        previousView={() => this.setState({ assetView: ASSET_VIEWS.assets })}
                     />
                 )}
             </div>

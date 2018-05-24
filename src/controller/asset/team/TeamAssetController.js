@@ -55,6 +55,7 @@ export default class TeamAssetController extends Component {
         updateTeams: PropTypes.func.isRequired,
         match: matchPropType.isRequired,
         controllerState: controllerPropType.isRequired,
+        previousView: PropTypes.func.isRequired,
     };
 
     constructor(props) {
@@ -77,6 +78,7 @@ export default class TeamAssetController extends Component {
             },
             match,
             addAssets,
+            previousView,
         } = this.props;
         const teamAssets = [
             { team: awayTeam, vikes: match.awayTeam === VIKES },
@@ -84,6 +86,7 @@ export default class TeamAssetController extends Component {
         ].map(({ team, vikes }) => team.filter(p => p.show).map(p => getPlayerAsset(p, vikes)));
         const flattened = [].concat(...teamAssets);
         addAssets(flattened);
+        previousView();
     }
 
     clearTeams() {
