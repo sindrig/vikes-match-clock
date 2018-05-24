@@ -2,12 +2,12 @@ import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 import AWS from 'aws-sdk';
 import { RingLoader } from 'react-spinners';
-import { matchPropType } from '../../../propTypes';
+import { matchPropType, controllerPropType } from '../../../propTypes';
 import clubIds from '../../../club-ids';
-
+import * as assets from '../../../assets';
 
 import lambda from '../../../lambda';
-import Team, { Player } from './Team';
+import Team from './Team';
 
 const awsConf = {
     region: lambda.region,
@@ -33,12 +33,28 @@ const ensureCredentials = () => new Promise((resolve, reject) => {
     }
 });
 
+const VIKES = 'Víkingur R';
+
+const getPlayerAsset = (player, isVikes) => {
+    if (isVikes) {
+        const keyMatcher = new RegExp(`players/0?${player.number}`);
+        console.log('player.number, keyMatcher', player.number, keyMatcher);
+        // const possibleKey = `players/${player.number}`;
+        const asset = Object.keys(assets).find(key => key.match(keyMatcher));
+        if (asset) {
+            return asset;
+        }
+    }
+    return `customPlayer/${player.number}/${player.name}`;
+};
 
 export default class TeamAssetController extends Component {
     // TODO save state in localstorage
     static propTypes = {
-        addAsset: PropTypes.func.isRequired,
+        addAssets: PropTypes.func.isRequired,
+        updateTeams: PropTypes.func.isRequired,
         match: matchPropType.isRequired,
+        controllerState: controllerPropType.isRequired,
     };
 
     constructor(props) {
@@ -46,23 +62,54 @@ export default class TeamAssetController extends Component {
         this.state = {
             loading: false,
             error: '',
-            homeTeam: [new Player({ name: '', number: 1, role: '' })],
-            awayTeam: [new Player({ name: '', number: 1, role: '' })],
         };
         this.autoFill = this.autoFill.bind(this);
+        this.clearTeams = this.clearTeams.bind(this);
+        this.addPlayersToQ = this.addPlayersToQ.bind(this);
+    }
+
+    addPlayersToQ() {
+        const {
+            controllerState: {
+                teamPlayers: {
+                    homeTeam, awayTeam,
+                },
+            },
+            match,
+            addAssets,
+        } = this.props;
+        const teamAssets = [
+            { team: homeTeam, vikes: match.homeTeam === VIKES },
+            { team: awayTeam, vikes: match.awayTeam === VIKES },
+        ].map(({ team, vikes }) => team.filter(p => p.show).map(p => getPlayerAsset(p, vikes)));
+        const flattened = [].concat(...teamAssets);
+        addAssets(flattened);
+    }
+
+    clearTeams() {
+        const { updateTeams } = this.props;
+        updateTeams({
+            homeTeam: [],
+            awayTeam: [],
+        });
     }
 
     handleTeams(data) {
-        const { match: { homeTeam, awayTeam } } = this.props;
-        this.setState({
-            homeTeam: data[clubIds[homeTeam]].map(p => new Player(p)),
-            awayTeam: data[clubIds[awayTeam]].map(p => new Player(p)),
+        const { match: { homeTeam, awayTeam }, updateTeams } = this.props;
+        updateTeams({
+            homeTeam: data[clubIds[homeTeam]].map((p, i) => ({ ...p, show: i < 11 })),
+            awayTeam: data[clubIds[awayTeam]].map((p, i) => ({ ...p, show: i < 11 })),
         });
     }
 
     autoFill() {
         const { match: { homeTeam, awayTeam } } = this.props;
+        if (!homeTeam || !awayTeam) {
+            this.setState({ error: 'Choose teams first' });
+            return;
+        }
         this.setState({ loading: true });
+
         ensureCredentials().then(() => {
             const fn = new AWS.Lambda({
                 region: lambda.region,
@@ -93,19 +140,39 @@ export default class TeamAssetController extends Component {
     }
 
     render() {
+        const { loading, error } = this.state;
         const {
-            loading, error, homeTeam, awayTeam,
-        } = this.state;
+            controllerState: {
+                teamPlayers: {
+                    homeTeam, awayTeam,
+                },
+            },
+            updateTeams,
+        } = this.props;
         return (
             <div className="team-asset-controller">
                 <RingLoader loading={loading} />
-                {!loading ? <button onClick={this.autoFill}>Sækja lið</button> : null}
-                <span className="error">{error}</span>
-                <div className="team-asset-controller-home-team">
-                    <Team team={homeTeam} />
+                <div className="control-item">
+                    {!loading ? <button onClick={this.autoFill}>Sækja lið</button> : null}
                 </div>
-                <div className="team-asset-controller-away-team">
-                    <Team team={awayTeam} />
+                <div className="control-item">
+                    {!loading ? <button onClick={this.clearTeams}>Hreinsa lið</button> : null}
+                </div>
+                <div className="control-item">
+                    {!loading ? <button onClick={this.addPlayersToQ}>Setja lið í biðröð</button> : null}
+                </div>
+                <span className="error">{error}</span>
+                <div className="team-asset-controller">
+                    <Team
+                        team={homeTeam}
+                        teamName="homeTeam"
+                        updateTeams={updateTeams}
+                    />
+                    <Team
+                        team={awayTeam}
+                        teamName="awayTeam"
+                        updateTeams={updateTeams}
+                    />
                 </div>
             </div>
         );

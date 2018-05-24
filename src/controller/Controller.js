@@ -4,6 +4,7 @@ import PropTypes from 'prop-types';
 import MatchActions from './MatchActions';
 import AssetController from './asset/AssetController';
 import { clearState } from '../api';
+import { matchPropType, controllerPropType } from '../propTypes';
 import './Controller.css';
 
 const Controller = ({
@@ -15,12 +16,12 @@ const Controller = ({
     });
     return (
         <div className="controller">
-            {state.view === 'MATCH' ? <MatchActions matchAction={matchAction} state={state} /> : null}
+            <MatchActions matchAction={matchAction} state={state} />
             <AssetController
                 renderAsset={renderAsset}
                 updateState={updateState}
                 match={state.match}
-                {...controllerState.assets}
+                state={controllerState}
             />
             <div className="page-actions">
                 <div className="view-selector">
@@ -54,12 +55,8 @@ Controller.propTypes = {
     renderAsset: PropTypes.func.isRequired,
     views: PropTypes.arrayOf(PropTypes.string).isRequired,
     state: PropTypes.shape({
-        match: PropTypes.shape({
-            homeScore: PropTypes.number,
-            awayScore: PropTypes.number,
-            started: PropTypes.number,
-            half: PropTypes.number,
-        }).isRequired,
+        match: matchPropType.isRequired,
+        controller: controllerPropType.isRequired,
     }).isRequired,
     controllerState: PropTypes.shape({
         assets: PropTypes.any.isRequired,

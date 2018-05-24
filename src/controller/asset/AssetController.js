@@ -1,6 +1,6 @@
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
-import { matchPropType } from '../../propTypes';
+import { matchPropType, controllerPropType } from '../../propTypes';
 
 import RemovableAsset from './RemovableAsset';
 import Asset, { checkKey } from './Asset';
@@ -18,12 +18,13 @@ export default class AssetController extends Component {
     static propTypes = {
         renderAsset: PropTypes.func.isRequired,
         updateState: PropTypes.func.isRequired,
-        selectedAssets: PropTypes.arrayOf(PropTypes.string).isRequired,
-        cycle: PropTypes.bool.isRequired,
-        autoPlay: PropTypes.bool.isRequired,
-        imageSeconds: PropTypes.number.isRequired,
-        freeTextAsset: PropTypes.string.isRequired,
+        // selectedAssets: PropTypes.arrayOf(PropTypes.string).isRequired,
+        // cycle: PropTypes.bool.isRequired,
+        // autoPlay: PropTypes.bool.isRequired,
+        // imageSeconds: PropTypes.number.isRequired,
+        // freeTextAsset: PropTypes.string.isRequired,
         match: matchPropType.isRequired,
+        state: controllerPropType.isRequired,
     };
 
     constructor(props) {
@@ -43,16 +44,18 @@ export default class AssetController extends Component {
         this.onTextChange = this.onTextChange.bind(this);
         this.addUrlAsset = this.addUrlAsset.bind(this);
         this.requestRemoval = this.requestRemoval.bind(this);
+        this.updateTeams = this.updateTeams.bind(this);
+        this.addMultipleAssets = this.addMultipleAssets.bind(this);
     }
 
     onCycleChange() {
-        const { cycle } = this.props;
-        this.updateState({ cycle: !cycle });
+        const { state: { assets: { cycle } } } = this.props;
+        this.updateAssets({ cycle: !cycle });
     }
 
     onAutoPlayChange() {
-        const { autoPlay } = this.props;
-        this.updateState({ autoPlay: !autoPlay });
+        const { state: { assets: { autoPlay } } } = this.props;
+        this.updateAssets({ autoPlay: !autoPlay });
         if (!autoPlay) {
             this.pause();
         }
@@ -61,13 +64,13 @@ export default class AssetController extends Component {
     onImageSecondsChange(event) {
         event.preventDefault();
         const { target: { value } } = event;
-        this.updateState({ imageSeconds: Math.max(parseInt(value, 10), 1) });
+        this.updateAssets({ imageSeconds: Math.max(parseInt(value, 10), 1) });
     }
 
     onTextChange(event) {
         event.preventDefault();
         const { target: { value } } = event;
-        this.updateState({ freeTextAsset: value });
+        this.updateAssets({ freeTextAsset: value });
     }
 
 
@@ -78,32 +81,62 @@ export default class AssetController extends Component {
     }
 
     addUrlAsset() {
-        const { freeTextAsset } = this.props;
+        const { state: { assets: { freeTextAsset } } } = this.props;
         return this.addAssetKey(freeTextAsset, { freeTextAsset: '' });
     }
 
     addAssetKey(key, extra = {}) {
-        if (checkKey(key)) {
-            const { selectedAssets } = this.props;
-            if (selectedAssets.indexOf(key) === -1) {
-                this.setState({ error: '' });
-                this.updateState({ selectedAssets: [...selectedAssets, key], ...extra });
+        return this.addMultipleAssets([key], extra);
+    }
+
+    addMultipleAssets(assetKeys, extra = {}) {
+        const { state: { assets: { selectedAssets } } } = this.props;
+        const updatedAssets = [...selectedAssets];
+        const errors = [];
+        assetKeys.forEach((key) => {
+            if (checkKey(key)) {
+                if (selectedAssets.indexOf(key) === -1) {
+                    updatedAssets.push(key);
+                } else {
+                    errors.push(`Key ${key} already in asset list.`);
+                }
             } else {
-                this.setState({ error: `Key ${key} already in asset list.` });
+                errors.push(`Unknown key ${key}`);
             }
+        });
+        this.updateAssets({ selectedAssets: updatedAssets, ...extra });
+        if (errors.length) {
+            this.setState({ error: errors.join(' - ') });
         } else {
-            this.setState({ error: `Unknown key ${key}` });
+            this.setState({ error: '' });
         }
     }
 
-    updateState(newState) {
+    updateAssets(newState) {
         const {
-            updateState, selectedAssets, cycle, imageSeconds, autoPlay, freeTextAsset,
+            state: {
+                assets: {
+                    selectedAssets, cycle, imageSeconds, autoPlay, freeTextAsset,
+                },
+            },
+            updateState,
         } = this.props;
         updateState({
             assets: {
                 selectedAssets, cycle, imageSeconds, autoPlay, freeTextAsset, ...newState,
             },
+        });
+    }
+
+    updateTeams(newState) {
+        const {
+            state: {
+                teamPlayers,
+            },
+            updateState,
+        } = this.props;
+        updateState({
+            teamPlayers: { ...teamPlayers, ...newState },
         });
     }
 
@@ -120,7 +153,12 @@ export default class AssetController extends Component {
 
     showNextAsset() {
         const {
-            renderAsset, cycle, selectedAssets, imageSeconds, autoPlay,
+            state: {
+                assets: {
+                    cycle, selectedAssets, imageSeconds, autoPlay,
+                },
+            },
+            renderAsset,
         } = this.props;
         if (!selectedAssets.length) {
             this.pause();
@@ -136,32 +174,32 @@ export default class AssetController extends Component {
                 this.setState({ playing: true });
             }
             if (cycle) {
-                this.updateState({ selectedAssets: [...selectedAssets, nextAsset] });
+                this.updateAssets({ selectedAssets: [...selectedAssets, nextAsset] });
             }
         }
     }
 
     deleteNextAsset() {
-        const { selectedAssets } = this.props;
+        const { state: { assets: { selectedAssets } } } = this.props;
         const asset = selectedAssets.shift();
-        this.updateState({ selectedAssets });
+        this.updateAssets({ selectedAssets });
         return asset;
     }
 
     removeAsset(key) {
         return () => {
-            const { selectedAssets } = this.props;
+            const { state: { assets: { selectedAssets } } } = this.props;
             const idx = selectedAssets.indexOf(key);
             if (idx > -1) {
                 const newAssets = [...selectedAssets];
                 newAssets.splice(idx, 1);
-                this.updateState({ selectedAssets: newAssets });
+                this.updateAssets({ selectedAssets: newAssets });
             }
         };
     }
 
     renderNextAsset() {
-        const { selectedAssets } = this.props;
+        const { state: { assets: { selectedAssets } } } = this.props;
         return (
             <div>
                 {selectedAssets.map(key => (
@@ -176,14 +214,18 @@ export default class AssetController extends Component {
     renderError() {
         const { error } = this.state;
         if (error) {
-            return error;
+            return <div>{error}</div>;
         }
         return null;
     }
 
     renderAssetController() {
         const {
-            selectedAssets, cycle, imageSeconds, autoPlay, freeTextAsset,
+            state: {
+                assets: {
+                    cycle, selectedAssets, imageSeconds, autoPlay, freeTextAsset,
+                },
+            },
         } = this.props;
         const { playing } = this.state;
         return (
@@ -245,7 +287,7 @@ export default class AssetController extends Component {
     }
 
     render() {
-        const { match } = this.props;
+        const { match, state } = this.props;
         const { assetView } = this.state;
         return (
             <div className="asset-controller">
@@ -259,7 +301,12 @@ export default class AssetController extends Component {
                 </div>
                 {assetView === ASSET_VIEWS.assets && this.renderAssetController()}
                 {assetView === ASSET_VIEWS.teams && (
-                    <TeamAssetController addAsset={this.addAssetKey} match={match} />
+                    <TeamAssetController
+                        addAssets={this.addMultipleAssets}
+                        match={match}
+                        updateTeams={this.updateTeams}
+                        controllerState={state}
+                    />
                 )}
             </div>
         );
