@@ -31,7 +31,7 @@ export default class RemovableAsset extends Component {
                     <button onClick={remove} className="removeButton"><img src={redXImage} alt="remove" /></button>
                     {children}
                 </div>
-                {hover ? <span>{assetKey}</span> : null}
+                {hover ? <div className="removable-asset-key-name">{assetKey}</div> : null}
             </div>
         );
     }

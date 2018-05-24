@@ -18,6 +18,10 @@ const defaultState = {
             autoPlay: false,
             freeTextAsset: '',
         },
+        teamPlayers: {
+            homeTeam: [],
+            awayTeam: [],
+        },
     },
     view: 'IDLE',
 };
@@ -93,4 +97,4 @@ export const updateMatch = ({
 
 export const updateView = view => getState().then(state => saveState({ ...state, view }));
 export const updateController = controller => getState()
-    .then(state => saveState({ ...state, controller }));
+    .then(state => saveState({ ...state, controller: { ...state.controller, ...controller } }));

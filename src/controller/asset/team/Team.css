@@ -1,0 +1,18 @@
+.team-player-number {
+    width: 25px;
+}
+.team-player-role {
+    width: 80px;
+}
+
+div.team-asset-player {
+    float: none;
+}
+
+.team-asset-container {
+    float: left;
+    margin-left: 50px;
+}
+.team-asset-controller {
+    clear: both;
+}
