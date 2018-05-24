@@ -47,7 +47,7 @@ export default class ScoreBoard extends Component {
 
     render() {
         return (
-            <div>
+            <div className="scoreboard">
                 <AdImage />
                 <Team className="home" team={getTeam('home', this.props.match)} score={this.props.match.homeScore} />
                 <Team className="away" team={getTeam('away', this.props.match)} score={this.props.match.awayScore} />
