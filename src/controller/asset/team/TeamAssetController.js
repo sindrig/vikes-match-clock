@@ -35,7 +35,7 @@ const ensureCredentials = () => new Promise((resolve, reject) => {
 
 const VIKES = 'Víkingur R';
 
-const getPlayerAsset = (player, isVikes) => {
+const getPlayerAsset = ({ player, isVikes, teamName }) => {
     if (isVikes) {
         const keyMatcher = new RegExp(`players/0?${player.number}`);
         console.log('player.number, keyMatcher', player.number, keyMatcher);
@@ -45,7 +45,7 @@ const getPlayerAsset = (player, isVikes) => {
             return asset;
         }
     }
-    return `customPlayer/${player.number}/${player.name}`;
+    return `customPlayer/${player.number}/${player.name}/${teamName}`;
 };
 
 export default class TeamAssetController extends Component {
@@ -81,9 +81,11 @@ export default class TeamAssetController extends Component {
             previousView,
         } = this.props;
         const teamAssets = [
-            { team: awayTeam, vikes: match.awayTeam === VIKES },
-            { team: homeTeam, vikes: match.homeTeam === VIKES },
-        ].map(({ team, vikes }) => team.filter(p => p.show).map(p => getPlayerAsset(p, vikes)));
+            { team: awayTeam, isVikes: match.awayTeam === VIKES, teamName: match.awayTeam },
+            { team: homeTeam, isVikes: match.homeTeam === VIKES, teamName: match.homeTeam },
+        ].map(({ team, isVikes, teamName }) =>
+            team.filter(p => p.show)
+                .map(player => getPlayerAsset({ player, isVikes, teamName })));
         const flattened = [].concat(...teamAssets);
         addAssets(flattened);
         previousView();
