@@ -159,7 +159,10 @@ export default class TeamAssetController extends Component {
                     {!loading ? <button onClick={this.clearTeams}>Hreinsa lið</button> : null}
                 </div>
                 <div className="control-item">
-                    {!loading ? <button onClick={this.addPlayersToQ}>Setja lið í biðröð</button> : null}
+                    {!loading ?
+                        <button onClick={this.addPlayersToQ}>Setja lið í biðröð</button> :
+                        null
+                    }
                 </div>
                 <span className="error">{error}</span>
                 <div className="team-asset-controller">
