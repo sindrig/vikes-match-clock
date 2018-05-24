@@ -45,9 +45,9 @@ test() {
 
 all() {
     if check-master; then
-        exit $(main lint test unpack-deps build deploy)
+        exit $(main unpack-deps lint test build deploy)
     else
-        exit $(main lint test)
+        exit $(main unpack-deps lint test)
     fi
 }
 
