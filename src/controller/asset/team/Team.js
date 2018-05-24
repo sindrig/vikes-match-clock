@@ -26,6 +26,7 @@ export default class Team extends Component {
         return (
             <div className="team-asset-container">
                 {team.map((p, i) => (
+                    // eslint-disable-next-line react/no-array-index-key
                     <div key={`${i}`}>
                         <TeamPlayer player={p} onChange={this.updatePlayer(i)} />
                     </div>
