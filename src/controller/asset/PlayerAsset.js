@@ -1,8 +1,8 @@
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 
-import backgroundImage from '../images/background.png';
-import { VP, THUMB_VP } from '../constants';
+import backgroundImage from '../../images/background.png';
+import { VP, THUMB_VP } from '../../constants';
 
 
 const getTextWidth = (text, font) => {

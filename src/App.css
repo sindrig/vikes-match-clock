@@ -7,6 +7,7 @@ body {
   position: absolute;
   height: 176px;
   width: 240px;
+  cursor: none;
 }
 
 button {
@@ -23,6 +24,7 @@ button:focus {
     position: absolute;
     height: 176px;
     width: 240px;
+    cursor: none;
 }
 
 .overlay-container * {

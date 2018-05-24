@@ -4,7 +4,7 @@ import YouTube from 'react-youtube';
 
 import PlayerAsset from './PlayerAsset';
 
-import * as assets from '../assets';
+import * as assets from '../../assets';
 
 import './Asset.css';
 

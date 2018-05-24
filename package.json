@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "aws-sdk": "^2.245.1",
     "axios": "^0.18.0",
     "babel-eslint": "^8.2.2",
     "prop-types": "^15.6.1",
@@ -11,9 +12,11 @@
     "react-live-clock": "^2.0.3",
     "react-scripts": "1.1.4",
     "react-shortcuts": "^1.6.2",
+    "react-spinners": "^0.3.2",
     "react-youtube": "^7.6.0"
   },
   "devDependencies": {
+    "eslint": "^4.19.1",
     "eslint-config-airbnb": "^16.1.0",
     "eslint-plugin-react": "^7.7.0",
     "s3-deploy": "^1.0.0"
@@ -22,7 +25,8 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test --env=jsdom",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "lint": "eslint src --max-warnings=0"
   },
   "proxy": "http://localhost:5000/"
 }

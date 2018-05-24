@@ -11,6 +11,7 @@ module.exports = {
         "react/jsx-indent-props": ["error", 4],
         "react/no-unescaped-entities": [0],
         "react/jsx-filename-extension": [1, { "extensions": [".js", ".jsx"] }],
+        "no-console": 0,
     },
     "globals": {
         "document": true,

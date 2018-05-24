@@ -14,6 +14,7 @@ export default class Clock extends Component {
         reset: PropTypes.func.isRequired,
         started: PropTypes.number,
         className: PropTypes.string.isRequired,
+        half: PropTypes.number.isRequired,
     };
 
     static defaultProps = {

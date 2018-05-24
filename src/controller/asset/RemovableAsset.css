@@ -2,6 +2,8 @@
     position: relative;
     background-color: #000000;
     width: 100px;
+    float: left;
+    margin: 1px;
 }
 
 .removable-asset button.removeButton {
@@ -15,13 +17,6 @@
     margin: 0;
 }
 
-.removable-asset-container span {
-    display: block;
-    font-size: 8px;
-    max-width: 100px;
-    color: #000000;
-}
-
 .removable-asset img {
     max-width: 50px;
     max-height: 100px;
@@ -29,3 +24,7 @@
     display: block;
 }
 
+.removable-asset-key-name {
+    position: absolute;
+    left: 600px;
+}

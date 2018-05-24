@@ -52,10 +52,8 @@ class App extends Component {
             .catch(err => console.log(err));
     }
 
-    handleShortcuts() {
-        // TODO do we need something?
-        // handleShorcuts accepts (action (string), event (Event))
-        return this;
+    setOverlay(component) {
+        this.setState({ overlay: component });
     }
 
     updateMatch(partial) {
@@ -77,8 +75,10 @@ class App extends Component {
             .catch(err => console.log(err));
     }
 
-    setOverlay(component) {
-        this.setState({ overlay: component });
+    handleShortcuts() {
+        // TODO do we need something?
+        // handleShorcuts accepts (action (string), event (Event))
+        return this;
     }
 
     renderOverlay() {

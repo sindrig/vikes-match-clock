@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 
-import redXImage from '../images/red-x.png';
+import redXImage from '../../images/red-x.png';
 import './RemovableAsset.css';
 
 export default class RemovableAsset extends Component {
@@ -31,7 +31,7 @@ export default class RemovableAsset extends Component {
                     <button onClick={remove} className="removeButton"><img src={redXImage} alt="remove" /></button>
                     {children}
                 </div>
-                {hover ? <span>{assetKey}</span> : null}
+                {hover ? <div className="removable-asset-key-name">{assetKey}</div> : null}
             </div>
         );
     }

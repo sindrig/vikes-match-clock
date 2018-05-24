@@ -10,12 +10,9 @@ import clubLogos from '../images/clubLogos';
 import './ScoreBoard.css';
 
 const getTeam = (id, match) => {
-    let name = match[`${id}Team`];
-    if (!name) {
-        name = 'Víkingur R';
-    }
+    const name = match[`${id}Team`];
     return {
-        image: clubLogos[name],
+        image: clubLogos[name] || null,
         name,
         id,
     };

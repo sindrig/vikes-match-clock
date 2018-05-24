@@ -9,14 +9,31 @@
 
 .asset-controller {
     height: 300px;
+    width: 1070px;
     overflow: scroll;
 }
 
+.asset-controller .view-selector {
+    position: absolute;
+    top: 75px;
+    left: -60px;
+}
+
+.asset-controller .view-selector button {
+    float: right;
+}
+
 .asset-controller .controls {
+    width: 130px;
+    float: left;
+}
+.asset-controller .controls select {
     width: 130px;
 }
 
 .asset-controller .upcoming-assets {
     overflow: hidden;
     width: 500px;
+    float: left;
+    margin-left: 10px;
 }
