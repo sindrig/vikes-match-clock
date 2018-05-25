@@ -24,6 +24,15 @@ const getMaxFontSize = (text, width, max) => {
     return regular;
 };
 
+const getName = ({ name }) => {
+    // if (name === 'Vladimir Tugegdzic') {
+    //     return 'Владимир Туфегдžиć';
+    // } else if (name === 'Milos Ozegovic') {
+    //     return 'Милош Ожеговић';
+    // }
+    return name;
+};
+
 export default class PlayerCard extends Component {
     static propTypes = {
         thumbnail: PropTypes.bool,
@@ -47,10 +56,10 @@ export default class PlayerCard extends Component {
     };
 
     static getDerivedStateFromProps(nextProps) {
-        const { playerName } = nextProps;
+        const { asset: { name } } = nextProps;
         const fontSizes = {
-            thumbnail: getMaxFontSize(playerName, THUMB_VP.width, 12),
-            regular: getMaxFontSize(playerName, VP.width, 30),
+            thumbnail: getMaxFontSize(name, THUMB_VP.width, 12),
+            regular: getMaxFontSize(name, VP.width, 30),
         };
         return { fontSizes };
     }
@@ -68,7 +77,7 @@ export default class PlayerCard extends Component {
             <div className="asset-player-icon" key={asset.key} style={{ backgroundImage: `url(${backgroundImage})` }}>
                 {children}
                 <span className="asset-player-number">{asset.number}</span>
-                <span className="asset-player-name" style={nameStyle}>{asset.name}</span>
+                <span className="asset-player-name" style={nameStyle}>{getName(asset)}</span>
             </div>
         );
     }
