@@ -41,9 +41,14 @@ export default class Idle extends Component {
         axios.get('http://apis.is/weather/observations/en', options)
             .then(({
                 data: { results },
-            }) => this.setState({
-                temperature: Math.ceil(parseFloat(results[0].T)),
-            }));
+            }) => {
+                const temperature = Math.ceil(parseFloat(results[0].T));
+                if (!Number.isNaN(temperature)) {
+                    this.setState({ temperature });
+                } else {
+                    console.log('Received strange temperature:', results, results[0].T);
+                }
+            });
     }
 
     render() {
