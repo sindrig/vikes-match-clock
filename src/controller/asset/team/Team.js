@@ -10,6 +10,11 @@ export default class Team extends Component {
         team: PropTypes.arrayOf(playerPropType).isRequired,
         updateTeams: PropTypes.func.isRequired,
         teamName: PropTypes.oneOf(['homeTeam', 'awayTeam']).isRequired,
+        selectSub: PropTypes.func,
+    };
+
+    static defaultProps = {
+        selectSub: null,
     };
 
     updatePlayer(idx) {
@@ -22,13 +27,16 @@ export default class Team extends Component {
 
 
     render() {
-        const { team } = this.props;
+        const { team, selectSub, teamName } = this.props;
         return (
             <div className="team-asset-container">
                 {team.map((p, i) => (
                     // eslint-disable-next-line react/no-array-index-key
                     <div key={`${i}`}>
-                        <TeamPlayer player={p} onChange={this.updatePlayer(i)} />
+                        {selectSub ?
+                            <button onClick={() => selectSub(p, teamName)}>{`#${p.number} - ${p.name}`}</button> :
+                            <TeamPlayer player={p} onChange={this.updatePlayer(i)} />
+                        }
                     </div>
                 ))}
             </div>

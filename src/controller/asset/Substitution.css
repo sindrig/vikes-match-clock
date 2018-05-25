@@ -1,0 +1,41 @@
+.asset-substitution {
+    height: 176px;
+    width: 240px;
+}
+
+.thumbnail.asset-substitution {
+    height: 73px;
+    width: 100%;
+}
+
+.asset-substitution > div {
+    position: absolute;
+    background-image: none !important;
+}
+
+
+.asset-substitution .asset-player-name {
+    display: none;
+}
+
+.asset-substitution > div:nth-child(1) img {
+    left: 0px;
+    right: auto;
+}
+
+
+.asset-substitution span.asset-player-number {
+    top: 0px !important;
+    z-index: 9999;
+}
+.asset-substitution > div:nth-child(1) .asset-player-number {
+    left: 5px;
+    color: red;
+}
+
+
+.asset-substitution > div:nth-child(2) .asset-player-number {
+    right: 5px;
+    text-align: right;
+    color: green;
+}
