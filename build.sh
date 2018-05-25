@@ -22,7 +22,7 @@ update-deps() {
 }
 
 deploy() {
-    node_modules/.bin/s3-deploy "./build/**" --cwd "./build/" --region "eu-west-1" --bucket klukka.irdn.is $EXTRA_S3
+    node_modules/.bin/s3-deploy "./build/**" --cwd "./build/" --region "eu-west-1" --bucket klukka.irdn.is --gzip $EXTRA_S3
 }
 
 windows() {
