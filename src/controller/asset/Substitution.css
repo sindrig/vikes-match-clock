@@ -14,8 +14,26 @@
 }
 
 
-.asset-substitution .asset-player-name {
+.asset-substitution .player-card-image .asset-player-name {
     display: none;
+}
+
+.asset-substitution .player-card-no-image .asset-player-name {
+    /*display: none;*/
+    z-index: 99;
+    height: auto;
+    bottom: 10px;
+    top: auto;
+    left: auto;
+}
+
+.asset-substitution .player-card-no-image:nth-child(1) .asset-player-name {
+    /*top: 80px;*/
+    left: 5px;
+}
+
+.asset-substitution .player-card-no-image:nth-child(2) .asset-player-name {
+    right: 5px;
 }
 
 .asset-substitution > div:nth-child(1) img {
@@ -26,7 +44,7 @@
 
 .asset-substitution span.asset-player-number {
     top: 0px !important;
-    z-index: 9999;
+    z-index: 9;
 }
 .asset-substitution > div:nth-child(1) .asset-player-number {
     left: 5px;

@@ -64,6 +64,8 @@ export default class Asset extends Component {
                 <PlayerCard
                     asset={asset}
                     thumbnail={thumbnail}
+                    className="player-card-image"
+                    key={asset.key}
                 >
                     <img src={assets[asset.key]} alt={asset.key} />
                 </PlayerCard>
@@ -74,6 +76,9 @@ export default class Asset extends Component {
                 <PlayerCard
                     asset={asset}
                     thumbnail={thumbnail}
+                    className="player-card-no-image"
+                    widthMultiplier={0.5}
+                    key={asset.key}
                 >
                     {clubLogos[teamName] ?
                         <img src={clubLogos[teamName]} alt="teamName" /> :

@@ -24,15 +24,6 @@ const getMaxFontSize = (text, width, max) => {
     return regular;
 };
 
-const getName = ({ name }) => {
-    // if (name === 'Vladimir Tugegdzic') {
-    //     return 'Владимир Туфегдžиć';
-    // } else if (name === 'Milos Ozegovic') {
-    //     return 'Милош Ожеговић';
-    // }
-    return name;
-};
-
 export default class PlayerCard extends Component {
     static propTypes = {
         thumbnail: PropTypes.bool,
@@ -41,11 +32,16 @@ export default class PlayerCard extends Component {
             PropTypes.arrayOf(PropTypes.node),
             PropTypes.node,
         ]),
+        className: PropTypes.string,
+        // eslint-disable-next-line
+        widthMultiplier: PropTypes.number,
     };
 
     static defaultProps = {
         thumbnail: false,
         children: [],
+        className: '',
+        widthMultiplier: 1,
     };
 
     state = {
@@ -56,28 +52,27 @@ export default class PlayerCard extends Component {
     };
 
     static getDerivedStateFromProps(nextProps) {
-        const { asset: { name } } = nextProps;
+        const { asset: { name }, widthMultiplier } = nextProps;
         const fontSizes = {
-            thumbnail: getMaxFontSize(name, THUMB_VP.width, 12),
-            regular: getMaxFontSize(name, VP.width, 30),
+            thumbnail: getMaxFontSize(name, THUMB_VP.width * widthMultiplier, 12),
+            regular: getMaxFontSize(name, VP.width * widthMultiplier, 30),
         };
         return { fontSizes };
     }
 
     render() {
         const {
-            thumbnail, asset, children,
+            thumbnail, asset, children, className,
         } = this.props;
         const { fontSizes } = this.state;
         const nameStyle = {
             fontSize: `${thumbnail ? fontSizes.thumbnail : fontSizes.regular}px`,
         };
-        console.log('asset', asset);
         return (
-            <div className="asset-player-icon" key={asset.key} style={{ backgroundImage: `url(${backgroundImage})` }}>
+            <div className={`asset-player-icon ${className}`} key={asset.key} style={{ backgroundImage: `url(${backgroundImage})` }}>
                 {children}
                 <span className="asset-player-number">{asset.number}</span>
-                <span className="asset-player-name" style={nameStyle}>{getName(asset)}</span>
+                <span className="asset-player-name" style={nameStyle}>{asset.name}</span>
             </div>
         );
     }
