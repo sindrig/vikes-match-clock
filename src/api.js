@@ -1,5 +1,4 @@
-
-const store = window.localStorage;
+import DB from './db';
 
 const defaultState = {
     match: {
@@ -26,6 +25,8 @@ const defaultState = {
     view: 'IDLE',
 };
 
+const db = new DB(defaultState);
+
 const checkObjectKeys = (newState, against = defaultState) => {
     const newStateKeys = Object.keys(newState);
     const againstKeys = Object.keys(against);
@@ -45,30 +46,12 @@ const checkObjectKeys = (newState, against = defaultState) => {
 
 const saveState = (newState) => {
     checkObjectKeys(newState);
-    store.setItem('state', JSON.stringify(newState));
-    return newState;
+    return db.setAllData(newState);
 };
 
-export const clearState = () => new Promise(resolve => resolve(saveState(defaultState)));
+export const clearState = db.clearAllData;
 
-export const getState = () => new Promise((resolve) => {
-    const stateText = store.getItem('state');
-    if (!stateText) {
-        return resolve(saveState(defaultState));
-    }
-    try {
-        const result = JSON.parse(stateText);
-        const allExists = Object.keys(defaultState).every(key => result[key]);
-        if (!allExists) {
-            throw new Error('Missing some keys');
-        }
-        return resolve(result);
-    } catch (e) {
-        console.error('e', e);
-        store.removeItem('state');
-        return getState();
-    }
-});
+export const getState = db.getAllData;
 
 const positiveNumber = (score) => {
     if (Number.isNaN(score)) {
