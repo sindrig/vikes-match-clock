@@ -125,6 +125,7 @@ export default class TeamAssetController extends Component {
             type: assetTypes.SUB,
             subIn: subInObj,
             subOut: subOutObj,
+            key: `sub-${subInObj.key}-${subOutObj.key}`,
         }]);
         previousView();
     }

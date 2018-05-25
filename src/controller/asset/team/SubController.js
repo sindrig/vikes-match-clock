@@ -2,7 +2,9 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import { playerPropType } from '../../../propTypes';
 
-const SubController = ({ subTeam, subIn, subOut, addSubAsset }) => (
+const SubController = ({
+    subTeam, subIn, subOut, addSubAsset,
+}) => (
     <div>
         {subTeam}
         {subIn && <div className="substition-player">Út: {`#${subIn.number} - ${subIn.name}`}</div>}

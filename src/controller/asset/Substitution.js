@@ -6,11 +6,9 @@ import backgroundImage from '../../images/background.png';
 import './Substitution.css';
 
 const Substitution = ({ children, thumbnail }) => {
-    console.log('thumbnail', thumbnail);
     if (children.length !== 2) {
         console.error('Children should have length 2, received ', children);
     }
-    console.log('children', children);
     return (
         <div
             className={`asset-substitution${thumbnail ? ' thumbnail' : ''}`}
