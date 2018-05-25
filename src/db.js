@@ -1,10 +1,9 @@
-import { set, get, keys, clear } from 'idb-keyval';
+import { set, get, keys, clear } from './idb-keyval';
 
 export default class DB {
     constructor(defaultState) {
         this.getAllData = this.getAllData.bind(this);
         this.setAllData = this.setAllData.bind(this);
-        this.clearAllData = this.clearAllData.bind(this);
         this.defaultState = defaultState;
     }
 
