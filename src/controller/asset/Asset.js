@@ -134,7 +134,7 @@ export default class Asset extends Component {
             const { subIn, subOut } = asset;
             return (
                 <Substitution thumbnail={thumbnail}>
-                    {[subOut, subIn].map(this.getPlayerAsset)}
+                    {[subIn, subOut].map(this.getPlayerAsset)}
                 </Substitution>
             );
         }
