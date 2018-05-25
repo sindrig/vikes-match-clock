@@ -30,7 +30,5 @@ export default class DB {
             .then(this.getAllData);
     }
 
-    clearAllData() {
-        return clear();
-    }
+    clearAllData = clear;
 }
