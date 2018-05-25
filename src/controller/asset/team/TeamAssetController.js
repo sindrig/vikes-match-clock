@@ -77,6 +77,7 @@ export default class TeamAssetController extends Component {
             loading: false,
             error: '',
             selectSubs: false,
+            subTeam: null,
             subIn: null,
             subOut: null,
         };
@@ -130,7 +131,10 @@ export default class TeamAssetController extends Component {
 
     selectSubs(player, teamName) {
         const { subIn } = this.state;
-        this.setState({ [subIn ? 'subOut' : 'subIn']: { teamName, ...player } });
+        this.setState({
+            [subIn ? 'subOut' : 'subIn']: { teamName, ...player },
+            subTeam: teamName,
+        });
     }
 
     clearTeams() {
@@ -193,8 +197,11 @@ export default class TeamAssetController extends Component {
                     homeTeam, awayTeam,
                 },
             },
+            match,
         } = this.props;
-        const { subIn, subOut, selectSubs } = this.state;
+        const {
+            subIn, subOut, selectSubs, subTeam,
+        } = this.state;
         return (
             <div>
                 <div className="control-item">
@@ -221,6 +228,7 @@ export default class TeamAssetController extends Component {
                             selectSubs: false,
                             subIn: null,
                             subOut: null,
+                            subTeam: null,
                         })}
                     >
                         Hætta við skiptingu
@@ -233,6 +241,7 @@ export default class TeamAssetController extends Component {
                             subIn={subIn}
                             subOut={subOut}
                             addSubAsset={this.addSubAsset}
+                            subTeam={subTeam ? match[subTeam] : null}
                         />
                     </div>
                 ) : null}
@@ -242,7 +251,7 @@ export default class TeamAssetController extends Component {
 
     render() {
         const {
-            loading, error, selectSubs,
+            loading, error, selectSubs, subTeam,
         } = this.state;
         const {
             controllerState: {
@@ -262,13 +271,17 @@ export default class TeamAssetController extends Component {
                         team={homeTeam}
                         teamName="homeTeam"
                         updateTeams={updateTeams}
-                        selectSub={selectSubs ? this.selectSubs : null}
+                        selectSub={selectSubs && (!subTeam || subTeam === 'homeTeam') ?
+                            this.selectSubs : null}
+                        subTeam={subTeam}
                     />
                     <Team
                         team={awayTeam}
                         teamName="awayTeam"
                         updateTeams={updateTeams}
-                        selectSub={selectSubs ? this.selectSubs : null}
+                        selectSub={selectSubs && (!subTeam || subTeam === 'awayTeam') ?
+                            this.selectSubs : null}
+                        subTeam={subTeam}
                     />
                 </div>
             </div>
