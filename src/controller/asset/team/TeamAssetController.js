@@ -8,6 +8,7 @@ import * as assets from '../../../assets';
 
 import lambda from '../../../lambda';
 import Team from './Team';
+import SubController from './SubController';
 
 const awsConf = {
     region: lambda.region,
@@ -35,7 +36,8 @@ const ensureCredentials = () => new Promise((resolve, reject) => {
 
 const VIKES = 'Víkingur R';
 
-const getPlayerAsset = ({ player, isVikes, teamName }) => {
+const getPlayerAsset = ({ player, teamName }) => {
+    const isVikes = teamName === VIKES
     if (isVikes) {
         const keyMatcher = new RegExp(`players/0?${player.number}`);
         console.log('player.number, keyMatcher', player.number, keyMatcher);
@@ -63,10 +65,15 @@ export default class TeamAssetController extends Component {
         this.state = {
             loading: false,
             error: '',
+            selectSubs: false,
+            subIn: null,
+            subOut: null,
         };
         this.autoFill = this.autoFill.bind(this);
         this.clearTeams = this.clearTeams.bind(this);
         this.addPlayersToQ = this.addPlayersToQ.bind(this);
+        this.selectSubs = this.selectSubs.bind(this);
+        this.addSubAsset = this.addSubAsset.bind(this);
     }
 
     addPlayersToQ() {
@@ -81,14 +88,35 @@ export default class TeamAssetController extends Component {
             previousView,
         } = this.props;
         const teamAssets = [
-            { team: awayTeam, isVikes: match.awayTeam === VIKES, teamName: match.awayTeam },
-            { team: homeTeam, isVikes: match.homeTeam === VIKES, teamName: match.homeTeam },
-        ].map(({ team, isVikes, teamName }) =>
+            { team: awayTeam, teamName: match.awayTeam },
+            { team: homeTeam, teamName: match.homeTeam },
+        ].map(({ team, teamName }) =>
             team.filter(p => p.show)
-                .map(player => getPlayerAsset({ player, isVikes, teamName })));
+                .map(player => getPlayerAsset({ player, teamName })));
         const flattened = [].concat(...teamAssets);
         addAssets(flattened);
         previousView();
+    }
+
+    addSubAsset() {
+        const { subIn, subOut } = this.state;
+        const { match, addAssets, previousView } = this.props;
+        const subInString = getPlayerAsset({
+            player: subIn,
+            teamName: match[subIn.teamName],
+        });
+        const subOutString = getPlayerAsset({
+            player: subOut,
+            teamName: match[subIn.teamName],
+        });
+        const key = `sub!${subInString}!${subOutString}`;
+        addAssets([key]);
+        previousView();
+    }
+
+    selectSubs(player, teamName) {
+        const { subIn } = this.state;
+        this.setState({ [subIn ? 'subOut' : 'subIn']: { teamName, ...player } });
     }
 
     clearTeams() {
@@ -144,8 +172,64 @@ export default class TeamAssetController extends Component {
         });
     }
 
+    renderControls() {
+        const {
+            controllerState: {
+                teamPlayers: {
+                    homeTeam, awayTeam,
+                },
+            },
+        } = this.props;
+        const { subIn, subOut, selectSubs } = this.state;
+        return (
+            <div>
+                <div className="control-item">
+                    {!(homeTeam.length * awayTeam.length) ?
+                        <button onClick={this.autoFill}>Sækja lið</button> :
+                        null
+                    }
+                </div>
+                <div className="control-item">
+                    {(homeTeam.length * awayTeam.length) ?
+                        <button onClick={this.clearTeams}>Hreinsa lið</button> :
+                        null
+                    }
+                </div>
+                <div className="control-item">
+                    {(homeTeam.length * awayTeam.length) ?
+                        <button onClick={this.addPlayersToQ}>Setja lið í biðröð</button> :
+                        null
+                    }
+                </div>
+                {selectSubs ? (
+                    <button
+                        onClick={() => this.setState({
+                            selectSubs: false,
+                            subIn: null,
+                            subOut: null,
+                        })}
+                    >
+                        Hætta við skiptingu
+                    </button>
+                ) : <button onClick={() => this.setState({ selectSubs: true })}>Skipting</button>
+                }
+                {selectSubs ? (
+                    <div className="control-item">
+                        <SubController
+                            subIn={subIn}
+                            subOut={subOut}
+                            addSubAsset={this.addSubAsset}
+                        />
+                    </div>
+                ) : null}
+            </div>
+        );
+    }
+
     render() {
-        const { loading, error } = this.state;
+        const {
+            loading, error, selectSubs,
+        } = this.state;
         const {
             controllerState: {
                 teamPlayers: {
@@ -157,29 +241,20 @@ export default class TeamAssetController extends Component {
         return (
             <div className="team-asset-controller">
                 <RingLoader loading={loading} />
-                <div className="control-item">
-                    {!loading ? <button onClick={this.autoFill}>Sækja lið</button> : null}
-                </div>
-                <div className="control-item">
-                    {!loading ? <button onClick={this.clearTeams}>Hreinsa lið</button> : null}
-                </div>
-                <div className="control-item">
-                    {!loading ?
-                        <button onClick={this.addPlayersToQ}>Setja lið í biðröð</button> :
-                        null
-                    }
-                </div>
+                {!loading && this.renderControls()}
                 <span className="error">{error}</span>
                 <div className="team-asset-controller">
                     <Team
                         team={homeTeam}
                         teamName="homeTeam"
                         updateTeams={updateTeams}
+                        selectSub={selectSubs ? this.selectSubs : null}
                     />
                     <Team
                         team={awayTeam}
                         teamName="awayTeam"
                         updateTeams={updateTeams}
+                        selectSub={selectSubs ? this.selectSubs : null}
                     />
                 </div>
             </div>
