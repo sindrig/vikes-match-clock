@@ -62,8 +62,6 @@ export default class Asset extends Component {
         if (asset.type === assetTypes.PLAYER) {
             return (
                 <PlayerCard
-                    playerNumber={asset.number}
-                    playerName={asset.name}
                     asset={asset}
                     thumbnail={thumbnail}
                 >
@@ -71,11 +69,9 @@ export default class Asset extends Component {
                 </PlayerCard>
             );
         } else if (asset.type === assetTypes.NO_IMAGE_PLAYER) {
-            const { number, name, teamName } = asset;
+            const { teamName } = asset;
             return (
                 <PlayerCard
-                    playerNumber={parseInt(number, 10)}
-                    playerName={name}
                     asset={asset}
                     thumbnail={thumbnail}
                 >
