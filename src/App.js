@@ -2,7 +2,7 @@ import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 import { Shortcuts } from 'react-shortcuts';
 
-import { getState, updateMatch, updateView, updateController } from './api';
+import { getState, updateMatch, updateView, updateController, clearState } from './api';
 import ShortcutManager from './utils/ShortcutManager';
 
 import Controller from './controller/Controller';
@@ -125,6 +125,7 @@ class App extends Component {
                         renderAsset={this.setOverlay}
                         controllerState={this.state.controller}
                         updateState={this.updateController}
+                        clearState={clearState}
                     />
                 }
                 {this.renderOverlay()}

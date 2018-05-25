@@ -3,12 +3,11 @@ import PropTypes from 'prop-types';
 
 import MatchActions from './MatchActions';
 import AssetController from './asset/AssetController';
-import { clearState } from '../api';
 import { matchPropType, controllerPropType } from '../propTypes';
 import './Controller.css';
 
 const Controller = ({
-    updateMatch, state, selectView, views, renderAsset, controllerState, updateState,
+    updateMatch, state, selectView, views, renderAsset, controllerState, updateState, clearState,
 }) => {
     const matchAction = (attr, fn) => event => updateMatch({
         ...state.match,
@@ -51,6 +50,7 @@ const Controller = ({
 
 Controller.propTypes = {
     updateMatch: PropTypes.func.isRequired,
+    clearState: PropTypes.func.isRequired,
     selectView: PropTypes.func.isRequired,
     renderAsset: PropTypes.func.isRequired,
     views: PropTypes.arrayOf(PropTypes.string).isRequired,
