@@ -1,6 +1,7 @@
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 
+import { assetPropType } from '../../propTypes';
 import backgroundImage from '../../images/background.png';
 import { VP, THUMB_VP } from '../../constants';
 
@@ -25,10 +26,8 @@ const getMaxFontSize = (text, width, max) => {
 
 export default class PlayerCard extends Component {
     static propTypes = {
-        playerName: PropTypes.string.isRequired,
-        playerNumber: PropTypes.number.isRequired,
         thumbnail: PropTypes.bool,
-        assetKey: PropTypes.string.isRequired,
+        asset: assetPropType.isRequired,
         children: PropTypes.oneOfType([
             PropTypes.arrayOf(PropTypes.node),
             PropTypes.node,
@@ -58,17 +57,18 @@ export default class PlayerCard extends Component {
 
     render() {
         const {
-            playerNumber, playerName, thumbnail, assetKey, children,
+            thumbnail, asset, children,
         } = this.props;
         const { fontSizes } = this.state;
         const nameStyle = {
             fontSize: `${thumbnail ? fontSizes.thumbnail : fontSizes.regular}px`,
         };
+        console.log('asset', asset);
         return (
-            <div className="asset-player-icon" key={assetKey} style={{ backgroundImage: `url(${backgroundImage})` }}>
+            <div className="asset-player-icon" key={asset.key} style={{ backgroundImage: `url(${backgroundImage})` }}>
                 {children}
-                <span className="asset-player-number">{playerNumber}</span>
-                <span className="asset-player-name" style={nameStyle}>{playerName}</span>
+                <span className="asset-player-number">{asset.number}</span>
+                <span className="asset-player-name" style={nameStyle}>{asset.name}</span>
             </div>
         );
     }

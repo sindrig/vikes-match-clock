@@ -1,5 +1,6 @@
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
+import { assetPropType } from '../../propTypes';
 
 import redXImage from '../../images/red-x.png';
 import './RemovableAsset.css';
@@ -11,7 +12,7 @@ export default class RemovableAsset extends Component {
             PropTypes.node,
         ]).isRequired,
         remove: PropTypes.func.isRequired,
-        assetKey: PropTypes.string.isRequired,
+        asset: assetPropType.isRequired,
     };
 
     state = {
@@ -19,7 +20,7 @@ export default class RemovableAsset extends Component {
     };
 
     render() {
-        const { children, remove, assetKey } = this.props;
+        const { children, remove, asset } = this.props;
         const { hover } = this.state;
         return (
             <div className="removable-asset-container">
@@ -28,10 +29,10 @@ export default class RemovableAsset extends Component {
                     onMouseEnter={() => this.setState({ hover: true })}
                     onMouseLeave={() => this.setState({ hover: false })}
                 >
-                    <button onClick={remove} className="removeButton"><img src={redXImage} alt="remove" /></button>
+                    <button onClick={() => remove(asset)} className="removeButton"><img src={redXImage} alt="remove" /></button>
                     {children}
                 </div>
-                {hover ? <div className="removable-asset-key-name">{assetKey}</div> : null}
+                {hover ? <div className="removable-asset-key-name">{asset.key}</div> : null}
             </div>
         );
     }

@@ -16,9 +16,14 @@ export const playerPropType = PropTypes.shape({
     show: PropTypes.bool,
 });
 
+export const assetPropType = PropTypes.shape({
+    key: PropTypes.string.isRequired,
+    type: PropTypes.string.isRequired,
+});
+
 export const controllerPropType = PropTypes.shape({
     assets: PropTypes.shape({
-        selectedAssets: PropTypes.arrayOf(PropTypes.string).isRequired,
+        selectedAssets: PropTypes.arrayOf(assetPropType).isRequired,
         cycle: PropTypes.bool.isRequired,
         imageSeconds: PropTypes.number.isRequired,
         autoPlay: PropTypes.bool.isRequired,

@@ -2,45 +2,21 @@ import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 import YouTube from 'react-youtube';
 
-import PlayerAsset from './PlayerAsset';
+import { assetPropType } from '../../propTypes';
 import PlayerCard from './PlayerCard';
 import Substitution from './Substitution';
 
 import * as assets from '../../assets';
+import assetTypes from './AssetTypes';
 import clubLogos from '../../images/clubLogos';
 
 import './Asset.css';
 
-const assetKeyTests = {
-    IMAGE: key => /\.((jpg)|(png))$/.test(key) && key.startsWith('assets/'),
-    YOUTUBE: key => /^http/.test(key) && key.indexOf('youtube') > 0,
-    PLAYER_IMG: key => /\.((jpg)|(png))$/.test(key) && key.startsWith('players/'),
-    CUSTOM_PLAYER: key => /^customPlayer\/\d+\/[\S ]+\/[\S ]+$/.test(key),
-    SUB: (key) => {
-        const parts = key.split('!');
-        if (parts[0] === 'sub' && parts.length === 3) {
-            return (
-                (
-                    assetKeyTests.PLAYER_IMG(parts[1]) || assetKeyTests.CUSTOM_PLAYER(parts[1])
-                )
-                &&
-                (
-                    assetKeyTests.PLAYER_IMG(parts[2]) || assetKeyTests.CUSTOM_PLAYER(parts[2])
-                )
-            );
-        }
-        return false;
-    },
-};
-
-export const checkKey = key => Object.values(assetKeyTests).some(keyTest => keyTest(key));
-
-const getType = key => Object.keys(assetKeyTests)
-    .find(keyTestKey => assetKeyTests[keyTestKey](key));
+export const checkKey = key => Object.keys(assetTypes).indexOf(key.type) !== -1;
 
 export default class Asset extends Component {
     static propTypes = {
-        assetKey: PropTypes.string.isRequired,
+        asset: assetPropType.isRequired,
         remove: PropTypes.func,
         thumbnail: PropTypes.bool,
         time: PropTypes.number,
@@ -55,6 +31,7 @@ export default class Asset extends Component {
     constructor(props) {
         super(props);
         this.timeout = null;
+        this.getPlayerAsset = this.getPlayerAsset.bind(this);
     }
 
     componentDidMount() {
@@ -71,36 +48,35 @@ export default class Asset extends Component {
 
     setTimeoutIfNecessary() {
         const {
-            time, thumbnail, remove, assetKey,
+            time, thumbnail, remove, asset,
         } = this.props;
         clearTimeout(this.timeout);
-        const type = getType(assetKey);
-        const typeNeedsManualRemove = type !== 'YOUTUBE';
+        const typeNeedsManualRemove = asset.type !== assetTypes.YOUTUBE;
         if (time && !thumbnail && remove && typeNeedsManualRemove) {
             this.timeout = setTimeout(remove, time * 1000);
         }
     }
 
-    getPlayerAsset(assetKey, type) {
+    getPlayerAsset(asset) {
         const { thumbnail } = this.props;
-        if (type === 'PLAYER_IMG') {
-            return (
-                <PlayerAsset
-                    assetKey={assetKey}
-                    thumbnail={thumbnail}
-                    asset={assets[assetKey]}
-                />
-            );
-        } else if (type === 'CUSTOM_PLAYER') {
-            const parts = assetKey.split('/');
-            // Get rid of "customPlayer"
-            parts.shift();
-            const [playerNumber, playerName, teamName] = parts;
+        if (asset.type === assetTypes.PLAYER) {
             return (
                 <PlayerCard
-                    playerNumber={parseInt(playerNumber, 10)}
-                    playerName={playerName}
-                    assetKey={assetKey}
+                    playerNumber={asset.number}
+                    playerName={asset.name}
+                    asset={asset}
+                    thumbnail={thumbnail}
+                >
+                    <img src={assets[asset.key]} alt={asset.key} />
+                </PlayerCard>
+            );
+        } else if (asset.type === assetTypes.NO_IMAGE_PLAYER) {
+            const { number, name, teamName } = asset;
+            return (
+                <PlayerCard
+                    playerNumber={parseInt(number, 10)}
+                    playerName={name}
+                    asset={asset}
                     thumbnail={thumbnail}
                 >
                     {clubLogos[teamName] ?
@@ -114,12 +90,12 @@ export default class Asset extends Component {
     }
 
     render() {
-        const { assetKey, thumbnail, remove } = this.props;
-        const type = getType(assetKey);
-        if (type === 'IMAGE') {
-            return <img src={assets[assetKey]} alt={assetKey} key={assetKey} />;
-        } else if (type === 'YOUTUBE') {
-            const url = new window.URL(assetKey);
+        const { asset, thumbnail, remove } = this.props;
+        if (asset.type === assetTypes.IMAGE) {
+            return <img src={assets[asset.key]} alt={asset.key} key={asset.key} />;
+        } else if (asset.type === assetTypes.URL) {
+            // TODO can only handle youtube
+            const url = new window.URL(asset.key);
             const params = url.search.replace('?', '').split('&');
             const videoId = params.map(p => p.split('=')).filter(kv => kv[0] === 'v').map(kv => kv[1])[0];
             if (videoId) {
@@ -151,17 +127,17 @@ export default class Asset extends Component {
                     </div>
                 );
             }
-        } else if (type === 'PLAYER_IMG' || type === 'CUSTOM_PLAYER') {
-            return this.getPlayerAsset(assetKey, type);
-        } else if (type === 'SUB') {
-            const parts = assetKey.split('!');
-            // get rid of "sub"
-            parts.shift();
-            const [playerOut, playerIn] = parts.map(p => this.getPlayerAsset(p, getType(p)));
-            // return <sub>{getplayerasset1}{getplayerasset2}
-            return <Substitution thumbnail={thumbnail}>{playerOut}{playerIn}</Substitution>;
+        } else if (asset.type === assetTypes.PLAYER || asset.type === assetTypes.NO_IMAGE_PLAYER) {
+            return this.getPlayerAsset(asset);
+        } else if (asset.type === assetTypes.SUB) {
+            const { subIn, subOut } = asset;
+            return (
+                <Substitution thumbnail={thumbnail}>
+                    {[subOut, subIn].map(this.getPlayerAsset)}
+                </Substitution>
+            );
         }
-        console.error('No type for key ', assetKey);
+        console.error('No type for item ', asset);
         return null;
     }
 }
