@@ -3,6 +3,8 @@ import PropTypes from 'prop-types';
 import { matchPropType, controllerPropType } from '../../propTypes';
 
 import RemovableAsset from './RemovableAsset';
+import AssetSelector from './AssetSelector';
+import assetTypes from './AssetTypes';
 import Asset, { checkKey } from './Asset';
 import * as assets from '../../assets';
 import TeamAssetController from './team/TeamAssetController';
@@ -29,7 +31,6 @@ export default class AssetController extends Component {
             error: '',
             assetView: ASSET_VIEWS.assets,
         };
-        this.onAddAsset = this.onAddAsset.bind(this);
         this.deleteNextAsset = this.deleteNextAsset.bind(this);
         this.showNextAsset = this.showNextAsset.bind(this);
         this.onCycleChange = this.onCycleChange.bind(this);
@@ -42,6 +43,8 @@ export default class AssetController extends Component {
         this.updateTeams = this.updateTeams.bind(this);
         this.addMultipleAssets = this.addMultipleAssets.bind(this);
         this.clearQueue = this.clearQueue.bind(this);
+        this.addAssetKey = this.addAssetKey.bind(this);
+        this.removeAsset = this.removeAsset.bind(this);
     }
 
     onCycleChange() {
@@ -70,15 +73,9 @@ export default class AssetController extends Component {
     }
 
 
-    onAddAsset(event) {
-        event.preventDefault();
-        const { target: { value } } = event;
-        return this.addAssetKey(value);
-    }
-
     addUrlAsset() {
         const { state: { assets: { freeTextAsset } } } = this.props;
-        return this.addAssetKey(freeTextAsset, { freeTextAsset: '' });
+        return this.addAssetKey({ type: assetTypes.URL, key: freeTextAsset }, { freeTextAsset: '' });
     }
 
     addAssetKey(key, extra = {}) {
@@ -166,7 +163,7 @@ export default class AssetController extends Component {
         } else {
             const nextAsset = this.deleteNextAsset();
             renderAsset(<Asset
-                assetKey={nextAsset}
+                asset={nextAsset}
                 remove={this.requestRemoval}
                 time={autoPlay ? imageSeconds : null}
             />);
@@ -186,25 +183,27 @@ export default class AssetController extends Component {
         return asset;
     }
 
-    removeAsset(key) {
-        return () => {
-            const { state: { assets: { selectedAssets } } } = this.props;
-            const idx = selectedAssets.indexOf(key);
-            if (idx > -1) {
-                const newAssets = [...selectedAssets];
-                newAssets.splice(idx, 1);
-                this.updateAssets({ selectedAssets: newAssets });
-            }
-        };
+    removeAsset(asset) {
+        const { state: { assets: { selectedAssets } } } = this.props;
+        const idx = selectedAssets.map(a => a.key).indexOf(asset.key);
+        if (idx > -1) {
+            const newAssets = [...selectedAssets];
+            newAssets.splice(idx, 1);
+            this.updateAssets({ selectedAssets: newAssets });
+        }
     }
 
     renderNextAsset() {
         const { state: { assets: { selectedAssets } } } = this.props;
         return (
             <div>
-                {selectedAssets.map(key => (
-                    <RemovableAsset remove={this.removeAsset(key)} key={key} assetKey={key}>
-                        <Asset assetKey={key} thumbnail />
+                {selectedAssets.map(asset => (
+                    <RemovableAsset
+                        asset={asset}
+                        remove={this.removeAsset}
+                        key={asset.key}
+                    >
+                        <Asset asset={asset} thumbnail />
                     </RemovableAsset>
                 ))}
             </div>
@@ -231,15 +230,15 @@ export default class AssetController extends Component {
         return (
             <div>
                 <div className="controls">
-                    <select onChange={this.onAddAsset} value="null">
+                    <AssetSelector addAssetKey={this.addAssetKey}>
                         <option value="null">Myndir</option>
                         {Object
                             .keys(assets)
-                            .filter(key => selectedAssets.indexOf(key) === -1)
+                            .filter(key => selectedAssets.map(a => a.key).indexOf(key) === -1)
                             .map(key => ({ key, name: key.split('/')[key.split('/').length - 1] }))
                             .map(({ key, name }) => <option value={key} key={key}>{name}</option>)
                         }
-                    </select>
+                    </AssetSelector>
                     <span>{selectedAssets.length} í biðröð</span>
                     {selectedAssets.length ?
                         <button onClick={this.clearQueue}>Hreinsa biðröð</button> :

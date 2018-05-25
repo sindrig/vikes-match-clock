@@ -9,6 +9,7 @@ import * as assets from '../../../assets';
 import lambda from '../../../lambda';
 import Team from './Team';
 import SubController from './SubController';
+import assetTypes from '../AssetTypes';
 
 const awsConf = {
     region: lambda.region,
@@ -37,17 +38,27 @@ const ensureCredentials = () => new Promise((resolve, reject) => {
 const VIKES = 'Víkingur R';
 
 const getPlayerAsset = ({ player, teamName }) => {
-    const isVikes = teamName === VIKES
+    const isVikes = teamName === VIKES;
     if (isVikes) {
         const keyMatcher = new RegExp(`players/0?${player.number}`);
-        console.log('player.number, keyMatcher', player.number, keyMatcher);
-        // const possibleKey = `players/${player.number}`;
-        const asset = Object.keys(assets).find(key => key.match(keyMatcher));
-        if (asset) {
-            return asset;
+        const assetKey = Object.keys(assets).find(key => key.match(keyMatcher));
+        if (assetKey) {
+            return {
+                type: assetTypes.PLAYER,
+                key: assetKey,
+                name: player.name,
+                number: player.number,
+                teamName,
+            };
         }
     }
-    return `customPlayer/${player.number}/${player.name}/${teamName}`;
+    return {
+        type: assetTypes.NO_IMAGE_PLAYER,
+        key: `custom-${player.number}-${player.name}`,
+        name: player.name,
+        number: player.number,
+        teamName,
+    };
 };
 
 export default class TeamAssetController extends Component {
@@ -101,16 +112,19 @@ export default class TeamAssetController extends Component {
     addSubAsset() {
         const { subIn, subOut } = this.state;
         const { match, addAssets, previousView } = this.props;
-        const subInString = getPlayerAsset({
+        const subInObj = getPlayerAsset({
             player: subIn,
             teamName: match[subIn.teamName],
         });
-        const subOutString = getPlayerAsset({
+        const subOutObj = getPlayerAsset({
             player: subOut,
             teamName: match[subIn.teamName],
         });
-        const key = `sub!${subInString}!${subOutString}`;
-        addAssets([key]);
+        addAssets([{
+            type: assetTypes.SUB,
+            subIn: subInObj,
+            subOut: subOutObj,
+        }]);
         previousView();
     }
 
