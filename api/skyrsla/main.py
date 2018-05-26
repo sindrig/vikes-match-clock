@@ -76,6 +76,17 @@ def get_players(match_id):
     return dict(result)
 
 
+def no_match_found(home_team, away_team):
+    return {
+        'error': {
+            'key': 'NO_MATCH_FOUND',
+            'text': 'No match found for these teams (%s-%s)' % (
+                home_team, away_team,
+            )
+        }
+    }
+
+
 def handler(json_input, context, date=None):
     date = date or datetime.date.today()
     try:
@@ -90,24 +101,20 @@ def handler(json_input, context, date=None):
         }
     matches = get_matches(home_team, away_team, date)
     if not matches:
-        return {
-            'error': {
-                'key': 'NO_MATCH_FOUND',
-                'text': 'No match found for these teams (%s-%s)' % (
-                    home_team, away_team,
-                )
-            }
-        }
+        return no_match_found(home_team, away_team)
     elif isinstance(matches, dict) and 'error' in matches:
         return matches
-    return {
-        'matches': {
-            match.match_id: {
-                'players': get_players(match.match_id),
+    result = {}
+    for match in matches:
+        players = get_players(match.match_id)
+        if players and 'error' not in players:
+            result[match.match_id] = {
+                'players': players,
                 'group': match.group,
-            } for match in matches
-        }
-    }
+            }
+    if not result:
+        return no_match_found(home_team, away_team)
+    return result
 
 
 if __name__ == '__main__':
