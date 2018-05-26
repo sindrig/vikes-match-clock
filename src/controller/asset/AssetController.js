@@ -8,12 +8,8 @@ import Asset, { checkKey } from './Asset';
 import * as assets from '../../assets';
 import TeamAssetController from './team/TeamAssetController';
 import UrlController from './UrlController';
+import { ASSET_VIEWS } from '../../api';
 import './AssetController.css';
-
-const ASSET_VIEWS = {
-    assets: 'assets',
-    team: 'team',
-};
 
 export default class AssetController extends Component {
     // TODO save state in localstorage
@@ -29,7 +25,6 @@ export default class AssetController extends Component {
         this.state = {
             playing: false,
             error: '',
-            assetView: ASSET_VIEWS.assets,
         };
         this.deleteNextAsset = this.deleteNextAsset.bind(this);
         this.showNextAsset = this.showNextAsset.bind(this);
@@ -273,26 +268,25 @@ export default class AssetController extends Component {
     }
 
     render() {
-        const { match, state } = this.props;
-        const { assetView } = this.state;
+        const { match, state, updateState } = this.props;
         return (
             <div className="asset-controller">
                 <div className="view-selector">
-                    <button onClick={() => this.setState({ assetView: ASSET_VIEWS.assets })}>
+                    <button onClick={() => updateState({ assetView: ASSET_VIEWS.assets })}>
                         Biðröð
                     </button>
-                    <button onClick={() => this.setState({ assetView: ASSET_VIEWS.teams })}>
+                    <button onClick={() => updateState({ assetView: ASSET_VIEWS.teams })}>
                         Lið
                     </button>
                 </div>
-                {assetView === ASSET_VIEWS.assets && this.renderAssetController()}
-                {assetView === ASSET_VIEWS.teams && (
+                {state.assetView === ASSET_VIEWS.assets && this.renderAssetController()}
+                {state.assetView === ASSET_VIEWS.teams && (
                     <TeamAssetController
                         addAssets={this.addMultipleAssets}
                         match={match}
                         updateTeams={this.updateTeams}
                         controllerState={state}
-                        previousView={() => this.setState({ assetView: ASSET_VIEWS.assets })}
+                        previousView={() => updateState({ assetView: ASSET_VIEWS.assets })}
                     />
                 )}
             </div>

@@ -1,4 +1,5 @@
 import PropTypes from 'prop-types';
+import { ASSET_VIEWS } from './api';
 
 export const matchPropType = PropTypes.shape({
     homeScore: PropTypes.number,
@@ -32,4 +33,5 @@ export const controllerPropType = PropTypes.shape({
         homeTeam: PropTypes.arrayOf(playerPropType).isRequired,
         awayTeam: PropTypes.arrayOf(playerPropType).isRequired,
     }),
+    assetView: PropTypes.oneOf(Object.values(ASSET_VIEWS)),
 });
