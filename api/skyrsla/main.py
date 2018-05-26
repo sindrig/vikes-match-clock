@@ -1,13 +1,14 @@
 import argparse
 import datetime
 import pprint
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 from suds.client import Client
 
 WSDL_URL = 'http://www2.ksi.is/vefthjonustur/mot.asmx?WSDL'
 VIKES = '103'
 
 client = Client(WSDL_URL)
+Match = namedtuple('Match', ('match_id', 'group', ))
 
 
 def get_player(player):
@@ -18,7 +19,7 @@ def get_player(player):
     }
 
 
-def get_match_id(home_team, away_team, date):
+def get_matches(home_team, away_team, date):
     result = client.service.FelogLeikir(
         FelagNumer=home_team,
         DagsFra=date - datetime.timedelta(10),
@@ -30,9 +31,13 @@ def get_match_id(home_team, away_team, date):
 
     if hasattr(result, 'Villa'):
         return {
-            'error': result.Villa,
+            'error': {
+                'key': 'UPSTREAM_ERROR',
+                'text': result.Villa,
+            }
         }
     games = result.ArrayFelogLeikir.FelogLeikir
+    matches = []
     for game in games:
         print(game.FelagHeimaNafn, '-', game.FelagUtiNafn)
         if (
@@ -40,30 +45,21 @@ def get_match_id(home_team, away_team, date):
             game.FelagUtiNumer == away_team
         ):
             print('Found match: %s' % (game.LeikurNumer, ))
-            return game.LeikurNumer
+            matches.append(Match(game.LeikurNumer, game.Flokkur))
+    return matches
 
 
-def handler(json_input, context, date=None):
-    date = date or datetime.date.today()
-    try:
-        home_team = int(json_input['homeTeam'])
-        away_team = int(json_input['awayTeam'])
-    except ValueError:
-        return {
-            'error': 'homeTeam and awayTeam must be integers'
-        }
-    match_id = get_match_id(home_team, away_team, date)
-    if not match_id:
-        return {
-            'error': 'No match found for these teams (%s-%s)' % (
-                home_team, away_team,
-            )
-        }
-    elif isinstance(match_id, dict) and 'error' in match_id:
-        return match_id
+def get_players(match_id):
     game = client.service.LeikurLeikmenn(LeikurNumer=match_id)
     result = defaultdict(list)
     captains = {}
+    if not game.ArrayLeikurLeikmenn:
+        return {
+            'error': {
+                'key': 'NO_PLAYERS',
+                'text': 'No players found for game %s' % (match_id, ),
+            }
+        }
     for player in game.ArrayLeikurLeikmenn.LeikurLeikmenn:
         club_id = str(player.FelagNumer)
         player_dict = get_player(player)
@@ -78,6 +74,40 @@ def handler(json_input, context, date=None):
         else:
             result[club_id].append(player_dict)
     return dict(result)
+
+
+def handler(json_input, context, date=None):
+    date = date or datetime.date.today()
+    try:
+        home_team = int(json_input['homeTeam'])
+        away_team = int(json_input['awayTeam'])
+    except ValueError:
+        return {
+            'error': {
+                'key': 'BAD_INPUT',
+                'text': 'homeTeam and awayTeam must be integers',
+            }
+        }
+    matches = get_matches(home_team, away_team, date)
+    if not matches:
+        return {
+            'error': {
+                'key': 'NO_MATCH_FOUND',
+                'text': 'No match found for these teams (%s-%s)' % (
+                    home_team, away_team,
+                )
+            }
+        }
+    elif isinstance(matches, dict) and 'error' in matches:
+        return matches
+    return {
+        'matches': {
+            match.match_id: {
+                'players': get_players(match.match_id),
+                'group': match.group,
+            } for match in matches
+        }
+    }
 
 
 if __name__ == '__main__':

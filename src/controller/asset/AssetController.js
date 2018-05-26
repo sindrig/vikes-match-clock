@@ -4,10 +4,10 @@ import { matchPropType, controllerPropType } from '../../propTypes';
 
 import RemovableAsset from './RemovableAsset';
 import AssetSelector from './AssetSelector';
-import assetTypes from './AssetTypes';
 import Asset, { checkKey } from './Asset';
 import * as assets from '../../assets';
 import TeamAssetController from './team/TeamAssetController';
+import UrlController from './UrlController';
 import './AssetController.css';
 
 const ASSET_VIEWS = {
@@ -37,8 +37,6 @@ export default class AssetController extends Component {
         this.onAutoPlayChange = this.onAutoPlayChange.bind(this);
         this.onImageSecondsChange = this.onImageSecondsChange.bind(this);
         this.pause = this.pause.bind(this);
-        this.onTextChange = this.onTextChange.bind(this);
-        this.addUrlAsset = this.addUrlAsset.bind(this);
         this.requestRemoval = this.requestRemoval.bind(this);
         this.updateTeams = this.updateTeams.bind(this);
         this.addMultipleAssets = this.addMultipleAssets.bind(this);
@@ -66,35 +64,26 @@ export default class AssetController extends Component {
         this.updateAssets({ imageSeconds: Math.max(parseInt(value, 10), 1) });
     }
 
-    onTextChange(event) {
-        event.preventDefault();
-        const { target: { value } } = event;
-        this.updateAssets({ freeTextAsset: value });
-    }
-
-
-    addUrlAsset() {
-        const { state: { assets: { freeTextAsset } } } = this.props;
-        return this.addAssetKey({ type: assetTypes.URL, key: freeTextAsset }, { freeTextAsset: '' });
-    }
-
     addAssetKey(key, extra = {}) {
         return this.addMultipleAssets([key], extra);
     }
 
-    addMultipleAssets(assetKeys, extra = {}) {
+    addMultipleAssets(assetList, extra = {}) {
+        if (Object.keys(extra).length) {
+            console.error('Someone is using extra... ', extra);
+        }
         const { state: { assets: { selectedAssets } } } = this.props;
         const updatedAssets = [...selectedAssets];
         const errors = [];
-        assetKeys.forEach((key) => {
-            if (checkKey(key)) {
-                if (selectedAssets.indexOf(key) === -1) {
-                    updatedAssets.push(key);
+        assetList.forEach((asset) => {
+            if (checkKey(asset)) {
+                if (updatedAssets.map(s => s.key).indexOf(asset.key) === -1) {
+                    updatedAssets.push(asset);
                 } else {
-                    errors.push(`Key ${key} already in asset list.`);
+                    errors.push(`Asset ${asset.key} already in asset list.`);
                 }
             } else {
-                errors.push(`Unknown key ${key}`);
+                errors.push(`Unknown asset ${asset.key}`);
             }
         });
         this.updateAssets({ selectedAssets: updatedAssets, ...extra });
@@ -113,14 +102,14 @@ export default class AssetController extends Component {
         const {
             state: {
                 assets: {
-                    selectedAssets, cycle, imageSeconds, autoPlay, freeTextAsset,
+                    selectedAssets, cycle, imageSeconds, autoPlay,
                 },
             },
             updateState,
         } = this.props;
         updateState({
             assets: {
-                selectedAssets, cycle, imageSeconds, autoPlay, freeTextAsset, ...newState,
+                selectedAssets, cycle, imageSeconds, autoPlay, ...newState,
             },
         });
     }
@@ -222,14 +211,14 @@ export default class AssetController extends Component {
         const {
             state: {
                 assets: {
-                    cycle, selectedAssets, imageSeconds, autoPlay, freeTextAsset,
+                    cycle, selectedAssets, imageSeconds, autoPlay,
                 },
             },
         } = this.props;
         const { playing } = this.state;
         return (
             <div>
-                <div className="controls">
+                <div className="controls control-item">
                     <AssetSelector addAssetKey={this.addAssetKey}>
                         <option value="null">Myndir</option>
                         {Object
@@ -273,13 +262,7 @@ export default class AssetController extends Component {
                             />sek
                         </div>
                     }
-                    Url: <input
-                        type="text"
-                        onChange={this.onTextChange}
-                        value={freeTextAsset}
-                        style={{ width: '95px' }}
-                    />
-                    <button onClick={this.addUrlAsset}>Bæta við</button>
+                    <UrlController addAsset={this.addAssetKey} />
                     {this.renderError()}
                 </div>
                 <div className="upcoming-assets">

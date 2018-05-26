@@ -28,12 +28,14 @@ const TeamPlayer = ({ player, onChange }) => (
             value={player.number || ''}
             onChange={e => handler(onChange, 'number', e)}
             className="team-player-number"
+            placeholder="#"
         />
         <input
             type="text"
             value={player.name || ''}
             onChange={e => handler(onChange, 'name', e)}
             className="team-player-name"
+            placeholder="Nafn"
         />
         {false && <input
             type="text"

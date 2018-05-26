@@ -27,7 +27,6 @@ export const controllerPropType = PropTypes.shape({
         cycle: PropTypes.bool.isRequired,
         imageSeconds: PropTypes.number.isRequired,
         autoPlay: PropTypes.bool.isRequired,
-        freeTextAsset: PropTypes.string.isRequired,
     }),
     teamPlayers: PropTypes.shape({
         homeTeam: PropTypes.arrayOf(playerPropType).isRequired,

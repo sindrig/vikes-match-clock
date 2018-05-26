@@ -15,7 +15,6 @@ const defaultState = {
             cycle: false,
             imageSeconds: 3,
             autoPlay: false,
-            freeTextAsset: '',
         },
         teamPlayers: {
             homeTeam: [],
@@ -27,19 +26,20 @@ const defaultState = {
 
 const db = new DB(defaultState);
 
-const checkObjectKeys = (newState, against = defaultState) => {
-    const newStateKeys = Object.keys(newState);
-    const againstKeys = Object.keys(against);
+const checkObjectKeys = (newState, against = defaultState, depth = 0) => {
+    const filterUpper = key => !depth && key !== key.toUpperCase();
+    const newStateKeys = Object.keys(newState).filter(filterUpper);
+    const againstKeys = Object.keys(against).filter(filterUpper);
     if (newStateKeys.length === againstKeys.length) {
         againstKeys.forEach((key) => {
             if (newState[key] === undefined) {
                 console.error(`Missing ${key} in newState`);
-            }
-            if (against[key] && Object.prototype.toString.call(against[key]) === '[object Object]') {
-                checkObjectKeys(newState[key], against[key]);
+            } else if (against[key] && Object.prototype.toString.call(against[key]) === '[object Object]') {
+                checkObjectKeys(newState[key], against[key], depth + 1);
             }
         });
     } else {
+        console.log('depth', depth);
         console.error('Key count differs', newState, against);
     }
 };
@@ -49,7 +49,7 @@ const saveState = (newState) => {
     return db.setAllData(newState);
 };
 
-export const clearState = db.clearAllData;
+export const clearState = db.clear;
 
 export const getState = db.getAllData;
 
@@ -81,3 +81,6 @@ export const updateMatch = ({
 export const updateView = view => getState().then(state => saveState({ ...state, view }));
 export const updateController = controller => getState()
     .then(state => saveState({ ...state, controller: { ...state.controller, ...controller } }));
+
+export const getKey = key => db.get(key);
+export const setKey = (key, value) => db.set(key, value);
