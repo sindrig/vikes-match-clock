@@ -62,7 +62,7 @@ export default class Asset extends Component {
         }
     }
 
-    getPlayerAsset(asset) {
+    getPlayerAsset({ asset, widthMultiplier }) {
         const { thumbnail } = this.props;
         if (asset.type === assetTypes.PLAYER) {
             return (
@@ -82,7 +82,7 @@ export default class Asset extends Component {
                     asset={asset}
                     thumbnail={thumbnail}
                     className="player-card-no-image"
-                    widthMultiplier={0.5}
+                    widthMultiplier={widthMultiplier}
                     key={asset.key}
                 >
                     {clubLogos[teamName] ?
@@ -147,12 +147,12 @@ export default class Asset extends Component {
         } else if (asset.type === assetTypes.URL) {
             return this.renderUrl();
         } else if (asset.type === assetTypes.PLAYER || asset.type === assetTypes.NO_IMAGE_PLAYER) {
-            return this.getPlayerAsset(asset);
+            return this.getPlayerAsset({ asset, widthMultiplier: 1 });
         } else if (asset.type === assetTypes.SUB) {
             const { subIn, subOut } = asset;
             return (
                 <Substitution thumbnail={thumbnail}>
-                    {[subIn, subOut].map(this.getPlayerAsset)}
+                    {[subIn, subOut].map(asset => this.getPlayerAsset({ asset, widthMultiplier: 0.5 }))}
                 </Substitution>
             );
         }
