@@ -5,11 +5,16 @@ import { RingLoader } from 'react-spinners';
 import { matchPropType, controllerPropType } from '../../../propTypes';
 import clubIds from '../../../club-ids';
 import * as assets from '../../../assets';
+import { getKey, setKey } from '../../../api';
 
 import lambda from '../../../lambda';
 import Team from './Team';
 import SubController from './SubController';
 import assetTypes from '../AssetTypes';
+import lambdaExample from '../../../debug/lambda-example';
+
+const DEBUG = false;
+const AVAILABLE_MATCHES = 'AVAILABLE_MATCHES';
 
 const awsConf = {
     region: lambda.region,
@@ -37,30 +42,6 @@ const ensureCredentials = () => new Promise((resolve, reject) => {
 
 const VIKES = 'Víkingur R';
 
-const getPlayerAsset = ({ player, teamName }) => {
-    const isVikes = teamName === VIKES;
-    if (isVikes) {
-        const keyMatcher = new RegExp(`players/0?${player.number}`);
-        const assetKey = Object.keys(assets).find(key => key.match(keyMatcher));
-        if (assetKey) {
-            return {
-                type: assetTypes.PLAYER,
-                key: assetKey,
-                name: player.name,
-                number: player.number,
-                teamName,
-            };
-        }
-    }
-    return {
-        type: assetTypes.NO_IMAGE_PLAYER,
-        key: `custom-${player.number}-${player.name}`,
-        name: player.name,
-        number: player.number,
-        teamName,
-    };
-};
-
 export default class TeamAssetController extends Component {
     // TODO save state in localstorage
     static propTypes = {
@@ -80,12 +61,56 @@ export default class TeamAssetController extends Component {
             subTeam: null,
             subIn: null,
             subOut: null,
+            availableMatches: null,
+            selectedMatch: null,
         };
         this.autoFill = this.autoFill.bind(this);
         this.clearTeams = this.clearTeams.bind(this);
         this.addPlayersToQ = this.addPlayersToQ.bind(this);
         this.selectSubs = this.selectSubs.bind(this);
         this.addSubAsset = this.addSubAsset.bind(this);
+        this.selectMatch = this.selectMatch.bind(this);
+    }
+
+    componentDidMount() {
+        console.log('getKey(AVAILABLE_MATCHES)', getKey(AVAILABLE_MATCHES));
+        getKey(AVAILABLE_MATCHES).then(availableMatches => this.setState({
+            availableMatches,
+            selectedMatch: Object.keys(availableMatches.matches)[0],
+        }));
+    }
+
+    getPlayerAssetObject({ player, teamName }) {
+        const {
+            selectedMatch, availableMatches: { matches },
+        } = this.state;
+        const { group } = matches[selectedMatch];
+        if (!player.name || !player.number) {
+            return null;
+        }
+        if (group.match(/meistara/i)) {
+            const isVikes = teamName === VIKES;
+            if (isVikes) {
+                const keyMatcher = new RegExp(`players/0?${player.number}`);
+                const assetKey = Object.keys(assets).find(key => key.match(keyMatcher));
+                if (assetKey) {
+                    return {
+                        type: assetTypes.PLAYER,
+                        key: assetKey,
+                        name: player.name,
+                        number: player.number,
+                        teamName,
+                    };
+                }
+            }
+        }
+        return {
+            type: assetTypes.NO_IMAGE_PLAYER,
+            key: `custom-${player.number}-${player.name}`,
+            name: player.name,
+            number: player.number,
+            teamName,
+        };
     }
 
     addPlayersToQ() {
@@ -104,20 +129,24 @@ export default class TeamAssetController extends Component {
             { team: homeTeam, teamName: match.homeTeam },
         ].map(({ team, teamName }) =>
             team.filter(p => p.show)
-                .map(player => getPlayerAsset({ player, teamName })));
+                .map(player => this.getPlayerAssetObject({ player, teamName })));
         const flattened = [].concat(...teamAssets);
-        addAssets(flattened);
-        previousView();
+        if (!flattened.every(i => i)) {
+            this.setState({ error: 'Missing name/number for some players to show' });
+        } else {
+            addAssets(flattened);
+            previousView();
+        }
     }
 
     addSubAsset() {
         const { subIn, subOut } = this.state;
         const { match, addAssets, previousView } = this.props;
-        const subInObj = getPlayerAsset({
+        const subInObj = this.getPlayerAssetObject({
             player: subIn,
             teamName: match[subIn.teamName],
         });
-        const subOutObj = getPlayerAsset({
+        const subOutObj = this.getPlayerAssetObject({
             player: subOut,
             teamName: match[subIn.teamName],
         });
@@ -144,13 +173,29 @@ export default class TeamAssetController extends Component {
             homeTeam: [],
             awayTeam: [],
         });
+        setKey(AVAILABLE_MATCHES, null);
+        this.setState({
+            availableMatches: null,
+            selectedMatch: null,
+        });
     }
 
     handleTeams(data) {
+        setKey(AVAILABLE_MATCHES, data);
+        const firstKey = Object.keys(data.matches)[0];
+        this.setState({
+            availableMatches: data,
+            selectedMatch: firstKey,
+        });
+        this.handleMatch(data.matches[firstKey]);
+    }
+
+    handleMatch(match) {
         const { match: { homeTeam, awayTeam }, updateTeams } = this.props;
+        const mapper = (p, i) => ({ ...p, show: i < 11 });
         updateTeams({
-            homeTeam: data[clubIds[homeTeam]].map((p, i) => ({ ...p, show: i < 11 })),
-            awayTeam: data[clubIds[awayTeam]].map((p, i) => ({ ...p, show: i < 11 })),
+            homeTeam: match.players[clubIds[homeTeam]].map(mapper),
+            awayTeam: match.players[clubIds[awayTeam]].map(mapper),
         });
     }
 
@@ -162,33 +207,46 @@ export default class TeamAssetController extends Component {
         }
         this.setState({ loading: true });
 
-        ensureCredentials().then(() => {
-            const fn = new AWS.Lambda({
-                region: lambda.region,
-                apiVersion: '2015-03-31',
-            });
-            const fnParams = {
-                FunctionName: lambda.skyrslaFunction,
-                InvocationType: 'RequestResponse',
-                Payload: JSON.stringify({
-                    homeTeam: clubIds[homeTeam],
-                    awayTeam: clubIds[awayTeam],
-                }),
-            };
-            fn.invoke(fnParams, (error, data) => {
-                if (error) {
-                    this.setState({ error });
-                } else {
-                    const json = JSON.parse(data.Payload);
-                    if (json.error) {
-                        this.setState({ error: json.error });
+        if (DEBUG) {
+            this.handleTeams(lambdaExample);
+            this.setState({ loading: false });
+        } else {
+            ensureCredentials().then(() => {
+                const fn = new AWS.Lambda({
+                    region: lambda.region,
+                    apiVersion: '2015-03-31',
+                });
+                const fnParams = {
+                    FunctionName: lambda.skyrslaFunction,
+                    InvocationType: 'RequestResponse',
+                    Payload: JSON.stringify({
+                        homeTeam: clubIds[homeTeam],
+                        awayTeam: clubIds[awayTeam],
+                    }),
+                };
+                fn.invoke(fnParams, (error, data) => {
+                    if (error) {
+                        this.setState({ error });
                     } else {
-                        this.handleTeams(json);
+                        const json = JSON.parse(data.Payload);
+                        if (json.error) {
+                            console.log(json.error);
+                            this.setState({ error: `${json.error.text || json.error}` });
+                        } else {
+                            this.handleTeams(json);
+                        }
                     }
-                }
-                this.setState({ loading: false });
+                    this.setState({ loading: false });
+                });
             });
-        });
+        }
+    }
+
+    selectMatch(event) {
+        const { target: { value } } = event;
+        const { availableMatches } = this.state;
+        this.setState({ selectedMatch: value });
+        this.handleMatch(availableMatches.matches[value]);
     }
 
     renderControls() {
@@ -198,31 +256,60 @@ export default class TeamAssetController extends Component {
                     homeTeam, awayTeam,
                 },
             },
-            match,
         } = this.props;
         const {
-            subIn, subOut, selectSubs, subTeam,
+            availableMatches,
         } = this.state;
         return (
             <div>
-                <div className="control-item">
-                    {!(homeTeam.length * awayTeam.length) ?
-                        <button onClick={this.autoFill}>Sækja lið</button> :
-                        null
-                    }
-                </div>
-                <div className="control-item">
-                    {(homeTeam.length * awayTeam.length) ?
-                        <button onClick={this.clearTeams}>Hreinsa lið</button> :
-                        null
-                    }
-                </div>
-                <div className="control-item">
-                    {(homeTeam.length * awayTeam.length) ?
-                        <button onClick={this.addPlayersToQ}>Setja lið í biðröð</button> :
-                        null
-                    }
-                </div>
+                {!(homeTeam.length * awayTeam.length) ?
+                    <div className="control-item">
+                        <button onClick={this.autoFill}>Sækja lið</button>
+                    </div> :
+                    null
+                }
+                {(homeTeam.length * awayTeam.length) ?
+                    <div className="control-item">
+                        <button onClick={this.clearTeams}>Hreinsa lið</button>
+                    </div> :
+                    null
+                }
+                {(homeTeam.length * awayTeam.length) ?
+                    <div className="control-item">
+                        <button onClick={this.addPlayersToQ}>Setja lið í biðröð</button>
+                    </div> :
+                    null
+                }
+                {(availableMatches && Object.keys(availableMatches.matches).length > 1) ?
+                    this.renderMatchControllers(availableMatches.matches) :
+                    null
+                }
+                {(homeTeam.length * awayTeam.length) ? this.renderSubControllers() : null}
+            </div>
+        );
+    }
+
+    renderMatchControllers(matches) {
+        const { selectedMatch } = this.state;
+        console.log('selectedMatch', selectedMatch);
+        return (
+            <div className="control-item">
+                <select value={selectedMatch} onChange={this.selectMatch}>
+                    {Object.keys(matches).map(matchKey => (
+                        <option value={matchKey} key={matchKey}>{matches[matchKey].group}</option>
+                    ))}
+                </select>
+            </div>
+        );
+    }
+
+    renderSubControllers() {
+        const {
+            subIn, subOut, selectSubs, subTeam,
+        } = this.state;
+        const { match } = this.props;
+        return (
+            <div className="sub-controller control-item">
                 {selectSubs ? (
                     <button
                         onClick={() => this.setState({
@@ -250,40 +337,42 @@ export default class TeamAssetController extends Component {
         );
     }
 
-    render() {
+    renderTeam(teamName) {
         const {
-            loading, error, selectSubs, subTeam,
+            selectSubs, subTeam,
         } = this.state;
         const {
-            controllerState: {
-                teamPlayers: {
-                    homeTeam, awayTeam,
-                },
-            },
+            controllerState: { teamPlayers },
             updateTeams,
+            match,
         } = this.props;
+        return (
+            <Team
+                team={teamPlayers[teamName]}
+                teamName={teamName}
+                updateTeams={updateTeams}
+                selectPlayer={selectSubs && (!subTeam || subTeam === teamName) ?
+                    this.selectSubs : null}
+                subTeam={subTeam}
+                match={match}
+            />
+        );
+    }
+
+    render() {
+        const { loading, error } = this.state;
+        const { match } = this.props;
+        if (!match.homeTeam || !match.awayTeam) {
+            return <div>Veldu lið fyrst</div>;
+        }
         return (
             <div className="team-asset-controller">
                 <RingLoader loading={loading} />
                 {!loading && this.renderControls()}
                 <span className="error">{error}</span>
                 <div className="team-asset-controller">
-                    <Team
-                        team={homeTeam}
-                        teamName="homeTeam"
-                        updateTeams={updateTeams}
-                        selectSub={selectSubs && (!subTeam || subTeam === 'homeTeam') ?
-                            this.selectSubs : null}
-                        subTeam={subTeam}
-                    />
-                    <Team
-                        team={awayTeam}
-                        teamName="awayTeam"
-                        updateTeams={updateTeams}
-                        selectSub={selectSubs && (!subTeam || subTeam === 'awayTeam') ?
-                            this.selectSubs : null}
-                        subTeam={subTeam}
-                    />
+                    {this.renderTeam('homeTeam')}
+                    {this.renderTeam('awayTeam')}
                 </div>
             </div>
         );

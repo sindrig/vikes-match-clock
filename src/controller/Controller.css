@@ -19,7 +19,7 @@
     border: 2px solid black;
 }
 
-.controller div > button, .controller div > select {
+.controller div.control-item > button, .controller div.control-item > select {
     margin: 2px;
     float: left;
     clear: both;

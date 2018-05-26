@@ -22,7 +22,7 @@ const Controller = ({
                 match={state.match}
                 state={controllerState}
             />
-            <div className="page-actions">
+            <div className="page-actions control-item">
                 <div className="view-selector">
                     {views.map(view => (
                         <label htmlFor={`view-selector-${view}`} key={view}>

@@ -13,6 +13,19 @@ div.team-asset-player {
     float: left;
     margin-left: 50px;
 }
+
 .team-asset-controller {
     clear: both;
+}
+
+.team-asset-controller .sub-controller {
+    clear: both;
+}
+
+.team-player {
+    float: left;
+}
+
+.team-asset-container button {
+    clear: none;
 }

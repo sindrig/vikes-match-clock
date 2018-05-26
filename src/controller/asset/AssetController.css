@@ -11,12 +11,15 @@
     height: 300px;
     width: 1070px;
     overflow: scroll;
+    margin: 30px 5px 5px 5px;
+    float: left;
 }
 
 .asset-controller .view-selector {
     position: absolute;
-    top: 75px;
-    left: -60px;
+    top: 105px;
+    left: -54px;
+    width: 54px;
 }
 
 .asset-controller .view-selector button {
