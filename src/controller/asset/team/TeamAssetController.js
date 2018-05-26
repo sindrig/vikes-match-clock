@@ -12,7 +12,6 @@ import Team from './Team';
 import SubController from './SubController';
 import assetTypes from '../AssetTypes';
 import lambdaExample from '../../../debug/lambda-example';
-import raven from '../../../raven';
 
 const DEBUG = false;
 const AVAILABLE_MATCHES = 'AVAILABLE_MATCHES';
@@ -245,7 +244,6 @@ export default class TeamAssetController extends Component {
                         const json = JSON.parse(data.Payload);
                         if (json.error) {
                             console.error(json.error);
-                            raven.captureMessage(json.error);
                             this.setState({ error: `${json.error.text || JSON.stringify(json.error)}` });
                         } else {
                             this.handleTeams(json);
