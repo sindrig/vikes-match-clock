@@ -12,6 +12,7 @@ import Team from './Team';
 import SubController from './SubController';
 import assetTypes from '../AssetTypes';
 import lambdaExample from '../../../debug/lambda-example';
+import raven from '../../../raven';
 
 const DEBUG = false;
 const AVAILABLE_MATCHES = 'AVAILABLE_MATCHES';
@@ -63,6 +64,7 @@ export default class TeamAssetController extends Component {
             subOut: null,
             availableMatches: null,
             selectedMatch: null,
+            selectPlayerAsset: false,
         };
         this.autoFill = this.autoFill.bind(this);
         this.clearTeams = this.clearTeams.bind(this);
@@ -70,13 +72,16 @@ export default class TeamAssetController extends Component {
         this.selectSubs = this.selectSubs.bind(this);
         this.addSubAsset = this.addSubAsset.bind(this);
         this.selectMatch = this.selectMatch.bind(this);
+        this.selectPlayerAsset = this.selectPlayerAsset.bind(this);
     }
 
     componentDidMount() {
-        console.log('getKey(AVAILABLE_MATCHES)', getKey(AVAILABLE_MATCHES));
         getKey(AVAILABLE_MATCHES).then(availableMatches => this.setState({
             availableMatches,
-            selectedMatch: Object.keys(availableMatches.matches)[0],
+            selectedMatch: (
+                availableMatches && availableMatches.matches ?
+                    Object.keys(availableMatches.matches)[0] : null
+            ),
         }));
     }
 
@@ -167,6 +172,15 @@ export default class TeamAssetController extends Component {
         });
     }
 
+    selectPlayerAsset(player, teamName) {
+        const { match, addAssets, previousView } = this.props;
+        addAssets([this.getPlayerAssetObject({
+            player,
+            teamName: match[teamName],
+        })]);
+        previousView();
+    }
+
     clearTeams() {
         const { updateTeams } = this.props;
         updateTeams({
@@ -230,8 +244,9 @@ export default class TeamAssetController extends Component {
                     } else {
                         const json = JSON.parse(data.Payload);
                         if (json.error) {
-                            console.log(json.error);
-                            this.setState({ error: `${json.error.text || json.error}` });
+                            console.error(json.error);
+                            raven.captureMessage(json.error);
+                            this.setState({ error: `${json.error.text || JSON.stringify(json.error)}` });
                         } else {
                             this.handleTeams(json);
                         }
@@ -284,14 +299,13 @@ export default class TeamAssetController extends Component {
                     this.renderMatchControllers(availableMatches.matches) :
                     null
                 }
-                {(homeTeam.length * awayTeam.length) ? this.renderSubControllers() : null}
+                {(homeTeam.length * awayTeam.length) ? this.renderActionControllers() : null}
             </div>
         );
     }
 
     renderMatchControllers(matches) {
         const { selectedMatch } = this.state;
-        console.log('selectedMatch', selectedMatch);
         return (
             <div className="control-item">
                 <select value={selectedMatch} onChange={this.selectMatch}>
@@ -303,26 +317,56 @@ export default class TeamAssetController extends Component {
         );
     }
 
-    renderSubControllers() {
+    renderActionButtons() {
+        const {
+            selectSubs, selectPlayerAsset,
+        } = this.state;
+        if (selectSubs) {
+            return (
+                <button
+                    onClick={() => this.setState({
+                        selectSubs: false,
+                        subIn: null,
+                        subOut: null,
+                        subTeam: null,
+                    })}
+                >
+                    Hætta við skiptingu
+                </button>
+            );
+        } else if (selectPlayerAsset) {
+            return (
+                <button
+                    onClick={() => this.setState({
+                        selectPlayerAsset: false,
+                    })}
+                >
+                    Hætta við birtingu
+                </button>
+            );
+        }
+        return (
+            <div>
+                <div className="control-item">
+                    <button onClick={() => this.setState({ selectSubs: true })}>Skipting</button>
+                </div>
+                <div className="control-item">
+                    <button onClick={() => this.setState({ selectPlayerAsset: true })}>
+                        Birta leikmann
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    renderActionControllers() {
         const {
             subIn, subOut, selectSubs, subTeam,
         } = this.state;
         const { match } = this.props;
         return (
             <div className="sub-controller control-item">
-                {selectSubs ? (
-                    <button
-                        onClick={() => this.setState({
-                            selectSubs: false,
-                            subIn: null,
-                            subOut: null,
-                            subTeam: null,
-                        })}
-                    >
-                        Hætta við skiptingu
-                    </button>
-                ) : <button onClick={() => this.setState({ selectSubs: true })}>Skipting</button>
-                }
+                {this.renderActionButtons()}
                 {selectSubs ? (
                     <div className="control-item">
                         <SubController
@@ -339,20 +383,27 @@ export default class TeamAssetController extends Component {
 
     renderTeam(teamName) {
         const {
-            selectSubs, subTeam,
+            selectSubs, subTeam, selectPlayerAsset,
         } = this.state;
         const {
             controllerState: { teamPlayers },
             updateTeams,
             match,
         } = this.props;
+        let selectPlayerAction = null;
+        if (selectSubs) {
+            if (!subTeam || subTeam === teamName) {
+                selectPlayerAction = this.selectSubs;
+            }
+        } else if (selectPlayerAsset) {
+            selectPlayerAction = this.selectPlayerAsset;
+        }
         return (
             <Team
                 team={teamPlayers[teamName]}
                 teamName={teamName}
                 updateTeams={updateTeams}
-                selectPlayer={selectSubs && (!subTeam || subTeam === teamName) ?
-                    this.selectSubs : null}
+                selectPlayer={selectPlayerAction}
                 subTeam={subTeam}
                 match={match}
             />
