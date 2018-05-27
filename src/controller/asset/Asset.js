@@ -56,7 +56,7 @@ export default class Asset extends Component {
             time, thumbnail, remove, asset,
         } = this.props;
         clearTimeout(this.timeout);
-        const typeNeedsManualRemove = asset.type !== assetTypes.YOUTUBE;
+        const typeNeedsManualRemove = asset.type !== assetTypes.URL;
         if (time && !thumbnail && remove && typeNeedsManualRemove) {
             this.timeout = setTimeout(remove, time * 1000);
         }

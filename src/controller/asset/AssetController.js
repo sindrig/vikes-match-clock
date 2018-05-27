@@ -286,7 +286,9 @@ export default class AssetController extends Component {
                         match={match}
                         updateTeams={this.updateTeams}
                         controllerState={state}
-                        previousView={() => updateState({ assetView: ASSET_VIEWS.assets })}
+                        previousView={() => setTimeout(() => updateState({
+                            assetView: ASSET_VIEWS.assets,
+                        }), 500)}
                     />
                 )}
             </div>

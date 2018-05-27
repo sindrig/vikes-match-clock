@@ -117,7 +117,7 @@ def handler(json_input, context, date=None):
                 'players': players,
                 'group': match.group,
             }
-    if not result:
+    if not result['matches']:
         return no_match_found(home_team, away_team)
     return result
 
