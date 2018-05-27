@@ -61,7 +61,7 @@ export default class TeamAssetController extends Component {
             subTeam: null,
             subIn: null,
             subOut: null,
-            availableMatches: null,
+            availableMatches: { matches: null },
             selectedMatch: null,
             selectPlayerAsset: false,
         };
@@ -76,7 +76,10 @@ export default class TeamAssetController extends Component {
 
     componentDidMount() {
         getKey(AVAILABLE_MATCHES).then(availableMatches => this.setState({
-            availableMatches,
+            availableMatches: {
+                matches: null,
+                ...availableMatches,
+            },
             selectedMatch: (
                 availableMatches && availableMatches.matches ?
                     Object.keys(availableMatches.matches)[0] : null
@@ -88,7 +91,9 @@ export default class TeamAssetController extends Component {
         const {
             selectedMatch, availableMatches: { matches },
         } = this.state;
-        const { group } = matches[selectedMatch];
+        const { group } = matches && matches[selectedMatch] ?
+            matches[selectedMatch] :
+            { group: 'Meistaraflokkur' };
         if (!player.name || !player.number) {
             return null;
         }
@@ -246,6 +251,7 @@ export default class TeamAssetController extends Component {
                             console.error(json.error);
                             this.setState({ error: `${json.error.text || JSON.stringify(json.error)}` });
                         } else {
+                            this.setState({ error: '' });
                             this.handleTeams(json);
                         }
                     }
