@@ -36,7 +36,10 @@ def get_matches(home_team, away_team, date):
                 'text': result.Villa,
             }
         }
-    games = result.ArrayFelogLeikir.FelogLeikir
+    gameArray = result.ArrayFelogLeikir
+    if not gameArray:
+        return
+    games = gameArray.FelogLeikir
     matches = []
     for game in games:
         print(game.FelagHeimaNafn, '-', game.FelagUtiNafn)
@@ -104,11 +107,13 @@ def handler(json_input, context, date=None):
         return no_match_found(home_team, away_team)
     elif isinstance(matches, dict) and 'error' in matches:
         return matches
-    result = {}
+    result = {
+        'matches': {},
+    }
     for match in matches:
         players = get_players(match.match_id)
         if players and 'error' not in players:
-            result[match.match_id] = {
+            result['matches'][match.match_id] = {
                 'players': players,
                 'group': match.group,
             }
