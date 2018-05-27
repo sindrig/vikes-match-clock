@@ -89,10 +89,11 @@ export default class TeamAssetController extends Component {
 
     getPlayerAssetObject({ player, teamName }) {
         const {
-            selectedMatch, availableMatches: { matches },
+            selectedMatch, availableMatches,
         } = this.state;
-        const { group } = matches && matches[selectedMatch] ?
-            matches[selectedMatch] :
+        const { group } = availableMatches && availableMatches.matches
+            && availableMatches.matches[selectedMatch] ?
+            availableMatches.matches[selectedMatch] :
             { group: 'Meistaraflokkur' };
         if (!player.name || !player.number) {
             return null;
