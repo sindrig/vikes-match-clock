@@ -293,7 +293,7 @@ export default class TeamAssetController extends Component {
                     </div> :
                     null
                 }
-                {(availableMatches && Object.keys(availableMatches.matches).length > 1) ?
+                {(availableMatches && Object.keys(availableMatches.matches || {}).length > 1) ?
                     this.renderMatchControllers(availableMatches.matches) :
                     null
                 }
