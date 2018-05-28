@@ -1,6 +1,7 @@
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 import { Shortcuts } from 'react-shortcuts';
+import { connect } from 'react-redux';
 
 import { getState, updateMatch, updateView, updateController, clearState } from './api';
 import ShortcutManager from './utils/ShortcutManager';
@@ -23,6 +24,10 @@ const backgrounds = [
 ];
 
 class App extends Component {
+    static propTypes = {
+        view: PropTypes.string.isRequired,
+    };
+
     static childContextTypes = {
         shortcuts: PropTypes.object.isRequired,
     }
@@ -96,7 +101,7 @@ class App extends Component {
     }
 
     renderCurrentView() {
-        const { view } = this.state;
+        const { view } = this.props;
 
         switch (view) {
         case MATCH:
@@ -134,4 +139,6 @@ class App extends Component {
     }
 }
 
-export default App;
+const stateToProps = ({ view }) => ({ view });
+
+export default connect(stateToProps)(App);
