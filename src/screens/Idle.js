@@ -14,7 +14,7 @@ export default class Idle extends Component {
         super(props);
         this.updateTemp = this.updateTemp.bind(this);
         this.state = {
-            temperature: 0,
+            temperature: 17,
         };
     }
 

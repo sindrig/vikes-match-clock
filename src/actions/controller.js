@@ -3,7 +3,7 @@ import ActionTypes from '../ActionTypes';
 
 
 const actions = {
-    [ActionTypes.updateMatch]: partial => partial,
+    [ActionTypes.selectView]: view => ({ view }),
 };
 
 Object.keys(actions).forEach((type) => {

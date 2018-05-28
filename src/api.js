@@ -46,7 +46,6 @@ const checkObjectKeys = (newState, against = defaultState, depth = 0) => {
             }
         });
     } else {
-        console.log('depth', depth);
         console.error('Key count differs', newState, against);
     }
 };
