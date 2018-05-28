@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import { Shortcuts } from 'react-shortcuts';
 import { connect } from 'react-redux';
 
-import { getState, updateMatch, updateController, clearState } from './api';
+import { getState, updateMatch, updateController } from './api';
 import ShortcutManager from './utils/ShortcutManager';
 
 import Controller from './controller/Controller';
@@ -119,7 +119,6 @@ class App extends Component {
                         renderAsset={this.setOverlay}
                         controllerState={this.state.controller}
                         updateState={this.updateController}
-                        clearState={clearState}
                     />
                 }
                 {this.renderOverlay()}
