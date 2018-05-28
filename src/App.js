@@ -16,8 +16,6 @@ import { VIEWS } from './reducers/controller';
 
 import './App.css';
 
-const IDLE = 'IDLE';
-const MATCH = 'MATCH';
 
 const backgrounds = [
     { backgroundImage: `url(${backgroundImage})` },
@@ -118,7 +116,6 @@ class App extends Component {
                     <Controller
                         state={this.state}
                         updateMatch={this.updateMatch}
-                        views={[IDLE, MATCH]}
                         renderAsset={this.setOverlay}
                         controllerState={this.state.controller}
                         updateState={this.updateController}
