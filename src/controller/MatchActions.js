@@ -5,7 +5,7 @@ import matchActions from '../actions/match';
 import MatchActions from './components/MatchActions';
 
 
-const stateToProps = ({ view, match }) => ({ view, match });
+const stateToProps = ({ controller: { view }, match }) => ({ view, match });
 const dispatchToProps = dispatch => bindActionCreators({
     updateMatch: matchActions.updateMatch,
 }, dispatch);
