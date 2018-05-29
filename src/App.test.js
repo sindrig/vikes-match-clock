@@ -1,8 +1,5 @@
 import React from 'react';
-import ReactDOM from 'react-dom';
-import { mount } from 'enzyme';
 import App from './App';
-import Controller from './controller/Controller';
 import { initialState as controllerInitialState } from './reducers/controller';
 import { initialState as matchInitialState } from './reducers/match';
 
