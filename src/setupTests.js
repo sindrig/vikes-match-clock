@@ -1,5 +1,6 @@
 import React from 'react';
 import { Provider } from 'react-redux';
+// import { IDBFactory, IDBKeyRange, reset } from 'shelving-mock-indexeddb';
 import { IDBFactory, IDBKeyRange } from 'shelving-mock-indexeddb';
 import configureStore from 'redux-mock-store';
 import Enzyme, { mount } from 'enzyme';
