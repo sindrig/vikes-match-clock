@@ -1,0 +1,72 @@
+{
+  "_from": "shelving-mock-event@^1.0.8",
+  "_id": "shelving-mock-event@1.0.12",
+  "_inBundle": false,
+  "_integrity": "sha512-2F+IZ010rwV3sA/Kd2hnC1vGNycsxeBJmjkXR8+4IOlv5e+Wvj+xH+A8Cv8/Z0lUyCut/HcxSpeDccYTVtnuaQ==",
+  "_location": "/shelving-mock-event",
+  "_phantomChildren": {},
+  "_requested": {
+    "type": "range",
+    "registry": true,
+    "raw": "shelving-mock-event@^1.0.8",
+    "name": "shelving-mock-event",
+    "escapedName": "shelving-mock-event",
+    "rawSpec": "^1.0.8",
+    "saveSpec": null,
+    "fetchSpec": "^1.0.8"
+  },
+  "_requiredBy": [
+    "/shelving-mock-indexeddb"
+  ],
+  "_resolved": "https://registry.npmjs.org/shelving-mock-event/-/shelving-mock-event-1.0.12.tgz",
+  "_shasum": "401dc90b3b49cbf2a817ecf2dd5a83eff4de2e14",
+  "_spec": "shelving-mock-event@^1.0.8",
+  "_where": "/home/sindri/dev/vikes-match-clock/node_modules/shelving-mock-indexeddb",
+  "author": {
+    "name": "Dave Houlbrooke",
+    "email": "dave@shax.com"
+  },
+  "bugs": {
+    "url": "https://github.com/dhoulb/mock-event/issues"
+  },
+  "bundleDependencies": false,
+  "dependencies": {},
+  "deprecated": false,
+  "description": "Fully unit tested mock implementation of the browser Event API.",
+  "devDependencies": {
+    "eslint": "^3.19.0",
+    "jest": "^20.0.3"
+  },
+  "engineStrict": true,
+  "engines": {
+    "node": ">=6.0.0"
+  },
+  "eslintConfig": {
+    "extends": "eslint:recommended",
+    "env": {
+      "es6": true,
+      "node": true,
+      "jest": true
+    },
+    "rules": {
+      "valid-jsdoc": 2,
+      "global-require": 2,
+      "no-var": 2,
+      "prefer-const": 2,
+      "prefer-spread": 2
+    }
+  },
+  "homepage": "https://github.com/dhoulb/mock-event#readme",
+  "license": "0BSD",
+  "main": "lib/mock.js",
+  "name": "shelving-mock-event",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/dhoulb/mock-event.git"
+  },
+  "scripts": {
+    "test": "jest",
+    "watch": "jest --watchAll --no-watchman"
+  },
+  "version": "1.0.12"
+}
