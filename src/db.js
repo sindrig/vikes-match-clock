@@ -40,7 +40,7 @@ export default class DB {
     }
 
     set(key, value) {
-        console.trace()
+        console.trace();
         this.cache[key] = value;
         return set(key, value);
     }
