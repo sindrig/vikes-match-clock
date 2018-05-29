@@ -6,8 +6,7 @@ import lambdaExample from '../debug/lambda-example';
 import clubIds from '../club-ids';
 
 
-// DO NOT COMMIT DIS
-const DEBUG = true;
+const DEBUG = false;
 
 const awsConf = {
     region: lambda.region,

@@ -173,7 +173,9 @@ class TeamAssetController extends Component {
             return;
         }
         this.setState({ loading: true });
-        getAvailableMatches(homeTeam, awayTeam).then(() => this.setState({ loading: false }));
+        getAvailableMatches(homeTeam, awayTeam)
+            .catch(e => this.setState({ error: e.message }))
+            .then(() => this.setState({ loading: false }));
     }
 
     renderControls() {
