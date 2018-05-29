@@ -9,12 +9,12 @@ run-stack-action() {
     CMD="aws cloudformation $ACTION_NAME \
         --stack-name $STACK_NAME \
         --profile irdn \
-        --region eu-west-1 \
-        --capabilities CAPABILITY_IAM"
+        --region eu-west-1"
     if [[ $ACTION_NAME != delete-stack ]]; then
         CMD="$CMD \
         --template-body file://$SCRIPTPATH/match-clock-template.json \
-        --parameters ParameterKey=Domain,ParameterValue=$DOMAIN"
+        --parameters ParameterKey=Domain,ParameterValue=$DOMAIN \
+        --capabilities CAPABILITY_IAM"
     fi
     echo $CMD
     $CMD

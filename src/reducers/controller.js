@@ -58,11 +58,11 @@ const actions = {
         },
     },
     [`${ActionTypes.getAvailableMatches}_${FULFILLED}`]: {
-        next(state, { payload }) {
+        next(state, { payload: { data: { matches } } }) {
             return {
                 ...state,
-                availableMatches: payload,
-                selectedMatch: Object.keys(payload)[0] || null,
+                availableMatches: matches,
+                selectedMatch: Object.keys(matches)[0] || null,
             };
         },
     },

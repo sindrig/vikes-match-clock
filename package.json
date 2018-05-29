@@ -3,7 +3,6 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "aws-sdk": "^2.245.1",
     "axios": "^0.18.0",
     "babel-eslint": "^8.2.2",
     "keymirror": "^0.1.1",
