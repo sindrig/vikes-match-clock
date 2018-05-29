@@ -5,9 +5,3 @@ export default {
     setItem: set,
     removeItem: del,
 };
-
-export const getItem = get;
-
-export const setItem = set;
-
-export const removeItem = del;
