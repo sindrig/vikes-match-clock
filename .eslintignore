@@ -1,4 +1,4 @@
 src/club-ids.js
 src/registerServiceWorker.js
 **/*.test.js
-src/idb-keyval.js
+src/lib/idb-keyval.js
