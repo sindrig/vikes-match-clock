@@ -13,6 +13,7 @@ export default keymirror({
     editPlayer: null,
     deletePlayer: null,
     addPlayer: null,
+    updateAssets: null,
 
     // Global
     clearState: null,

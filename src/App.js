@@ -3,7 +3,6 @@ import PropTypes from 'prop-types';
 import { Shortcuts } from 'react-shortcuts';
 import { connect } from 'react-redux';
 
-import { getState, updateMatch, updateController } from './api';
 import ShortcutManager from './utils/ShortcutManager';
 
 import Controller from './controller/Controller';
@@ -35,40 +34,18 @@ class App extends Component {
     constructor(props) {
         super(props);
         this.state = {
-            match: {},
             overlay: null,
-            controller: null,
         };
-        this.updateMatch = this.updateMatch.bind(this);
         this.handleShortcuts = this.handleShortcuts.bind(this);
         this.setOverlay = this.setOverlay.bind(this);
-        this.updateController = this.updateController.bind(this);
     }
 
     getChildContext() {
         return { shortcuts: ShortcutManager };
     }
 
-    componentDidMount() {
-        getState()
-            .then(state => this.setState(state))
-            .catch(err => console.log(err));
-    }
-
     setOverlay(component) {
         this.setState({ overlay: component });
-    }
-
-    updateMatch(partial) {
-        updateMatch(partial)
-            .then(state => this.setState(state))
-            .catch(err => console.log(err));
-    }
-
-    updateController(partial) {
-        updateController(partial)
-            .then(state => this.setState(state))
-            .catch(err => console.log(err));
     }
 
     handleShortcuts() {
@@ -96,7 +73,7 @@ class App extends Component {
 
         switch (view) {
         case VIEWS.match:
-            return <ScoreBoard match={this.state.match} update={this.updateMatch} />;
+            return <ScoreBoard />;
         case VIEWS.idle:
         default:
             return <Idle />;
@@ -112,15 +89,7 @@ class App extends Component {
                 <div className="App" style={backgrounds[0]}>
                     {this.renderCurrentView()}
                 </div>
-                {this.state.controller &&
-                    <Controller
-                        state={this.state}
-                        updateMatch={this.updateMatch}
-                        renderAsset={this.setOverlay}
-                        controllerState={this.state.controller}
-                        updateState={this.updateController}
-                    />
-                }
+                <Controller renderAsset={this.setOverlay} />
                 {this.renderOverlay()}
             </Shortcuts>
         );

@@ -3,12 +3,12 @@ import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
 import { bindActionCreators } from 'redux';
 import controllerActions from '../../actions/controller';
-import { matchPropType } from '../../propTypes';
+import { matchPropType, assetsPropType } from '../../propTypes';
 
 import RemovableAsset from './RemovableAsset';
 import AssetSelector from './AssetSelector';
 import Asset, { checkKey } from './Asset';
-import * as assets from '../../assets';
+import * as assetsImages from '../../assets';
 import TeamAssetController from './team/TeamAssetController';
 import UrlController from './UrlController';
 import { ASSET_VIEWS } from '../../reducers/controller';
@@ -19,10 +19,10 @@ class AssetController extends Component {
     static propTypes = {
         renderAsset: PropTypes.func.isRequired,
         selectAssetView: PropTypes.func.isRequired,
-        // updateState: PropTypes.func.isRequired,
         match: matchPropType.isRequired,
-        // state: controllerPropType.isRequired,
         assetView: PropTypes.string.isRequired,
+        assets: assetsPropType.isRequired,
+        updateAssets: PropTypes.func.isRequired,
     };
 
     constructor(props) {
@@ -38,7 +38,6 @@ class AssetController extends Component {
         this.onImageSecondsChange = this.onImageSecondsChange.bind(this);
         this.pause = this.pause.bind(this);
         this.requestRemoval = this.requestRemoval.bind(this);
-        this.updateTeams = this.updateTeams.bind(this);
         this.addMultipleAssets = this.addMultipleAssets.bind(this);
         this.clearQueue = this.clearQueue.bind(this);
         this.addAssetKey = this.addAssetKey.bind(this);
@@ -46,12 +45,12 @@ class AssetController extends Component {
     }
 
     onCycleChange() {
-        const { state: { assets: { cycle } } } = this.props;
+        const { assets: { cycle } } = this.props;
         this.updateAssets({ cycle: !cycle });
     }
 
     onAutoPlayChange() {
-        const { state: { assets: { autoPlay } } } = this.props;
+        const { assets: { autoPlay } } = this.props;
         this.updateAssets({ autoPlay: !autoPlay });
         if (!autoPlay) {
             this.pause();
@@ -68,11 +67,11 @@ class AssetController extends Component {
         return this.addMultipleAssets([key], extra);
     }
 
-    addMultipleAssets(assetList, extra = {}) {
-        if (Object.keys(extra).length) {
-            console.error('Someone is using extra... ', extra);
+    addMultipleAssets(assetList, ...rest) {
+        if (rest.length > 1) {
+            console.trace('Someone is using extra... ', rest);
         }
-        const { state: { assets: { selectedAssets } } } = this.props;
+        const { assets: { selectedAssets } } = this.props;
         const updatedAssets = [...selectedAssets];
         const errors = [];
         assetList.forEach((asset) => {
@@ -86,7 +85,7 @@ class AssetController extends Component {
                 errors.push(`Unknown asset ${asset.key}`);
             }
         });
-        this.updateAssets({ selectedAssets: updatedAssets, ...extra });
+        this.updateAssets({ selectedAssets: updatedAssets });
         if (errors.length) {
             this.setState({ error: errors.join(' - ') });
         } else {
@@ -99,31 +98,8 @@ class AssetController extends Component {
     }
 
     updateAssets(newState) {
-        const {
-            state: {
-                assets: {
-                    selectedAssets, cycle, imageSeconds, autoPlay,
-                },
-            },
-            updateState,
-        } = this.props;
-        updateState({
-            assets: {
-                selectedAssets, cycle, imageSeconds, autoPlay, ...newState,
-            },
-        });
-    }
-
-    updateTeams(newState) {
-        const {
-            state: {
-                teamPlayers,
-            },
-            updateState,
-        } = this.props;
-        updateState({
-            teamPlayers: { ...teamPlayers, ...newState },
-        });
+        const { updateAssets } = this.props;
+        updateAssets(newState);
     }
 
     pause() {
@@ -139,10 +115,8 @@ class AssetController extends Component {
 
     showNextAsset() {
         const {
-            state: {
-                assets: {
-                    cycle, selectedAssets, imageSeconds, autoPlay,
-                },
+            assets: {
+                cycle, selectedAssets, imageSeconds, autoPlay,
             },
             renderAsset,
         } = this.props;
@@ -166,14 +140,14 @@ class AssetController extends Component {
     }
 
     deleteNextAsset() {
-        const { state: { assets: { selectedAssets } } } = this.props;
+        const { assets: { selectedAssets } } = this.props;
         const asset = selectedAssets.shift();
         this.updateAssets({ selectedAssets });
         return asset;
     }
 
     removeAsset(asset) {
-        const { state: { assets: { selectedAssets } } } = this.props;
+        const { assets: { selectedAssets } } = this.props;
         const idx = selectedAssets.map(a => a.key).indexOf(asset.key);
         if (idx > -1) {
             const newAssets = [...selectedAssets];
@@ -183,7 +157,7 @@ class AssetController extends Component {
     }
 
     renderNextAsset() {
-        const { state: { assets: { selectedAssets } } } = this.props;
+        const { assets: { selectedAssets } } = this.props;
         return (
             <div>
                 {selectedAssets.map(asset => (
@@ -209,10 +183,8 @@ class AssetController extends Component {
 
     renderAssetController() {
         const {
-            state: {
-                assets: {
-                    cycle, selectedAssets, imageSeconds, autoPlay,
-                },
+            assets: {
+                cycle, selectedAssets, imageSeconds, autoPlay,
             },
         } = this.props;
         const { playing } = this.state;
@@ -222,7 +194,7 @@ class AssetController extends Component {
                     <AssetSelector addAssetKey={this.addAssetKey}>
                         <option value="null">Myndir</option>
                         {Object
-                            .keys(assets)
+                            .keys(assetsImages)
                             .filter(key => selectedAssets.map(a => a.key).indexOf(key) === -1)
                             .map(key => ({ key, name: key.split('/')[key.split('/').length - 1] }))
                             .map(({ key, name }) => <option value={key} key={key}>{name}</option>)
@@ -301,10 +273,15 @@ class AssetController extends Component {
     }
 }
 
-const stateToProps = ({ controller: { assetView }, match }) => ({ assetView, match });
+const stateToProps = ({ controller: { assetView, assets }, match }) => ({
+    assetView,
+    match,
+    assets,
+});
 
 const dispatchToProps = dispatch => bindActionCreators({
     selectAssetView: controllerActions.selectAssetView,
+    updateAssets: controllerActions.updateAssets,
 }, dispatch);
 
 export default connect(stateToProps, dispatchToProps)(AssetController);

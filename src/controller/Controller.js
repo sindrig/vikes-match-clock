@@ -9,19 +9,15 @@ import globalActions from '../actions/global';
 import { VIEWS } from '../reducers/controller';
 import MatchActions from './MatchActions';
 import AssetController from './asset/AssetController';
-import { matchPropType, controllerPropType } from '../propTypes';
 import './Controller.css';
 
 const Controller = ({
-    state, selectView, renderAsset, controllerState, updateState, clearState, view,
+    selectView, renderAsset, clearState, view,
 }) => (
     <div className="controller">
         <MatchActions />
         <AssetController
             renderAsset={renderAsset}
-            updateState={updateState}
-            match={state.match}
-            state={controllerState}
         />
         <div className="page-actions control-item">
             <div className="view-selector">
@@ -52,14 +48,6 @@ Controller.propTypes = {
     clearState: PropTypes.func.isRequired,
     selectView: PropTypes.func.isRequired,
     renderAsset: PropTypes.func.isRequired,
-    state: PropTypes.shape({
-        match: matchPropType.isRequired,
-        controller: controllerPropType.isRequired,
-    }).isRequired,
-    controllerState: PropTypes.shape({
-        assets: PropTypes.any.isRequired,
-    }).isRequired,
-    updateState: PropTypes.func.isRequired,
     view: PropTypes.string.isRequired,
 };
 

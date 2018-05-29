@@ -41,6 +41,7 @@ const actions = {
     [ActionTypes.editPlayer]: (teamId, idx, updatedPlayer) => ({ teamId, idx, updatedPlayer }),
     [ActionTypes.deletePlayer]: (teamId, idx) => ({ teamId, idx }),
     [ActionTypes.addPlayer]: teamId => ({ teamId }),
+    [ActionTypes.updateAssets]: partial => partial,
     [ActionTypes.getAvailableMatches]: (homeTeam, awayTeam) => new Promise((resolve, reject) => {
         if (DEBUG) {
             resolve(lambdaExample.matches);

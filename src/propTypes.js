@@ -27,13 +27,15 @@ export const teamPlayersPropType = PropTypes.shape({
     awayTeam: PropTypes.arrayOf(playerPropType).isRequired,
 });
 
+export const assetsPropType = PropTypes.shape({
+    selectedAssets: PropTypes.arrayOf(assetPropType).isRequired,
+    cycle: PropTypes.bool.isRequired,
+    imageSeconds: PropTypes.number.isRequired,
+    autoPlay: PropTypes.bool.isRequired,
+})
+
 export const controllerPropType = PropTypes.shape({
-    assets: PropTypes.shape({
-        selectedAssets: PropTypes.arrayOf(assetPropType).isRequired,
-        cycle: PropTypes.bool.isRequired,
-        imageSeconds: PropTypes.number.isRequired,
-        autoPlay: PropTypes.bool.isRequired,
-    }),
+    assets: assetsPropType,
     teamPlayers: teamPlayersPropType.isRequired,
     assetView: PropTypes.oneOf(Object.values(ASSET_VIEWS)),
 });
