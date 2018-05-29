@@ -19,6 +19,7 @@ def main(out_folder):
     soup = bs4.BeautifulSoup(r.text, 'html.parser')
     table = soup.find('table')
     name_id_map = {}
+    name_files_map = {}
     for row in table.find('tbody').find_all('tr'):
         img_url = row.find('img')['src']
         club_name = row.find('a').text
@@ -45,11 +46,23 @@ def main(out_folder):
                         if chunk:
                             f.write(chunk)
                 print('Saved %s for %s' % (path, club_name, ))
+            name_files_map[sanitized_name] = path
     with open(os.path.join(BASE, 'src', 'club-ids.js'), 'w') as f:
         f.write('export default {\n')
         for name, _id in name_id_map.items():
             f.write("    '%s': '%s',\n" % (name, _id))
         f.write('}\n')
+    club_logos = os.path.join(BASE, 'src', 'images', 'clubLogos.js')
+    with open(club_logos, 'w') as f:
+        f.write('/* eslint-disable global-require */\n')
+        f.write('module.exports = {\n')
+        for name, path in name_files_map.items():
+            relpath = os.path.relpath(path, os.path.dirname(club_logos))
+            key = name
+            if ' ' in key or '-' in key:
+                key = "'%s'" % (key, )
+            f.write("    %s: require('./%s'),\n" % (key, relpath))
+        f.write('};\n')
 
 
 if __name__ == '__main__':
