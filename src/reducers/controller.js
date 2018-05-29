@@ -119,5 +119,16 @@ const actions = {
             };
         },
     },
+    [ActionTypes.updateAssets]: {
+        next(state, { payload }) {
+            return {
+                ...state,
+                assets: {
+                    ...state.assets,
+                    ...payload,
+                },
+            };
+        },
+    },
 };
 export default handleActions(actions, initialState);
