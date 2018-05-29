@@ -1,21 +1,28 @@
 import React, { Component } from 'react';
+import { connect } from 'react-redux';
+import { bindActionCreators } from 'redux';
 import PropTypes from 'prop-types';
 import { playerPropType, matchPropType } from '../../../propTypes';
+import controllerActions from '../../../actions/controller';
 import TeamPlayer from './TeamPlayer';
 
 import './Team.css';
 
-export default class Team extends Component {
+class Team extends Component {
     static propTypes = {
         team: PropTypes.arrayOf(playerPropType).isRequired,
-        updateTeams: PropTypes.func.isRequired,
+        editPlayer: PropTypes.func.isRequired,
+        addPlayer: PropTypes.func.isRequired,
+        deletePlayer: PropTypes.func.isRequired,
         teamName: PropTypes.oneOf(['homeTeam', 'awayTeam']).isRequired,
         selectPlayer: PropTypes.func,
         match: matchPropType.isRequired,
+        teamId: PropTypes.string,
     };
 
     static defaultProps = {
         selectPlayer: null,
+        teamId: null,
     };
 
     constructor(props) {
@@ -24,25 +31,19 @@ export default class Team extends Component {
     }
 
     addEmptyLine() {
-        const { updateTeams, teamName, team } = this.props;
-        const empty = {
-            name: '',
-            number: null,
-            role: '',
-        };
-        updateTeams({ [teamName]: [...team, empty] });
+        const { addPlayer, teamId } = this.props;
+        addPlayer(teamId);
     }
 
     removePlayer(idx) {
-        const { updateTeams, teamName, team } = this.props;
-        return updateTeams({ [teamName]: team.filter((item, i) => i !== idx) });
+        const { deletePlayer, teamId } = this.props;
+        deletePlayer(teamId, idx);
     }
 
     updatePlayer(idx) {
         return (updatedPlayer) => {
-            const { team, teamName, updateTeams } = this.props;
-            team[idx] = { ...team[idx], ...updatedPlayer };
-            updateTeams({ [teamName]: team });
+            const { editPlayer, teamId } = this.props;
+            editPlayer(teamId, idx, updatedPlayer);
         };
     }
 
@@ -72,3 +73,29 @@ export default class Team extends Component {
         );
     }
 }
+
+const stateToProps = (
+    {
+        controller: { availableMatches, selectedMatch },
+        match,
+    },
+    ownProps,
+) => {
+    const selectedMatchObj = availableMatches[selectedMatch];
+    const teamId = match[`${ownProps.teamName}Id`];
+    return {
+        team: selectedMatchObj ?
+            selectedMatchObj.players[teamId] || [] :
+            [],
+        match,
+        teamId,
+    };
+};
+
+const dispatchToProps = dispatch => bindActionCreators({
+    editPlayer: controllerActions.editPlayer,
+    deletePlayer: controllerActions.deletePlayer,
+    addPlayer: controllerActions.addPlayer,
+}, dispatch);
+
+export default connect(stateToProps, dispatchToProps)(Team);

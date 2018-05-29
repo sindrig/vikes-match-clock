@@ -1,8 +1,8 @@
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 import { Shortcuts } from 'react-shortcuts';
+import { connect } from 'react-redux';
 
-import { getState, updateMatch, updateView, updateController, clearState } from './api';
 import ShortcutManager from './utils/ShortcutManager';
 
 import Controller from './controller/Controller';
@@ -11,10 +11,10 @@ import ScoreBoard from './screens/ScoreBoard';
 import Idle from './screens/Idle';
 import backgroundImage from './images/background.png';
 
+import { VIEWS } from './reducers/controller';
+
 import './App.css';
 
-const IDLE = 'IDLE';
-const MATCH = 'MATCH';
 
 const backgrounds = [
     { backgroundImage: `url(${backgroundImage})` },
@@ -23,6 +23,10 @@ const backgrounds = [
 ];
 
 class App extends Component {
+    static propTypes = {
+        view: PropTypes.string.isRequired,
+    };
+
     static childContextTypes = {
         shortcuts: PropTypes.object.isRequired,
     }
@@ -30,49 +34,18 @@ class App extends Component {
     constructor(props) {
         super(props);
         this.state = {
-            match: {},
-            view: IDLE,
             overlay: null,
-            controller: null,
         };
-        this.updateMatch = this.updateMatch.bind(this);
         this.handleShortcuts = this.handleShortcuts.bind(this);
-        this.selectView = this.selectView.bind(this);
         this.setOverlay = this.setOverlay.bind(this);
-        this.updateController = this.updateController.bind(this);
     }
 
     getChildContext() {
         return { shortcuts: ShortcutManager };
     }
 
-    componentDidMount() {
-        getState()
-            .then(state => this.setState(state))
-            .catch(err => console.log(err));
-    }
-
     setOverlay(component) {
         this.setState({ overlay: component });
-    }
-
-    updateMatch(partial) {
-        updateMatch(partial)
-            .then(state => this.setState(state))
-            .catch(err => console.log(err));
-    }
-
-    updateController(partial) {
-        updateController(partial)
-            .then(state => this.setState(state))
-            .catch(err => console.log(err));
-    }
-
-    selectView(event) {
-        const { target: { value } } = event;
-        updateView(value)
-            .then(state => this.setState(state))
-            .catch(err => console.log(err));
     }
 
     handleShortcuts() {
@@ -96,12 +69,12 @@ class App extends Component {
     }
 
     renderCurrentView() {
-        const { view } = this.state;
+        const { view } = this.props;
 
         switch (view) {
-        case MATCH:
-            return <ScoreBoard match={this.state.match} update={this.updateMatch} />;
-        case IDLE:
+        case VIEWS.match:
+            return <ScoreBoard />;
+        case VIEWS.idle:
         default:
             return <Idle />;
         }
@@ -116,22 +89,13 @@ class App extends Component {
                 <div className="App" style={backgrounds[0]}>
                     {this.renderCurrentView()}
                 </div>
-                {this.state.controller &&
-                    <Controller
-                        state={this.state}
-                        updateMatch={this.updateMatch}
-                        selectView={this.selectView}
-                        views={[IDLE, MATCH]}
-                        renderAsset={this.setOverlay}
-                        controllerState={this.state.controller}
-                        updateState={this.updateController}
-                        clearState={clearState}
-                    />
-                }
+                <Controller renderAsset={this.setOverlay} />
                 {this.renderOverlay()}
             </Shortcuts>
         );
     }
 }
 
-export default App;
+const stateToProps = ({ controller: { view } }) => ({ view });
+
+export default connect(stateToProps)(App);

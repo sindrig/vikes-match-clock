@@ -1,5 +1,6 @@
-import React, { Component } from 'react';
-import PropTypes from 'prop-types';
+import React from 'react';
+import { connect } from 'react-redux';
+import { matchPropType } from '../propTypes';
 
 import Team from '../match/Team';
 import Clock from '../match/Clock';
@@ -18,41 +19,20 @@ const getTeam = (id, match) => {
     };
 };
 
-export default class ScoreBoard extends Component {
-    static propTypes = {
-        match: PropTypes.shape({
-            homeScore: PropTypes.number,
-            awayScore: PropTypes.number,
-            started: PropTypes.number,
-            half: PropTypes.number,
-        }).isRequired,
-        update: PropTypes.func.isRequired,
-    }
+const ScoreBoard = ({ match }) => (
+    <div className="scoreboard">
+        <AdImage />
+        <Team className="home" team={getTeam('home', match)} score={match.homeScore} />
+        <Team className="away" team={getTeam('away', match)} score={match.awayScore} />
+        <Clock className="clock" />
+    </div>
+);
 
-    constructor(props) {
-        super(props);
-        this.start = this.start.bind(this);
-        this.resetClock = this.resetClock.bind(this);
-    }
+ScoreBoard.propTypes = {
+    match: matchPropType.isRequired,
+};
 
-    resetClock() {
-        const { update } = this.props;
-        update({ started: null });
-    }
 
-    start() {
-        const { update } = this.props;
-        update({ started: Date.now() });
-    }
+const stateToProps = ({ match }) => ({ match });
 
-    render() {
-        return (
-            <div className="scoreboard">
-                <AdImage />
-                <Team className="home" team={getTeam('home', this.props.match)} score={this.props.match.homeScore} />
-                <Team className="away" team={getTeam('away', this.props.match)} score={this.props.match.awayScore} />
-                <Clock onStart={this.start} started={this.props.match.started} className="clock" reset={this.resetClock} half={this.props.match.half} />
-            </div>
-        );
-    }
-}
+export default connect(stateToProps)(ScoreBoard);

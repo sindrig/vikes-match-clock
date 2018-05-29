@@ -1,23 +1,28 @@
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
-import { matchPropType, controllerPropType } from '../../propTypes';
+import { connect } from 'react-redux';
+import { bindActionCreators } from 'redux';
+import controllerActions from '../../actions/controller';
+import { matchPropType, assetsPropType } from '../../propTypes';
 
 import RemovableAsset from './RemovableAsset';
 import AssetSelector from './AssetSelector';
 import Asset, { checkKey } from './Asset';
-import * as assets from '../../assets';
+import * as assetsImages from '../../assets';
 import TeamAssetController from './team/TeamAssetController';
 import UrlController from './UrlController';
-import { ASSET_VIEWS } from '../../api';
+import { ASSET_VIEWS } from '../../reducers/controller';
 import './AssetController.css';
 
-export default class AssetController extends Component {
+class AssetController extends Component {
     // TODO save state in localstorage
     static propTypes = {
         renderAsset: PropTypes.func.isRequired,
-        updateState: PropTypes.func.isRequired,
+        selectAssetView: PropTypes.func.isRequired,
         match: matchPropType.isRequired,
-        state: controllerPropType.isRequired,
+        assetView: PropTypes.string.isRequired,
+        assets: assetsPropType.isRequired,
+        updateAssets: PropTypes.func.isRequired,
     };
 
     constructor(props) {
@@ -33,7 +38,6 @@ export default class AssetController extends Component {
         this.onImageSecondsChange = this.onImageSecondsChange.bind(this);
         this.pause = this.pause.bind(this);
         this.requestRemoval = this.requestRemoval.bind(this);
-        this.updateTeams = this.updateTeams.bind(this);
         this.addMultipleAssets = this.addMultipleAssets.bind(this);
         this.clearQueue = this.clearQueue.bind(this);
         this.addAssetKey = this.addAssetKey.bind(this);
@@ -41,12 +45,12 @@ export default class AssetController extends Component {
     }
 
     onCycleChange() {
-        const { state: { assets: { cycle } } } = this.props;
+        const { assets: { cycle } } = this.props;
         this.updateAssets({ cycle: !cycle });
     }
 
     onAutoPlayChange() {
-        const { state: { assets: { autoPlay } } } = this.props;
+        const { assets: { autoPlay } } = this.props;
         this.updateAssets({ autoPlay: !autoPlay });
         if (!autoPlay) {
             this.pause();
@@ -63,11 +67,11 @@ export default class AssetController extends Component {
         return this.addMultipleAssets([key], extra);
     }
 
-    addMultipleAssets(assetList, extra = {}) {
-        if (Object.keys(extra).length) {
-            console.error('Someone is using extra... ', extra);
+    addMultipleAssets(assetList, ...rest) {
+        if (rest.length > 1) {
+            console.trace('Someone is using extra... ', rest);
         }
-        const { state: { assets: { selectedAssets } } } = this.props;
+        const { assets: { selectedAssets } } = this.props;
         const updatedAssets = [...selectedAssets];
         const errors = [];
         assetList.forEach((asset) => {
@@ -81,7 +85,7 @@ export default class AssetController extends Component {
                 errors.push(`Unknown asset ${asset.key}`);
             }
         });
-        this.updateAssets({ selectedAssets: updatedAssets, ...extra });
+        this.updateAssets({ selectedAssets: updatedAssets });
         if (errors.length) {
             this.setState({ error: errors.join(' - ') });
         } else {
@@ -94,31 +98,8 @@ export default class AssetController extends Component {
     }
 
     updateAssets(newState) {
-        const {
-            state: {
-                assets: {
-                    selectedAssets, cycle, imageSeconds, autoPlay,
-                },
-            },
-            updateState,
-        } = this.props;
-        updateState({
-            assets: {
-                selectedAssets, cycle, imageSeconds, autoPlay, ...newState,
-            },
-        });
-    }
-
-    updateTeams(newState) {
-        const {
-            state: {
-                teamPlayers,
-            },
-            updateState,
-        } = this.props;
-        updateState({
-            teamPlayers: { ...teamPlayers, ...newState },
-        });
+        const { updateAssets } = this.props;
+        updateAssets(newState);
     }
 
     pause() {
@@ -134,10 +115,8 @@ export default class AssetController extends Component {
 
     showNextAsset() {
         const {
-            state: {
-                assets: {
-                    cycle, selectedAssets, imageSeconds, autoPlay,
-                },
+            assets: {
+                cycle, selectedAssets, imageSeconds, autoPlay,
             },
             renderAsset,
         } = this.props;
@@ -161,14 +140,14 @@ export default class AssetController extends Component {
     }
 
     deleteNextAsset() {
-        const { state: { assets: { selectedAssets } } } = this.props;
+        const { assets: { selectedAssets } } = this.props;
         const asset = selectedAssets.shift();
         this.updateAssets({ selectedAssets });
         return asset;
     }
 
     removeAsset(asset) {
-        const { state: { assets: { selectedAssets } } } = this.props;
+        const { assets: { selectedAssets } } = this.props;
         const idx = selectedAssets.map(a => a.key).indexOf(asset.key);
         if (idx > -1) {
             const newAssets = [...selectedAssets];
@@ -178,7 +157,7 @@ export default class AssetController extends Component {
     }
 
     renderNextAsset() {
-        const { state: { assets: { selectedAssets } } } = this.props;
+        const { assets: { selectedAssets } } = this.props;
         return (
             <div>
                 {selectedAssets.map(asset => (
@@ -204,10 +183,8 @@ export default class AssetController extends Component {
 
     renderAssetController() {
         const {
-            state: {
-                assets: {
-                    cycle, selectedAssets, imageSeconds, autoPlay,
-                },
+            assets: {
+                cycle, selectedAssets, imageSeconds, autoPlay,
             },
         } = this.props;
         const { playing } = this.state;
@@ -217,7 +194,7 @@ export default class AssetController extends Component {
                     <AssetSelector addAssetKey={this.addAssetKey}>
                         <option value="null">Myndir</option>
                         {Object
-                            .keys(assets)
+                            .keys(assetsImages)
                             .filter(key => selectedAssets.map(a => a.key).indexOf(key) === -1)
                             .map(key => ({ key, name: key.split('/')[key.split('/').length - 1] }))
                             .map(({ key, name }) => <option value={key} key={key}>{name}</option>)
@@ -268,30 +245,43 @@ export default class AssetController extends Component {
     }
 
     render() {
-        const { match, state, updateState } = this.props;
+        const { match, assetView, selectAssetView } = this.props;
         return (
             <div className="asset-controller">
                 <div className="view-selector">
-                    <button onClick={() => updateState({ assetView: ASSET_VIEWS.assets })}>
+                    <button onClick={() => selectAssetView(ASSET_VIEWS.assets)}>
                         Biðröð
                     </button>
-                    <button onClick={() => updateState({ assetView: ASSET_VIEWS.teams })}>
+                    <button onClick={() => selectAssetView(ASSET_VIEWS.teams)}>
                         Lið
                     </button>
                 </div>
-                {state.assetView === ASSET_VIEWS.assets && this.renderAssetController()}
-                {state.assetView === ASSET_VIEWS.teams && (
+                {assetView === ASSET_VIEWS.assets && this.renderAssetController()}
+                {assetView === ASSET_VIEWS.teams && (
                     <TeamAssetController
                         addAssets={this.addMultipleAssets}
                         match={match}
                         updateTeams={this.updateTeams}
-                        controllerState={state}
-                        previousView={() => setTimeout(() => updateState({
-                            assetView: ASSET_VIEWS.assets,
-                        }), 500)}
+                        // TODO
+                        controllerState={null}
+                        previousView={() => setTimeout(() =>
+                            selectAssetView(ASSET_VIEWS.assets), 500)}
                     />
                 )}
             </div>
         );
     }
 }
+
+const stateToProps = ({ controller: { assetView, assets }, match }) => ({
+    assetView,
+    match,
+    assets,
+});
+
+const dispatchToProps = dispatch => bindActionCreators({
+    selectAssetView: controllerActions.selectAssetView,
+    updateAssets: controllerActions.updateAssets,
+}, dispatch);
+
+export default connect(stateToProps, dispatchToProps)(AssetController);
