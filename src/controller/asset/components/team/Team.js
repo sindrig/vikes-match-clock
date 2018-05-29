@@ -82,7 +82,6 @@ const stateToProps = (
     },
     ownProps,
 ) => {
-    console.log('availableMatches', availableMatches);
     const selectedMatchObj = availableMatches[selectedMatch];
     const teamId = match[`${ownProps.teamName}Id`];
     return {
