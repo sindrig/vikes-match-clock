@@ -1,5 +1,5 @@
 import PropTypes from 'prop-types';
-import { ASSET_VIEWS } from './api';
+import { ASSET_VIEWS } from './reducers/controller';
 
 export const matchPropType = PropTypes.shape({
     homeScore: PropTypes.number,
@@ -22,6 +22,11 @@ export const assetPropType = PropTypes.shape({
     type: PropTypes.string.isRequired,
 });
 
+export const teamPlayersPropType = PropTypes.shape({
+    homeTeam: PropTypes.arrayOf(playerPropType).isRequired,
+    awayTeam: PropTypes.arrayOf(playerPropType).isRequired,
+});
+
 export const controllerPropType = PropTypes.shape({
     assets: PropTypes.shape({
         selectedAssets: PropTypes.arrayOf(assetPropType).isRequired,
@@ -29,9 +34,6 @@ export const controllerPropType = PropTypes.shape({
         imageSeconds: PropTypes.number.isRequired,
         autoPlay: PropTypes.bool.isRequired,
     }),
-    teamPlayers: PropTypes.shape({
-        homeTeam: PropTypes.arrayOf(playerPropType).isRequired,
-        awayTeam: PropTypes.arrayOf(playerPropType).isRequired,
-    }),
+    teamPlayers: teamPlayersPropType.isRequired,
     assetView: PropTypes.oneOf(Object.values(ASSET_VIEWS)),
 });
