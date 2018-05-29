@@ -4,7 +4,7 @@ import { bindActionCreators } from 'redux';
 import PropTypes from 'prop-types';
 
 import { RingLoader } from 'react-spinners';
-import { matchPropType, playerPropType, availableMatchesPropType } from '../../../propTypes';
+import { matchPropType, availableMatchesPropType } from '../../../propTypes';
 import clubIds from '../../../club-ids';
 import * as assets from '../../../assets';
 
@@ -22,7 +22,6 @@ class TeamAssetController extends Component {
     static propTypes = {
         addAssets: PropTypes.func.isRequired,
         match: matchPropType.isRequired,
-        // TODO get rid of this?
         previousView: PropTypes.func.isRequired,
         selectedMatch: PropTypes.string,
         availableMatches: availableMatchesPropType,
@@ -47,7 +46,6 @@ class TeamAssetController extends Component {
             selectPlayerAsset: false,
         };
         this.autoFill = this.autoFill.bind(this);
-        this.clearTeams = this.clearTeams.bind(this);
         this.addPlayersToQ = this.addPlayersToQ.bind(this);
         this.selectSubs = this.selectSubs.bind(this);
         this.addSubAsset = this.addSubAsset.bind(this);
@@ -161,11 +159,6 @@ class TeamAssetController extends Component {
         previousView();
     }
 
-    clearTeams() {
-        const { clearMatchPlayers } = this.props;
-        clearMatchPlayers();
-    }
-
     autoFill() {
         const { match: { homeTeam, awayTeam }, getAvailableMatches } = this.props;
         if (!homeTeam || !awayTeam) {
@@ -181,6 +174,7 @@ class TeamAssetController extends Component {
     renderControls() {
         const {
             availableMatches,
+            clearMatchPlayers,
         } = this.props;
         const { homeTeam, awayTeam } = this.getTeamPlayers();
         return (
@@ -193,7 +187,7 @@ class TeamAssetController extends Component {
                 }
                 {((homeTeam.length * awayTeam.length) || Object.keys(availableMatches).length) ?
                     <div className="control-item">
-                        <button onClick={this.clearTeams}>Hreinsa lið</button>
+                        <button onClick={clearMatchPlayers}>Hreinsa lið</button>
                     </div> :
                     null
                 }
