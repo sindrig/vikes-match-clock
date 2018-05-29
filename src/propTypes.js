@@ -32,10 +32,15 @@ export const assetsPropType = PropTypes.shape({
     cycle: PropTypes.bool.isRequired,
     imageSeconds: PropTypes.number.isRequired,
     autoPlay: PropTypes.bool.isRequired,
-})
+});
 
 export const controllerPropType = PropTypes.shape({
     assets: assetsPropType,
     teamPlayers: teamPlayersPropType.isRequired,
     assetView: PropTypes.oneOf(Object.values(ASSET_VIEWS)),
 });
+
+export const availableMatchesPropType = PropTypes.objectOf(PropTypes.shape({
+    group: PropTypes.string,
+    players: PropTypes.objectOf(PropTypes.arrayOf(playerPropType)),
+}));
