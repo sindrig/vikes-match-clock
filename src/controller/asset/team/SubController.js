@@ -1,6 +1,6 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import { playerPropType } from '../../../../propTypes';
+import { playerPropType } from '../../../propTypes';
 
 const SubController = ({
     subTeam, subIn, subOut, addSubAsset,

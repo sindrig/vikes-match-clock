@@ -2,8 +2,8 @@ import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { bindActionCreators } from 'redux';
 import PropTypes from 'prop-types';
-import { playerPropType, matchPropType } from '../../../../propTypes';
-import controllerActions from '../../../../actions/controller';
+import { playerPropType, matchPropType } from '../../../propTypes';
+import controllerActions from '../../../actions/controller';
 import TeamPlayer from './TeamPlayer';
 
 import './Team.css';
@@ -52,7 +52,6 @@ class Team extends Component {
         const {
             team, selectPlayer, teamName, match,
         } = this.props;
-        console.log('team', team);
         return (
             <div className="team-asset-container">
                 <div className="team-name">{match[teamName]}</div>
