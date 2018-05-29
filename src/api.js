@@ -1,11 +1,6 @@
 import DB from './db';
 
 
-export const ASSET_VIEWS = {
-    assets: 'assets',
-    team: 'team',
-};
-
 const defaultState = {
     match: {
         homeScore: 0,
@@ -26,7 +21,7 @@ const defaultState = {
             homeTeam: [],
             awayTeam: [],
         },
-        assetView: ASSET_VIEWS.assets,
+        assetView: '',
     },
     view: 'IDLE',
 };

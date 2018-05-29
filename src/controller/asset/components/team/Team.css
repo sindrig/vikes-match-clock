@@ -28,4 +28,5 @@ div.team-asset-player {
 
 .team-asset-container button {
     clear: none;
+    height: 22px;
 }

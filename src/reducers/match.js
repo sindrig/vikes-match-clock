@@ -1,5 +1,6 @@
 import { handleActions } from 'redux-actions';
 import ActionTypes from '../ActionTypes';
+import clubIds from '../club-ids';
 
 const initialState = {
     homeScore: 0,
@@ -8,6 +9,8 @@ const initialState = {
     half: 1,
     homeTeam: 'Víkingur R',
     awayTeam: null,
+    homeTeamId: 103,
+    awayTeamId: null,
 };
 
 
@@ -20,7 +23,10 @@ const actions = {
             if (!payload) {
                 return { ...state, pending: true };
             }
-            return { ...state, ...payload };
+            const newState = { ...state, ...payload };
+            newState.homeTeamId = newState.homeTeam ? clubIds[newState.homeTeam] : null;
+            newState.awayTeamId = newState.awayTeam ? clubIds[newState.awayTeam] : null;
+            return newState;
         },
     },
 };
