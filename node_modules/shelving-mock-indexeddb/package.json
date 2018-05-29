@@ -1,0 +1,76 @@
+{
+  "_from": "shelving-mock-indexeddb@^1.0.7",
+  "_id": "shelving-mock-indexeddb@1.0.7",
+  "_inBundle": false,
+  "_integrity": "sha1-ztNKOKrtInE/+1+nJYR26VoYMMU=",
+  "_location": "/shelving-mock-indexeddb",
+  "_phantomChildren": {},
+  "_requested": {
+    "type": "range",
+    "registry": true,
+    "raw": "shelving-mock-indexeddb@^1.0.7",
+    "name": "shelving-mock-indexeddb",
+    "escapedName": "shelving-mock-indexeddb",
+    "rawSpec": "^1.0.7",
+    "saveSpec": null,
+    "fetchSpec": "^1.0.7"
+  },
+  "_requiredBy": [
+    "#DEV:/"
+  ],
+  "_resolved": "https://registry.npmjs.org/shelving-mock-indexeddb/-/shelving-mock-indexeddb-1.0.7.tgz",
+  "_shasum": "ced34a38aaed22713ffb5fa7258476e95a1830c5",
+  "_spec": "shelving-mock-indexeddb@^1.0.7",
+  "_where": "/home/sindri/dev/vikes-match-clock",
+  "author": {
+    "name": "Dave Houlbrooke",
+    "email": "dave@shax.com"
+  },
+  "bugs": {
+    "url": "https://github.com/dhoulb/mock-indexeddb/issues"
+  },
+  "bundleDependencies": false,
+  "dependencies": {
+    "realistic-structured-clone": "^1.0.1",
+    "shelving-mock-event": "^1.0.8"
+  },
+  "deprecated": false,
+  "description": "Unit tested mock implementation of the browser IndexedDB API.",
+  "devDependencies": {
+    "blob-polyfill": "^1.0.20150320",
+    "eslint": "^3.19.0",
+    "jest": "^20.0.3"
+  },
+  "engineStrict": true,
+  "engines": {
+    "node": ">=6.0.0"
+  },
+  "eslintConfig": {
+    "extends": "eslint:recommended",
+    "env": {
+      "es6": true,
+      "node": true,
+      "jest": true
+    },
+    "rules": {
+      "valid-jsdoc": 2,
+      "global-require": 2,
+      "no-var": 2,
+      "prefer-const": 2,
+      "prefer-spread": 2
+    }
+  },
+  "homepage": "https://github.com/dhoulb/mock-indexeddb#readme",
+  "license": "0BSD",
+  "main": "lib/mock.js",
+  "name": "shelving-mock-indexeddb",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/dhoulb/mock-indexeddb.git"
+  },
+  "scripts": {
+    "test": "jest",
+    "watch": "jest --watchAll --no-watchman"
+  },
+  "version": "1.0.7"
+}
