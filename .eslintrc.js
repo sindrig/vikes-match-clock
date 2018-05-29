@@ -1,6 +1,9 @@
 module.exports = {
     "parser": "babel-eslint",
-    "extends": "airbnb",
+    "extends": [
+        "airbnb",
+        "plugin:jest/recommended",
+    ],
     "plugins": [
         "react"
     ],
@@ -17,9 +20,6 @@ module.exports = {
     "globals": {
         "document": true,
         "window": true,
-        "fetch": true,
-        "beforeEach": true,
-        "afterEach": true,
-        "jest": true,
-    },
+        "fetch": true
+    }
 };
