@@ -14,6 +14,7 @@ STARTER_ROLES = [
     'Markmaður',
     'Leikmaður',
     'Fyrirliði',
+    'Fyrirliði/markmaður',
 ]
 
 
