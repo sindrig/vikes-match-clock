@@ -45,10 +45,10 @@ test() {
 
 all() {
     if check-master; then
-        main unpack-deps lint test build deploy
+        main lint test build deploy
         EXIT_CODE=$?
     else
-        main unpack-deps lint test
+        main lint test
         EXIT_CODE=$?
     fi
     exit $EXIT_CODE
