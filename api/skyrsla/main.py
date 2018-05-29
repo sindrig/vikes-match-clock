@@ -1,6 +1,7 @@
 import argparse
 import datetime
 import pprint
+import json
 from collections import defaultdict, namedtuple
 from suds.client import Client
 
@@ -98,8 +99,8 @@ def no_match_found(home_team, away_team):
     }
 
 
-def handler(json_input, context, date=None):
-    date = date or datetime.date.today()
+def main(json_input, context):
+    date = datetime.date.today()
     try:
         home_team = int(json_input['homeTeam'])
         away_team = int(json_input['awayTeam'])
@@ -128,6 +129,21 @@ def handler(json_input, context, date=None):
     if not result['matches']:
         return no_match_found(home_team, away_team)
     return result
+
+
+def handler(json_input, context):
+
+    if 'queryStringParameters' in json_input:
+        json_input = json_input['queryStringParameters']
+    data = main(json_input, context)
+    return {
+        # TODO think about other status codes
+        'statusCode': 200,
+        'body': json.dumps(data),
+        'headers': {
+            'Access-Control-Allow-Origin': '*',
+        },
+    }
 
 
 if __name__ == '__main__':

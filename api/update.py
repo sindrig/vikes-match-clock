@@ -44,14 +44,10 @@ def update_zips():
         sys.exit(p.returncode)
 
 
-def write_fn_name(fn_name, cognito_pool_id, cognito_role):
-    with open(os.path.join(DIR, '..', 'src', 'lambda.js'), 'w') as f:
+def write_fn_name(base_api_url):
+    with open(os.path.join(DIR, '..', 'src', 'apiConfig.js'), 'w') as f:
         f.write("export default {\n")
-        f.write("    skyrslaFunction: '%s',\n" % (fn_name, ))
-        f.write("    cognitoPoolId: '%s',\n" % (cognito_pool_id, ))
-        f.write("    cognitoRole: '%s',\n" % (cognito_role, ))
-        f.write("    region: '%s',\n" % (REGION, ))
-        f.write("    accountId: '525422706348',\n")
+        f.write("    gateWayUrl: '%s',\n" % (base_api_url))
         f.write("};\n")
 
 
@@ -59,11 +55,10 @@ def main():
     stack_name = get_stack_name()
     outputs = get_outputs(stack_name)
     fn_name = outputs['SkyrslaFunctionName']
-    cognito_pool_id = outputs['CognitoPool']
-    cognito_role = outputs['CognitoRole']
+    base_api_url = outputs['ApiGatewayUrl']
     update_zips()
     update_lambda(fn_name)
-    write_fn_name(fn_name, cognito_pool_id, cognito_role)
+    write_fn_name(base_api_url)
 
 
 if __name__ == '__main__':
