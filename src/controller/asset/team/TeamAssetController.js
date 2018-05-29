@@ -4,13 +4,14 @@ import { bindActionCreators } from 'redux';
 import PropTypes from 'prop-types';
 
 import { RingLoader } from 'react-spinners';
-import { matchPropType, playerPropType } from '../../../propTypes';
+import { matchPropType, playerPropType, availableMatchesPropType } from '../../../propTypes';
 import clubIds from '../../../club-ids';
 import * as assets from '../../../assets';
 
 import Team from './Team';
 import SubController from './SubController';
 import assetTypes from '../AssetTypes';
+import MatchSelector from './MatchSelector';
 import controllerActions from '../../../actions/controller';
 
 
@@ -24,13 +25,9 @@ class TeamAssetController extends Component {
         // TODO get rid of this?
         previousView: PropTypes.func.isRequired,
         selectedMatch: PropTypes.string,
-        availableMatches: PropTypes.objectOf(PropTypes.shape({
-            group: PropTypes.string,
-            players: PropTypes.objectOf(PropTypes.arrayOf(playerPropType)),
-        })),
+        availableMatches: availableMatchesPropType,
         getAvailableMatches: PropTypes.func.isRequired,
         clearMatchPlayers: PropTypes.func.isRequired,
-        selectMatch: PropTypes.func.isRequired,
     };
 
     static defaultProps = {
@@ -54,7 +51,6 @@ class TeamAssetController extends Component {
         this.addPlayersToQ = this.addPlayersToQ.bind(this);
         this.selectSubs = this.selectSubs.bind(this);
         this.addSubAsset = this.addSubAsset.bind(this);
-        this.selectMatch = this.selectMatch.bind(this);
         this.selectPlayerAsset = this.selectPlayerAsset.bind(this);
     }
 
@@ -180,12 +176,6 @@ class TeamAssetController extends Component {
         getAvailableMatches(homeTeam, awayTeam).then(() => this.setState({ loading: false }));
     }
 
-    selectMatch(event) {
-        const { target: { value } } = event;
-        const { selectMatch } = this.props;
-        selectMatch(value);
-    }
-
     renderControls() {
         const {
             availableMatches,
@@ -212,23 +202,10 @@ class TeamAssetController extends Component {
                     null
                 }
                 {(availableMatches && Object.keys(availableMatches || {}).length > 1) ?
-                    this.renderMatchControllers(availableMatches) :
+                    <MatchSelector /> :
                     null
                 }
                 {(homeTeam.length * awayTeam.length) ? this.renderActionControllers() : null}
-            </div>
-        );
-    }
-
-    renderMatchControllers(matches) {
-        const { selectedMatch } = this.props;
-        return (
-            <div className="control-item">
-                <select value={selectedMatch} onChange={this.selectMatch}>
-                    {Object.keys(matches).map(matchKey => (
-                        <option value={matchKey} key={matchKey}>{matches[matchKey].group}</option>
-                    ))}
-                </select>
             </div>
         );
     }
@@ -352,7 +329,6 @@ const stateToProps = ({
 const dispatchToProps = dispatch => bindActionCreators({
     clearMatchPlayers: controllerActions.clearMatchPlayers,
     getAvailableMatches: controllerActions.getAvailableMatches,
-    selectMatch: controllerActions.selectMatch,
 }, dispatch);
 
 export default connect(stateToProps, dispatchToProps)(TeamAssetController);
