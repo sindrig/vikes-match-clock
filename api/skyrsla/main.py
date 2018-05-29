@@ -10,12 +10,19 @@ VIKES = '103'
 client = Client(WSDL_URL)
 Match = namedtuple('Match', ('match_id', 'group', ))
 
+STARTER_ROLES = [
+    'Markmaður',
+    'Leikmaður',
+    'Fyrirliði',
+]
+
 
 def get_player(player):
     return {
         'number': player.TreyjuNumer and int(player.TreyjuNumer),
         'name': player.LeikmadurNafn.strip(),
         'role': player.StadaNafn,
+        'show': player.StadaNafn in STARTER_ROLES,
     }
 
 
