@@ -2,13 +2,13 @@ import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 import YouTube from 'react-youtube';
 
-import { assetPropType } from '../../../propTypes';
+import { assetPropType } from '../../propTypes';
 import PlayerCard from './PlayerCard';
 import Substitution from './Substitution';
 
-import * as assets from '../../../assets';
+import * as assets from '../../assets';
 import assetTypes from './AssetTypes';
-import clubLogos from '../../../images/clubLogos';
+import clubLogos from '../../images/clubLogos';
 
 import './Asset.css';
 

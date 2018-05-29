@@ -1,7 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 
-import backgroundImage from '../../../images/background.png';
+import backgroundImage from '../../images/background.png';
 
 import './Substitution.css';
 

@@ -4,14 +4,14 @@ import { bindActionCreators } from 'redux';
 import PropTypes from 'prop-types';
 
 import { RingLoader } from 'react-spinners';
-import { matchPropType, playerPropType } from '../../../../propTypes';
-import clubIds from '../../../../club-ids';
-import * as assets from '../../../../assets';
+import { matchPropType, playerPropType } from '../../../propTypes';
+import clubIds from '../../../club-ids';
+import * as assets from '../../../assets';
 
 import Team from './Team';
 import SubController from './SubController';
 import assetTypes from '../AssetTypes';
-import controllerActions from '../../../../actions/controller';
+import controllerActions from '../../../actions/controller';
 
 
 const VIKES = 'Víkingur R';
@@ -20,7 +20,6 @@ class TeamAssetController extends Component {
     // TODO save state in localstorage
     static propTypes = {
         addAssets: PropTypes.func.isRequired,
-        updateTeams: PropTypes.func.isRequired,
         match: matchPropType.isRequired,
         // TODO get rid of this?
         previousView: PropTypes.func.isRequired,
