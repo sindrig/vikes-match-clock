@@ -2,7 +2,7 @@ import { handleActions } from 'redux-actions';
 import ActionTypes from '../ActionTypes';
 import clubIds from '../club-ids';
 
-const initialState = {
+export const initialState = {
     homeScore: 0,
     awayScore: 0,
     started: null,

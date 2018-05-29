@@ -1,10 +1,12 @@
 import React, { Component } from 'react';
-import axios from 'axios';
 import Clock from 'react-live-clock';
 import clubLogos from '../images/clubLogos';
 import AdImage from '../utils/AdImage';
+import { getTemp } from '../lib/weather';
 
 import './Idle.css';
+
+const fetchTempInterval = 5 * 60 * 1000;
 
 // Change this to true touse real temp
 const useRealTemperature = true;
@@ -20,7 +22,7 @@ export default class Idle extends Component {
 
     componentDidMount() {
         this.updateTemp();
-        this.interval = setInterval(this.updateTemp, 60000);
+        this.interval = setInterval(this.updateTemp, fetchTempInterval);
     }
 
     componentWillUnmount() {
@@ -31,24 +33,11 @@ export default class Idle extends Component {
         if (!useRealTemperature) {
             return;
         }
-        const options = {
-            params: {
-                stations: '1',
-                time: '1h',
-                anytime: '1',
-            },
-        };
-        axios.get('http://apis.is/weather/observations/en', options)
-            .then(({
-                data: { results },
-            }) => {
-                const temperature = Math.ceil(parseFloat(results[0].T));
-                if (!Number.isNaN(temperature)) {
-                    this.setState({ temperature });
-                } else {
-                    console.log('Received strange temperature:', results, results[0].T);
-                }
-            });
+        getTemp().then((temperature) => {
+            if (temperature) {
+                this.setState({ temperature });
+            }
+        });
     }
 
     render() {
