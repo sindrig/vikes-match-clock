@@ -16,7 +16,7 @@ export const VIEWS = keymirror({
     match: null,
 });
 
-const initialState = {
+export const initialState = {
     assets: {
         selectedAssets: [],
         cycle: false,
