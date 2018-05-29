@@ -40,7 +40,7 @@ lint() {
 }
 
 test() {
-    echo "Not configured"
+    npm run test
 }
 
 all() {
