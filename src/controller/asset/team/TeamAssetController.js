@@ -1,56 +1,38 @@
 import React, { Component } from 'react';
+import { connect } from 'react-redux';
+import { bindActionCreators } from 'redux';
 import PropTypes from 'prop-types';
-import AWS from 'aws-sdk';
+
 import { RingLoader } from 'react-spinners';
-import { matchPropType, controllerPropType } from '../../../propTypes';
+import { matchPropType, availableMatchesPropType } from '../../../propTypes';
 import clubIds from '../../../club-ids';
 import * as assets from '../../../assets';
-import { getKey, setKey } from '../../../api';
 
-import lambda from '../../../lambda';
 import Team from './Team';
 import SubController from './SubController';
 import assetTypes from '../AssetTypes';
-import lambdaExample from '../../../debug/lambda-example';
+import MatchSelector from './MatchSelector';
+import controllerActions from '../../../actions/controller';
 
-const DEBUG = false;
-const AVAILABLE_MATCHES = 'AVAILABLE_MATCHES';
-
-const awsConf = {
-    region: lambda.region,
-    credentials: new AWS.CognitoIdentityCredentials({
-        IdentityPoolId: lambda.cognitoPoolId,
-        RoleArn: lambda.cognitoRole,
-        AccountId: lambda.accountId,
-    }),
-};
-AWS.config.update(awsConf);
-
-const ensureCredentials = () => new Promise((resolve, reject) => {
-    if (!AWS.config.credentials || AWS.config.credentials.expired !== false) {
-        AWS.config.credentials.get((err) => {
-            if (err) {
-                reject(err);
-            } else {
-                resolve(AWS.config.credentials);
-            }
-        });
-    } else {
-        resolve(AWS.config.credentials);
-    }
-});
 
 const VIKES = 'Víkingur R';
 
-export default class TeamAssetController extends Component {
+class TeamAssetController extends Component {
     // TODO save state in localstorage
     static propTypes = {
         addAssets: PropTypes.func.isRequired,
-        updateTeams: PropTypes.func.isRequired,
         match: matchPropType.isRequired,
-        controllerState: controllerPropType.isRequired,
         previousView: PropTypes.func.isRequired,
+        selectedMatch: PropTypes.string,
+        availableMatches: availableMatchesPropType,
+        getAvailableMatches: PropTypes.func.isRequired,
+        clearMatchPlayers: PropTypes.func.isRequired,
     };
+
+    static defaultProps = {
+        availableMatches: {},
+        selectedMatch: null,
+    }
 
     constructor(props) {
         super(props);
@@ -61,39 +43,34 @@ export default class TeamAssetController extends Component {
             subTeam: null,
             subIn: null,
             subOut: null,
-            availableMatches: { matches: null },
-            selectedMatch: null,
             selectPlayerAsset: false,
         };
         this.autoFill = this.autoFill.bind(this);
-        this.clearTeams = this.clearTeams.bind(this);
         this.addPlayersToQ = this.addPlayersToQ.bind(this);
         this.selectSubs = this.selectSubs.bind(this);
         this.addSubAsset = this.addSubAsset.bind(this);
-        this.selectMatch = this.selectMatch.bind(this);
         this.selectPlayerAsset = this.selectPlayerAsset.bind(this);
     }
 
-    componentDidMount() {
-        getKey(AVAILABLE_MATCHES).then(availableMatches => this.setState({
-            availableMatches: {
-                matches: null,
-                ...availableMatches,
-            },
-            selectedMatch: (
-                availableMatches && availableMatches.matches ?
-                    Object.keys(availableMatches.matches)[0] : null
-            ),
-        }));
+    getTeamPlayers() {
+        const {
+            selectedMatch,
+            availableMatches,
+            match: { homeTeam, awayTeam },
+        } = this.props;
+        const match = availableMatches[selectedMatch];
+        return {
+            homeTeam: match ? match.players[clubIds[homeTeam]] || [] : [],
+            awayTeam: match ? match.players[clubIds[awayTeam]] || [] : [],
+        };
     }
 
     getPlayerAssetObject({ player, teamName }) {
         const {
             selectedMatch, availableMatches,
-        } = this.state;
-        const { group } = availableMatches && availableMatches.matches
-            && availableMatches.matches[selectedMatch] ?
-            availableMatches.matches[selectedMatch] :
+        } = this.props;
+        const { group } = availableMatches && availableMatches[selectedMatch] ?
+            availableMatches[selectedMatch] :
             { group: 'Meistaraflokkur' };
         if (!player.name || !player.number) {
             return null;
@@ -125,15 +102,11 @@ export default class TeamAssetController extends Component {
 
     addPlayersToQ() {
         const {
-            controllerState: {
-                teamPlayers: {
-                    homeTeam, awayTeam,
-                },
-            },
             match,
             addAssets,
             previousView,
         } = this.props;
+        const { homeTeam, awayTeam } = this.getTeamPlayers();
         const teamAssets = [
             { team: awayTeam, teamName: match.awayTeam },
             { team: homeTeam, teamName: match.homeTeam },
@@ -186,100 +159,24 @@ export default class TeamAssetController extends Component {
         previousView();
     }
 
-    clearTeams() {
-        const { updateTeams } = this.props;
-        updateTeams({
-            homeTeam: [],
-            awayTeam: [],
-        });
-        setKey(AVAILABLE_MATCHES, null);
-        this.setState({
-            availableMatches: null,
-            selectedMatch: null,
-        });
-    }
-
-    handleTeams(data) {
-        setKey(AVAILABLE_MATCHES, data);
-        const firstKey = Object.keys(data.matches)[0];
-        this.setState({
-            availableMatches: data,
-            selectedMatch: firstKey,
-        });
-        this.handleMatch(data.matches[firstKey]);
-    }
-
-    handleMatch(match) {
-        const { match: { homeTeam, awayTeam }, updateTeams } = this.props;
-        const mapper = (p, i) => ({ ...p, show: i < 11 });
-        updateTeams({
-            homeTeam: match.players[clubIds[homeTeam]].map(mapper),
-            awayTeam: match.players[clubIds[awayTeam]].map(mapper),
-        });
-    }
-
     autoFill() {
-        const { match: { homeTeam, awayTeam } } = this.props;
+        const { match: { homeTeam, awayTeam }, getAvailableMatches } = this.props;
         if (!homeTeam || !awayTeam) {
             this.setState({ error: 'Choose teams first' });
             return;
         }
         this.setState({ loading: true });
-
-        if (DEBUG) {
-            this.handleTeams(lambdaExample);
-            this.setState({ loading: false });
-        } else {
-            ensureCredentials().then(() => {
-                const fn = new AWS.Lambda({
-                    region: lambda.region,
-                    apiVersion: '2015-03-31',
-                });
-                const fnParams = {
-                    FunctionName: lambda.skyrslaFunction,
-                    InvocationType: 'RequestResponse',
-                    Payload: JSON.stringify({
-                        homeTeam: clubIds[homeTeam],
-                        awayTeam: clubIds[awayTeam],
-                    }),
-                };
-                fn.invoke(fnParams, (error, data) => {
-                    if (error) {
-                        this.setState({ error });
-                    } else {
-                        const json = JSON.parse(data.Payload);
-                        if (json.error) {
-                            console.error(json.error);
-                            this.setState({ error: `${json.error.text || JSON.stringify(json.error)}` });
-                        } else {
-                            this.setState({ error: '' });
-                            this.handleTeams(json);
-                        }
-                    }
-                    this.setState({ loading: false });
-                });
-            });
-        }
-    }
-
-    selectMatch(event) {
-        const { target: { value } } = event;
-        const { availableMatches } = this.state;
-        this.setState({ selectedMatch: value });
-        this.handleMatch(availableMatches.matches[value]);
+        getAvailableMatches(homeTeam, awayTeam)
+            .catch(e => this.setState({ error: e.message }))
+            .then(() => this.setState({ loading: false }));
     }
 
     renderControls() {
         const {
-            controllerState: {
-                teamPlayers: {
-                    homeTeam, awayTeam,
-                },
-            },
-        } = this.props;
-        const {
             availableMatches,
-        } = this.state;
+            clearMatchPlayers,
+        } = this.props;
+        const { homeTeam, awayTeam } = this.getTeamPlayers();
         return (
             <div>
                 {!(homeTeam.length * awayTeam.length) ?
@@ -288,9 +185,9 @@ export default class TeamAssetController extends Component {
                     </div> :
                     null
                 }
-                {(homeTeam.length * awayTeam.length) ?
+                {((homeTeam.length * awayTeam.length) || Object.keys(availableMatches).length) ?
                     <div className="control-item">
-                        <button onClick={this.clearTeams}>Hreinsa lið</button>
+                        <button onClick={clearMatchPlayers}>Hreinsa lið</button>
                     </div> :
                     null
                 }
@@ -300,24 +197,11 @@ export default class TeamAssetController extends Component {
                     </div> :
                     null
                 }
-                {(availableMatches && Object.keys(availableMatches.matches || {}).length > 1) ?
-                    this.renderMatchControllers(availableMatches.matches) :
+                {(availableMatches && Object.keys(availableMatches || {}).length > 1) ?
+                    <MatchSelector /> :
                     null
                 }
                 {(homeTeam.length * awayTeam.length) ? this.renderActionControllers() : null}
-            </div>
-        );
-    }
-
-    renderMatchControllers(matches) {
-        const { selectedMatch } = this.state;
-        return (
-            <div className="control-item">
-                <select value={selectedMatch} onChange={this.selectMatch}>
-                    {Object.keys(matches).map(matchKey => (
-                        <option value={matchKey} key={matchKey}>{matches[matchKey].group}</option>
-                    ))}
-                </select>
             </div>
         );
     }
@@ -390,11 +274,6 @@ export default class TeamAssetController extends Component {
         const {
             selectSubs, subTeam, selectPlayerAsset,
         } = this.state;
-        const {
-            controllerState: { teamPlayers },
-            updateTeams,
-            match,
-        } = this.props;
         let selectPlayerAction = null;
         if (selectSubs) {
             if (!subTeam || subTeam === teamName) {
@@ -405,12 +284,8 @@ export default class TeamAssetController extends Component {
         }
         return (
             <Team
-                team={teamPlayers[teamName]}
                 teamName={teamName}
-                updateTeams={updateTeams}
                 selectPlayer={selectPlayerAction}
-                subTeam={subTeam}
-                match={match}
             />
         );
     }
@@ -434,3 +309,22 @@ export default class TeamAssetController extends Component {
         );
     }
 }
+
+const stateToProps = ({
+    match,
+    controller: {
+        availableMatches,
+        selectedMatch,
+    },
+}) => ({
+    match,
+    availableMatches,
+    selectedMatch,
+});
+
+const dispatchToProps = dispatch => bindActionCreators({
+    clearMatchPlayers: controllerActions.clearMatchPlayers,
+    getAvailableMatches: controllerActions.getAvailableMatches,
+}, dispatch);
+
+export default connect(stateToProps, dispatchToProps)(TeamAssetController);
