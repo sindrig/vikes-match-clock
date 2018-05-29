@@ -1,15 +1,28 @@
-const requireAssets = require.context('./assets', true, /.*/);
-const requirePlayers = require.context('./players', true, /.*/);
-
-const RE = /^[\\./\\]+/;
-const getKey = (key, loc) => `${loc}/${key.replace(RE, '')}`;
-
-const exp = {};
-requireAssets.keys().forEach((key) => {
-    exp[getKey(key, 'assets')] = requireAssets(key);
-});
-requirePlayers.keys().forEach((key) => {
-    exp[getKey(key, 'players')] = requirePlayers(key);
-});
-
-module.exports = exp;
+/* eslint-disable global-require */
+module.exports = {
+    'players/01 Andreas Larsen.png': require('./players/01 Andreas Larsen.png'),
+    'players/01 Aris Vaporakis.png': require('./players/01 Aris Vaporakis.png'),
+    'players/02 Sindri Scheving.png': require('./players/02 Sindri Scheving.png'),
+    'players/03 Jorgen Richardsen.png': require('./players/03 Jorgen Richardsen.png'),
+    'players/04 Gunnlaugur Hlynur Birgisson.png': require('./players/04 Gunnlaugur Hlynur Birgisson.png'),
+    'players/05 Milos Ozegovic.png': require('./players/05 Milos Ozegovic.png'),
+    'players/06 Halldór Smári Sigurðsson.png': require('./players/06 Halldór Smári Sigurðsson.png'),
+    'players/07 Alex Freyr Hilmarsson.png': require('./players/07 Alex Freyr Hilmarsson.png'),
+    'players/08 Sölvi Geir Ottesen.png': require('./players/08 Sölvi Geir Ottesen.png'),
+    'players/09 Erlingur Agnarsson.png': require('./players/09 Erlingur Agnarsson.png'),
+    'players/10 Rick ten Voorde.png': require('./players/10 Rick ten Voorde.png'),
+    'players/12 Emil Andri Auðunsson.png': require('./players/12 Emil Andri Auðunsson.png'),
+    'players/13 Viktor Örlygur Andrason.png': require('./players/13 Viktor Örlygur Andrason.png'),
+    'players/14 Bjarni Páll Runólfsson.png': require('./players/14 Bjarni Páll Runólfsson.png'),
+    'players/17 Gunnlaugur Fannar Guðmundsson.png': require('./players/17 Gunnlaugur Fannar Guðmundsson.png'),
+    'players/18 Örvar Eggertsson.png': require('./players/18 Örvar Eggertsson.png'),
+    'players/19 Atli Hrafn Andrason.png': require('./players/19 Atli Hrafn Andrason.png'),
+    'players/20 Aron Már Brynjarsson.png': require('./players/20 Aron Már Brynjarsson.png'),
+    'players/21 Arnþór Ingi Kristinsson.png': require('./players/21 Arnþór Ingi Kristinsson.png'),
+    'players/22 Logi Tómason.png': require('./players/22 Logi Tómason.png'),
+    'players/23 Nikolaj Hansen.png': require('./players/23 Nikolaj Hansen.png'),
+    'players/24 Davíð Örn Atlason.png': require('./players/24 Davíð Örn Atlason.png'),
+    'players/25 Vladimir Tugegdzic.png': require('./players/25 Vladimir Tugegdzic.png'),
+    'players/29 Serigne Mor Mbaye.png': require('./players/29 Serigne Mor Mbaye.png'),
+    'players/AÞ Arnar Gunnlaugsson.png': require('./players/AÞ Arnar Gunnlaugsson.png'),
+};
