@@ -84,6 +84,7 @@ const MatchActions = ({ view, match, updateMatch }) => (
                     >
                         Seinni hálfleikur
                     </button>
+                    Uppbótartími: <input type="number" value={match.injuryTime || ''} onChange={({ target: { value } }) => updateMatch({ injuryTime: parseInt(value, 10) })} />
                 </div>
             </div>
         )}
