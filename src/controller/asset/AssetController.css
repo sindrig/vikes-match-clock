@@ -8,7 +8,7 @@
 }
 
 .asset-controller {
-    height: 300px;
+    height: calc(100vh - 110px);
     width: 1070px;
     overflow: scroll;
     margin: 30px 5px 5px 5px;
