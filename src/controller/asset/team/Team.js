@@ -25,16 +25,16 @@ class Team extends Component {
         teamId: null,
     };
 
-    state = {
-        inputValue: '',
-        error: '',
-    };
-
     constructor(props) {
         super(props);
         this.addEmptyLine = this.addEmptyLine.bind(this);
         this.submitForm = this.submitForm.bind(this);
     }
+
+    state = {
+        inputValue: '',
+        error: '',
+    };
 
     addEmptyLine() {
         const { addPlayer, teamId } = this.props;
