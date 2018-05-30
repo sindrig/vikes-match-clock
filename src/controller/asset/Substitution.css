@@ -28,12 +28,17 @@
 }
 
 .asset-substitution .player-card-no-image:nth-child(1) .asset-player-name {
-    /*top: 80px;*/
+    bottom: 50px;
     left: 5px;
+    /*color: red;*/
+    /*text-shadow: -1px 0 white, 0 1px white, 1px 0 white, 0 -1px white;*/
 }
 
 .asset-substitution .player-card-no-image:nth-child(2) .asset-player-name {
     right: 5px;
+    /*color: green;*/
+    /*text-shadow: -1px 0 white, 0 1px white, 1px 0 white, 0 -1px white;*/
+
 }
 
 .asset-substitution > div:nth-child(1) img {
@@ -56,4 +61,9 @@
     right: 5px;
     text-align: right;
     color: green;
+}
+
+.asset-substitution .asset-player-icon.player-card-no-image img {
+    height: 50%;
+    position: relative;
 }
