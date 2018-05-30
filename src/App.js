@@ -48,9 +48,14 @@ class App extends Component {
         this.setState({ overlay: component });
     }
 
-    handleShortcuts() {
-        // TODO do we need something?
-        // handleShorcuts accepts (action (string), event (Event))
+    handleShortcuts(action) {
+        switch (action) {
+        case 'clearImage':
+            this.setOverlay(null);
+            break;
+        default:
+            console.error('Unknown key pressed', action);
+        }
         return this;
     }
 
@@ -85,6 +90,8 @@ class App extends Component {
             <Shortcuts
                 name="MAIN"
                 handler={this.handleShortcuts}
+                global
+                targetNodeSelector="body"
             >
                 <div className="App" style={backgrounds[0]}>
                     {this.renderCurrentView()}
