@@ -25,9 +25,15 @@ class Team extends Component {
         teamId: null,
     };
 
+    state = {
+        inputValue: '',
+        error: '',
+    };
+
     constructor(props) {
         super(props);
         this.addEmptyLine = this.addEmptyLine.bind(this);
+        this.submitForm = this.submitForm.bind(this);
     }
 
     addEmptyLine() {
@@ -47,13 +53,50 @@ class Team extends Component {
         };
     }
 
+    submitForm(event) {
+        const { team, selectPlayer, teamName } = this.props;
+        event.preventDefault();
+        const { inputValue } = this.state;
+        const requestedNumber = parseInt(inputValue, 10);
+        let found = false;
+        team.forEach((player) => {
+            if (requestedNumber === parseInt(player.number, 10)) {
+                selectPlayer(player, teamName);
+                found = true;
+            }
+        });
+        this.setState({
+            error: found ? '' : `No player #${inputValue} found`,
+            inputValue: '',
+        });
+    }
+
+    renderForm() {
+        const { inputValue } = this.state;
+        return (
+            <form onSubmit={this.submitForm}>
+                <input
+                    type="text"
+                    value={inputValue}
+                    onChange={({ target: { value } }) => this.setState({ inputValue: value })}
+                    placeholder="# leikmanns og ENTER"
+                    className="player-input"
+                />
+            </form>
+        );
+    }
 
     render() {
         const {
             team, selectPlayer, teamName, match,
         } = this.props;
+        const {
+            error,
+        } = this.state;
         return (
             <div className="team-asset-container">
+                <span>{error}</span>
+                {selectPlayer ? this.renderForm() : null}
                 <div className="team-name">{match[teamName]}</div>
                 {match[teamName] ? team.map((p, i) => (
                     // eslint-disable-next-line react/no-array-index-key
