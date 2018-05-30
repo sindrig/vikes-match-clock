@@ -9,7 +9,7 @@ import clubIds from '../../../club-ids';
 import * as assets from '../../../assets';
 
 import Team from './Team';
-import SubController from './SubController';
+import SubView from './SubView';
 import assetTypes from '../AssetTypes';
 import MatchSelector from './MatchSelector';
 import controllerActions from '../../../actions/controller';
@@ -131,6 +131,7 @@ class TeamAssetController extends Component {
         });
         const subOutObj = this.getPlayerAssetObject({
             player: subOut,
+            // NOTE: We use subIn teamName
             teamName: match[subIn.teamName],
         });
         addAssets([{
@@ -144,10 +145,14 @@ class TeamAssetController extends Component {
 
     selectSubs(player, teamName) {
         const { subIn } = this.state;
-        this.setState({
-            [subIn ? 'subOut' : 'subIn']: { teamName, ...player },
-            subTeam: teamName,
-        });
+        if (subIn) {
+            this.setState({ subOut: player }, this.addSubAsset);
+        } else {
+            this.setState({
+                subIn: { teamName, ...player },
+                subTeam: teamName,
+            });
+        }
     }
 
     selectPlayerAsset(player, teamName) {
@@ -258,7 +263,7 @@ class TeamAssetController extends Component {
                 {this.renderActionButtons()}
                 {selectSubs ? (
                     <div className="control-item">
-                        <SubController
+                        <SubView
                             subIn={subIn}
                             subOut={subOut}
                             addSubAsset={this.addSubAsset}
