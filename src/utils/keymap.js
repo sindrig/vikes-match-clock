@@ -1,5 +1,5 @@
 export default {
     MAIN: {
-        BACKGROUND: 'enter',
+        clearImage: 'esc',
     },
 };
