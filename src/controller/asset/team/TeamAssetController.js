@@ -100,6 +100,17 @@ class TeamAssetController extends Component {
         };
     }
 
+    clearState() {
+        this.setState({
+            error: '',
+            selectSubs: false,
+            subTeam: null,
+            subIn: null,
+            subOut: null,
+            selectPlayerAsset: false,
+        });
+    }
+
     addPlayersToQ() {
         const {
             match,
@@ -124,7 +135,7 @@ class TeamAssetController extends Component {
 
     addSubAsset() {
         const { subIn, subOut } = this.state;
-        const { match, addAssets, previousView } = this.props;
+        const { match, addAssets } = this.props;
         const subInObj = this.getPlayerAssetObject({
             player: subIn,
             teamName: match[subIn.teamName],
@@ -139,8 +150,10 @@ class TeamAssetController extends Component {
             subIn: subInObj,
             subOut: subOutObj,
             key: `sub-${subInObj.key}-${subOutObj.key}`,
-        }]);
-        previousView();
+        }], {
+            showNow: true,
+        });
+        this.clearState();
     }
 
     selectSubs(player, teamName) {
@@ -156,12 +169,14 @@ class TeamAssetController extends Component {
     }
 
     selectPlayerAsset(player, teamName) {
-        const { match, addAssets, previousView } = this.props;
+        const { match, addAssets } = this.props;
         addAssets([this.getPlayerAssetObject({
             player,
             teamName: match[teamName],
-        })]);
-        previousView();
+        })], {
+            showNow: true,
+        });
+        this.clearState();
     }
 
     autoFill() {

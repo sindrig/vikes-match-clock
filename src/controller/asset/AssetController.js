@@ -63,33 +63,36 @@ class AssetController extends Component {
         this.updateAssets({ imageSeconds: Math.max(parseInt(value, 10), 1) });
     }
 
-    addAssetKey(key, extra = {}) {
-        return this.addMultipleAssets([key], extra);
+    addAssetKey(key) {
+        return this.addMultipleAssets([key]);
     }
 
-    addMultipleAssets(assetList, ...rest) {
-        if (rest.length > 1) {
-            console.trace('Someone is using extra... ', rest);
-        }
-        const { assets: { selectedAssets } } = this.props;
+    addMultipleAssets(assetList, options = { showNow: false }) {
+        const { assets: { selectedAssets }, renderAsset } = this.props;
         const updatedAssets = [...selectedAssets];
         const errors = [];
-        assetList.forEach((asset) => {
-            if (checkKey(asset)) {
-                if (updatedAssets.map(s => s.key).indexOf(asset.key) === -1) {
-                    updatedAssets.push(asset);
-                } else {
-                    errors.push(`Asset ${asset.key} already in asset list.`);
-                }
-            } else {
-                errors.push(`Unknown asset ${asset.key}`);
-            }
-        });
-        this.updateAssets({ selectedAssets: updatedAssets });
-        if (errors.length) {
-            this.setState({ error: errors.join(' - ') });
+        if (options.showNow && assetList.length === 1) {
+            renderAsset(<Asset
+                asset={assetList[0]}
+            />);
         } else {
-            this.setState({ error: '' });
+            assetList.forEach((asset) => {
+                if (checkKey(asset)) {
+                    if (updatedAssets.map(s => s.key).indexOf(asset.key) === -1) {
+                        updatedAssets.push(asset);
+                    } else {
+                        errors.push(`Asset ${asset.key} already in asset list.`);
+                    }
+                } else {
+                    errors.push(`Unknown asset ${asset.key}`);
+                }
+            });
+            this.updateAssets({ selectedAssets: updatedAssets });
+            if (errors.length) {
+                this.setState({ error: errors.join(' - ') });
+            } else {
+                this.setState({ error: '' });
+            }
         }
     }
 
