@@ -30,3 +30,7 @@ div.team-asset-player {
     clear: none;
     height: 22px;
 }
+
+.team-asset-container .player-input {
+    width: 310px;
+}
