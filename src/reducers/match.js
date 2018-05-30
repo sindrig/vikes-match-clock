@@ -11,6 +11,7 @@ export const initialState = {
     awayTeam: null,
     homeTeamId: 103,
     awayTeamId: null,
+    injuryTime: 0,
 };
 
 
@@ -26,6 +27,9 @@ const actions = {
             const newState = { ...state, ...payload };
             newState.homeTeamId = newState.homeTeam ? clubIds[newState.homeTeam] : null;
             newState.awayTeamId = newState.awayTeam ? clubIds[newState.awayTeam] : null;
+            if (Number.isNaN(newState.injuryTime)) {
+                newState.injuryTime = 0;
+            }
             return newState;
         },
     },

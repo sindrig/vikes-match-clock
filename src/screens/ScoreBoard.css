@@ -56,3 +56,15 @@
     top: 150px;
     position: absolute;
 }
+
+.scoreboard .injury-time {
+    top: 60px;
+    /*right: 90px;*/
+    font-size: 30px;
+    height: 20px;
+    width: 20px;
+    position: relative;
+    margin: 0 auto;
+    color: white;
+    font-family: 'Anton', sans-serif;
+}

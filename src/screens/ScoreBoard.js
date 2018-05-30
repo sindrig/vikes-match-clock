@@ -24,6 +24,7 @@ const ScoreBoard = ({ match }) => (
         <AdImage />
         <Team className="home" team={getTeam('home', match)} score={match.homeScore} />
         <Team className="away" team={getTeam('away', match)} score={match.awayScore} />
+        {match.injuryTime ? <div className="injury-time">+{match.injuryTime}</div> : null}
         <Clock className="clock" />
     </div>
 );

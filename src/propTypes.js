@@ -8,6 +8,7 @@ export const matchPropType = PropTypes.shape({
     half: PropTypes.number,
     homeTeam: PropTypes.string.isRequired,
     awayTeam: PropTypes.string,
+    injuryTime: PropTypes.number,
 });
 
 export const playerPropType = PropTypes.shape({
