@@ -154,7 +154,7 @@ export default class Asset extends Component {
                 <Substitution thumbnail={thumbnail}>
                     {[subIn, subOut].map(subAsset => this.getPlayerAsset({
                         asset: subAsset,
-                        widthMultiplier: 0.5,
+                        widthMultiplier: 0.7,
                     }))}
                 </Substitution>
             );

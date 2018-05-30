@@ -158,11 +158,15 @@ class TeamAssetController extends Component {
 
     selectSubs(player, teamName) {
         const { subIn } = this.state;
+        const asset = {
+            ...player,
+            name: player.name.split(' ').slice(0, player.name.split(' ').length - 1).join(' '),
+        };
         if (subIn) {
-            this.setState({ subOut: player }, this.addSubAsset);
+            this.setState({ subOut: asset }, this.addSubAsset);
         } else {
             this.setState({
-                subIn: { teamName, ...player },
+                subIn: { teamName, ...asset },
                 subTeam: teamName,
             });
         }
