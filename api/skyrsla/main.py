@@ -64,6 +64,8 @@ def get_matches(home_team, away_team, date):
 def player_sort_key(p):
     n = int(p.TreyjuNumer) if p.TreyjuNumer else 999
     if p.StadaNafn in STARTER_ROLES:
+        if 'markmaður' in p.StadaNafn.lower():
+            return n / 1000
         return n / 100
     return n
 
