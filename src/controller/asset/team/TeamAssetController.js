@@ -191,6 +191,7 @@ class TeamAssetController extends Component {
         }
         this.setState({ loading: true });
         getAvailableMatches(homeTeam, awayTeam)
+            .then(() => this.setState({ error: '' }))
             .catch(e => this.setState({ error: e.message }))
             .then(() => this.setState({ loading: false }));
     }
