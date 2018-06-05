@@ -61,6 +61,13 @@ def get_matches(home_team, away_team, date):
     return matches
 
 
+def player_sort_key(p):
+    n = int(p.TreyjuNumer) if p.TreyjuNumer else 999
+    if p.StadaNafn in STARTER_ROLES:
+        return n / 100
+    return n
+
+
 def get_players(match_id):
     game = client.service.LeikurLeikmenn(LeikurNumer=match_id)
     result = defaultdict(list)
@@ -72,7 +79,10 @@ def get_players(match_id):
                 'text': 'No players found for game %s' % (match_id, ),
             }
         }
-    for player in game.ArrayLeikurLeikmenn.LeikurLeikmenn:
+    for player in sorted(
+        game.ArrayLeikurLeikmenn.LeikurLeikmenn,
+        key=player_sort_key,
+    ):
         club_id = str(player.FelagNumer)
         player_dict = get_player(player)
         if (
@@ -152,8 +162,10 @@ if __name__ == '__main__':
     parser.add_argument('away_team', type=int)
     args = parser.parse_args()
     pprint.pprint(
-        handler(
-            {'homeTeam': args.home_team, 'awayTeam': args.away_team},
-            None
+        json.loads(
+            handler(
+                {'homeTeam': args.home_team, 'awayTeam': args.away_team},
+                None
+            )['body']
         )
     )
