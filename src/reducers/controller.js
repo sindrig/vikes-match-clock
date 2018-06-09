@@ -61,8 +61,8 @@ const actions = {
         next(state, { payload: { data: { matches } } }) {
             return {
                 ...state,
-                availableMatches: matches,
-                selectedMatch: Object.keys(matches)[0] || null,
+                availableMatches: matches || {},
+                selectedMatch: Object.keys(matches || {})[0] || null,
             };
         },
     },
