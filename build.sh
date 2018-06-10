@@ -13,12 +13,9 @@ check-master() {
     [[ "$LAMBCI_BRANCH" == "master" ]] || { echo >&2 "Not on master ($LAMBCI_BRANCH)"; return 1; }
 }
 
-unpack-deps() {
-    tar zxf node_modules.tar.gz
-}
-
-update-deps() {
-    tar czvf node_modules.tar.gz node_modules
+node-modules() {
+    command -v npm-git-lock 2>&1 || npm install -g npm-git-lock
+    npm-git-lock --repo git@github.com:sindrig/vikes-match-clock-node-modules.git
 }
 
 deploy() {
@@ -65,11 +62,8 @@ main() {
             check-master)
                 check-master;
                 ;;
-            unpack-deps)
-                unpack-deps;
-                ;;
-            update-deps)
-                update-deps;
+            node-modules)
+                node-modules;
                 ;;
             deploy)
                 deploy;
