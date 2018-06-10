@@ -15,7 +15,9 @@ check-master() {
 
 node-modules() {
     command -v npm-git-lock 2>&1 || npm install -g npm-git-lock
-    HOME=/tmp/ npm-git-lock --repo git@github.com:sindrig/vikes-match-clock-node-modules.git
+    mkdir -p /tmp/git/
+    export HOME=/tmp/git/
+    npm-git-lock --repo git@github.com:sindrig/vikes-match-clock-node-modules.git
 }
 
 deploy() {
