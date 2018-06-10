@@ -15,8 +15,9 @@ check-master() {
 
 node-modules() {
     command -v npm-git-lock 2>&1 || npm install -g npm-git-lock
-    mkdir -p /tmp/git/
-    export HOME=/tmp/git/
+    export GIT_TEMPLATE_DIR='/tmp/lambci/home/usr/share/git-core/templates'
+    export GIT_EXEC_PATH='/tmp/lambci/home/usr/libexec/git-core'
+    echo "HAI: $(cat /tmp/lambci/home/usr/libexec/git-core | wc -l)"
     npm-git-lock --repo git@github.com:sindrig/vikes-match-clock-node-modules.git
 }
 
