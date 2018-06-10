@@ -42,10 +42,10 @@ test() {
 
 all() {
     if check-master; then
-        main lint test build deploy
+        main node-modules lint test build deploy
         EXIT_CODE=$?
     else
-        main lint test
+        main node-modules lint test
         EXIT_CODE=$?
     fi
     exit $EXIT_CODE
