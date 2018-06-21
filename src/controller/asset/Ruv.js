@@ -55,6 +55,12 @@ class Ruv extends Component {
         }
     }
 
+    componentWillUnmount() {
+        if (this.hls) {
+            this.hls.destroy();
+        }
+    }
+
     render() {
         const { thumbnail } = this.props;
         if (thumbnail) {

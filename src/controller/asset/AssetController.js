@@ -12,6 +12,7 @@ import * as assetsImages from '../../assets';
 import TeamAssetController from './team/TeamAssetController';
 import UrlController from './UrlController';
 import { ASSET_VIEWS } from '../../reducers/controller';
+import assetTypes from './AssetTypes';
 import './AssetController.css';
 
 class AssetController extends Component {
@@ -42,6 +43,7 @@ class AssetController extends Component {
         this.clearQueue = this.clearQueue.bind(this);
         this.addAssetKey = this.addAssetKey.bind(this);
         this.removeAsset = this.removeAsset.bind(this);
+        this.playRuv = this.playRuv.bind(this);
     }
 
     onCycleChange() {
@@ -103,6 +105,13 @@ class AssetController extends Component {
     updateAssets(newState) {
         const { updateAssets } = this.props;
         updateAssets(newState);
+    }
+
+    playRuv() {
+        const { renderAsset } = this.props;
+        renderAsset(<Asset
+            asset={{ key: 'ruv', type: assetTypes.URL }}
+        />);
     }
 
     pause() {
@@ -238,6 +247,7 @@ class AssetController extends Component {
                         </div>
                     }
                     <UrlController addAsset={this.addAssetKey} />
+                    <button onClick={this.playRuv}>RÚV</button>
                     {this.renderError()}
                 </div>
                 <div className="upcoming-assets">
