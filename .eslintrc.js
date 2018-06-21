@@ -16,6 +16,11 @@ module.exports = {
         "react/jsx-filename-extension": [1, { "extensions": [".js", ".jsx"] }],
         "no-console": 0,
         "import/no-extraneous-dependencies": ["error", {"devDependencies": true}],
+        "jsx-a11y/media-has-caption": [ 0, {
+            "audio": [ "Audio" ],
+            "video": [ "Video" ],
+            "track": [ "Track" ],
+          }],
     },
     "globals": {
         "document": true,

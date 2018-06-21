@@ -30,6 +30,7 @@ const actions = {
         };
         return axios.get(`${apiConfig.gateWayUrl}getPlayers`, options);
     },
+    [ActionTypes.getRuvUrl]: () => axios.get(`${apiConfig.gateWayUrl}getRuv`),
 };
 
 Object.keys(actions).forEach((type) => {

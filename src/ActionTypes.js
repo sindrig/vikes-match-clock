@@ -8,6 +8,7 @@ export default keymirror({
     selectView: null,
     selectAssetView: null,
     getAvailableMatches: null,
+    getRuvUrl: null,
     clearMatchPlayers: null,
     selectMatch: null,
     editPlayer: null,

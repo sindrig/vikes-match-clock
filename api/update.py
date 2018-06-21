@@ -11,9 +11,9 @@ session = boto3.Session(profile_name='irdn')
 cloudformation = session.client('cloudformation', region_name=REGION)
 
 
-def update_lambda(lambda_function_name):
+def update_lambda(zip_name, lambda_function_name):
     client = session.client('lambda', region_name=REGION)
-    with open(os.path.join(DIR, 'skyrsla.zip'), 'rb') as f:
+    with open(os.path.join(DIR, '%s.zip' % (zip_name, )), 'rb') as f:
         client.update_function_code(
             FunctionName=lambda_function_name,
             ZipFile=f.read(),
@@ -54,10 +54,12 @@ def write_fn_name(base_api_url):
 def main():
     stack_name = get_stack_name()
     outputs = get_outputs(stack_name)
-    fn_name = outputs['SkyrslaFunctionName']
+    skyrsla_fn_name = outputs['SkyrslaFunctionName']
+    ruv_fn_name = outputs['RuvFunctionName']
     base_api_url = outputs['ApiGatewayUrl']
     update_zips()
-    update_lambda(fn_name)
+    update_lambda('skyrsla', skyrsla_fn_name)
+    update_lambda('ruv', ruv_fn_name)
     write_fn_name(base_api_url)
 
 

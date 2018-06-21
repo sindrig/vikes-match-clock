@@ -9,6 +9,7 @@ import Substitution from './Substitution';
 import * as assets from '../../assets';
 import assetTypes from './AssetTypes';
 import clubLogos from '../../images/clubLogos';
+import Ruv from './Ruv';
 
 import './Asset.css';
 
@@ -97,6 +98,9 @@ export default class Asset extends Component {
 
     renderUrl() {
         const { asset, thumbnail, remove } = this.props;
+        if (asset.key === 'ruv') {
+            return <Ruv thumbnail={thumbnail} />;
+        }
         // TODO can only handle youtube
         let url;
         try {

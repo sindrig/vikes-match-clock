@@ -26,12 +26,14 @@ export default class UrlController extends Component {
     addUrlAsset() {
         const { addAsset } = this.props;
         const { value } = this.state;
-        try {
-            // eslint-disable-next-line no-new
-            new URL(value);
-        } catch (e) {
-            this.setState({ error: `"${value}" is not a valid url` });
-            return null;
+        if (value !== 'ruv') {
+            try {
+                // eslint-disable-next-line no-new
+                new URL(value);
+            } catch (e) {
+                this.setState({ error: `"${value}" is not a valid url` });
+                return null;
+            }
         }
         const asset = { type: assetTypes.URL, key: value };
         this.setState({ value: '', error: '' });
