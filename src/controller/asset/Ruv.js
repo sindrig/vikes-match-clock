@@ -3,10 +3,10 @@ import { connect } from 'react-redux';
 import { bindActionCreators } from 'redux';
 import PropTypes from 'prop-types';
 import Hls from 'hls.js';
-// import hls from 'hls.js/dist/hls';
 
 import controllerActions from '../../actions/controller';
 
+const DEFAULT_URL = 'http://ruvruv-live.hls.adaptive.level3.net/ruv/ruv/index.m3u8';
 
 class Ruv extends Component {
     static propTypes = {
@@ -31,6 +31,8 @@ class Ruv extends Component {
         const { getRuvUrl } = this.props;
         getRuvUrl().then(({ value: { data: { result } } }) => {
             this.setState({ streamUrl: result[0] });
+        }).catch(() => {
+            this.setState({ streamUrl: DEFAULT_URL });
         });
     }
 
