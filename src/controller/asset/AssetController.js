@@ -43,7 +43,6 @@ class AssetController extends Component {
         this.clearQueue = this.clearQueue.bind(this);
         this.addAssetKey = this.addAssetKey.bind(this);
         this.removeAsset = this.removeAsset.bind(this);
-        this.playRuv = this.playRuv.bind(this);
     }
 
     onCycleChange() {
@@ -107,11 +106,13 @@ class AssetController extends Component {
         updateAssets(newState);
     }
 
-    playRuv() {
-        const { renderAsset } = this.props;
-        renderAsset(<Asset
-            asset={{ key: 'ruv', type: assetTypes.URL }}
-        />);
+    playRuv(key) {
+        return () => {
+            const { renderAsset } = this.props;
+            renderAsset(<Asset
+                asset={{ key, type: assetTypes.RUV }}
+            />);
+        };
     }
 
     pause() {
@@ -247,7 +248,8 @@ class AssetController extends Component {
                         </div>
                     }
                     <UrlController addAsset={this.addAssetKey} />
-                    <button onClick={this.playRuv}>RÚV</button>
+                    <button onClick={this.playRuv('ruv')}>RÚV</button>
+                    <button onClick={this.playRuv('ruv2')}>RÚV 2</button>
                     {this.renderError()}
                 </div>
                 <div className="upcoming-assets">

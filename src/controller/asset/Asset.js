@@ -96,11 +96,13 @@ export default class Asset extends Component {
         throw new Error('you should not get here');
     }
 
+    renderRuv() {
+        const { asset: { key }, thumbnail } = this.props;
+        return <Ruv thumbnail={thumbnail} channel={key} />;
+    }
+
     renderUrl() {
         const { asset, thumbnail, remove } = this.props;
-        if (asset.key === 'ruv') {
-            return <Ruv thumbnail={thumbnail} />;
-        }
         // TODO can only handle youtube
         let url;
         try {
@@ -150,6 +152,8 @@ export default class Asset extends Component {
             return <img src={assets[asset.key]} alt={asset.key} key={asset.key} />;
         } else if (asset.type === assetTypes.URL) {
             return this.renderUrl();
+        } else if (asset.type === assetTypes.RUV) {
+            return this.renderRuv();
         } else if (asset.type === assetTypes.PLAYER || asset.type === assetTypes.NO_IMAGE_PLAYER) {
             return this.getPlayerAsset({ asset, widthMultiplier: 1 });
         } else if (asset.type === assetTypes.SUB) {

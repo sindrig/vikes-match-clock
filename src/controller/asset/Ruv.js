@@ -6,12 +6,16 @@ import Hls from 'hls.js';
 
 import controllerActions from '../../actions/controller';
 
-const DEFAULT_URL = 'http://ruvruv-live.hls.adaptive.level3.net/ruv/ruv/index.m3u8';
+const DEFAULT_URLS = {
+    ruv: 'http://ruvruv-live.hls.adaptive.level3.net/ruv/ruv/index.m3u8',
+    ruv2: 'http://ruvruv-live.hls.adaptive.level3.net/ruv/ruv2/index.m3u8',
+};
 
 class Ruv extends Component {
     static propTypes = {
         thumbnail: PropTypes.bool,
         getRuvUrl: PropTypes.func.isRequired,
+        channel: PropTypes.string.isRequired,
     };
 
     static defaultProps = {
@@ -28,19 +32,15 @@ class Ruv extends Component {
     }
 
     componentWillMount() {
-        const { getRuvUrl } = this.props;
-        getRuvUrl().then(({ value: { result } }) => {
-            this.setState({ streamUrl: result[0] || DEFAULT_URL });
-        }).catch((e) => {
-            console.log('e', e);
-            this.setState({ streamUrl: DEFAULT_URL });
-        });
+        this.updateStreamUrl();
     }
 
-    componentDidUpdate() {
+    componentDidUpdate(prevProps) {
         console.log('this.video', this.video);
         const { streamUrl } = this.state;
-        if (this.video) {
+        if (prevProps.channel !== this.props.channel) {
+            this.updateStreamUrl();
+        } else if (this.video) {
             if (this.hls) {
                 this.hls.destroy();
             }
@@ -60,6 +60,16 @@ class Ruv extends Component {
         if (this.hls) {
             this.hls.destroy();
         }
+    }
+
+    updateStreamUrl() {
+        const { getRuvUrl, channel } = this.props;
+        getRuvUrl(channel).then(({ value: { result } }) => {
+            this.setState({ streamUrl: result[0] || DEFAULT_URLS[channel] });
+        }).catch((e) => {
+            console.log('e', e);
+            this.setState({ streamUrl: DEFAULT_URLS[channel] });
+        });
     }
 
     render() {

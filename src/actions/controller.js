@@ -30,11 +30,11 @@ const actions = {
         };
         return axios.get(`${apiConfig.gateWayUrl}getPlayers`, options);
     },
-    [ActionTypes.getRuvUrl]: () => new Promise((resolve, reject) => {
+    [ActionTypes.getRuvUrl]: channel => new Promise((resolve, reject) => {
         try {
             const timeout = setTimeout(() => reject(new Error('Timeout')), 10000);
             const script = document.createElement('script');
-            script.src = 'http://www.ruv.is/sites/all/themes/at_ruv/scripts/ruv-stream.php?format=jsonp&channel=ruv';
+            script.src = `http://www.ruv.is/sites/all/themes/at_ruv/scripts/ruv-stream.php?format=jsonp&channel=${channel}`;
             script.onload = () => {
                 console.log(window.tengipunktur);
                 resolve(window.tengipunktur);
