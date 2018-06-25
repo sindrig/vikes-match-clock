@@ -30,7 +30,25 @@ const actions = {
         };
         return axios.get(`${apiConfig.gateWayUrl}getPlayers`, options);
     },
-    [ActionTypes.getRuvUrl]: () => axios.get(`${apiConfig.gateWayUrl}getRuv`),
+    [ActionTypes.getRuvUrl]: () => new Promise((resolve, reject) => {
+        try {
+            const timeout = setTimeout(() => reject(new Error('Timeout')), 10000);
+            const script = document.createElement('script');
+            script.src = 'http://www.ruv.is/sites/all/themes/at_ruv/scripts/ruv-stream.php?format=jsonp&channel=ruv';
+            script.onload = () => {
+                console.log(window.tengipunktur);
+                resolve(window.tengipunktur);
+                clearTimeout(timeout);
+            };
+            script.onerror = () => {
+                reject(new Error('Load error'));
+                clearTimeout(timeout);
+            }
+            document.getElementsByTagName('head')[0].appendChild(script);
+        } catch (e) {
+            reject(e);
+        }
+    }),
 };
 
 Object.keys(actions).forEach((type) => {

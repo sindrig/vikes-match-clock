@@ -29,9 +29,10 @@ class Ruv extends Component {
 
     componentWillMount() {
         const { getRuvUrl } = this.props;
-        getRuvUrl().then(({ value: { data: { result } } }) => {
+        getRuvUrl().then(({ value: { result } }) => {
             this.setState({ streamUrl: result[0] || DEFAULT_URL });
-        }).catch(() => {
+        }).catch((e) => {
+            console.log('e', e);
             this.setState({ streamUrl: DEFAULT_URL });
         });
     }
