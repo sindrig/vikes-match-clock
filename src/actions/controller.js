@@ -43,7 +43,7 @@ const actions = {
             script.onerror = () => {
                 reject(new Error('Load error'));
                 clearTimeout(timeout);
-            }
+            };
             document.getElementsByTagName('head')[0].appendChild(script);
         } catch (e) {
             reject(e);
