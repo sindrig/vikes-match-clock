@@ -23,7 +23,7 @@ module.exports = {
     'players/23 Nikolaj Hansen.png': require('./players/23 Nikolaj Hansen.png'),
     'players/24 Davíð Örn Atlason.png': require('./players/24 Davíð Örn Atlason.png'),
     'players/25 Vladimir Tugegdzic.png': require('./players/25 Vladimir Tugegdzic.png'),
-    'players/27 Kári Árnason.png': require('./players/27 Kári Árnason.png'),
+    'players/27 Geoffrey Castillion.png': require('./players/27 Geoffrey Castillion.png'),
     'players/29 Serigne Mor Mbaye.png': require('./players/29 Serigne Mor Mbaye.png'),
     'players/AÞ Arnar Gunnlaugsson.png': require('./players/AÞ Arnar Gunnlaugsson.png'),
 };

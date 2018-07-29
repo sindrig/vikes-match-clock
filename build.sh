@@ -14,10 +14,11 @@ check-master() {
 }
 
 node-modules() {
-    command -v npm-git-lock 2>&1 || npm install -g npm-git-lock
-    export GIT_TEMPLATE_DIR='/tmp/lambci/home/usr/share/git-core/templates'
-    export GIT_EXEC_PATH='/tmp/lambci/home/usr/libexec/git-core'
-    echo "HAI: $(cat /tmp/lambci/home/usr/libexec/git-core | wc -l)"
+    if [[ -f /tmp/lambci ]]; then
+        command -v npm-git-lock 2>&1 || npm install -g npm-git-lock
+        export GIT_TEMPLATE_DIR='/tmp/lambci/home/usr/share/git-core/templates'
+        export GIT_EXEC_PATH='/tmp/lambci/home/usr/libexec/git-core'
+    fi
     npm-git-lock --repo https://github.com/sindrig/vikes-match-clock-node-modules.git
 }
 
