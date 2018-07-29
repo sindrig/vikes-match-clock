@@ -111,36 +111,40 @@ export default class Asset extends Component {
             console.error('Unknown url ', asset.key);
             return null;
         }
+        const isYouTube = url.host.indexOf('youtube');
         const params = url.search.replace('?', '').split('&');
         const videoId = params.map(p => p.split('=')).filter(kv => kv[0] === 'v').map(kv => kv[1])[0];
-        if (videoId) {
-            const opts = {
-                height: '50',
-                width: '100',
-                playerVars: {
-                    autoplay: 0,
-                    modestbranding: 1,
-                    rel: 0,
-                    fs: 0,
-                    disablekb: 1,
-                },
-            };
-            if (!thumbnail) {
+        if (isYouTube) {
+            if (videoId) {
+                if (thumbnail) {
+                    return <a href={`https://www.youtube.com/watch?v=${videoId}`}>Youtube: {videoId}</a>;
+                }
+                const opts = {
+                    height: '50',
+                    width: '100',
+                    playerVars: {
+                        autoplay: 0,
+                        modestbranding: 1,
+                        rel: 0,
+                        fs: 0,
+                        disablekb: 1,
+                    },
+                };
                 opts.playerVars.showinfo = 0;
                 opts.playerVars.autoplay = 1;
                 opts.playerVars.controls = 0;
                 opts.height = '176';
                 opts.width = '240';
+                return (
+                    <div style={{ backgroundColor: '#000000' }}>
+                        <YouTube
+                            videoId={videoId}
+                            opts={opts}
+                            onEnd={remove}
+                        />
+                    </div>
+                );
             }
-            return (
-                <div style={{ backgroundColor: '#000000' }}>
-                    <YouTube
-                        videoId={videoId}
-                        opts={opts}
-                        onEnd={remove}
-                    />
-                </div>
-            );
         }
         console.log('Do not know how to render ', url);
         return null;

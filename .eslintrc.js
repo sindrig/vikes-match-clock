@@ -25,6 +25,7 @@ module.exports = {
     "globals": {
         "document": true,
         "window": true,
+        "gapi": true,
         "fetch": true
     }
 };

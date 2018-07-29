@@ -1,19 +1,22 @@
-import React, { Component } from 'react';
-import PropTypes from 'prop-types';
-import { connect } from 'react-redux';
 import { bindActionCreators } from 'redux';
-import controllerActions from '../../actions/controller';
-import { matchPropType, assetsPropType } from '../../propTypes';
+import { connect } from 'react-redux';
+import PropTypes from 'prop-types';
+import React, { Component } from 'react';
 
-import RemovableAsset from './RemovableAsset';
-import AssetSelector from './AssetSelector';
+import { addVideosFromPlaylist } from './YoutubePlaylist';
+import { ASSET_VIEWS } from '../../reducers/controller';
+import { matchPropType, assetsPropType } from '../../propTypes';
 import Asset, { checkKey } from './Asset';
-import * as assetsImages from '../../assets';
+import AssetSelector from './AssetSelector';
+import RemovableAsset from './RemovableAsset';
 import TeamAssetController from './team/TeamAssetController';
 import UrlController from './UrlController';
-import { ASSET_VIEWS } from '../../reducers/controller';
 import assetTypes from './AssetTypes';
+import * as assetsImages from '../../assets';
+import controllerActions from '../../actions/controller';
+
 import './AssetController.css';
+
 
 class AssetController extends Component {
     // TODO save state in localstorage
@@ -64,8 +67,23 @@ class AssetController extends Component {
         this.updateAssets({ imageSeconds: Math.max(parseInt(value, 10), 1) });
     }
 
-    addAssetKey(key) {
-        return this.addMultipleAssets([key]);
+    addAssetKey(asset) {
+        if (asset.type === assetTypes.URL) {
+            if (asset.key.indexOf('youtube') > -1) {
+                try {
+                    const url = new URL(asset.key);
+                    if (url.pathname === '/playlist') {
+                        const params = url.search.replace('?', '').split('&');
+                        const listId = params.map(p => p.split('=')).filter(kv => kv[0] === 'list').map(kv => kv[1])[0];
+                        console.log('listId', listId);
+                        return addVideosFromPlaylist(listId, this.addAssetKey);
+                    }
+                } catch (e) {
+                    console.log(e);
+                }
+            }
+        }
+        return this.addMultipleAssets([asset]);
     }
 
     addMultipleAssets(assetList, options = { showNow: false }) {
