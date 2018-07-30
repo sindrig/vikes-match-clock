@@ -11,6 +11,15 @@ import MatchActions from './MatchActions';
 import AssetController from './asset/AssetController';
 import './Controller.css';
 
+const confirmRefresh = () => new Promise((resolve, reject) => {
+    // eslint-disable-next-line
+    if (confirm('Are you absolutely sure?')) {
+        resolve();
+    } else {
+        reject();
+    }
+});
+
 const Controller = ({
     selectView, renderAsset, clearState, view,
 }) => (
@@ -36,7 +45,7 @@ const Controller = ({
                     </label>
                 ))}
             </div>
-            <button onClick={() => clearState().then(() => window.location.reload())}>
+            <button onClick={() => confirmRefresh().then(clearState).then(() => window.location.reload())}>
                 Hard refresh
             </button>
             <button onClick={() => renderAsset(null)}>Hreinsa núverandi mynd</button>
