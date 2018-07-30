@@ -9,8 +9,20 @@ export const THUMB_VP = {
 };
 
 export const HALFS = {
-    FIRST: 0,
-    SECOND: 45,
-    FIRSTET: 90,
-    SECONDET: 105,
+    FIRST: {
+        startAt: 0,
+        length: 45,
+    },
+    SECOND: {
+        startAt: 45,
+        length: 45,
+    },
+    FIRSTET: {
+        startAt: 90,
+        length: 15,
+    },
+    SECONDET: {
+        startAt: 105,
+        length: 15,
+    },
 };
