@@ -45,20 +45,19 @@ export default class Clock extends Component {
         const { done } = this.state;
         if (started) {
             const secondsElapsed = Math.floor((Date.now() - started) / 1000);
-            let minutes = Math.min(Math.floor(secondsElapsed / 60), HALFS[half].length);
+            const minutesElapsed = Math.floor(secondsElapsed / 60);
             if (done) {
                 // If more than 1 hour since game is over, set to idle
-                if (minutes > (HALFS[half].length + 60)) {
+                if (minutesElapsed > (HALFS[half].length + 60)) {
                     updateMatch({ started: null, half: 'FIRST' });
                     selectView(VIEWS.idle);
+                    return null;
                 }
             } else {
+                let minutes = Math.min(minutesElapsed, HALFS[half].length);
                 let seconds;
-                console.log('minutes', minutes);
-                console.log('HALFS', HALFS[half].length);
                 if (minutes >= HALFS[half].length) {
                     seconds = 0;
-                    console.log('done', done);
                     this.setState({ done: true });
                 } else {
                     seconds = secondsElapsed % 60;
@@ -78,7 +77,10 @@ export default class Clock extends Component {
         const { time } = this.state;
         const minutesString = pad(HALFS[half].startAt || 0);
         const zeroTime = `${minutesString}:00`;
-        const displayedTime = started && time || zeroTime;
+        let displayedTime = zeroTime;
+        if (started) {
+            displayedTime = time || displayedTime;
+        }
         const style = {};
         if (displayedTime.length > 5) {
             style.fontSize = '24px';
