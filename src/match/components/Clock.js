@@ -1,13 +1,16 @@
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 
-const pad = x => String(`0${x}`).slice(-2);
+import { HALFS } from '../../constants';
+
+// eslint-disable-next-line
+const pad = x => `${x}`.length < 2 ? pad(`0${x}`) : x;
 
 export default class Clock extends Component {
     static propTypes = {
         started: PropTypes.number,
         className: PropTypes.string.isRequired,
-        half: PropTypes.number.isRequired,
+        half: PropTypes.oneOf(Object.keys(HALFS)).isRequired,
     };
 
     static defaultProps = {
@@ -53,9 +56,7 @@ export default class Clock extends Component {
             } else {
                 seconds = secondsElapsed % 60;
             }
-            if (half === 2) {
-                minutes += 45;
-            }
+            minutes += HALFS[half];
             const time = `${pad(minutes)}:${pad(seconds)}`;
             this.setState({ time });
         }
@@ -66,14 +67,17 @@ export default class Clock extends Component {
         const {
             started, className, half,
         } = this.props;
-        const zeroTime = half === 2 ? '45:00' : '00:00';
-        if (!started) {
-            return <div className={className}>{zeroTime}</div>;
-        }
         const { time } = this.state;
+        const minutesString = pad(HALFS[half] || 0);
+        const zeroTime = `${minutesString}:00`;
+        const displayedTime = started && time || zeroTime;
+        const style = {};
+        if (displayedTime.length > 5) {
+            style.fontSize = '24px';
+        }
         return (
-            <div className={className}>
-                {time || zeroTime}
+            <div className={className} style={style}>
+                {displayedTime}
             </div>
         );
     }

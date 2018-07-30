@@ -1,11 +1,13 @@
 import PropTypes from 'prop-types';
+
+import { HALFS } from './constants';
 import { ASSET_VIEWS } from './reducers/controller';
 
 export const matchPropType = PropTypes.shape({
     homeScore: PropTypes.number,
     awayScore: PropTypes.number,
     started: PropTypes.number,
-    half: PropTypes.number,
+    half: PropTypes.oneOf(Object.keys(HALFS)),
     homeTeam: PropTypes.string.isRequired,
     awayTeam: PropTypes.string,
     injuryTime: PropTypes.number,

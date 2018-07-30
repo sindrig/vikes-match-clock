@@ -72,18 +72,15 @@ const MatchActions = ({ view, match, updateMatch }) => (
                     </button>
                 </div>
                 <div className="control-item">
-                    <button
-                        onClick={() => updateMatch({ half: 1 })}
-                        disabled={match.half === 1}
+                    <select
+                        onChange={({ target: { value }}) => updateMatch({ half: value })}
+                        value={match.half}
                     >
-                        Fyrri hálfleikur
-                    </button>
-                    <button
-                        onClick={() => updateMatch({ half: 2 })}
-                        disabled={match.half === 2}
-                    >
-                        Seinni hálfleikur
-                    </button>
+                        <option value="FIRST">Fyrri hálfleikur</option>
+                        <option value="SECOND">Seinni hálfleikur</option>
+                        <option value="FIRSTET">Fyrri hálfleikur framlengingar</option>
+                        <option value="SECONDET">Seinni hálfleikur framlengingar</option>
+                    </select>
                     Uppbótartími: <input type="number" value={match.injuryTime || ''} onChange={({ target: { value } }) => updateMatch({ injuryTime: parseInt(value, 10) })} />
                 </div>
             </div>
