@@ -73,7 +73,7 @@ const MatchActions = ({ view, match, updateMatch }) => (
                 </div>
                 <div className="control-item">
                     <select
-                        onChange={({ target: { value }}) => updateMatch({ half: value })}
+                        onChange={({ target: { value } }) => updateMatch({ half: value })}
                         value={match.half}
                     >
                         <option value="FIRST">Fyrri hálfleikur</option>
