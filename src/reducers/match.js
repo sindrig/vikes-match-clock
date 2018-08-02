@@ -6,7 +6,7 @@ export const initialState = {
     homeScore: 0,
     awayScore: 0,
     started: null,
-    half: 1,
+    half: 'FIRST',
     homeTeam: 'Víkingur R',
     awayTeam: null,
     homeTeamId: 103,
