@@ -1,12 +1,20 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 
+const imageStyle = (team) => {
+    if (team.name === 'HK-Víkingur') {
+        return {
+            maxWidth: '100px',
+        };
+    }
+    return {};
+};
 
 const Team = ({
     score, className, team,
 }) => (
     <div className={`team ${className}`}>
-        {team.image && <img src={team.image} alt={team.name} />}
+        {team.image && <img src={team.image} alt={team.name} style={imageStyle(team)} />}
         <span>{score}</span>
     </div>
 );
