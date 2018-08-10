@@ -1,5 +1,6 @@
 /* eslint-disable global-require */
 module.exports = {
+    'assets/arion-vellir.jpg': require('./arion-vellir.jpg'),
     'assets/arion1.svg': require('./arion1.svg'),
     'assets/arion2.svg': require('./arion2.svg'),
     'players/01 Andreas Larsen.png': require('./players/01 Andreas Larsen.png'),
