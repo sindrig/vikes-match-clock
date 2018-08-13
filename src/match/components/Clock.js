@@ -38,6 +38,13 @@ export default class Clock extends Component {
         clearInterval(this.interval);
     }
 
+    static getDerivedStateFromProps({ started }) {
+        if (!started) {
+            return { done: false, time: null };
+        }
+        return null;
+    }
+
     updateTime() {
         const {
             started, half, selectView, updateMatch,
