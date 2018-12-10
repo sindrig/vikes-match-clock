@@ -9,7 +9,7 @@ const options = {
 };
 
 export const getTemp = () =>
-    axios.get('http://apis.is/weather/observations/en', options)
+    axios.get('https://apis.is/weather/observations/en', options)
         .then(({
             data: { results },
         }) => {
