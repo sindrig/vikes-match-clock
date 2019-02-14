@@ -3,6 +3,7 @@ module.exports = {
     'assets/arion-vellir.jpg': require('./arion-vellir.jpg'),
     'assets/arion1.svg': require('./arion1.svg'),
     'assets/arion2.svg': require('./arion2.svg'),
+    'assets/be50.png': require('./be50.png'),
     'players/01 Andreas Larsen.png': require('./players/01 Andreas Larsen.png'),
     'players/01 Aris Vaporakis.png': require('./players/01 Aris Vaporakis.png'),
     'players/02 Sindri Scheving.png': require('./players/02 Sindri Scheving.png'),
