@@ -31,7 +31,7 @@ def get_player(player):
 def get_matches(home_team, away_team, date):
     result = client.service.FelogLeikir(
         FelagNumer=home_team,
-        DagsFra=date - datetime.timedelta(10),
+        DagsFra=date - datetime.timedelta(15),
         DagsTil=date + datetime.timedelta(10),
         Kyn='',
         FlokkurNumer='',
