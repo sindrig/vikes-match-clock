@@ -10,7 +10,6 @@ import Controller from './controller/Controller';
 import ScoreBoard from './screens/ScoreBoard';
 import Idle from './screens/Idle';
 import backgroundImage from './images/background.png';
-import be50 from './images/be50.png';
 
 import { VIEWS } from './reducers/controller';
 
@@ -23,9 +22,6 @@ const backgrounds = [
     {},
 ];
 
-// January is 0...
-const beFrom = new Date(2019, 1, 16, 19);
-const beTo = new Date(2019, 1, 16, 21);
 
 class App extends Component {
     static propTypes = {
@@ -40,7 +36,6 @@ class App extends Component {
         super(props);
         this.state = {
             overlay: null,
-            currentTime: new Date(),
         };
         this.handleShortcuts = this.handleShortcuts.bind(this);
         this.setOverlay = this.setOverlay.bind(this);
@@ -49,15 +44,6 @@ class App extends Component {
     getChildContext() {
         return { shortcuts: ShortcutManager };
     }
-
-    componentDidMount() {
-        this.interval = setInterval(() => this.setState({ currentTime: new Date() }), 10000);
-    }
-
-    componentWillUnmount() {
-        clearInterval(this.interval);
-    }
-
 
     setOverlay(component) {
         this.setState({ overlay: component });
@@ -77,14 +63,7 @@ class App extends Component {
     renderOverlay() {
         // TODO move to separate container.
         // TODO fade out.
-        const { overlay, currentTime } = this.state;
-        if (beFrom <= currentTime && beTo >= currentTime) {
-            return (
-                <div className="overlay-container">
-                    <img src={be50} alt="" style={{ width: '100%' }} />
-                </div>
-            );
-        }
+        const { overlay } = this.state;
         if (!overlay) {
             return null;
         }
