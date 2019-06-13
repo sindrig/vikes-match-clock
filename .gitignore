@@ -48,3 +48,11 @@ yarn-error.log*
 /api/ruv/idna-2.7.dist-info/
 
 /api/ruv/idna/
+
+/api/ruv/certifi-2019.3.9.dist-info/
+
+/api/ruv/idna-2.8.dist-info/
+
+/api/ruv/requests-2.22.0.dist-info/
+
+/api/ruv/urllib3-1.25.3.dist-info/
