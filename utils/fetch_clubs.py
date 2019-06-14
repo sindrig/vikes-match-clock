@@ -24,7 +24,16 @@ def main(out_folder):
         img_url = row.find('img')['src']
         club_name = row.find('a').text
         team_id = row.find('a')['href'].split('=')[1]
-        sanitized_name = club_name.replace('/', '-').rstrip('.')
+        sanitized_name = club_name.replace(
+            '/', '-'
+        ).rstrip('.')
+        # Special cases
+        if sanitized_name == 'Víkingur Ó':
+            sanitized_name = 'Víkingur O'
+        elif sanitized_name == 'Þór Þ':
+            sanitized_name = 'Þór Th'
+        elif sanitized_name == 'Stál-úlfur':
+            sanitized_name = 'StálÚlfur'
         name_id_map[sanitized_name] = team_id
         if 'vantar_logo' in img_url:
             print('%s missing logo' % (club_name, ))
