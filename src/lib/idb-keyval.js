@@ -42,21 +42,21 @@ export function remove(key, store = getDefaultStore()) {
         store.delete(key);
     });
 }
-function clear(store = getDefaultStore()) {
-    return store._withIDBStore('readwrite', store => {
-        store.clear();
-    });
-}
-function keys(store = getDefaultStore()) {
-    const keys = [];
-    return store._withIDBStore('readonly', store => {
-        // This would be store.getAllKeys(), but it isn't supported by Edge or Safari.
-        // And openKeyCursor isn't supported by Safari.
-        (store.openKeyCursor || store.openCursor).call(store).onsuccess = function () {
-            if (!this.result)
-                return;
-            keys.push(this.result.key);
-            this.result.continue();
-        };
-    }).then(() => keys);
-}
+// function clear(store = getDefaultStore()) {
+//     return store._withIDBStore('readwrite', store => {
+//         store.clear();
+//     });
+// }
+// function keys(store = getDefaultStore()) {
+//     const keys = [];
+//     return store._withIDBStore('readonly', store => {
+//         // This would be store.getAllKeys(), but it isn't supported by Edge or Safari.
+//         // And openKeyCursor isn't supported by Safari.
+//         (store.openKeyCursor || store.openCursor).call(store).onsuccess = function () {
+//             if (!this.result)
+//                 return;
+//             keys.push(this.result.key);
+//             this.result.continue();
+//         };
+//     }).then(() => keys);
+// }
