@@ -36,19 +36,23 @@ class Ruv extends Component {
     }
 
     componentDidUpdate(prevProps) {
-        console.log('this.video', this.video);
         const { streamUrl } = this.state;
-        if (prevProps.channel !== this.props.channel) {
+        const { channel } = this.props;
+        if (prevProps.channel !== channel) {
             this.updateStreamUrl();
         } else if (this.video) {
             if (this.hls) {
                 this.hls.destroy();
             }
-            const hls = new Hls();
+            // TODO: Remove when new version of hls.js is live
+            const hls = new Hls({ enableWorker: false });
             hls.loadSource(streamUrl);
             hls.attachMedia(this.video.current);
             hls.on(Hls.Events.MANIFEST_PARSED, () => {
                 console.log('streamUrl', streamUrl, 'parsed');
+                console.log(this.video);
+                console.log(this.video.current);
+                console.log(this.video.current.play);
                 this.video.current.play();
             });
 

@@ -44,13 +44,15 @@ export default class UrlController extends Component {
         const { value, error } = this.state;
         return (
             <div>
-                Url: <input
+                Url:
+                {' '}
+                <input
                     type="text"
                     onChange={this.onTextChange}
                     value={value}
                     style={{ width: '95px' }}
                 />
-                <button onClick={this.addUrlAsset}>Bæta við</button>
+                <button type="button" onClick={this.addUrlAsset}>Bæta við</button>
                 <span>{error}</span>
             </div>
         );

@@ -1,6 +1,6 @@
 import keymirror from 'keymirror';
 import { handleActions } from 'redux-actions';
-import { FULFILLED } from 'redux-promise-middleware';
+import { ActionType } from 'redux-promise-middleware';
 
 import ActionTypes from '../ActionTypes';
 
@@ -57,7 +57,7 @@ const actions = {
             };
         },
     },
-    [`${ActionTypes.getAvailableMatches}_${FULFILLED}`]: {
+    [`${ActionTypes.getAvailableMatches}_${ActionType.Fulfilled}`]: {
         next(state, { payload: { data: { matches } } }) {
             return {
                 ...state,

@@ -14,29 +14,31 @@ const MatchActions = ({ view, match, updateMatch }) => (
         {view === VIEWS.match && (
             <div>
                 <div className="control-item">
-                    <button onClick={() => updateMatch({ homeScore: match.homeScore + 1 })}>
+                    <button type="button" onClick={() => updateMatch({ homeScore: match.homeScore + 1 })}>
                         Heima +1
                     </button>
-                    <button onClick={() => updateMatch({ homeScore: match.homeScore - 1 })}>
+                    <button type="button" onClick={() => updateMatch({ homeScore: match.homeScore - 1 })}>
                         Heima -1
                     </button>
                 </div>
                 <div className="control-item">
-                    <button onClick={() => updateMatch({ awayScore: match.awayScore + 1 })}>
+                    <button type="button" onClick={() => updateMatch({ awayScore: match.awayScore + 1 })}>
                         Úti +1
                     </button>
-                    <button onClick={() => updateMatch({ awayScore: match.awayScore - 1 })}>
+                    <button type="button" onClick={() => updateMatch({ awayScore: match.awayScore - 1 })}>
                         Úti -1
                     </button>
                 </div>
                 <div className="control-item">
                     <button
+                        type="button"
                         onClick={() => updateMatch({ started: Date.now() })}
                         disabled={!!match.started}
                     >
                         Byrja
                     </button>
                     <button
+                        type="button"
                         onClick={() => updateMatch({ started: null })}
                         disabled={!match.started}
                     >
@@ -45,12 +47,14 @@ const MatchActions = ({ view, match, updateMatch }) => (
                 </div>
                 <div className="control-item">
                     <button
+                        type="button"
                         onClick={() => updateMatch({ started: match.started - (60 * 1000) })}
                         disabled={!match.started}
                     >
                         Klukka +1 mín
                     </button>
                     <button
+                        type="button"
                         onClick={() => updateMatch({ started: match.started + (60 * 1000) })}
                         disabled={!match.started}
                     >
@@ -59,12 +63,14 @@ const MatchActions = ({ view, match, updateMatch }) => (
                 </div>
                 <div className="control-item">
                     <button
+                        type="button"
                         onClick={() => updateMatch({ started: match.started - (5 * 1000) })}
                         disabled={!match.started}
                     >
                         Klukka +5 sek
                     </button>
                     <button
+                        type="button"
                         onClick={() => updateMatch({ started: match.started + (5 * 1000) })}
                         disabled={!match.started}
                     >
@@ -81,14 +87,22 @@ const MatchActions = ({ view, match, updateMatch }) => (
                         <option value="FIRSTET">Fyrri hálfleikur framlengingar</option>
                         <option value="SECONDET">Seinni hálfleikur framlengingar</option>
                     </select>
-                    Uppbótartími: <input type="number" value={match.injuryTime || ''} onChange={({ target: { value } }) => updateMatch({ injuryTime: parseInt(value, 10) })} />
+                    Uppbótartími:
+                    {' '}
+                    <input type="number" value={match.injuryTime || ''} onChange={({ target: { value } }) => updateMatch({ injuryTime: parseInt(value, 10) })} />
                 </div>
             </div>
         )}
         <div>
             <div className="control-item">
-                <span>Heima: <TeamSelector teamAttrName="homeTeam" /></span>
-                <span>Úti: <TeamSelector teamAttrName="awayTeam" /></span>
+                <span>
+Heima:
+                    <TeamSelector teamAttrName="homeTeam" />
+                </span>
+                <span>
+Úti:
+                    <TeamSelector teamAttrName="awayTeam" />
+                </span>
             </div>
         </div>
     </div>

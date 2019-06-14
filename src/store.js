@@ -10,7 +10,7 @@ export const store = createStore(
     reducer,
     {},
     compose(
-        applyMiddleware(promiseMiddleware()),
+        applyMiddleware(promiseMiddleware),
         devTools,
     ),
 );

@@ -7,8 +7,18 @@ const SubView = ({
 }) => (
     <div>
         {subTeam}
-        {subIn && <div className="substition-player">Út: {`#${subIn.number} - ${subIn.name}`}</div>}
-        {subOut && <div className="substition-player">Inn: {`#${subOut.number} - ${subOut.name}`}</div>}
+        {subIn && (
+            <div className="substition-player">
+Út:
+                {`#${subIn.number} - ${subIn.name}`}
+            </div>
+        )}
+        {subOut && (
+            <div className="substition-player">
+Inn:
+                {`#${subOut.number} - ${subOut.name}`}
+            </div>
+        )}
     </div>
 );
 

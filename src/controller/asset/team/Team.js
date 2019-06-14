@@ -101,16 +101,16 @@ class Team extends Component {
                 {match[teamName] ? team.map((p, i) => (
                     // eslint-disable-next-line react/no-array-index-key
                     <div key={`${i}`}>
-                        {selectPlayer && p.number && p.name ?
-                            <button onClick={() => selectPlayer(p, teamName)}>{`#${p.number} - ${p.name}`}</button> :
-                            <TeamPlayer player={p} onChange={this.updatePlayer(i)} />
+                        {selectPlayer && p.number && p.name
+                            ? <button type="button" onClick={() => selectPlayer(p, teamName)}>{`#${p.number} - ${p.name}`}</button>
+                            : <TeamPlayer player={p} onChange={this.updatePlayer(i)} />
                         }
-                        <button onClick={() => this.removePlayer(i)}>Eyða línu</button>
+                        <button type="button" onClick={() => this.removePlayer(i)}>Eyða línu</button>
                     </div>
                 )) : null}
-                {match[teamName] ?
-                    <div><button onClick={this.addEmptyLine}>Ný lína...</button></div> :
-                    null
+                {match[teamName]
+                    ? <div><button type="button" onClick={this.addEmptyLine}>Ný lína...</button></div>
+                    : null
                 }
             </div>
         );
@@ -127,9 +127,9 @@ const stateToProps = (
     const selectedMatchObj = availableMatches[selectedMatch];
     const teamId = match[`${ownProps.teamName}Id`];
     return {
-        team: selectedMatchObj ?
-            selectedMatchObj.players[teamId] || [] :
-            [],
+        team: selectedMatchObj
+            ? selectedMatchObj.players[teamId] || []
+            : [],
         match,
         teamId,
     };

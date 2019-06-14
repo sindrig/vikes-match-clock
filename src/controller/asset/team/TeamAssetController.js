@@ -69,9 +69,9 @@ class TeamAssetController extends Component {
         const {
             selectedMatch, availableMatches,
         } = this.props;
-        const { group } = availableMatches && availableMatches[selectedMatch] ?
-            availableMatches[selectedMatch] :
-            { group: 'Meistaraflokkur' };
+        const { group } = availableMatches && availableMatches[selectedMatch]
+            ? availableMatches[selectedMatch]
+            : { group: 'Meistaraflokkur' };
         if (!player.name || !player.number) {
             return null;
         }
@@ -121,9 +121,8 @@ class TeamAssetController extends Component {
         const teamAssets = [
             { team: awayTeam, teamName: match.awayTeam },
             { team: homeTeam, teamName: match.homeTeam },
-        ].map(({ team, teamName }) =>
-            team.filter(p => p.show)
-                .map(player => this.getPlayerAssetObject({ player, teamName })));
+        ].map(({ team, teamName }) => team.filter(p => p.show)
+            .map(player => this.getPlayerAssetObject({ player, teamName })));
         const flattened = [].concat(...teamAssets);
         if (!flattened.every(i => i)) {
             this.setState({ error: 'Missing name/number for some players to show' });
@@ -204,27 +203,33 @@ class TeamAssetController extends Component {
         const { homeTeam, awayTeam } = this.getTeamPlayers();
         return (
             <div>
-                {!(homeTeam.length * awayTeam.length) ?
-                    <div className="control-item">
-                        <button onClick={this.autoFill}>Sækja lið</button>
-                    </div> :
-                    null
+                {!(homeTeam.length * awayTeam.length)
+                    ? (
+                        <div className="control-item">
+                            <button type="button" onClick={this.autoFill}>Sækja lið</button>
+                        </div>
+                    )
+                    : null
                 }
-                {((homeTeam.length * awayTeam.length) || Object.keys(availableMatches).length) ?
-                    <div className="control-item">
-                        <button onClick={clearMatchPlayers}>Hreinsa lið</button>
-                    </div> :
-                    null
+                {((homeTeam.length * awayTeam.length) || Object.keys(availableMatches).length)
+                    ? (
+                        <div className="control-item">
+                            <button type="button" onClick={clearMatchPlayers}>Hreinsa lið</button>
+                        </div>
+                    )
+                    : null
                 }
-                {(homeTeam.length * awayTeam.length) ?
-                    <div className="control-item">
-                        <button onClick={this.addPlayersToQ}>Setja lið í biðröð</button>
-                    </div> :
-                    null
+                {(homeTeam.length * awayTeam.length)
+                    ? (
+                        <div className="control-item">
+                            <button type="button" onClick={this.addPlayersToQ}>Setja lið í biðröð</button>
+                        </div>
+                    )
+                    : null
                 }
-                {(availableMatches && Object.keys(availableMatches || {}).length > 1) ?
-                    <MatchSelector /> :
-                    null
+                {(availableMatches && Object.keys(availableMatches || {}).length > 1)
+                    ? <MatchSelector />
+                    : null
                 }
                 {(homeTeam.length * awayTeam.length) ? this.renderActionControllers() : null}
             </div>
@@ -238,6 +243,7 @@ class TeamAssetController extends Component {
         if (selectSubs) {
             return (
                 <button
+                    type="button"
                     onClick={() => this.setState({
                         selectSubs: false,
                         subIn: null,
@@ -248,9 +254,10 @@ class TeamAssetController extends Component {
                     Hætta við skiptingu
                 </button>
             );
-        } else if (selectPlayerAsset) {
+        } if (selectPlayerAsset) {
             return (
                 <button
+                    type="button"
                     onClick={() => this.setState({
                         selectPlayerAsset: false,
                     })}
@@ -262,10 +269,10 @@ class TeamAssetController extends Component {
         return (
             <div>
                 <div className="control-item">
-                    <button onClick={() => this.setState({ selectSubs: true })}>Skipting</button>
+                    <button type="button" onClick={() => this.setState({ selectSubs: true })}>Skipting</button>
                 </div>
                 <div className="control-item">
-                    <button onClick={() => this.setState({ selectPlayerAsset: true })}>
+                    <button type="button" onClick={() => this.setState({ selectPlayerAsset: true })}>
                         Birta leikmann
                     </button>
                 </div>

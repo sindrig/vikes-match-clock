@@ -231,43 +231,52 @@ class AssetController extends Component {
                             .map(({ key, name }) => <option value={key} key={key}>{name}</option>)
                         }
                     </AssetSelector>
-                    <span>{selectedAssets.length} í biðröð</span>
-                    {selectedAssets.length ?
-                        <button onClick={this.clearQueue}>Hreinsa biðröð</button> :
-                        null
+                    <span>
+                        {selectedAssets.length}
+                        {' '}
+                        í biðröð
+                    </span>
+                    {selectedAssets.length
+                        ? <button type="button" onClick={this.clearQueue}>Hreinsa biðröð</button>
+                        : null
                     }
-                    {playing ? <button onClick={this.pause}>Pause</button> : null}
-                    {!playing && selectedAssets.length ?
-                        <button onClick={this.showNextAsset}>Birta</button> :
-                        null
+                    {playing ? <button type="button" onClick={this.pause}>Pause</button> : null}
+                    {!playing && selectedAssets.length
+                        ? <button type="button" onClick={this.showNextAsset}>Birta</button>
+                        : null
                     }
                     <div>
                         <input
                             type="checkbox"
                             onChange={this.onAutoPlayChange}
                             checked={autoPlay}
-                        />Autoplay
+                        />
+                        Autoplay
                     </div>
                     <div>
                         <input
                             type="checkbox"
                             onChange={this.onCycleChange}
                             checked={cycle}
-                        />Loop
+                        />
+                        Loop
                     </div>
-                    {autoPlay &&
-                        <div>
-                            <input
-                                type="number"
-                                onChange={this.onImageSecondsChange}
-                                value={imageSeconds}
-                                style={{ width: '33px' }}
-                            />sek
-                        </div>
+                    {autoPlay
+                        && (
+                            <div>
+                                <input
+                                    type="number"
+                                    onChange={this.onImageSecondsChange}
+                                    value={imageSeconds}
+                                    style={{ width: '33px' }}
+                                />
+                                sek
+                            </div>
+                        )
                     }
                     <UrlController addAsset={this.addAssetKey} />
-                    <button onClick={this.playRuv('ruv')}>RÚV</button>
-                    <button onClick={this.playRuv('ruv2')}>RÚV 2</button>
+                    <button type="button" onClick={this.playRuv('ruv')}>RÚV</button>
+                    <button type="button" onClick={this.playRuv('ruv2')}>RÚV 2</button>
                     {this.renderError()}
                 </div>
                 <div className="upcoming-assets">
@@ -282,10 +291,10 @@ class AssetController extends Component {
         return (
             <div className="asset-controller">
                 <div className="view-selector">
-                    <button onClick={() => selectAssetView(ASSET_VIEWS.assets)}>
+                    <button type="button" onClick={() => selectAssetView(ASSET_VIEWS.assets)}>
                         Biðröð
                     </button>
-                    <button onClick={() => selectAssetView(ASSET_VIEWS.teams)}>
+                    <button type="button" onClick={() => selectAssetView(ASSET_VIEWS.teams)}>
                         Lið
                     </button>
                 </div>
@@ -297,8 +306,10 @@ class AssetController extends Component {
                         updateTeams={this.updateTeams}
                         // TODO
                         controllerState={null}
-                        previousView={() => setTimeout(() =>
-                            selectAssetView(ASSET_VIEWS.assets), 500)}
+                        previousView={() => setTimeout(
+                            () => selectAssetView(ASSET_VIEWS.assets),
+                            500,
+                        )}
                     />
                 )}
             </div>

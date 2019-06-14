@@ -30,5 +30,6 @@ jest.mock('./lib/weather', () => ({
 
 window.mockStore = configureStore([]);
 
-window.mountWrapComponent = (component, store) =>
-    mount(<Provider store={store}>{component}</Provider>);
+window.mountWrapComponent = (component, store) => mount(
+    <Provider store={store}>{component}</Provider>,
+);

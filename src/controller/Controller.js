@@ -39,12 +39,14 @@ const Controller = ({
                     </label>
                 ))}
             </div>
-            <button onClick={() => confirmRefresh() && clearState()
-                .then(() => window.location.reload())}
+            <button
+                type="button"
+                onClick={() => confirmRefresh() && clearState()
+                    .then(() => window.location.reload())}
             >
                 Hard refresh
             </button>
-            <button onClick={() => renderAsset(null)}>Hreinsa núverandi mynd</button>
+            <button type="button" onClick={() => renderAsset(null)}>Hreinsa núverandi mynd</button>
         </div>
     </div>
 );

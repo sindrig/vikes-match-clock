@@ -37,12 +37,14 @@ const TeamPlayer = ({ player, onChange }) => (
             className="team-player-name"
             placeholder="Nafn"
         />
-        {false && <input
-            type="text"
-            value={player.role || ''}
-            onChange={e => handler(onChange, 'role', e)}
-            className="team-player-role"
-        />}
+        {false && (
+            <input
+                type="text"
+                value={player.role || ''}
+                onChange={e => handler(onChange, 'role', e)}
+                className="team-player-role"
+            />
+        )}
     </div>
 );
 

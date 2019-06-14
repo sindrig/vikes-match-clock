@@ -29,7 +29,7 @@ export default class RemovableAsset extends Component {
                     onMouseEnter={() => this.setState({ hover: true })}
                     onMouseLeave={() => this.setState({ hover: false })}
                 >
-                    <button onClick={() => remove(asset)} className="removeButton"><img src={redXImage} alt="remove" /></button>
+                    <button type="button" onClick={() => remove(asset)} className="removeButton"><img src={redXImage} alt="remove" /></button>
                     {children}
                 </div>
                 {hover ? <div className="removable-asset-key-name">{asset.key}</div> : null}
@@ -37,4 +37,3 @@ export default class RemovableAsset extends Component {
         );
     }
 }
-

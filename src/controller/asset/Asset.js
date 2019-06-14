@@ -15,9 +15,8 @@ import './Asset.css';
 
 export const checkKey = asset => (
     // Make sure that the asset type is in assetTypes
-    Object.keys(assetTypes).indexOf(asset.type) !== -1 &&
     // And make sure that the asset key is not null/undefined/empty
-    asset.key
+    Object.keys(assetTypes).indexOf(asset.type) !== -1 && asset.key
 );
 
 export default class Asset extends Component {
@@ -76,7 +75,8 @@ export default class Asset extends Component {
                     <img src={assets[asset.key]} alt={asset.key} />
                 </PlayerCard>
             );
-        } else if (asset.type === assetTypes.NO_IMAGE_PLAYER) {
+        }
+        if (asset.type === assetTypes.NO_IMAGE_PLAYER) {
             const { teamName } = asset;
             return (
                 <PlayerCard
@@ -86,9 +86,9 @@ export default class Asset extends Component {
                     widthMultiplier={widthMultiplier}
                     key={asset.key}
                 >
-                    {clubLogos[teamName] ?
-                        <img src={clubLogos[teamName]} alt="teamName" /> :
-                        null
+                    {clubLogos[teamName]
+                        ? <img src={clubLogos[teamName]} alt="teamName" />
+                        : null
                     }
                 </PlayerCard>
             );
@@ -117,7 +117,12 @@ export default class Asset extends Component {
         if (isYouTube) {
             if (videoId) {
                 if (thumbnail) {
-                    return <a href={`https://www.youtube.com/watch?v=${videoId}`}>Youtube: {videoId}</a>;
+                    return (
+                        <a href={`https://www.youtube.com/watch?v=${videoId}`}>
+                            Youtube:
+                            {videoId}
+                        </a>
+                    );
                 }
                 const opts = {
                     height: '50',
@@ -154,13 +159,17 @@ export default class Asset extends Component {
         const { asset, thumbnail } = this.props;
         if (asset.type === assetTypes.IMAGE) {
             return <img src={assets[asset.key]} alt={asset.key} key={asset.key} />;
-        } else if (asset.type === assetTypes.URL) {
+        }
+        if (asset.type === assetTypes.URL) {
             return this.renderUrl();
-        } else if (asset.type === assetTypes.RUV) {
+        }
+        if (asset.type === assetTypes.RUV) {
             return this.renderRuv();
-        } else if (asset.type === assetTypes.PLAYER || asset.type === assetTypes.NO_IMAGE_PLAYER) {
+        }
+        if (asset.type === assetTypes.PLAYER || asset.type === assetTypes.NO_IMAGE_PLAYER) {
             return this.getPlayerAsset({ asset, widthMultiplier: 1 });
-        } else if (asset.type === assetTypes.SUB) {
+        }
+        if (asset.type === assetTypes.SUB) {
             const { subIn, subOut } = asset;
             return (
                 <Substitution thumbnail={thumbnail}>

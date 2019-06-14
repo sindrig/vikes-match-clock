@@ -29,6 +29,7 @@ class App extends Component {
     };
 
     static childContextTypes = {
+        // eslint-disable-next-line
         shortcuts: PropTypes.object.isRequired,
     }
 
