@@ -1,5 +1,3 @@
-Object.defineProperty(exports, '__esModule', { value: true });
-
 class Store {
     constructor(dbName = 'keyval-store', storeName = 'keyval') {
         this.storeName = storeName;
@@ -28,18 +26,18 @@ function getDefaultStore() {
         store = new Store();
     return store;
 }
-function get(key, store = getDefaultStore()) {
+export function get(key, store = getDefaultStore()) {
     let req;
     return store._withIDBStore('readonly', store => {
         req = store.get(key);
     }).then(() => req.result);
 }
-function set(key, value, store = getDefaultStore()) {
+export function set(key, value, store = getDefaultStore()) {
     return store._withIDBStore('readwrite', store => {
         store.put(value, key);
     });
 }
-function del(key, store = getDefaultStore()) {
+export function remove(key, store = getDefaultStore()) {
     return store._withIDBStore('readwrite', store => {
         store.delete(key);
     });
@@ -62,10 +60,3 @@ function keys(store = getDefaultStore()) {
         };
     }).then(() => keys);
 }
-
-exports.Store = Store;
-exports.get = get;
-exports.set = set;
-exports.del = del;
-exports.clear = clear;
-exports.keys = keys;
