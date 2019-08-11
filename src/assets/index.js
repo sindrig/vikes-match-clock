@@ -24,6 +24,7 @@ module.exports = {
     'players/8 Sölvi Geir Ottesen.png': require('./players/8 Sölvi Geir Ottesen.png'),
     'players/9 Erlingur Agnarsson.png': require('./players/9 Erlingur Agnarsson.png'),
     'players/10 Rick ten Voorde.png': require('./players/10 Rick ten Voorde.png'),
+    'players/10 Óttar Magnús Karlsson.png': require('./players/10 Óttar Magnús Karlsson.png'),
     'players/11 Dofri Snorrason.png': require('./players/11 Dofri Snorrason.png'),
     'players/12 Emil Andri Auðunsson.png': require('./players/12 Emil Andri Auðunsson.png'),
     'players/13 Viktor Örlygur Andrason.png': require('./players/13 Viktor Örlygur Andrason.png'),
