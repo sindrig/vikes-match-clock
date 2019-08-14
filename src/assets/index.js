@@ -1,8 +1,11 @@
 /* eslint-disable global-require */
 module.exports = {
-    'assets/adalvollur.svg': require('./adalvollur.svg'),
-    'assets/aefingasvaedi.svg': require('./aefingasvaedi.svg'),
-    'assets/gervigras.svg': require('./gervigras.svg'),
+    'assets/Adalvollur.svg': require('./Adalvollur.svg'),
+    'assets/Aefingasvaedi.svg': require('./Aefingasvaedi.svg'),
+    'assets/Gervigras.svg': require('./Gervigras.svg'),
+    'assets/Velkomin.svg': require('./Velkomin.svg'),
+    'assets/Yfirlitsmynd_1.svg': require('./Yfirlitsmynd_1.svg'),
+    'assets/fsmyndirstraskjinnstrrifyrirsgn.zip': require('./fsmyndirstraskjinnstrrifyrirsgn.zip'),
     'players/1 Þórður Ingason.png': require('./players/1 Þórður Ingason.png'),
     'players/3 Logi Tómasson.png': require('./players/3 Logi Tómasson.png'),
     'players/4 Gunnlaugur Birgisson.png': require('./players/4 Gunnlaugur Birgisson.png'),
