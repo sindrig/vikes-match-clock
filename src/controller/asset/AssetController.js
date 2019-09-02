@@ -56,7 +56,7 @@ class AssetController extends Component {
     onAutoPlayChange() {
         const { assets: { autoPlay } } = this.props;
         this.updateAssets({ autoPlay: !autoPlay });
-        if (!autoPlay) {
+        if (autoPlay) {
             this.pause();
         }
     }
@@ -75,7 +75,6 @@ class AssetController extends Component {
                     if (url.pathname === '/playlist') {
                         const params = url.search.replace('?', '').split('&');
                         const listId = params.map(p => p.split('=')).filter(kv => kv[0] === 'list').map(kv => kv[1])[0];
-                        console.log('listId', listId);
                         return addVideosFromPlaylist(listId, this.addAssetKey);
                     }
                 } catch (e) {
