@@ -24,6 +24,7 @@ class Team extends Component {
     static defaultProps = {
         selectPlayer: null,
         teamId: null,
+        selectedMatch: null,
     };
 
     constructor(props) {
