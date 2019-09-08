@@ -103,6 +103,9 @@ const actions = {
         next(state, { payload: { teamId } }) {
             const { availableMatches, selectedMatch } = state;
             // TODO why not immutable
+            if (!availableMatches[selectedMatch]) {
+                return state;
+            }
             const match = JSON.parse(JSON.stringify(availableMatches[selectedMatch]));
             if (!match.players[teamId]) {
                 match.players[teamId] = [];

@@ -18,6 +18,7 @@ class Team extends Component {
         selectPlayer: PropTypes.func,
         match: matchPropType.isRequired,
         teamId: PropTypes.string,
+        selectedMatch: PropTypes.string,
     };
 
     static defaultProps = {
@@ -88,7 +89,7 @@ class Team extends Component {
 
     render() {
         const {
-            team, selectPlayer, teamName, match,
+            team, selectPlayer, teamName, match, selectedMatch,
         } = this.props;
         const {
             error,
@@ -108,7 +109,7 @@ class Team extends Component {
                         <button type="button" onClick={() => this.removePlayer(i)}>Eyða línu</button>
                     </div>
                 )) : null}
-                {match[teamName]
+                {match[teamName] && selectedMatch
                     ? <div><button type="button" onClick={this.addEmptyLine}>Ný lína...</button></div>
                     : null
                 }
@@ -132,6 +133,7 @@ const stateToProps = (
             : [],
         match,
         teamId,
+        selectedMatch,
     };
 };
 
