@@ -104,6 +104,9 @@ const actions = {
             const { availableMatches, selectedMatch } = state;
             // TODO why not immutable
             const match = JSON.parse(JSON.stringify(availableMatches[selectedMatch]));
+            if (!match.players[teamId]) {
+                match.players[teamId] = [];
+            }
             match.players[teamId].push({
                 name: '',
                 number: '',

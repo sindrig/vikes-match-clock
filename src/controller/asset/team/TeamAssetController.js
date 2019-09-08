@@ -203,7 +203,7 @@ class TeamAssetController extends Component {
         const { homeTeam, awayTeam } = this.getTeamPlayers();
         return (
             <div>
-                {!(homeTeam.length * awayTeam.length)
+                {!(homeTeam.length || awayTeam.length)
                     ? (
                         <div className="control-item">
                             <button type="button" onClick={this.autoFill}>Sækja lið</button>
@@ -211,7 +211,7 @@ class TeamAssetController extends Component {
                     )
                     : null
                 }
-                {((homeTeam.length * awayTeam.length) || Object.keys(availableMatches).length)
+                {((homeTeam.length || awayTeam.length) || Object.keys(availableMatches).length)
                     ? (
                         <div className="control-item">
                             <button type="button" onClick={clearMatchPlayers}>Hreinsa lið</button>
@@ -219,7 +219,7 @@ class TeamAssetController extends Component {
                     )
                     : null
                 }
-                {(homeTeam.length * awayTeam.length)
+                {(homeTeam.length || awayTeam.length)
                     ? (
                         <div className="control-item">
                             <button type="button" onClick={this.addPlayersToQ}>Setja lið í biðröð</button>
@@ -231,7 +231,7 @@ class TeamAssetController extends Component {
                     ? <MatchSelector />
                     : null
                 }
-                {(homeTeam.length * awayTeam.length) ? this.renderActionControllers() : null}
+                {(homeTeam.length || awayTeam.length) ? this.renderActionControllers() : null}
             </div>
         );
     }

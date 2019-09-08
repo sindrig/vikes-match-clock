@@ -134,6 +134,10 @@ def main(json_input, context):
     for match in matches:
         players = get_players(match.match_id)
         if players and 'error' not in players:
+            if str(home_team) not in players:
+                players[str(home_team)] = []
+            if str(away_team) not in players:
+                players[str(away_team)] = []
             result['matches'][match.match_id] = {
                 'players': players,
                 'group': match.group,
