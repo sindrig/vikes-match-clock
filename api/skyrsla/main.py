@@ -20,8 +20,12 @@ STARTER_ROLES = [
 
 
 def get_player(player):
+    if player.TreyjuNumer:
+        number = int(player.TreyjuNumer)
+    else:
+        number = 0
     return {
-        'number': player.TreyjuNumer and int(player.TreyjuNumer),
+        'number': number,
         'name': player.LeikmadurNafn.strip(),
         'role': player.StadaNafn,
         'show': player.StadaNafn in STARTER_ROLES,
