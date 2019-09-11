@@ -35,6 +35,10 @@ export default class PlayerCard extends Component {
         className: PropTypes.string,
         // eslint-disable-next-line
         widthMultiplier: PropTypes.number,
+        overlay: PropTypes.shape({
+            text: PropTypes.string.isRequired,
+            blink: PropTypes.bool,
+        }),
     };
 
     static defaultProps = {
@@ -42,6 +46,10 @@ export default class PlayerCard extends Component {
         children: [],
         className: '',
         widthMultiplier: 1,
+        overlay: {
+            text: '',
+            blink: false,
+        },
     };
 
     state = {
@@ -62,7 +70,7 @@ export default class PlayerCard extends Component {
 
     render() {
         const {
-            thumbnail, asset, children, className,
+            thumbnail, asset, children, className, overlay,
         } = this.props;
         const { fontSizes } = this.state;
         const nameStyle = {
@@ -71,6 +79,7 @@ export default class PlayerCard extends Component {
         return (
             <div className={`asset-player-icon ${className}`} key={asset.key} style={{ backgroundImage: `url(${backgroundImage})` }}>
                 {children}
+                <span className={`player-card-overlay ${overlay.blink ? 'blink' : ''}`}>{overlay.text}</span>
                 <span className="asset-player-number">{asset.number}</span>
                 <span className="asset-player-name" style={nameStyle}>{asset.name}</span>
             </div>

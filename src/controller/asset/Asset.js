@@ -71,6 +71,7 @@ export default class Asset extends Component {
                     thumbnail={thumbnail}
                     className="player-card-image"
                     key={asset.key}
+                    overlay={asset.overlay}
                 >
                     <img src={assets[asset.key]} alt={asset.key} />
                 </PlayerCard>
@@ -85,6 +86,7 @@ export default class Asset extends Component {
                     className="player-card-no-image"
                     widthMultiplier={widthMultiplier}
                     key={asset.key}
+                    overlay={asset.overlay}
                 >
                     {clubLogos[teamName]
                         ? <img src={clubLogos[teamName]} alt="teamName" />

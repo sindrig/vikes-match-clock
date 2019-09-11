@@ -52,3 +52,50 @@ span.asset-player-number {
     left: 14px;
     line-height: 50px;
 }
+
+.player-card-overlay {
+    transform: rotate(35deg);
+    top: 35px;
+    left: 50px;
+    z-index: 9999999;
+    text-shadow: 4px 4px 10px black;
+    font-size: 50px;
+}
+
+.blink {
+    -webkit-animation: blink 2s linear infinite;
+    -moz-animation: blink 2s linear infinite;
+    -ms-animation: blink 2s linear infinite;
+    -o-animation: blink 2s linear infinite;
+     animation: blink 2s linear infinite;
+}
+@-webkit-keyframes blink {
+    0% { opacity: 1; }
+    50% { opacity: 1; }
+    50.01% { opacity: 0; }
+    100% { opacity: 0; }
+}
+@-moz-keyframes blink {
+    0% { opacity: 1; }
+    50% { opacity: 1; }
+    50.01% { opacity: 0; }
+    100% { opacity: 0; }
+}
+@-ms-keyframes blink {
+    0% { opacity: 1; }
+    50% { opacity: 1; }
+    50.01% { opacity: 0; }
+    100% { opacity: 0; }
+}
+@-o-keyframes blink {
+    0% { opacity: 1; }
+    50% { opacity: 1; }
+    50.01% { opacity: 0; }
+    100% { opacity: 0; }
+}
+@keyframes blink {
+    0% { opacity: 1; }
+    50% { opacity: 1; }
+    50.01% { opacity: 0; }
+    100% { opacity: 0; }
+}

@@ -44,12 +44,14 @@ class TeamAssetController extends Component {
             subIn: null,
             subOut: null,
             selectPlayerAsset: false,
+            selectGoalScorer: false,
         };
         this.autoFill = this.autoFill.bind(this);
         this.addPlayersToQ = this.addPlayersToQ.bind(this);
         this.selectSubs = this.selectSubs.bind(this);
         this.addSubAsset = this.addSubAsset.bind(this);
         this.selectPlayerAsset = this.selectPlayerAsset.bind(this);
+        this.selectGoalScorer = this.selectGoalScorer.bind(this);
     }
 
     getTeamPlayers() {
@@ -65,7 +67,7 @@ class TeamAssetController extends Component {
         };
     }
 
-    getPlayerAssetObject({ player, teamName }) {
+    getPlayerAssetObject({ player, teamName, overlay }) {
         const {
             selectedMatch, availableMatches,
         } = this.props;
@@ -86,6 +88,7 @@ class TeamAssetController extends Component {
                         key: assetKey,
                         name: player.name,
                         number: player.number,
+                        overlay,
                         teamName,
                     };
                 }
@@ -96,6 +99,7 @@ class TeamAssetController extends Component {
             key: `custom-${player.number}-${player.name}`,
             name: player.name,
             number: player.number,
+            overlay,
             teamName,
         };
     }
@@ -108,6 +112,7 @@ class TeamAssetController extends Component {
             subIn: null,
             subOut: null,
             selectPlayerAsset: false,
+            selectGoalScorer: false,
         });
     }
 
@@ -182,6 +187,21 @@ class TeamAssetController extends Component {
         this.clearState();
     }
 
+    selectGoalScorer(player, teamName) {
+        const { match, addAssets } = this.props;
+        addAssets([this.getPlayerAssetObject({
+            player,
+            teamName: match[teamName],
+            overlay: {
+                text: 'MAAAARK',
+                blink: true,
+            },
+        })], {
+            showNow: true,
+        });
+        this.clearState();
+    }
+
     autoFill() {
         const { match: { homeTeam, awayTeam }, getAvailableMatches } = this.props;
         if (!homeTeam || !awayTeam) {
@@ -238,7 +258,7 @@ class TeamAssetController extends Component {
 
     renderActionButtons() {
         const {
-            selectSubs, selectPlayerAsset,
+            selectSubs, selectPlayerAsset, selectGoalScorer,
         } = this.state;
         if (selectSubs) {
             return (
@@ -254,12 +274,25 @@ class TeamAssetController extends Component {
                     Hætta við skiptingu
                 </button>
             );
-        } if (selectPlayerAsset) {
+        }
+        if (selectPlayerAsset) {
             return (
                 <button
                     type="button"
                     onClick={() => this.setState({
                         selectPlayerAsset: false,
+                    })}
+                >
+                    Hætta við birtingu
+                </button>
+            );
+        }
+        if (selectGoalScorer) {
+            return (
+                <button
+                    type="button"
+                    onClick={() => this.setState({
+                        selectGoalScorer: false,
                     })}
                 >
                     Hætta við birtingu
@@ -274,6 +307,11 @@ class TeamAssetController extends Component {
                 <div className="control-item">
                     <button type="button" onClick={() => this.setState({ selectPlayerAsset: true })}>
                         Birta leikmann
+                    </button>
+                </div>
+                <div className="control-item">
+                    <button type="button" onClick={() => this.setState({ selectGoalScorer: true })}>
+                        Birta markaskorara
                     </button>
                 </div>
             </div>
@@ -304,7 +342,7 @@ class TeamAssetController extends Component {
 
     renderTeam(teamName) {
         const {
-            selectSubs, subTeam, selectPlayerAsset,
+            selectSubs, subTeam, selectPlayerAsset, selectGoalScorer,
         } = this.state;
         let selectPlayerAction = null;
         if (selectSubs) {
@@ -313,6 +351,8 @@ class TeamAssetController extends Component {
             }
         } else if (selectPlayerAsset) {
             selectPlayerAction = this.selectPlayerAsset;
+        } else if (selectGoalScorer) {
+            selectPlayerAction = this.selectGoalScorer;
         }
         return (
             <Team
