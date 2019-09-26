@@ -1,6 +1,7 @@
 /* eslint-disable global-require */
 module.exports = {
     'assets/herrakvold.jpg': require('./herrakvold.jpg'),
+    'assets/kvennakvold.jpg': require('./kvennakvold.jpg'),
     'players/1 Þórður Ingason.png': require('./players/1 Þórður Ingason.png'),
     'players/3 Logi Tómasson.png': require('./players/3 Logi Tómasson.png'),
     'players/4 Gunnlaugur Birgisson.png': require('./players/4 Gunnlaugur Birgisson.png'),
