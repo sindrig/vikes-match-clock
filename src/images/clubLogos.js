@@ -109,7 +109,7 @@ module.exports = {
     'Þróttur-SR': require('./club-logos/Þróttur-SR.png'),
     Ægir: require('./club-logos/Ægir.svg'),
     Örninn: require('./club-logos/Örninn.svg'),
-    'U21 Ísland': require('./club-logos/Iceland.svg'),
-    'U21 Lúxemborg': require('./club-logos/Luxembourg.svg'),
-    'U21 Armenía': require('./club-logos/Armenia.svg'),
+    Ísland: require('./club-logos/Iceland.svg'),
+    Lúxemborg: require('./club-logos/Luxembourg.svg'),
+    Armenía: require('./club-logos/Armenia.svg'),
 };

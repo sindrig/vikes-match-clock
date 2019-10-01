@@ -159,7 +159,11 @@ export default {
     'Ægir': '822',
     'Æskan': '139060',
     'Örninn': '145472',
-    'U21 Ísland': '136924',
-    'U21 Lúxemborg': '137000',
-    'U21 Armenía': '137582',
+    'Ísland': '136924',
+    'Lúxemborg': '137000',
+    'Armenía': '137582',
+    'Grikkland': '2029',
+    'Kasakstan': '138740',
+    'Spánn': '136963',
+
 }
