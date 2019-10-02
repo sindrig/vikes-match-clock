@@ -7,6 +7,11 @@ const imageStyle = (team) => {
             maxWidth: '100px',
         };
     }
+    if (team.name === 'Grikkland') {
+        return {
+            top: '14px',
+        };
+    }
     return {};
 };
 
