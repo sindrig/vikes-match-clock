@@ -109,6 +109,7 @@ module.exports = {
     ÍBV: require('./club-logos/ÍBV.svg'),
     ÍH: require('./club-logos/ÍH.svg'),
     ÍR: require('./club-logos/ÍR.svg'),
+    Írland: require('./club-logos/Írland.svg'),
     Ísbjörninn: require('./club-logos/Ísbjörninn.svg'),
     Ísland: require('./club-logos/Iceland.svg'),
     Örninn: require('./club-logos/Örninn.svg'),
