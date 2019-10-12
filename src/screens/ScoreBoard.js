@@ -4,9 +4,12 @@ import { matchPropType } from '../propTypes';
 
 import Team from '../match/Team';
 import Clock from '../match/Clock';
+import TimeoutClock from '../match/TimeoutClock';
 import AdImage from '../utils/AdImage';
 
 import clubLogos from '../images/clubLogos';
+import { SPORTS } from '../constants';
+import buzzer from '../sounds/buzzersound.mp3';
 
 import './ScoreBoard.css';
 
@@ -20,17 +23,24 @@ const getTeam = (id, match) => {
 };
 
 const ScoreBoard = ({ match }) => (
-    <div className="scoreboard">
+    <div className={`scoreboard scoreboard-${match.matchType}`}>
         <AdImage />
-        <Team className="home" team={getTeam('home', match)} score={match.homeScore} />
-        <Team className="away" team={getTeam('away', match)} score={match.awayScore} />
+        <Team className="home" team={getTeam('home', match)} score={match.homeScore} penalties={match.home2min} />
+        <Team className="away" team={getTeam('away', match)} score={match.awayScore} penalties={match.away2min} />
         {match.injuryTime ? (
             <div className="injury-time">
-+
-                {match.injuryTime}
+                <span>
+                    +
+                    {match.injuryTime}
+                </span>
             </div>
         ) : null}
-        <Clock className="clock" />
+        <Clock className="clock matchclock" />
+        {match.timeout ? <TimeoutClock className="clock timeoutclock" /> : null}
+        {match.matchType === SPORTS.handball
+            && match.buzzer
+            && (Date.now() - match.buzzer) < 5000
+            && <audio src={buzzer} autoPlay />}
     </div>
 );
 

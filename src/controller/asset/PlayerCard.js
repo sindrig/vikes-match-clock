@@ -1,9 +1,9 @@
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
+import { connect } from 'react-redux';
 
-import { assetPropType } from '../../propTypes';
-import backgroundImage from '../../images/background.png';
-import { VP, THUMB_VP } from '../../constants';
+import { assetPropType, viewPortPropType } from '../../propTypes';
+import { THUMB_VP, BACKGROUND } from '../../constants';
 
 
 const getTextWidth = (text, font) => {
@@ -24,7 +24,7 @@ const getMaxFontSize = (text, width, max) => {
     return regular;
 };
 
-export default class PlayerCard extends Component {
+class PlayerCard extends Component {
     static propTypes = {
         thumbnail: PropTypes.bool,
         asset: assetPropType.isRequired,
@@ -39,6 +39,8 @@ export default class PlayerCard extends Component {
             text: PropTypes.string.isRequired,
             blink: PropTypes.bool,
         }),
+        // eslint-disable-next-line
+        vp: viewPortPropType.isRequired,
     };
 
     static defaultProps = {
@@ -60,10 +62,14 @@ export default class PlayerCard extends Component {
     };
 
     static getDerivedStateFromProps(nextProps) {
-        const { asset: { name }, widthMultiplier } = nextProps;
+        const { asset: { name }, widthMultiplier, vp: { style: { width } } } = nextProps;
         const fontSizes = {
-            thumbnail: getMaxFontSize(name, THUMB_VP.width * widthMultiplier, 12),
-            regular: getMaxFontSize(name, VP.width * widthMultiplier, 30),
+            thumbnail: getMaxFontSize(
+                name, THUMB_VP.width * widthMultiplier, Math.floor(width / 14),
+            ),
+            regular: getMaxFontSize(
+                name, width * widthMultiplier, Math.floor(width / 5),
+            ),
         };
         return { fontSizes };
     }
@@ -77,7 +83,7 @@ export default class PlayerCard extends Component {
             fontSize: `${thumbnail ? fontSizes.thumbnail : fontSizes.regular}px`,
         };
         return (
-            <div className={`asset-player-icon ${className}`} key={asset.key} style={{ backgroundImage: `url(${backgroundImage})` }}>
+            <div className={`asset-player-icon ${className}`} key={asset.key} style={BACKGROUND}>
                 {children}
                 <span className={`player-card-overlay ${overlay.blink ? 'blink' : ''}`}>{overlay.text}</span>
                 <span className="asset-player-number">{asset.number}</span>
@@ -86,3 +92,8 @@ export default class PlayerCard extends Component {
         );
     }
 }
+
+
+const stateToProps = ({ view: { vp } }) => ({ vp });
+
+export default connect(stateToProps)(PlayerCard);

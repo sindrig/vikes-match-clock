@@ -7,7 +7,7 @@
 .controller {
     position: absolute;
     top: 30px;
-    left: 300px;
+    font-size: 16px;
 }
 
 .controller .control-item {
@@ -19,7 +19,7 @@
     border: 2px solid black;
 }
 
-.controller div.control-item > button, .controller div.control-item > select {
+.controller div.control-item > button, .controller div.control-item > select, .controller div.control-item > div {
     margin: 2px;
     float: left;
     clear: both;
@@ -27,8 +27,6 @@
 
 .controller .page-actions {
     position: absolute;
-    top: 150px;
-    left: -300px;
 }
 
 .controller .asset-controller {

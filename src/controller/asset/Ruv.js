@@ -5,6 +5,7 @@ import PropTypes from 'prop-types';
 import Hls from 'hls.js';
 
 import controllerActions from '../../actions/controller';
+import { viewPortPropType } from '../../propTypes';
 
 const DEFAULT_URLS = {
     ruv: 'http://ruvruv-live.hls.adaptive.level3.net/ruv/ruv/index.m3u8',
@@ -16,6 +17,7 @@ class Ruv extends Component {
         thumbnail: PropTypes.bool,
         getRuvUrl: PropTypes.func.isRequired,
         channel: PropTypes.string.isRequired,
+        vp: viewPortPropType.isRequired,
     };
 
     static defaultProps = {
@@ -77,7 +79,7 @@ class Ruv extends Component {
     }
 
     render() {
-        const { thumbnail } = this.props;
+        const { thumbnail, vp: { style: { width, height } } } = this.props;
         if (thumbnail) {
             return <div>RÚV</div>;
         }
@@ -85,8 +87,8 @@ class Ruv extends Component {
             <video
                 ref={this.video}
                 className="hls-player"
-                width={240}
-                height={176}
+                width={width}
+                height={height}
                 preload="metadata"
                 style={{
                     backgroundColor: 'black',
@@ -100,5 +102,6 @@ class Ruv extends Component {
 const dispatchToProps = dispatch => bindActionCreators({
     getRuvUrl: controllerActions.getRuvUrl,
 }, dispatch);
+const stateToProps = ({ view: { vp } }) => ({ vp });
 
-export default connect(null, dispatchToProps)(Ruv);
+export default connect(stateToProps, dispatchToProps)(Ruv);
