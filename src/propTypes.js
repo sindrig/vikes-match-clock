@@ -1,16 +1,24 @@
 import PropTypes from 'prop-types';
 
-import { HALFS } from './constants';
+import { SPORTS } from './constants';
 import { ASSET_VIEWS } from './reducers/controller';
+
+export const twoMinPropType = PropTypes.shape({
+    atTimeElapsed: PropTypes.number.isRequired,
+    key: PropTypes.string.isRequired,
+    penaltyLength: PropTypes.number.isRequired,
+});
 
 export const matchPropType = PropTypes.shape({
     homeScore: PropTypes.number,
     awayScore: PropTypes.number,
     started: PropTypes.number,
-    half: PropTypes.oneOf(Object.keys(HALFS)),
     homeTeam: PropTypes.string.isRequired,
     awayTeam: PropTypes.string,
     injuryTime: PropTypes.number,
+    matchType: PropTypes.oneOf(Object.keys(SPORTS)),
+    home2min: PropTypes.arrayOf(twoMinPropType),
+    away2min: PropTypes.arrayOf(twoMinPropType),
 });
 
 export const playerPropType = PropTypes.shape({
@@ -47,3 +55,11 @@ export const availableMatchesPropType = PropTypes.objectOf(PropTypes.shape({
     group: PropTypes.string,
     players: PropTypes.objectOf(PropTypes.arrayOf(playerPropType)),
 }));
+
+export const viewPortPropType = PropTypes.shape({
+    style: PropTypes.shape({
+        height: PropTypes.number.isRequired,
+        width: PropTypes.number.isRequired,
+    }),
+    fontSize: PropTypes.string,
+});

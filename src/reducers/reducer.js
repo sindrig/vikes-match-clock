@@ -4,6 +4,7 @@ import storage from 'redux-persist/lib/storage';
 
 import match from './match';
 import controller from './controller';
+import view from './view';
 
 const persistConfig = key => ({
     key,
@@ -14,4 +15,5 @@ const persistConfig = key => ({
 export default combineReducers({
     match: persistReducer(persistConfig('match'), match),
     controller: persistReducer(persistConfig('controller'), controller),
+    view: persistReducer(persistConfig('view'), view),
 });

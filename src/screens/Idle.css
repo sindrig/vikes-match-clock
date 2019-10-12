@@ -21,12 +21,13 @@
 
 .idle .idle-text-container {
     position: absolute;
-    top: 110px;
+    top: 65%;
+    width: 100%;
 }
 
 .idle .idle-text-box {
     float: left;
-    width: 120px;
+    width: 50%;
     font-size: 40px;
     font-weight: bold;
     color: #FFFFFF;
@@ -35,7 +36,7 @@
 
 .idle .idle-vikes {
     position: absolute;
-    left: 95px;
-    top: 20px;
-    width: 60px;
+    left: 15%;
+    top: 5%;
+    width: 30%;
 }

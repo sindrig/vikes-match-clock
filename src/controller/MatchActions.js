@@ -6,10 +6,46 @@ import { bindActionCreators } from 'redux';
 import matchActions from '../actions/match';
 import { matchPropType } from '../propTypes';
 import TeamSelector from './TeamSelector';
+import TimeOutManipulationBox from './TimeOutManipulationBox';
 import { VIEWS } from '../reducers/controller';
+import { SPORTS, HALFSTOPS } from '../constants';
+import HalfStops from './HalfStops';
+
+const roundMillisToSeconds = millis => Math.floor(millis / 1000) * 1000;
 
 
-const MatchActions = ({ view, match, updateMatch }) => (
+const clockManipulationBox = (seconds, match, updateMatch) => {
+    const unit = seconds >= 60 ? 'mín' : 'sek';
+    const humanReadableSeconds = seconds >= 60 ? seconds / 60 : seconds;
+    return (
+        <div className="control-item">
+            <button
+                type="button"
+                onClick={() => updateMatch({
+                    timeElapsed: roundMillisToSeconds(match.timeElapsed) + (seconds * 1000),
+                })}
+            >
+                +
+                {humanReadableSeconds}
+                {unit}
+            </button>
+            <button
+                type="button"
+                onClick={() => updateMatch({
+                    timeElapsed: roundMillisToSeconds(match.timeElapsed) - (seconds * 1000),
+                })}
+            >
+                -
+                {humanReadableSeconds}
+                {unit}
+            </button>
+        </div>
+    );
+};
+
+const MatchActions = ({
+    view, match, updateMatch, pauseMatch, matchTimeout, removeTimeout,
+}) => (
     <div className="control-item">
         {view === VIEWS.match && (
             <div>
@@ -17,7 +53,11 @@ const MatchActions = ({ view, match, updateMatch }) => (
                     <button type="button" onClick={() => updateMatch({ homeScore: match.homeScore + 1 })}>
                         Heima +1
                     </button>
-                    <button type="button" onClick={() => updateMatch({ homeScore: match.homeScore - 1 })}>
+                    <button
+                        type="button"
+                        onClick={() => updateMatch({ homeScore: match.homeScore - 1 })}
+                        disabled={match.homeScore <= 0}
+                    >
                         Heima -1
                     </button>
                 </div>
@@ -25,91 +65,116 @@ const MatchActions = ({ view, match, updateMatch }) => (
                     <button type="button" onClick={() => updateMatch({ awayScore: match.awayScore + 1 })}>
                         Úti +1
                     </button>
-                    <button type="button" onClick={() => updateMatch({ awayScore: match.awayScore - 1 })}>
+                    <button
+                        type="button"
+                        onClick={() => updateMatch({ awayScore: match.awayScore - 1 })}
+                        disabled={match.awayScore <= 0}
+                    >
                         Úti -1
                     </button>
                 </div>
                 <div className="control-item">
+                    {match.started ? (
+                        <button
+                            type="button"
+                            onClick={pauseMatch}
+                        >
+                            Pása
+                        </button>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={() => updateMatch({ started: Date.now() })}
+                        >
+                            Byrja
+                        </button>
+                    )}
                     <button
                         type="button"
-                        onClick={() => updateMatch({ started: Date.now() })}
-                        disabled={!!match.started}
-                    >
-                        Byrja
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => updateMatch({ started: null })}
-                        disabled={!match.started}
+                        onClick={() => updateMatch({
+                            started: null,
+                            timeElapsed: 0,
+                            home2min: [],
+                            away2min: [],
+                            timeout: null,
+                            buzzer: false,
+                            halfStops: HALFSTOPS[match.matchType],
+                        })}
+                        disabled={
+                            !match.started
+                            && !match.timeElapsed
+                            && HALFSTOPS[match.matchType][0] === match.halfStops[0]
+                            && !match.timeout
+                        }
                     >
                         Núllstilla klukku
                     </button>
                 </div>
+                {clockManipulationBox(1, match, updateMatch)}
+                {clockManipulationBox(5, match, updateMatch)}
+                {clockManipulationBox(60, match, updateMatch)}
+                {clockManipulationBox(60 * 5, match, updateMatch)}
                 <div className="control-item">
-                    <button
-                        type="button"
-                        onClick={() => updateMatch({ started: match.started - (60 * 1000) })}
-                        disabled={!match.started}
-                    >
-                        Klukka +1 mín
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => updateMatch({ started: match.started + (60 * 1000) })}
-                        disabled={!match.started}
-                    >
-                        Klukka -1 mín
-                    </button>
-                </div>
-                <div className="control-item">
-                    <button
-                        type="button"
-                        onClick={() => updateMatch({ started: match.started - (5 * 1000) })}
-                        disabled={!match.started}
-                    >
-                        Klukka +5 sek
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => updateMatch({ started: match.started + (5 * 1000) })}
-                        disabled={!match.started}
-                    >
-                        Klukka -5 sek
-                    </button>
-                </div>
-                <div className="control-item">
-                    <select
-                        onChange={({ target: { value } }) => updateMatch({ half: value })}
-                        value={match.half}
-                    >
-                        <option value="FIRST">Fyrri hálfleikur</option>
-                        <option value="SECOND">Seinni hálfleikur</option>
-                        <option value="FIRSTET">Fyrri hálfleikur framlengingar</option>
-                        <option value="SECONDET">Seinni hálfleikur framlengingar</option>
-                    </select>
-                    Uppbótartími:
-                    {' '}
-                    <input type="number" value={match.injuryTime || ''} onChange={({ target: { value } }) => updateMatch({ injuryTime: parseInt(value, 10) })} />
+                    {
+                        match.matchType === SPORTS.football ? (
+                            <div style={{ whiteSpace: 'nowrap', width: '400px' }}>
+                                Uppbótartími:
+                                {' '}
+                                <input type="number" value={match.injuryTime || ''} onChange={({ target: { value } }) => updateMatch({ injuryTime: parseInt(value, 10) })} />
+                            </div>
+                        ) : null
+                    }
+                    <div>
+                        Klukkustopp:
+                        <HalfStops />
+                    </div>
                 </div>
             </div>
         )}
         <div>
             <div className="control-item">
-                <span>
-Heima:
-                    <TeamSelector teamAttrName="homeTeam" />
-                </span>
-                <span>
-Úti:
-                    <TeamSelector teamAttrName="awayTeam" />
-                </span>
+                <TeamSelector teamAttrName="homeTeam" />
+                <TeamSelector teamAttrName="awayTeam" />
+                <div>
+                    Íþrótt:
+                    <select
+                        value={match.matchType}
+                        onChange={({ target: { value } }) => updateMatch({ matchType: value })}
+                    >
+                        {Object.keys(SPORTS).map(s => <option key={s}>{s}</option>)}
+                    </select>
+                </div>
             </div>
+            <div className="control-item">
+                {
+                    match.matchType === SPORTS.handball ? (
+                        <div>
+                            <TimeOutManipulationBox team="home" />
+                            <TimeOutManipulationBox team="away" />
+                        </div>
+                    ) : null
+                }
+            </div>
+            {
+                match.matchType === SPORTS.handball ? (
+                    <div className="control-item">
+                        { match.timeout
+                            ? <button type="button" onClick={removeTimeout}>Eyða Leikhlé</button>
+                            : <button type="button" onClick={() => matchTimeout() && pauseMatch()}>Leikhlé</button>
+                        }
+                    </div>
+                ) : null
+
+            }
         </div>
     </div>
 );
 
 MatchActions.propTypes = {
     updateMatch: PropTypes.func.isRequired,
+    pauseMatch: PropTypes.func.isRequired,
+    matchTimeout: PropTypes.func.isRequired,
+    removeTimeout: PropTypes.func.isRequired,
     match: matchPropType.isRequired,
     view: PropTypes.string.isRequired,
 };
@@ -118,6 +183,9 @@ MatchActions.propTypes = {
 const stateToProps = ({ controller: { view }, match }) => ({ view, match });
 const dispatchToProps = dispatch => bindActionCreators({
     updateMatch: matchActions.updateMatch,
+    pauseMatch: matchActions.pauseMatch,
+    matchTimeout: matchActions.matchTimeout,
+    removeTimeout: matchActions.removeTimeout,
 }, dispatch);
 
 export default connect(stateToProps, dispatchToProps)(MatchActions);

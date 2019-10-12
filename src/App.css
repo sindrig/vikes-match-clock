@@ -3,10 +3,12 @@ body {
     overflow: hidden;
 }
 
+html {
+    font-size: 100%;
+}
+
 .App {
   position: absolute;
-  height: 176px;
-  width: 240px;
   cursor: none;
 }
 
@@ -22,8 +24,6 @@ button:focus {
 
 .overlay-container {
     position: absolute;
-    height: 176px;
-    width: 240px;
     cursor: none;
 }
 

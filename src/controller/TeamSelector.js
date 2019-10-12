@@ -8,18 +8,40 @@ import clubLogos from '../images/clubLogos';
 
 import matchActions from '../actions/match';
 
+const normalize = string => string.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+const noCaseSensMatch = (value) => {
+    const foundLogo = Object.keys(clubLogos)
+        .filter(logo => normalize(logo) === normalize(value));
+    if (foundLogo.length > 0) {
+        return foundLogo[0];
+    }
+    return value;
+};
+
+const filterOption = (key, currentValue) => {
+    if (currentValue && !clubLogos[currentValue]) {
+        return normalize(key).startsWith(normalize(currentValue));
+    }
+    return true;
+};
+
 const TeamSelector = ({ teamAttrName, match, updateMatch }) => (
-    <select
-        value={match[teamAttrName] || ''}
-        onChange={event => updateMatch({ [teamAttrName]: event.target.value })}
-    >
-        <option value="">Veldu lið...</option>
-        {
-            Object.keys(clubLogos).map(key => (
-                <option value={key} key={key}>{key}</option>
-            ))
-        }
-    </select>
+    <div>
+        <select
+            value={match[teamAttrName] || ''}
+            onChange={event => updateMatch({ [teamAttrName]: event.target.value })}
+        >
+            <option value="">Veldu lið...</option>
+            {
+                Object.keys(clubLogos)
+                    .filter(key => filterOption(key, match[teamAttrName])).map(key => (
+                        <option value={key} key={key}>{key}</option>
+                    ))
+            }
+        </select>
+        <input type="text" value={match[teamAttrName] || ''} onChange={({ target: { value } }) => updateMatch({ [teamAttrName]: noCaseSensMatch(value) })} />
+    </div>
 );
 
 TeamSelector.propTypes = {

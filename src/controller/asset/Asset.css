@@ -26,9 +26,8 @@ div.asset-player-icon img {
 
 span.asset-player-name {
     font-size: 30px;
-    top: 130px;
-    left: 20px;
-    height: 70px;
+    bottom: 5%;
+    left: 5%;
     line-height: normal;
 }
 
@@ -55,11 +54,11 @@ span.asset-player-number {
 
 .player-card-overlay {
     transform: rotate(35deg);
-    top: 35px;
-    left: 50px;
+    top: 18%;
+    left: 18%;
     z-index: 9999999;
     text-shadow: 4px 4px 10px black;
-    font-size: 50px;
+    font-size: 3rem;
 }
 
 .blink {

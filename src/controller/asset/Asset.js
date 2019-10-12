@@ -1,8 +1,9 @@
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 import YouTube from 'react-youtube';
+import { connect } from 'react-redux';
 
-import { assetPropType } from '../../propTypes';
+import { assetPropType, viewPortPropType } from '../../propTypes';
 import PlayerCard from './PlayerCard';
 import Substitution from './Substitution';
 
@@ -19,12 +20,13 @@ export const checkKey = asset => (
     Object.keys(assetTypes).indexOf(asset.type) !== -1 && asset.key
 );
 
-export default class Asset extends Component {
+class Asset extends Component {
     static propTypes = {
         asset: assetPropType.isRequired,
         remove: PropTypes.func,
         thumbnail: PropTypes.bool,
         time: PropTypes.number,
+        vp: viewPortPropType.isRequired,
     };
 
     static defaultProps = {
@@ -104,7 +106,9 @@ export default class Asset extends Component {
     }
 
     renderUrl() {
-        const { asset, thumbnail, remove } = this.props;
+        const {
+            asset, thumbnail, remove, vp,
+        } = this.props;
         // TODO can only handle youtube
         let url;
         try {
@@ -140,8 +144,8 @@ export default class Asset extends Component {
                 opts.playerVars.showinfo = 0;
                 opts.playerVars.autoplay = 1;
                 opts.playerVars.controls = 0;
-                opts.height = '176';
-                opts.width = '240';
+                opts.height = vp.style.height;
+                opts.width = vp.style.width;
                 return (
                     <div style={{ backgroundColor: '#000000' }}>
                         <YouTube
@@ -186,3 +190,8 @@ export default class Asset extends Component {
         return null;
     }
 }
+
+
+const stateToProps = ({ view: { vp } }) => ({ vp });
+
+export default connect(stateToProps)(Asset);

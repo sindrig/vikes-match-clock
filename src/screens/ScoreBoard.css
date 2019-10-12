@@ -1,53 +1,67 @@
-.team.home span {
-    left: 10px;
+.team.home span.score {
+    left: 4%;
 }
 
-.team.away span {
-    right: 10px;
+.team.home img {
+    left: 6%;
 }
 
-.team span {
+.team.away span.score {
+    right: 4%;
+}
+
+.team.away img{
+    right: 6%;
+}
+
+.team {
+    margin: 0 auto;
+}
+
+.team span.score {
     position:absolute;
     background-color: black;
     font-family: 'Anton', sans-serif;
-    font-size: 40px;
+    font-size: 2.5rem;
     color: white;
-    top: 100px;
-    height: 60px;
-    width: 60px;
-    line-height:60px;
+    top: 57%;
+    height: 34%;
+    width: 25%;
+    /*line-height:60px;*/
     text-align: center;
     border: 1px solid white;
 }
 
 .team img {
     position:absolute;
-    top: 20px;
-    max-height: 75px;
-    max-width: 62px;
-}
-
-.team.home img {
-    left: 10px;
-}
-
-.team.away img {
-    right: 10px;
+    top: 10%;
+    height: 43%;
+    max-width: 26%;
 }
 
 .clock {
     position:absolute;
     background-color: black;
     font-family: 'Anton', sans-serif;
-    font-size: 30px;
     color: white;
-    top: 100px;
-    left: 80px;
-    height: 40px;
-    width: 80px;
-    line-height:40px;
+    line-height:140%;
     text-align: center;
     border: 1px solid white;
+}
+
+.matchclock {
+    top: 57%;
+    left: 33.5%;
+    height: 23%;
+    width: 33%;
+}
+
+.timeoutclock {
+    top: 81%;
+    left: calc(37.5% - 1px);
+    height: 18%;
+    width: 25%;
+    line-height: 130%;
 }
 
 .scoreboard img.ad {
@@ -57,14 +71,121 @@
     position: absolute;
 }
 
-.scoreboard .injury-time {
-    top: 60px;
-    /*right: 90px;*/
-    font-size: 30px;
-    height: 20px;
-    width: 20px;
-    position: relative;
-    margin: 0 auto;
+.scoreboard .injury-time span {
+    top: 30%;
+    left: 45%;
+    font-size: 2rem;
+    position: absolute;
     color: white;
     font-family: 'Anton', sans-serif;
+}
+
+.scoreboard .penalty {
+    display: none;
+}
+
+.scoreboard-handball .team span.score {
+    top: 37%;
+    height: 23%;
+    width: 17%;
+    font-size: 1.5rem;
+}
+
+.scoreboard-handball .team img {
+    height: 23%;
+    max-width: 17%;
+    top: 2%;
+}
+
+.scoreboard-handball .team.home span.score {
+    left: 8%;
+}
+
+.scoreboard-handball .team.home img {
+    left: 11%;
+}
+
+.scoreboard-handball .team.away span.score {
+    right: 8%;
+}
+
+.scoreboard-handball .team.away img{
+    right: 11%;
+}
+
+.scoreboard-handball .matchclock {
+    top: 30%;
+}
+
+.scoreboard-handball .timeoutclock {
+    top: 55%;
+}
+
+.scoreboard-handball .team div.team-name {
+    top: 25%;
+    height: 11.5%;
+    width: 26%;
+    font-size: .7rem;
+    position: absolute;
+    color: white;
+    font-family: 'Anton', sans-serif;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+.scoreboard-handball .team.home div.team-name {
+    left: 4%;
+}
+
+.scoreboard-handball .team.away div.team-name {
+    right: 4%;
+}
+
+.scoreboard-handball .penalty {
+    display: block;
+    height: 12%;
+    width: calc(50% - 2px);
+    font-size: 0.9rem;
+
+    /*position:absolute;*/
+    background-color: black;
+    font-family: 'Anton', sans-serif;
+    color: white;
+    line-height:140%;
+    text-align: center;
+    border: 1px solid white;
+}
+
+.scoreboard-handball .penalties {
+    position: absolute;
+    width: 34%;
+    top: 65%;
+}
+
+.scoreboard-handball .team.home .penalties {
+    left: 8%;
+}
+
+.scoreboard-handball .team.home .penalties .penalty {
+    float: left;
+}
+
+.scoreboard-handball .team.away .penalties {
+    right: 8%;
+}
+
+.scoreboard-handball .team.away .penalties .penalty {
+    float: right;
+}
+
+.penalty-manipulation button.remove-penalty {
+    display: block;
+    float: left;
+}
+
+.penalty-manipulation button.add-penalty {
+    clear: both;
+    float: left;
+    width: 100%;
 }
