@@ -39,6 +39,7 @@ test() {
     npm run test
 }
 
+
 all() {
     if check-master; then
         main node-modules lint test build deploy
