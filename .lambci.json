@@ -1,4 +1,4 @@
 {
-  "cmd": "nave use 8 bash -c './build.sh all'",
+  "cmd": "nave use 10 bash -c './build.sh all'",
   "build": true
 }
