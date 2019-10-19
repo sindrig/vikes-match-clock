@@ -35,13 +35,12 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build && gzipper --verbose ./build --output-file-format [filename].[ext]",
+    "build": "react-scripts build && gzipper --verbose ./build && ./rm-gz-ext.sh",
     "test": "CI=true react-scripts test --env=jsdom",
     "test:watch": "react-scripts test --env=jsdom",
     "eject": "react-scripts eject",
     "lint": "eslint src --max-warnings=0",
-    "ncu": "ncu",
-    "deploy": "s3-deploy './build/**' --cwd ./build/ --region eu-west-1 --bucket klukka.irdn.is --gzip"
+    "ncu": "ncu"
   },
   "browserslist": {
     "production": [
