@@ -39,7 +39,8 @@
     "test:watch": "react-scripts test --env=jsdom",
     "eject": "react-scripts eject",
     "lint": "eslint src --max-warnings=0",
-    "ncu": "ncu"
+    "ncu": "ncu",
+    "deploy": "s3-deploy './build/**' --cwd ./build/ --region eu-west-1 --bucket klukka.irdn.is --gzip"
   },
   "browserslist": {
     "production": [

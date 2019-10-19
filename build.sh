@@ -15,14 +15,10 @@ check-master() {
 
 node-modules() {
     npm install
-    # command -v npm-git-lock 2>&1 || npm install -g npm-git-lock
-    # export GIT_TEMPLATE_DIR='/tmp/lambci/home/usr/share/git-core/templates'
-    # export GIT_EXEC_PATH='/tmp/lambci/home/usr/libexec/git-core'
-    # npm-git-lock --repo https://github.com/sindrig/vikes-match-clock-node-modules.git
 }
 
 deploy() {
-    node_modules/.bin/s3-deploy "./build/**" --cwd "./build/" --region "eu-west-1" --bucket klukka.irdn.is --gzip $EXTRA_S3
+    node_modules/.bin/s3-deploy "./build/**" --cwd "./build/" --region "eu-west-1" --bucket klukka.irdn.is --gzip
 }
 
 windows() {
