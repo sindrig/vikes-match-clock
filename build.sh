@@ -4,7 +4,7 @@ set -e
 windows() {
     ./package.sh http://klukka.irdn.is --platform windows
     zip -qyr klukka.zip Vallarklukka-win32-x64/
-    aws s3 cp klukka.zip s3://klukka.irdn.is/klukka.zip $EXTRA_S3
+    aws s3 cp klukka.zip s3://klukka.irdn.is/klukka.zip
 }
 
 platform() {

@@ -40,7 +40,7 @@ const TeamSelector = ({ teamAttrName, match, updateMatch }) => (
                     ))
             }
         </select>
-        <input type="text" value={match[teamAttrName] || ''} onChange={({ target: { value } }) => updateMatch({ [teamAttrName]: noCaseSensMatch(value) })} />
+        <input id={`team-selector-${teamAttrName}`} type="text" value={match[teamAttrName] || ''} onChange={({ target: { value } }) => updateMatch({ [teamAttrName]: noCaseSensMatch(value) })} />
     </div>
 );
 

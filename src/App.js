@@ -8,6 +8,7 @@ import ShortcutManager from './utils/ShortcutManager';
 
 import viewActions from './actions/view';
 import Controller from './controller/Controller';
+import Asset from './controller/asset/Asset';
 
 import ScoreBoard from './screens/ScoreBoard';
 import Idle from './screens/Idle';
@@ -15,6 +16,7 @@ import { BACKGROUND } from './constants';
 
 import { VIEWS } from './reducers/controller';
 import { viewPortPropType } from './propTypes';
+import StateListener from './StateListener';
 
 import './App.css';
 
@@ -23,7 +25,18 @@ class App extends Component {
     static propTypes = {
         view: PropTypes.string.isRequired,
         vp: viewPortPropType.isRequired,
+        asset: PropTypes.shape({
+            asset: PropTypes.shape({
+                key: PropTypes.string.isRequired,
+                type: PropTypes.string.isRequired,
+            }).isRequired,
+            time: PropTypes.number,
+        }),
         setViewPort: PropTypes.func.isRequired,
+    };
+
+    static defaultProps = {
+        asset: null,
     };
 
     static childContextTypes = {
@@ -33,11 +46,7 @@ class App extends Component {
 
     constructor(props) {
         super(props);
-        this.state = {
-            overlay: null,
-        };
         this.handleShortcuts = this.handleShortcuts.bind(this);
-        this.setOverlay = this.setOverlay.bind(this);
     }
 
     getChildContext() {
@@ -49,34 +58,15 @@ class App extends Component {
         setViewPort(vp);
     }
 
-    setOverlay(component) {
-        this.setState({ overlay: component });
-    }
-
     handleShortcuts(action) {
         switch (action) {
         case 'clearImage':
-            this.setOverlay(null);
+            console.log('clearImage');
             break;
         default:
             console.error('Unknown key pressed', action);
         }
         return this;
-    }
-
-    renderOverlay() {
-        // TODO move to separate container.
-        // TODO fade out.
-        const { vp } = this.props;
-        const { overlay } = this.state;
-        if (!overlay) {
-            return null;
-        }
-        return (
-            <div className="overlay-container" style={vp.style}>
-                {overlay}
-            </div>
-        );
     }
 
     renderCurrentView() {
@@ -92,7 +82,7 @@ class App extends Component {
     }
 
     render() {
-        const { vp } = this.props;
+        const { vp, asset } = this.props;
         const style = {
             ...BACKGROUND,
             ...vp.style,
@@ -107,14 +97,22 @@ class App extends Component {
                 <div className="App" style={style}>
                     {this.renderCurrentView()}
                 </div>
-                <Controller renderAsset={this.setOverlay} />
-                {this.renderOverlay()}
+                <Controller />
+                { asset ? (
+                    <div className="overlay-container" style={vp.style}>
+                        <Asset {...asset} />
+                    </div>
+                ) : null
+                }
+                <StateListener />
             </Shortcuts>
         );
     }
 }
 
-const stateToProps = ({ controller: { view }, view: { vp } }) => ({ view, vp });
+const stateToProps = ({
+    controller: { view, currentAsset }, view: { vp },
+}) => ({ view, vp, asset: currentAsset || null });
 
 const dispatchToProps = dispatch => bindActionCreators({
     setViewPort: viewActions.setViewPort,

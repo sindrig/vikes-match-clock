@@ -3,12 +3,15 @@ import App from './App';
 import { initialState as controllerInitialState } from './reducers/controller';
 import { initialState as matchInitialState } from './reducers/match';
 import { initialState as viewInitialState } from './reducers/view';
+import { initialState as remoteInitialState } from './reducers/remote';
 
 it('renders Idle', () => {
     const store = window.mockStore({
         controller: controllerInitialState,
         match: matchInitialState,
         view: viewInitialState,
+        remote: remoteInitialState,
+        firebase: { data: null },
     });
     const app = window.mountWrapComponent(<App />, store);
     const controller = app.find('Controller');
@@ -30,6 +33,8 @@ it('renders TeamAssetController', () => {
         },
         match: matchInitialState,
         view: viewInitialState,
+        remote: remoteInitialState,
+        firebase: { data: null },
     });
     const app = window.mountWrapComponent(<App />, store);
     const controller = app.find('Controller');

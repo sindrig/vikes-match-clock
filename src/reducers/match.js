@@ -6,18 +6,18 @@ import { SPORTS, HALFSTOPS } from '../constants';
 export const initialState = {
     homeScore: 0,
     awayScore: 0,
-    started: null,
+    started: 0,
     timeElapsed: 0,
     halfStops: HALFSTOPS[SPORTS.football],
     homeTeam: 'Víkingur R',
-    awayTeam: null,
+    awayTeam: '',
     homeTeamId: 103,
-    awayTeamId: null,
+    awayTeamId: 0,
     injuryTime: 0,
     matchType: SPORTS.football,
     home2min: [],
     away2min: [],
-    timeout: null,
+    timeout: 0,
     buzzer: false,
 };
 
@@ -32,8 +32,8 @@ const actions = {
                 return { ...state, pending: true };
             }
             const newState = { ...state, ...payload };
-            newState.homeTeamId = newState.homeTeam ? clubIds[newState.homeTeam] : null;
-            newState.awayTeamId = newState.awayTeam ? clubIds[newState.awayTeam] : null;
+            newState.homeTeamId = newState.homeTeam ? clubIds[newState.homeTeam] || 0 : 0;
+            newState.awayTeamId = newState.awayTeam ? clubIds[newState.awayTeam] || 0 : 0;
             if (Number.isNaN(newState.injuryTime)) {
                 newState.injuryTime = 0;
             }
@@ -94,7 +94,7 @@ const actions = {
             const { isHalfEnd } = payload;
             const newState = {
                 ...state,
-                started: null,
+                started: 0,
                 buzzer: isHalfEnd ? Date.now() : false,
             };
             if (isHalfEnd) {
@@ -152,11 +152,20 @@ const actions = {
             const { buzzer } = payload;
             return {
                 ...state,
-                timeout: null,
+                timeout: 0,
                 buzzer: buzzer ? Date.now() : false,
             };
         },
     },
+    [ActionTypes.receiveRemoteData]: {
+        next(state, { data, path }) {
+            if (path === 'match' && data) {
+                return { ...state, ...data };
+            }
+            return state;
+        },
+    },
+
 };
 
 export default handleActions(actions, initialState);

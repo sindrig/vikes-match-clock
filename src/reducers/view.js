@@ -9,14 +9,27 @@ export const VPS = {
             height: 176,
             width: 240,
         },
+        key: 'outside',
         fontSize: '100%',
+        name: 'Klukka úti',
     },
     insidebig: {
         style: {
             height: 288,
             width: 448,
         },
+        key: 'insidebig',
         fontSize: '180%',
+        name: 'Inni stór',
+    },
+    insidesmall: {
+        style: {
+            height: 244,
+            width: 288,
+        },
+        key: 'insidesmall',
+        fontSize: '130%',
+        name: 'Inni lítil',
     },
 };
 
