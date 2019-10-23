@@ -1,11 +1,11 @@
+import React, { Component } from 'react';
 import { bindActionCreators } from 'redux';
 import { connect } from 'react-redux';
 import PropTypes from 'prop-types';
-import React, { Component } from 'react';
 
 import { addVideosFromPlaylist } from './YoutubePlaylist';
 import { ASSET_VIEWS } from '../../reducers/controller';
-import { matchPropType, assetsPropType } from '../../propTypes';
+import { matchPropType, assetPropType } from '../../propTypes';
 import Asset, { checkKey } from './Asset';
 import AssetSelector from './AssetSelector';
 import RemovableAsset from './RemovableAsset';
@@ -24,9 +24,25 @@ class AssetController extends Component {
         selectAssetView: PropTypes.func.isRequired,
         match: matchPropType.isRequired,
         assetView: PropTypes.string.isRequired,
-        assets: assetsPropType.isRequired,
-        updateAssets: PropTypes.func.isRequired,
+        imageSeconds: PropTypes.number,
+        selectedAssets: PropTypes.arrayOf(assetPropType).isRequired,
+        cycle: PropTypes.bool,
+        playing: PropTypes.bool,
+        autoPlay: PropTypes.bool,
+        toggleCycle: PropTypes.func.isRequired,
+        setImageSeconds: PropTypes.func.isRequired,
+        toggleAutoPlay: PropTypes.func.isRequired,
+        setPlaying: PropTypes.func.isRequired,
+        showNextAsset: PropTypes.func.isRequired,
+        setSelectedAssets: PropTypes.func.isRequired,
     };
+
+    static defaultProps = {
+        imageSeconds: 0,
+        autoPlay: false,
+        cycle: false,
+        playing: false,
+    }
 
     constructor(props) {
         super(props);
@@ -34,36 +50,17 @@ class AssetController extends Component {
             playing: false,
             error: '',
         };
-        this.deleteNextAsset = this.deleteNextAsset.bind(this);
-        this.showNextAsset = this.showNextAsset.bind(this);
-        this.onCycleChange = this.onCycleChange.bind(this);
-        this.onAutoPlayChange = this.onAutoPlayChange.bind(this);
         this.onImageSecondsChange = this.onImageSecondsChange.bind(this);
-        this.pause = this.pause.bind(this);
-        this.requestRemoval = this.requestRemoval.bind(this);
         this.addMultipleAssets = this.addMultipleAssets.bind(this);
-        this.clearQueue = this.clearQueue.bind(this);
         this.addAssetKey = this.addAssetKey.bind(this);
         this.removeAsset = this.removeAsset.bind(this);
     }
 
-    onCycleChange() {
-        const { assets: { cycle } } = this.props;
-        this.updateAssets({ cycle: !cycle });
-    }
-
-    onAutoPlayChange() {
-        const { assets: { autoPlay } } = this.props;
-        this.updateAssets({ autoPlay: !autoPlay });
-        if (autoPlay) {
-            this.pause();
-        }
-    }
-
     onImageSecondsChange(event) {
+        const { setImageSeconds } = this.props;
         event.preventDefault();
         const { target: { value } } = event;
-        this.updateAssets({ imageSeconds: Math.max(parseInt(value, 10), 1) });
+        setImageSeconds(Math.max(parseInt(value, 10), 1));
     }
 
     addAssetKey(asset) {
@@ -85,13 +82,13 @@ class AssetController extends Component {
     }
 
     addMultipleAssets(assetList, options = { showNow: false }) {
-        const { assets: { selectedAssets }, renderAsset } = this.props;
-        const updatedAssets = [...selectedAssets];
+        const { selectedAssets, renderAsset, setSelectedAssets } = this.props;
+        const updatedAssets = [...(selectedAssets || [])];
         const errors = [];
         if (options.showNow && assetList.length === 1) {
-            renderAsset(<Asset
-                asset={assetList[0]}
-            />);
+            renderAsset({
+                asset: assetList[0],
+            });
         } else {
             assetList.forEach((asset) => {
                 if (checkKey(asset)) {
@@ -104,7 +101,8 @@ class AssetController extends Component {
                     errors.push(`Unknown asset ${asset.key}`);
                 }
             });
-            this.updateAssets({ selectedAssets: updatedAssets });
+            console.log('updatedAssets', updatedAssets);
+            setSelectedAssets(updatedAssets);
             if (errors.length) {
                 this.setState({ error: errors.join(' - ') });
             } else {
@@ -113,83 +111,30 @@ class AssetController extends Component {
         }
     }
 
-    clearQueue() {
-        return this.updateAssets({ selectedAssets: [] });
-    }
-
-    updateAssets(newState) {
-        const { updateAssets } = this.props;
-        updateAssets(newState);
-    }
-
     playRuv(key) {
         return () => {
             const { renderAsset } = this.props;
-            renderAsset(<Asset
-                asset={{ key, type: assetTypes.RUV }}
-            />);
+            renderAsset({
+                asset: { key, type: assetTypes.RUV },
+            });
         };
     }
 
-    pause() {
-        this.setState({ playing: false });
-    }
-
-    requestRemoval() {
-        const { playing } = this.state;
-        if (playing) {
-            this.showNextAsset();
-        }
-    }
-
-    showNextAsset() {
-        const {
-            assets: {
-                cycle, selectedAssets, imageSeconds, autoPlay,
-            },
-            renderAsset,
-        } = this.props;
-        if (!selectedAssets.length) {
-            this.pause();
-            renderAsset(null);
-        } else {
-            const nextAsset = this.deleteNextAsset();
-            renderAsset(<Asset
-                asset={nextAsset}
-                remove={this.requestRemoval}
-                time={autoPlay ? imageSeconds : null}
-            />);
-            if (autoPlay) {
-                this.setState({ playing: true });
-            }
-            if (cycle) {
-                this.updateAssets({ selectedAssets: [...selectedAssets, nextAsset] });
-            }
-        }
-    }
-
-    deleteNextAsset() {
-        const { assets: { selectedAssets } } = this.props;
-        const asset = selectedAssets.shift();
-        this.updateAssets({ selectedAssets });
-        return asset;
-    }
-
     removeAsset(asset) {
-        const { assets: { selectedAssets } } = this.props;
+        const { selectedAssets, setSelectedAssets } = this.props;
         const idx = selectedAssets.map(a => a.key).indexOf(asset.key);
         if (idx > -1) {
             const newAssets = [...selectedAssets];
             newAssets.splice(idx, 1);
-            this.updateAssets({ selectedAssets: newAssets });
+            setSelectedAssets(newAssets);
         }
     }
 
     renderNextAsset() {
-        const { assets: { selectedAssets } } = this.props;
+        const { selectedAssets } = this.props;
         return (
             <div>
-                {selectedAssets.map(asset => (
+                {(selectedAssets || []).map(asset => (
                     <RemovableAsset
                         asset={asset}
                         remove={this.removeAsset}
@@ -212,11 +157,10 @@ class AssetController extends Component {
 
     renderAssetController() {
         const {
-            assets: {
-                cycle, selectedAssets, imageSeconds, autoPlay,
-            },
+            cycle, selectedAssets, imageSeconds, autoPlay, setSelectedAssets,
+            toggleCycle, toggleAutoPlay, playing, setPlaying, showNextAsset,
         } = this.props;
-        const { playing } = this.state;
+        const selectedAssetsList = selectedAssets || [];
         return (
             <div>
                 <div className="controls control-item">
@@ -224,29 +168,29 @@ class AssetController extends Component {
                         <option value="null">Myndir</option>
                         {Object
                             .keys(assetsImages)
-                            .filter(key => selectedAssets.map(a => a.key).indexOf(key) === -1)
+                            .filter(key => selectedAssetsList.map(a => a.key).indexOf(key) === -1)
                             .map(key => ({ key, name: key.split('/')[key.split('/').length - 1] }))
                             .map(({ key, name }) => <option value={key} key={key}>{name}</option>)
                         }
                     </AssetSelector>
                     <span>
-                        {selectedAssets.length}
+                        {selectedAssetsList.length}
                         {' '}
                         í biðröð
                     </span>
-                    {selectedAssets.length
-                        ? <button type="button" onClick={this.clearQueue}>Hreinsa biðröð</button>
+                    {selectedAssetsList.length
+                        ? <button type="button" onClick={() => setSelectedAssets([])}>Hreinsa biðröð</button>
                         : null
                     }
-                    {playing ? <button type="button" onClick={this.pause}>Pause</button> : null}
-                    {!playing && selectedAssets.length
-                        ? <button type="button" onClick={this.showNextAsset}>Birta</button>
+                    {playing ? <button type="button" onClick={() => setPlaying(false)}>Pause</button> : null}
+                    {!playing && selectedAssetsList.length
+                        ? <button type="button" onClick={showNextAsset}>Birta</button>
                         : null
                     }
                     <div>
                         <input
                             type="checkbox"
-                            onChange={this.onAutoPlayChange}
+                            onChange={toggleAutoPlay}
                             checked={autoPlay}
                         />
                         Autoplay
@@ -254,7 +198,7 @@ class AssetController extends Component {
                     <div>
                         <input
                             type="checkbox"
-                            onChange={this.onCycleChange}
+                            onChange={toggleCycle}
                             checked={cycle}
                         />
                         Loop
@@ -315,15 +259,30 @@ class AssetController extends Component {
     }
 }
 
-const stateToProps = ({ controller: { assetView, assets }, match }) => ({
+const stateToProps = ({
+    controller: {
+        assetView, selectedAssets, autoPlay, cycle, imageSeconds, playing,
+    },
+    match,
+}) => ({
     assetView,
     match,
-    assets,
+    selectedAssets,
+    autoPlay,
+    cycle,
+    playing,
+    imageSeconds,
 });
 
 const dispatchToProps = dispatch => bindActionCreators({
     selectAssetView: controllerActions.selectAssetView,
-    updateAssets: controllerActions.updateAssets,
+    toggleCycle: controllerActions.toggleCycle,
+    setImageSeconds: controllerActions.setImageSeconds,
+    toggleAutoPlay: controllerActions.toggleAutoPlay,
+    setPlaying: controllerActions.setPlaying,
+    setSelectedAssets: controllerActions.setSelectedAssets,
+    showNextAsset: controllerActions.showNextAsset,
+    renderAsset: controllerActions.renderAsset,
 }, dispatch);
 
 export default connect(stateToProps, dispatchToProps)(AssetController);

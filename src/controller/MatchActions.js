@@ -92,11 +92,11 @@ const MatchActions = ({
                     <button
                         type="button"
                         onClick={() => updateMatch({
-                            started: null,
+                            started: 0,
                             timeElapsed: 0,
                             home2min: [],
                             away2min: [],
-                            timeout: null,
+                            timeout: 0,
                             buzzer: false,
                             halfStops: HALFSTOPS[match.matchType],
                         })}

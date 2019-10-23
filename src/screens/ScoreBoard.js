@@ -1,6 +1,6 @@
 import React from 'react';
 import { connect } from 'react-redux';
-import { matchPropType } from '../propTypes';
+import { matchPropType, viewPortPropType } from '../propTypes';
 
 import Team from '../match/Team';
 import Clock from '../match/Clock';
@@ -22,8 +22,8 @@ const getTeam = (id, match) => {
     };
 };
 
-const ScoreBoard = ({ match }) => (
-    <div className={`scoreboard scoreboard-${match.matchType}`}>
+const ScoreBoard = ({ match, vp }) => (
+    <div className={`scoreboard scoreboard-${match.matchType} scoreboard-${vp.key}`}>
         <AdImage />
         <Team className="home" team={getTeam('home', match)} score={match.homeScore} penalties={match.home2min} />
         <Team className="away" team={getTeam('away', match)} score={match.awayScore} penalties={match.away2min} />
@@ -46,9 +46,10 @@ const ScoreBoard = ({ match }) => (
 
 ScoreBoard.propTypes = {
     match: matchPropType.isRequired,
+    vp: viewPortPropType.isRequired,
 };
 
 
-const stateToProps = ({ match }) => ({ match });
+const stateToProps = ({ match, view: { vp } }) => ({ match, vp });
 
 export default connect(stateToProps)(ScoreBoard);

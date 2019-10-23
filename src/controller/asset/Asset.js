@@ -1,7 +1,9 @@
 import React, { Component } from 'react';
+import { bindActionCreators } from 'redux';
 import PropTypes from 'prop-types';
 import YouTube from 'react-youtube';
 import { connect } from 'react-redux';
+import { withFirebase } from 'react-redux-firebase';
 
 import { assetPropType, viewPortPropType } from '../../propTypes';
 import PlayerCard from './PlayerCard';
@@ -11,6 +13,8 @@ import * as assets from '../../assets';
 import assetTypes from './AssetTypes';
 import clubLogos from '../../images/clubLogos';
 import Ruv from './Ruv';
+import controllerActions from '../../actions/controller';
+
 
 import './Asset.css';
 
@@ -23,16 +27,21 @@ export const checkKey = asset => (
 class Asset extends Component {
     static propTypes = {
         asset: assetPropType.isRequired,
-        remove: PropTypes.func,
+        removeAssetAfterTimeout: PropTypes.func.isRequired,
         thumbnail: PropTypes.bool,
         time: PropTypes.number,
         vp: viewPortPropType.isRequired,
+        sync: PropTypes.bool,
+        firebase: PropTypes.shape({
+            auth: PropTypes.func,
+        }),
     };
 
     static defaultProps = {
         thumbnail: false,
-        remove: () => {},
         time: null,
+        firebase: null,
+        sync: false,
     };
 
     constructor(props) {
@@ -55,12 +64,15 @@ class Asset extends Component {
 
     setTimeoutIfNecessary() {
         const {
-            time, thumbnail, remove, asset,
+            time, thumbnail, removeAssetAfterTimeout, asset, sync, firebase,
         } = this.props;
         clearTimeout(this.timeout);
+        if (sync && firebase && !firebase.auth().currentUser) {
+            return;
+        }
         const typeNeedsManualRemove = asset.type !== assetTypes.URL;
-        if (time && !thumbnail && remove && typeNeedsManualRemove) {
-            this.timeout = setTimeout(remove, time * 1000);
+        if (time && !thumbnail && typeNeedsManualRemove) {
+            this.timeout = setTimeout(removeAssetAfterTimeout, time * 1000);
         }
     }
 
@@ -107,7 +119,7 @@ class Asset extends Component {
 
     renderUrl() {
         const {
-            asset, thumbnail, remove, vp,
+            asset, thumbnail, removeAssetAfterTimeout, vp,
         } = this.props;
         // TODO can only handle youtube
         let url;
@@ -151,7 +163,7 @@ class Asset extends Component {
                         <YouTube
                             videoId={videoId}
                             opts={opts}
-                            onEnd={remove}
+                            onEnd={removeAssetAfterTimeout}
                         />
                     </div>
                 );
@@ -192,6 +204,9 @@ class Asset extends Component {
 }
 
 
-const stateToProps = ({ view: { vp } }) => ({ vp });
+const stateToProps = ({ view: { vp }, remote: { sync } }) => ({ vp, sync });
+const dispatchToProps = dispatch => bindActionCreators({
+    removeAssetAfterTimeout: controllerActions.removeAssetAfterTimeout,
+}, dispatch);
 
-export default connect(stateToProps)(Asset);
+export default withFirebase(connect(stateToProps, dispatchToProps)(Asset));

@@ -1,7 +1,6 @@
 import keymirror from 'keymirror';
 
-export default keymirror({
-    // Match
+export const Match = keymirror({
     updateMatch: null,
     removePenalty: null,
     addTimeout: null,
@@ -9,8 +8,9 @@ export default keymirror({
     updateHalfLength: null,
     matchTimeout: null,
     removeTimeout: null,
+});
 
-    // Controller
+export const Controller = keymirror({
     selectView: null,
     selectAssetView: null,
     getAvailableMatches: null,
@@ -20,11 +20,38 @@ export default keymirror({
     editPlayer: null,
     deletePlayer: null,
     addPlayer: null,
-    updateAssets: null,
+    // updateAssets: null,
+    clearAsset: null,
+    toggleCycle: null,
+    setImageSeconds: null,
+    toggleAutoPlay: null,
+    setPlaying: null,
+    setSelectedAssets: null,
+    showNextAsset: null,
+    renderAsset: null,
+    removeAssetAfterTimeout: null,
+});
 
-    // View
+export const View = keymirror({
     setViewPort: null,
+});
 
-    // Global
+export const Global = keymirror({
     clearState: null,
 });
+
+
+export const Remote = keymirror({
+    setEmail: null,
+    setPassword: null,
+    setSync: null,
+    receiveRemoteData: null,
+});
+
+export default {
+    ...Match,
+    ...Controller,
+    ...View,
+    ...Global,
+    ...Remote,
+};

@@ -87,7 +87,7 @@ class TeamAssetController extends Component {
                         key: assetKey,
                         name: player.name,
                         number: player.number,
-                        overlay,
+                        overlay: overlay || '',
                         teamName,
                     };
                 }
@@ -98,7 +98,7 @@ class TeamAssetController extends Component {
             key: `custom-${player.number}-${player.name}`,
             name: player.name,
             number: player.number,
-            overlay,
+            overlay: overlay || '',
             teamName,
         };
     }

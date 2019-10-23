@@ -17,7 +17,14 @@ const actions = {
     [ActionTypes.editPlayer]: (teamId, idx, updatedPlayer) => ({ teamId, idx, updatedPlayer }),
     [ActionTypes.deletePlayer]: (teamId, idx) => ({ teamId, idx }),
     [ActionTypes.addPlayer]: teamId => ({ teamId }),
-    [ActionTypes.updateAssets]: partial => partial,
+    [ActionTypes.toggleCycle]: () => {},
+    [ActionTypes.setImageSeconds]: imageSeconds => ({ imageSeconds }),
+    [ActionTypes.toggleAutoPlay]: () => {},
+    [ActionTypes.removeAssetAfterTimeout]: () => {},
+    [ActionTypes.showNextAsset]: () => {},
+    [ActionTypes.setPlaying]: playing => ({ playing }),
+    [ActionTypes.renderAsset]: asset => ({ asset }),
+    [ActionTypes.setSelectedAssets]: selectedAssets => ({ selectedAssets }),
     [ActionTypes.getAvailableMatches]: (homeTeam, awayTeam) => {
         if (DEBUG) {
             return new Promise(resolve => resolve(lambdaExample));
