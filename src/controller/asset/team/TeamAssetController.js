@@ -18,7 +18,6 @@ import controllerActions from '../../../actions/controller';
 const VIKES = 'Víkingur R';
 
 class TeamAssetController extends Component {
-    // TODO save state in localstorage
     static propTypes = {
         addAssets: PropTypes.func.isRequired,
         match: matchPropType.isRequired,

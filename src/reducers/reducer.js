@@ -1,6 +1,6 @@
 import { combineReducers } from 'redux';
 import { persistReducer } from 'redux-persist';
-import storage from './storage';
+import storage from 'redux-persist/lib/storage';
 
 import match from './match';
 import controller from './controller';
@@ -8,7 +8,7 @@ import controller from './controller';
 const persistConfig = key => ({
     key,
     storage,
-    serialize: false,
+    serialize: true,
 });
 
 export default combineReducers({

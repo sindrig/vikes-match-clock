@@ -19,7 +19,6 @@ import './AssetController.css';
 
 
 class AssetController extends Component {
-    // TODO save state in localstorage
     static propTypes = {
         renderAsset: PropTypes.func.isRequired,
         selectAssetView: PropTypes.func.isRequired,
