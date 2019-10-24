@@ -1,18 +1,12 @@
 import React from 'react';
 import { Provider } from 'react-redux';
 // import { IDBFactory, IDBKeyRange, reset } from 'shelving-mock-indexeddb';
-import { IDBFactory, IDBKeyRange } from 'shelving-mock-indexeddb';
 import configureStore from 'redux-mock-store';
 import Enzyme, { mount } from 'enzyme';
 import Adapter from 'enzyme-adapter-react-16';
 
 
 Enzyme.configure({ adapter: new Adapter() });
-// Create an IDBFactory at window.indexedDB so your code can use IndexedDB.
-window.indexedDB = new IDBFactory();
-
-// Make IDBKeyRange global so your code can create key ranges.
-window.IDBKeyRange = IDBKeyRange;
 
 // I don't think i need this since I don't configure the store to use the persist api
 // Reset the IndexedDB mock before/after tests.
