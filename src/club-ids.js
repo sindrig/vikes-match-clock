@@ -17,6 +17,7 @@ export default {
     'Dalvík 2': '145394',
     'Dalvík': '620',
     'Dalvík-Reynir': '141080',
+    'Derby County': '148273',
     'Drangey': '144312',
     'Draupnir': '142352',
     'Efling': '650',
