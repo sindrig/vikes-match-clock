@@ -160,7 +160,14 @@ const actions = {
     [ActionTypes.receiveRemoteData]: {
         next(state, { data, path }) {
             if (path === 'match' && data) {
-                return { ...state, ...data };
+                const results = { ...state, ...data };
+                if (!data.home2min) {
+                    results.home2min = [];
+                }
+                if (!data.away2min) {
+                    results.away2min = [];
+                }
+                return results;
             }
             return state;
         },
