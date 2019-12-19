@@ -1,3 +1,3 @@
 PAGE=$1;
 shift;
-nativefier $PAGE --full-screen --name Vallarklukka --single-instance --icon src/images/vikes.png "$@"
+nativefier $PAGE --maximize --hide-window-frame --name Vallarklukka --icon src/images/vikes.png "$@"

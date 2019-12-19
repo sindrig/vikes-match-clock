@@ -60,3 +60,7 @@ yarn-error.log*
 /api/ruv/certifi-2019.6.16.dist-info/
 
 /klukka.zip
+
+/ENV.local
+
+/Vallarklukka-win32-x64/
