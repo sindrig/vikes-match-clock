@@ -24,7 +24,7 @@ export const VPS = {
     },
     insidesmall: {
         style: {
-            height: 244,
+            height: 224,
             width: 288,
         },
         key: 'insidesmall',
