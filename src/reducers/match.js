@@ -160,7 +160,13 @@ const actions = {
     [ActionTypes.receiveRemoteData]: {
         next(state, { data, path }) {
             if (path === 'match' && data) {
+                const startedBefore = state.started;
                 const results = { ...state, ...data };
+                const startedAfter = results.started;
+                if (startedAfter > 0 && startedAfter !== startedBefore) {
+                    // Compensate for some small lag
+                    results.started = Date.now() - 200;
+                }
                 if (!data.home2min) {
                     results.home2min = [];
                 }
