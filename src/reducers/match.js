@@ -163,7 +163,8 @@ const actions = {
                 const startedBefore = state.started;
                 const results = { ...state, ...data };
                 const startedAfter = results.started;
-                if (startedAfter > 0 && startedAfter !== startedBefore) {
+                if (startedAfter > 0 && startedBefore === 0) {
+                    // We just pressed start clock. Trust our own time.
                     // Compensate for some small lag
                     results.started = Date.now() - 200;
                 }
