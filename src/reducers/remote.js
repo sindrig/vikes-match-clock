@@ -7,6 +7,19 @@ export const initialState = {
     password: '',
     sync: false,
     syncedData: null,
+    listenPrefix: '',
+};
+
+const handleRemote = {
+    next(state, { data, path }) {
+        if (path === 'listeners' && data && data.available && !state.listenPrefix) {
+            return {
+                ...state,
+                listenPrefix: data.available.split(',')[0],
+            };
+        }
+        return state;
+    },
 };
 
 
@@ -26,5 +39,14 @@ const actions = {
             return { ...state, sync };
         },
     },
+    [ActionTypes.setListenPrefix]: {
+        next(state, { payload: { listenPrefix } }) {
+            console.log('listen', listenPrefix);
+            return { ...state, listenPrefix };
+        },
+    },
+    [ActionTypes.receiveRemoteData]: handleRemote,
+    // This can't be triggered by changing UI, so we need to listen here as well
+    '@@reactReduxFirebase/SET': handleRemote,
 };
 export default handleActions(actions, initialState);

@@ -11,11 +11,24 @@ const style = {
 };
 
 const StateListener = ({
-    sync,
+    sync, listenPrefix,
 }) => {
-    useFirebaseConnect([
-        'match', 'controller',
-    ]);
+    const listens = ['listeners'];
+    if (listenPrefix) {
+        listens.push(
+            {
+                path: `${listenPrefix}/match`,
+                storeAs: 'match',
+            },
+        );
+        listens.push(
+            {
+                path: `${listenPrefix}/controller`,
+                storeAs: 'controller',
+            },
+        );
+    }
+    useFirebaseConnect(listens);
     const fbstate = useSelector(state => state.firebase.data);
     if (sync) {
         const txt = isLoaded(fbstate)
@@ -28,6 +41,7 @@ const StateListener = ({
 
 StateListener.propTypes = {
     sync: PropTypes.bool,
+    listenPrefix: PropTypes.string.isRequired,
 };
 
 StateListener.defaultProps = {
@@ -35,5 +49,5 @@ StateListener.defaultProps = {
 };
 
 
-const stateToProps = ({ remote: { sync } }) => ({ sync });
+const stateToProps = ({ remote: { sync, listenPrefix } }) => ({ sync, listenPrefix });
 export default connect(stateToProps)(StateListener);

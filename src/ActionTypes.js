@@ -45,6 +45,7 @@ export const Remote = keymirror({
     setEmail: null,
     setPassword: null,
     setSync: null,
+    setListenPrefix: null,
     receiveRemoteData: null,
 });
 
