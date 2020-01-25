@@ -31,7 +31,9 @@ class TimeoutClock extends Component {
         }
         const millisLeft = 60000 - (Date.now() - timeout);
         if (millisLeft <= 0) {
-            removeTimeout({ playBuzzer: true });
+            // Allow us to update time first so we don't try state update on
+            // unmounted clock.
+            setTimeout(() => removeTimeout({ playBuzzer: true }), 10);
         }
         return formatMillisAsTime(millisLeft);
     }
