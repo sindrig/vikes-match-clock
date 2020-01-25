@@ -41,7 +41,6 @@ const actions = {
     },
     [ActionTypes.setListenPrefix]: {
         next(state, { payload: { listenPrefix } }) {
-            console.log('listen', listenPrefix);
             return { ...state, listenPrefix };
         },
     },
