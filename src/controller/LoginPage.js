@@ -139,8 +139,12 @@ class LoginPage extends Component {
 }
 
 
-const stateToProps = ({ remote: { email, password, sync, listenPrefix }, listeners: { available } }) => ({
-    email, password, sync, listenPrefix, available: available,
+const stateToProps = ({
+    remote: {
+        email, password, sync, listenPrefix,
+    }, listeners: { available },
+}) => ({
+    email, password, sync, listenPrefix, available,
 });
 const dispatchToProps = dispatch => bindActionCreators({
     setEmail: remoteActions.setEmail,

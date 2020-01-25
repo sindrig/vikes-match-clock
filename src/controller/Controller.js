@@ -20,7 +20,7 @@ import './Controller.css';
 const confirmRefresh = () => confirm('Are you absolutely sure?');
 
 const Controller = ({
-    selectView, renderAsset, clearState, view, vp, setViewPort, sync, firebase,
+    selectView, renderAsset, currentAsset, clearState, view, vp, setViewPort, sync, firebase,
 }) => {
     const left = vp.style.width + 70;
     const currentViewPortName = Object.keys(VPS)
@@ -28,38 +28,31 @@ const Controller = ({
             VPS[key].style.height === vp.style.height
             && VPS[key].style.width === vp.style.width
         ))[0];
-    if (sync && !firebase.auth().currentUser) {
-        return <div className="controller" style={{ left }}><LoginPage /></div>;
-    }
+    const showControls = !sync || firebase.auth().currentUser;
     return (
         <div className="controller" style={{ left }}>
-            <MatchActions />
-            <AssetController />
+            {showControls && <MatchActions />}
+            {showControls && <AssetController />}
             <div className="page-actions control-item" style={{ left: -left, top: vp.style.height, width: vp.style.width }}>
-                <div className="view-selector">
-                    {Object.keys(VIEWS).map(VIEW => (
-                        <label htmlFor={`view-selector-${VIEW}`} key={VIEW}>
-                            <input
-                                type="radio"
-                                value={VIEW}
-                                checked={VIEW === view ? 'checked' : false}
-                                onChange={e => selectView(e.target.value)}
-                                className="view-selector-input"
-                                id={`view-selector-${VIEW}`}
-                                name="view-selector"
-                            />
-                            {VIEW}
-                        </label>
-                    ))}
-                </div>
-                <button
-                    type="button"
-                    onClick={() => confirmRefresh() && clearState()
-                        .then(() => window.location.reload())}
-                >
-                    Hard refresh
-                </button>
-                <button type="button" onClick={() => renderAsset(0)}>Hreinsa núverandi mynd</button>
+                {showControls && (
+                    <div className="view-selector">
+                        {Object.keys(VIEWS).map(VIEW => (
+                            <label htmlFor={`view-selector-${VIEW}`} key={VIEW}>
+                                <input
+                                    type="radio"
+                                    value={VIEW}
+                                    checked={VIEW === view ? 'checked' : false}
+                                    onChange={e => selectView(e.target.value)}
+                                    className="view-selector-input"
+                                    id={`view-selector-${VIEW}`}
+                                    name="view-selector"
+                                />
+                                {VIEW}
+                            </label>
+                        ))}
+                    </div>
+                )}
+                {showControls && currentAsset && <button type="button" onClick={() => renderAsset(0)}>Hreinsa núverandi mynd</button>}
                 <div className="viewport-select">
                     <select
                         value={currentViewPortName}
@@ -75,6 +68,13 @@ const Controller = ({
                         ))}
                     </select>
                 </div>
+                <button
+                    type="button"
+                    onClick={() => confirmRefresh() && clearState()
+                        .then(() => window.location.reload())}
+                >
+                    Hard refresh
+                </button>
                 <LoginPage />
             </div>
         </div>
@@ -92,18 +92,26 @@ Controller.propTypes = {
     firebase: PropTypes.shape({
         auth: PropTypes.func.isRequired,
     }),
+    currentAsset: PropTypes.shape({
+        asset: PropTypes.shape({
+            key: PropTypes.string.isRequired,
+            type: PropTypes.string.isRequired,
+        }).isRequired,
+        time: PropTypes.number,
+    }),
 };
 
 Controller.defaultProps = {
     sync: false,
     firebase: null,
+    currentAsset: null,
 };
 
 
 const stateToProps = ({
-    controller: { view }, match, view: { vp }, remote: { sync },
+    controller: { view, currentAsset }, match, view: { vp }, remote: { sync },
 }) => ({
-    view, match, vp, sync,
+    view, match, vp, sync, currentAsset: currentAsset || null,
 });
 
 const dispatchToProps = dispatch => bindActionCreators({
