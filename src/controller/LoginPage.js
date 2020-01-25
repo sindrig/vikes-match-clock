@@ -16,12 +16,16 @@ class LoginPage extends Component {
         firebase: PropTypes.shape({
             auth: PropTypes.func.isRequired,
         }).isRequired,
+        available: PropTypes.arrayOf(PropTypes.string),
+        listenPrefix: PropTypes.string.isRequired,
+        setListenPrefix: PropTypes.func.isRequired,
     };
 
     static defaultProps = {
         password: '',
         email: '',
         sync: false,
+        available: [],
     };
 
     constructor(props) {
@@ -55,6 +59,24 @@ class LoginPage extends Component {
         );
     }
 
+    renderListenerCtrl() {
+        const { setListenPrefix, available, listenPrefix } = this.props;
+        if (!available) {
+            return null;
+        }
+        return (
+            <div>
+                Stjórnandi:
+                <select
+                    onChange={({ target: { value } }) => setListenPrefix(value)}
+                    value={listenPrefix}
+                >
+                    {available.map(a => <option value={a} key={a}>{a}</option>)}
+                </select>
+            </div>
+        );
+    }
+
     render() {
         const {
             password, email, setEmail, setPassword, firebase,
@@ -64,6 +86,9 @@ class LoginPage extends Component {
             return (
                 <div>
                     {this.renderIsRemoteCtrl()}
+                    [
+                    <b>{currentUser.email.split('@')[0]}</b>
+                    ]
                     <br />
                     <button type="button" onClick={() => firebase.logout().then(this.checkUserLoggedIn)}>Log out...</button>
                 </div>
@@ -80,6 +105,7 @@ class LoginPage extends Component {
                     <div>
                         {this.renderIsRemoteCtrl()}
                     </div>
+                    {this.renderListenerCtrl()}
                     <div>
                         <input
                             name="email"
@@ -113,11 +139,14 @@ class LoginPage extends Component {
 }
 
 
-const stateToProps = ({ remote: { email, password, sync } }) => ({ email, password, sync });
+const stateToProps = ({ remote: { email, password, sync, listenPrefix }, listeners: { available } }) => ({
+    email, password, sync, listenPrefix, available: available,
+});
 const dispatchToProps = dispatch => bindActionCreators({
     setEmail: remoteActions.setEmail,
     setPassword: remoteActions.setPassword,
     setSync: remoteActions.setSync,
+    setListenPrefix: remoteActions.setListenPrefix,
 }, dispatch);
 
 export default withFirebase(connect(stateToProps, dispatchToProps)(LoginPage));

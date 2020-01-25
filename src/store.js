@@ -20,12 +20,15 @@ const firebaseMiddleware = store => next => (action) => {
         firebase = null;
     }
     if (firebase && sync) {
-        if (firebase.auth().currentUser) {
+        const { currentUser } = firebase.auth();
+        if (currentUser) {
+            const { email } = currentUser;
+            const userPrefix = email.split('@')[0];
             if (Match[type]) {
-                firebase.set('match', match);
+                firebase.set(`${userPrefix}/match`, match);
             }
             if (Controller[type]) {
-                firebase.set('controller', controller);
+                firebase.set(`${userPrefix}/controller`, controller);
             }
         }
         if (type === rrfActionTypes.SET) {

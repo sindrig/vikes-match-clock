@@ -7,6 +7,7 @@ import match from './match';
 import controller from './controller';
 import view from './view';
 import remote from './remote';
+import listeners from './listeners';
 
 const persistConfig = key => ({
     key,
@@ -19,5 +20,6 @@ export default combineReducers({
     controller: persistReducer(persistConfig('controller'), controller),
     view: persistReducer(persistConfig('view'), view),
     remote: persistReducer(persistConfig('remote'), remote),
+    listeners,
     firebase: firebaseReducer,
 });

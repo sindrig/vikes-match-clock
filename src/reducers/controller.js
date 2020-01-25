@@ -197,7 +197,6 @@ const actions = {
     },
     [ActionTypes.setSelectedAssets]: {
         next(state, { payload: { selectedAssets } }) {
-            console.log('selectedAssets', selectedAssets || []);
             return {
                 ...state,
                 selectedAssets: selectedAssets || [],
