@@ -12,6 +12,7 @@ class TimeoutClock extends Component {
     static propTypes = {
         timeout: PropTypes.number,
         removeTimeout: PropTypes.func.isRequired,
+        buzz: PropTypes.func.isRequired,
         className: PropTypes.string.isRequired,
     };
 
@@ -22,18 +23,28 @@ class TimeoutClock extends Component {
     constructor(props) {
         super(props);
         this.updateTime = this.updateTime.bind(this);
+        this.state = {
+            warningPlayed: false,
+        };
     }
 
     updateTime() {
-        const { timeout, removeTimeout } = this.props;
+        const { timeout, removeTimeout, buzz } = this.props;
         if (!timeout) {
             return null;
         }
-        const millisLeft = 60000 - (Date.now() - timeout);
+        const { warningPlayed } = this.state;
+        const millisLeft = 60000 - (Date.now() - timeout) + 1000;
         if (millisLeft <= 0) {
             // Allow us to update time first so we don't try state update on
             // unmounted clock.
+            buzz(true);
+            setTimeout(() => buzz(false), 3000);
             setTimeout(() => removeTimeout({ playBuzzer: true }), 10);
+        } else if (!warningPlayed && millisLeft <= 10000) {
+            this.setState({ warningPlayed: true });
+            buzz(true);
+            setTimeout(() => buzz(false), 3000);
         }
         return formatMillisAsTime(millisLeft);
     }
@@ -65,6 +76,7 @@ const stateToProps = ({
 
 const dispatchToProps = dispatch => bindActionCreators({
     removeTimeout: matchActions.removeTimeout,
+    buzz: matchActions.buzz,
 }, dispatch);
 
 export default connect(stateToProps, dispatchToProps)(TimeoutClock);

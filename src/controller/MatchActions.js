@@ -44,7 +44,7 @@ const clockManipulationBox = (seconds, match, updateMatch) => {
 };
 
 const MatchActions = ({
-    view, match, updateMatch, pauseMatch, matchTimeout, removeTimeout,
+    view, match, updateMatch, pauseMatch, matchTimeout, removeTimeout, buzz,
 }) => (
     <div className="control-item">
         {view === VIEWS.match && (
@@ -159,7 +159,7 @@ const MatchActions = ({
                     <div className="control-item">
                         { match.timeout
                             ? <button type="button" onClick={removeTimeout}>Eyða Leikhlé</button>
-                            : <button type="button" onClick={() => matchTimeout() && pauseMatch()}>Leikhlé</button>
+                            : <button type="button" onClick={() => pauseMatch() && buzz(true) && matchTimeout()}>Leikhlé</button>
                         }
                     </div>
                 ) : null
@@ -174,6 +174,7 @@ MatchActions.propTypes = {
     pauseMatch: PropTypes.func.isRequired,
     matchTimeout: PropTypes.func.isRequired,
     removeTimeout: PropTypes.func.isRequired,
+    buzz: PropTypes.func.isRequired,
     match: matchPropType.isRequired,
     view: PropTypes.string.isRequired,
 };
@@ -185,6 +186,7 @@ const dispatchToProps = dispatch => bindActionCreators({
     pauseMatch: matchActions.pauseMatch,
     matchTimeout: matchActions.matchTimeout,
     removeTimeout: matchActions.removeTimeout,
+    buzz: matchActions.buzz,
 }, dispatch);
 
 export default connect(stateToProps, dispatchToProps)(MatchActions);

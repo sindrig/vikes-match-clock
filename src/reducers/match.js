@@ -157,6 +157,17 @@ const actions = {
         },
     },
     [ActionTypes.removeTimeout]: {
+        next(state, { error }) {
+            if (error) {
+                return { ...state, error };
+            }
+            return {
+                ...state,
+                timeout: 0,
+            };
+        },
+    },
+    [ActionTypes.buzz]: {
         next(state, { payload, error }) {
             if (error) {
                 return { ...state, error };
@@ -164,11 +175,10 @@ const actions = {
             if (!payload) {
                 return { ...state, pending: true };
             }
-            const { buzzer } = payload;
+            const { buzz } = payload;
             return {
                 ...state,
-                timeout: 0,
-                buzzer: buzzer ? Date.now() : false,
+                buzzer: buzz ? Date.now() : false,
             };
         },
     },

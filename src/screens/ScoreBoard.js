@@ -39,7 +39,8 @@ const ScoreBoard = ({ match, vp }) => (
         {match.timeout ? <TimeoutClock className="clock timeoutclock" /> : null}
         {match.matchType === SPORTS.handball
             && match.buzzer
-            && (Date.now() - match.buzzer) < 5000
+            && (Date.now() - match.buzzer) < 3000
+            && (Date.now() - match.buzzer) > 0
             && <audio src={buzzer} autoPlay />}
     </div>
 );

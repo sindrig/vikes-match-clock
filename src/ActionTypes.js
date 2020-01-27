@@ -9,6 +9,7 @@ export const Match = keymirror({
     setHalfStops: null,
     matchTimeout: null,
     removeTimeout: null,
+    buzz: null,
 });
 
 export const Controller = keymirror({

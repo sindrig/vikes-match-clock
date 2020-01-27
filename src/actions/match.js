@@ -16,7 +16,8 @@ const actions = {
     [ActionTypes.setHalfStops]: halfStops => ({ halfStops }),
     [ActionTypes.updateHalfLength]: (currentValue, newValue) => ({ currentValue, newValue }),
     [ActionTypes.matchTimeout]: () => {},
-    [ActionTypes.removeTimeout]: options => ({ buzzer: options && options.playBuzzer }),
+    [ActionTypes.buzz]: buzz => ({ buzz }),
+    [ActionTypes.removeTimeout]: () => {},
 };
 
 Object.keys(actions).forEach((type) => {
