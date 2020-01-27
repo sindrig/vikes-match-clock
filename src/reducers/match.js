@@ -95,7 +95,6 @@ const actions = {
             const newState = {
                 ...state,
                 started: 0,
-                buzzer: isHalfEnd ? Date.now() : false,
             };
             if (isHalfEnd) {
                 newState.timeElapsed = newState.halfStops[0] * 60 * 1000;
@@ -175,10 +174,10 @@ const actions = {
             if (!payload) {
                 return { ...state, pending: true };
             }
-            const { buzz } = payload;
+            const { on } = payload;
             return {
                 ...state,
-                buzzer: buzz ? Date.now() : false,
+                buzzer: on ? Date.now() : false,
             };
         },
     },

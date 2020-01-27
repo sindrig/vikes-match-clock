@@ -36,15 +36,13 @@ class TimeoutClock extends Component {
         const { warningPlayed } = this.state;
         const millisLeft = 60000 - (Date.now() - timeout) + 1000;
         if (millisLeft <= 0) {
+            buzz();
             // Allow us to update time first so we don't try state update on
             // unmounted clock.
-            buzz(true);
-            setTimeout(() => buzz(false), 3000);
-            setTimeout(() => removeTimeout({ playBuzzer: true }), 10);
+            setTimeout(removeTimeout, 10);
         } else if (!warningPlayed && millisLeft <= 10000) {
             this.setState({ warningPlayed: true });
-            buzz(true);
-            setTimeout(() => buzz(false), 3000);
+            buzz();
         }
         return formatMillisAsTime(millisLeft);
     }

@@ -159,7 +159,7 @@ const MatchActions = ({
                     <div className="control-item">
                         { match.timeout
                             ? <button type="button" onClick={removeTimeout}>Eyða Leikhlé</button>
-                            : <button type="button" onClick={() => pauseMatch() && buzz(true) && matchTimeout()}>Leikhlé</button>
+                            : <button type="button" onClick={() => pauseMatch() && buzz() && matchTimeout()}>Leikhlé</button>
                         }
                     </div>
                 ) : null

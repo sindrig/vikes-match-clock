@@ -1,6 +1,7 @@
 import { createStore, applyMiddleware, compose } from 'redux';
 import { persistStore } from 'redux-persist';
 import promiseMiddleware from 'redux-promise-middleware';
+import thunk from 'redux-thunk';
 import { getFirebase, actionTypes as rrfActionTypes } from 'react-redux-firebase';
 import reducer from './reducers/reducer';
 import {
@@ -48,7 +49,7 @@ export const store = createStore(
     reducer,
     {},
     compose(
-        applyMiddleware(promiseMiddleware, firebaseMiddleware),
+        applyMiddleware(thunk, promiseMiddleware, firebaseMiddleware),
         devTools,
     ),
 );

@@ -16,12 +16,17 @@ const actions = {
     [ActionTypes.setHalfStops]: halfStops => ({ halfStops }),
     [ActionTypes.updateHalfLength]: (currentValue, newValue) => ({ currentValue, newValue }),
     [ActionTypes.matchTimeout]: () => {},
-    [ActionTypes.buzz]: buzz => ({ buzz }),
     [ActionTypes.removeTimeout]: () => {},
 };
 
 Object.keys(actions).forEach((type) => {
     actions[type] = createAction(type, actions[type]);
 });
+
+actions.buzz = () => (dispatch) => {
+    dispatch({ type: ActionTypes.buzz, payload: { on: true } });
+    setTimeout(() => dispatch({ type: ActionTypes.buzz, payload: { on: false } }), 3000);
+    return true;
+};
 
 export default actions;

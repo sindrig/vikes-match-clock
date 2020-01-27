@@ -21,7 +21,8 @@
     "redux": "4.0.1",
     "redux-actions": "2.6.5",
     "redux-persist": "5.10.0",
-    "redux-promise-middleware": "6.1.0"
+    "redux-promise-middleware": "6.1.0",
+    "redux-thunk": "^2.3.0"
   },
   "devDependencies": {
     "cypress": "^3.5.0",
