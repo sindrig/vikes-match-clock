@@ -1,14 +1,14 @@
 import { handleActions } from 'redux-actions';
 import ActionTypes from '../ActionTypes';
 import clubIds from '../club-ids';
-import { SPORTS, HALFSTOPS } from '../constants';
+import { SPORTS, DEFAULT_HALFSTOPS } from '../constants';
 
 export const initialState = {
     homeScore: 0,
     awayScore: 0,
     started: 0,
     timeElapsed: 0,
-    halfStops: HALFSTOPS[SPORTS.football],
+    halfStops: DEFAULT_HALFSTOPS[SPORTS.football],
     homeTeam: 'Víkingur R',
     awayTeam: '',
     homeTeamId: 103,
@@ -41,7 +41,7 @@ const actions = {
                 newState.matchType = SPORTS.football;
             }
             if (newState.matchType !== state.matchType) {
-                newState.halfStops = HALFSTOPS[newState.matchType];
+                newState.halfStops = DEFAULT_HALFSTOPS[newState.matchType];
             }
             if (newState.started && !state.started) {
                 newState.buzzer = false;
@@ -127,6 +127,21 @@ const actions = {
                 ...state,
                 halfStops: state.halfStops
                     .map(v => (v === currentValueParsed ? newValueParsed : v)),
+            };
+        },
+    },
+    [ActionTypes.setHalfStops]: {
+        next(state, { error, payload }) {
+            if (error) {
+                return { ...state, error };
+            }
+            if (!payload) {
+                return { ...state, pending: true };
+            }
+            const { halfStops } = payload;
+            return {
+                ...state,
+                halfStops,
             };
         },
     },

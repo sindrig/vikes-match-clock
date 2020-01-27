@@ -13,6 +13,7 @@ const actions = {
     [ActionTypes.addTimeout]: ({ team, penaltyLength }) => ({ team, key: uuidv4(), penaltyLength }),
     [ActionTypes.removePenalty]: key => ({ key }),
     [ActionTypes.pauseMatch]: options => ({ isHalfEnd: options && options.isHalfEnd }),
+    [ActionTypes.setHalfStops]: halfStops => ({ halfStops }),
     [ActionTypes.updateHalfLength]: (currentValue, newValue) => ({ currentValue, newValue }),
     [ActionTypes.matchTimeout]: () => {},
     [ActionTypes.removeTimeout]: options => ({ buzzer: options && options.playBuzzer }),

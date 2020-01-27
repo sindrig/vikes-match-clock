@@ -6,6 +6,7 @@ export const Match = keymirror({
     addTimeout: null,
     pauseMatch: null,
     updateHalfLength: null,
+    setHalfStops: null,
     matchTimeout: null,
     removeTimeout: null,
 });

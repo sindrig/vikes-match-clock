@@ -8,7 +8,7 @@ import { matchPropType } from '../propTypes';
 import TeamSelector from './TeamSelector';
 import TimeOutManipulationBox from './TimeOutManipulationBox';
 import { VIEWS } from '../reducers/controller';
-import { SPORTS, HALFSTOPS } from '../constants';
+import { SPORTS, DEFAULT_HALFSTOPS } from '../constants';
 import HalfStops from './HalfStops';
 
 const roundMillisToSeconds = millis => Math.floor(millis / 1000) * 1000;
@@ -98,12 +98,12 @@ const MatchActions = ({
                             away2min: [],
                             timeout: 0,
                             buzzer: false,
-                            halfStops: HALFSTOPS[match.matchType],
+                            halfStops: DEFAULT_HALFSTOPS[match.matchType],
                         })}
                         disabled={
                             !match.started
                             && !match.timeElapsed
-                            && HALFSTOPS[match.matchType][0] === match.halfStops[0]
+                            && DEFAULT_HALFSTOPS[match.matchType][0] === match.halfStops[0]
                             && !match.timeout
                         }
                     >
@@ -125,7 +125,6 @@ const MatchActions = ({
                         ) : null
                     }
                     <div>
-                        Klukkustopp:
                         <HalfStops />
                     </div>
                 </div>
