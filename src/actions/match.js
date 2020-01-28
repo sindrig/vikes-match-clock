@@ -1,5 +1,6 @@
 import { createAction } from 'redux-actions';
 import ActionTypes from '../ActionTypes';
+import { PENALTY_LENGTH } from '../constants';
 
 const uuidv4 = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
     const r = Math.random() * 16 | 0; // eslint-disable-line
@@ -10,12 +11,18 @@ const uuidv4 = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c)
 
 const actions = {
     [ActionTypes.updateMatch]: partial => partial,
-    [ActionTypes.addTimeout]: ({ team, penaltyLength }) => ({ team, key: uuidv4(), penaltyLength }),
+    [ActionTypes.addPenalty]: ({ team, penaltyLength }) => ({
+        team,
+        key: uuidv4(),
+        penaltyLength: penaltyLength || PENALTY_LENGTH,
+    }),
     [ActionTypes.removePenalty]: key => ({ key }),
     [ActionTypes.pauseMatch]: options => ({ isHalfEnd: options && options.isHalfEnd }),
+    [ActionTypes.startMatch]: () => {},
     [ActionTypes.setHalfStops]: halfStops => ({ halfStops }),
     [ActionTypes.updateHalfLength]: (currentValue, newValue) => ({ currentValue, newValue }),
     [ActionTypes.removeTimeout]: () => {},
+    [ActionTypes.addGoal]: ({ team }) => ({ team }),
 };
 
 Object.keys(actions).forEach((type) => {

@@ -13,11 +13,10 @@ const teamToTimeoutKey = team => `${team}2min`;
 const translateTeam = team => ({ home: 'Heima', away: 'Úti' }[team] || team);
 
 const MAX_TIMEOUTS_PER_TEAM = 4;
-const penaltyLength = 2 * 60 * 1000;
 
 
-const TimeOutManipulationBox = ({
-    penalties, team, addTimeout, started, removePenalty,
+const PenaltiesManipulationBox = ({
+    penalties, team, addPenalty, started, removePenalty,
 }) => (
     <div className="penalty-manipulation">
         {penalties.map(({ key, atTimeElapsed }) => (
@@ -27,7 +26,7 @@ const TimeOutManipulationBox = ({
         ))}
         <button
             type="button"
-            onClick={() => addTimeout({ team, penaltyLength })}
+            onClick={() => addPenalty({ team })}
             disabled={penalties.length >= MAX_TIMEOUTS_PER_TEAM || started}
             className="add-penalty"
         >
@@ -36,15 +35,15 @@ const TimeOutManipulationBox = ({
     </div>
 );
 
-TimeOutManipulationBox.propTypes = {
+PenaltiesManipulationBox.propTypes = {
     penalties: PropTypes.arrayOf(twoMinPropType).isRequired,
     team: PropTypes.string.isRequired,
-    addTimeout: PropTypes.func.isRequired,
+    addPenalty: PropTypes.func.isRequired,
     removePenalty: PropTypes.func.isRequired,
     started: PropTypes.number,
 };
 
-TimeOutManipulationBox.defaultProps = {
+PenaltiesManipulationBox.defaultProps = {
     started: null,
 };
 
@@ -55,8 +54,8 @@ const stateToProps = ({ match }, { team }) => ({
     started: match.started,
 });
 const dispatchToProps = dispatch => bindActionCreators({
-    addTimeout: matchActions.addTimeout,
+    addPenalty: matchActions.addPenalty,
     removePenalty: matchActions.removePenalty,
 }, dispatch);
 
-export default connect(stateToProps, dispatchToProps)(TimeOutManipulationBox);
+export default connect(stateToProps, dispatchToProps)(PenaltiesManipulationBox);

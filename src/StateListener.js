@@ -3,12 +3,7 @@ import PropTypes from 'prop-types';
 import { useSelector, connect } from 'react-redux';
 import { useFirebaseConnect, isLoaded } from 'react-redux-firebase';
 
-const style = {
-    textAlign: 'right',
-    width: '20%',
-    position: 'absolute',
-    right: 0,
-};
+import './StateListener.css';
 
 const StateListener = ({
     sync, listenPrefix,
@@ -31,10 +26,9 @@ const StateListener = ({
     useFirebaseConnect(listens);
     const fbstate = useSelector(state => state.firebase.data);
     if (sync) {
-        const txt = isLoaded(fbstate)
-            ? 'Connected!'
-            : 'Loading remote...';
-        return <div style={style}>{txt}</div>;
+        if (isLoaded(fbstate)) {
+            return <div className="connect-indicator">&#8226;</div>;
+        }
     }
     return null;
 };

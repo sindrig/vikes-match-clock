@@ -7,6 +7,8 @@ import matchActions from '../actions/match';
 
 import { formatMillisAsTime } from '../utils/timeUtils';
 import ClockBase from './ClockBase';
+import { TIMEOUT_LENGTH } from '../constants';
+
 
 class TimeoutClock extends Component {
     static propTypes = {
@@ -34,7 +36,7 @@ class TimeoutClock extends Component {
             return null;
         }
         const { warningPlayed } = this.state;
-        const millisLeft = 60000 - (Date.now() - timeout) + 1000;
+        const millisLeft = TIMEOUT_LENGTH - (Date.now() - timeout) + 1000;
         if (millisLeft <= 0) {
             buzz();
             // Allow us to update time first so we don't try state update on
@@ -56,7 +58,7 @@ class TimeoutClock extends Component {
                 updateTime={this.updateTime}
                 isTimeNull={false}
                 className={className}
-                zeroTime={60000}
+                zeroTime={TIMEOUT_LENGTH}
                 fontSizeMin="1.3rem"
                 fontSizeMax="1.5rem"
             />

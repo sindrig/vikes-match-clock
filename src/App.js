@@ -17,6 +17,7 @@ import { BACKGROUND } from './constants';
 import { VIEWS } from './reducers/controller';
 import { viewPortPropType } from './propTypes';
 import StateListener from './StateListener';
+import MatchController from './match-controller/MatchController';
 
 import './App.css';
 
@@ -75,12 +76,8 @@ class App extends Component {
         return this;
     }
 
-    renderCurrentView() {
-        const { view, sync, auth } = this.props;
-        if (view === VIEWS.control && (sync ? auth.isLoaded && !auth.isEmpty : true)) {
-            return 'hahaha';
-        }
-
+    renderAppContents() {
+        const { view } = this.props;
         switch (view) {
         case VIEWS.match:
         case VIEWS.control:
@@ -91,21 +88,28 @@ class App extends Component {
         }
     }
 
-    render() {
-        const { vp, asset } = this.props;
+    renderCurrentView() {
+        const {
+            view, sync, auth, vp, asset,
+        } = this.props;
         const style = {
             ...BACKGROUND,
             ...vp.style,
         };
+        if (view === VIEWS.control && (sync ? auth.isLoaded && !auth.isEmpty : true)) {
+            // Need scoreboard because there's business logic in there.
+            return (
+                <React.Fragment>
+                    <MatchController />
+                    <div style={{ display: 'none' }}><ScoreBoard /></div>
+                </React.Fragment>
+            );
+        }
+
         return (
-            <Shortcuts
-                name="MAIN"
-                handler={this.handleShortcuts}
-                global
-                targetNodeSelector="body"
-            >
+            <React.Fragment>
                 <div className="App" style={style}>
-                    {this.renderCurrentView()}
+                    {this.renderAppContents()}
                 </div>
                 <Controller />
                 { asset ? (
@@ -114,6 +118,19 @@ class App extends Component {
                     </div>
                 ) : null
                 }
+            </React.Fragment>
+        );
+    }
+
+    render() {
+        return (
+            <Shortcuts
+                name="MAIN"
+                handler={this.handleShortcuts}
+                global
+                targetNodeSelector="body"
+            >
+                {this.renderCurrentView()}
                 <StateListener />
             </Shortcuts>
         );

@@ -111,9 +111,9 @@ Controller.defaultProps = {
 
 
 const stateToProps = ({
-    controller: { view, currentAsset }, match, view: { vp }, remote: { sync }, firebase: { auth },
+    controller: { view, currentAsset }, view: { vp }, remote: { sync }, firebase: { auth },
 }) => ({
-    view, match, vp, sync, currentAsset: currentAsset || null, auth,
+    view, vp, sync, currentAsset: currentAsset || null, auth,
 });
 
 const dispatchToProps = dispatch => bindActionCreators({

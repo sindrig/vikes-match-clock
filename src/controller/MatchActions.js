@@ -6,7 +6,7 @@ import { bindActionCreators } from 'redux';
 import matchActions from '../actions/match';
 import { matchPropType } from '../propTypes';
 import TeamSelector from './TeamSelector';
-import TimeOutManipulationBox from './TimeOutManipulationBox';
+import PenaltiesManipulationBox from './PenaltiesManipulationBox';
 import { VIEWS } from '../reducers/controller';
 import { SPORTS, DEFAULT_HALFSTOPS } from '../constants';
 import HalfStops from './HalfStops';
@@ -46,31 +46,31 @@ const clockManipulationBox = (seconds, match, updateMatch) => {
 };
 
 const MatchActions = ({
-    view, match, updateMatch, pauseMatch, matchTimeout, removeTimeout,
+    view, match, updateMatch, pauseMatch, matchTimeout, removeTimeout, startMatch, addGoal,
 }) => (
     <div className="control-item">
         {view === VIEWS.match && (
             <div>
                 <div className="control-item">
-                    <button type="button" onClick={() => updateMatch({ homeScore: match.homeScore + 1 })} disabled={match.timeout}>
+                    <button type="button" onClick={() => addGoal({ team: 'home' })}>
                         Heima +1
                     </button>
                     <button
                         type="button"
                         onClick={() => updateMatch({ homeScore: match.homeScore - 1 })}
-                        disabled={match.homeScore <= 0 || match.timeout}
+                        disabled={match.homeScore <= 0}
                     >
                         Heima -1
                     </button>
                 </div>
                 <div className="control-item">
-                    <button type="button" onClick={() => updateMatch({ awayScore: match.awayScore + 1 })} disabled={match.timeout}>
+                    <button type="button" onClick={() => addGoal({ team: 'away' })}>
                         Úti +1
                     </button>
                     <button
                         type="button"
                         onClick={() => updateMatch({ awayScore: match.awayScore - 1 })}
-                        disabled={match.awayScore <= 0 || match.timeout}
+                        disabled={match.awayScore <= 0}
                     >
                         Úti -1
                     </button>
@@ -86,7 +86,7 @@ const MatchActions = ({
                     ) : (
                         <button
                             type="button"
-                            onClick={() => updateMatch({ started: Date.now() })}
+                            onClick={startMatch}
                             disabled={match.timeout}
                         >
                             Byrja
@@ -153,8 +153,8 @@ const MatchActions = ({
                 {
                     match.matchType === SPORTS.handball ? (
                         <div>
-                            <TimeOutManipulationBox team="home" />
-                            <TimeOutManipulationBox team="away" />
+                            <PenaltiesManipulationBox team="home" />
+                            <PenaltiesManipulationBox team="away" />
                         </div>
                     ) : null
                 }
@@ -185,6 +185,8 @@ const MatchActions = ({
 MatchActions.propTypes = {
     updateMatch: PropTypes.func.isRequired,
     pauseMatch: PropTypes.func.isRequired,
+    startMatch: PropTypes.func.isRequired,
+    addGoal: PropTypes.func.isRequired,
     matchTimeout: PropTypes.func.isRequired,
     removeTimeout: PropTypes.func.isRequired,
     match: matchPropType.isRequired,
@@ -196,6 +198,8 @@ const stateToProps = ({ controller: { view }, match }) => ({ view, match });
 const dispatchToProps = dispatch => bindActionCreators({
     updateMatch: matchActions.updateMatch,
     pauseMatch: matchActions.pauseMatch,
+    startMatch: matchActions.startMatch,
+    addGoal: matchActions.addGoal,
     matchTimeout: matchActions.matchTimeout,
     removeTimeout: matchActions.removeTimeout,
 }, dispatch);

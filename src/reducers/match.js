@@ -51,7 +51,7 @@ const actions = {
             return newState;
         },
     },
-    [ActionTypes.addTimeout]: {
+    [ActionTypes.addPenalty]: {
         next(state, { payload, error }) {
             if (error) {
                 return { ...state, error };
@@ -108,6 +108,14 @@ const actions = {
                     + Math.floor((Date.now() - state.started));
             }
             return newState;
+        },
+    },
+    [ActionTypes.startMatch]: {
+        next(state) {
+            return {
+                ...state,
+                started: Date.now(),
+            };
         },
     },
     [ActionTypes.updateHalfLength]: {
@@ -186,6 +194,16 @@ const actions = {
             return {
                 ...state,
                 buzzer: on ? Date.now() : false,
+            };
+        },
+    },
+
+    [ActionTypes.addGoal]: {
+        next(state, { payload: { team } }) {
+            const key = `${team}Score`;
+            return {
+                ...state,
+                [key]: state[key] + 1,
             };
         },
     },

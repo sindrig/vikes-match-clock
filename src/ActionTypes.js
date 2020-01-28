@@ -3,13 +3,15 @@ import keymirror from 'keymirror';
 export const Match = keymirror({
     updateMatch: null,
     removePenalty: null,
-    addTimeout: null,
+    addPenalty: null,
     pauseMatch: null,
+    startMatch: null,
     updateHalfLength: null,
     setHalfStops: null,
     matchTimeout: null,
     removeTimeout: null,
     buzz: null,
+    addGoal: null,
 });
 
 export const Controller = keymirror({

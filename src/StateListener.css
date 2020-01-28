@@ -1,0 +1,23 @@
+.connect-indicator {
+    text-align: right;
+    position: absolute;
+    top: 0;
+    right: 0;
+    color: green;
+    font-size: 2rem;
+    line-height: 1.5rem;
+    animation: state-color 5s infinite;
+}
+
+
+@keyframes state-color {
+  0% {
+    color: #009900;
+  }
+  50% {
+    color: #66ff99;
+  }
+  100% {
+    color: #009900;
+  }
+}

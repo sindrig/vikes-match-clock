@@ -39,3 +39,6 @@ export const DEFAULT_HALFSTOPS = {
     [SPORTS.football]: HALFSTOPS[SPORTS.football]['45'],
     [SPORTS.handball]: HALFSTOPS[SPORTS.handball]['30'],
 };
+
+export const PENALTY_LENGTH = 2 * 60 * 1000;
+export const TIMEOUT_LENGTH = 60000;
