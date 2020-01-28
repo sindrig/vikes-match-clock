@@ -33,10 +33,16 @@ class App extends Component {
             time: PropTypes.number,
         }),
         setViewPort: PropTypes.func.isRequired,
+        auth: PropTypes.shape({
+            isLoaded: PropTypes.bool,
+            isEmpty: PropTypes.bool,
+        }).isRequired,
+        sync: PropTypes.bool,
     };
 
     static defaultProps = {
         asset: null,
+        sync: false,
     };
 
     static childContextTypes = {
@@ -70,10 +76,14 @@ class App extends Component {
     }
 
     renderCurrentView() {
-        const { view } = this.props;
+        const { view, sync, auth } = this.props;
+        if (view === VIEWS.control && (sync ? auth.isLoaded && !auth.isEmpty : true)) {
+            return 'hahaha';
+        }
 
         switch (view) {
         case VIEWS.match:
+        case VIEWS.control:
             return <ScoreBoard />;
         case VIEWS.idle:
         default:
@@ -111,8 +121,10 @@ class App extends Component {
 }
 
 const stateToProps = ({
-    controller: { view, currentAsset }, view: { vp },
-}) => ({ view, vp, asset: currentAsset || null });
+    controller: { view, currentAsset }, view: { vp }, remote: { sync }, firebase,
+}) => ({
+    view, vp, asset: currentAsset || null, sync, auth: firebase.auth,
+});
 
 const dispatchToProps = dispatch => bindActionCreators({
     setViewPort: viewActions.setViewPort,

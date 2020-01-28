@@ -2,7 +2,6 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
 import { bindActionCreators } from 'redux';
-import { withFirebase } from 'react-redux-firebase';
 
 import controllerActions from '../actions/controller';
 import viewActions from '../actions/view';
@@ -20,7 +19,7 @@ import './Controller.css';
 const confirmRefresh = () => confirm('Are you absolutely sure?');
 
 const Controller = ({
-    selectView, renderAsset, currentAsset, clearState, view, vp, setViewPort, sync, firebase,
+    selectView, renderAsset, currentAsset, clearState, view, vp, setViewPort, sync, auth,
 }) => {
     const left = vp.style.width + 70;
     const currentViewPortName = Object.keys(VPS)
@@ -28,7 +27,7 @@ const Controller = ({
             VPS[key].style.height === vp.style.height
             && VPS[key].style.width === vp.style.width
         ))[0];
-    const showControls = !sync || firebase.auth().currentUser;
+    const showControls = !sync || !auth.isEmpty;
     return (
         <div className="controller" style={{ left }}>
             {showControls && <MatchActions />}
@@ -99,6 +98,9 @@ Controller.propTypes = {
         }).isRequired,
         time: PropTypes.number,
     }),
+    auth: PropTypes.shape({
+        isEmpty: PropTypes.bool,
+    }).isRequired,
 };
 
 Controller.defaultProps = {
@@ -109,9 +111,9 @@ Controller.defaultProps = {
 
 
 const stateToProps = ({
-    controller: { view, currentAsset }, match, view: { vp }, remote: { sync },
+    controller: { view, currentAsset }, match, view: { vp }, remote: { sync }, firebase: { auth },
 }) => ({
-    view, match, vp, sync, currentAsset: currentAsset || null,
+    view, match, vp, sync, currentAsset: currentAsset || null, auth,
 });
 
 const dispatchToProps = dispatch => bindActionCreators({
@@ -121,4 +123,4 @@ const dispatchToProps = dispatch => bindActionCreators({
     setViewPort: viewActions.setViewPort,
 }, dispatch);
 
-export default withFirebase(connect(stateToProps, dispatchToProps)(Controller));
+export default connect(stateToProps, dispatchToProps)(Controller);

@@ -12,7 +12,7 @@ const firebaseMiddleware = store => next => (action) => {
     const { type } = action;
     const result = next(action);
     const {
-        remote: { sync }, match, controller,
+        remote: { sync }, match, controller, firebase: { auth },
     } = store.getState();
     let firebase;
     try {
@@ -21,9 +21,8 @@ const firebaseMiddleware = store => next => (action) => {
         firebase = null;
     }
     if (firebase && sync) {
-        const { currentUser } = firebase.auth();
-        if (currentUser) {
-            const { email } = currentUser;
+        if (auth.isLoaded && !auth.isEmpty) {
+            const { email } = auth;
             const userPrefix = email.split('@')[0];
             if (Match[type]) {
                 firebase.set(`${userPrefix}/match`, match);

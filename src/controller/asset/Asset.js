@@ -3,7 +3,6 @@ import { bindActionCreators } from 'redux';
 import PropTypes from 'prop-types';
 import YouTube from 'react-youtube';
 import { connect } from 'react-redux';
-import { withFirebase } from 'react-redux-firebase';
 
 import { assetPropType, viewPortPropType } from '../../propTypes';
 import PlayerCard from './PlayerCard';
@@ -32,15 +31,15 @@ class Asset extends Component {
         time: PropTypes.number,
         vp: viewPortPropType.isRequired,
         sync: PropTypes.bool,
-        firebase: PropTypes.shape({
-            auth: PropTypes.func,
-        }),
+        auth: PropTypes.shape({
+            isLoaded: PropTypes.bool,
+            isEmpty: PropTypes.bool,
+        }).isRequired,
     };
 
     static defaultProps = {
         thumbnail: false,
         time: null,
-        firebase: null,
         sync: false,
     };
 
@@ -64,10 +63,10 @@ class Asset extends Component {
 
     setTimeoutIfNecessary() {
         const {
-            time, thumbnail, removeAssetAfterTimeout, asset, sync, firebase,
+            time, thumbnail, removeAssetAfterTimeout, asset, sync, auth,
         } = this.props;
         clearTimeout(this.timeout);
-        if (sync && firebase && !firebase.auth().currentUser) {
+        if (sync && auth.isEmpty) {
             return;
         }
         const typeNeedsManualRemove = asset.type !== assetTypes.URL;
@@ -204,9 +203,11 @@ class Asset extends Component {
 }
 
 
-const stateToProps = ({ view: { vp }, remote: { sync } }) => ({ vp, sync });
+const stateToProps = ({
+    view: { vp }, remote: { sync }, firebase: { auth },
+}) => ({ vp, sync, auth });
 const dispatchToProps = dispatch => bindActionCreators({
     removeAssetAfterTimeout: controllerActions.removeAssetAfterTimeout,
 }, dispatch);
 
-export default withFirebase(connect(stateToProps, dispatchToProps)(Asset));
+export default connect(stateToProps, dispatchToProps)(Asset);

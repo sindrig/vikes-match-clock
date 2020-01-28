@@ -19,6 +19,10 @@ class LoginPage extends Component {
         available: PropTypes.arrayOf(PropTypes.string),
         listenPrefix: PropTypes.string.isRequired,
         setListenPrefix: PropTypes.func.isRequired,
+        auth: PropTypes.shape({
+            isLoaded: PropTypes.bool,
+            isEmpty: PropTypes.bool,
+        }).isRequired,
     };
 
     static defaultProps = {
@@ -27,27 +31,6 @@ class LoginPage extends Component {
         sync: false,
         available: [],
     };
-
-    constructor(props) {
-        super(props);
-        this.state = { currentUser: null };
-        this.checkUserLoggedIn = this.checkUserLoggedIn.bind(this);
-    }
-
-    componentDidMount() {
-        this.interval = setInterval(this.checkUserLoggedIn, 5000);
-        setTimeout(this.checkUserLoggedIn, 1000);
-    }
-
-    componentWillUnmount() {
-        clearInterval(this.interval);
-    }
-
-    checkUserLoggedIn() {
-        const { firebase } = this.props;
-        const { currentUser } = firebase.auth();
-        this.setState({ currentUser });
-    }
 
     renderIsRemoteCtrl() {
         const { sync, setSync } = this.props;
@@ -79,25 +62,24 @@ class LoginPage extends Component {
 
     render() {
         const {
-            password, email, setEmail, setPassword, firebase,
+            password, email, setEmail, setPassword, firebase, auth,
         } = this.props;
-        const { currentUser } = this.state;
-        if (currentUser) {
+        if (auth.isLoaded && !auth.isEmpty) {
             return (
                 <div>
                     {this.renderIsRemoteCtrl()}
                     [
-                    <b>{currentUser.email.split('@')[0]}</b>
+                    <b>{auth.email.split('@')[0]}</b>
                     ]
                     <br />
-                    <button type="button" onClick={() => firebase.logout().then(this.checkUserLoggedIn)}>Log out...</button>
+                    <button type="button" onClick={() => firebase.logout()}>Log out...</button>
                 </div>
             );
         }
         const login = (e) => {
             e.preventDefault();
             // eslint-disable-next-line
-            firebase.login({ email, password }).catch(err => alert(err.message)).then(this.checkUserLoggedIn);
+            firebase.login({ email, password }).catch(err => alert(err.message));
         };
         return (
             <div>
@@ -142,9 +124,9 @@ class LoginPage extends Component {
 const stateToProps = ({
     remote: {
         email, password, sync, listenPrefix,
-    }, listeners: { available },
+    }, listeners: { available }, firebase,
 }) => ({
-    email, password, sync, listenPrefix, available,
+    email, password, sync, listenPrefix, available, auth: firebase.auth,
 });
 const dispatchToProps = dispatch => bindActionCreators({
     setEmail: remoteActions.setEmail,

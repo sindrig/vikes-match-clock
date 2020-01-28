@@ -14,6 +14,7 @@ export const ASSET_VIEWS = keymirror({
 export const VIEWS = keymirror({
     idle: null,
     match: null,
+    control: null,
 });
 
 export const initialState = {
