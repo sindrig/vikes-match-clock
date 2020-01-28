@@ -24,6 +24,7 @@ const clockManipulationBox = (seconds, match, updateMatch) => {
                 onClick={() => updateMatch({
                     timeElapsed: roundMillisToSeconds(match.timeElapsed) + (seconds * 1000),
                 })}
+                disabled={match.timeout}
             >
                 +
                 {humanReadableSeconds}
@@ -34,6 +35,7 @@ const clockManipulationBox = (seconds, match, updateMatch) => {
                 onClick={() => updateMatch({
                     timeElapsed: roundMillisToSeconds(match.timeElapsed) - (seconds * 1000),
                 })}
+                disabled={match.timeout}
             >
                 -
                 {humanReadableSeconds}
@@ -50,25 +52,25 @@ const MatchActions = ({
         {view === VIEWS.match && (
             <div>
                 <div className="control-item">
-                    <button type="button" onClick={() => updateMatch({ homeScore: match.homeScore + 1 })}>
+                    <button type="button" onClick={() => updateMatch({ homeScore: match.homeScore + 1 })} disabled={match.timeout}>
                         Heima +1
                     </button>
                     <button
                         type="button"
                         onClick={() => updateMatch({ homeScore: match.homeScore - 1 })}
-                        disabled={match.homeScore <= 0}
+                        disabled={match.homeScore <= 0 || match.timeout}
                     >
                         Heima -1
                     </button>
                 </div>
                 <div className="control-item">
-                    <button type="button" onClick={() => updateMatch({ awayScore: match.awayScore + 1 })}>
+                    <button type="button" onClick={() => updateMatch({ awayScore: match.awayScore + 1 })} disabled={match.timeout}>
                         Úti +1
                     </button>
                     <button
                         type="button"
                         onClick={() => updateMatch({ awayScore: match.awayScore - 1 })}
-                        disabled={match.awayScore <= 0}
+                        disabled={match.awayScore <= 0 || match.timeout}
                     >
                         Úti -1
                     </button>
@@ -85,6 +87,7 @@ const MatchActions = ({
                         <button
                             type="button"
                             onClick={() => updateMatch({ started: Date.now() })}
+                            disabled={match.timeout}
                         >
                             Byrja
                         </button>
