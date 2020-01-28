@@ -15,7 +15,6 @@ const actions = {
     [ActionTypes.pauseMatch]: options => ({ isHalfEnd: options && options.isHalfEnd }),
     [ActionTypes.setHalfStops]: halfStops => ({ halfStops }),
     [ActionTypes.updateHalfLength]: (currentValue, newValue) => ({ currentValue, newValue }),
-    [ActionTypes.matchTimeout]: () => {},
     [ActionTypes.removeTimeout]: () => {},
 };
 
@@ -27,6 +26,12 @@ actions.buzz = () => (dispatch) => {
     dispatch({ type: ActionTypes.buzz, payload: { on: true } });
     setTimeout(() => dispatch({ type: ActionTypes.buzz, payload: { on: false } }), 3000);
     return true;
+};
+
+actions.matchTimeout = ({ team }) => (dispatch) => {
+    dispatch(actions.pauseMatch());
+    dispatch(actions.buzz());
+    dispatch({ type: ActionTypes.matchTimeout, payload: { team } });
 };
 
 export default actions;

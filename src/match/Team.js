@@ -21,12 +21,15 @@ const imageStyle = (team) => {
 };
 
 const Team = ({
-    score, className, team, match: { matchType }, penalties,
+    score, className, team, match: { matchType }, penalties, timeouts,
 }) => (
     <div className={`team ${className}`}>
         {team.image && <div><img src={team.image} alt={team.name} style={imageStyle(team)} /></div>}
         <div className="team-name">{ matchType === SPORTS.handball && team.name }</div>
         <span className="score">{score}</span>
+        <div className={`team-timeouts team-timeouts-${className}`}>
+            {[...Array(timeouts).keys()].map(i => <div key={i} className="team-timeout">&#8226;</div>)}
+        </div>
         <div className="penalties">
             {
                 penalties.map(
@@ -53,6 +56,7 @@ Team.propTypes = {
     }).isRequired,
     match: matchPropType.isRequired,
     penalties: PropTypes.arrayOf(twoMinPropType),
+    timeouts: PropTypes.number.isRequired,
 };
 
 Team.defaultProps = {

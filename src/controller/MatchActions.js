@@ -44,7 +44,7 @@ const clockManipulationBox = (seconds, match, updateMatch) => {
 };
 
 const MatchActions = ({
-    view, match, updateMatch, pauseMatch, matchTimeout, removeTimeout, buzz,
+    view, match, updateMatch, pauseMatch, matchTimeout, removeTimeout,
 }) => (
     <div className="control-item">
         {view === VIEWS.match && (
@@ -97,6 +97,8 @@ const MatchActions = ({
                             home2min: [],
                             away2min: [],
                             timeout: 0,
+                            homeTimeouts: 0,
+                            awayTimeouts: 0,
                             buzzer: false,
                             halfStops: DEFAULT_HALFSTOPS[match.matchType],
                         })}
@@ -159,7 +161,15 @@ const MatchActions = ({
                     <div className="control-item">
                         { match.timeout
                             ? <button type="button" onClick={removeTimeout}>Eyða Leikhlé</button>
-                            : <button type="button" onClick={() => pauseMatch() && buzz() && matchTimeout()}>Leikhlé</button>
+                            : (
+                                <React.Fragment>
+                                    {[{ team: 'home', name: 'heima' }, { team: 'away', name: 'úti' }].map(({ team, name }) => (
+                                        <button type="button" key={team} onClick={() => matchTimeout({ team })}>
+                                            {`Leikhlé ${name}`}
+                                        </button>
+                                    ))}
+                                </React.Fragment>
+                            )
                         }
                     </div>
                 ) : null
@@ -174,7 +184,6 @@ MatchActions.propTypes = {
     pauseMatch: PropTypes.func.isRequired,
     matchTimeout: PropTypes.func.isRequired,
     removeTimeout: PropTypes.func.isRequired,
-    buzz: PropTypes.func.isRequired,
     match: matchPropType.isRequired,
     view: PropTypes.string.isRequired,
 };
@@ -186,7 +195,6 @@ const dispatchToProps = dispatch => bindActionCreators({
     pauseMatch: matchActions.pauseMatch,
     matchTimeout: matchActions.matchTimeout,
     removeTimeout: matchActions.removeTimeout,
-    buzz: matchActions.buzz,
 }, dispatch);
 
 export default connect(stateToProps, dispatchToProps)(MatchActions);

@@ -25,8 +25,8 @@ const getTeam = (id, match) => {
 const ScoreBoard = ({ match, vp }) => (
     <div className={`scoreboard scoreboard-${match.matchType} scoreboard-${vp.key}`}>
         <AdImage />
-        <Team className="home" team={getTeam('home', match)} score={match.homeScore} penalties={match.home2min} />
-        <Team className="away" team={getTeam('away', match)} score={match.awayScore} penalties={match.away2min} />
+        <Team className="home" team={getTeam('home', match)} score={match.homeScore} penalties={match.home2min} timeouts={match.homeTimeouts} />
+        <Team className="away" team={getTeam('away', match)} score={match.awayScore} penalties={match.away2min} timeouts={match.awayTimeouts} />
         {match.injuryTime ? (
             <div className="injury-time">
                 <span>

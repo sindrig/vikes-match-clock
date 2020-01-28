@@ -18,6 +18,8 @@ export const initialState = {
     home2min: [],
     away2min: [],
     timeout: 0,
+    homeTimeouts: 0,
+    awayTimeouts: 0,
     buzzer: false,
 };
 
@@ -145,13 +147,19 @@ const actions = {
         },
     },
     [ActionTypes.matchTimeout]: {
-        next(state, { error }) {
+        next(state, { error, payload }) {
             if (error) {
                 return { ...state, error };
             }
+            if (!payload) {
+                return { ...state, pending: true };
+            }
+            const { team } = payload;
+            const stateKey = `${team}Timeouts`;
             return {
                 ...state,
                 timeout: Date.now(),
+                [stateKey]: Math.min(state[stateKey] + 1, 4),
             };
         },
     },

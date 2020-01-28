@@ -22,6 +22,16 @@
     display: none;
 }
 
+.team-timeouts {
+    display: none;
+    position: absolute;
+}
+
+.team-timeout {
+    color: red;
+    line-height: .8rem
+}
+
 .team span.score {
     position:absolute;
     background-color: black;
@@ -163,6 +173,7 @@
 }
 
 .scoreboard-insidebig .penalties {
+    display: block;
     position: absolute;
     width: 34%;
     top: 65%;
@@ -182,6 +193,19 @@
 
 .scoreboard-insidebig .team.away .penalties .penalty {
     float: right;
+}
+
+.scoreboard-insidebig .team-timeouts {
+    display: block;
+    top: 37%;
+}
+
+.scoreboard-insidebig .team-timeouts-home {
+    left: 3%;
+}
+
+.scoreboard-insidebig .team-timeouts-away {
+    right: 3%;
 }
 
 .penalty-manipulation button.remove-penalty {
@@ -233,4 +257,25 @@
     width: 30%;
     line-height: 120%;
     font-size: 0.9rem !important;
+}
+
+
+
+.scoreboard-insidesmall .team-timeouts {
+    display: block;
+    top: 62%;
+}
+
+.scoreboard-insidesmall .team-timeout {
+    display: inline-block;
+    float: left;
+    margin: 0 .3rem .3rem 0;
+}
+
+.scoreboard-insidesmall .team-timeouts-home {
+    left: 3%;
+}
+
+.scoreboard-insidesmall .team-timeouts-away {
+    right: 3%;
 }

@@ -19,6 +19,9 @@ export const matchPropType = PropTypes.shape({
     matchType: PropTypes.oneOf(Object.keys(SPORTS)),
     home2min: PropTypes.arrayOf(twoMinPropType),
     away2min: PropTypes.arrayOf(twoMinPropType),
+    timeout: PropTypes.number,
+    homeTimeouts: PropTypes.number,
+    awayTimeouts: PropTypes.number,
 });
 
 export const playerPropType = PropTypes.shape({
