@@ -142,6 +142,7 @@ const MatchActions = ({
                 <div>
                     Íþrótt:
                     <select
+                        className="match-type-selector"
                         value={match.matchType}
                         onChange={({ target: { value } }) => updateMatch({ matchType: value })}
                     >

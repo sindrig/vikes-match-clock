@@ -35,4 +35,42 @@ context('Basic navigation', () => {
         cy.contains('Uppbótartími').type('5');
         cy.get('.injury-time').should('have.text', '+5');
     });
+
+    it('uses the simple control panel and updates the clock', () => {
+        cy.get('#view-selector-match').click();
+        cy.get('.match-type-selector').select('handball');
+        cy.get('.viewport-select select').select('Inni stór');
+        cy.get('#view-selector-control').click();
+
+        cy.contains('Stop').should('have.length', 0);
+        cy.contains('Leikhlé').should('be.disabled');
+        cy.contains('Start').click();
+        cy.tick(ONE_MINUTE / 2);
+        cy.contains('Stop').should('have.length', 1);
+        cy.tick(ONE_MINUTE);
+        cy.get('.matchclock').should('have.text', '01:30');
+        cy.contains('Brottvísun').should('be.disabled');
+        cy.get('.match-controller-box-home').contains('Leikhlé').click();
+        cy.tick(1500);
+        cy.get('audio').should('have.length', 1);
+        cy.get('.timeoutclock').should('have.text', '00:59');
+        cy.tick(30000);
+        cy.get('audio').should('have.length', 0);
+        cy.tick(20000);
+        cy.get('audio').should('have.length', 1);
+        cy.tick(5000);
+        cy.get('audio').should('have.length', 0);
+        cy.tick(5000);
+        cy.get('audio').should('have.length', 1);
+        cy.get('.timeoutclock').should('have.length', 0);
+        cy.contains('Stop').should('have.length', 0);
+        cy.contains('Start').should('have.length', 1);
+        cy.tick(ONE_MINUTE);
+        cy.get('.match-controller-box-home').contains('Brottvísun').click();
+        cy.get('.matchclock').should('have.text', '01:30');
+        cy.contains('Start').click();
+        cy.tick(30000);
+        cy.get('.team-timeout').should('have.length', 1);
+        cy.get('.penalty').should('have.text', '01:30');
+    });
 });

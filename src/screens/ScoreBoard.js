@@ -40,7 +40,7 @@ const ScoreBoard = ({ match, vp }) => (
         {match.matchType === SPORTS.handball
             && match.buzzer
             && (Date.now() - match.buzzer) < 3000
-            && (Date.now() - match.buzzer) > 0
+            && (Date.now() - match.buzzer) >= 0
             && <audio src={buzzer} autoPlay />}
     </div>
 );

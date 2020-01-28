@@ -96,18 +96,11 @@ class App extends Component {
             ...BACKGROUND,
             ...vp.style,
         };
-        if (view === VIEWS.control && (sync ? auth.isLoaded && !auth.isEmpty : true)) {
-            // Need scoreboard because there's business logic in there.
-            return (
-                <React.Fragment>
-                    <MatchController />
-                    <div style={{ display: 'none' }}><ScoreBoard /></div>
-                </React.Fragment>
-            );
-        }
 
         return (
             <React.Fragment>
+                {view === VIEWS.control && (sync ? auth.isLoaded && !auth.isEmpty : true)
+                    ? <MatchController /> : null}
                 <div className="App" style={style}>
                     {this.renderAppContents()}
                 </div>

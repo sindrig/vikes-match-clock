@@ -26,6 +26,8 @@ module.exports = {
         "document": true,
         "window": true,
         "gapi": true,
-        "fetch": true
+        "fetch": true,
+        "context": true,
+        "cy": true,
     }
 };

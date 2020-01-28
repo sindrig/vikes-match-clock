@@ -6,11 +6,11 @@ import ControlButton from './ControlButton';
 import matchActions from '../actions/match';
 
 const TeamController = ({
-    goal, penalty, timeout, started,
+    goal, penalty, timeout, started, team,
 }) => (
-    <div className="match-controller-box">
+    <div className={`match-controller-box match-controller-box-${team}`}>
         <ControlButton className="yellow" onClick={goal}>Mark</ControlButton>
-        <ControlButton className="red" onClick={penalty} disabled={started}>Brottvísun</ControlButton>
+        <ControlButton className="red" onClick={penalty} disabled={!!started}>Brottvísun</ControlButton>
         <ControlButton className="green" onClick={timeout} disabled={!started}>Leikhlé</ControlButton>
     </div>
 );
@@ -20,6 +20,7 @@ TeamController.propTypes = {
     penalty: PropTypes.func.isRequired,
     timeout: PropTypes.func.isRequired,
     started: PropTypes.number,
+    team: PropTypes.string.isRequired,
 };
 
 TeamController.defaultProps = {

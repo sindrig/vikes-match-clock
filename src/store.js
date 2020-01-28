@@ -20,7 +20,6 @@ const firebaseMiddleware = store => next => (action) => {
     } catch (e) {
         firebase = null;
     }
-    console.log('firebase, sync, loaded, empty', firebase, sync, auth.isLoaded, auth.isEmpty);
     if (firebase && sync) {
         if (auth.isLoaded && !auth.isEmpty) {
             const { email } = auth;
