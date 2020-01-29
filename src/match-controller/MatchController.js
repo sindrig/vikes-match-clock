@@ -13,7 +13,7 @@ import ControlButton from './ControlButton';
 import './MatchController.css';
 
 const MatchController = ({
-    match: { started },
+    match: { started, timeout },
     selectView,
     pauseMatch,
     startMatch,
@@ -21,7 +21,7 @@ const MatchController = ({
     <div className="match-controller">
         <TeamController className="match-controller-box" team="home" started={started} />
         <div className="match-controller-box">
-            <ControlButton className="yellow" big onClick={started ? pauseMatch : startMatch}>{started ? 'Stop' : 'Start'}</ControlButton>
+            <ControlButton className="yellow" big onClick={started ? pauseMatch : startMatch} disabled={!!timeout}>{started ? 'Stop' : 'Start'}</ControlButton>
             <ControlButton onClick={() => selectView(VIEWS.match)}>Leiðrétta</ControlButton>
         </div>
         <TeamController className="match-controller-box" team="away" started={started} />

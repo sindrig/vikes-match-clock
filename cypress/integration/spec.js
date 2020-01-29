@@ -36,7 +36,7 @@ context('Basic navigation', () => {
         cy.get('.injury-time').should('have.text', '+5');
     });
 
-    it('uses the simple control panel and updates the clock', () => {
+    it.only('uses the simple control panel and updates the clock', () => {
         cy.get('#view-selector-match').click();
         cy.get('.match-type-selector').select('handball');
         cy.get('.viewport-select select').select('Inni stór');
@@ -52,6 +52,9 @@ context('Basic navigation', () => {
         cy.contains('Brottvísun').should('be.disabled');
         cy.get('.match-controller-box-home').contains('Leikhlé').click();
         cy.tick(1500);
+        cy.contains('Start').should('have.length', 1);
+        cy.contains('Start').should('be.disabled');
+        cy.contains('Leikhlé').should('be.disabled');
         cy.get('audio').should('have.length', 1);
         cy.get('.timeoutclock').should('have.text', '00:59');
         cy.tick(30000);
