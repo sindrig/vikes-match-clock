@@ -64,7 +64,7 @@
 }
 
 .matchclock {
-    top: 57%;
+    top: 45.5%;
     left: 33.5%;
     height: 23%;
     width: 33%;
@@ -86,7 +86,7 @@
 }
 
 .scoreboard .injury-time span {
-    top: 30%;
+    top: 18%;
     left: 45%;
     font-size: 2rem;
     position: absolute;
