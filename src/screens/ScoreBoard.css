@@ -78,11 +78,18 @@
     line-height: 130%;
 }
 
-.scoreboard img.ad {
-    width: 80px;
-    left: 80px;
-    top: 150px;
+img.ad {
+    display: none;
+}
+
+.scoreboard-outside img.ad {
+    background-color: yellow;
+    left: calc(33.5% + 1px);
+    height: 25%;
+    width: 33%;
+    bottom: 2%;
     position: absolute;
+    /*display: block;*/
 }
 
 .scoreboard .injury-time span {
