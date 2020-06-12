@@ -27,7 +27,7 @@ def main():
                         os.path.join(root, fn),
                         IMAGES_DIR
                     )
-                    loc = os.path.basename(root)
+                    loc = os.path.dirname(relpath) or os.path.basename(root)
                     key = '%s/%s' % (loc, fn)
                     f.write("    '%s': require('./%s'),\n" % (key, relpath))
         f.write('};\n')

@@ -3,12 +3,6 @@ import PropTypes from 'prop-types';
 
 import * as assets from '../assets';
 
-const AD_REGEX = /ads\/(.*)-.*\.*/;
-const AD_ASSETS = [...new Set(Object.keys(assets)
-    .map(k => k.match(AD_REGEX))
-    .filter(m => m)
-    .map(m => m[1]))];
-
 function useInterval(callback, delay) {
     const savedCallback = useRef();
 
@@ -31,6 +25,11 @@ function useInterval(callback, delay) {
 }
 
 const AdImage = ({ size, time, blankBetweenImages }) => {
+    const adRegex = new RegExp(`ads\\/${size}\\/(.*)\\.*`);
+    const adAssets = [...new Set(Object.keys(assets)
+        .map(k => k.match(adRegex))
+        .filter(m => m)
+        .map(m => m[1]))];
     const [img, setImg] = useState(0);
     const [isBlank, setBlank] = useState(blankBetweenImages);
     useInterval(() => {
@@ -41,13 +40,12 @@ const AdImage = ({ size, time, blankBetweenImages }) => {
             setBlank(false);
         }
         const nextImg = img + 1;
-        return setImg(nextImg === AD_ASSETS.length ? 0 : nextImg);
-    }, time * 1000);
-    const src = `ads/${AD_ASSETS[img]}-${size}.png`;
+        return setImg(nextImg === adAssets.length ? 0 : nextImg);
+    }, time * 100);
+    const src = `ads/${size}/${adAssets[img]}`;
     if (isBlank) {
         return null;
     }
-    console.log('src', src);
     return <img src={assets[src]} className="ad" alt="Ad" />;
 };
 
