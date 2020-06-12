@@ -1,8 +1,10 @@
-.idle img.ad {
-    width: 160px;
-    left: 40px;
-    top: 131px;
+.idle-outside img.ad {
+    left: 0px;
+    height: 100%;
+    width: 100%;
     position: absolute;
+    display: block;
+    z-index: 9999;
 }
 
 

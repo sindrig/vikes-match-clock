@@ -83,14 +83,14 @@ img.ad {
 }
 
 .scoreboard-outside img.ad {
-    background-color: yellow;
     left: calc(33.5% + 1px);
     height: 25%;
     width: 33%;
     bottom: 2%;
     position: absolute;
-    /*display: block;*/
+    display: block;
 }
+
 
 .scoreboard .injury-time span {
     top: 18%;

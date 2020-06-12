@@ -1,5 +1,8 @@
 import React, { Component } from 'react';
+import { connect } from 'react-redux';
 import Clock from 'react-live-clock';
+import { viewPortPropType } from '../propTypes';
+
 import clubLogos from '../images/clubLogos';
 import AdImage from '../utils/AdImage';
 import { getTemp } from '../lib/weather';
@@ -11,7 +14,11 @@ const fetchTempInterval = 5 * 60 * 1000;
 // Change this to true touse real temp
 const useRealTemperature = true;
 
-export default class Idle extends Component {
+class Idle extends Component {
+    static propTypes = {
+        vp: viewPortPropType.isRequired,
+    }
+
     constructor(props) {
         super(props);
         this.updateTemp = this.updateTemp.bind(this);
@@ -41,9 +48,11 @@ export default class Idle extends Component {
     }
 
     render() {
+        const { vp } = this.props;
         const { temperature } = this.state;
         return (
-            <div className="idle">
+            <div className={`idle idle-${vp.key}`}>
+                <AdImage size="large" blankBetweenImages time={10} />
                 <img src={clubLogos['Víkingur R']} alt="Vikes" className="idle-vikes" />
                 <div className="idle-text-container">
                     <div className="idle-text-box idle-clock">
@@ -53,8 +62,12 @@ export default class Idle extends Component {
                         <span className="idle-temperature">{useRealTemperature ? `${temperature}°` : '17°'}</span>
                     </div>
                 </div>
-                <AdImage />
             </div>
         );
     }
 }
+
+
+const stateToProps = ({ match, view: { vp } }) => ({ match, vp });
+
+export default connect(stateToProps)(Idle);
