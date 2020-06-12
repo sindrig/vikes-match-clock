@@ -41,7 +41,7 @@ const AdImage = ({ size, time, blankBetweenImages }) => {
         }
         const nextImg = img + 1;
         return setImg(nextImg === adAssets.length ? 0 : nextImg);
-    }, time * 100);
+    }, time * 1000);
     const src = `ads/${size}/${adAssets[img]}`;
     if (isBlank) {
         return null;
