@@ -1,7 +1,6 @@
 /* eslint-disable global-require */
 module.exports = {
-    'assets/herrakvold.jpg': require('./herrakvold.jpg'),
-    'assets/kvennakvold.jpg': require('./kvennakvold.jpg'),
+    'assets/arnor.png': require('./arnor.png'),
     'ads/small/bilaleiga.png': require('./ads/small/bilaleiga.png'),
     'ads/small/eimskip.png': require('./ads/small/eimskip.png'),
     'ads/small/grantthornton.png': require('./ads/small/grantthornton.png'),
