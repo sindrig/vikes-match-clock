@@ -25,6 +25,7 @@ button:focus {
 .overlay-container {
     position: absolute;
     cursor: none;
+    z-index: 9999;
 }
 
 .overlay-container * {

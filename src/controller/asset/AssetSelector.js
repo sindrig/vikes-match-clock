@@ -8,9 +8,10 @@ const keyToAssetKey = (key) => {
         const parts = playerKey.split(/[ ](.+)/);
         let playerNumber = parseInt(parts[0], 10);
         if (Number.isNaN(playerNumber)) {
-            [playerNumber] = parts;
+            playerNumber = '';
         }
-        const playerName = parts[1].split('_').join(' ');
+        const playerParts = playerNumber === '' ? playerKey : parts[1];
+        const playerName = playerParts.split('_').join(' ');
         return {
             type: assetTypes.PLAYER,
             key,

@@ -168,6 +168,7 @@ class AssetController extends Component {
                         <option value="null">Myndir</option>
                         {Object
                             .keys(assetsImages)
+                            .filter(key => !key.startsWith('ads/'))
                             .filter(key => selectedAssetsList.map(a => a.key).indexOf(key) === -1)
                             .map(key => ({ key, name: key.split('/')[key.split('/').length - 1] }))
                             .map(({ key, name }) => <option value={key} key={key}>{name}</option>)
