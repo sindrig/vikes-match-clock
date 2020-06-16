@@ -3,6 +3,10 @@
     width: 100%;
 }
 
+.asset-substitution {
+    height: 100%;
+}
+
 .asset-substitution > div {
     position: absolute;
     background-image: none !important;
