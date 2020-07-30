@@ -1,8 +1,6 @@
 /* eslint-disable global-require */
 module.exports = {
-    'assets/arnor.png': require('./arnor.png'),
-    'assets/leeds.png': require('./leeds.png'),
-    'assets/liverpool.png': require('./liverpool.png'),
+    'assets/astonvilla.png': require('./astonvilla.png'),
     'ads/small/bilaleiga.png': require('./ads/small/bilaleiga.png'),
     'ads/small/eimskip.png': require('./ads/small/eimskip.png'),
     'ads/small/floti.png': require('./ads/small/floti.png'),
@@ -20,6 +18,7 @@ module.exports = {
     'ads/large/macron.png': require('./ads/large/macron.png'),
     'ads/large/smurstodin.png': require('./ads/large/smurstodin.png'),
     'ads/large/voltaren.png': require('./ads/large/voltaren.png'),
+    'ads/large/wokon.png': require('./ads/large/wokon.png'),
     'players/1 Ingvar Jónsson.png': require('./players/1 Ingvar Jónsson.png'),
     'players/3 Logi Tómasson.png': require('./players/3 Logi Tómasson.png'),
     'players/6 Halldór Smári Sigurðsson.png': require('./players/6 Halldór Smári Sigurðsson.png'),
