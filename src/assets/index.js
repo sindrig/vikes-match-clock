@@ -26,7 +26,6 @@ module.exports = {
     'players/28 Halldór Jón Sigurður Þórðarson.png': require('./players/28 Halldór Jón Sigurður Þórðarson.png'),
     'players/31 Isaac Owusu Afriyie.png': require('./players/31 Isaac Owusu Afriyie.png'),
     'players/32 Francisco Marmolejo Mancilla.png': require('./players/32 Francisco Marmolejo Mancilla.png'),
-    'players/77 Atli Hrafn Andrason.png': require('./players/77 Atli Hrafn Andrason.png'),
     'players/77 Kwame Quee.png': require('./players/77 Kwame Quee.png'),
     'ads/large/eimskip.png': require('./ads/large/eimskip.png'),
     'ads/large/floti.png': require('./ads/large/floti.png'),
