@@ -29,6 +29,7 @@ module.exports = {
     'players/77 Kwame Quee.png': require('./players/77 Kwame Quee.png'),
     'ads/large/eimskip.png': require('./ads/large/eimskip.png'),
     'ads/large/floti.png': require('./ads/large/floti.png'),
+    'ads/large/glo.png': require('./ads/large/glo.png'),
     'ads/large/grantthornton.png': require('./ads/large/grantthornton.png'),
     'ads/large/macron.png': require('./ads/large/macron.png'),
     'ads/large/smurstodin.png': require('./ads/large/smurstodin.png'),
