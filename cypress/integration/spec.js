@@ -9,7 +9,7 @@ context('Basic navigation', () => {
         cy.clearLocalStorage();
         // Need to start at 1 because 0 won't trigger started
         cy.clock(1);
-        cy.visit('http://localhost:3000/');
+        cy.visit('/');
     });
 
     it('starts the clock and does some things', () => {
