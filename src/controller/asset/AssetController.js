@@ -11,6 +11,7 @@ import AssetSelector from './AssetSelector';
 import RemovableAsset from './RemovableAsset';
 import TeamAssetController from './team/TeamAssetController';
 import UrlController from './UrlController';
+import FreeTextController from './FreeTextController';
 import assetTypes from './AssetTypes';
 import * as assetsImages from '../../assets';
 import controllerActions from '../../actions/controller';
@@ -218,6 +219,7 @@ class AssetController extends Component {
                         )
                     }
                     <UrlController addAsset={this.addAssetKey} />
+                    <FreeTextController addAsset={this.addAssetKey} />
                     <button type="button" onClick={this.playRuv('ruv')}>RÚV</button>
                     <button type="button" onClick={this.playRuv('ruv2')}>RÚV 2</button>
                     {this.renderError()}

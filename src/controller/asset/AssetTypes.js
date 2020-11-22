@@ -5,4 +5,5 @@ export default {
     NO_IMAGE_PLAYER: 'NO_IMAGE_PLAYER',
     IMAGE: 'IMAGE',
     SUB: 'SUB',
+    FREE_TEXT: 'FREE_TEXT',
 };

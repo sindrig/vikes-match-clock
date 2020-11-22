@@ -111,6 +111,12 @@ class Asset extends Component {
         throw new Error('you should not get here');
     }
 
+    renderFreeText() {
+        const { asset, thumbnail } = this.props;
+
+        return <div className={`free-text-container ${ thumbnail ? 'thumbnail' : '' }`}>{asset.key}</div>
+    }
+
     renderRuv() {
         const { asset: { key }, thumbnail } = this.props;
         return <Ruv thumbnail={thumbnail} channel={key} />;
@@ -196,6 +202,9 @@ class Asset extends Component {
                     }))}
                 </Substitution>
             );
+        }
+        if (asset.type === assetTypes.FREE_TEXT) {
+            return this.renderFreeText();
         }
         console.error('No type for item ', asset);
         return null;
