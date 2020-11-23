@@ -1,24 +1,21 @@
 module.exports = {
   parser: "babel-eslint",
-  extends: ["airbnb", "plugin:jest/recommended"],
+  // extends: ["prettier"],
+  extends: ["eslint:recommended", "plugin:react/recommended", "prettier"],
   plugins: ["react"],
-  rules: {
-    strict: 0,
-    indent: ["error", 4],
-    "react/jsx-indent": ["error", 4],
-    "react/jsx-indent-props": ["error", 4],
-    "react/no-unescaped-entities": [0],
-    "react/jsx-filename-extension": [1, { extensions: [".js", ".jsx"] }],
-    "no-console": 0,
-    "import/no-extraneous-dependencies": ["error", { devDependencies: true }],
-    "jsx-a11y/media-has-caption": [
-      0,
-      {
-        audio: ["Audio"],
-        video: ["Video"],
-        track: ["Track"],
+
+  overrides: [
+    {
+      files: ["**/*.spec.js", "**/*.spec.jsx"],
+      env: {
+        jest: true,
       },
-    ],
+    },
+  ],
+  env: {
+    browser: true,
+    node: true,
+    es6: true,
   },
   globals: {
     document: true,
@@ -26,6 +23,7 @@ module.exports = {
     gapi: true,
     fetch: true,
     context: true,
+    jest: true,
     cy: true,
   },
 };

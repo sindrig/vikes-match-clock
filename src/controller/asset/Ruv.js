@@ -33,7 +33,8 @@ class Ruv extends Component {
     this.hls = null;
   }
 
-  componentWillMount() {
+  // TODO: Can we get rid of this...?
+  UNSAFE_componentWillMount() {
     this.updateStreamUrl();
   }
 

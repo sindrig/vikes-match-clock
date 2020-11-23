@@ -31,10 +31,18 @@ it("renders TeamAssetController", () => {
       ...controllerInitialState,
       assetView: "teams",
     },
+    listeners: {},
+    firebase: {
+      auth: {
+        isLoaded: true,
+        isEmpty: false,
+        email: "fotbolti@vikingur.is",
+      },
+      data: null,
+    },
     match: matchInitialState,
     view: viewInitialState,
     remote: remoteInitialState,
-    firebase: { data: null },
   });
   const app = window.mountWrapComponent(<App />, store);
   const controller = app.find("Controller");
