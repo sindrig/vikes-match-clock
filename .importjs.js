@@ -1,3 +1,3 @@
 module.exports = {
-	sortImports: false
-}
+  sortImports: false,
+};

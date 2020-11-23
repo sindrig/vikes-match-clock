@@ -1,44 +1,42 @@
 .idle-outside img.ad {
-    left: 0px;
-    height: 100%;
-    width: 100%;
-    position: absolute;
-    display: block;
-    z-index: 999;
+  left: 0px;
+  height: 100%;
+  width: 100%;
+  position: absolute;
+  display: block;
+  z-index: 999;
 }
-
 
 .idle .idle-clock {
-    text-align: center;
-    display: inline-block;
-    width: 100%;
+  text-align: center;
+  display: inline-block;
+  width: 100%;
 }
 
-
 .idle .idle-temperature {
-    text-align: center;
-    display: inline-block;
-    width: 100%;
+  text-align: center;
+  display: inline-block;
+  width: 100%;
 }
 
 .idle .idle-text-container {
-    position: absolute;
-    top: 65%;
-    width: 100%;
+  position: absolute;
+  top: 65%;
+  width: 100%;
 }
 
 .idle .idle-text-box {
-    float: left;
-    width: 50%;
-    font-size: 40px;
-    font-weight: bold;
-    color: #FFFFFF;
-    /*padding: 0 20px 0 20px;*/
+  float: left;
+  width: 50%;
+  font-size: 40px;
+  font-weight: bold;
+  color: #ffffff;
+  /*padding: 0 20px 0 20px;*/
 }
 
 .idle .idle-vikes {
-    position: absolute;
-    left: 15%;
-    top: 5%;
-    width: 30%;
+  position: absolute;
+  left: 15%;
+  top: 5%;
+  width: 30%;
 }

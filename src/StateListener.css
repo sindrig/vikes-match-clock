@@ -1,14 +1,13 @@
 .connect-indicator {
-    text-align: right;
-    position: absolute;
-    top: 0;
-    right: 0;
-    color: green;
-    font-size: 2rem;
-    line-height: 1.5rem;
-    animation: state-color 5s infinite;
+  text-align: right;
+  position: absolute;
+  top: 0;
+  right: 0;
+  color: green;
+  font-size: 2rem;
+  line-height: 1.5rem;
+  animation: state-color 5s infinite;
 }
-
 
 @keyframes state-color {
   0% {

@@ -1,5 +1,5 @@
 export default {
-    MAIN: {
-        clearImage: 'esc',
-    },
+  MAIN: {
+    clearImage: "esc",
+  },
 };
