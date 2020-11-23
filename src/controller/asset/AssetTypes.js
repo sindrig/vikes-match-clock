@@ -1,8 +1,8 @@
 export default {
-    URL: 'URL',
-    RUV: 'RUV',
-    PLAYER: 'PLAYER',
-    NO_IMAGE_PLAYER: 'NO_IMAGE_PLAYER',
-    IMAGE: 'IMAGE',
-    SUB: 'SUB',
+  URL: "URL",
+  RUV: "RUV",
+  PLAYER: "PLAYER",
+  NO_IMAGE_PLAYER: "NO_IMAGE_PLAYER",
+  IMAGE: "IMAGE",
+  SUB: "SUB",
 };

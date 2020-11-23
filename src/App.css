@@ -1,10 +1,10 @@
 body {
-    /* prevent scrolling */
-    overflow: hidden;
+  /* prevent scrolling */
+  overflow: hidden;
 }
 
 html {
-    font-size: 100%;
+  font-size: 100%;
 }
 
 .App {
@@ -13,24 +13,24 @@ html {
 }
 
 button {
-    border:none;
-    background-color: transparent;
-    font-size: 30px;
+  border: none;
+  background-color: transparent;
+  font-size: 30px;
 }
 
 button:focus {
-    outline:0;
+  outline: 0;
 }
 
 .overlay-container {
-    position: absolute;
-    cursor: none;
-    z-index: 9999;
+  position: absolute;
+  cursor: none;
+  z-index: 9999;
 }
 
 .overlay-container * {
-    margin: 0 auto;
-    display: block;
-    max-height: 100%;
-    max-width: 100%;
+  margin: 0 auto;
+  display: block;
+  max-height: 100%;
+  max-width: 100%;
 }

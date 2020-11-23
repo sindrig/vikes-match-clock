@@ -1,68 +1,64 @@
 .thumbnail.asset-substitution {
-    height: 73px;
-    width: 100%;
+  height: 73px;
+  width: 100%;
 }
 
 .asset-substitution {
-    height: 100%;
+  height: 100%;
 }
 
 .asset-substitution > div {
-    position: absolute;
-    background-image: none !important;
+  position: absolute;
+  background-image: none !important;
 }
 
-
 .asset-substitution .player-card-image .asset-player-name {
-    display: none;
+  display: none;
 }
 
 .asset-substitution .player-card-no-image .asset-player-name {
-    /*display: none;*/
-    z-index: 99;
-    height: auto;
-    bottom: 10px;
-    top: auto;
-    left: auto;
+  /*display: none;*/
+  z-index: 99;
+  height: auto;
+  bottom: 10px;
+  top: auto;
+  left: auto;
 }
 
 .asset-substitution .player-card-no-image:nth-child(1) .asset-player-name {
-    bottom: 50px;
-    left: 5px;
-    /*color: red;*/
-    /*text-shadow: -1px 0 white, 0 1px white, 1px 0 white, 0 -1px white;*/
+  bottom: 50px;
+  left: 5px;
+  /*color: red;*/
+  /*text-shadow: -1px 0 white, 0 1px white, 1px 0 white, 0 -1px white;*/
 }
 
 .asset-substitution .player-card-no-image:nth-child(2) .asset-player-name {
-    right: 5px;
-    /*color: green;*/
-    /*text-shadow: -1px 0 white, 0 1px white, 1px 0 white, 0 -1px white;*/
-
+  right: 5px;
+  /*color: green;*/
+  /*text-shadow: -1px 0 white, 0 1px white, 1px 0 white, 0 -1px white;*/
 }
 
 .asset-substitution > div:nth-child(1) img {
-    left: 0px;
-    right: auto;
+  left: 0px;
+  right: auto;
 }
-
 
 .asset-substitution span.asset-player-number {
-    top: 0px !important;
-    z-index: 9;
+  top: 0px !important;
+  z-index: 9;
 }
 .asset-substitution > div:nth-child(1) .asset-player-number {
-    left: 5px;
-    color: red;
+  left: 5px;
+  color: red;
 }
 
-
 .asset-substitution > div:nth-child(2) .asset-player-number {
-    right: 5px;
-    text-align: right;
-    color: green;
+  right: 5px;
+  text-align: right;
+  color: green;
 }
 
 .asset-substitution .asset-player-icon.player-card-no-image img {
-    height: 50%;
-    position: relative;
+  height: 50%;
+  position: relative;
 }

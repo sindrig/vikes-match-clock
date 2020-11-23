@@ -1,36 +1,36 @@
 .team-player-number {
-    width: 25px;
+  width: 25px;
 }
 .team-player-role {
-    width: 80px;
+  width: 80px;
 }
 
 div.team-asset-player {
-    float: none;
+  float: none;
 }
 
 .team-asset-container {
-    float: left;
-    margin-left: 50px;
+  float: left;
+  margin-left: 50px;
 }
 
 .team-asset-controller {
-    clear: both;
+  clear: both;
 }
 
 .team-asset-controller .sub-controller {
-    clear: both;
+  clear: both;
 }
 
 .team-player {
-    float: left;
+  float: left;
 }
 
 .team-asset-container button {
-    clear: none;
-    height: 22px;
+  clear: none;
+  height: 22px;
 }
 
 .team-asset-container .player-input {
-    width: 310px;
+  width: 310px;
 }

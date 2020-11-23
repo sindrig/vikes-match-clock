@@ -1,100 +1,139 @@
 .removable-asset div.asset-player-icon {
-    margin: 0;
-    height: 73px;
-    width: 100%;
+  margin: 0;
+  height: 73px;
+  width: 100%;
 }
 
 .overlay-container div.asset-player-icon {
-    margin: 0;
-    height: 100%;
-    width: 100%;
+  margin: 0;
+  height: 100%;
+  width: 100%;
 }
 
 div.asset-player-icon img {
-    position: absolute;
-    bottom: 0px;
-    right: 0px;
+  position: absolute;
+  bottom: 0px;
+  right: 0px;
 }
 
 .asset-player-icon span {
-    font-family: 'Anton', sans-serif;
-    position: absolute;
-    text-shadow: 2px 2px 5px black;
-    text-align: center;
-    color: white;
+  font-family: "Anton", sans-serif;
+  position: absolute;
+  text-shadow: 2px 2px 5px black;
+  text-align: center;
+  color: white;
 }
 
 span.asset-player-name {
-    font-size: 30px;
-    bottom: 5%;
-    left: 5%;
-    line-height: normal;
+  font-size: 30px;
+  bottom: 5%;
+  left: 5%;
+  line-height: normal;
 }
 
 .removable-asset span.asset-player-name {
-    top: 53px;
-    font-size: 12px;
-    left: 14px;
+  top: 53px;
+  font-size: 12px;
+  left: 14px;
 }
 
-
 span.asset-player-number {
-    font-size: 64px;
-    top: 20px;
-    left: 20px;
-    line-height: 90px;
+  font-size: 64px;
+  top: 20px;
+  left: 20px;
+  line-height: 90px;
 }
 
 .removable-asset span.asset-player-number {
-    top: 5px;
-    font-size: 33px;
-    left: 14px;
-    line-height: 50px;
+  top: 5px;
+  font-size: 33px;
+  left: 14px;
+  line-height: 50px;
 }
 
 .player-card-overlay {
-    transform: rotate(35deg);
-    top: 18%;
-    left: 18%;
-    z-index: 9999999;
-    text-shadow: 4px 4px 10px black;
-    font-size: 3rem;
+  transform: rotate(35deg);
+  top: 18%;
+  left: 18%;
+  z-index: 9999999;
+  text-shadow: 4px 4px 10px black;
+  font-size: 3rem;
 }
 
 .blink {
-    -webkit-animation: blink 2s linear infinite;
-    -moz-animation: blink 2s linear infinite;
-    -ms-animation: blink 2s linear infinite;
-    -o-animation: blink 2s linear infinite;
-     animation: blink 2s linear infinite;
+  -webkit-animation: blink 2s linear infinite;
+  -moz-animation: blink 2s linear infinite;
+  -ms-animation: blink 2s linear infinite;
+  -o-animation: blink 2s linear infinite;
+  animation: blink 2s linear infinite;
 }
 @-webkit-keyframes blink {
-    0% { opacity: 1; }
-    50% { opacity: 1; }
-    50.01% { opacity: 0; }
-    100% { opacity: 0; }
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 1;
+  }
+  50.01% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
 }
 @-moz-keyframes blink {
-    0% { opacity: 1; }
-    50% { opacity: 1; }
-    50.01% { opacity: 0; }
-    100% { opacity: 0; }
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 1;
+  }
+  50.01% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
 }
 @-ms-keyframes blink {
-    0% { opacity: 1; }
-    50% { opacity: 1; }
-    50.01% { opacity: 0; }
-    100% { opacity: 0; }
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 1;
+  }
+  50.01% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
 }
 @-o-keyframes blink {
-    0% { opacity: 1; }
-    50% { opacity: 1; }
-    50.01% { opacity: 0; }
-    100% { opacity: 0; }
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 1;
+  }
+  50.01% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
 }
 @keyframes blink {
-    0% { opacity: 1; }
-    50% { opacity: 1; }
-    50.01% { opacity: 0; }
-    100% { opacity: 0; }
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 1;
+  }
+  50.01% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
 }
