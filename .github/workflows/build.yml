@@ -46,6 +46,7 @@ jobs:
           delete-removed: true
           private: true
           dist-id: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
+          invalidation: index.html
 
   notify:
     runs-on: ubuntu-latest
