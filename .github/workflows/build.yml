@@ -41,7 +41,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         with:
           folder: build
-          bucket: klukka.irdn.is
+          bucket: ${{ secrets.FRONTEND_BUCKET }}
           bucket-region: eu-west-1
           delete-removed: true
           private: true

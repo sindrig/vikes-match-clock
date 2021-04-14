@@ -37,7 +37,7 @@ const actions = {
         awayTeam: clubIds[awayTeam],
       },
     };
-    return axios.get(`${apiConfig.gateWayUrl}getPlayers`, options);
+    return axios.get(`${apiConfig.gateWayUrl}match-report`, options);
   },
   [ActionTypes.getRuvUrl]: (channel) =>
     new Promise((resolve, reject) => {
