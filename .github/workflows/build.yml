@@ -45,6 +45,7 @@ jobs:
           bucket-region: eu-west-1
           delete-removed: true
           private: true
+          dist-id: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
 
   notify:
     runs-on: ubuntu-latest
