@@ -124,7 +124,12 @@ def no_match_found(home_team, away_team):
 
 
 def main(json_input, context):
-    date = datetime.date.today()
+    if 'date' in json_input:
+        date = datetime.datetime.strptime(
+            json_input['date'], '%Y-%m-%d'
+        ).date()
+    else:
+        date = datetime.date.today()
     try:
         home_team = int(json_input['homeTeam'])
         away_team = int(json_input['awayTeam'])
