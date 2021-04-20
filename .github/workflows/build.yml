@@ -30,7 +30,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           start: npx serve -s build
-          record: true
+          record: ${{ secrets.CYPRESS_RECORD_KEY != '' }}
           config: baseUrl=http://localhost:5000
 
       - name: Deploy
