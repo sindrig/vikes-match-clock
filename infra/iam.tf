@@ -4,7 +4,8 @@ data "aws_iam_policy_document" "grant_deploy" {
       "s3:*",
     ]
     resources = [
-      "arn:aws:s3:::vikes-match-clock-frontend"
+      module.webpage.s3_bucket_arn,
+      "${module.webpage.s3_bucket_arn}/*"
     ]
   }
 }

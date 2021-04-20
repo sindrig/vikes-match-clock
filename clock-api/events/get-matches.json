@@ -5,7 +5,9 @@
   "httpMethod": "POST",
   "isBase64Encoded": false,
   "queryStringParameters": {
-    "debug": "1"
+    "homeTeam": "103",
+    "awayTeam": "200",
+    "date": "2020-08-16"
   },
   "pathParameters": {
     "proxy": "/path/to/resource"
