@@ -67,17 +67,19 @@ class TeamAssetController extends Component {
 
   getPlayerAssetObject({ player, teamName, overlay }) {
     const { selectedMatch, availableMatches } = this.props;
-    const { group } =
+    const currentMatch =
       availableMatches && availableMatches[selectedMatch]
         ? availableMatches[selectedMatch]
         : { group: "Meistaraflokkur" };
+    const { group, sex } = currentMatch;
+
     if (!player.name || !player.number) {
       return null;
     }
     if (group.match(/meistara/i)) {
       const isVikes = teamName === VIKES;
       if (isVikes) {
-        const keyMatcher = new RegExp(`players/0?${player.number}`);
+        const keyMatcher = new RegExp(`players/${sex}/0?${player.number}`);
         const assetKey = Object.keys(assets).find((key) =>
           key.match(keyMatcher)
         );
@@ -87,7 +89,7 @@ class TeamAssetController extends Component {
             key: assetKey,
             name: player.name,
             number: player.number,
-            overlay: overlay || "",
+            overlay: overlay || { text: "" },
             teamName,
           };
         }
@@ -98,7 +100,7 @@ class TeamAssetController extends Component {
       key: `custom-${player.number}-${player.name}`,
       name: player.name,
       number: player.number,
-      overlay: overlay || "",
+      overlay: overlay || { text: "" },
       teamName,
     };
   }
