@@ -7,11 +7,17 @@ from suds.client import Client
 WSDL_URL = 'http://www2.ksi.is/vefthjonustur/mot.asmx?WSDL'
 VIKES = '103'
 
+sex_map = {
+    0: 'kvk',
+    1: 'kk',
+}
+
 Match = namedtuple(
     'Match',
     (
         'match_id',
         'group',
+        'sex',
     ),
 )
 
@@ -71,13 +77,21 @@ class KsiClient:
         games = gameArray.FelogLeikir
         matches = []
         for game in games:
-            print(game.FelagHeimaNafn, '-', game.FelagUtiNafn)
+            print(
+                game.MotKyn, ':', game.FelagHeimaNafn, '-', game.FelagUtiNafn
+            )
             if (
                 game.FelagHeimaNumer == home_team
                 and game.FelagUtiNumer == away_team
             ):
                 print('Found match: %s' % (game.LeikurNumer,))
-                matches.append(Match(game.LeikurNumer, game.Flokkur))
+                matches.append(
+                    Match(
+                        game.LeikurNumer,
+                        game.Flokkur,
+                        sex_map.get(game.MotKyn, 'kk'),
+                    )
+                )
         return matches
 
     def get_players(self, match_id):
@@ -123,16 +137,14 @@ def no_match_found(home_team, away_team):
     }
 
 
-def main(json_input, context):
-    if 'date' in json_input:
-        date = datetime.datetime.strptime(
-            json_input['date'], '%Y-%m-%d'
-        ).date()
+def main(query, context):
+    if 'date' in query:
+        date = datetime.datetime.strptime(query['date'], '%Y-%m-%d').date()
     else:
         date = datetime.date.today()
     try:
-        home_team = int(json_input['homeTeam'])
-        away_team = int(json_input['awayTeam'])
+        home_team = int(query['homeTeam'])
+        away_team = int(query['awayTeam'])
     except ValueError:
         return {
             'error': {
@@ -159,6 +171,7 @@ def main(json_input, context):
             result['matches'][match.match_id] = {
                 'players': players,
                 'group': match.group,
+                'sex': match.sex,
             }
     if not result['matches']:
         return no_match_found(home_team, away_team)
@@ -182,3 +195,11 @@ def lambda_handler(json_input, context):
             'Access-Control-Allow-Origin': '*',
         },
     }
+
+
+if __name__ == '__main__':
+    print(
+        lambda_handler(
+            {'queryStringParameters': {'homeTeam': 103, 'awayTeam': 203}}, {}
+        )
+    )
