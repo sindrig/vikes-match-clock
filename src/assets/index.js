@@ -65,7 +65,6 @@ module.exports = {
   "players/kk/25 Bjarki Björn Gunnarsson.png": require("./players/kk/25 Bjarki Björn Gunnarsson.png"),
   "players/kk/27 Tómas Guðmundsson.png": require("./players/kk/27 Tómas Guðmundsson.png"),
   "players/kk/28 Halldór Jón Sigurður Þórðarson.png": require("./players/kk/28 Halldór Jón Sigurður Þórðarson.png"),
-  "players/kk/77 Axel Þór Harðarson.png": require("./players/kk/77 Axel Þór Harðarson.png"),
   "players/kk/77 Kwame Quee.png": require("./players/kk/77 Kwame Quee.png"),
   "players/kk/80 Kristall Máni Ingason.png": require("./players/kk/80 Kristall Máni Ingason.png"),
   "players/kk/99 Uggi Jóhann Auðunsson.png": require("./players/kk/99 Uggi Jóhann Auðunsson.png"),
