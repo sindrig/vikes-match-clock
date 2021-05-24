@@ -97,7 +97,7 @@ class LoginPage extends Component {
       // eslint-disable-next-line
       firebase
         .login({ email, password })
-        .then((data) => setListenPrefix(email.split("@")[0]))
+        .then(() => setListenPrefix(email.split("@")[0]))
         .catch((err) => alert(err.message));
     };
     return (
