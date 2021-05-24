@@ -75,14 +75,16 @@ class LoginPage extends Component {
       email,
       setEmail,
       setPassword,
+      setListenPrefix,
+      listenPrefix,
       firebase,
       auth,
     } = this.props;
     if (auth.isLoaded && !auth.isEmpty) {
       return (
         <div>
-          {this.renderIsRemoteCtrl()}[<b>{auth.email.split("@")[0]}</b>
-          ]
+          {this.renderIsRemoteCtrl()}[<b>{auth.email.split("@")[0]}</b>][
+          {listenPrefix}]
           <br />
           <button type="button" onClick={() => firebase.logout()}>
             Log out...
@@ -93,7 +95,10 @@ class LoginPage extends Component {
     const login = (e) => {
       e.preventDefault();
       // eslint-disable-next-line
-      firebase.login({ email, password }).catch((err) => alert(err.message));
+      firebase
+        .login({ email, password })
+        .then((data) => setListenPrefix(email.split("@")[0]))
+        .catch((err) => alert(err.message));
     };
     return (
       <div>
