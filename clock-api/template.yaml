@@ -41,7 +41,43 @@ Resources:
           - subnet-0c45ac69865df1ecf
           - subnet-09299f279812c8762
           - subnet-0191832d9edda018a
+  WeatherFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: weather/
+      Handler: app.lambda_handler
+      Role: !GetAtt WeatherFunctionRole.Arn
+      Runtime: python3.8
+      Events:
+        MatchReport:
+          Type: Api
+          Properties:
+            Path: /currentWeather
+            Method: get
 
+  WeatherFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - 'lambda.amazonaws.com'
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      Policies:
+        - PolicyName: 'WeatherFunctionParameterAccess'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'ssm:GetParameter*'
+                Resource: !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/vikes-match-clock/weather-api*'
 Outputs:
   MatchReportApi:
     Description: "API Gateway endpoint URL for Prod stage for Match Report function"
