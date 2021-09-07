@@ -17,6 +17,10 @@ const actions = {
     penaltyLength: penaltyLength || PENALTY_LENGTH,
   }),
   [ActionTypes.removePenalty]: (key) => ({ key }),
+  [ActionTypes.addToPenalty]: (key, toAdd) => ({
+    key,
+    toAdd: toAdd || PENALTY_LENGTH,
+  }),
   [ActionTypes.pauseMatch]: (options) => ({
     isHalfEnd: options && options.isHalfEnd,
   }),

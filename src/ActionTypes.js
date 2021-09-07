@@ -3,6 +3,7 @@ import keymirror from "keymirror";
 export const Match = keymirror({
   updateMatch: null,
   removePenalty: null,
+  addToPenalty: null,
   addPenalty: null,
   pauseMatch: null,
   startMatch: null,

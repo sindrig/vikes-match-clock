@@ -214,9 +214,23 @@ img.ad {
   right: 3%;
 }
 
-.penalty-manipulation button.remove-penalty {
+.penalty-manipulation div.manipulate-penalty {
   display: block;
   float: left;
+}
+
+.penalty-manipulation div#penalty-manipulation-box {
+  display: block;
+  position: absolute;
+  width: 400px;
+  height: 100px;
+  background-color: white;
+}
+
+.penalty-manipulation div#penalty-manipulation-box span {
+  font-weight: bold;
+  display: block;
+  margin-bottom: 20px;
 }
 
 .penalty-manipulation button.add-penalty {

@@ -88,6 +88,26 @@ const actions = {
       };
     },
   },
+  [ActionTypes.addToPenalty]: {
+    next(state, { payload, error }) {
+      if (error) {
+        return { ...state, error };
+      }
+      if (!payload) {
+        return { ...state, pending: true };
+      }
+      const { key, toAdd } = payload;
+      return {
+        ...state,
+        home2min: state.home2min.map((t) =>
+          t.key === key ? { ...t, penaltyLength: t.penaltyLength + toAdd } : t
+        ),
+        away2min: state.away2min.map((t) =>
+          t.key === key ? { ...t, penaltyLength: t.penaltyLength + toAdd } : t
+        ),
+      };
+    },
+  },
   [ActionTypes.pauseMatch]: {
     next(state, { error, payload }) {
       if (error) {
