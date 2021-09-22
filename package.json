@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "axios": "0.21.1",
+    "axios": "0.21.2",
     "babel-eslint": "10.1.0",
     "firebase": "^7.15.0",
     "hls.js": "0.12.4",
