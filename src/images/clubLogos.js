@@ -1,7 +1,9 @@
 /* eslint-disable global-require */
 module.exports = {
+   Portúgal: require('./club-logos/Portugal.svg'),
   "Dalvík 2": require("./club-logos/Dalvík 2.png"),
   "Dalvík-Reynir": require("./club-logos/Dalvík-Reynir.svg"),
+  "Derby County": require("./club-logos/Derby County.png"),
   "Fjarðab-Höttur-Leiknir": require("./club-logos/Fjarðab-Höttur-Leiknir.svg"),
   "Geisli A": require("./club-logos/Geisli A.svg"),
   "HK-Víkingur": require("./club-logos/HK-Víkingur.svg"),
@@ -32,7 +34,6 @@ module.exports = {
   Björninn: require("./club-logos/Björninn.png"),
   Breiðablik: require("./club-logos/Breiðablik.svg"),
   Dalvík: require("./club-logos/Dalvík.png"),
-  "Derby County": require("./club-logos/Derby County.png"),
   Drangey: require("./club-logos/Drangey.svg"),
   Einherji: require("./club-logos/Einherji.svg"),
   Elliði: require("./club-logos/Elliði.svg"),
