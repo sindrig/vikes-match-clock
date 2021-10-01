@@ -98,6 +98,7 @@ const MatchActions = ({
           <button
             type="button"
             onClick={() =>
+              window.confirm("Ertu alveg viss?") &&
               updateMatch({
                 started: 0,
                 timeElapsed: 0,
