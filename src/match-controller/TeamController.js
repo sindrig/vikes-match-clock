@@ -13,7 +13,7 @@ const TeamController = ({ goal, penalty, timeout, started, team }) => (
     <ControlButton className="red" onClick={penalty} disabled={!!started}>
       Brottvísun
     </ControlButton>
-    <ControlButton className="green" onClick={timeout} disabled={!started}>
+    <ControlButton className="green" onClick={timeout}>
       Leikhlé
     </ControlButton>
   </div>
