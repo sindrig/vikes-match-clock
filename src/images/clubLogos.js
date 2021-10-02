@@ -1,6 +1,6 @@
 /* eslint-disable global-require */
 module.exports = {
-   Portúgal: require('./club-logos/Portugal.svg'),
+  Portúgal: require("./club-logos/Portugal.svg"),
   "Dalvík 2": require("./club-logos/Dalvík 2.png"),
   "Dalvík-Reynir": require("./club-logos/Dalvík-Reynir.svg"),
   "Derby County": require("./club-logos/Derby County.png"),

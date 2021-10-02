@@ -1,5 +1,5 @@
 export default {
-    'Portúgal': '2065',
+  Portúgal: "2065",
   "Boltaf. Norðfj": "744",
   "BÍ-Bolungarvík": "8010",
   "Dalvík 2": "145394",
