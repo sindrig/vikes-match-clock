@@ -42,7 +42,7 @@ context("Basic navigation", () => {
     cy.get("#view-selector-control").click();
 
     cy.contains("Stop").should("have.length", 0);
-    cy.contains("Leikhlé").should("be.disabled");
+    cy.contains("Leikhlé").should("be.enabled");
     cy.contains("Start").click();
     cy.tick(ONE_MINUTE / 2);
     cy.contains("Stop").should("have.length", 1);
@@ -53,7 +53,7 @@ context("Basic navigation", () => {
     cy.tick(1500);
     cy.contains("Start").should("have.length", 1);
     cy.contains("Start").should("be.disabled");
-    cy.contains("Leikhlé").should("be.disabled");
+    cy.contains("Leikhlé").should("be.enabled");
     cy.get("audio").should("have.length", 1);
     cy.get(".timeoutclock").should("have.text", "00:59");
     cy.tick(30000);
