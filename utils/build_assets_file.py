@@ -23,6 +23,7 @@ def main():
         f.write('/* eslint-disable global-require */\n')
         f.write('module.exports = {\n')
         for root, dirs, files in os.walk(IMAGES_DIR):
+            dirs.sort()
             for fn in sorted(files, key=sort_key):
                 if include(fn):
                     relpath = os.path.relpath(
