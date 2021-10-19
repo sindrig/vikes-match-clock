@@ -6,6 +6,7 @@ module.exports = {
   "ads/large/eimskip.png": require("./ads/large/eimskip.png"),
   "ads/large/floti.png": require("./ads/large/floti.png"),
   "ads/large/grantthornton.png": require("./ads/large/grantthornton.png"),
+  "ads/large/karisolvi.png": require("./ads/large/karisolvi.png"),
   "ads/large/macron.png": require("./ads/large/macron.png"),
   "ads/large/smurstodin.png": require("./ads/large/smurstodin.png"),
   "ads/large/voltaren.png": require("./ads/large/voltaren.png"),
