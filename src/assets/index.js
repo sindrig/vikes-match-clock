@@ -1,11 +1,13 @@
 /* eslint-disable global-require */
 module.exports = {
   "assets/astonvilla.png": require("./astonvilla.png"),
+  "ads/large/bikarmeistarar.jpg": require("./ads/large/bikarmeistarar.jpg"),
   "ads/large/bmw.png": require("./ads/large/bmw.png"),
   "ads/large/byko.png": require("./ads/large/byko.png"),
   "ads/large/eimskip.png": require("./ads/large/eimskip.png"),
   "ads/large/floti.png": require("./ads/large/floti.png"),
   "ads/large/grantthornton.png": require("./ads/large/grantthornton.png"),
+  "ads/large/islandsmeistarar.png": require("./ads/large/islandsmeistarar.png"),
   "ads/large/karisolvi.png": require("./ads/large/karisolvi.png"),
   "ads/large/macron.png": require("./ads/large/macron.png"),
   "ads/large/smurstodin.png": require("./ads/large/smurstodin.png"),
