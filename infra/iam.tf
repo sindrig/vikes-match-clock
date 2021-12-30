@@ -8,6 +8,12 @@ data "aws_iam_policy_document" "grant_deploy" {
       "${module.webpage.s3_bucket_arn}/*"
     ]
   }
+  statement {
+    actions = [
+      "cloudfront:CreateInvalidation"
+    ]
+    resources = ["*"]
+  }
 }
 
 resource "aws_iam_user" "deployer" {
