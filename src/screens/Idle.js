@@ -56,7 +56,7 @@ class Idle extends Component {
         <AdImage
           size="large"
           blankBetweenImages
-          time={1}
+          time={10}
           postAdImg={gledilegt_ar}
         />
         <img src={clubLogos["Víkingur R"]} alt="Vikes" className="idle-vikes" />
