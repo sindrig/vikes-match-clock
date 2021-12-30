@@ -24,7 +24,7 @@ function useInterval(callback, delay) {
   }, [delay]);
 }
 
-const AdImage = ({ size, time, blankBetweenImages }) => {
+const AdImage = ({ size, time, blankBetweenImages, postAdImg }) => {
   const adRegex = new RegExp(`ads\\/${size}\\/(.*)\\.*`);
   const adAssets = [
     ...new Set(
@@ -36,32 +36,42 @@ const AdImage = ({ size, time, blankBetweenImages }) => {
   ];
   const [img, setImg] = useState(0);
   const [isBlank, setBlank] = useState(blankBetweenImages);
+  const [isPost, setPost] = useState(!postAdImg);
   useInterval(() => {
-    if (!isBlank && blankBetweenImages) {
-      return setBlank(true);
-    }
-    if (blankBetweenImages && isBlank) {
-      setBlank(false);
+    if (blankBetweenImages) {
+      if (!isBlank) {
+        if (!isPost) {
+          return setPost(true);
+        } else {
+          setPost(false);
+        }
+        return setBlank(true);
+      }
+      if (isBlank) {
+        setBlank(false);
+      }
     }
     const nextImg = img + 1;
     return setImg(nextImg === adAssets.length ? 0 : nextImg);
   }, time * 1000);
-  const src = `ads/${size}/${adAssets[img]}`;
   if (isBlank) {
     return null;
   }
-  return <img src={assets[src]} className="ad" alt="Ad" />;
+  const src = isPost ? postAdImg : assets[`ads/${size}/${adAssets[img]}`];
+  return <img src={src} className="ad" alt="Ad" />;
 };
 
 AdImage.propTypes = {
   size: PropTypes.string.isRequired,
   time: PropTypes.number,
   blankBetweenImages: PropTypes.bool,
+  postAdImg: PropTypes.string,
 };
 
 AdImage.defaultProps = {
   time: 5,
   blankBetweenImages: false,
+  postAdImg: null,
 };
 
 export default AdImage;
