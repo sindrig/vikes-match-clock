@@ -37,12 +37,11 @@ const Controller = ({
   )[0];
   const showControls = !sync || !auth.isEmpty;
   return (
-    <div className="controller" style={{ left }}>
+    <div className="controller">
+      <div className="dummyDiv"></div>
       {showControls && <MatchActions />}
-      {showControls && <AssetController />}
       <div
         className="page-actions control-item"
-        style={{ left: -left, top: vp.style.height, width: vp.style.width }}
       >
         {showControls && (
           <div className="view-selector">
@@ -92,6 +91,7 @@ const Controller = ({
         </button>
         <LoginPage />
       </div>
+      {showControls && <AssetController />}
     </div>
   );
 };

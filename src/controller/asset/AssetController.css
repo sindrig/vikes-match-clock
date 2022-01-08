@@ -9,7 +9,7 @@
 
 .asset-controller {
   height: calc(100vh - 110px);
-  width: 1070px;
+  width: 70%;
   overflow: scroll;
   margin: 30px 5px 5px 5px;
   float: left;

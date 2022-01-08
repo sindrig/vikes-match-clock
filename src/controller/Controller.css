@@ -5,18 +5,31 @@
 }
 
 .controller {
-  position: relative;
-  top: 30px;
+  position: absolute;
+  top: 0px;  
   font-size: 16px;
 }
 
 .controller .control-item {
-  margin: 5px;
+  margin: 1px;
   float: left;
 }
 
+.controller .playerControls {
+  width:400px;
+}
+
+.controller .dummyDiv {
+  position: relative;
+  top: 0px;
+  width: 240px;
+  height: 176px;
+  float:left;
+}
+
 .controller > div {
-  border: 2px solid black;
+  border: 1px solid #757575;
+  border-radius: 3px;
 }
 
 .controller div.control-item > button,
@@ -28,9 +41,18 @@
 }
 
 .controller .page-actions {
-  position: absolute;
+  position: relative;
+  float: left;
 }
 
 .controller .asset-controller {
   clear: both;
+}
+
+input[type='number']{
+  width: 40px;
+} 
+
+input.longerInput{
+  width: 95px;
 }

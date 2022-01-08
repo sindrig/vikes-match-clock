@@ -14,7 +14,7 @@ import HalfStops from "./HalfStops";
 const roundMillisToSeconds = (millis) => Math.floor(millis / 1000) * 1000;
 
 const clockManipulationBox = (seconds, match, updateMatch) => {
-  const unit = seconds >= 60 ? "mín" : "sek";
+  const unit = seconds >= 60 ? "m" : "s";
   const humanReadableSeconds = seconds >= 60 ? seconds / 60 : seconds;
   return (
     <div className="control-item">
@@ -58,31 +58,31 @@ const MatchActions = ({
   startMatch,
   addGoal,
 }) => (
-  <div className="control-item">
+  <div className="control-item playerControls">
     {view === VIEWS.match && (
       <div>
         <div className="control-item">
           <button type="button" onClick={() => addGoal({ team: "home" })}>
-            Heima +1
+            H +1
           </button>
           <button
             type="button"
             onClick={() => updateMatch({ homeScore: match.homeScore - 1 })}
             disabled={match.homeScore <= 0}
           >
-            Heima -1
+            H -1
           </button>
         </div>
         <div className="control-item">
           <button type="button" onClick={() => addGoal({ team: "away" })}>
-            Úti +1
+            Ú +1
           </button>
           <button
             type="button"
             onClick={() => updateMatch({ awayScore: match.awayScore - 1 })}
             disabled={match.awayScore <= 0}
           >
-            Úti -1
+            Ú -1
           </button>
         </div>
         <div className="control-item">
@@ -128,9 +128,11 @@ const MatchActions = ({
         <div className="control-item">
           {match.matchType === SPORTS.football ? (
             <div style={{ whiteSpace: "nowrap", width: "400px" }}>
-              Uppbótartími:{" "}
+              {" "}
               <input
                 type="number"
+                className="longerInput"
+                placeholder="Uppbótartími"
                 value={match.injuryTime || ""}
                 onChange={({ target: { value } }) =>
                   updateMatch({ injuryTime: parseInt(value, 10) })
