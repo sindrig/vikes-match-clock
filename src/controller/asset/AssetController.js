@@ -174,7 +174,7 @@ class AssetController extends Component {
     } = this.props;
     const selectedAssetsList = selectedAssets || [];
     return (
-      <div>
+      <div className="withborder">
         <div className="controls control-item">
           <AssetSelector addAssetKey={this.addAssetKey}>
             <option value="null">Myndir</option>

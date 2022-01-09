@@ -15,6 +15,12 @@ export const VIEWS = keymirror({
   control: null,
 });
 
+export const TABS = keymirror({
+  home: null,
+  settings: null
+});
+
+
 export const initialState = {
   selectedAssets: [],
   cycle: false,
@@ -25,7 +31,7 @@ export const initialState = {
   view: VIEWS.idle,
   availableMatches: {},
   selectedMatch: null,
-  currentAsset: "",
+  currentAsset: ""
 };
 
 const getStateShowingNextAsset = (state) => {
@@ -61,6 +67,12 @@ const actions = {
   [ActionTypes.selectAssetView]: {
     next(state, { payload: { assetView } }) {
       return { ...state, assetView };
+    },
+  },
+  [ActionTypes.selectTab]: {
+    next(state, { payload: { tab } }) {
+      console.log("slect tab in redux");
+      return { ...state, tab };
     },
   },
   [ActionTypes.clearMatchPlayers]: {

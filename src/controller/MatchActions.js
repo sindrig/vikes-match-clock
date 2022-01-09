@@ -2,14 +2,19 @@ import React from "react";
 import PropTypes from "prop-types";
 import { connect } from "react-redux";
 import { bindActionCreators } from "redux";
-
+import IconButton from 'rsuite/IconButton';
+import Button from 'rsuite/Button';
+import PlayIcon from '@rsuite/icons/PlayOutline';
+import PauseIcon from '@rsuite/icons/PauseRound';
+import TimeIcon from '@rsuite/icons/TimeRound';
+import { Input, InputGroup } from 'rsuite';
+import HistoryIcon from '@rsuite/icons/History';
 import matchActions from "../actions/match";
 import { matchPropType } from "../propTypes";
-import TeamSelector from "./TeamSelector";
 import PenaltiesManipulationBox from "./PenaltiesManipulationBox";
 import { VIEWS } from "../reducers/controller";
 import { SPORTS, DEFAULT_HALFSTOPS } from "../constants";
-import HalfStops from "./HalfStops";
+
 
 const roundMillisToSeconds = (millis) => Math.floor(millis / 1000) * 1000;
 
@@ -58,7 +63,7 @@ const MatchActions = ({
   startMatch,
   addGoal,
 }) => (
-  <div className="control-item playerControls">
+  <div className="control-item playerControls withborder">
     {view === VIEWS.match && (
       <div>
         <div className="control-item">
@@ -87,17 +92,15 @@ const MatchActions = ({
         </div>
         <div className="control-item">
           {match.started ? (
-            <button type="button" onClick={pauseMatch}>
-              Pása
-            </button>
+                <Button color="yellow" appearance="primary" placement="left" onClick={pauseMatch} disabled={match.timeout}>
+                <PauseIcon /> Pása
+              </Button>
           ) : (
-            <button type="button" onClick={startMatch} disabled={match.timeout}>
-              Byrja
-            </button>
+            <Button color="green" appearance="primary" placement="left" onClick={startMatch} disabled={match.timeout}>
+              <PlayIcon /> Byrja
+            </Button>
           )}
-          <button
-            type="button"
-            onClick={() =>
+          <IconButton size="xs" icon={<HistoryIcon />} placement="left" onClick={() =>
               window.confirm("Ertu alveg viss?") &&
               updateMatch({
                 started: 0,
@@ -110,16 +113,14 @@ const MatchActions = ({
                 buzzer: false,
                 halfStops: DEFAULT_HALFSTOPS[match.matchType],
               })
-            }
-            disabled={
-              !match.started &&
+            } disabled={
+              (!match.started &&
               !match.timeElapsed &&
               DEFAULT_HALFSTOPS[match.matchType][0] === match.halfStops[0] &&
-              !match.timeout
-            }
-          >
-            Núllstilla klukku
-          </button>
+              !match.timeout) ? true : false
+            } color="red" appearance="primary">
+            Reset
+            </IconButton>
         </div>
         {clockManipulationBox(1, match, updateMatch)}
         {clockManipulationBox(5, match, updateMatch)}
@@ -140,31 +141,10 @@ const MatchActions = ({
               />
             </div>
           ) : null}
-          <div>
-            <HalfStops />
-          </div>
         </div>
       </div>
     )}
     <div>
-      <div className="control-item">
-        <TeamSelector teamAttrName="homeTeam" />
-        <TeamSelector teamAttrName="awayTeam" />
-        <div>
-          Íþrótt:
-          <select
-            className="match-type-selector"
-            value={match.matchType}
-            onChange={({ target: { value } }) =>
-              updateMatch({ matchType: value })
-            }
-          >
-            {Object.keys(SPORTS).map((s) => (
-              <option key={s}>{s}</option>
-            ))}
-          </select>
-        </div>
-      </div>
       <div className="control-item">
         {match.matchType === SPORTS.handball ? (
           <div>

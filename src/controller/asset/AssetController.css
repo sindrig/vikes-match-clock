@@ -16,10 +16,8 @@
 }
 
 .asset-controller .view-selector {
-  position: absolute;
-  top: 105px;
-  left: -54px;
-  width: 54px;
+  position: relative;
+  float:left;
 }
 
 .asset-controller .view-selector button {
@@ -35,7 +33,7 @@
 }
 
 .asset-controller .upcoming-assets {
-  overflow: hidden;
+  position:relative;
   width: 500px;
   float: left;
   margin-left: 10px;

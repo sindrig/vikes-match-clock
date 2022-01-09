@@ -12,6 +12,7 @@ html {
   cursor: none;
   top: 0px;
   float: left;
+  z-index: 999;
 }
 
 button {

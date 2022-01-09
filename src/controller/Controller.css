@@ -7,7 +7,7 @@
 .controller {
   position: absolute;
   top: 0px;  
-  font-size: 16px;
+  font-size: 14px;
 }
 
 .controller .control-item {
@@ -25,9 +25,10 @@
   width: 240px;
   height: 176px;
   float:left;
+  z-index: -100;
 }
 
-.controller > div {
+.controller > div.withborder {
   border: 1px solid #757575;
   border-radius: 3px;
 }
@@ -50,9 +51,9 @@
 }
 
 input[type='number']{
-  width: 40px;
+  width: 50px;
 } 
 
 input.longerInput{
-  width: 95px;
+  width: 120px;
 }
