@@ -242,7 +242,7 @@ class TeamAssetController extends Component {
     return (
       <div>
         {!(homeTeam.length || awayTeam.length) ? (
-          <div className="control-item">
+          <div className="control-item stdbuttons">
             <button type="button" onClick={this.autoFill}>
               Sækja lið
             </button>
@@ -251,14 +251,14 @@ class TeamAssetController extends Component {
         {homeTeam.length ||
         awayTeam.length ||
         Object.keys(availableMatches).length ? (
-          <div className="control-item">
-            <button type="button" onClick={clearMatchPlayers}>
+          <div className="control-item stdbuttons">
+            <button type="button" onClick={() => window.confirm("Ertu alveg viss?") && clearMatchPlayers() }>
               Hreinsa lið
             </button>
           </div>
         ) : null}
         {homeTeam.length || awayTeam.length ? (
-          <div className="control-item">
+          <div className="control-item stdbuttons">
             <button type="button" onClick={this.addPlayersToQ}>
               Setja lið í biðröð
             </button>
@@ -323,7 +323,7 @@ class TeamAssetController extends Component {
     }
     return (
       <div>
-        <div className="control-item">
+        <div className="control-item stdbuttons">
           <button
             type="button"
             onClick={() => this.setState({ selectSubs: true })}
@@ -331,7 +331,7 @@ class TeamAssetController extends Component {
             Skipting
           </button>
         </div>
-        <div className="control-item">
+        <div className="control-item stdbuttons">
           <button
             type="button"
             onClick={() => this.setState({ selectPlayerAsset: true })}
@@ -339,7 +339,7 @@ class TeamAssetController extends Component {
             Birta leikmann
           </button>
         </div>
-        <div className="control-item">
+        <div className="control-item stdbuttons">
           <button
             type="button"
             onClick={() => this.setState({ selectGoalScorer: true })}
@@ -355,7 +355,7 @@ class TeamAssetController extends Component {
     const { subIn, subOut, selectSubs, subTeam } = this.state;
     const { match } = this.props;
     return (
-      <div className="sub-controller control-item">
+      <div className="sub-controller control-item stdbuttons">
         {this.renderActionButtons()}
         {selectSubs ? (
           <div className="control-item">

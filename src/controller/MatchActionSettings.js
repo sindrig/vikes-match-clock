@@ -5,7 +5,6 @@ import { bindActionCreators } from "redux";
 import matchActions from "../actions/match";
 import { matchPropType } from "../propTypes";
 import TeamSelector from "./TeamSelector";
-import PenaltiesManipulationBox from "./PenaltiesManipulationBox";
 import { VIEWS } from "../reducers/controller";
 import { SPORTS } from "../constants";
 import HalfStops from "./HalfStops";

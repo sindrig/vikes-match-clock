@@ -175,7 +175,7 @@ class AssetController extends Component {
     const selectedAssetsList = selectedAssets || [];
     return (
       <div className="withborder">
-        <div className="controls control-item">
+        <div className="controls control-item stdbuttons">
           <AssetSelector addAssetKey={this.addAssetKey}>
             <option value="null">Myndir</option>
             {Object.keys(assetsImages)
@@ -251,7 +251,7 @@ class AssetController extends Component {
     const { match, assetView, selectAssetView } = this.props;
     return (
       <div className="asset-controller">
-        <div className="view-selector">
+        <div className="view-selector assettabs stdbuttons">
           <button
             type="button"
             onClick={() => selectAssetView(ASSET_VIEWS.assets)}

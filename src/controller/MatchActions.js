@@ -6,8 +6,6 @@ import IconButton from 'rsuite/IconButton';
 import Button from 'rsuite/Button';
 import PlayIcon from '@rsuite/icons/PlayOutline';
 import PauseIcon from '@rsuite/icons/PauseRound';
-import TimeIcon from '@rsuite/icons/TimeRound';
-import { Input, InputGroup } from 'rsuite';
 import HistoryIcon from '@rsuite/icons/History';
 import matchActions from "../actions/match";
 import { matchPropType } from "../propTypes";
@@ -22,7 +20,7 @@ const clockManipulationBox = (seconds, match, updateMatch) => {
   const unit = seconds >= 60 ? "m" : "s";
   const humanReadableSeconds = seconds >= 60 ? seconds / 60 : seconds;
   return (
-    <div className="control-item">
+    <div className="control-item stdbuttons">
       <button
         type="button"
         onClick={() =>
@@ -66,7 +64,7 @@ const MatchActions = ({
   <div className="control-item playerControls withborder">
     {view === VIEWS.match && (
       <div>
-        <div className="control-item">
+        <div className="control-item stdbuttons">
           <button type="button" onClick={() => addGoal({ team: "home" })}>
             H +1
           </button>
@@ -78,7 +76,7 @@ const MatchActions = ({
             H -1
           </button>
         </div>
-        <div className="control-item">
+        <div className="control-item stdbuttons">
           <button type="button" onClick={() => addGoal({ team: "away" })}>
             Ú +1
           </button>
@@ -126,7 +124,7 @@ const MatchActions = ({
         {clockManipulationBox(5, match, updateMatch)}
         {clockManipulationBox(60, match, updateMatch)}
         {clockManipulationBox(60 * 5, match, updateMatch)}
-        <div className="control-item">
+        <div className="control-item stdbuttons">
           {match.matchType === SPORTS.football ? (
             <div style={{ whiteSpace: "nowrap", width: "400px" }}>
               {" "}

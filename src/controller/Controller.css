@@ -1,7 +1,7 @@
 .controller button {
-  background-color: #c0c0c0;
+  /*background-color: #c0c0c0;
   border: 1px solid black;
-  font-size: 15px;
+  font-size: 15px;*/
 }
 
 .controller {
@@ -16,21 +16,35 @@
 }
 
 .controller .playerControls {
-  width:400px;
+  width:380px;
 }
 
 .controller .dummyDiv {
   position: relative;
   top: 0px;
-  width: 240px;
+  width: 242px;
   height: 176px;
   float:left;
   z-index: -100;
 }
 
 .controller > div.withborder {
-  border: 1px solid #757575;
-  border-radius: 3px;
+  border: 1px solid #c7c7c7;
+  border-radius: 5px;
+}
+
+div.stdbuttons> button
+{
+  border: 1px solid #747474;
+  background-color: lightgray;
+  border-radius: 2px;
+}
+
+div.stdbuttons> button:hover
+{
+  border: 1px solid #494949;
+  background-color: rgb(187, 187, 187);
+  border-radius: 2px;
 }
 
 .controller div.control-item > button,

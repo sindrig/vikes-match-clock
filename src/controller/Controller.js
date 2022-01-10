@@ -9,6 +9,9 @@ import globalActions from "../actions/global";
 import { Nav } from 'rsuite';
 import GearIcon from '@rsuite/icons/Gear';
 import TimeIcon from '@rsuite/icons/Time';
+import CloseIcon from '@rsuite/icons/CloseOutline';
+import Button from 'rsuite/Button';
+import { Tooltip, Whisper } from 'rsuite';
 
 import { TABS, VIEWS } from "../reducers/controller";
 import { VPS } from "../reducers/view";
@@ -44,7 +47,11 @@ const Controller = ({
   const showControls = !sync || !auth.isEmpty;
   const showHome = tab === "home";
   const showSettings = tab === "settings";
-
+  const tooltipClear = (
+    <Tooltip>
+      Birtir aftur stöðu leiksins á skjá.
+    </Tooltip>
+  );
   return (
     <div className="controller">
       <div className="dummyDiv"></div>
@@ -56,7 +63,15 @@ const Controller = ({
       </Nav>
       {showControls && showHome && <MatchActions />}
       {showControls && showSettings && <MatchActionSettings />}
-      
+      {showControls && currentAsset && (
+         <div className="control-item">
+            <Whisper placement="bottom" controlId="clearoverlay-id-hover" trigger="hover" speaker={tooltipClear}>
+              <Button color="cyan" appearance="primary" size="sm" onClick={() => renderAsset(0)}>
+                <CloseIcon /> Hreinsa virkt overlay
+              </Button>
+            </Whisper>
+         </div>
+        )}
       { showSettings && (
       <div
         className="page-actions control-item withborder"
@@ -78,11 +93,6 @@ const Controller = ({
               </label>
             ))}
           </div>
-        )}
-        {showControls && currentAsset && (
-          <button type="button" onClick={() => renderAsset(0)}>
-            Hreinsa núverandi mynd
-          </button>
         )}
         <div className="viewport-select">
           <select

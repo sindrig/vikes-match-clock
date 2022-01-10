@@ -5,6 +5,8 @@ import PropTypes from "prop-types";
 import { playerPropType, matchPropType } from "../../../propTypes";
 import controllerActions from "../../../actions/controller";
 import TeamPlayer from "./TeamPlayer";
+import IconButton from 'rsuite/IconButton';
+import CloseIcon from '@rsuite/icons/Close';
 
 import "./Team.css";
 
@@ -101,7 +103,7 @@ class Team extends Component {
         {match[teamName]
           ? team.map((p, i) => (
               // eslint-disable-next-line react/no-array-index-key
-              <div key={`${i}`}>
+              <div className="player-whole-line" key={`${i}`}>
                 {selectPlayer && p.number && p.name ? (
                   <button
                     type="button"
@@ -110,9 +112,7 @@ class Team extends Component {
                 ) : (
                   <TeamPlayer player={p} onChange={this.updatePlayer(i)} />
                 )}
-                <button type="button" onClick={() => this.removePlayer(i)}>
-                  Eyða línu
-                </button>
+                <IconButton icon={<CloseIcon />} size="xs" color="red" appearance="primary" circle onClick={() => this.removePlayer(i)}/>
               </div>
             ))
           : null}

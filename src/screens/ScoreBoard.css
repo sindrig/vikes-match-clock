@@ -19,7 +19,8 @@
 }
 
 .team-name {
-  display: none;
+  /*display: none;*/
+  font-style: oblique;
 }
 
 .team-timeouts {
