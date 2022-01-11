@@ -108,15 +108,10 @@ const Controller = ({
             ))}
           </select>
         </div>
-        <button
-          type="button"
-          onClick={() =>
+        <Button color="red" appearance="primary" size="sm" onClick={() =>
             confirmRefresh() &&
             clearState().then(() => window.location.reload())
-          }
-        >
-          Hard refresh
-        </button>
+          }>Hard refresh</Button>
         <LoginPage />
       </div>)}
       {showControls && <AssetController />}

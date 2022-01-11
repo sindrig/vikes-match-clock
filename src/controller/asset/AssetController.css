@@ -5,6 +5,7 @@
 
 .asset-controller > div {
   display: inline-block;
+  overflow:auto;
 }
 
 .asset-controller {
