@@ -7,6 +7,19 @@
   z-index: 999;
 }
 
+img.idle-ad {
+  display: none;
+}
+
+.idle-outside img.idle-ad {
+  position: absolute;
+  display: block;
+  width: 80px;
+  height: 80px;
+  right: 10%;
+  top: 10%;
+}
+
 .idle .idle-clock {
   text-align: center;
   display: inline-block;

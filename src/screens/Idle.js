@@ -7,6 +7,7 @@ import clubLogos from "../images/clubLogos";
 import AdImage from "../utils/AdImage";
 import { getTemp } from "../lib/weather";
 import gledilegt_ar from "../images/gledilegt_ar_2021.png";
+import husasmidjan from "../images/husa.png";
 
 import "./Idle.css";
 
@@ -56,10 +57,11 @@ class Idle extends Component {
         <AdImage
           size="large"
           blankBetweenImages
-          time={10}
+          time={8}
           postAdImg={gledilegt_ar}
         />
         <img src={clubLogos["Víkingur R"]} alt="Vikes" className="idle-vikes" />
+        <img src={husasmidjan} alt="Vikes" className="idle-ad" />
         <div className="idle-text-container">
           <div className="idle-text-box idle-clock">
             <Clock format="HH:mm" className="idle-clock" ticking />

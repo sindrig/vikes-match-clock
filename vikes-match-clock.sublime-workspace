@@ -1,0 +1,1858 @@
+{
+	"auto_complete":
+	{
+		"selected_items":
+		[
+			[
+				"ent",
+				"entity_sk"
+			],
+			[
+				"ssm",
+				"ssm_prefix"
+			],
+			[
+				"token",
+				"token_kms_key"
+			],
+			[
+				"MA",
+				"MAX_TTL"
+			],
+			[
+				"time",
+				"timedelta"
+			]
+		]
+	},
+	"buffers":
+	[
+		{
+			"file": "src/constants.js",
+			"settings":
+			{
+				"buffer_size": 1003,
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"file": "src/index.js",
+			"settings":
+			{
+				"buffer_size": 1386,
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"file": "src/App.js",
+			"settings":
+			{
+				"buffer_size": 3457,
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"file": "src/screens/Idle.js",
+			"settings":
+			{
+				"buffer_size": 2124,
+				"encoding": "UTF-8",
+				"line_ending": "Unix"
+			},
+			"undo_stack":
+			[
+				[
+					20,
+					1,
+					"duplicate_line",
+					null,
+					"AQAAAGQBAAAAAAAAoAEAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAABjAQAAAAAAAGMBAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					23,
+					1,
+					"insert",
+					{
+						"characters": "husa"
+					},
+					"BQAAAIgBAAAAAAAAiQEAAAAAAAAAAAAAiQEAAAAAAACJAQAAAAAAABEAAABnbGVkaWxlZ3RfYXJfMjAyMYkBAAAAAAAAigEAAAAAAAAAAAAAigEAAAAAAACLAQAAAAAAAAAAAACLAQAAAAAAAIwBAAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAACIAQAAAAAAAJkBAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					28,
+					1,
+					"insert",
+					{
+						"characters": "husasmidjan"
+					},
+					"DAAAAGsBAAAAAAAAbAEAAAAAAAAAAAAAbAEAAAAAAABsAQAAAAAAAAwAAABnbGVkaWxlZ3RfYXJsAQAAAAAAAG0BAAAAAAAAAAAAAG0BAAAAAAAAbgEAAAAAAAAAAAAAbgEAAAAAAABvAQAAAAAAAAAAAABvAQAAAAAAAHABAAAAAAAAAAAAAHABAAAAAAAAcQEAAAAAAAAAAAAAcQEAAAAAAAByAQAAAAAAAAAAAAByAQAAAAAAAHMBAAAAAAAAAAAAAHMBAAAAAAAAdAEAAAAAAAAAAAAAdAEAAAAAAAB1AQAAAAAAAAAAAAB1AQAAAAAAAHYBAAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAABrAQAAAAAAAHcBAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					33,
+					1,
+					"duplicate_line",
+					null,
+					"AQAAAPAFAAAAAAAAQQYAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAADvBQAAAAAAAO8FAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					39,
+					1,
+					"insert",
+					{
+						"characters": "husasmidjan-"
+					},
+					"DQAAADIGAAAAAAAAMwYAAAAAAAAAAAAAMwYAAAAAAAAzBgAAAAAAAAoAAABpZGxlLXZpa2VzMwYAAAAAAAA0BgAAAAAAAAAAAAA0BgAAAAAAADUGAAAAAAAAAAAAADUGAAAAAAAANgYAAAAAAAAAAAAANgYAAAAAAAA3BgAAAAAAAAAAAAA3BgAAAAAAADgGAAAAAAAAAAAAADgGAAAAAAAAOQYAAAAAAAAAAAAAOQYAAAAAAAA6BgAAAAAAAAAAAAA6BgAAAAAAADsGAAAAAAAAAAAAADsGAAAAAAAAPAYAAAAAAAAAAAAAPAYAAAAAAAA9BgAAAAAAAAAAAAA9BgAAAAAAAD4GAAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAAAyBgAAAAAAADwGAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					42,
+					1,
+					"insert",
+					{
+						"characters": "ad"
+					},
+					"AgAAAD4GAAAAAAAAPwYAAAAAAAAAAAAAPwYAAAAAAABABgAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAAA+BgAAAAAAAD4GAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					48,
+					1,
+					"paste",
+					null,
+					"AgAAAAIGAAAAAAAADQYAAAAAAAAAAAAADQYAAAAAAAANBgAAAAAAABgAAABjbHViTG9nb3NbIlbDrWtpbmd1ciBSIl0",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAAACBgAAAAAAABkGAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					79,
+					1,
+					"insert",
+					{
+						"characters": "id"
+					},
+					"AwAAACYGAAAAAAAAJwYAAAAAAAAAAAAAJwYAAAAAAAAnBgAAAAAAAAsAAABodXNhc21pZGphbicGAAAAAAAAKAYAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAAAmBgAAAAAAADEGAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					80,
+					2,
+					"left_delete",
+					null,
+					"AgAAACcGAAAAAAAAJwYAAAAAAAABAAAAZCYGAAAAAAAAJgYAAAAAAAABAAAAaQ",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAAAoBgAAAAAAACgGAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					81,
+					1,
+					"insert",
+					{
+						"characters": "mainpage"
+					},
+					"CAAAACYGAAAAAAAAJwYAAAAAAAAAAAAAJwYAAAAAAAAoBgAAAAAAAAAAAAAoBgAAAAAAACkGAAAAAAAAAAAAACkGAAAAAAAAKgYAAAAAAAAAAAAAKgYAAAAAAAArBgAAAAAAAAAAAAArBgAAAAAAACwGAAAAAAAAAAAAACwGAAAAAAAALQYAAAAAAAAAAAAALQYAAAAAAAAuBgAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAAAmBgAAAAAAACYGAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					87,
+					1,
+					"insert",
+					{
+						"characters": "idel"
+					},
+					"BQAAACYGAAAAAAAAJwYAAAAAAAAAAAAAJwYAAAAAAAAnBgAAAAAAAAgAAABtYWlucGFnZScGAAAAAAAAKAYAAAAAAAAAAAAAKAYAAAAAAAApBgAAAAAAAAAAAAApBgAAAAAAACoGAAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAAAmBgAAAAAAAC4GAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					88,
+					2,
+					"left_delete",
+					null,
+					"AgAAACkGAAAAAAAAKQYAAAAAAAABAAAAbCgGAAAAAAAAKAYAAAAAAAABAAAAZQ",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAAAqBgAAAAAAACoGAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					89,
+					1,
+					"insert",
+					{
+						"characters": "le"
+					},
+					"AgAAACgGAAAAAAAAKQYAAAAAAAAAAAAAKQYAAAAAAAAqBgAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAAAoBgAAAAAAACgGAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					125,
+					1,
+					"cut",
+					null,
+					"AQAAABcFAAAAAAAAFwUAAAAAAACHAAAACiAgICAgICAgPEFkSW1hZ2UKICAgICAgICAgIHNpemU9ImxhcmdlIgogICAgICAgICAgYmxhbmtCZXR3ZWVuSW1hZ2VzCiAgICAgICAgICB0aW1lPXsxMH0KICAgICAgICAgIHBvc3RBZEltZz17Z2xlZGlsZWd0X2FyfQogICAgICAgIC8+",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAACeBQAAAAAAABcFAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					128,
+					1,
+					"paste",
+					null,
+					"AQAAANwEAAAAAAAAYwUAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAADcBAAAAAAAANwEAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					132,
+					1,
+					"toggle_comment",
+					{
+						"block": false
+					},
+					"BgAAAGEFAAAAAAAAZAUAAAAAAAAAAAAAPgUAAAAAAABBBQAAAAAAAAAAAAAqBQAAAAAAAC0FAAAAAAAAAAAAAA0FAAAAAAAAEAUAAAAAAAAAAAAA9gQAAAAAAAD5BAAAAAAAAAAAAADlBAAAAAAAAOgEAAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAABjBQAAAAAAAO0EAAAAAAAAAAAAAAAAYkA"
+				],
+				[
+					149,
+					1,
+					"cut",
+					null,
+					"AQAAANwEAAAAAAAA3AQAAAAAAACZAAAACiAgICAgICAgLy8gPEFkSW1hZ2UKICAgICAgICAvLyAgIHNpemU9ImxhcmdlIgogICAgICAgIC8vICAgYmxhbmtCZXR3ZWVuSW1hZ2VzCiAgICAgICAgLy8gICB0aW1lPXsxMH0KICAgICAgICAvLyAgIHBvc3RBZEltZz17Z2xlZGlsZWd0X2FyfQogICAgICAgIC8vIC8+",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAAB1BQAAAAAAANwEAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					152,
+					1,
+					"paste",
+					null,
+					"AQAAABcFAAAAAAAAsAUAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAAAXBQAAAAAAABcFAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					155,
+					1,
+					"toggle_comment",
+					{
+						"block": false
+					},
+					"BgAAAKsFAAAAAAAAqwUAAAAAAAADAAAALy8ghQUAAAAAAACFBQAAAAAAAAMAAAAvLyBuBQAAAAAAAG4FAAAAAAAAAwAAAC8vIE4FAAAAAAAATgUAAAAAAAADAAAALy8gNAUAAAAAAAA0BQAAAAAAAAMAAAAvLyAgBQAAAAAAACAFAAAAAAAAAwAAAC8vIA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAACwBQAAAAAAACsFAAAAAAAAAAAAAAAA8L8"
+				]
+			]
+		},
+		{
+			"contents": "Searching 227 files for \"Klukka úti\" (regex)\n\n/home/sindri/dev/vikes-match-clock/src/reducers/view.js:\n   11      key: \"outside\",\n   12      fontSize: \"100%\",\n   13:     name: \"Klukka úti\",\n   14    },\n   15    insidebig: {\n\n1 match in 1 file\n",
+			"settings":
+			{
+				"buffer_size": 243,
+				"line_ending": "Unix",
+				"name": "Find Results",
+				"scratch": true
+			}
+		},
+		{
+			"file": "src/reducers/view.js",
+			"settings":
+			{
+				"buffer_size": 907,
+				"encoding": "UTF-8",
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"file": "src/propTypes.js",
+			"settings":
+			{
+				"buffer_size": 2108,
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"file": "src/reducers/controller.js",
+			"settings":
+			{
+				"buffer_size": 5779,
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"file": "src/App.css",
+			"settings":
+			{
+				"buffer_size": 424,
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"file": "src/screens/Idle.css",
+			"settings":
+			{
+				"buffer_size": 784,
+				"encoding": "UTF-8",
+				"line_ending": "Unix"
+			},
+			"undo_stack":
+			[
+				[
+					6,
+					1,
+					"insert",
+					{
+						"characters": "\n\nimg."
+					},
+					"BgAAAHwAAAAAAAAAfQAAAAAAAAAAAAAAfQAAAAAAAAB+AAAAAAAAAAAAAAB+AAAAAAAAAH8AAAAAAAAAAAAAAH8AAAAAAAAAgAAAAAAAAAAAAAAAgAAAAAAAAACBAAAAAAAAAAAAAACBAAAAAAAAAIIAAAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAAB8AAAAAAAAAHwAAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					13,
+					1,
+					"paste",
+					null,
+					"AQAAAIIAAAAAAAAAiQAAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAACCAAAAAAAAAIIAAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					14,
+					1,
+					"insert",
+					{
+						"characters": " "
+					},
+					"AQAAAIkAAAAAAAAAigAAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAACJAAAAAAAAAIkAAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					15,
+					1,
+					"insert_snippet",
+					{
+						"contents": "{$0}"
+					},
+					"AQAAAIoAAAAAAAAAjAAAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAACKAAAAAAAAAIoAAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					16,
+					1,
+					"run_macro_file",
+					{
+						"file": "res://Packages/Default/Add Line in Braces.sublime-macro"
+					},
+					"AwAAAIsAAAAAAAAAjAAAAAAAAAAAAAAAjAAAAAAAAACNAAAAAAAAAAAAAACMAAAAAAAAAI4AAAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAACLAAAAAAAAAIsAAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					17,
+					1,
+					"insert",
+					{
+						"characters": "di"
+					},
+					"AgAAAI4AAAAAAAAAjwAAAAAAAAAAAAAAjwAAAAAAAACQAAAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAACOAAAAAAAAAI4AAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					18,
+					1,
+					"insert_completion",
+					{
+						"completion": "display: $0;",
+						"format": "snippet",
+						"keep_prefix": false,
+						"must_insert": false,
+						"trigger": "display"
+					},
+					"AgAAAI4AAAAAAAAAjgAAAAAAAAACAAAAZGmOAAAAAAAAAJgAAAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAACQAAAAAAAAAJAAAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					19,
+					1,
+					"insert",
+					{
+						"characters": "none"
+					},
+					"BAAAAJcAAAAAAAAAmAAAAAAAAAAAAAAAmAAAAAAAAACZAAAAAAAAAAAAAACZAAAAAAAAAJoAAAAAAAAAAAAAAJoAAAAAAAAAmwAAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAACXAAAAAAAAAJcAAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					28,
+					2,
+					"paste",
+					null,
+					"AwAAAHwAAAAAAAAAnwAAAAAAAAAAAAAAnwAAAAAAAACfAAAAAAAAACMAAAAKCmltZy5pZGxlLWFkIHsKICBkaXNwbGF5OiBub25lOwp9Cp8AAAAAAAAAwgAAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAACfAAAAAAAAAHwAAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					32,
+					1,
+					"insert",
+					{
+						"characters": ".idel"
+					},
+					"BQAAAKEAAAAAAAAAogAAAAAAAAAAAAAAogAAAAAAAACjAAAAAAAAAAAAAACjAAAAAAAAAKQAAAAAAAAAAAAAAKQAAAAAAAAApQAAAAAAAAAAAAAApQAAAAAAAACmAAAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAAChAAAAAAAAAKEAAAAAAAAAAAAAAAAAAAA"
+				],
+				[
+					33,
+					2,
+					"left_delete",
+					null,
+					"AgAAAKUAAAAAAAAApQAAAAAAAAABAAAAbKQAAAAAAAAApAAAAAAAAAABAAAAZQ",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAACmAAAAAAAAAKYAAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					34,
+					1,
+					"insert",
+					{
+						"characters": "le-outside"
+					},
+					"CgAAAKQAAAAAAAAApQAAAAAAAAAAAAAApQAAAAAAAACmAAAAAAAAAAAAAACmAAAAAAAAAKcAAAAAAAAAAAAAAKcAAAAAAAAAqAAAAAAAAAAAAAAAqAAAAAAAAACpAAAAAAAAAAAAAACpAAAAAAAAAKoAAAAAAAAAAAAAAKoAAAAAAAAAqwAAAAAAAAAAAAAAqwAAAAAAAACsAAAAAAAAAAAAAACsAAAAAAAAAK0AAAAAAAAAAAAAAK0AAAAAAAAArgAAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAACkAAAAAAAAAKQAAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					35,
+					1,
+					"insert",
+					{
+						"characters": " "
+					},
+					"AQAAAK4AAAAAAAAArwAAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAACuAAAAAAAAAK4AAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					37,
+					2,
+					"toggle_comment",
+					{
+						"block": false
+					},
+					"BAAAAM0AAAAAAAAAzwAAAAAAAAAAAAAAvwAAAAAAAADBAAAAAAAAAAAAAAC/AAAAAAAAAL8AAAAAAAAAAgAAAC8qzQAAAAAAAADNAAAAAAAAAAIAAAAqLw",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAADLAAAAAAAAAMsAAAAAAAAAAAAAAAAAXEA"
+				],
+				[
+					39,
+					1,
+					"insert",
+					{
+						"characters": "block"
+					},
+					"BgAAAMgAAAAAAAAAyQAAAAAAAAAAAAAAyQAAAAAAAADJAAAAAAAAAAQAAABub25lyQAAAAAAAADKAAAAAAAAAAAAAADKAAAAAAAAAMsAAAAAAAAAAAAAAMsAAAAAAAAAzAAAAAAAAAAAAAAAzAAAAAAAAADNAAAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAADIAAAAAAAAAMwAAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					54,
+					1,
+					"insert",
+					{
+						"characters": "\nwidh"
+					},
+					"BgAAAM4AAAAAAAAAzwAAAAAAAAAAAAAAzwAAAAAAAADRAAAAAAAAAAAAAADRAAAAAAAAANIAAAAAAAAAAAAAANIAAAAAAAAA0wAAAAAAAAAAAAAA0wAAAAAAAADUAAAAAAAAAAAAAADUAAAAAAAAANUAAAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAADOAAAAAAAAAM4AAAAAAAAAAAAAAAAAa0A"
+				],
+				[
+					55,
+					1,
+					"insert_completion",
+					{
+						"completion": "width: $0;",
+						"format": "snippet",
+						"keep_prefix": false,
+						"must_insert": false,
+						"trigger": "width"
+					},
+					"AgAAANEAAAAAAAAA0QAAAAAAAAAEAAAAd2lkaNEAAAAAAAAA2QAAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAADVAAAAAAAAANUAAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					56,
+					1,
+					"insert",
+					{
+						"characters": "20px"
+					},
+					"BAAAANgAAAAAAAAA2QAAAAAAAAAAAAAA2QAAAAAAAADaAAAAAAAAAAAAAADaAAAAAAAAANsAAAAAAAAAAAAAANsAAAAAAAAA3AAAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAADYAAAAAAAAANgAAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					57,
+					1,
+					"duplicate_line",
+					null,
+					"AQAAAN4AAAAAAAAA7QAAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAADcAAAAAAAAANwAAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					60,
+					1,
+					"insert",
+					{
+						"characters": "height"
+					},
+					"BwAAAOAAAAAAAAAA4QAAAAAAAAAAAAAA4QAAAAAAAADhAAAAAAAAAAUAAAB3aWR0aOEAAAAAAAAA4gAAAAAAAAAAAAAA4gAAAAAAAADjAAAAAAAAAAAAAADjAAAAAAAAAOQAAAAAAAAAAAAAAOQAAAAAAAAA5QAAAAAAAAAAAAAA5QAAAAAAAADmAAAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAADgAAAAAAAAAOUAAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					76,
+					1,
+					"paste",
+					null,
+					"AQAAAO0AAAAAAAAAKQEAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAADtAAAAAAAAAO0AAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					79,
+					3,
+					"swap_line_up",
+					null,
+					"BgAAAO4AAAAAAAAA7gAAAAAAAAAWAAAAICBwb3NpdGlvbjogYWJzb2x1dGU7Ct4AAAAAAAAA9AAAAAAAAAAAAAAA3gAAAAAAAADeAAAAAAAAABYAAAAgIHBvc2l0aW9uOiBhYnNvbHV0ZTsKzwAAAAAAAADlAAAAAAAAAAAAAADPAAAAAAAAAM8AAAAAAAAAFgAAACAgcG9zaXRpb246IGFic29sdXRlOwq9AAAAAAAAANMAAAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAAAAAQAAAAAAAAABAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					91,
+					1,
+					"insert",
+					{
+						"characters": "right"
+					},
+					"BgAAAAYBAAAAAAAABwEAAAAAAAAAAAAABwEAAAAAAAAHAQAAAAAAAAQAAABsZWZ0BwEAAAAAAAAIAQAAAAAAAAAAAAAIAQAAAAAAAAkBAAAAAAAAAAAAAAkBAAAAAAAACgEAAAAAAAAAAAAACgEAAAAAAAALAQAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAAAGAQAAAAAAAAoBAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					103,
+					2,
+					"left_delete",
+					null,
+					"AgAAAO8AAAAAAAAA7wAAAAAAAAABAAAAMO4AAAAAAAAA7gAAAAAAAAABAAAAMg",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAADwAAAAAAAAAPAAAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					104,
+					1,
+					"insert",
+					{
+						"characters": "72"
+					},
+					"AgAAAO4AAAAAAAAA7wAAAAAAAAAAAAAA7wAAAAAAAADwAAAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAADuAAAAAAAAAO4AAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					106,
+					1,
+					"right_delete",
+					null,
+					"AQAAAP8AAAAAAAAA/wAAAAAAAAABAAAAMA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAAD/AAAAAAAAAP8AAAAAAAAAAAAAAAAAVkA"
+				],
+				[
+					107,
+					1,
+					"left_delete",
+					null,
+					"AQAAAP4AAAAAAAAA/gAAAAAAAAABAAAAMg",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAAD/AAAAAAAAAP8AAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					108,
+					1,
+					"insert",
+					{
+						"characters": "87"
+					},
+					"AgAAAP4AAAAAAAAA/wAAAAAAAAAAAAAA/wAAAAAAAAAAAQAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAAD+AAAAAAAAAP4AAAAAAAAAAAAAAAAA8L8"
+				]
+			]
+		},
+		{
+			"contents": "\n  BRANCH:  On branch `master` tracking `origin/master`.\n  ROOT:    ~/dev/vikes-match-clock\n  HEAD:    a3c91dd5 give deployer more permissions\n\n  UNSTAGED:\n    package.json\n    src/assets/index.js\n    src/screens/Idle.css\n    src/screens/Idle.js\n    yarn.lock\n\n  UNTRACKED:\n    src/assets/ads/large/husasmidjan.png\n    src/assets/ads/small/husasmidjan.png\n    src/images/husa.png\n    vikes-match-clock.sublime-project\n    vikes-match-clock.sublime-workspace\n\n  ###################                   ###############\n  ## SELECTED FILE ##                   ## ALL FILES ##\n  ###################                   ###############\n\n  [o] open file                         [a] stage all unstaged files\n  [s] stage file                        [A] stage all unstaged and untracked files\n  [u] unstage file                      [U] unstage all staged files\n  [d] discard changes to file           [D] discard all unstaged changes\n  [h] open file on remote\n  [M] launch external merge tool\n\n  [l] diff file inline                  [f] diff all files\n  [e] diff file                         [F] diff all cached files\n\n  #############                         #############\n  ## ACTIONS ##                         ## STASHES ##\n  #############                         #############\n\n  [c] commit                            [t][a] apply stash\n  [C] commit, including unstaged        [t][p] pop stash\n  [m] amend previous commit             [t][s] show stash\n  [p] push current branch               [t][c] create stash\n                                        [t][u] create stash including untracked files\n  [i] ignore file                       [t][g] create stash of staged changes only\n  [I] ignore pattern                    [t][d] drop stash\n\n  [B] abort merge\n\n  ###########\n  ## OTHER ##\n  ###########\n\n  [g]         show graph repop history\n  [?]         toggle this help menu\n  [tab]       transition to next dashboard\n  [SHIFT-tab] transition to previous dashboard\n  [.]         move cursor to next file\n  [,]         move cursor to previous file\n\n-\n\n",
+			"settings":
+			{
+				"buffer_size": 2046,
+				"line_ending": "Unix",
+				"name": "STATUS: vikes-match-clock",
+				"read_only": true,
+				"scratch": true
+			},
+			"undo_stack":
+			[
+				[
+					4,
+					1,
+					"gs_new_content_and_regions",
+					{
+						"content": "\n  BRANCH:  On branch `master` tracking `origin/master`.\n  ROOT:    ~/dev/vikes-match-clock\n  HEAD:    \n\n  UNSTAGED:\n    src/assets/index.js\n\n  UNTRACKED:\n    src/assets/ads/large/husasmidjan.png\n    src/assets/ads/small/husasmidjan.png\n    src/images/husa.png\n    vikes-match-clock.sublime-project\n    vikes-match-clock.sublime-workspace\n\n  ###################                   ###############\n  ## SELECTED FILE ##                   ## ALL FILES ##\n  ###################                   ###############\n\n  [o] open file                         [a] stage all unstaged files\n  [s] stage file                        [A] stage all unstaged and untracked files\n  [u] unstage file                      [U] unstage all staged files\n  [d] discard changes to file           [D] discard all unstaged changes\n  [h] open file on remote\n  [M] launch external merge tool\n\n  [l] diff file inline                  [f] diff all files\n  [e] diff file                         [F] diff all cached files\n\n  #############                         #############\n  ## ACTIONS ##                         ## STASHES ##\n  #############                         #############\n\n  [c] commit                            [t][a] apply stash\n  [C] commit, including unstaged        [t][p] pop stash\n  [m] amend previous commit             [t][s] show stash\n  [p] push current branch               [t][c] create stash\n                                        [t][u] create stash including untracked files\n  [i] ignore file                       [t][g] create stash of staged changes only\n  [I] ignore pattern                    [t][d] drop stash\n\n  [B] abort merge\n\n  ###########\n  ## OTHER ##\n  ###########\n\n  [g]         show graph repop history\n  [?]         toggle this help menu\n  [tab]       transition to next dashboard\n  [SHIFT-tab] transition to previous dashboard\n  [.]         move cursor to next file\n  [,]         move cursor to previous file\n\n-\n\n",
+						"nuke_cursors": false,
+						"regions":
+						{
+							"branch_status":
+							[
+								12,
+								56
+							],
+							"git_root":
+							[
+								68,
+								91
+							],
+							"help":
+							[
+								339,
+								1926
+							],
+							"unstaged_files":
+							[
+								104,
+								141
+							],
+							"untracked_files":
+							[
+								141,
+								339
+							]
+						}
+					},
+					"AQAAAAAAAAAAAAAAhwcAAAAAAAAAAAAA",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					6,
+					1,
+					"gs_new_content_and_regions",
+					{
+						"content": "\n  BRANCH:  On branch `master` tracking `origin/master`.\n  ROOT:    ~/dev/vikes-match-clock\n  HEAD:    a3c91dd5 give deployer more permissions\n\n  UNSTAGED:\n    src/assets/index.js\n\n  UNTRACKED:\n    src/assets/ads/large/husasmidjan.png\n    src/assets/ads/small/husasmidjan.png\n    src/images/husa.png\n    vikes-match-clock.sublime-project\n    vikes-match-clock.sublime-workspace\n\n  ###################                   ###############\n  ## SELECTED FILE ##                   ## ALL FILES ##\n  ###################                   ###############\n\n  [o] open file                         [a] stage all unstaged files\n  [s] stage file                        [A] stage all unstaged and untracked files\n  [u] unstage file                      [U] unstage all staged files\n  [d] discard changes to file           [D] discard all unstaged changes\n  [h] open file on remote\n  [M] launch external merge tool\n\n  [l] diff file inline                  [f] diff all files\n  [e] diff file                         [F] diff all cached files\n\n  #############                         #############\n  ## ACTIONS ##                         ## STASHES ##\n  #############                         #############\n\n  [c] commit                            [t][a] apply stash\n  [C] commit, including unstaged        [t][p] pop stash\n  [m] amend previous commit             [t][s] show stash\n  [p] push current branch               [t][c] create stash\n                                        [t][u] create stash including untracked files\n  [i] ignore file                       [t][g] create stash of staged changes only\n  [I] ignore pattern                    [t][d] drop stash\n\n  [B] abort merge\n\n  ###########\n  ## OTHER ##\n  ###########\n\n  [g]         show graph repop history\n  [?]         toggle this help menu\n  [tab]       transition to next dashboard\n  [SHIFT-tab] transition to previous dashboard\n  [.]         move cursor to next file\n  [,]         move cursor to previous file\n\n-\n\n",
+						"nuke_cursors": false,
+						"regions":
+						{
+							"branch_status":
+							[
+								12,
+								56
+							],
+							"git_root":
+							[
+								68,
+								91
+							],
+							"head":
+							[
+								103,
+								142
+							],
+							"help":
+							[
+								378,
+								1965
+							],
+							"unstaged_files":
+							[
+								143,
+								180
+							],
+							"untracked_files":
+							[
+								180,
+								378
+							]
+						}
+					},
+					"AQAAAAAAAAAAAAAArgcAAAAAAACHBwAACiAgQlJBTkNIOiAgT24gYnJhbmNoIGBtYXN0ZXJgIHRyYWNraW5nIGBvcmlnaW4vbWFzdGVyYC4KICBST09UOiAgICB+L2Rldi92aWtlcy1tYXRjaC1jbG9jawogIEhFQUQ6ICAgIAoKICBVTlNUQUdFRDoKICAgIHNyYy9hc3NldHMvaW5kZXguanMKCiAgVU5UUkFDS0VEOgogICAgc3JjL2Fzc2V0cy9hZHMvbGFyZ2UvaHVzYXNtaWRqYW4ucG5nCiAgICBzcmMvYXNzZXRzL2Fkcy9zbWFsbC9odXNhc21pZGphbi5wbmcKICAgIHNyYy9pbWFnZXMvaHVzYS5wbmcKICAgIHZpa2VzLW1hdGNoLWNsb2NrLnN1YmxpbWUtcHJvamVjdAogICAgdmlrZXMtbWF0Y2gtY2xvY2suc3VibGltZS13b3Jrc3BhY2UKCiAgIyMjIyMjIyMjIyMjIyMjIyMjIyAgICAgICAgICAgICAgICAgICAjIyMjIyMjIyMjIyMjIyMKICAjIyBTRUxFQ1RFRCBGSUxFICMjICAgICAgICAgICAgICAgICAgICMjIEFMTCBGSUxFUyAjIwogICMjIyMjIyMjIyMjIyMjIyMjIyMgICAgICAgICAgICAgICAgICAgIyMjIyMjIyMjIyMjIyMjCgogIFtvXSBvcGVuIGZpbGUgICAgICAgICAgICAgICAgICAgICAgICAgW2FdIHN0YWdlIGFsbCB1bnN0YWdlZCBmaWxlcwogIFtzXSBzdGFnZSBmaWxlICAgICAgICAgICAgICAgICAgICAgICAgW0FdIHN0YWdlIGFsbCB1bnN0YWdlZCBhbmQgdW50cmFja2VkIGZpbGVzCiAgW3VdIHVuc3RhZ2UgZmlsZSAgICAgICAgICAgICAgICAgICAgICBbVV0gdW5zdGFnZSBhbGwgc3RhZ2VkIGZpbGVzCiAgW2RdIGRpc2NhcmQgY2hhbmdlcyB0byBmaWxlICAgICAgICAgICBbRF0gZGlzY2FyZCBhbGwgdW5zdGFnZWQgY2hhbmdlcwogIFtoXSBvcGVuIGZpbGUgb24gcmVtb3RlCiAgW01dIGxhdW5jaCBleHRlcm5hbCBtZXJnZSB0b29sCgogIFtsXSBkaWZmIGZpbGUgaW5saW5lICAgICAgICAgICAgICAgICAgW2ZdIGRpZmYgYWxsIGZpbGVzCiAgW2VdIGRpZmYgZmlsZSAgICAgICAgICAgICAgICAgICAgICAgICBbRl0gZGlmZiBhbGwgY2FjaGVkIGZpbGVzCgogICMjIyMjIyMjIyMjIyMgICAgICAgICAgICAgICAgICAgICAgICAgIyMjIyMjIyMjIyMjIwogICMjIEFDVElPTlMgIyMgICAgICAgICAgICAgICAgICAgICAgICAgIyMgU1RBU0hFUyAjIwogICMjIyMjIyMjIyMjIyMgICAgICAgICAgICAgICAgICAgICAgICAgIyMjIyMjIyMjIyMjIwoKICBbY10gY29tbWl0ICAgICAgICAgICAgICAgICAgICAgICAgICAgIFt0XVthXSBhcHBseSBzdGFzaAogIFtDXSBjb21taXQsIGluY2x1ZGluZyB1bnN0YWdlZCAgICAgICAgW3RdW3BdIHBvcCBzdGFzaAogIFttXSBhbWVuZCBwcmV2aW91cyBjb21taXQgICAgICAgICAgICAgW3RdW3NdIHNob3cgc3Rhc2gKICBbcF0gcHVzaCBjdXJyZW50IGJyYW5jaCAgICAgICAgICAgICAgIFt0XVtjXSBjcmVhdGUgc3Rhc2gKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIFt0XVt1XSBjcmVhdGUgc3Rhc2ggaW5jbHVkaW5nIHVudHJhY2tlZCBmaWxlcwogIFtpXSBpZ25vcmUgZmlsZSAgICAgICAgICAgICAgICAgICAgICAgW3RdW2ddIGNyZWF0ZSBzdGFzaCBvZiBzdGFnZWQgY2hhbmdlcyBvbmx5CiAgW0ldIGlnbm9yZSBwYXR0ZXJuICAgICAgICAgICAgICAgICAgICBbdF1bZF0gZHJvcCBzdGFzaAoKICBbQl0gYWJvcnQgbWVyZ2UKCiAgIyMjIyMjIyMjIyMKICAjIyBPVEhFUiAjIwogICMjIyMjIyMjIyMjCgogIFtnXSAgICAgICAgIHNob3cgZ3JhcGggcmVwb3AgaGlzdG9yeQogIFs/XSAgICAgICAgIHRvZ2dsZSB0aGlzIGhlbHAgbWVudQogIFt0YWJdICAgICAgIHRyYW5zaXRpb24gdG8gbmV4dCBkYXNoYm9hcmQKICBbU0hJRlQtdGFiXSB0cmFuc2l0aW9uIHRvIHByZXZpb3VzIGRhc2hib2FyZAogIFsuXSAgICAgICAgIG1vdmUgY3Vyc29yIHRvIG5leHQgZmlsZQogIFssXSAgICAgICAgIG1vdmUgY3Vyc29yIHRvIHByZXZpb3VzIGZpbGUKCi0KCg",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAAB5AAAAAAAAAHkAAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					13,
+					1,
+					"gs_new_content_and_regions",
+					{
+						"content": "\n  BRANCH:  On branch `master` tracking `origin/master`.\n  ROOT:    ~/dev/vikes-match-clock\n  HEAD:    a3c91dd5 give deployer more permissions\n\n  UNSTAGED:\n    package.json\n    src/assets/index.js\n    yarn.lock\n\n  UNTRACKED:\n    src/assets/ads/large/husasmidjan.png\n    src/assets/ads/small/husasmidjan.png\n    src/images/husa.png\n    vikes-match-clock.sublime-project\n    vikes-match-clock.sublime-workspace\n\n  ###################                   ###############\n  ## SELECTED FILE ##                   ## ALL FILES ##\n  ###################                   ###############\n\n  [o] open file                         [a] stage all unstaged files\n  [s] stage file                        [A] stage all unstaged and untracked files\n  [u] unstage file                      [U] unstage all staged files\n  [d] discard changes to file           [D] discard all unstaged changes\n  [h] open file on remote\n  [M] launch external merge tool\n\n  [l] diff file inline                  [f] diff all files\n  [e] diff file                         [F] diff all cached files\n\n  #############                         #############\n  ## ACTIONS ##                         ## STASHES ##\n  #############                         #############\n\n  [c] commit                            [t][a] apply stash\n  [C] commit, including unstaged        [t][p] pop stash\n  [m] amend previous commit             [t][s] show stash\n  [p] push current branch               [t][c] create stash\n                                        [t][u] create stash including untracked files\n  [i] ignore file                       [t][g] create stash of staged changes only\n  [I] ignore pattern                    [t][d] drop stash\n\n  [B] abort merge\n\n  ###########\n  ## OTHER ##\n  ###########\n\n  [g]         show graph repop history\n  [?]         toggle this help menu\n  [tab]       transition to next dashboard\n  [SHIFT-tab] transition to previous dashboard\n  [.]         move cursor to next file\n  [,]         move cursor to previous file\n\n-\n\n",
+						"nuke_cursors": false,
+						"regions":
+						{
+							"branch_status":
+							[
+								12,
+								56
+							],
+							"git_root":
+							[
+								68,
+								91
+							],
+							"head":
+							[
+								103,
+								142
+							],
+							"help":
+							[
+								409,
+								1996
+							],
+							"unstaged_files":
+							[
+								143,
+								211
+							],
+							"untracked_files":
+							[
+								211,
+								409
+							]
+						}
+					},
+					"AQAAAAAAAAAAAAAAzQcAAAAAAACuBwAACiAgQlJBTkNIOiAgT24gYnJhbmNoIGBtYXN0ZXJgIHRyYWNraW5nIGBvcmlnaW4vbWFzdGVyYC4KICBST09UOiAgICB+L2Rldi92aWtlcy1tYXRjaC1jbG9jawogIEhFQUQ6ICAgIGEzYzkxZGQ1IGdpdmUgZGVwbG95ZXIgbW9yZSBwZXJtaXNzaW9ucwoKICBVTlNUQUdFRDoKICAgIHNyYy9hc3NldHMvaW5kZXguanMKCiAgVU5UUkFDS0VEOgogICAgc3JjL2Fzc2V0cy9hZHMvbGFyZ2UvaHVzYXNtaWRqYW4ucG5nCiAgICBzcmMvYXNzZXRzL2Fkcy9zbWFsbC9odXNhc21pZGphbi5wbmcKICAgIHNyYy9pbWFnZXMvaHVzYS5wbmcKICAgIHZpa2VzLW1hdGNoLWNsb2NrLnN1YmxpbWUtcHJvamVjdAogICAgdmlrZXMtbWF0Y2gtY2xvY2suc3VibGltZS13b3Jrc3BhY2UKCiAgIyMjIyMjIyMjIyMjIyMjIyMjIyAgICAgICAgICAgICAgICAgICAjIyMjIyMjIyMjIyMjIyMKICAjIyBTRUxFQ1RFRCBGSUxFICMjICAgICAgICAgICAgICAgICAgICMjIEFMTCBGSUxFUyAjIwogICMjIyMjIyMjIyMjIyMjIyMjIyMgICAgICAgICAgICAgICAgICAgIyMjIyMjIyMjIyMjIyMjCgogIFtvXSBvcGVuIGZpbGUgICAgICAgICAgICAgICAgICAgICAgICAgW2FdIHN0YWdlIGFsbCB1bnN0YWdlZCBmaWxlcwogIFtzXSBzdGFnZSBmaWxlICAgICAgICAgICAgICAgICAgICAgICAgW0FdIHN0YWdlIGFsbCB1bnN0YWdlZCBhbmQgdW50cmFja2VkIGZpbGVzCiAgW3VdIHVuc3RhZ2UgZmlsZSAgICAgICAgICAgICAgICAgICAgICBbVV0gdW5zdGFnZSBhbGwgc3RhZ2VkIGZpbGVzCiAgW2RdIGRpc2NhcmQgY2hhbmdlcyB0byBmaWxlICAgICAgICAgICBbRF0gZGlzY2FyZCBhbGwgdW5zdGFnZWQgY2hhbmdlcwogIFtoXSBvcGVuIGZpbGUgb24gcmVtb3RlCiAgW01dIGxhdW5jaCBleHRlcm5hbCBtZXJnZSB0b29sCgogIFtsXSBkaWZmIGZpbGUgaW5saW5lICAgICAgICAgICAgICAgICAgW2ZdIGRpZmYgYWxsIGZpbGVzCiAgW2VdIGRpZmYgZmlsZSAgICAgICAgICAgICAgICAgICAgICAgICBbRl0gZGlmZiBhbGwgY2FjaGVkIGZpbGVzCgogICMjIyMjIyMjIyMjIyMgICAgICAgICAgICAgICAgICAgICAgICAgIyMjIyMjIyMjIyMjIwogICMjIEFDVElPTlMgIyMgICAgICAgICAgICAgICAgICAgICAgICAgIyMgU1RBU0hFUyAjIwogICMjIyMjIyMjIyMjIyMgICAgICAgICAgICAgICAgICAgICAgICAgIyMjIyMjIyMjIyMjIwoKICBbY10gY29tbWl0ICAgICAgICAgICAgICAgICAgICAgICAgICAgIFt0XVthXSBhcHBseSBzdGFzaAogIFtDXSBjb21taXQsIGluY2x1ZGluZyB1bnN0YWdlZCAgICAgICAgW3RdW3BdIHBvcCBzdGFzaAogIFttXSBhbWVuZCBwcmV2aW91cyBjb21taXQgICAgICAgICAgICAgW3RdW3NdIHNob3cgc3Rhc2gKICBbcF0gcHVzaCBjdXJyZW50IGJyYW5jaCAgICAgICAgICAgICAgIFt0XVtjXSBjcmVhdGUgc3Rhc2gKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIFt0XVt1XSBjcmVhdGUgc3Rhc2ggaW5jbHVkaW5nIHVudHJhY2tlZCBmaWxlcwogIFtpXSBpZ25vcmUgZmlsZSAgICAgICAgICAgICAgICAgICAgICAgW3RdW2ddIGNyZWF0ZSBzdGFzaCBvZiBzdGFnZWQgY2hhbmdlcyBvbmx5CiAgW0ldIGlnbm9yZSBwYXR0ZXJuICAgICAgICAgICAgICAgICAgICBbdF1bZF0gZHJvcCBzdGFzaAoKICBbQl0gYWJvcnQgbWVyZ2UKCiAgIyMjIyMjIyMjIyMKICAjIyBPVEhFUiAjIwogICMjIyMjIyMjIyMjCgogIFtnXSAgICAgICAgIHNob3cgZ3JhcGggcmVwb3AgaGlzdG9yeQogIFs/XSAgICAgICAgIHRvZ2dsZSB0aGlzIGhlbHAgbWVudQogIFt0YWJdICAgICAgIHRyYW5zaXRpb24gdG8gbmV4dCBkYXNoYm9hcmQKICBbU0hJRlQtdGFiXSB0cmFuc2l0aW9uIHRvIHByZXZpb3VzIGRhc2hib2FyZAogIFsuXSAgICAgICAgIG1vdmUgY3Vyc29yIHRvIG5leHQgZmlsZQogIFssXSAgICAgICAgIG1vdmUgY3Vyc29yIHRvIHByZXZpb3VzIGZpbGUKCi0KCg",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAACgAAAAAAAAAKAAAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					38,
+					1,
+					"gs_new_content_and_regions",
+					{
+						"content": "\n  BRANCH:  On branch `master` tracking `origin/master`.\n  ROOT:    ~/dev/vikes-match-clock\n  HEAD:    a3c91dd5 give deployer more permissions\n\n  UNSTAGED:\n    package.json\n    src/assets/index.js\n    src/screens/Idle.js\n    yarn.lock\n\n  UNTRACKED:\n    src/assets/ads/large/husasmidjan.png\n    src/assets/ads/small/husasmidjan.png\n    src/images/husa.png\n    vikes-match-clock.sublime-project\n    vikes-match-clock.sublime-workspace\n\n  ###################                   ###############\n  ## SELECTED FILE ##                   ## ALL FILES ##\n  ###################                   ###############\n\n  [o] open file                         [a] stage all unstaged files\n  [s] stage file                        [A] stage all unstaged and untracked files\n  [u] unstage file                      [U] unstage all staged files\n  [d] discard changes to file           [D] discard all unstaged changes\n  [h] open file on remote\n  [M] launch external merge tool\n\n  [l] diff file inline                  [f] diff all files\n  [e] diff file                         [F] diff all cached files\n\n  #############                         #############\n  ## ACTIONS ##                         ## STASHES ##\n  #############                         #############\n\n  [c] commit                            [t][a] apply stash\n  [C] commit, including unstaged        [t][p] pop stash\n  [m] amend previous commit             [t][s] show stash\n  [p] push current branch               [t][c] create stash\n                                        [t][u] create stash including untracked files\n  [i] ignore file                       [t][g] create stash of staged changes only\n  [I] ignore pattern                    [t][d] drop stash\n\n  [B] abort merge\n\n  ###########\n  ## OTHER ##\n  ###########\n\n  [g]         show graph repop history\n  [?]         toggle this help menu\n  [tab]       transition to next dashboard\n  [SHIFT-tab] transition to previous dashboard\n  [.]         move cursor to next file\n  [,]         move cursor to previous file\n\n-\n\n",
+						"nuke_cursors": false,
+						"regions":
+						{
+							"branch_status":
+							[
+								12,
+								56
+							],
+							"git_root":
+							[
+								68,
+								91
+							],
+							"head":
+							[
+								103,
+								142
+							],
+							"help":
+							[
+								433,
+								2020
+							],
+							"unstaged_files":
+							[
+								143,
+								235
+							],
+							"untracked_files":
+							[
+								235,
+								433
+							]
+						}
+					},
+					"AQAAAAAAAAAAAAAA5QcAAAAAAADNBwAACiAgQlJBTkNIOiAgT24gYnJhbmNoIGBtYXN0ZXJgIHRyYWNraW5nIGBvcmlnaW4vbWFzdGVyYC4KICBST09UOiAgICB+L2Rldi92aWtlcy1tYXRjaC1jbG9jawogIEhFQUQ6ICAgIGEzYzkxZGQ1IGdpdmUgZGVwbG95ZXIgbW9yZSBwZXJtaXNzaW9ucwoKICBVTlNUQUdFRDoKICAgIHBhY2thZ2UuanNvbgogICAgc3JjL2Fzc2V0cy9pbmRleC5qcwogICAgeWFybi5sb2NrCgogIFVOVFJBQ0tFRDoKICAgIHNyYy9hc3NldHMvYWRzL2xhcmdlL2h1c2FzbWlkamFuLnBuZwogICAgc3JjL2Fzc2V0cy9hZHMvc21hbGwvaHVzYXNtaWRqYW4ucG5nCiAgICBzcmMvaW1hZ2VzL2h1c2EucG5nCiAgICB2aWtlcy1tYXRjaC1jbG9jay5zdWJsaW1lLXByb2plY3QKICAgIHZpa2VzLW1hdGNoLWNsb2NrLnN1YmxpbWUtd29ya3NwYWNlCgogICMjIyMjIyMjIyMjIyMjIyMjIyMgICAgICAgICAgICAgICAgICAgIyMjIyMjIyMjIyMjIyMjCiAgIyMgU0VMRUNURUQgRklMRSAjIyAgICAgICAgICAgICAgICAgICAjIyBBTEwgRklMRVMgIyMKICAjIyMjIyMjIyMjIyMjIyMjIyMjICAgICAgICAgICAgICAgICAgICMjIyMjIyMjIyMjIyMjIwoKICBbb10gb3BlbiBmaWxlICAgICAgICAgICAgICAgICAgICAgICAgIFthXSBzdGFnZSBhbGwgdW5zdGFnZWQgZmlsZXMKICBbc10gc3RhZ2UgZmlsZSAgICAgICAgICAgICAgICAgICAgICAgIFtBXSBzdGFnZSBhbGwgdW5zdGFnZWQgYW5kIHVudHJhY2tlZCBmaWxlcwogIFt1XSB1bnN0YWdlIGZpbGUgICAgICAgICAgICAgICAgICAgICAgW1VdIHVuc3RhZ2UgYWxsIHN0YWdlZCBmaWxlcwogIFtkXSBkaXNjYXJkIGNoYW5nZXMgdG8gZmlsZSAgICAgICAgICAgW0RdIGRpc2NhcmQgYWxsIHVuc3RhZ2VkIGNoYW5nZXMKICBbaF0gb3BlbiBmaWxlIG9uIHJlbW90ZQogIFtNXSBsYXVuY2ggZXh0ZXJuYWwgbWVyZ2UgdG9vbAoKICBbbF0gZGlmZiBmaWxlIGlubGluZSAgICAgICAgICAgICAgICAgIFtmXSBkaWZmIGFsbCBmaWxlcwogIFtlXSBkaWZmIGZpbGUgICAgICAgICAgICAgICAgICAgICAgICAgW0ZdIGRpZmYgYWxsIGNhY2hlZCBmaWxlcwoKICAjIyMjIyMjIyMjIyMjICAgICAgICAgICAgICAgICAgICAgICAgICMjIyMjIyMjIyMjIyMKICAjIyBBQ1RJT05TICMjICAgICAgICAgICAgICAgICAgICAgICAgICMjIFNUQVNIRVMgIyMKICAjIyMjIyMjIyMjIyMjICAgICAgICAgICAgICAgICAgICAgICAgICMjIyMjIyMjIyMjIyMKCiAgW2NdIGNvbW1pdCAgICAgICAgICAgICAgICAgICAgICAgICAgICBbdF1bYV0gYXBwbHkgc3Rhc2gKICBbQ10gY29tbWl0LCBpbmNsdWRpbmcgdW5zdGFnZWQgICAgICAgIFt0XVtwXSBwb3Agc3Rhc2gKICBbbV0gYW1lbmQgcHJldmlvdXMgY29tbWl0ICAgICAgICAgICAgIFt0XVtzXSBzaG93IHN0YXNoCiAgW3BdIHB1c2ggY3VycmVudCBicmFuY2ggICAgICAgICAgICAgICBbdF1bY10gY3JlYXRlIHN0YXNoCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBbdF1bdV0gY3JlYXRlIHN0YXNoIGluY2x1ZGluZyB1bnRyYWNrZWQgZmlsZXMKICBbaV0gaWdub3JlIGZpbGUgICAgICAgICAgICAgICAgICAgICAgIFt0XVtnXSBjcmVhdGUgc3Rhc2ggb2Ygc3RhZ2VkIGNoYW5nZXMgb25seQogIFtJXSBpZ25vcmUgcGF0dGVybiAgICAgICAgICAgICAgICAgICAgW3RdW2RdIGRyb3Agc3Rhc2gKCiAgW0JdIGFib3J0IG1lcmdlCgogICMjIyMjIyMjIyMjCiAgIyMgT1RIRVIgIyMKICAjIyMjIyMjIyMjIwoKICBbZ10gICAgICAgICBzaG93IGdyYXBoIHJlcG9wIGhpc3RvcnkKICBbP10gICAgICAgICB0b2dnbGUgdGhpcyBoZWxwIG1lbnUKICBbdGFiXSAgICAgICB0cmFuc2l0aW9uIHRvIG5leHQgZGFzaGJvYXJkCiAgW1NISUZULXRhYl0gdHJhbnNpdGlvbiB0byBwcmV2aW91cyBkYXNoYm9hcmQKICBbLl0gICAgICAgICBtb3ZlIGN1cnNvciB0byBuZXh0IGZpbGUKICBbLF0gICAgICAgICBtb3ZlIGN1cnNvciB0byBwcmV2aW91cyBmaWxlCgotCgo",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAADBAAAAAAAAAMEAAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					39,
+					1,
+					"gs_new_content_and_regions",
+					{
+						"content": "\n  BRANCH:  On branch `master` tracking `origin/master`.\n  ROOT:    ~/dev/vikes-match-clock\n  HEAD:    a3c91dd5 give deployer more permissions\n\n  UNSTAGED:\n    package.json\n    src/assets/index.js\n    src/screens/Idle.css\n    src/screens/Idle.js\n    yarn.lock\n\n  UNTRACKED:\n    src/assets/ads/large/husasmidjan.png\n    src/assets/ads/small/husasmidjan.png\n    src/images/husa.png\n    vikes-match-clock.sublime-project\n    vikes-match-clock.sublime-workspace\n\n  ###################                   ###############\n  ## SELECTED FILE ##                   ## ALL FILES ##\n  ###################                   ###############\n\n  [o] open file                         [a] stage all unstaged files\n  [s] stage file                        [A] stage all unstaged and untracked files\n  [u] unstage file                      [U] unstage all staged files\n  [d] discard changes to file           [D] discard all unstaged changes\n  [h] open file on remote\n  [M] launch external merge tool\n\n  [l] diff file inline                  [f] diff all files\n  [e] diff file                         [F] diff all cached files\n\n  #############                         #############\n  ## ACTIONS ##                         ## STASHES ##\n  #############                         #############\n\n  [c] commit                            [t][a] apply stash\n  [C] commit, including unstaged        [t][p] pop stash\n  [m] amend previous commit             [t][s] show stash\n  [p] push current branch               [t][c] create stash\n                                        [t][u] create stash including untracked files\n  [i] ignore file                       [t][g] create stash of staged changes only\n  [I] ignore pattern                    [t][d] drop stash\n\n  [B] abort merge\n\n  ###########\n  ## OTHER ##\n  ###########\n\n  [g]         show graph repop history\n  [?]         toggle this help menu\n  [tab]       transition to next dashboard\n  [SHIFT-tab] transition to previous dashboard\n  [.]         move cursor to next file\n  [,]         move cursor to previous file\n\n-\n\n",
+						"nuke_cursors": false,
+						"regions":
+						{
+							"branch_status":
+							[
+								12,
+								56
+							],
+							"git_root":
+							[
+								68,
+								91
+							],
+							"head":
+							[
+								103,
+								142
+							],
+							"help":
+							[
+								458,
+								2045
+							],
+							"unstaged_files":
+							[
+								143,
+								260
+							],
+							"untracked_files":
+							[
+								260,
+								458
+							]
+						}
+					},
+					"AQAAAAAAAAAAAAAA/gcAAAAAAADlBwAACiAgQlJBTkNIOiAgT24gYnJhbmNoIGBtYXN0ZXJgIHRyYWNraW5nIGBvcmlnaW4vbWFzdGVyYC4KICBST09UOiAgICB+L2Rldi92aWtlcy1tYXRjaC1jbG9jawogIEhFQUQ6ICAgIGEzYzkxZGQ1IGdpdmUgZGVwbG95ZXIgbW9yZSBwZXJtaXNzaW9ucwoKICBVTlNUQUdFRDoKICAgIHBhY2thZ2UuanNvbgogICAgc3JjL2Fzc2V0cy9pbmRleC5qcwogICAgc3JjL3NjcmVlbnMvSWRsZS5qcwogICAgeWFybi5sb2NrCgogIFVOVFJBQ0tFRDoKICAgIHNyYy9hc3NldHMvYWRzL2xhcmdlL2h1c2FzbWlkamFuLnBuZwogICAgc3JjL2Fzc2V0cy9hZHMvc21hbGwvaHVzYXNtaWRqYW4ucG5nCiAgICBzcmMvaW1hZ2VzL2h1c2EucG5nCiAgICB2aWtlcy1tYXRjaC1jbG9jay5zdWJsaW1lLXByb2plY3QKICAgIHZpa2VzLW1hdGNoLWNsb2NrLnN1YmxpbWUtd29ya3NwYWNlCgogICMjIyMjIyMjIyMjIyMjIyMjIyMgICAgICAgICAgICAgICAgICAgIyMjIyMjIyMjIyMjIyMjCiAgIyMgU0VMRUNURUQgRklMRSAjIyAgICAgICAgICAgICAgICAgICAjIyBBTEwgRklMRVMgIyMKICAjIyMjIyMjIyMjIyMjIyMjIyMjICAgICAgICAgICAgICAgICAgICMjIyMjIyMjIyMjIyMjIwoKICBbb10gb3BlbiBmaWxlICAgICAgICAgICAgICAgICAgICAgICAgIFthXSBzdGFnZSBhbGwgdW5zdGFnZWQgZmlsZXMKICBbc10gc3RhZ2UgZmlsZSAgICAgICAgICAgICAgICAgICAgICAgIFtBXSBzdGFnZSBhbGwgdW5zdGFnZWQgYW5kIHVudHJhY2tlZCBmaWxlcwogIFt1XSB1bnN0YWdlIGZpbGUgICAgICAgICAgICAgICAgICAgICAgW1VdIHVuc3RhZ2UgYWxsIHN0YWdlZCBmaWxlcwogIFtkXSBkaXNjYXJkIGNoYW5nZXMgdG8gZmlsZSAgICAgICAgICAgW0RdIGRpc2NhcmQgYWxsIHVuc3RhZ2VkIGNoYW5nZXMKICBbaF0gb3BlbiBmaWxlIG9uIHJlbW90ZQogIFtNXSBsYXVuY2ggZXh0ZXJuYWwgbWVyZ2UgdG9vbAoKICBbbF0gZGlmZiBmaWxlIGlubGluZSAgICAgICAgICAgICAgICAgIFtmXSBkaWZmIGFsbCBmaWxlcwogIFtlXSBkaWZmIGZpbGUgICAgICAgICAgICAgICAgICAgICAgICAgW0ZdIGRpZmYgYWxsIGNhY2hlZCBmaWxlcwoKICAjIyMjIyMjIyMjIyMjICAgICAgICAgICAgICAgICAgICAgICAgICMjIyMjIyMjIyMjIyMKICAjIyBBQ1RJT05TICMjICAgICAgICAgICAgICAgICAgICAgICAgICMjIFNUQVNIRVMgIyMKICAjIyMjIyMjIyMjIyMjICAgICAgICAgICAgICAgICAgICAgICAgICMjIyMjIyMjIyMjIyMKCiAgW2NdIGNvbW1pdCAgICAgICAgICAgICAgICAgICAgICAgICAgICBbdF1bYV0gYXBwbHkgc3Rhc2gKICBbQ10gY29tbWl0LCBpbmNsdWRpbmcgdW5zdGFnZWQgICAgICAgIFt0XVtwXSBwb3Agc3Rhc2gKICBbbV0gYW1lbmQgcHJldmlvdXMgY29tbWl0ICAgICAgICAgICAgIFt0XVtzXSBzaG93IHN0YXNoCiAgW3BdIHB1c2ggY3VycmVudCBicmFuY2ggICAgICAgICAgICAgICBbdF1bY10gY3JlYXRlIHN0YXNoCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBbdF1bdV0gY3JlYXRlIHN0YXNoIGluY2x1ZGluZyB1bnRyYWNrZWQgZmlsZXMKICBbaV0gaWdub3JlIGZpbGUgICAgICAgICAgICAgICAgICAgICAgIFt0XVtnXSBjcmVhdGUgc3Rhc2ggb2Ygc3RhZ2VkIGNoYW5nZXMgb25seQogIFtJXSBpZ25vcmUgcGF0dGVybiAgICAgICAgICAgICAgICAgICAgW3RdW2RdIGRyb3Agc3Rhc2gKCiAgW0JdIGFib3J0IG1lcmdlCgogICMjIyMjIyMjIyMjCiAgIyMgT1RIRVIgIyMKICAjIyMjIyMjIyMjIwoKICBbZ10gICAgICAgICBzaG93IGdyYXBoIHJlcG9wIGhpc3RvcnkKICBbP10gICAgICAgICB0b2dnbGUgdGhpcyBoZWxwIG1lbnUKICBbdGFiXSAgICAgICB0cmFuc2l0aW9uIHRvIG5leHQgZGFzaGJvYXJkCiAgW1NISUZULXRhYl0gdHJhbnNpdGlvbiB0byBwcmV2aW91cyBkYXNoYm9hcmQKICBbLl0gICAgICAgICBtb3ZlIGN1cnNvciB0byBuZXh0IGZpbGUKICBbLF0gICAgICAgICBtb3ZlIGN1cnNvciB0byBwcmV2aW91cyBmaWxlCgotCgo",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAADBAAAAAAAAAMEAAAAAAAAAAAAAAAAA8L8"
+				],
+				[
+					49,
+					1,
+					"gs_new_content_and_regions",
+					{
+						"content": "\n  BRANCH:  On branch `master` tracking `origin/master`.\n  ROOT:    ~/dev/vikes-match-clock\n  HEAD:    a3c91dd5 give deployer more permissions\n\n  UNSTAGED:\n    package.json\n    src/assets/index.js\n    src/screens/Idle.css\n    src/screens/Idle.js\n    yarn.lock\n\n  UNTRACKED:\n    src/assets/ads/large/husasmidjan.png\n    src/assets/ads/small/husasmidjan.png\n    src/images/husa.png\n    vikes-match-clock.sublime-project\n    vikes-match-clock.sublime-workspace\n\n  ###################                   ###############\n  ## SELECTED FILE ##                   ## ALL FILES ##\n  ###################                   ###############\n\n  [o] open file                         [a] stage all unstaged files\n  [s] stage file                        [A] stage all unstaged and untracked files\n  [u] unstage file                      [U] unstage all staged files\n  [d] discard changes to file           [D] discard all unstaged changes\n  [h] open file on remote\n  [M] launch external merge tool\n\n  [l] diff file inline                  [f] diff all files\n  [e] diff file                         [F] diff all cached files\n\n  #############                         #############\n  ## ACTIONS ##                         ## STASHES ##\n  #############                         #############\n\n  [c] commit                            [t][a] apply stash\n  [C] commit, including unstaged        [t][p] pop stash\n  [m] amend previous commit             [t][s] show stash\n  [p] push current branch               [t][c] create stash\n                                        [t][u] create stash including untracked files\n  [i] ignore file                       [t][g] create stash of staged changes only\n  [I] ignore pattern                    [t][d] drop stash\n\n  [B] abort merge\n\n  ###########\n  ## OTHER ##\n  ###########\n\n  [g]         show graph repop history\n  [?]         toggle this help menu\n  [tab]       transition to next dashboard\n  [SHIFT-tab] transition to previous dashboard\n  [.]         move cursor to next file\n  [,]         move cursor to previous file\n\n-\n\n",
+						"nuke_cursors": false,
+						"regions":
+						{
+							"branch_status":
+							[
+								12,
+								56
+							],
+							"git_root":
+							[
+								68,
+								91
+							],
+							"head":
+							[
+								103,
+								142
+							],
+							"help":
+							[
+								458,
+								2045
+							],
+							"unstaged_files":
+							[
+								143,
+								260
+							],
+							"untracked_files":
+							[
+								260,
+								458
+							]
+						}
+					},
+					"AQAAAAAAAAAAAAAA/gcAAAAAAAD+BwAACiAgQlJBTkNIOiAgT24gYnJhbmNoIGBtYXN0ZXJgIHRyYWNraW5nIGBvcmlnaW4vbWFzdGVyYC4KICBST09UOiAgICB+L2Rldi92aWtlcy1tYXRjaC1jbG9jawogIEhFQUQ6ICAgIGEzYzkxZGQ1IGdpdmUgZGVwbG95ZXIgbW9yZSBwZXJtaXNzaW9ucwoKICBVTlNUQUdFRDoKICAgIHBhY2thZ2UuanNvbgogICAgc3JjL2Fzc2V0cy9pbmRleC5qcwogICAgc3JjL3NjcmVlbnMvSWRsZS5jc3MKICAgIHNyYy9zY3JlZW5zL0lkbGUuanMKICAgIHlhcm4ubG9jawoKICBVTlRSQUNLRUQ6CiAgICBzcmMvYXNzZXRzL2Fkcy9sYXJnZS9odXNhc21pZGphbi5wbmcKICAgIHNyYy9hc3NldHMvYWRzL3NtYWxsL2h1c2FzbWlkamFuLnBuZwogICAgc3JjL2ltYWdlcy9odXNhLnBuZwogICAgdmlrZXMtbWF0Y2gtY2xvY2suc3VibGltZS1wcm9qZWN0CiAgICB2aWtlcy1tYXRjaC1jbG9jay5zdWJsaW1lLXdvcmtzcGFjZQoKICAjIyMjIyMjIyMjIyMjIyMjIyMjICAgICAgICAgICAgICAgICAgICMjIyMjIyMjIyMjIyMjIwogICMjIFNFTEVDVEVEIEZJTEUgIyMgICAgICAgICAgICAgICAgICAgIyMgQUxMIEZJTEVTICMjCiAgIyMjIyMjIyMjIyMjIyMjIyMjIyAgICAgICAgICAgICAgICAgICAjIyMjIyMjIyMjIyMjIyMKCiAgW29dIG9wZW4gZmlsZSAgICAgICAgICAgICAgICAgICAgICAgICBbYV0gc3RhZ2UgYWxsIHVuc3RhZ2VkIGZpbGVzCiAgW3NdIHN0YWdlIGZpbGUgICAgICAgICAgICAgICAgICAgICAgICBbQV0gc3RhZ2UgYWxsIHVuc3RhZ2VkIGFuZCB1bnRyYWNrZWQgZmlsZXMKICBbdV0gdW5zdGFnZSBmaWxlICAgICAgICAgICAgICAgICAgICAgIFtVXSB1bnN0YWdlIGFsbCBzdGFnZWQgZmlsZXMKICBbZF0gZGlzY2FyZCBjaGFuZ2VzIHRvIGZpbGUgICAgICAgICAgIFtEXSBkaXNjYXJkIGFsbCB1bnN0YWdlZCBjaGFuZ2VzCiAgW2hdIG9wZW4gZmlsZSBvbiByZW1vdGUKICBbTV0gbGF1bmNoIGV4dGVybmFsIG1lcmdlIHRvb2wKCiAgW2xdIGRpZmYgZmlsZSBpbmxpbmUgICAgICAgICAgICAgICAgICBbZl0gZGlmZiBhbGwgZmlsZXMKICBbZV0gZGlmZiBmaWxlICAgICAgICAgICAgICAgICAgICAgICAgIFtGXSBkaWZmIGFsbCBjYWNoZWQgZmlsZXMKCiAgIyMjIyMjIyMjIyMjIyAgICAgICAgICAgICAgICAgICAgICAgICAjIyMjIyMjIyMjIyMjCiAgIyMgQUNUSU9OUyAjIyAgICAgICAgICAgICAgICAgICAgICAgICAjIyBTVEFTSEVTICMjCiAgIyMjIyMjIyMjIyMjIyAgICAgICAgICAgICAgICAgICAgICAgICAjIyMjIyMjIyMjIyMjCgogIFtjXSBjb21taXQgICAgICAgICAgICAgICAgICAgICAgICAgICAgW3RdW2FdIGFwcGx5IHN0YXNoCiAgW0NdIGNvbW1pdCwgaW5jbHVkaW5nIHVuc3RhZ2VkICAgICAgICBbdF1bcF0gcG9wIHN0YXNoCiAgW21dIGFtZW5kIHByZXZpb3VzIGNvbW1pdCAgICAgICAgICAgICBbdF1bc10gc2hvdyBzdGFzaAogIFtwXSBwdXNoIGN1cnJlbnQgYnJhbmNoICAgICAgICAgICAgICAgW3RdW2NdIGNyZWF0ZSBzdGFzaAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgW3RdW3VdIGNyZWF0ZSBzdGFzaCBpbmNsdWRpbmcgdW50cmFja2VkIGZpbGVzCiAgW2ldIGlnbm9yZSBmaWxlICAgICAgICAgICAgICAgICAgICAgICBbdF1bZ10gY3JlYXRlIHN0YXNoIG9mIHN0YWdlZCBjaGFuZ2VzIG9ubHkKICBbSV0gaWdub3JlIHBhdHRlcm4gICAgICAgICAgICAgICAgICAgIFt0XVtkXSBkcm9wIHN0YXNoCgogIFtCXSBhYm9ydCBtZXJnZQoKICAjIyMjIyMjIyMjIwogICMjIE9USEVSICMjCiAgIyMjIyMjIyMjIyMKCiAgW2ddICAgICAgICAgc2hvdyBncmFwaCByZXBvcCBoaXN0b3J5CiAgWz9dICAgICAgICAgdG9nZ2xlIHRoaXMgaGVscCBtZW51CiAgW3RhYl0gICAgICAgdHJhbnNpdGlvbiB0byBuZXh0IGRhc2hib2FyZAogIFtTSElGVC10YWJdIHRyYW5zaXRpb24gdG8gcHJldmlvdXMgZGFzaGJvYXJkCiAgWy5dICAgICAgICAgbW92ZSBjdXJzb3IgdG8gbmV4dCBmaWxlCiAgWyxdICAgICAgICAgbW92ZSBjdXJzb3IgdG8gcHJldmlvdXMgZmlsZQoKLQoK",
+					"AgAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPC/AAAAAAEAAADBAAAAAAAAAMEAAAAAAAAAAAAAAAAA8L8"
+				]
+			]
+		}
+	],
+	"build_system": "",
+	"build_system_choices":
+	[
+	],
+	"build_varint": "",
+	"command_palette":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+			[
+				"git stat",
+				"git: status"
+			],
+			[
+				"ssj",
+				"Set Syntax: JSX"
+			],
+			[
+				"edi",
+				"Project: Edit Project"
+			],
+			[
+				"ssjsx",
+				"Set Syntax: JSX"
+			],
+			[
+				"install",
+				"Package Control: Install Package"
+			],
+			[
+				"restar",
+				"LSP: Restart Server"
+			],
+			[
+				"git stsa",
+				"git: stash save"
+			],
+			[
+				"filde",
+				"File Manager: Delete"
+			],
+			[
+				"filede",
+				"File Manager: Delete"
+			],
+			[
+				"json",
+				"JSON Reindent: reindent file or selection"
+			],
+			[
+				"dup",
+				"File Manager: Duplicate"
+			],
+			[
+				"filedele",
+				"File Manager: Delete"
+			],
+			[
+				"gitpu",
+				"git: pull"
+			],
+			[
+				"ww",
+				"Word Wrap: Toggle"
+			],
+			[
+				"res",
+				"LSP: Restart Server"
+			],
+			[
+				"rename",
+				"Rename File"
+			],
+			[
+				"dupl",
+				"File Manager: Duplicate"
+			],
+			[
+				"rest",
+				"LSP: Restart Server"
+			],
+			[
+				"restart",
+				"LSP: Restart Server"
+			],
+			[
+				"remove",
+				"Package Control: Remove Package"
+			],
+			[
+				"key",
+				"Preferences: Key Bindings"
+			],
+			[
+				"lspsettings",
+				"Preferences: LSP Settings"
+			]
+		],
+		"width": 0.0
+	},
+	"console":
+	{
+		"height": 256.0,
+		"history":
+		[
+		]
+	},
+	"distraction_free":
+	{
+		"menu_visible": true,
+		"show_minimap": false,
+		"show_open_files": false,
+		"show_tabs": false,
+		"side_bar_visible": false,
+		"status_bar_visible": false
+	},
+	"expanded_folders":
+	[
+		"/home/sindri/dev/vikes-match-clock",
+		"/home/sindri/dev/vikes-match-clock/src",
+		"/home/sindri/dev/vikes-match-clock/src/screens"
+	],
+	"file_history":
+	[
+		"/home/sindri/dev/vikes-match-clock/src/utils/AdImage.js",
+		"/home/sindri/dev/vikes-match-clock/vikes-match-clock.sublime-project",
+		"/usr/share/sway/scripts/sbdp.py",
+		"/home/sindri/dev/syndis/vikingr/infra/modules/workers/modules/lambda/lambda.tf",
+		"/home/sindri/dev/syndis/vikingr/infra/dev/workers/out.json",
+		"/home/sindri/dev/syndis/vikingr/infra/dev/workers/policy.json",
+		"/home/sindri/dev/syndis/vikingr/src/parallelize-resources/trigger.py",
+		"/home/sindri/dev/syndis/vikingr/src/token-service/app/config.py",
+		"/home/sindri/dev/syndis/vikingr/src/token-service/app/.env",
+		"/home/sindri/dev/syndis/vikingr/infra/modules/user-pool/ssm.tf",
+		"/home/sindri/dev/syndis/vikingr/Makefile",
+		"/home/sindri/dev/syndis/vikingr/infra/modules/ecr-repo/main.tf",
+		"/home/sindri/dev/syndis/vikingr/src/asset-writer/app/main.py",
+		"/home/sindri/dev/syndis/vikingr/dev.txt",
+		"/home/sindri/dev/syndis/vikingr/lib/python/messaging/tox.ini",
+		"/home/sindri/dev/syndis/vikingr/infra/modules/workers/sns.tf",
+		"/home/sindri/dev/syndis/vikingr/infra/modules/web/cloudfront.tf",
+		"/home/sindri/dev/syndis/vikingr/lib/python/db/src/syndis_db/models.py",
+		"/home/sindri/dev/syndis/vikingr/lib/python/db/src/syndis_db/base.py",
+		"/home/sindri/dev/syndis/vikingr/lib/python/messaging/src/syndis_messaging/models.py",
+		"/home/sindri/dev/syndis/vikingr/infra/modules/user-pool/lambda.tf",
+		"/home/sindri/dev/syndis/vikingr/src/score-calculator/app/main.py",
+		"/home/sindri/dev/syndis/vikingr/src/web.backend/app/routers/company_assets/employees.py",
+		"/home/sindri/dev/syndis/vikingr/src/web.backend/app/routers/companies.py",
+		"/home/sindri/dev/syndis/vikingr/lib/python/db/src/syndis_db/test_base.py",
+		"/home/sindri/dev/syndis/vikingr/src/asset-writer/app/test_main.py",
+		"/home/sindri/dev/syndis/vikingr/src/web.backend/requirements.txt",
+		"/home/sindri/dev/syndis/vikingr/scripts/Dockerfile.python",
+		"/home/sindri/dev/syndis/vikingr/.direnv/python-3.10.1/lib/python3.10/site-packages/aws_lambda_typing/events/__init__.py",
+		"/home/sindri/dev/syndis/vikingr/src/web.backend/app/utils/auth.py",
+		"/home/sindri/dev/syndis/vikingr/src/web.backend/app/dependencies.py",
+		"/home/sindri/dev/syndis/vikingr/src/score-calculator/app/test_main.py",
+		"/home/sindri/dev/syndis/vikingr/src/score-calculator/app/tests/fixtures.py",
+		"/home/sindri/dev/syndis/vikingr/src/score-calculator/pytest.ini",
+		"/home/sindri/dev/syndis/vikingr/infra/modules/web/src/static_origin_response/main.py",
+		"/home/sindri/dev/syndis/vikingr/infra/modules/web/lambda_edge.tf",
+		"/home/sindri/dev/syndis/vikingr/vikingr.sublime-project",
+		"/home/sindri/dev/syndis/vikingr/infra/dev/web/main.tf",
+		"/home/sindri/dev/syndis/vikingr/infra/modules/user-pool/client.tf",
+		"/home/sindri/dev/syndis/vikingr/infra/modules/user-pool/main.tf",
+		"/home/sindri/dev/syndis/vikingr/infra/modules/user-pool/ui.tf",
+		"/home/sindri/dev/syndis/vikingr/infra/modules/user-pool/ui.css",
+		"/home/sindri/dev/syndis/vikingr/infra/modules/workers/score-calculator.tf",
+		"/home/sindri/dev/syndis/vikingr/infra/modules/workers/asset-writer.tf",
+		"/home/sindri/dev/syndis/vikingr/lib/python/messaging/src/syndis_messaging/tests/utils.py",
+		"/home/sindri/dev/syndis/vikingr/infra/modules/workers/corpsec.tf",
+		"/home/sindri/dev/syndis/vikingr/infra/modules/workers/parallelize-resources.tf",
+		"/home/sindri/dev/syndis/vikingr/lib/python/messaging/src/syndis_messaging/parsing.py",
+		"/home/sindri/dev/syndis/vikingr/.direnv/python-3.10.1/lib/python3.10/site-packages/aws_lambda_typing/events/sqs.py",
+		"/home/sindri/dev/syndis/vikingr/.direnv/python-3.10.1/lib/python3.10/site-packages/mypy_boto3_sqs/service_resource.py",
+		"/home/sindri/dev/syndis/vikingr/.direnv/python-3.10.1/lib/python3.10/site-packages/aws_lambda_typing/events/sns.py",
+		"/home/sindri/dev/syndis/vikingr/lib/python/db/src/syndis_db/query.py",
+		"/home/sindri/.config/sublime-text/Packages/User/JSONReindent.sublime-settings",
+		"/home/sindri/.config/sublime-text/Packages/JSON Reindent/JSONReindent.sublime-settings"
+	],
+	"find":
+	{
+		"height": 24.0
+	},
+	"find_in_files":
+	{
+		"height": 98.0,
+		"where_history":
+		[
+			""
+		]
+	},
+	"find_state":
+	{
+		"case_sensitive": false,
+		"find_history":
+		[
+			"width",
+			"none",
+			"Klukka úti",
+			"husasmidjan",
+			"gledilegt_ar",
+			"gledilegt_ar_2021",
+			"style",
+			"BACKGROUND"
+		],
+		"highlight": true,
+		"in_selection": false,
+		"preserve_case": false,
+		"regex": true,
+		"replace_history":
+		[
+		],
+		"reverse": false,
+		"scrollbar_highlights": true,
+		"show_context": true,
+		"use_buffer2": true,
+		"use_gitignore": true,
+		"whole_word": false,
+		"wrap": true
+	},
+	"groups":
+	[
+		{
+			"sheets":
+			[
+				{
+					"buffer": 0,
+					"file": "src/constants.js",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 1003,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								395,
+								395
+							]
+						],
+						"settings":
+						{
+							"auto_complete_triggers":
+							[
+								{
+									"characters": "<",
+									"selector": "text.html, text.xml"
+								},
+								{
+									"rhs_empty": true,
+									"selector": "punctuation.accessor"
+								},
+								{
+									"characters": ".\"'/@<",
+									"selector": "meta.tag, source - comment - string.quoted.double.block - string.quoted.single.block - string.unquoted.heredoc",
+									"server": "LSP-typescript"
+								}
+							],
+							"lsp_active": true,
+							"lsp_hover_provider_count": 3,
+							"lsp_uri": "file:///home/sindri/dev/vikes-match-clock/src/constants.js",
+							"show_definitions": false,
+							"syntax": "Packages/JavaScript/JavaScript.sublime-syntax",
+							"tab_size": 2,
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 9,
+					"stack_multiselect": false,
+					"type": "text"
+				},
+				{
+					"buffer": 1,
+					"file": "src/index.js",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 1386,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								1273,
+								1273
+							]
+						],
+						"settings":
+						{
+							"auto_complete_triggers":
+							[
+								{
+									"characters": "<",
+									"selector": "text.html, text.xml"
+								},
+								{
+									"rhs_empty": true,
+									"selector": "punctuation.accessor"
+								},
+								{
+									"characters": ".\"'/@<",
+									"selector": "meta.tag, source - comment - string.quoted.double.block - string.quoted.single.block - string.unquoted.heredoc",
+									"server": "LSP-typescript"
+								}
+							],
+							"lsp_active": true,
+							"lsp_hover_provider_count": 3,
+							"lsp_uri": "file:///home/sindri/dev/vikes-match-clock/src/index.js",
+							"show_definitions": false,
+							"syntax": "Packages/JavaScript/JavaScript.sublime-syntax",
+							"tab_size": 2,
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 10,
+					"stack_multiselect": false,
+					"type": "text"
+				},
+				{
+					"buffer": 2,
+					"file": "src/App.js",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 3457,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								2160,
+								2160
+							]
+						],
+						"settings":
+						{
+							"auto_complete_triggers":
+							[
+								{
+									"characters": "<",
+									"selector": "text.html, text.xml"
+								},
+								{
+									"rhs_empty": true,
+									"selector": "punctuation.accessor"
+								},
+								{
+									"characters": ".\"'/@<",
+									"selector": "meta.tag, source - comment - string.quoted.double.block - string.quoted.single.block - string.unquoted.heredoc",
+									"server": "LSP-typescript"
+								}
+							],
+							"lsp_active": true,
+							"lsp_hover_provider_count": 6,
+							"lsp_uri": "file:///home/sindri/dev/vikes-match-clock/src/App.js",
+							"show_definitions": false,
+							"syntax": "Packages/JavaScript/JSX.sublime-syntax",
+							"tab_size": 2,
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 855.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 6,
+					"stack_multiselect": false,
+					"type": "text"
+				},
+				{
+					"buffer": 3,
+					"file": "src/screens/Idle.js",
+					"selected": true,
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 2124,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								1585,
+								1585
+							]
+						],
+						"settings":
+						{
+							"auto_complete_triggers":
+							[
+								{
+									"characters": "<",
+									"selector": "text.html, text.xml"
+								},
+								{
+									"rhs_empty": true,
+									"selector": "punctuation.accessor"
+								},
+								{
+									"characters": ".\"'/@<",
+									"selector": "meta.tag, source - comment - string.quoted.double.block - string.quoted.single.block - string.unquoted.heredoc",
+									"server": "LSP-typescript"
+								}
+							],
+							"lsp_active": true,
+							"lsp_hover_provider_count": 3,
+							"lsp_uri": "file:///home/sindri/dev/vikes-match-clock/src/screens/Idle.js",
+							"show_definitions": false,
+							"syntax": "Packages/JavaScript/JSX.sublime-syntax",
+							"tab_size": 2,
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 608.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 0,
+					"stack_multiselect": false,
+					"type": "text"
+				},
+				{
+					"buffer": 4,
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 243,
+						"regions":
+						{
+							"match":
+							{
+								"flags": 112,
+								"regions":
+								[
+									[
+										177,
+										187
+									]
+								],
+								"scope": ""
+							}
+						},
+						"selection":
+						[
+							[
+								181,
+								181
+							]
+						],
+						"settings":
+						{
+							"auto_complete_triggers":
+							[
+								{
+									"characters": "<",
+									"selector": "text.html, text.xml"
+								},
+								{
+									"rhs_empty": true,
+									"selector": "punctuation.accessor"
+								}
+							],
+							"detect_indentation": false,
+							"line_numbers": false,
+							"lsp_uri": "buffer://sublime/314",
+							"output_tag": 1,
+							"result_base_dir": "",
+							"result_file_regex": "^([^ \t].*):$",
+							"result_line_regex": "^ +([0-9]+):",
+							"scroll_past_end": true,
+							"syntax": "Packages/Default/Find Results.hidden-tmLanguage"
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 5,
+					"stack_multiselect": false,
+					"type": "text"
+				},
+				{
+					"buffer": 5,
+					"file": "src/reducers/view.js",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 907,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								114,
+								121
+							]
+						],
+						"settings":
+						{
+							"auto_complete_triggers":
+							[
+								{
+									"characters": "<",
+									"selector": "text.html, text.xml"
+								},
+								{
+									"rhs_empty": true,
+									"selector": "punctuation.accessor"
+								},
+								{
+									"characters": ".\"'/@<",
+									"selector": "meta.tag, source - comment - string.quoted.double.block - string.quoted.single.block - string.unquoted.heredoc",
+									"server": "LSP-typescript"
+								}
+							],
+							"lsp_active": true,
+							"lsp_hover_provider_count": 1,
+							"lsp_uri": "file:///home/sindri/dev/vikes-match-clock/src/reducers/view.js",
+							"show_definitions": false,
+							"syntax": "Packages/JavaScript/JavaScript.sublime-syntax",
+							"tab_size": 2,
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 1.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 4,
+					"stack_multiselect": false,
+					"type": "text"
+				},
+				{
+					"buffer": 6,
+					"file": "src/propTypes.js",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 2108,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								1850,
+								1850
+							]
+						],
+						"settings":
+						{
+							"auto_complete_triggers":
+							[
+								{
+									"characters": "<",
+									"selector": "text.html, text.xml"
+								},
+								{
+									"rhs_empty": true,
+									"selector": "punctuation.accessor"
+								},
+								{
+									"characters": ".\"'/@<",
+									"selector": "meta.tag, source - comment - string.quoted.double.block - string.quoted.single.block - string.unquoted.heredoc",
+									"server": "LSP-typescript"
+								}
+							],
+							"lsp_active": true,
+							"lsp_hover_provider_count": 1,
+							"lsp_uri": "file:///home/sindri/dev/vikes-match-clock/src/propTypes.js",
+							"show_definitions": false,
+							"syntax": "Packages/JavaScript/JavaScript.sublime-syntax",
+							"tab_size": 2,
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 585.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 7,
+					"stack_multiselect": false,
+					"type": "text"
+				},
+				{
+					"buffer": 7,
+					"file": "src/reducers/controller.js",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 5779,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								269,
+								269
+							]
+						],
+						"settings":
+						{
+							"auto_complete_triggers":
+							[
+								{
+									"characters": "<",
+									"selector": "text.html, text.xml"
+								},
+								{
+									"rhs_empty": true,
+									"selector": "punctuation.accessor"
+								},
+								{
+									"characters": ".\"'/@<",
+									"selector": "meta.tag, source - comment - string.quoted.double.block - string.quoted.single.block - string.unquoted.heredoc",
+									"server": "LSP-typescript"
+								}
+							],
+							"lsp_active": true,
+							"lsp_hover_provider_count": 1,
+							"lsp_uri": "file:///home/sindri/dev/vikes-match-clock/src/reducers/controller.js",
+							"show_definitions": false,
+							"syntax": "Packages/JavaScript/JavaScript.sublime-syntax",
+							"tab_size": 2,
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 8,
+					"stack_multiselect": false,
+					"type": "text"
+				},
+				{
+					"buffer": 8,
+					"file": "src/App.css",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 424,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								132,
+								132
+							]
+						],
+						"settings":
+						{
+							"lsp_uri": "file:///home/sindri/dev/vikes-match-clock/src/App.css",
+							"syntax": "Packages/CSS/CSS.sublime-syntax",
+							"tab_size": 2,
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 3,
+					"stack_multiselect": false,
+					"type": "text"
+				},
+				{
+					"buffer": 9,
+					"file": "src/screens/Idle.css",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 784,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								256,
+								256
+							]
+						],
+						"settings":
+						{
+							"lsp_uri": "file:///home/sindri/dev/vikes-match-clock/src/screens/Idle.css",
+							"syntax": "Packages/CSS/CSS.sublime-syntax",
+							"tab_size": 2,
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 1,
+					"stack_multiselect": false,
+					"type": "text"
+				},
+				{
+					"buffer": 10,
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 2046,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								172,
+								172
+							]
+						],
+						"settings":
+						{
+							"__vi_external_disable": false,
+							"auto_complete_triggers":
+							[
+								{
+									"characters": "<",
+									"selector": "text.html, text.xml"
+								},
+								{
+									"rhs_empty": true,
+									"selector": "punctuation.accessor"
+								}
+							],
+							"git_savvy.help_hidden": false,
+							"git_savvy.interface": "status",
+							"git_savvy.repo_path": "/home/sindri/dev/vikes-match-clock",
+							"git_savvy.status_view": true,
+							"git_savvy.tabbable": true,
+							"lsp_uri": "buffer://sublime/269",
+							"result_base_dir": "/home/sindri/dev/vikes-match-clock",
+							"result_file_regex": "^(?:    .+ -> |  [ -] (?!\\(\\d+\\) ))(?!Your working directory is clean\\.)(\\S.*)$",
+							"syntax": "Packages/GitSavvy/syntax/status.sublime-syntax"
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 2,
+					"stack_multiselect": false,
+					"type": "text"
+				}
+			]
+		}
+	],
+	"incremental_find":
+	{
+		"height": 24.0
+	},
+	"input":
+	{
+		"height": 36.0
+	},
+	"layout":
+	{
+		"cells":
+		[
+			[
+				0,
+				0,
+				1,
+				1
+			]
+		],
+		"cols":
+		[
+			0.0,
+			1.0
+		],
+		"rows":
+		[
+			0.0,
+			1.0
+		]
+	},
+	"menu_visible": true,
+	"output.GitSavvy":
+	{
+		"height": 108.0
+	},
+	"output.diagnostics":
+	{
+		"height": 108.0
+	},
+	"output.find_results":
+	{
+		"height": 0.0
+	},
+	"output.language servers":
+	{
+		"height": 0.0
+	},
+	"output.mdpopups":
+	{
+		"height": 0.0
+	},
+	"output.references":
+	{
+		"height": 215.0
+	},
+	"output.show_commit_info":
+	{
+		"height": 108.0
+	},
+	"output.terrafmt":
+	{
+		"height": 108.0
+	},
+	"pinned_build_system": "",
+	"project": "vikes-match-clock.sublime-project",
+	"replace":
+	{
+		"height": 44.0
+	},
+	"save_all_on_build": true,
+	"select_file":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+			[
+				"app",
+				"src/App.css"
+			],
+			[
+				".css",
+				"src/App.css"
+			],
+			[
+				"indejs",
+				"src/index.js"
+			],
+			[
+				"githwork",
+				".github/workflows/push.yml"
+			],
+			[
+				"getch",
+				"scripts/get-changes.sh"
+			],
+			[
+				"make",
+				"Makefile"
+			],
+			[
+				"trig",
+				"src/token-service/trigger.py"
+			],
+			[
+				"trigg",
+				"src/parallelize-resources/trigger.py"
+			],
+			[
+				"dev",
+				"dev.txt"
+			],
+			[
+				"ecr",
+				"infra/shared/general/ecr.tf"
+			],
+			[
+				"sns",
+				"infra/modules/workers/sns.tf"
+			],
+			[
+				"asswritetf",
+				"infra/modules/workers/asset-writer.tf"
+			],
+			[
+				"asswritemain",
+				"src/asset-writer/app/main.py"
+			],
+			[
+				"snst",
+				"infra/modules/workers/sns.tf"
+			],
+			[
+				"messagtox",
+				"lib/python/messaging/tox.ini"
+			],
+			[
+				"devt",
+				"dev.txt"
+			],
+			[
+				"dock",
+				"scripts/Dockerfile.python"
+			],
+			[
+				"cloud",
+				"infra/modules/web/cloudfront.tf"
+			],
+			[
+				"cloudfr",
+				"infra/modules/web/cloudfront.tf"
+			],
+			[
+				"inframainpy",
+				"infra/modules/web/src/static_origin_response/main.py"
+			],
+			[
+				"indexpy",
+				"infra/modules/web/src/static_origin_response/index.py"
+			],
+			[
+				"mainpy",
+				"src/asset-writer/app/main.py"
+			],
+			[
+				"workerlamb",
+				"infra/modules/workers/modules/lambda/lambda.tf"
+			],
+			[
+				"lambda",
+				"infra/modules/user-pool/lambda.tf"
+			],
+			[
+				"messagemod",
+				"lib/python/messaging/src/syndis_messaging/models.py"
+			],
+			[
+				"dbmodels",
+				"lib/python/db/src/syndis_db/models.py"
+			],
+			[
+				"companemp",
+				"src/web.backend/app/routers/company_assets/employees.py"
+			],
+			[
+				"asswritmain",
+				"src/asset-writer/app/main.py"
+			],
+			[
+				"scorecalmainpy",
+				"src/score-calculator/app/main.py"
+			],
+			[
+				"scorecal",
+				"infra/modules/workers/score-calculator.tf"
+			],
+			[
+				"asswritestma",
+				"src/asset-writer/app/test_main.py"
+			],
+			[
+				"userpo",
+				"infra/modules/user-pool/client.tf"
+			]
+		],
+		"width": 0.0
+	},
+	"select_project":
+	{
+		"height": 500.0,
+		"last_filter": "",
+		"selected_items":
+		[
+			[
+				"",
+				"~/dev/syndis/vikingr/vikingr.sublime-project"
+			]
+		],
+		"width": 380.0
+	},
+	"select_symbol":
+	{
+		"height": 141.0,
+		"last_filter": "back",
+		"selected_items":
+		[
+			[
+				"back",
+				"BACKGROUND"
+			],
+			[
+				"companyt",
+				"CompanyType"
+			],
+			[
+				"testhandleem",
+				"test_handler_employee"
+			],
+			[
+				"scan",
+				"scan_company_asset"
+			],
+			[
+				"gettest",
+				"get_test_record"
+			]
+		],
+		"width": 592.0
+	},
+	"selected_group": 0,
+	"settings":
+	{
+	},
+	"show_minimap": true,
+	"show_open_files": false,
+	"show_tabs": true,
+	"side_bar_visible": true,
+	"side_bar_width": 247.0,
+	"status_bar_visible": true,
+	"template_settings":
+	{
+	}
+}
