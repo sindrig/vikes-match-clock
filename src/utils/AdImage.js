@@ -57,7 +57,8 @@ const AdImage = ({ size, time, blankBetweenImages, postAdImg }) => {
   if (isBlank) {
     return null;
   }
-  const src = isPost ? postAdImg : assets[`ads/${size}/${adAssets[img]}`];
+  const src =
+    isPost && postAdImg ? postAdImg : assets[`ads/${size}/${adAssets[img]}`];
   return <img src={src} className="ad" alt="Ad" />;
 };
 
