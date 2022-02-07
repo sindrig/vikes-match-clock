@@ -6,7 +6,6 @@ import { viewPortPropType } from "../propTypes";
 import clubLogos from "../images/clubLogos";
 import AdImage from "../utils/AdImage";
 import { getTemp } from "../lib/weather";
-import gledilegt_ar from "../images/gledilegt_ar_2021.png";
 import husasmidjan from "../images/husa.png";
 
 import "./Idle.css";
@@ -54,12 +53,7 @@ class Idle extends Component {
     const { temperature } = this.state;
     return (
       <div className={`idle idle-${vp.key}`}>
-        <AdImage
-          size="large"
-          blankBetweenImages
-          time={8}
-          postAdImg={gledilegt_ar}
-        />
+        <AdImage size="large" blankBetweenImages time={8} />
         <img src={clubLogos["Víkingur R"]} alt="Vikes" className="idle-vikes" />
         <img src={husasmidjan} alt="Vikes" className="idle-ad" />
         <div className="idle-text-container">
