@@ -9,19 +9,10 @@ import { VIEWS } from "../reducers/controller";
 import { SPORTS } from "../constants";
 import HalfStops from "./HalfStops";
 
-const MatchActionSettings = ({
-  view,
-  match,
-  updateMatch,
-  pauseMatch,
-  matchTimeout,
-  removeTimeout,
-  startMatch,
-  addGoal,
-}) => (
+const MatchActionSettings = ({ view, match, updateMatch }) => (
   <div className="control-item playerControls withborder">
     {view === VIEWS.match && (
-      <div>  
+      <div>
         <div className="control-item">
           <div>
             <HalfStops />
