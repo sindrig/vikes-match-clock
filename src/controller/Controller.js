@@ -6,12 +6,12 @@ import { bindActionCreators } from "redux";
 import controllerActions from "../actions/controller";
 import viewActions from "../actions/view";
 import globalActions from "../actions/global";
-import { Nav } from 'rsuite';
-import GearIcon from '@rsuite/icons/Gear';
-import TimeIcon from '@rsuite/icons/Time';
-import CloseIcon from '@rsuite/icons/CloseOutline';
-import Button from 'rsuite/Button';
-import { Tooltip, Whisper } from 'rsuite';
+import { Nav } from "rsuite";
+import GearIcon from "@rsuite/icons/Gear";
+import TimeIcon from "@rsuite/icons/Time";
+import CloseIcon from "@rsuite/icons/CloseOutline";
+import Button from "rsuite/Button";
+import { Tooltip, Whisper } from "rsuite";
 
 import { TABS, VIEWS } from "../reducers/controller";
 import { VPS } from "../reducers/view";
@@ -20,7 +20,7 @@ import MatchActionSettings from "./MatchActionSettings";
 import LoginPage from "./LoginPage";
 import AssetController from "./asset/AssetController";
 import { viewPortPropType } from "../propTypes";
-import 'rsuite/dist/rsuite.min.css';
+import "rsuite/dist/rsuite.min.css";
 import "./Controller.css";
 
 // eslint-disable-next-line
@@ -37,7 +37,7 @@ const Controller = ({
   setViewPort,
   sync,
   auth,
-  tab
+  tab,
 }) => {
   const currentViewPortName = Object.keys(VPS).filter(
     (key) =>
@@ -47,11 +47,7 @@ const Controller = ({
   const showControls = !sync || !auth.isEmpty;
   const showHome = tab === "home";
   const showSettings = tab === "settings";
-  const tooltipClear = (
-    <Tooltip>
-      Birtir aftur stöðu leiksins á skjá.
-    </Tooltip>
-  );
+  const tooltipClear = <Tooltip>Birtir aftur stöðu leiksins á skjá.</Tooltip>;
   return (
     <div className="controller">
       <div className="dummyDiv"></div>
@@ -59,61 +55,79 @@ const Controller = ({
         <Nav.Item eventKey="home" icon={<TimeIcon />}>
           Heim
         </Nav.Item>
-        <Nav.Item eventKey="settings" icon={<GearIcon />}>Stillingar</Nav.Item>
+        <Nav.Item eventKey="settings" icon={<GearIcon />}>
+          Stillingar
+        </Nav.Item>
       </Nav>
       {showControls && showHome && <MatchActions />}
       {showControls && showSettings && <MatchActionSettings />}
       {showControls && currentAsset && (
-         <div className="control-item">
-            <Whisper placement="bottom" controlId="clearoverlay-id-hover" trigger="hover" speaker={tooltipClear}>
-              <Button color="cyan" appearance="primary" size="sm" onClick={() => renderAsset(0)}>
-                <CloseIcon /> Hreinsa virkt overlay
-              </Button>
-            </Whisper>
-         </div>
-        )}
-      { showSettings && (
-      <div
-        className="page-actions control-item withborder"
-      >
-        {showControls && (
-          <div className="view-selector">
-            {Object.keys(VIEWS).map((VIEW) => (
-              <label htmlFor={`view-selector-${VIEW}`} key={VIEW}>
-                <input
-                  type="radio"
-                  value={VIEW}
-                  checked={VIEW === view ? "checked" : false}
-                  onChange={(e) => selectView(e.target.value)}
-                  className="view-selector-input"
-                  id={`view-selector-${VIEW}`}
-                  name="view-selector"
-                />
-                {VIEW}
-              </label>
-            ))}
+        <div className="control-item">
+          <Whisper
+            placement="bottom"
+            controlId="clearoverlay-id-hover"
+            trigger="hover"
+            speaker={tooltipClear}
+          >
+            <Button
+              color="cyan"
+              appearance="primary"
+              size="sm"
+              onClick={() => renderAsset(0)}
+            >
+              <CloseIcon /> Hreinsa virkt overlay
+            </Button>
+          </Whisper>
+        </div>
+      )}
+      {showSettings && (
+        <div className="page-actions control-item withborder">
+          {showControls && (
+            <div className="view-selector">
+              {Object.keys(VIEWS).map((VIEW) => (
+                <label htmlFor={`view-selector-${VIEW}`} key={VIEW}>
+                  <input
+                    type="radio"
+                    value={VIEW}
+                    checked={VIEW === view ? "checked" : false}
+                    onChange={(e) => selectView(e.target.value)}
+                    className="view-selector-input"
+                    id={`view-selector-${VIEW}`}
+                    name="view-selector"
+                  />
+                  {VIEW}
+                </label>
+              ))}
+            </div>
+          )}
+          <div className="viewport-select">
+            <select
+              value={currentViewPortName}
+              onChange={(e) =>
+                VPS[e.target.value] && setViewPort(VPS[e.target.value])
+              }
+            >
+              {Object.keys(VPS).map((VP) => (
+                <option value={VP} key={VP}>
+                  {VPS[VP].name}
+                </option>
+              ))}
+            </select>
           </div>
-        )}
-        <div className="viewport-select">
-          <select
-            value={currentViewPortName}
-            onChange={(e) =>
-              VPS[e.target.value] && setViewPort(VPS[e.target.value])
+          <Button
+            color="red"
+            appearance="primary"
+            size="sm"
+            onClick={() =>
+              confirmRefresh() &&
+              clearState().then(() => window.location.reload())
             }
           >
-            {Object.keys(VPS).map((VP) => (
-              <option value={VP} key={VP}>
-                {VPS[VP].name}
-              </option>
-            ))}
-          </select>
+            Hard refresh
+          </Button>
+          <LoginPage />
         </div>
-        <Button color="red" appearance="primary" size="sm" onClick={() =>
-            confirmRefresh() &&
-            clearState().then(() => window.location.reload())
-          }>Hard refresh</Button>
-        <LoginPage />
-      </div>)}
+      )}
       {showControls && <AssetController />}
     </div>
   );
@@ -170,7 +184,7 @@ const stateToProps = ({
   sync,
   currentAsset: currentAsset || null,
   auth,
-  tab: tab
+  tab: tab,
 });
 
 const dispatchToProps = (dispatch) =>
@@ -180,7 +194,7 @@ const dispatchToProps = (dispatch) =>
       selectTab: controllerActions.selectTab,
       clearState: globalActions.clearState,
       renderAsset: controllerActions.renderAsset,
-      setViewPort: viewActions.setViewPort
+      setViewPort: viewActions.setViewPort,
     },
     dispatch
   );

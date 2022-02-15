@@ -12,9 +12,9 @@ import RemovableAsset from "./RemovableAsset";
 import TeamAssetController from "./team/TeamAssetController";
 import UrlController from "./UrlController";
 import assetTypes from "./AssetTypes";
-import Button from 'rsuite/Button';
-import InputNumber from 'rsuite/InputNumber';
-import Checkbox from 'rsuite/Checkbox';
+import Button from "rsuite/Button";
+import InputNumber from "rsuite/InputNumber";
+import Checkbox from "rsuite/Checkbox";
 import * as assetsImages from "../../assets";
 import controllerActions from "../../actions/controller";
 
@@ -199,34 +199,60 @@ class AssetController extends Component {
           </AssetSelector>
           <span>{selectedAssetsList.length} í biðröð</span>
           {selectedAssetsList.length ? (
-            <Button color="red" size="xs" appearance="primary" onClick={() => window.confirm("Ertu alveg viss?") && setSelectedAssets([])}>Hreinsa biðröð</Button>
+            <Button
+              color="red"
+              size="xs"
+              appearance="primary"
+              onClick={() =>
+                window.confirm("Ertu alveg viss?") && setSelectedAssets([])
+              }
+            >
+              Hreinsa biðröð
+            </Button>
           ) : null}
           {playing ? (
-             <Button color="yellow" appearance="primary" onClick={() => setPlaying(false)}>Pause</Button>
+            <Button
+              color="yellow"
+              appearance="primary"
+              onClick={() => setPlaying(false)}
+            >
+              Pause
+            </Button>
           ) : null}
           {!playing && selectedAssetsList.length ? (
-             <Button color="green" appearance="primary" onClick={showNextAsset}>Birta</Button>
+            <Button color="green" appearance="primary" onClick={showNextAsset}>
+              Birta
+            </Button>
           ) : null}
           <div>
-          <Checkbox onChange={toggleAutoPlay}
-              checked={autoPlay}>
-            Autoplay
-          </Checkbox>
+            <Checkbox onChange={toggleAutoPlay} checked={autoPlay}>
+              Autoplay
+            </Checkbox>
           </div>
           {autoPlay && (
             <div>
-               <InputNumber defaultValue={3} max={600} min={1} onChange={this.onImageSecondsChange}
-                value={imageSeconds} postfix="sek" />
+              <InputNumber
+                defaultValue={3}
+                max={600}
+                min={1}
+                onChange={this.onImageSecondsChange}
+                value={imageSeconds}
+                postfix="sek"
+              />
             </div>
           )}
           <div>
-          <Checkbox onChange={toggleCycle} checked={cycle}>
-            Loop
-          </Checkbox>
+            <Checkbox onChange={toggleCycle} checked={cycle}>
+              Loop
+            </Checkbox>
           </div>
           <UrlController addAsset={this.addAssetKey} />
-          <Button appearance="default" onClick={this.playRuv("ruv")}>RÚV</Button>
-          <Button appearance="default" onClick={this.playRuv("ruv2")}>RÚV 2</Button>
+          <Button appearance="default" onClick={this.playRuv("ruv")}>
+            RÚV
+          </Button>
+          <Button appearance="default" onClick={this.playRuv("ruv2")}>
+            RÚV 2
+          </Button>
           {this.renderError()}
         </div>
         <div className="upcoming-assets">{this.renderNextAsset()}</div>

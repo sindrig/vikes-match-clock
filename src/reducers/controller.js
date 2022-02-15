@@ -17,9 +17,8 @@ export const VIEWS = keymirror({
 
 export const TABS = keymirror({
   home: null,
-  settings: null
+  settings: null,
 });
-
 
 export const initialState = {
   selectedAssets: [],
@@ -31,7 +30,7 @@ export const initialState = {
   view: VIEWS.idle,
   availableMatches: {},
   selectedMatch: null,
-  currentAsset: ""
+  currentAsset: "",
 };
 
 const getStateShowingNextAsset = (state) => {

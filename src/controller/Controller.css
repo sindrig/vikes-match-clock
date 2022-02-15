@@ -6,7 +6,7 @@
 
 .controller {
   position: absolute;
-  top: 0px;  
+  top: 0px;
   font-size: 14px;
 }
 
@@ -16,7 +16,7 @@
 }
 
 .controller .playerControls {
-  width:380px;
+  width: 380px;
 }
 
 .controller .dummyDiv {
@@ -24,7 +24,7 @@
   top: 0px;
   width: 242px;
   height: 176px;
-  float:left;
+  float: left;
   z-index: -100;
 }
 
@@ -33,15 +33,13 @@
   border-radius: 5px;
 }
 
-div.stdbuttons> button
-{
+div.stdbuttons > button {
   border: 1px solid #747474;
   background-color: lightgray;
   border-radius: 2px;
 }
 
-div.stdbuttons> button:hover
-{
+div.stdbuttons > button:hover {
   border: 1px solid #494949;
   background-color: rgb(187, 187, 187);
   border-radius: 2px;
@@ -64,10 +62,10 @@ div.stdbuttons> button:hover
   clear: both;
 }
 
-input[type='number']{
+input[type="number"] {
   width: 50px;
-} 
+}
 
-input.longerInput{
+input.longerInput {
   width: 120px;
 }

@@ -93,7 +93,6 @@ class App extends Component {
       ...BACKGROUND,
       ...vp.style,
     };
-    console.log(view)
     return (
       <React.Fragment>
         {view === VIEWS.control &&
@@ -103,9 +102,7 @@ class App extends Component {
         <div className="App" style={style}>
           {this.renderAppContents()}
         </div>
-        {(view === VIEWS.match || view === VIEWS.idle) && (
-          <Controller />
-        )}
+        {(view === VIEWS.match || view === VIEWS.idle) && <Controller />}
         {asset ? (
           <div className="overlay-container" style={vp.style}>
             <Asset {...asset} />

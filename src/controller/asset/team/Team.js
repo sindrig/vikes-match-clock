@@ -5,8 +5,8 @@ import PropTypes from "prop-types";
 import { playerPropType, matchPropType } from "../../../propTypes";
 import controllerActions from "../../../actions/controller";
 import TeamPlayer from "./TeamPlayer";
-import CloseIcon from '@rsuite/icons/Close';
-import { Button, IconButton } from 'rsuite';
+import CloseIcon from "@rsuite/icons/Close";
+import { Button, IconButton } from "rsuite";
 
 import "./Team.css";
 
@@ -105,11 +105,23 @@ class Team extends Component {
               // eslint-disable-next-line react/no-array-index-key
               <div className="player-whole-line" key={`${i}`}>
                 {selectPlayer && p.number && p.name ? (
-                   <Button appearance="default" onClick={() => selectPlayer(p, teamName)}>{`#${p.number} - ${p.name}`}</Button>
+                  <Button
+                    appearance="default"
+                    onClick={() => selectPlayer(p, teamName)}
+                  >{`#${p.number} - ${p.name}`}</Button>
                 ) : (
                   <TeamPlayer player={p} onChange={this.updatePlayer(i)} />
                 )}
-                { !selectPlayer && <IconButton icon={<CloseIcon />} size="xs" color="red" appearance="primary" circle onClick={() => this.removePlayer(i)}/> }
+                {!selectPlayer && (
+                  <IconButton
+                    icon={<CloseIcon />}
+                    size="xs"
+                    color="red"
+                    appearance="primary"
+                    circle
+                    onClick={() => this.removePlayer(i)}
+                  />
+                )}
               </div>
             ))
           : null}

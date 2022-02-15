@@ -252,7 +252,12 @@ class TeamAssetController extends Component {
         awayTeam.length ||
         Object.keys(availableMatches).length ? (
           <div className="control-item stdbuttons">
-            <button type="button" onClick={() => window.confirm("Ertu alveg viss?") && clearMatchPlayers() }>
+            <button
+              type="button"
+              onClick={() =>
+                window.confirm("Ertu alveg viss?") && clearMatchPlayers()
+              }
+            >
               Hreinsa lið
             </button>
           </div>
