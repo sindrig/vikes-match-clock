@@ -1,22 +1,50 @@
 .controller button {
-  background-color: #c0c0c0;
+  /*background-color: #c0c0c0;
   border: 1px solid black;
-  font-size: 15px;
+  font-size: 15px;*/
 }
 
 .controller {
-  position: relative;
-  top: 30px;
-  font-size: 16px;
+  position: absolute;
+  top: 0px;  
+  font-size: 14px;
 }
 
 .controller .control-item {
-  margin: 5px;
+  margin: 1px;
   float: left;
 }
 
-.controller > div {
-  border: 2px solid black;
+.controller .playerControls {
+  width:380px;
+}
+
+.controller .dummyDiv {
+  position: relative;
+  top: 0px;
+  width: 242px;
+  height: 176px;
+  float:left;
+  z-index: -100;
+}
+
+.controller > div.withborder {
+  border: 1px solid #c7c7c7;
+  border-radius: 5px;
+}
+
+div.stdbuttons> button
+{
+  border: 1px solid #747474;
+  background-color: lightgray;
+  border-radius: 2px;
+}
+
+div.stdbuttons> button:hover
+{
+  border: 1px solid #494949;
+  background-color: rgb(187, 187, 187);
+  border-radius: 2px;
 }
 
 .controller div.control-item > button,
@@ -28,9 +56,18 @@
 }
 
 .controller .page-actions {
-  position: absolute;
+  position: relative;
+  float: left;
 }
 
 .controller .asset-controller {
   clear: both;
+}
+
+input[type='number']{
+  width: 50px;
+} 
+
+input.longerInput{
+  width: 120px;
 }

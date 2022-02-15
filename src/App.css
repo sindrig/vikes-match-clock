@@ -1,6 +1,6 @@
 body {
   /* prevent scrolling */
-  overflow: hidden;
+  /*overflow: hidden;*/
 }
 
 html {
@@ -8,14 +8,17 @@ html {
 }
 
 .App {
-  position: absolute;
+  position: relative;
   cursor: none;
+  top: 0px;
+  float: left;
+  z-index: 999;
 }
 
 button {
   border: none;
   background-color: transparent;
-  font-size: 30px;
+  font-size: 15px;
 }
 
 button:focus {

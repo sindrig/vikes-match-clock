@@ -12,6 +12,9 @@ import RemovableAsset from "./RemovableAsset";
 import TeamAssetController from "./team/TeamAssetController";
 import UrlController from "./UrlController";
 import assetTypes from "./AssetTypes";
+import Button from 'rsuite/Button';
+import InputNumber from 'rsuite/InputNumber';
+import Checkbox from 'rsuite/Checkbox';
 import * as assetsImages from "../../assets";
 import controllerActions from "../../actions/controller";
 
@@ -55,12 +58,12 @@ class AssetController extends Component {
     this.removeAsset = this.removeAsset.bind(this);
   }
 
-  onImageSecondsChange(event) {
+  onImageSecondsChange(value) {
     const { setImageSeconds } = this.props;
-    event.preventDefault();
-    const {
+    //event.preventDefault();
+    /*const {
       target: { value },
-    } = event;
+    } = event;*/
     setImageSeconds(Math.max(parseInt(value, 10), 1));
   }
 
@@ -174,7 +177,7 @@ class AssetController extends Component {
     } = this.props;
     const selectedAssetsList = selectedAssets || [];
     return (
-      <div>
+      <div className="withborder">
         <div className="controls control-item">
           <AssetSelector addAssetKey={this.addAssetKey}>
             <option value="null">Myndir</option>
@@ -196,50 +199,34 @@ class AssetController extends Component {
           </AssetSelector>
           <span>{selectedAssetsList.length} í biðröð</span>
           {selectedAssetsList.length ? (
-            <button type="button" onClick={() => setSelectedAssets([])}>
-              Hreinsa biðröð
-            </button>
+            <Button color="red" size="xs" appearance="primary" onClick={() => window.confirm("Ertu alveg viss?") && setSelectedAssets([])}>Hreinsa biðröð</Button>
           ) : null}
           {playing ? (
-            <button type="button" onClick={() => setPlaying(false)}>
-              Pause
-            </button>
+             <Button color="yellow" appearance="primary" onClick={() => setPlaying(false)}>Pause</Button>
           ) : null}
           {!playing && selectedAssetsList.length ? (
-            <button type="button" onClick={showNextAsset}>
-              Birta
-            </button>
+             <Button color="green" appearance="primary" onClick={showNextAsset}>Birta</Button>
           ) : null}
           <div>
-            <input
-              type="checkbox"
-              onChange={toggleAutoPlay}
-              checked={autoPlay}
-            />
+          <Checkbox onChange={toggleAutoPlay}
+              checked={autoPlay}>
             Autoplay
-          </div>
-          <div>
-            <input type="checkbox" onChange={toggleCycle} checked={cycle} />
-            Loop
+          </Checkbox>
           </div>
           {autoPlay && (
             <div>
-              <input
-                type="number"
-                onChange={this.onImageSecondsChange}
-                value={imageSeconds}
-                style={{ width: "33px" }}
-              />
-              sek
+               <InputNumber defaultValue={3} max={600} min={1} onChange={this.onImageSecondsChange}
+                value={imageSeconds} postfix="sek" />
             </div>
           )}
+          <div>
+          <Checkbox onChange={toggleCycle} checked={cycle}>
+            Loop
+          </Checkbox>
+          </div>
           <UrlController addAsset={this.addAssetKey} />
-          <button type="button" onClick={this.playRuv("ruv")}>
-            RÚV
-          </button>
-          <button type="button" onClick={this.playRuv("ruv2")}>
-            RÚV 2
-          </button>
+          <Button appearance="default" onClick={this.playRuv("ruv")}>RÚV</Button>
+          <Button appearance="default" onClick={this.playRuv("ruv2")}>RÚV 2</Button>
           {this.renderError()}
         </div>
         <div className="upcoming-assets">{this.renderNextAsset()}</div>
@@ -251,7 +238,7 @@ class AssetController extends Component {
     const { match, assetView, selectAssetView } = this.props;
     return (
       <div className="asset-controller">
-        <div className="view-selector">
+        <div className="view-selector assettabs stdbuttons">
           <button
             type="button"
             onClick={() => selectAssetView(ASSET_VIEWS.assets)}

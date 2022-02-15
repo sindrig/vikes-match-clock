@@ -9,6 +9,7 @@ const DEBUG = false;
 
 const actions = {
   [ActionTypes.selectView]: (view) => ({ view }),
+  [ActionTypes.selectTab]: (tab) => ({ tab }),
   [ActionTypes.selectAssetView]: (assetView) => ({ assetView }),
   [ActionTypes.clearMatchPlayers]: () => {},
   [ActionTypes.selectMatch]: (matchId) => matchId,

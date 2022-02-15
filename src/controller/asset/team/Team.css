@@ -11,7 +11,7 @@ div.team-asset-player {
 
 .team-asset-container {
   float: left;
-  margin-left: 50px;
+  margin-left: 40px;
 }
 
 .team-asset-controller {
@@ -28,9 +28,13 @@ div.team-asset-player {
 
 .team-asset-container button {
   clear: none;
-  height: 22px;
+  /*height: 22px;*/
 }
 
 .team-asset-container .player-input {
-  width: 310px;
+  width: 250px;
+}
+
+.team-asset-container .player-whole-line{
+  height:35px;
 }

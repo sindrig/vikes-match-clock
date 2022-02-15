@@ -6,13 +6,21 @@ import { bindActionCreators } from "redux";
 import controllerActions from "../actions/controller";
 import viewActions from "../actions/view";
 import globalActions from "../actions/global";
+import { Nav } from 'rsuite';
+import GearIcon from '@rsuite/icons/Gear';
+import TimeIcon from '@rsuite/icons/Time';
+import CloseIcon from '@rsuite/icons/CloseOutline';
+import Button from 'rsuite/Button';
+import { Tooltip, Whisper } from 'rsuite';
 
-import { VIEWS } from "../reducers/controller";
+import { TABS, VIEWS } from "../reducers/controller";
 import { VPS } from "../reducers/view";
 import MatchActions from "./MatchActions";
+import MatchActionSettings from "./MatchActionSettings";
 import LoginPage from "./LoginPage";
 import AssetController from "./asset/AssetController";
 import { viewPortPropType } from "../propTypes";
+import 'rsuite/dist/rsuite.min.css';
 import "./Controller.css";
 
 // eslint-disable-next-line
@@ -20,6 +28,7 @@ const confirmRefresh = () => confirm("Are you absolutely sure?");
 
 const Controller = ({
   selectView,
+  selectTab,
   renderAsset,
   currentAsset,
   clearState,
@@ -28,21 +37,44 @@ const Controller = ({
   setViewPort,
   sync,
   auth,
+  tab
 }) => {
-  const left = vp.style.width + 70;
   const currentViewPortName = Object.keys(VPS).filter(
     (key) =>
       VPS[key].style.height === vp.style.height &&
       VPS[key].style.width === vp.style.width
   )[0];
   const showControls = !sync || !auth.isEmpty;
+  const showHome = tab === "home";
+  const showSettings = tab === "settings";
+  const tooltipClear = (
+    <Tooltip>
+      Birtir aftur stöðu leiksins á skjá.
+    </Tooltip>
+  );
   return (
-    <div className="controller" style={{ left }}>
-      {showControls && <MatchActions />}
-      {showControls && <AssetController />}
+    <div className="controller">
+      <div className="dummyDiv"></div>
+      <Nav appearance="tabs" onSelect={selectTab}>
+        <Nav.Item eventKey="home" icon={<TimeIcon />}>
+          Heim
+        </Nav.Item>
+        <Nav.Item eventKey="settings" icon={<GearIcon />}>Stillingar</Nav.Item>
+      </Nav>
+      {showControls && showHome && <MatchActions />}
+      {showControls && showSettings && <MatchActionSettings />}
+      {showControls && currentAsset && (
+         <div className="control-item">
+            <Whisper placement="bottom" controlId="clearoverlay-id-hover" trigger="hover" speaker={tooltipClear}>
+              <Button color="cyan" appearance="primary" size="sm" onClick={() => renderAsset(0)}>
+                <CloseIcon /> Hreinsa virkt overlay
+              </Button>
+            </Whisper>
+         </div>
+        )}
+      { showSettings && (
       <div
-        className="page-actions control-item"
-        style={{ left: -left, top: vp.style.height, width: vp.style.width }}
+        className="page-actions control-item withborder"
       >
         {showControls && (
           <div className="view-selector">
@@ -62,11 +94,6 @@ const Controller = ({
             ))}
           </div>
         )}
-        {showControls && currentAsset && (
-          <button type="button" onClick={() => renderAsset(0)}>
-            Hreinsa núverandi mynd
-          </button>
-        )}
         <div className="viewport-select">
           <select
             value={currentViewPortName}
@@ -81,20 +108,24 @@ const Controller = ({
             ))}
           </select>
         </div>
-        <button
-          type="button"
-          onClick={() =>
+        <Button color="red" appearance="primary" size="sm" onClick={() =>
             confirmRefresh() &&
             clearState().then(() => window.location.reload())
-          }
-        >
-          Hard refresh
-        </button>
+          }>Hard refresh</Button>
         <LoginPage />
-      </div>
+      </div>)}
+      {showControls && <AssetController />}
     </div>
   );
 };
+
+//For the click of the Tabs
+/*Controller.selectTab = (paramTab) =>
+{
+  console.log("Smellur " + paramTab);
+  Controller.tab = paramTab
+}
+*/
 
 Controller.propTypes = {
   clearState: PropTypes.func.isRequired,
@@ -117,16 +148,19 @@ Controller.propTypes = {
   auth: PropTypes.shape({
     isEmpty: PropTypes.bool,
   }).isRequired,
+  selectTab: PropTypes.func.isRequired,
+  tab: PropTypes.string.isRequired,
 };
 
 Controller.defaultProps = {
   sync: false,
   firebase: null,
   currentAsset: null,
+  tab: TABS.home,
 };
 
 const stateToProps = ({
-  controller: { view, currentAsset },
+  controller: { view, currentAsset, tab },
   view: { vp },
   remote: { sync },
   firebase: { auth },
@@ -136,15 +170,17 @@ const stateToProps = ({
   sync,
   currentAsset: currentAsset || null,
   auth,
+  tab: tab
 });
 
 const dispatchToProps = (dispatch) =>
   bindActionCreators(
     {
       selectView: controllerActions.selectView,
+      selectTab: controllerActions.selectTab,
       clearState: globalActions.clearState,
       renderAsset: controllerActions.renderAsset,
-      setViewPort: viewActions.setViewPort,
+      setViewPort: viewActions.setViewPort
     },
     dispatch
   );

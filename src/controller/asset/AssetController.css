@@ -5,21 +5,27 @@
 
 .asset-controller > div {
   display: inline-block;
+  overflow:auto;
 }
 
 .asset-controller {
   height: calc(100vh - 110px);
-  width: 1070px;
+  width: 100%;
   overflow: scroll;
-  margin: 30px 5px 5px 5px;
+  margin: 0px 5px 5px 5px;
   float: left;
 }
 
 .asset-controller .view-selector {
-  position: absolute;
-  top: 105px;
-  left: -54px;
-  width: 54px;
+  position: relative;
+  float:left;
+}
+
+.asset-controller .assettabs {
+  clear: both;
+  width: 90%;
+  float: right;
+  margin: 10px;
 }
 
 .asset-controller .view-selector button {
@@ -35,7 +41,7 @@
 }
 
 .asset-controller .upcoming-assets {
-  overflow: hidden;
+  position:relative;
   width: 500px;
   float: left;
   margin-left: 10px;

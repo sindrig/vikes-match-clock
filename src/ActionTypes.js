@@ -34,6 +34,7 @@ export const Controller = keymirror({
   setSelectedAssets: null,
   showNextAsset: null,
   renderAsset: null,
+  selectTab: null,
   removeAssetAfterTimeout: null,
 });
 
