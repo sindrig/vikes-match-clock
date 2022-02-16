@@ -50,7 +50,7 @@ const Controller = ({
   const tooltipClear = <Tooltip>Birtir aftur stöðu leiksins á skjá.</Tooltip>;
   return (
     <div className="controller">
-      <div className="dummyDiv"></div>
+      <div className="dummyDiv" style={vp.style}></div>
       <Nav appearance="tabs" onSelect={selectTab}>
         <Nav.Item eventKey="home" icon={<TimeIcon />}>
           Heim
@@ -132,14 +132,6 @@ const Controller = ({
     </div>
   );
 };
-
-//For the click of the Tabs
-/*Controller.selectTab = (paramTab) =>
-{
-  console.log("Smellur " + paramTab);
-  Controller.tab = paramTab
-}
-*/
 
 Controller.propTypes = {
   clearState: PropTypes.func.isRequired,

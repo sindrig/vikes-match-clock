@@ -8,6 +8,7 @@
   position: absolute;
   top: 0px;
   font-size: 14px;
+  width: 100%;
 }
 
 .controller .control-item {
@@ -56,6 +57,7 @@ div.stdbuttons > button:hover {
 .controller .page-actions {
   position: relative;
   float: left;
+  clear: both;
 }
 
 .controller .asset-controller {
