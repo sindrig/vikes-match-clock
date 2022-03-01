@@ -67,6 +67,9 @@ span.asset-player-number {
   -o-animation: blink 2s linear infinite;
   animation: blink 2s linear infinite;
 }
+.blink::after {
+  content: "MAAAARK";
+}
 @-webkit-keyframes blink {
   0% {
     opacity: 1;
@@ -137,3 +140,71 @@ span.asset-player-number {
     opacity: 0;
   }
 }
+
+/* Sloppy shaker effect */
+.shaker {
+  animation-name: move_eye;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+  animation-duration: 0.6s;
+  transform: rotate(0deg);
+  left: 22%;
+  top: 30%;
+  font-size: 2.9rem;
+  -webkit-text-stroke-width: 2px;
+  -webkit-text-stroke-color: rgb(36, 36, 36);
+}
+.shaker::after {
+  content: "M A R K";
+}
+
+@-webkit-keyframes move_eye { from { margin-left: 12%; } to { margin-left: 15%; }  }
+        @keyframes move_eye { from { margin-left: 12%; } to { margin-left: 15%; }  }
+/* Shaker ends */
+
+/* Scale in out */
+.asset-player-icon .scaleit {
+  top: 48%;
+  left: 62%;
+  z-index: 9999;
+  transform: translate(-50%, -50%);
+  font-size: 6vw;
+  color: #ffffff;
+  animation-name: slidein, wave;
+  animation-iteration-count: 1, infinite;
+  animation-timing-function: ease-in-out;
+  animation-duration: 1.5s, 2s;
+  animation-delay: 0.8s - (1 / 4);
+  -webkit-text-stroke-width: 3px;
+  -webkit-text-stroke-color: black;
+}
+
+.scaleit:after {
+  content: "MARK";
+}
+
+@keyframes wave {
+  40%,
+  50% {
+    transform: translate(-50%, -65%) scale(1.05);
+  }
+
+  0%,
+  90%,
+  100% {
+    transform: translate(-50%, -45%) scale(0.95);
+  }
+}
+
+@keyframes slidein {
+  from {
+    margin-left: 70%;
+    width: 300%;
+  }
+
+  to {
+    margin-left: 0%;
+    width: 100%;
+  }
+}
+/* Scale in out ends */

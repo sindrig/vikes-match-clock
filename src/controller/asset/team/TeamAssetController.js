@@ -43,6 +43,7 @@ class TeamAssetController extends Component {
       subOut: null,
       selectPlayerAsset: false,
       selectGoalScorer: false,
+      effect: ''
     };
     this.autoFill = this.autoFill.bind(this);
     this.addPlayersToQ = this.addPlayersToQ.bind(this);
@@ -208,8 +209,9 @@ class TeamAssetController extends Component {
           player,
           teamName: match[teamName],
           overlay: {
-            text: "MAAAARK",
+            text: "",
             blink: true,
+            effect: this.state.effect
           },
         }),
       ],
@@ -351,6 +353,22 @@ class TeamAssetController extends Component {
           >
             Birta markaskorara
           </button>
+        </div>
+        <div className="control-item stdbuttons">
+        <select
+          onChange={({ target: { value } }) => this.setState({ effect: value})}
+          value={this.state.effect}
+        >
+            <option value='blink' key='Blink'>
+              Blink
+            </option>
+            <option value='shaker' key='Shaker'>
+              Shaker
+            </option>
+            <option value='scaleit' key='Scale Up'>
+              Scale Up
+            </option>
+        </select>
         </div>
       </div>
     );
