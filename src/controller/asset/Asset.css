@@ -158,8 +158,22 @@ span.asset-player-number {
   content: "M A R K";
 }
 
-@-webkit-keyframes move_eye { from { margin-left: 12%; } to { margin-left: 15%; }  }
-        @keyframes move_eye { from { margin-left: 12%; } to { margin-left: 15%; }  }
+@-webkit-keyframes move_eye {
+  from {
+    margin-left: 12%;
+  }
+  to {
+    margin-left: 15%;
+  }
+}
+@keyframes move_eye {
+  from {
+    margin-left: 12%;
+  }
+  to {
+    margin-left: 15%;
+  }
+}
 /* Shaker ends */
 
 /* Scale in out */

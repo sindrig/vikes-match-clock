@@ -43,7 +43,7 @@ class TeamAssetController extends Component {
       subOut: null,
       selectPlayerAsset: false,
       selectGoalScorer: false,
-      effect: ''
+      effect: "",
     };
     this.autoFill = this.autoFill.bind(this);
     this.addPlayersToQ = this.addPlayersToQ.bind(this);
@@ -211,7 +211,7 @@ class TeamAssetController extends Component {
           overlay: {
             text: "",
             blink: true,
-            effect: this.state.effect
+            effect: this.state.effect,
           },
         }),
       ],
@@ -355,20 +355,22 @@ class TeamAssetController extends Component {
           </button>
         </div>
         <div className="control-item stdbuttons">
-        <select
-          onChange={({ target: { value } }) => this.setState({ effect: value})}
-          value={this.state.effect}
-        >
-            <option value='blink' key='Blink'>
+          <select
+            onChange={({ target: { value } }) =>
+              this.setState({ effect: value })
+            }
+            value={this.state.effect}
+          >
+            <option value="blink" key="Blink">
               Blink
             </option>
-            <option value='shaker' key='Shaker'>
+            <option value="shaker" key="Shaker">
               Shaker
             </option>
-            <option value='scaleit' key='Scale Up'>
+            <option value="scaleit" key="Scale Up">
               Scale Up
             </option>
-        </select>
+          </select>
         </div>
       </div>
     );
