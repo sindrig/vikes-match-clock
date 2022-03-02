@@ -41,6 +41,7 @@ class PlayerCard extends Component {
     overlay: PropTypes.shape({
       text: PropTypes.string.isRequired,
       blink: PropTypes.bool,
+      effect: PropTypes.string
     }),
     // eslint-disable-next-line
     vp: viewPortPropType.isRequired,
@@ -100,7 +101,7 @@ class PlayerCard extends Component {
         style={BACKGROUND}
       >
         {children}
-        <span className={`player-card-overlay ${overlay.blink ? "blink" : ""}`}>
+        <span className={`player-card-overlay ${overlay.blink ? overlay.effect : ""}`}>
           {overlay.text}
         </span>
         <span className="asset-player-number">{asset.number}</span>
