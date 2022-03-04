@@ -14,9 +14,14 @@ const backgrounds = [
       "repeating-linear-gradient(90deg,#181003,#181003 25px,#2D1201 25px,#2D1201 50px)",
   },
   {},
+  //Ukraine
+  {
+    backgroundImage:
+      "linear-gradient(180deg, #005BBB 0, #005BBB 50%, #FFD500 50%, #FFD500 100%)",
+  },
 ];
 
-export const BACKGROUND = backgrounds[2];
+export const BACKGROUND = backgrounds[4];
 
 export const SPORTS = keymirror({
   football: null,
