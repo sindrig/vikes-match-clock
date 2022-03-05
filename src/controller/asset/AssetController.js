@@ -60,10 +60,6 @@ class AssetController extends Component {
 
   onImageSecondsChange(value) {
     const { setImageSeconds } = this.props;
-    //event.preventDefault();
-    /*const {
-      target: { value },
-    } = event;*/
     setImageSeconds(Math.max(parseInt(value, 10), 1));
   }
 

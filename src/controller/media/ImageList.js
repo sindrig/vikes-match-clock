@@ -1,9 +1,14 @@
 import React, { useEffect, useState } from "react";
+import { bindActionCreators } from "redux";
+import { connect } from "react-redux";
 import PropTypes from "prop-types";
 import { storage } from "../../firebase";
+import controllerActions from "../../actions/controller";
+import assetTypes from "../asset/AssetTypes";
+
 import "./ImageList.css";
 
-const ImageList = ({ prefix }) => {
+const ImageList = ({ prefix, renderAsset }) => {
   const [images, setImages] = useState([]);
 
   const deleteImage = (ref) => {
@@ -36,7 +41,15 @@ const ImageList = ({ prefix }) => {
       {images.map(({ imageUrl, name, ref }) => (
         <div className="asset-image withborder" key={name}>
           <div>
-            <img src={imageUrl} alt={name} />
+            <img
+              src={imageUrl}
+              alt={name}
+              onClick={() =>
+                renderAsset({
+                  asset: { key: imageUrl, type: assetTypes.IMAGE },
+                })
+              }
+            />
           </div>
           <div>
             <span>{name}</span>
@@ -52,4 +65,13 @@ const ImageList = ({ prefix }) => {
 ImageList.propTypes = {
   prefix: PropTypes.string,
 };
-export default ImageList;
+
+const dispatchToProps = (dispatch) =>
+  bindActionCreators(
+    {
+      renderAsset: controllerActions.renderAsset,
+    },
+    dispatch
+  );
+
+export default connect(() => {}, dispatchToProps)(ImageList);

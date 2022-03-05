@@ -181,7 +181,7 @@ class Asset extends Component {
   render() {
     const { asset, thumbnail } = this.props;
     if (asset.type === assetTypes.IMAGE) {
-      return <img src={assets[asset.key]} alt={asset.key} key={asset.key} />;
+      return <img src={asset.key} alt={asset.key} key={asset.key} />;
     }
     if (asset.type === assetTypes.URL) {
       return this.renderUrl();
