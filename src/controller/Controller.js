@@ -8,6 +8,7 @@ import viewActions from "../actions/view";
 import globalActions from "../actions/global";
 import { Nav } from "rsuite";
 import GearIcon from "@rsuite/icons/Gear";
+import MediaIcon from "@rsuite/icons/Media";
 import TimeIcon from "@rsuite/icons/Time";
 import CloseIcon from "@rsuite/icons/CloseOutline";
 import Button from "rsuite/Button";
@@ -17,6 +18,7 @@ import { TABS, VIEWS } from "../reducers/controller";
 import { VPS } from "../reducers/view";
 import MatchActions from "./MatchActions";
 import MatchActionSettings from "./MatchActionSettings";
+import MediaManager from "./media/MediaManager";
 import LoginPage from "./LoginPage";
 import AssetController from "./asset/AssetController";
 import { viewPortPropType } from "../propTypes";
@@ -47,13 +49,17 @@ const Controller = ({
   const showControls = !sync || !auth.isEmpty;
   const showHome = tab === "home";
   const showSettings = tab === "settings";
+  const showMedia = tab === "media";
   const tooltipClear = <Tooltip>Birtir aftur stöðu leiksins á skjá.</Tooltip>;
   return (
     <div className="controller">
       <div className="dummyDiv" style={vp.style}></div>
-      <Nav appearance="tabs" onSelect={selectTab}>
+      <Nav appearance="tabs" onSelect={selectTab} activeKey={tab}>
         <Nav.Item eventKey="home" icon={<TimeIcon />}>
           Heim
+        </Nav.Item>
+        <Nav.Item eventKey="media" icon={<MediaIcon />}>
+          Myndefni
         </Nav.Item>
         <Nav.Item eventKey="settings" icon={<GearIcon />}>
           Stillingar
@@ -61,6 +67,7 @@ const Controller = ({
       </Nav>
       {showControls && showHome && <MatchActions />}
       {showControls && showSettings && <MatchActionSettings />}
+      {showControls && showMedia && <MediaManager />}
       {showControls && currentAsset && (
         <div className="control-item">
           <Whisper

@@ -70,7 +70,6 @@ const actions = {
   },
   [ActionTypes.selectTab]: {
     next(state, { payload: { tab } }) {
-      console.log("slect tab in redux");
       return { ...state, tab };
     },
   },

@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import PropTypes from "prop-types";
-
-import * as assets from "../assets";
+import { storage } from "../firebase";
 
 function useInterval(callback, delay) {
   const savedCallback = useRef();
@@ -24,16 +23,8 @@ function useInterval(callback, delay) {
   }, [delay]);
 }
 
-const AdImage = ({ size, time, blankBetweenImages, postAdImg }) => {
-  const adRegex = new RegExp(`ads\\/${size}\\/(.*)\\.*`);
-  const adAssets = [
-    ...new Set(
-      Object.keys(assets)
-        .map((k) => k.match(adRegex))
-        .filter((m) => m)
-        .map((m) => m[1])
-    ),
-  ];
+const AdImage = ({ imageType, time, blankBetweenImages, postAdImg }) => {
+  const [assets, setAssets] = useState([]);
   const [img, setImg] = useState(0);
   const [isBlank, setBlank] = useState(blankBetweenImages);
   const [isPost, setPost] = useState(!postAdImg);
@@ -52,18 +43,29 @@ const AdImage = ({ size, time, blankBetweenImages, postAdImg }) => {
       }
     }
     const nextImg = img + 1;
-    return setImg(nextImg === adAssets.length ? 0 : nextImg);
+    return setImg(nextImg === assets.length ? 0 : nextImg);
   }, time * 1000);
-  if (isBlank) {
+
+  useEffect(() => {
+    const listRef = storage.ref(imageType);
+    listRef
+      .listAll()
+      .then((res) =>
+        Promise.all(res.items.map((itemRef) => itemRef.getDownloadURL())).then(
+          setAssets
+        )
+      );
+  }, [imageType]);
+
+  if (isBlank || assets.length === 0) {
     return null;
   }
-  const src =
-    isPost && postAdImg ? postAdImg : assets[`ads/${size}/${adAssets[img]}`];
+  const src = isPost && postAdImg ? postAdImg : assets[img];
   return <img src={src} className="ad" alt="Ad" />;
 };
 
 AdImage.propTypes = {
-  size: PropTypes.string.isRequired,
+  imageType: PropTypes.string.isRequired,
   time: PropTypes.number,
   blankBetweenImages: PropTypes.bool,
   postAdImg: PropTypes.string,

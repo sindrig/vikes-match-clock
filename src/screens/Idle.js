@@ -2,11 +2,11 @@ import React, { Component } from "react";
 import { connect } from "react-redux";
 import Clock from "react-live-clock";
 import { viewPortPropType } from "../propTypes";
-
 import clubLogos from "../images/clubLogos";
 import AdImage from "../utils/AdImage";
 import { getTemp } from "../lib/weather";
 import husasmidjan from "../images/husa.png";
+import { IMAGE_TYPES } from "../controller/media";
 
 import "./Idle.css";
 
@@ -53,7 +53,7 @@ class Idle extends Component {
     const { temperature } = this.state;
     return (
       <div className={`idle idle-${vp.key}`}>
-        <AdImage size="large" blankBetweenImages time={8} />
+        <AdImage imageType={IMAGE_TYPES.largeAds} blankBetweenImages time={8} />
         <img src={clubLogos["Víkingur R"]} alt="Vikes" className="idle-vikes" />
         <img src={husasmidjan} alt="Vikes" className="idle-ad" />
         <div className="idle-text-container">
