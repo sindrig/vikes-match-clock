@@ -74,4 +74,4 @@ const dispatchToProps = (dispatch) =>
     dispatch
   );
 
-export default connect(() => {}, dispatchToProps)(ImageList);
+export default connect(() => ({}), dispatchToProps)(ImageList);
