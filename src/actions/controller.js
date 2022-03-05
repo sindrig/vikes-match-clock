@@ -25,6 +25,7 @@ const actions = {
   [ActionTypes.toggleAutoPlay]: () => {},
   [ActionTypes.removeAssetAfterTimeout]: () => {},
   [ActionTypes.showNextAsset]: () => {},
+  [ActionTypes.remoteRefresh]: () => {},
   [ActionTypes.setPlaying]: (playing) => ({ playing }),
   [ActionTypes.renderAsset]: (asset) => ({ asset }),
   [ActionTypes.setSelectedAssets]: (selectedAssets) => ({ selectedAssets }),

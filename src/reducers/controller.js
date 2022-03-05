@@ -31,6 +31,7 @@ export const initialState = {
   availableMatches: {},
   selectedMatch: null,
   currentAsset: "",
+  refreshToken: "",
 };
 
 const getStateShowingNextAsset = (state) => {
@@ -251,6 +252,14 @@ const actions = {
         return state;
       }
       return { ...state, currentAsset: null };
+    },
+  },
+  [ActionTypes.remoteRefresh]: {
+    next(state) {
+      return {
+        ...state,
+        refreshToken: (Math.random() + 1).toString(36).substring(2),
+      };
     },
   },
 };

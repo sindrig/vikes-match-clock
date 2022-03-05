@@ -36,6 +36,7 @@ export const Controller = keymirror({
   renderAsset: null,
   selectTab: null,
   removeAssetAfterTimeout: null,
+  remoteRefresh: null,
 });
 
 export const View = keymirror({
