@@ -8,8 +8,8 @@ import controllerActions from "../../actions/controller";
 import { viewPortPropType } from "../../propTypes";
 
 const DEFAULT_URLS = {
-  ruv: "http://ruvruv-live.hls.adaptive.level3.net/ruv/ruv/index.m3u8",
-  ruv2: "http://ruvruv-live.hls.adaptive.level3.net/ruv/ruv2/index.m3u8",
+  ruv: `${window.location.protocol}//ruvruv-live.hls.adaptive.level3.net/ruv/ruv/index.m3u8`,
+  ruv2: `${window.location.protocol}//ruvruv-live.hls.adaptive.level3.net/ruv/ruv2/index.m3u8`,
 };
 
 class Ruv extends Component {
