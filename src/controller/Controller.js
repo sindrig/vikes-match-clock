@@ -48,13 +48,18 @@ const Controller = ({
   )[0];
   const showControls = !sync || !auth.isEmpty;
   const showHome = tab === "home";
-  const showSettings = tab === "settings";
+  // If not logged in, only show the settings tab
+  const showSettings = tab === "settings" || !showControls;
   const showMedia = tab === "media";
   const tooltipClear = <Tooltip>Birtir aftur stöðu leiksins á skjá.</Tooltip>;
   return (
     <div className="controller">
       <div className="dummyDiv" style={vp.style}></div>
-      <Nav appearance="tabs" onSelect={selectTab} activeKey={tab}>
+      <Nav
+        appearance="tabs"
+        onSelect={selectTab}
+        activeKey={showControls ? tab : "settings"}
+      >
         <Nav.Item eventKey="home" icon={<TimeIcon />}>
           Heim
         </Nav.Item>
