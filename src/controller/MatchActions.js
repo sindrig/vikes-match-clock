@@ -94,7 +94,7 @@ const MatchActions = ({
               appearance="primary"
               placement="left"
               onClick={pauseMatch}
-              disabled={match.timeout}
+              disabled={!!match.timeout}
             >
               <PauseIcon /> Pása
             </Button>
@@ -104,7 +104,7 @@ const MatchActions = ({
               appearance="primary"
               placement="left"
               onClick={startMatch}
-              disabled={match.timeout}
+              disabled={!!match.timeout}
             >
               <PlayIcon /> Byrja
             </Button>

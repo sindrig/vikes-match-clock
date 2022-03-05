@@ -10,6 +10,7 @@ import AdImage from "../utils/AdImage";
 import clubLogos from "../images/clubLogos";
 import { SPORTS } from "../constants";
 import buzzer from "../sounds/buzzersound.mp3";
+import { IMAGE_TYPES } from "../controller/media";
 
 import "./ScoreBoard.css";
 
@@ -26,7 +27,7 @@ const ScoreBoard = ({ match, vp }) => (
   <div
     className={`scoreboard scoreboard-${match.matchType} scoreboard-${vp.key}`}
   >
-    <AdImage size="small" />
+    <AdImage imageType={IMAGE_TYPES.smallAds} />
     <Team
       className="home"
       team={getTeam("home", match)}
