@@ -63,7 +63,8 @@ const ImageList = ({ prefix, renderAsset }) => {
   );
 };
 ImageList.propTypes = {
-  prefix: PropTypes.string,
+  prefix: PropTypes.string.isRequired,
+  renderAsset: PropTypes.func.isRequired,
 };
 
 const dispatchToProps = (dispatch) =>
