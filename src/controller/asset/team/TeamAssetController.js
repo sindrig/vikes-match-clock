@@ -65,14 +65,7 @@ class TeamAssetController extends Component {
     };
   }
 
-  getPlayerAssetObject({ player, teamName, overlay }) {
-    const { selectedMatch, availableMatches } = this.props;
-    const currentMatch =
-      availableMatches && availableMatches[selectedMatch]
-        ? availableMatches[selectedMatch]
-        : { group: "Meistaraflokkur" };
-    const { group, sex } = currentMatch;
-
+  async getPlayerAssetObject({ player, teamName, overlay }) {
     if (!player.name || !player.number) {
       return null;
     }

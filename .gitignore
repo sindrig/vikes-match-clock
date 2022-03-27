@@ -70,3 +70,4 @@ yarn-error.log*
 .aws-sam/
 /vikes-match-clock.sublime-workspace
 /cypress/videos/
+/.venv
