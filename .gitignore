@@ -69,3 +69,4 @@ yarn-error.log*
 .terraform/
 .aws-sam/
 /vikes-match-clock.sublime-workspace
+/cypress/videos/

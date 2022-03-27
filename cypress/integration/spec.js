@@ -12,6 +12,7 @@ context("Basic navigation", () => {
   });
 
   it("starts the clock and does some things", () => {
+    cy.contains("Stillingar").click();
     cy.get("#view-selector-match").click();
     cy.contains("Byrja").click();
     cy.tick(ONE_MINUTE / 2);
@@ -36,6 +37,7 @@ context("Basic navigation", () => {
   });
 
   it.only("uses the simple control panel and updates the clock", () => {
+    cy.contains("Stillingar").click();
     cy.get("#view-selector-match").click();
     cy.get(".match-type-selector").select("handball");
     cy.get(".viewport-select select").select("Inni stór");
