@@ -11,6 +11,17 @@ jobs:
 
       - uses: c-hive/gha-yarn-cache@v1
 
+        run: echo "RESTART_TOKEN=$(uuidgen)" >> $GITHUB_ENV
+
+      - name: Restart
+        # if: github.ref == 'refs/heads/master'
+        uses: w9jds/firebase-action@master
+        with:
+          args: database:set /fotbolti/controller/refreshToken -f -d '"${{ env.RESTART_TOKEN }}"'
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+          PROJECT_ID: vikes-match-clock
+
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
