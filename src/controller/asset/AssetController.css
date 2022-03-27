@@ -24,12 +24,12 @@
 .asset-controller .assettabs {
   clear: both;
   width: 90%;
-  float: right;
+  float: left;
   margin: 10px;
 }
 
 .asset-controller .view-selector button {
-  float: right;
+  float: left;
 }
 
 .asset-controller .controls {
