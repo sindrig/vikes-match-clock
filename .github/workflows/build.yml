@@ -16,9 +16,8 @@ jobs:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
         run: |
           curl -sL https://firebase.tools | bash
-          firebase use vikes-match-clock-firebase
-          database:set /fotbolti/controller/refreshToken -f -d '"'$(uuidgen)'"'
-          database:set /handbolti/controller/refreshToken -f -d '"'$(uuidgen)'"'
+          firebase -P vikes-match-clock-firebase database:set /fotbolti/controller/refreshToken -f -d '"'$(uuidgen)'"' --token $FIREBASE_TOKEN
+          firebase -P vikes-match-clock-firebase database:set /handbolti/controller/refreshToken -f -d '"'$(uuidgen)'"' --token $FIREBASE_TOKEN
 
       - name: Install dependencies
         run: yarn install --frozen-lockfile
