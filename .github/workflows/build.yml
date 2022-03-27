@@ -48,6 +48,15 @@ jobs:
           dist-id: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
           invalidation: index.html
 
+      - name: Restart all screens
+        if: github.ref == 'refs/heads/master'
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        run: |
+          curl -sL https://firebase.tools | bash
+          firebase -P vikes-match-clock-firebase database:set /fotbolti/controller/refreshToken -f -d '"'$(uuidgen)'"' --token $FIREBASE_TOKEN
+          firebase -P vikes-match-clock-firebase database:set /handbolti/controller/refreshToken -f -d '"'$(uuidgen)'"' --token $FIREBASE_TOKEN
+
   notify:
     runs-on: ubuntu-latest
     if: always()
