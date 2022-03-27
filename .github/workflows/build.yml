@@ -11,7 +11,7 @@ jobs:
 
       - uses: c-hive/gha-yarn-cache@v1
 
-        run: echo "RESTART_TOKEN=$(uuidgen)" >> $GITHUB_ENV
+      - run: echo "RESTART_TOKEN=$(uuidgen)" >> $GITHUB_ENV
 
       - name: Restart
         # if: github.ref == 'refs/heads/master'
