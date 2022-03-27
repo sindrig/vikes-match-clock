@@ -6,7 +6,6 @@ import PropTypes from "prop-types";
 import { RingLoader } from "react-spinners";
 import { matchPropType, availableMatchesPropType } from "../../../propTypes";
 import clubIds from "../../../club-ids";
-import * as assets from "../../../assets";
 
 import Team from "./Team";
 import SubView from "./SubView";
@@ -14,7 +13,7 @@ import assetTypes from "../AssetTypes";
 import MatchSelector from "./MatchSelector";
 import controllerActions from "../../../actions/controller";
 
-const VIKES = "Víkingur R";
+import { storage } from "../../../firebase";
 
 class TeamAssetController extends Component {
   static propTypes = {
@@ -77,33 +76,25 @@ class TeamAssetController extends Component {
     if (!player.name || !player.number) {
       return null;
     }
-    if (group.match(/meistara/i)) {
-      const isVikes = teamName === VIKES;
-      if (isVikes) {
-        const keyMatcher = new RegExp(`players/${sex}/0?${player.number}`);
-        const assetKey = Object.keys(assets).find((key) =>
-          key.match(keyMatcher)
-        );
-        if (assetKey) {
-          return {
-            type: assetTypes.PLAYER,
-            key: assetKey,
-            name: player.name,
-            number: player.number,
-            overlay: overlay || { text: "" },
-            teamName,
-          };
-        }
-      }
-    }
-    return {
-      type: assetTypes.NO_IMAGE_PLAYER,
-      key: `custom-${player.number}-${player.name}`,
-      name: player.name,
-      number: player.number,
-      overlay: overlay || { text: "" },
-      teamName,
-    };
+    return storage
+      .ref(`players/${player.id}.png`)
+      .getDownloadURL()
+      .then((key) => ({
+        type: assetTypes.PLAYER,
+        key,
+        name: player.name,
+        number: player.number,
+        overlay: overlay || { text: "" },
+        teamName,
+      }))
+      .catch(() => ({
+        type: assetTypes.NO_IMAGE_PLAYER,
+        key: `custom-${player.number}-${player.name}`,
+        name: player.name,
+        number: player.number,
+        overlay: overlay || { text: "" },
+        teamName,
+      }));
   }
 
   clearState() {
