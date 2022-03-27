@@ -2,6 +2,7 @@ import datetime
 import json
 import urllib.request
 from collections import defaultdict, namedtuple
+
 from suds.client import Client
 
 WSDL_URL = 'http://www2.ksi.is/vefthjonustur/mot.asmx?WSDL'
@@ -48,6 +49,7 @@ class KsiClient:
         else:
             number = 0
         return {
+            'id': player.LeikmadurNumer,
             'number': number,
             'name': player.LeikmadurNafn.strip(),
             'role': player.StadaNafn,
@@ -200,6 +202,6 @@ def lambda_handler(json_input, context):
 if __name__ == '__main__':
     print(
         lambda_handler(
-            {'queryStringParameters': {'homeTeam': 103, 'awayTeam': 203}}, {}
+            {'queryStringParameters': {'homeTeam': 103, 'awayTeam': 220}}, {}
         )
     )

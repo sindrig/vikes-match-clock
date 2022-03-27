@@ -8,7 +8,6 @@ import { assetPropType, viewPortPropType } from "../../propTypes";
 import PlayerCard from "./PlayerCard";
 import Substitution from "./Substitution";
 
-import * as assets from "../../assets";
 import assetTypes from "./AssetTypes";
 import clubLogos from "../../images/clubLogos";
 import Ruv from "./Ruv";
@@ -89,7 +88,7 @@ class Asset extends Component {
           key={asset.key}
           overlay={asset.overlay}
         >
-          <img src={assets[asset.key]} alt={asset.key} />
+          <img src={asset.key} alt={asset.key} />
         </PlayerCard>
       );
     }

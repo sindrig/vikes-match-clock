@@ -7,7 +7,6 @@ import { addVideosFromPlaylist } from "./YoutubePlaylist";
 import { ASSET_VIEWS } from "../../reducers/controller";
 import { matchPropType, assetPropType } from "../../propTypes";
 import Asset, { checkKey } from "./Asset";
-import AssetSelector from "./AssetSelector";
 import RemovableAsset from "./RemovableAsset";
 import TeamAssetController from "./team/TeamAssetController";
 import UrlController from "./UrlController";
@@ -15,7 +14,6 @@ import assetTypes from "./AssetTypes";
 import Button from "rsuite/Button";
 import InputNumber from "rsuite/InputNumber";
 import Checkbox from "rsuite/Checkbox";
-import * as assetsImages from "../../assets";
 import controllerActions from "../../actions/controller";
 
 import "./AssetController.css";
@@ -88,30 +86,31 @@ class AssetController extends Component {
     const { selectedAssets, renderAsset, setSelectedAssets } = this.props;
     const updatedAssets = [...(selectedAssets || [])];
     const errors = [];
-    if (options.showNow && assetList.length === 1) {
-      renderAsset({
-        asset: assetList[0],
-      });
-    } else {
-      assetList.forEach((asset) => {
-        if (checkKey(asset)) {
-          if (updatedAssets.map((s) => s.key).indexOf(asset.key) === -1) {
-            updatedAssets.push(asset);
-          } else {
-            errors.push(`Asset ${asset.key} already in asset list.`);
-          }
-        } else {
-          errors.push(`Unknown asset ${asset.key}`);
-        }
-      });
-      console.log("updatedAssets", updatedAssets);
-      setSelectedAssets(updatedAssets);
-      if (errors.length) {
-        this.setState({ error: errors.join(" - ") });
+    Promise.all(assetList).then((resolvedAssets) => {
+      if (options.showNow && resolvedAssets.length === 1) {
+        renderAsset({
+          asset: resolvedAssets[0],
+        });
       } else {
-        this.setState({ error: "" });
+        resolvedAssets.forEach((asset) => {
+          if (checkKey(asset)) {
+            if (updatedAssets.map((s) => s.key).indexOf(asset.key) === -1) {
+              updatedAssets.push(asset);
+            } else {
+              errors.push(`Asset ${asset.key} already in asset list.`);
+            }
+          } else {
+            errors.push(`Unknown asset ${asset.key}`);
+          }
+        });
+        setSelectedAssets(updatedAssets);
+        if (errors.length) {
+          this.setState({ error: errors.join(" - ") });
+        } else {
+          this.setState({ error: "" });
+        }
       }
-    }
+    });
   }
 
   playRuv(key) {
@@ -175,24 +174,6 @@ class AssetController extends Component {
     return (
       <div className="withborder">
         <div className="controls control-item">
-          <AssetSelector addAssetKey={this.addAssetKey}>
-            <option value="null">Myndir</option>
-            {Object.keys(assetsImages)
-              .filter((key) => !key.startsWith("ads/"))
-              .filter(
-                (key) =>
-                  selectedAssetsList.map((a) => a.key).indexOf(key) === -1
-              )
-              .map((key) => ({
-                key,
-                name: key.split("/")[key.split("/").length - 1],
-              }))
-              .map(({ key, name }) => (
-                <option value={key} key={key}>
-                  {name}
-                </option>
-              ))}
-          </AssetSelector>
           <span>{selectedAssetsList.length} í biðröð</span>
           {selectedAssetsList.length ? (
             <Button

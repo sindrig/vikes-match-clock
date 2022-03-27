@@ -11657,10 +11657,10 @@ react-scripts@^3.4.1:
   optionalDependencies:
     fsevents "2.1.2"
 
-react-shortcuts@2.0.1:
-  version "2.0.1"
-  resolved "https://registry.yarnpkg.com/react-shortcuts/-/react-shortcuts-2.0.1.tgz#6de302244ce33ac9f9273dbeec540a8f81808f91"
-  integrity sha512-Io51aosqU29ERe7uPDqvmZYVV1r8IrOCM3Vc46wkPqbLo84uqPphHfqijM0BkOnJMmwOfj8o5OIUZbTtoRBbDA==
+react-shortcuts@^2.1.0:
+  version "2.1.0"
+  resolved "https://registry.yarnpkg.com/react-shortcuts/-/react-shortcuts-2.1.0.tgz#e1ac50be4f847b96a473ce0ad877edadc5067ec6"
+  integrity sha512-yETQgoy/KRCOPjdlGSnfTjyVHwJYsFoHtVmuLzJABYBAnilpm1M14DhDavuAAMElbaQlXunOwKjh0Oq3I6Vt0A==
   dependencies:
     combokeys "^3.0.1"
     events "^1.0.2"

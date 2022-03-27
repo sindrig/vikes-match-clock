@@ -8,6 +8,7 @@ const compress = new Compress();
 const fileTypes = ["JPG", "PNG", "GIF"];
 
 const UploadManager = ({ prefix }) => {
+  const [doCompress, setDoCompress] = useState(true);
   const [imageUrls, setImageUrls] = useState([]);
   const upload = (images) => {
     images.forEach((image) => {
@@ -22,7 +23,7 @@ const UploadManager = ({ prefix }) => {
     const files = [...filelist];
     Promise.all(
       files.map((file, i) =>
-        file.type !== "image/gif"
+        file.type !== "image/gif" && doCompress
           ? compress
               .compress([file], {
                 size: 2, // the max size in MB, defaults to 2MB
@@ -48,6 +49,14 @@ const UploadManager = ({ prefix }) => {
 
   return (
     <div className="control-item withborder">
+      <label>
+        <input
+          type="checkbox"
+          checked={doCompress}
+          onChange={(e) => setDoCompress(e.target.checked)}
+        />{" "}
+        Compress automatically
+      </label>
       <FileUploader
         handleChange={insertImages}
         name="file"
