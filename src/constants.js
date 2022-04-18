@@ -1,5 +1,5 @@
 import keymirror from "keymirror";
-import backgroundImage from "./images/background.png";
+import backgroundImage from "./images/background_fade.png";
 
 export const THUMB_VP = {
   height: 50,
@@ -21,7 +21,7 @@ const backgrounds = [
   },
 ];
 
-export const BACKGROUND = backgrounds[4];
+export const BACKGROUND = backgrounds[0];
 
 export const SPORTS = keymirror({
   football: null,
