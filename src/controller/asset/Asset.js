@@ -109,7 +109,7 @@ class Asset extends Component {
         </PlayerCard>
       );
     }
-    throw new Error("you should not get here");
+    throw new Error("you should not get here: " + asset.type);
   }
 
   renderRuv() {
