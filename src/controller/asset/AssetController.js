@@ -70,14 +70,14 @@ const AssetController = ({
               .map((p) => p.split("="))
               .filter((kv) => kv[0] === "list")
               .map((kv) => kv[1])[0];
-            return addVideosFromPlaylist(listId, this.addAssetKey);
+            return addVideosFromPlaylist(listId, addAssetKey);
           }
         } catch (e) {
           console.log(e);
         }
       }
     }
-    return this.addMultipleAssets([asset]);
+    return addMultipleAssets([asset]);
   };
 
   const renderAssetController = () => {
