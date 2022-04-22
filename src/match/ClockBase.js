@@ -54,13 +54,8 @@ export default class Clock extends Component {
   }
 
   render() {
-    const {
-      isTimeNull,
-      zeroTime,
-      className,
-      fontSizeMax,
-      fontSizeMin,
-    } = this.props;
+    const { isTimeNull, zeroTime, className, fontSizeMax, fontSizeMin } =
+      this.props;
     const { time } = this.state;
     let displayedTime = formatMillisAsTime(zeroTime);
     if (!isTimeNull) {

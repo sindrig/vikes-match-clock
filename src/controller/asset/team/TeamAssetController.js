@@ -381,12 +381,8 @@ class TeamAssetController extends Component {
   }
 
   renderTeam(teamName) {
-    const {
-      selectSubs,
-      subTeam,
-      selectPlayerAsset,
-      selectGoalScorer,
-    } = this.state;
+    const { selectSubs, subTeam, selectPlayerAsset, selectGoalScorer } =
+      this.state;
     let selectPlayerAction = null;
     if (selectSubs) {
       if (!subTeam || subTeam === teamName) {

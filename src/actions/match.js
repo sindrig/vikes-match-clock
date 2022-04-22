@@ -47,10 +47,12 @@ actions.buzz = () => (dispatch) => {
   return true;
 };
 
-actions.matchTimeout = ({ team }) => (dispatch) => {
-  dispatch(actions.pauseMatch());
-  dispatch(actions.buzz());
-  dispatch({ type: ActionTypes.matchTimeout, payload: { team } });
-};
+actions.matchTimeout =
+  ({ team }) =>
+  (dispatch) => {
+    dispatch(actions.pauseMatch());
+    dispatch(actions.buzz());
+    dispatch({ type: ActionTypes.matchTimeout, payload: { team } });
+  };
 
 export default actions;
