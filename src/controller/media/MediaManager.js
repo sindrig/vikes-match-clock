@@ -8,6 +8,7 @@ import { IMAGE_TYPES } from ".";
 
 const MediaManager = ({ auth }) => {
   const [tab, setTab] = useState(IMAGE_TYPES.images);
+  const [displayNow, setDisplayNow] = useState(true);
   const selectTab = (tab) => {
     setTab(tab);
   };
@@ -20,7 +21,26 @@ const MediaManager = ({ auth }) => {
         <Nav.Item eventKey={IMAGE_TYPES.players}>Leikmenn</Nav.Item>
       </Nav>
       {!auth.isEmpty && <UploadManager prefix={tab} />}
-      <ImageList prefix={tab} />
+      <div>
+        <label>
+          Birta strax
+          <input
+            type="radio"
+            checked={displayNow}
+            onChange={() => setDisplayNow(true)}
+          />
+        </label>
+        <br />
+        <label>
+          Setja í biðröð
+          <input
+            type="radio"
+            checked={!displayNow}
+            onChange={() => setDisplayNow(false)}
+          />
+        </label>
+      </div>
+      <ImageList prefix={tab} displayNow={displayNow} />
     </div>
   );
 };

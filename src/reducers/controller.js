@@ -3,6 +3,7 @@ import { handleActions } from "redux-actions";
 import { ActionType } from "redux-promise-middleware";
 
 import ActionTypes from "../ActionTypes";
+import assetTypes from "../controller/asset/AssetTypes";
 
 export const ASSET_VIEWS = keymirror({
   assets: null,
@@ -218,6 +219,39 @@ const actions = {
         ...state,
         selectedAssets: selectedAssets || [],
       };
+    },
+  },
+  [ActionTypes.addAssets]: {
+    next(state, { payload: { assets } }) {
+      const updatedAssets = [...(state.selectedAssets || [])];
+      console.log("assets", assets);
+      assets.forEach((asset) => {
+        // Make sure that the asset type is in assetTypes
+        // And make sure that the asset key is not null/undefined/empty
+        if (Object.keys(assetTypes).indexOf(asset.type) !== -1 && asset.key) {
+          if (updatedAssets.map((s) => s.key).indexOf(asset.key) === -1) {
+            updatedAssets.push(asset);
+          }
+        }
+      });
+      return {
+        ...state,
+        selectedAssets: updatedAssets,
+      };
+    },
+  },
+  [ActionTypes.removeAsset]: {
+    next(state, { payload: { asset } }) {
+      const idx = state.selectedAssets.map((a) => a.key).indexOf(asset.key);
+      if (idx > -1) {
+        const newAssets = [...state.selectedAssets];
+        newAssets.splice(idx, 1);
+        return {
+          ...state,
+          selectedAssets: newAssets,
+        };
+      }
+      return state;
     },
   },
   [ActionTypes.receiveRemoteData]: {

@@ -6,7 +6,7 @@ import PropTypes from "prop-types";
 import { addVideosFromPlaylist } from "./YoutubePlaylist";
 import { ASSET_VIEWS } from "../../reducers/controller";
 import { matchPropType, assetPropType } from "../../propTypes";
-import Asset, { checkKey } from "./Asset";
+import Asset from "./Asset";
 import RemovableAsset from "./RemovableAsset";
 import TeamAssetController from "./team/TeamAssetController";
 import UrlController from "./UrlController";
@@ -35,6 +35,8 @@ class AssetController extends Component {
     setPlaying: PropTypes.func.isRequired,
     showNextAsset: PropTypes.func.isRequired,
     setSelectedAssets: PropTypes.func.isRequired,
+    addAssets: PropTypes.func.isRequired,
+    removeAsset: PropTypes.func.isRequired,
   };
 
   static defaultProps = {
@@ -53,7 +55,6 @@ class AssetController extends Component {
     this.onImageSecondsChange = this.onImageSecondsChange.bind(this);
     this.addMultipleAssets = this.addMultipleAssets.bind(this);
     this.addAssetKey = this.addAssetKey.bind(this);
-    this.removeAsset = this.removeAsset.bind(this);
   }
 
   onImageSecondsChange(value) {
@@ -83,8 +84,7 @@ class AssetController extends Component {
   }
 
   addMultipleAssets(assetList, options = { showNow: false }) {
-    const { selectedAssets, renderAsset, setSelectedAssets } = this.props;
-    const updatedAssets = [...(selectedAssets || [])];
+    const { renderAsset, addAssets } = this.props;
     const errors = [];
     Promise.all(assetList).then((resolvedAssets) => {
       if (options.showNow && resolvedAssets.length === 1) {
@@ -92,18 +92,7 @@ class AssetController extends Component {
           asset: resolvedAssets[0],
         });
       } else {
-        resolvedAssets.forEach((asset) => {
-          if (checkKey(asset)) {
-            if (updatedAssets.map((s) => s.key).indexOf(asset.key) === -1) {
-              updatedAssets.push(asset);
-            } else {
-              errors.push(`Asset ${asset.key} already in asset list.`);
-            }
-          } else {
-            errors.push(`Unknown asset ${asset.key}`);
-          }
-        });
-        setSelectedAssets(updatedAssets);
+        addAssets(resolvedAssets);
         if (errors.length) {
           this.setState({ error: errors.join(" - ") });
         } else {
@@ -122,26 +111,12 @@ class AssetController extends Component {
     };
   }
 
-  removeAsset(asset) {
-    const { selectedAssets, setSelectedAssets } = this.props;
-    const idx = selectedAssets.map((a) => a.key).indexOf(asset.key);
-    if (idx > -1) {
-      const newAssets = [...selectedAssets];
-      newAssets.splice(idx, 1);
-      setSelectedAssets(newAssets);
-    }
-  }
-
   renderNextAsset() {
-    const { selectedAssets } = this.props;
+    const { selectedAssets, removeAsset } = this.props;
     return (
       <div>
         {(selectedAssets || []).map((asset) => (
-          <RemovableAsset
-            asset={asset}
-            remove={this.removeAsset}
-            key={asset.key}
-          >
+          <RemovableAsset asset={asset} remove={removeAsset} key={asset.key}>
             <Asset asset={asset} thumbnail />
           </RemovableAsset>
         ))}
@@ -261,7 +236,6 @@ class AssetController extends Component {
             addAssets={this.addMultipleAssets}
             match={match}
             updateTeams={this.updateTeams}
-            // TODO
             controllerState={null}
             previousView={() =>
               setTimeout(() => selectAssetView(ASSET_VIEWS.assets), 500)
@@ -302,6 +276,8 @@ const dispatchToProps = (dispatch) =>
       toggleAutoPlay: controllerActions.toggleAutoPlay,
       setPlaying: controllerActions.setPlaying,
       setSelectedAssets: controllerActions.setSelectedAssets,
+      addAssets: controllerActions.addAssets,
+      removeAsset: controllerActions.removeAsset,
       showNextAsset: controllerActions.showNextAsset,
       renderAsset: controllerActions.renderAsset,
     },

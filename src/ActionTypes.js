@@ -32,6 +32,8 @@ export const Controller = keymirror({
   toggleAutoPlay: null,
   setPlaying: null,
   setSelectedAssets: null,
+  addAssets: null,
+  removeAsset: null,
   showNextAsset: null,
   renderAsset: null,
   selectTab: null,

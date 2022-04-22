@@ -8,7 +8,7 @@ import assetTypes from "../asset/AssetTypes";
 
 import "./ImageList.css";
 
-const ImageList = ({ prefix, renderAsset }) => {
+const ImageList = ({ prefix, renderAsset, displayNow, addAssets }) => {
   const [images, setImages] = useState([]);
 
   const deleteImage = (ref) => {
@@ -44,11 +44,14 @@ const ImageList = ({ prefix, renderAsset }) => {
             <img
               src={imageUrl}
               alt={name}
-              onClick={() =>
-                renderAsset({
-                  asset: { key: imageUrl, type: assetTypes.IMAGE },
-                })
-              }
+              onClick={() => {
+                const asset = { key: imageUrl, type: assetTypes.IMAGE };
+                if (displayNow) {
+                  renderAsset({ asset });
+                } else {
+                  addAssets([asset]);
+                }
+              }}
             />
           </div>
           <div>
@@ -65,12 +68,15 @@ const ImageList = ({ prefix, renderAsset }) => {
 ImageList.propTypes = {
   prefix: PropTypes.string.isRequired,
   renderAsset: PropTypes.func.isRequired,
+  addAssets: PropTypes.func.isRequired,
+  displayNow: PropTypes.bool.isRequired,
 };
 
 const dispatchToProps = (dispatch) =>
   bindActionCreators(
     {
       renderAsset: controllerActions.renderAsset,
+      addAssets: controllerActions.addAssets,
     },
     dispatch
   );

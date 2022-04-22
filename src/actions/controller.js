@@ -29,6 +29,8 @@ const actions = {
   [ActionTypes.setPlaying]: (playing) => ({ playing }),
   [ActionTypes.renderAsset]: (asset) => ({ asset }),
   [ActionTypes.setSelectedAssets]: (selectedAssets) => ({ selectedAssets }),
+  [ActionTypes.addAssets]: (assets) => ({ assets }),
+  [ActionTypes.removeAsset]: (asset) => ({ asset }),
   [ActionTypes.getAvailableMatches]: (homeTeam, awayTeam) => {
     if (DEBUG) {
       return new Promise((resolve) => resolve(lambdaExample));

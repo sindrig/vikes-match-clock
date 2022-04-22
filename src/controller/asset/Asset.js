@@ -15,11 +15,6 @@ import controllerActions from "../../actions/controller";
 
 import "./Asset.css";
 
-export const checkKey = (asset) =>
-  // Make sure that the asset type is in assetTypes
-  // And make sure that the asset key is not null/undefined/empty
-  Object.keys(assetTypes).indexOf(asset.type) !== -1 && asset.key;
-
 class Asset extends Component {
   static propTypes = {
     asset: assetPropType.isRequired,
@@ -59,14 +54,8 @@ class Asset extends Component {
   }
 
   setTimeoutIfNecessary() {
-    const {
-      time,
-      thumbnail,
-      removeAssetAfterTimeout,
-      asset,
-      sync,
-      auth,
-    } = this.props;
+    const { time, thumbnail, removeAssetAfterTimeout, asset, sync, auth } =
+      this.props;
     clearTimeout(this.timeout);
     if (sync && auth.isEmpty) {
       return;
