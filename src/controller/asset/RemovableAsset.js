@@ -7,7 +7,7 @@ import "./RemovableAsset.css";
 
 const assetItemType = "asset";
 
-const RemovableAsset = ({ children, remove, asset, index, moveAsset }) => {
+const RemovableAsset = ({ children, asset, index, moveAsset }) => {
   const ref = useRef(null);
   const [{ handlerId }, drop] = useDrop({
     accept: assetItemType,
