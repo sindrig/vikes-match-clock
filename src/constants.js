@@ -10,8 +10,10 @@ const backgrounds = [
   { backgroundImage: `url(${backgroundImage})` },
   { backgroundColor: "black" },
   {
-    backgroundImage:
-      "repeating-linear-gradient(90deg,#181003,#181003 25px,#2D1201 25px,#2D1201 50px)",
+    backgroundImage: [
+      "repeating-linear-gradient(0deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0) 20%, rgba(199,0,15, 0.5) 40%, rgba(199,0,15) 100%)",
+      "repeating-linear-gradient(90deg,rgba(199,0,15),rgba(199,0,15) 30px,#2D1201 30px,#2D1201 60px)",
+    ].join(", "),
   },
   {},
   //Ukraine
@@ -21,7 +23,7 @@ const backgrounds = [
   },
 ];
 
-export const BACKGROUND = backgrounds[0];
+export const BACKGROUND = backgrounds[2];
 
 export const SPORTS = keymirror({
   football: null,
