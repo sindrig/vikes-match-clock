@@ -1,13 +1,12 @@
-import React, { Component } from "react";
+import React from "react";
 import { bindActionCreators } from "redux";
 import { connect } from "react-redux";
 import PropTypes from "prop-types";
 
+import AssetQueue from "./AssetQueue";
 import { addVideosFromPlaylist } from "./YoutubePlaylist";
 import { ASSET_VIEWS } from "../../reducers/controller";
 import { matchPropType, assetPropType } from "../../propTypes";
-import Asset from "./Asset";
-import RemovableAsset from "./RemovableAsset";
 import TeamAssetController from "./team/TeamAssetController";
 import UrlController from "./UrlController";
 import assetTypes from "./AssetTypes";
@@ -18,51 +17,49 @@ import controllerActions from "../../actions/controller";
 
 import "./AssetController.css";
 
-class AssetController extends Component {
-  static propTypes = {
-    renderAsset: PropTypes.func.isRequired,
-    selectAssetView: PropTypes.func.isRequired,
-    match: matchPropType.isRequired,
-    assetView: PropTypes.string.isRequired,
-    imageSeconds: PropTypes.number,
-    selectedAssets: PropTypes.arrayOf(assetPropType).isRequired,
-    cycle: PropTypes.bool,
-    playing: PropTypes.bool,
-    autoPlay: PropTypes.bool,
-    toggleCycle: PropTypes.func.isRequired,
-    setImageSeconds: PropTypes.func.isRequired,
-    toggleAutoPlay: PropTypes.func.isRequired,
-    setPlaying: PropTypes.func.isRequired,
-    showNextAsset: PropTypes.func.isRequired,
-    setSelectedAssets: PropTypes.func.isRequired,
-    addAssets: PropTypes.func.isRequired,
-    removeAsset: PropTypes.func.isRequired,
+const AssetController = ({
+  addAssets,
+  assetView,
+  autoPlay,
+  cycle,
+  imageSeconds,
+  match,
+  playing,
+  renderAsset,
+  selectAssetView,
+  selectedAssets,
+  setImageSeconds,
+  setPlaying,
+  setSelectedAssets,
+  showNextAsset,
+  toggleAutoPlay,
+  toggleCycle,
+}) => {
+  const addMultipleAssets = (assetList, options = { showNow: false }) => {
+    Promise.all(assetList).then((resolvedAssets) => {
+      if (options.showNow && resolvedAssets.length === 1) {
+        renderAsset({
+          asset: resolvedAssets[0],
+        });
+      } else {
+        addAssets(resolvedAssets);
+      }
+    });
   };
 
-  static defaultProps = {
-    imageSeconds: 0,
-    autoPlay: false,
-    cycle: false,
-    playing: false,
-  };
-
-  constructor(props) {
-    super(props);
-    this.state = {
-      playing: false,
-      error: "",
+  const playRuv = (key) => {
+    return () => {
+      renderAsset({
+        asset: { key, type: assetTypes.RUV },
+      });
     };
-    this.onImageSecondsChange = this.onImageSecondsChange.bind(this);
-    this.addMultipleAssets = this.addMultipleAssets.bind(this);
-    this.addAssetKey = this.addAssetKey.bind(this);
-  }
+  };
 
-  onImageSecondsChange(value) {
-    const { setImageSeconds } = this.props;
+  const onImageSecondsChange = (value) => {
     setImageSeconds(Math.max(parseInt(value, 10), 1));
-  }
+  };
 
-  addAssetKey(asset) {
+  const addAssetKey = (asset) => {
     if (asset.type === assetTypes.URL) {
       if (asset.key.indexOf("youtube") > -1) {
         try {
@@ -81,70 +78,9 @@ class AssetController extends Component {
       }
     }
     return this.addMultipleAssets([asset]);
-  }
+  };
 
-  addMultipleAssets(assetList, options = { showNow: false }) {
-    const { renderAsset, addAssets } = this.props;
-    const errors = [];
-    Promise.all(assetList).then((resolvedAssets) => {
-      if (options.showNow && resolvedAssets.length === 1) {
-        renderAsset({
-          asset: resolvedAssets[0],
-        });
-      } else {
-        addAssets(resolvedAssets);
-        if (errors.length) {
-          this.setState({ error: errors.join(" - ") });
-        } else {
-          this.setState({ error: "" });
-        }
-      }
-    });
-  }
-
-  playRuv(key) {
-    return () => {
-      const { renderAsset } = this.props;
-      renderAsset({
-        asset: { key, type: assetTypes.RUV },
-      });
-    };
-  }
-
-  renderNextAsset() {
-    const { selectedAssets, removeAsset } = this.props;
-    return (
-      <div>
-        {(selectedAssets || []).map((asset) => (
-          <RemovableAsset asset={asset} remove={removeAsset} key={asset.key}>
-            <Asset asset={asset} thumbnail />
-          </RemovableAsset>
-        ))}
-      </div>
-    );
-  }
-
-  renderError() {
-    const { error } = this.state;
-    if (error) {
-      return <div>{error}</div>;
-    }
-    return null;
-  }
-
-  renderAssetController() {
-    const {
-      cycle,
-      selectedAssets,
-      imageSeconds,
-      autoPlay,
-      setSelectedAssets,
-      toggleCycle,
-      toggleAutoPlay,
-      playing,
-      setPlaying,
-      showNextAsset,
-    } = this.props;
+  const renderAssetController = () => {
     const selectedAssetsList = selectedAssets || [];
     return (
       <div className="withborder">
@@ -187,7 +123,7 @@ class AssetController extends Component {
                 defaultValue={3}
                 max={600}
                 min={1}
-                onChange={this.onImageSecondsChange}
+                onChange={onImageSecondsChange}
                 value={imageSeconds}
                 postfix="sek"
               />
@@ -198,54 +134,75 @@ class AssetController extends Component {
               Loop
             </Checkbox>
           </div>
-          <UrlController addAsset={this.addAssetKey} />
-          <Button appearance="default" onClick={this.playRuv("ruv")}>
+          <UrlController addAsset={addAssetKey} />
+          <Button appearance="default" onClick={playRuv("ruv")}>
             RÚV
           </Button>
-          <Button appearance="default" onClick={this.playRuv("ruv2")}>
+          <Button appearance="default" onClick={playRuv("ruv2")}>
             RÚV 2
           </Button>
-          {this.renderError()}
         </div>
-        <div className="upcoming-assets">{this.renderNextAsset()}</div>
+        <div className="upcoming-assets">
+          <AssetQueue />
+        </div>
       </div>
     );
-  }
+  };
+  return (
+    <div className="asset-controller">
+      <div className="view-selector assettabs stdbuttons">
+        <button
+          type="button"
+          onClick={() => selectAssetView(ASSET_VIEWS.assets)}
+        >
+          Biðröð
+        </button>
+        <button
+          type="button"
+          onClick={() => selectAssetView(ASSET_VIEWS.teams)}
+        >
+          Lið
+        </button>
+      </div>
+      {assetView === ASSET_VIEWS.assets && renderAssetController()}
+      {assetView === ASSET_VIEWS.teams && (
+        <TeamAssetController
+          addAssets={addMultipleAssets}
+          match={match}
+          controllerState={null}
+          previousView={() =>
+            setTimeout(() => selectAssetView(ASSET_VIEWS.assets), 500)
+          }
+        />
+      )}
+    </div>
+  );
+};
+AssetController.propTypes = {
+  renderAsset: PropTypes.func.isRequired,
+  selectAssetView: PropTypes.func.isRequired,
+  match: matchPropType.isRequired,
+  assetView: PropTypes.string.isRequired,
+  imageSeconds: PropTypes.number,
+  selectedAssets: PropTypes.arrayOf(assetPropType).isRequired,
+  cycle: PropTypes.bool,
+  playing: PropTypes.bool,
+  autoPlay: PropTypes.bool,
+  toggleCycle: PropTypes.func.isRequired,
+  setImageSeconds: PropTypes.func.isRequired,
+  toggleAutoPlay: PropTypes.func.isRequired,
+  setPlaying: PropTypes.func.isRequired,
+  showNextAsset: PropTypes.func.isRequired,
+  setSelectedAssets: PropTypes.func.isRequired,
+  addAssets: PropTypes.func.isRequired,
+};
 
-  render() {
-    const { match, assetView, selectAssetView } = this.props;
-    return (
-      <div className="asset-controller">
-        <div className="view-selector assettabs stdbuttons">
-          <button
-            type="button"
-            onClick={() => selectAssetView(ASSET_VIEWS.assets)}
-          >
-            Biðröð
-          </button>
-          <button
-            type="button"
-            onClick={() => selectAssetView(ASSET_VIEWS.teams)}
-          >
-            Lið
-          </button>
-        </div>
-        {assetView === ASSET_VIEWS.assets && this.renderAssetController()}
-        {assetView === ASSET_VIEWS.teams && (
-          <TeamAssetController
-            addAssets={this.addMultipleAssets}
-            match={match}
-            updateTeams={this.updateTeams}
-            controllerState={null}
-            previousView={() =>
-              setTimeout(() => selectAssetView(ASSET_VIEWS.assets), 500)
-            }
-          />
-        )}
-      </div>
-    );
-  }
-}
+AssetController.defaultProps = {
+  imageSeconds: 0,
+  autoPlay: false,
+  cycle: false,
+  playing: false,
+};
 
 const stateToProps = ({
   controller: {
@@ -277,7 +234,6 @@ const dispatchToProps = (dispatch) =>
       setPlaying: controllerActions.setPlaying,
       setSelectedAssets: controllerActions.setSelectedAssets,
       addAssets: controllerActions.addAssets,
-      removeAsset: controllerActions.removeAsset,
       showNextAsset: controllerActions.showNextAsset,
       renderAsset: controllerActions.renderAsset,
     },

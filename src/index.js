@@ -8,6 +8,8 @@ import { store, persistor } from "./store";
 import App from "./App";
 import "./raven";
 import { firebase } from "./firebase";
+import { DndProvider } from "react-dnd";
+import { HTML5Backend } from "react-dnd-html5-backend";
 
 const rrfConfig = {
   userProfile: "users",
@@ -23,7 +25,9 @@ ReactDOM.render(
   <Provider store={store}>
     <PersistGate loading={null} persistor={persistor}>
       <ReactReduxFirebaseProvider {...rrfProps}>
-        <App />
+        <DndProvider backend={HTML5Backend}>
+          <App />
+        </DndProvider>
       </ReactReduxFirebaseProvider>
     </PersistGate>
   </Provider>,
