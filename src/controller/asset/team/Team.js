@@ -19,7 +19,7 @@ class Team extends Component {
     teamName: PropTypes.oneOf(["homeTeam", "awayTeam"]).isRequired,
     selectPlayer: PropTypes.func,
     match: matchPropType.isRequired,
-    teamId: PropTypes.string,
+    teamId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     selectedMatch: PropTypes.string,
   };
 

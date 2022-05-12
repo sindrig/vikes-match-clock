@@ -12,8 +12,7 @@ import SubView from "./SubView";
 import assetTypes from "../AssetTypes";
 import MatchSelector from "./MatchSelector";
 import controllerActions from "../../../actions/controller";
-
-import { storage } from "../../../firebase";
+import { getPlayerAssetObject } from "./assetHelpers";
 
 class TeamAssetController extends Component {
   static propTypes = {
@@ -42,7 +41,7 @@ class TeamAssetController extends Component {
       subOut: null,
       selectPlayerAsset: false,
       selectGoalScorer: false,
-      effect: "",
+      effect: "blink",
     };
     this.autoFill = this.autoFill.bind(this);
     this.addPlayersToQ = this.addPlayersToQ.bind(this);
@@ -63,31 +62,6 @@ class TeamAssetController extends Component {
       homeTeam: match ? match.players[clubIds[homeTeam]] || [] : [],
       awayTeam: match ? match.players[clubIds[awayTeam]] || [] : [],
     };
-  }
-
-  async getPlayerAssetObject({ player, teamName, overlay }) {
-    if (!player.name || !player.number) {
-      return null;
-    }
-    return storage
-      .ref(`players/${player.id}.png`)
-      .getDownloadURL()
-      .then((key) => ({
-        type: assetTypes.PLAYER,
-        key,
-        name: player.name,
-        number: player.number,
-        overlay: overlay || { text: "" },
-        teamName,
-      }))
-      .catch(() => ({
-        type: assetTypes.NO_IMAGE_PLAYER,
-        key: `custom-${player.number}-${player.name}`,
-        name: player.name,
-        number: player.number,
-        overlay: overlay || { text: "" },
-        teamName,
-      }));
   }
 
   clearState() {
@@ -111,7 +85,7 @@ class TeamAssetController extends Component {
     ].map(({ team, teamName }) =>
       team
         .filter((p) => p.show)
-        .map((player) => this.getPlayerAssetObject({ player, teamName }))
+        .map((player) => getPlayerAssetObject({ player, teamName }))
     );
     const flattened = [].concat(...teamAssets);
     if (!flattened.every((i) => i)) {
@@ -125,11 +99,11 @@ class TeamAssetController extends Component {
   addSubAsset() {
     const { subIn, subOut } = this.state;
     const { match, addAssets } = this.props;
-    const subInObj = this.getPlayerAssetObject({
+    const subInObj = getPlayerAssetObject({
       player: subIn,
       teamName: match[subIn.teamName],
     });
-    const subOutObj = this.getPlayerAssetObject({
+    const subOutObj = getPlayerAssetObject({
       player: subOut,
       // NOTE: We use subIn teamName
       teamName: match[subIn.teamName],
@@ -173,7 +147,7 @@ class TeamAssetController extends Component {
     const { match, addAssets } = this.props;
     addAssets(
       [
-        this.getPlayerAssetObject({
+        getPlayerAssetObject({
           player,
           teamName: match[teamName],
         }),
@@ -189,7 +163,7 @@ class TeamAssetController extends Component {
     const { match, addAssets } = this.props;
     addAssets(
       [
-        this.getPlayerAssetObject({
+        getPlayerAssetObject({
           player,
           teamName: match[teamName],
           overlay: {
