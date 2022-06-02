@@ -13,16 +13,17 @@ def get_absolute_url(absolute_path):
     return 'https://www.ksi.is%s' % (absolute_path,)
 
 
-def main(club_id, out_folder):
+def main(club_id, out_folder, club_name=None):
     r = requests.get(get_absolute_url(f'/mot/felag/?lid={club_id}'))
     r.raise_for_status()
     soup = bs4.BeautifulSoup(r.text, 'html.parser')
     h1 = soup.find('h1')
     if not h1:
         raise RuntimeError("No h1 found")
-    club_name = h1.text.split('-')[1].strip()
     if not club_name:
-        raise RuntimeError("Club name not found")
+        club_name = h1.text.split('-')[1].strip()
+        if not club_name:
+            raise RuntimeError("Club name not found")
     img_tag = soup.find('img')
     if not img_tag:
         raise RuntimeError("img tag not found")
@@ -97,8 +98,10 @@ if __name__ == '__main__':
     folder = os.path.join(BASE, 'src', 'images', 'club-logos')
     parser.add_argument('club_id', type=str)
     args = parser.parse_args()
+    club_name = None
     if args.club_id.isdigit():
         club_id = int(args.club_id)
     else:
         club_id = get_club_id(args.club_id)
-    main(club_id, folder)
+        club_name = args.club_id
+    main(club_id, folder, club_name=club_name)
