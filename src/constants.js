@@ -21,9 +21,16 @@ const backgrounds = [
     backgroundImage:
       "linear-gradient(180deg, #005BBB 0, #005BBB 50%, #FFD500 50%, #FFD500 100%)",
   },
+  //Iceland general
+  {
+    backgroundImage: [
+      "repeating-linear-gradient(0deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0) 20%, #1c6fb3 40%, rgb(30 49 115 / 80%) 100%)",
+      "repeating-linear-gradient(90deg, #1e3173, #1e3173 100%)",
+    ].join(", "),
+  },
 ];
 
-export const BACKGROUND = backgrounds[2];
+export const BACKGROUND = backgrounds[5];
 
 export const SPORTS = keymirror({
   football: null,
