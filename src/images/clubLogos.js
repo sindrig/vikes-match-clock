@@ -1,6 +1,6 @@
 /* eslint-disable global-require */
 module.exports = {
-    Levadia Tallinn: require('./club-logos/Levadia Tallinn.png'),
+  "Levadia Tallinn": require("./club-logos/Levadia Tallinn.png"),
   "Antígva og Barbúda": require("./club-logos/Antígva og Barbúda.svg"),
   "Boltaf. Norðfj": require("./club-logos/Boltaf. Norðfj.png"),
   "Dalvík-Reynir": require("./club-logos/Dalvík-Reynir.svg"),
