@@ -1,5 +1,6 @@
 /* eslint-disable global-require */
 module.exports = {
+    Levadia Tallinn: require('./club-logos/Levadia Tallinn.png'),
   "Antígva og Barbúda": require("./club-logos/Antígva og Barbúda.svg"),
   "Boltaf. Norðfj": require("./club-logos/Boltaf. Norðfj.png"),
   "Dalvík-Reynir": require("./club-logos/Dalvík-Reynir.svg"),
@@ -17,6 +18,7 @@ module.exports = {
   "Leiknir F": require("./club-logos/Leiknir F.svg"),
   "Leiknir R": require("./club-logos/Leiknir R.svg"),
   "Neisti D": require("./club-logos/Neisti D.svg"),
+  "Norður-Írland": require("./club-logos/Norður-Írland.svg"),
   "Púertó Ríkó": require("./club-logos/Púertó Ríkó.svg"),
   "Reynir H": require("./club-logos/Reynir H.png"),
   "Reynir S": require("./club-logos/Reynir S.svg"),
@@ -144,7 +146,6 @@ module.exports = {
   Mön: require("./club-logos/Mön.svg"),
   Njarðvík: require("./club-logos/Njarðvík.svg"),
   Noregur: require("./club-logos/Noregur.svg"),
-  "Norður-Írland": require("./club-logos/Norður-Írland.svg"),
   Nígería: require("./club-logos/Nígería.svg"),
   Níkaragva: require("./club-logos/Níkaragva.svg"),
   Nökkvi: require("./club-logos/Nökkvi.svg"),

@@ -24,10 +24,12 @@ def main(club_id, out_folder, club_name=None):
         club_name = h1.text.split('-')[1].strip()
         if not club_name:
             raise RuntimeError("Club name not found")
-    img_tag = soup.find('img')
-    if not img_tag:
-        raise RuntimeError("img tag not found")
-    img_url = img_tag['src']  # type: ignore
+    for img_tag in soup.findAll('img'):
+        if img_tag.get('alt', '') == 'Model.BasicInfo.ShortName':
+            img_url = img_tag['src']
+            break
+    else:
+        raise RuntimeError("Did not find img!")
 
     exts = [os.path.splitext(str(img_url))[1], '.svg']
     for ext in exts:

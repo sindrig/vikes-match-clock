@@ -51,7 +51,8 @@
     "test:watch": "react-scripts test --env=jsdom",
     "eject": "react-scripts eject",
     "lint": "eslint src --max-warnings=0",
-    "ncu": "ncu"
+    "ncu": "ncu",
+    "format": "prettier src cypress -w"
   },
   "browserslist": {
     "production": [
