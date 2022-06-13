@@ -73,6 +73,7 @@ MatchActionSettings.propTypes = {
   match: matchPropType.isRequired,
   view: PropTypes.string.isRequired,
   background: PropTypes.string.isRequired,
+  setBackground: PropTypes.func.isRequired,
 };
 
 const stateToProps = ({
