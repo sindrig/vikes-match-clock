@@ -83,5 +83,17 @@ const actions = {
       };
     },
   },
+  [ActionTypes.receiveRemoteData]: {
+    next(state, { data, path }) {
+      if (path === "view" && data) {
+        return {
+          ...state,
+          ...data,
+          // Never overwrite vp
+          vp: state.vp,
+        };
+      }
+    },
+  },
 };
 export default handleActions(actions, initialState);

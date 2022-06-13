@@ -7,7 +7,7 @@ import {
   actionTypes as rrfActionTypes,
 } from "react-redux-firebase";
 import reducer from "./reducers/reducer";
-import { Match, Controller, Remote } from "./ActionTypes";
+import { Match, Controller, Remote, View } from "./ActionTypes";
 
 const firebaseMiddleware = (store) => (next) => (action) => {
   const { type } = action;
@@ -16,6 +16,7 @@ const firebaseMiddleware = (store) => (next) => (action) => {
     remote: { sync },
     match,
     controller,
+    view,
     firebase: { auth },
   } = store.getState();
   let firebase;
@@ -33,6 +34,9 @@ const firebaseMiddleware = (store) => (next) => (action) => {
       }
       if (Controller[type]) {
         firebase.set(`${userPrefix}/controller`, controller);
+      }
+      if (View[type]) {
+        firebase.set(`${userPrefix}/view`, view);
       }
     }
     if (type === rrfActionTypes.SET) {
