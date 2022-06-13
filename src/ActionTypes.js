@@ -43,6 +43,7 @@ export const Controller = keymirror({
 
 export const View = keymirror({
   setViewPort: null,
+  setBackground: null,
 });
 
 export const Global = keymirror({

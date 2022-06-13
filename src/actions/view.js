@@ -3,6 +3,7 @@ import ActionTypes from "../ActionTypes";
 
 const actions = {
   [ActionTypes.setViewPort]: (vp) => ({ vp }),
+  [ActionTypes.setBackground]: (background) => ({ background }),
 };
 
 Object.keys(actions).forEach((type) => {

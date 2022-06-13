@@ -66,3 +66,8 @@ export const viewPortPropType = PropTypes.shape({
   name: PropTypes.string.isRequired,
   key: PropTypes.string.isRequired,
 });
+
+export const backgroundPropType = PropTypes.shape({
+  backgroundImage: PropTypes.string,
+  backgroundColor: PropTypes.string,
+});

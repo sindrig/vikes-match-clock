@@ -12,9 +12,9 @@ import Asset from "./controller/asset/Asset";
 
 import ScoreBoard from "./screens/ScoreBoard";
 import Idle from "./screens/Idle";
-import { BACKGROUND } from "./constants";
 
 import { VIEWS } from "./reducers/controller";
+import { getBackground } from "./reducers/view";
 import { viewPortPropType } from "./propTypes";
 import StateListener from "./StateListener";
 import MatchController from "./match-controller/MatchController";
@@ -24,6 +24,7 @@ import "./App.css";
 class App extends Component {
   static propTypes = {
     view: PropTypes.string.isRequired,
+    background: PropTypes.string.isRequired,
     vp: viewPortPropType.isRequired,
     asset: PropTypes.shape({
       asset: PropTypes.shape({
@@ -88,9 +89,9 @@ class App extends Component {
   }
 
   renderCurrentView() {
-    const { view, sync, auth, vp, asset } = this.props;
+    const { view, sync, auth, vp, background, asset } = this.props;
     const style = {
-      ...BACKGROUND,
+      ...getBackground(background),
       ...vp.style,
     };
     return (
@@ -129,12 +130,13 @@ class App extends Component {
 
 const stateToProps = ({
   controller: { view, currentAsset },
-  view: { vp },
+  view: { vp, background },
   remote: { sync },
   firebase,
 }) => ({
   view,
   vp,
+  background,
   asset: currentAsset || null,
   sync,
   auth: firebase.auth,
