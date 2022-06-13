@@ -3,7 +3,8 @@ import PropTypes from "prop-types";
 import { connect } from "react-redux";
 
 import { assetPropType, viewPortPropType } from "../../propTypes";
-import { THUMB_VP, BACKGROUND } from "../../constants";
+import { THUMB_VP } from "../../constants";
+import { getBackground } from "../../reducers/view";
 
 const getTextWidth = (text, font) => {
   // re-use canvas object for better performance
@@ -45,6 +46,7 @@ class PlayerCard extends Component {
     }),
     // eslint-disable-next-line
     vp: viewPortPropType.isRequired,
+    background: PropTypes.string.isRequired,
   };
 
   static defaultProps = {
@@ -89,7 +91,8 @@ class PlayerCard extends Component {
   }
 
   render() {
-    const { thumbnail, asset, children, className, overlay } = this.props;
+    const { thumbnail, asset, children, className, overlay, background } =
+      this.props;
     const { fontSizes } = this.state;
     const nameStyle = {
       fontSize: `${thumbnail ? fontSizes.thumbnail : fontSizes.regular}px`,
@@ -98,7 +101,7 @@ class PlayerCard extends Component {
       <div
         className={`asset-player-icon ${className}`}
         key={asset.key}
-        style={BACKGROUND}
+        style={getBackground(background)}
       >
         {children}
         <span
@@ -117,6 +120,6 @@ class PlayerCard extends Component {
   }
 }
 
-const stateToProps = ({ view: { vp } }) => ({ vp });
+const stateToProps = ({ view: { vp, background } }) => ({ vp, background });
 
 export default connect(stateToProps)(PlayerCard);
