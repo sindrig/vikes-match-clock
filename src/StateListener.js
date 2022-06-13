@@ -16,6 +16,10 @@ const StateListener = ({ sync, listenPrefix }) => {
       path: `${listenPrefix}/controller`,
       storeAs: "controller",
     });
+    listens.push({
+      path: `${listenPrefix}/view`,
+      storeAs: "view",
+    });
   }
   useFirebaseConnect(listens);
   const fbstate = useSelector((state) => state.firebase.data);
