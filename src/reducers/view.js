@@ -93,6 +93,7 @@ const actions = {
           vp: state.vp,
         };
       }
+      return state;
     },
   },
 };
