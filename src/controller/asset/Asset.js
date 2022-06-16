@@ -168,6 +168,9 @@ class Asset extends Component {
 
   render() {
     const { asset, thumbnail } = this.props;
+    if (!asset) {
+      return null;
+    }
     if (asset.type === assetTypes.IMAGE) {
       return (
         <img
