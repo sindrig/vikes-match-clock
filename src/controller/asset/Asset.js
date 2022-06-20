@@ -125,7 +125,7 @@ class Asset extends Component {
       .map((p) => p.split("="))
       .filter((kv) => kv[0] === "v")
       .map((kv) => kv[1])[0];
-    if (isYouTube) {
+    if (isYouTube >= 0) {
       if (videoId) {
         if (thumbnail) {
           return (
