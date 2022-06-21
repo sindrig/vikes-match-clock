@@ -2,6 +2,7 @@ import { handleActions } from "redux-actions";
 
 import ActionTypes from "../ActionTypes";
 import backgroundImage from "../images/background_fade.png";
+import backgroundCLImage from "../images/background_cl.png";
 
 export const VPS = {
   outside: {
@@ -55,6 +56,8 @@ export const BACKGROUNDS = {
       "repeating-linear-gradient(90deg, #1e3173, #1e3173 100%)",
     ].join(", "),
   },
+  //CL
+  CL:{ backgroundImage: `url(${backgroundCLImage})` },
   Ekkert: {},
 };
 
