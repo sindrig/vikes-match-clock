@@ -57,7 +57,7 @@ export const BACKGROUNDS = {
     ].join(", "),
   },
   //CL
-  CL:{ backgroundImage: `url(${backgroundCLImage})` },
+  CL: { backgroundImage: `url(${backgroundCLImage})` },
   Ekkert: {},
 };
 
