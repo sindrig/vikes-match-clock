@@ -19,6 +19,7 @@ module.exports = {
   "Kormákur-Hvöt": require("./club-logos/Kormákur-Hvöt.png"),
   "Leiknir F": require("./club-logos/Leiknir F.svg"),
   "Leiknir R": require("./club-logos/Leiknir R.svg"),
+  "Malmo FF": require("./club-logos/Malmo FF.svg"),
   "Neisti D": require("./club-logos/Neisti D.svg"),
   "Norður-Írland": require("./club-logos/Norður-Írland.svg"),
   "Púertó Ríkó": require("./club-logos/Púertó Ríkó.svg"),
