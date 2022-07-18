@@ -3,6 +3,7 @@ import { handleActions } from "redux-actions";
 import ActionTypes from "../ActionTypes";
 import backgroundImage from "../images/background_fade.png";
 import backgroundCLImage from "../images/background_cl.png";
+import backgroundELImage from "../images/background_el.png";
 
 export const VPS = {
   outside: {
@@ -58,6 +59,7 @@ export const BACKGROUNDS = {
   },
   //CL
   CL: { backgroundImage: `url(${backgroundCLImage})` },
+  EuropaLeague: { backgroundImage: `url(${backgroundELImage})` },
   Ekkert: {},
 };
 
