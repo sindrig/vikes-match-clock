@@ -59,7 +59,7 @@ export const BACKGROUNDS = {
   },
   //CL
   CL: { backgroundImage: `url(${backgroundCLImage})` },
-  EuropaLeague: { backgroundImage: `url(${backgroundELImage})` }, 
+  EuropaLeague: { backgroundImage: `url(${backgroundELImage})` },
   Ekkert: {},
 };
 
