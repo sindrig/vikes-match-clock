@@ -21,6 +21,7 @@ module.exports = {
   "Leiknir R": require("./club-logos/Leiknir R.svg"),
   "Malmo FF": require("./club-logos/Malmo FF.svg"),
   "Neisti D": require("./club-logos/Neisti D.svg"),
+  "New Saints": require("./club-logos/TNS_Badgelarge-01.png"),
   "Norður-Írland": require("./club-logos/Norður-Írland.svg"),
   "Púertó Ríkó": require("./club-logos/Púertó Ríkó.svg"),
   "Reynir H": require("./club-logos/Reynir H.png"),
