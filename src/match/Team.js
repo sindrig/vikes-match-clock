@@ -30,7 +30,7 @@ const Team = ({
 }) => (
   <div className={`team ${className}`}>
     {team.image && (
-      <div>
+      <div className="img-wrapper">
         <img src={team.image} alt={team.name} style={imageStyle(team)} />
       </div>
     )}

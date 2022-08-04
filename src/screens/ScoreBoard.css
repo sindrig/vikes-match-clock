@@ -2,16 +2,16 @@
   left: 4%;
 }
 
-.team.home img {
-  left: 6%;
+.team.home .img-wrapper {
+  left: 4%;
 }
 
 .team.away span.score {
   right: 4%;
 }
 
-.team.away img {
-  right: 6%;
+.team.away .img-wrapper {
+  right: 4%;
 }
 
 .team {
@@ -47,11 +47,21 @@
   border: 1px solid white;
 }
 
-.team img {
+.team .img-wrapper {
+  width: 25%;
   position: absolute;
   top: 10%;
   height: 43%;
-  max-width: 26%;
+}
+
+.team img {
+  display: block;
+  width: 100%;
+  max-height: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  margin-bottom: 0;
+  margin-top: auto;
 }
 
 .clock {

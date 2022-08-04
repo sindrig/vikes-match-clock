@@ -17,6 +17,7 @@ module.exports = {
   "Hörður Í": require("./club-logos/Hörður Í.png"),
   "Höttur-Huginn": require("./club-logos/Höttur-Huginn.svg"),
   "Kormákur-Hvöt": require("./club-logos/Kormákur-Hvöt.png"),
+  "Lech poznan": require("./club-logos/lech-poznan2.png"),
   "Leiknir F": require("./club-logos/Leiknir F.svg"),
   "Leiknir R": require("./club-logos/Leiknir R.svg"),
   "Malmo FF": require("./club-logos/Malmo FF.svg"),
