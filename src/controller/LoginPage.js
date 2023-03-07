@@ -24,7 +24,7 @@ class LoginPage extends Component {
     auth: PropTypes.shape({
       isLoaded: PropTypes.bool,
       isEmpty: PropTypes.bool,
-      email: PropTypes.string.isRequired,
+      email: PropTypes.string,
     }).isRequired,
   };
 

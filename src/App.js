@@ -43,11 +43,6 @@ class App extends Component {
     sync: false,
   };
 
-  static childContextTypes = {
-    // eslint-disable-next-line
-    shortcuts: PropTypes.object.isRequired,
-  };
-
   componentDidMount() {
     const { setViewPort, vp } = this.props;
     setViewPort(vp);
