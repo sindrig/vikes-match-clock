@@ -1,10 +1,7 @@
 import React, { Component } from "react";
 import PropTypes from "prop-types";
-import { Shortcuts } from "react-shortcuts";
 import { connect } from "react-redux";
 import { bindActionCreators } from "redux";
-
-import ShortcutManager from "./utils/ShortcutManager";
 
 import viewActions from "./actions/view";
 import Controller from "./controller/Controller";
@@ -51,29 +48,9 @@ class App extends Component {
     shortcuts: PropTypes.object.isRequired,
   };
 
-  constructor(props) {
-    super(props);
-    this.handleShortcuts = this.handleShortcuts.bind(this);
-  }
-
-  getChildContext() {
-    return { shortcuts: ShortcutManager };
-  }
-
   componentDidMount() {
     const { setViewPort, vp } = this.props;
     setViewPort(vp);
-  }
-
-  handleShortcuts(action) {
-    switch (action) {
-      case "clearImage":
-        console.log("clearImage");
-        break;
-      default:
-        console.error("Unknown key pressed", action);
-    }
-    return this;
   }
 
   renderAppContents() {
@@ -115,15 +92,10 @@ class App extends Component {
 
   render() {
     return (
-      <Shortcuts
-        name="MAIN"
-        handler={this.handleShortcuts}
-        global
-        targetNodeSelector="body"
-      >
+      <div>
         {this.renderCurrentView()}
         <StateListener />
-      </Shortcuts>
+      </div>
     );
   }
 }

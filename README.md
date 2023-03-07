@@ -1,2 +1,2 @@
 Skorklukka
-yarn og yarn start til að keyra
+pnpm og pnpm start til að keyra

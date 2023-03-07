@@ -1,9 +1,14 @@
 module.exports = {
-  parser: "babel-eslint",
+  parser: "@babel/eslint-parser",
   // extends: ["prettier"],
   extends: ["eslint:recommended", "plugin:react/recommended", "prettier"],
   plugins: ["react"],
-
+  parserOptions: {
+    requireConfigFile: false,
+    babelOptions: {
+      presets: ["@babel/preset-react"],
+    },
+  },
   overrides: [
     {
       files: ["**/*.spec.js", "**/*.spec.jsx"],
