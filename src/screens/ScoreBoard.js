@@ -16,8 +16,9 @@ import "./ScoreBoard.css";
 
 const getTeam = (id, match) => {
   const name = match[`${id}Team`];
+  const imageName = name.replace(/[ -.]/g, "").toLowerCase();
   return {
-    image: clubLogos[name] || null,
+    image: clubLogos[imageName] || null,
     name,
     id,
   };

@@ -15,6 +15,8 @@ class LoginPage extends Component {
     setPassword: PropTypes.func.isRequired,
     firebase: PropTypes.shape({
       auth: PropTypes.func.isRequired,
+      login: PropTypes.func.isRequired,
+      logout: PropTypes.func.isRequired,
     }).isRequired,
     available: PropTypes.arrayOf(PropTypes.string),
     listenPrefix: PropTypes.string.isRequired,
@@ -22,6 +24,7 @@ class LoginPage extends Component {
     auth: PropTypes.shape({
       isLoaded: PropTypes.bool,
       isEmpty: PropTypes.bool,
+      email: PropTypes.string,
     }).isRequired,
   };
 
