@@ -23,6 +23,6 @@ def main(outfile='clubLogos.js', image_locs='club-logos' ):
         f.write(f'\nexport default {{\n')
         for n in sorted(importnames):
             f.write(f'  {n},\n')
-        f.write('}\n')
+        f.write('};\n')
 if __name__ == '__main__':
     main()

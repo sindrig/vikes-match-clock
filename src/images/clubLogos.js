@@ -766,4 +766,4 @@ export default {
   þórka,
   þórth,
   þýskaland,
-}
+};
