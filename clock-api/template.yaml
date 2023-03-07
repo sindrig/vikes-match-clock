@@ -1,4 +1,4 @@
-AWSTemplateFormatVersion: '2010-09-09'
+AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 Description: >
   clock-api
@@ -20,14 +20,13 @@ Globals:
       Route53:
         HostedZoneName: irdn.is.
 
-
 Resources:
   MatchReportFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: match-report/
       Handler: app.lambda_handler
-      Runtime: python3.8
+      Runtime: python3.9
       Events:
         MatchReport:
           Type: Api
@@ -47,7 +46,7 @@ Resources:
       CodeUri: weather/
       Handler: app.lambda_handler
       Role: !GetAtt WeatherFunctionRole.Arn
-      Runtime: python3.8
+      Runtime: python3.9
       Events:
         MatchReport:
           Type: Api
@@ -59,25 +58,25 @@ Resources:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
-        Version: '2012-10-17'
+        Version: "2012-10-17"
         Statement:
           - Effect: Allow
             Principal:
               Service:
-                - 'lambda.amazonaws.com'
+                - "lambda.amazonaws.com"
             Action:
-              - 'sts:AssumeRole'
+              - "sts:AssumeRole"
       ManagedPolicyArns:
-        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+        - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
       Policies:
-        - PolicyName: 'WeatherFunctionParameterAccess'
+        - PolicyName: "WeatherFunctionParameterAccess"
           PolicyDocument:
-            Version: '2012-10-17'
+            Version: "2012-10-17"
             Statement:
               - Effect: Allow
                 Action:
-                  - 'ssm:GetParameter*'
-                Resource: !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/vikes-match-clock/weather-api*'
+                  - "ssm:GetParameter*"
+                Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/vikes-match-clock/weather-api*"
 Outputs:
   MatchReportApi:
     Description: "API Gateway endpoint URL for Prod stage for Match Report function"
