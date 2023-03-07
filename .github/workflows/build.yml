@@ -55,9 +55,7 @@ jobs:
         with:
           start: npx serve -s build
           record: ${{ secrets.CYPRESS_RECORD_KEY != '' }}
-          config: baseUrl=http://localhost:5000
           install-command: pnpm i
-          wait-on: http://localhost:5000
 
       - name: Deploy
         if: github.ref == 'refs/heads/master'
