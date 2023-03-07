@@ -54,7 +54,7 @@ class Idle extends Component {
     return (
       <div className={`idle idle-${vp.key}`}>
         <AdImage imageType={IMAGE_TYPES.largeAds} blankBetweenImages time={8} />
-        <img src={clubLogos["Víkingur R"]} alt="Vikes" className="idle-vikes" />
+        <img src={clubLogos["víkingurr"]} alt="Vikes" className="idle-vikes" />
         <img src={husasmidjan} alt="Vikes" className="idle-ad" />
         <div className="idle-text-container">
           <div className="idle-text-box idle-clock">
