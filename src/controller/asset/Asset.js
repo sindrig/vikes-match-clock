@@ -98,7 +98,7 @@ class Asset extends Component {
         </PlayerCard>
       );
     }
-    throw new Error("you should not get here: " + asset.type);
+    throw new Error(`you should not get here: ${JSON.stringify(asset)}`);
   }
 
   renderRuv() {
@@ -195,6 +195,10 @@ class Asset extends Component {
     }
     if (asset.type === assetTypes.SUB) {
       const { subIn, subOut } = asset;
+      if (!subIn || !subOut) {
+        console.log("No subin or subout", asset);
+        return null;
+      }
       return (
         <Substitution thumbnail={thumbnail}>
           {[subIn, subOut].map((subAsset) =>

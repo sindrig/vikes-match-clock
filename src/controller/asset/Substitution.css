@@ -39,8 +39,11 @@
 }
 
 .asset-substitution > div:nth-child(1) img {
-  left: 0px;
+  left: -10%;
   right: auto;
+}
+.asset-substitution > div:nth-child(2) img {
+  right: -10%;
 }
 
 .asset-substitution span.asset-player-number {

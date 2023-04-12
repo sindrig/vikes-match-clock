@@ -96,6 +96,7 @@ const MatchActions = ({
             blink: true,
             effect: "blink",
           },
+          preferExt: "fagn",
         }).then((asset) => {
           renderAsset({
             asset,

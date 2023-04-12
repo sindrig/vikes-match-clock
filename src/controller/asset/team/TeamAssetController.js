@@ -85,7 +85,9 @@ class TeamAssetController extends Component {
     ].map(({ team, teamName }) =>
       team
         .filter((p) => p.show)
-        .map((player) => getPlayerAssetObject({ player, teamName }))
+        .map((player) =>
+          getPlayerAssetObject({ player, teamName, preferExt: "vinstri" })
+        )
     );
     const flattened = [].concat(...teamAssets);
     if (!flattened.every((i) => i)) {
@@ -96,14 +98,14 @@ class TeamAssetController extends Component {
     }
   }
 
-  addSubAsset() {
+  async addSubAsset() {
     const { subIn, subOut } = this.state;
     const { match, addAssets } = this.props;
-    const subInObj = getPlayerAssetObject({
+    const subInObj = await getPlayerAssetObject({
       player: subIn,
       teamName: match[subIn.teamName],
     });
-    const subOutObj = getPlayerAssetObject({
+    const subOutObj = await getPlayerAssetObject({
       player: subOut,
       // NOTE: We use subIn teamName
       teamName: match[subIn.teamName],

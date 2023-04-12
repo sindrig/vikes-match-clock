@@ -1,7 +1,12 @@
 import { storage } from "../../../firebase";
 import assetTypes from "../AssetTypes";
 
-export const getPlayerAssetObject = async ({ player, teamName, overlay }) => {
+export const getPlayerAssetObject = async ({
+  player,
+  teamName,
+  overlay,
+  preferExt,
+}) => {
   if (!player.name || !player.number) {
     return null;
   }
@@ -19,19 +24,21 @@ export const getPlayerAssetObject = async ({ player, teamName, overlay }) => {
       return await fallback();
     }
   };
+  if (preferExt) {
+    return await playerAssetObjectFromPromise(
+      storage.ref(`players/${player.id}-${preferExt}.png`).getDownloadURL(),
+      () => getPlayerAssetObject({ player, teamName, overlay })
+    );
+  }
   return await playerAssetObjectFromPromise(
-    storage.ref(`players/${player.id}-fagn.png`).getDownloadURL(),
-    () =>
-      playerAssetObjectFromPromise(
-        storage.ref(`players/${player.id}.png`).getDownloadURL(),
-        () => ({
-          type: assetTypes.NO_IMAGE_PLAYER,
-          key: `custom-${player.number}-${player.name}`,
-          name: player.name,
-          number: player.number,
-          overlay: overlay || { text: "" },
-          teamName,
-        })
-      )
+    storage.ref(`players/${player.id}.png`).getDownloadURL(),
+    () => ({
+      type: assetTypes.NO_IMAGE_PLAYER,
+      key: `custom-${player.number}-${player.name}`,
+      name: player.name,
+      number: player.number,
+      overlay: overlay || { text: "" },
+      teamName,
+    })
   );
 };
