@@ -20,7 +20,7 @@ export const getPlayerAssetObject = async ({ player, teamName, overlay }) => {
     }
   };
   return await playerAssetObjectFromPromise(
-    storage.ref(`players/${player.id}-goal.png`).getDownloadURL(),
+    storage.ref(`players/${player.id}-fagn.png`).getDownloadURL(),
     () =>
       playerAssetObjectFromPromise(
         storage.ref(`players/${player.id}.png`).getDownloadURL(),
