@@ -5,23 +5,33 @@ export const getPlayerAssetObject = async ({ player, teamName, overlay }) => {
   if (!player.name || !player.number) {
     return null;
   }
-  return storage
-    .ref(`players/${player.id}.png`)
-    .getDownloadURL()
-    .then((key) => ({
-      type: assetTypes.PLAYER,
-      key,
-      name: player.name,
-      number: player.number,
-      overlay: overlay || { text: "" },
-      teamName,
-    }))
-    .catch(() => ({
-      type: assetTypes.NO_IMAGE_PLAYER,
-      key: `custom-${player.number}-${player.name}`,
-      name: player.name,
-      number: player.number,
-      overlay: overlay || { text: "" },
-      teamName,
-    }));
+  const playerAssetObjectFromPromise = async (p, fallback) => {
+    try {
+      return {
+        type: assetTypes.PLAYER,
+        key: await p,
+        name: player.name,
+        number: player.number,
+        overlay: overlay || { text: "" },
+        teamName,
+      };
+    } catch (e) {
+      return await fallback();
+    }
+  };
+  return await playerAssetObjectFromPromise(
+    storage.ref(`players/${player.id}-goal.png`).getDownloadURL(),
+    () =>
+      playerAssetObjectFromPromise(
+        storage.ref(`players/${player.id}.png`).getDownloadURL(),
+        () => ({
+          type: assetTypes.NO_IMAGE_PLAYER,
+          key: `custom-${player.number}-${player.name}`,
+          name: player.name,
+          number: player.number,
+          overlay: overlay || { text: "" },
+          teamName,
+        })
+      )
+  );
 };
