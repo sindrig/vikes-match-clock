@@ -1,5 +1,6 @@
 import datetime
 import json
+import typing
 import urllib.request
 from collections import defaultdict, namedtuple
 
@@ -77,7 +78,7 @@ class KsiClient:
         if not gameArray:
             return
         games = gameArray.FelogLeikir
-        matches = []
+        matches: typing.List[Match] = []
         for game in games:
             print(
                 game.MotKyn, ':', game.FelagHeimaNafn, '-', game.FelagUtiNafn
@@ -158,8 +159,10 @@ def main(query, context):
     matches = ksi_client.get_matches(home_team, away_team, date)
     if not matches:
         return no_match_found(home_team, away_team)
-    elif isinstance(matches, dict) and 'error' in matches:
-        return matches
+    elif isinstance(matches, dict):
+        if 'error' in matches:
+            return matches
+        raise ValueError(f'Unknown matches {matches}')
     result = {
         'matches': {},
     }
@@ -181,7 +184,8 @@ def main(query, context):
 
 
 def lambda_handler(json_input, context):
-    query = json_input['queryStringParameters']
+    print(json_input)
+    query = json_input['queryStringParameters'] or {}
     if 'debug' in query:
         data = {
             'ip': urllib.request.urlopen('https://api.ipify.org')
@@ -202,6 +206,7 @@ def lambda_handler(json_input, context):
 if __name__ == '__main__':
     print(
         lambda_handler(
-            {'queryStringParameters': {'homeTeam': 103, 'awayTeam': 220}}, {}
+            {'queryStringParameters': {'homeTeam': 103, 'awayTeam': 220}},
+            {},
         )
     )
