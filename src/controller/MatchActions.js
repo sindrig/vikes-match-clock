@@ -65,30 +65,32 @@ const MatchActions = ({
   startMatch,
   addGoal,
   renderAsset,
-  team,
+  homeTeam,
+  awayTeam,
 }) => {
-  const [showScorerSelector, setShowScorerSelector] = useState(false);
+  const [showScorerSelector, setShowScorerSelector] = useState(null);
   const [goalScorer, setGoalScorer] = useState(0);
-  const homeGoal = () => {
-    addGoal({ team: "home" });
-    if (match.homeTeam === "Víkingur R") {
+  const goal = (awayOrHome) => {
+    addGoal({ team: awayOrHome });
+    if (match[`${awayOrHome}Team`] === "víkingurr") {
       renderAsset({
         asset: {
           key: baddi,
           type: assetTypes.IMAGE,
         },
       });
-      setShowScorerSelector(true);
+      setShowScorerSelector(awayOrHome);
     }
   };
   const handleSubmit = (e) => {
     e.preventDefault();
     const gs = parseInt(goalScorer, 10);
-    team.forEach((player) => {
+
+    (showScorerSelector == "away" ? awayTeam : homeTeam).forEach((player) => {
       if (player.number === gs) {
         getPlayerAssetObject({
           player,
-          teamName: "Víkingur R",
+          teamName: "víkingurr",
           overlay: {
             text: "",
             blink: true,
@@ -98,7 +100,7 @@ const MatchActions = ({
           renderAsset({
             asset,
           });
-          setShowScorerSelector(false);
+          setShowScorerSelector(null);
         });
       }
     });
@@ -140,7 +142,7 @@ const MatchActions = ({
       {view === VIEWS.match && (
         <div>
           <div className="control-item stdbuttons">
-            <button type="button" onClick={homeGoal}>
+            <button type="button" onClick={() => goal("home")}>
               H +1
             </button>
             <button
@@ -152,7 +154,7 @@ const MatchActions = ({
             </button>
           </div>
           <div className="control-item stdbuttons">
-            <button type="button" onClick={() => addGoal({ team: "away" })}>
+            <button type="button" onClick={() => goal("away")}>
               Ú +1
             </button>
             <button
@@ -287,7 +289,8 @@ MatchActions.propTypes = {
   match: matchPropType.isRequired,
   view: PropTypes.string.isRequired,
   renderAsset: PropTypes.func.isRequired,
-  team: PropTypes.arrayOf(playerPropType).isRequired,
+  homeTeam: PropTypes.arrayOf(playerPropType).isRequired,
+  awayTeam: PropTypes.arrayOf(playerPropType).isRequired,
 };
 
 const stateToProps = ({
@@ -295,11 +298,15 @@ const stateToProps = ({
   match,
 }) => {
   const selectedMatchObj = availableMatches[selectedMatch];
-  const teamId = match.homeTeamId;
   return {
     view,
     match,
-    team: selectedMatchObj ? selectedMatchObj.players[teamId] || [] : [],
+    homeTeam: selectedMatchObj
+      ? selectedMatchObj.players[match.homeTeamId] || []
+      : [],
+    awayTeam: selectedMatchObj
+      ? selectedMatchObj.players[match.awayTeamId] || []
+      : [],
   };
 };
 const dispatchToProps = (dispatch) =>
