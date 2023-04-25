@@ -21,6 +21,7 @@ export const initialState = {
   homeTimeouts: 0,
   awayTimeouts: 0,
   buzzer: false,
+  countdown: false,
 };
 
 const actions = {
@@ -138,6 +139,7 @@ const actions = {
       return {
         ...state,
         started: Date.now(),
+        countdown: false,
       };
     },
   },
@@ -231,12 +233,26 @@ const actions = {
       };
     },
   },
+  [ActionTypes.countdown]: {
+    next(state, { error }) {
+      if (error) {
+        return { ...state, error };
+      }
+      return {
+        ...state,
+        started: Date.now() + 1000 * 15,
+        countdown: true,
+      };
+    },
+  },
   [ActionTypes.receiveRemoteData]: {
     next(state, { data, path }) {
       if (path === "match" && data) {
         const results = { ...state, ...data };
         if (results.started > 0) {
-          if (state.started === 0) {
+          if (results.countdown) {
+            results.started = Date.now() + 1000 * 15;
+          } else if (state.started === 0) {
             // We just pressed start clock. Trust our own time.
             // Compensate for some small lag
             results.started = Date.now() - 150;

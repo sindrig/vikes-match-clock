@@ -37,3 +37,17 @@ button:focus {
   max-height: 100%;
   max-width: 100%;
 }
+
+.countdown {
+  color: white;
+  font-weight: bold;
+  text-align: center;
+  margin: 0 auto;
+}
+
+.countdown img {
+  margin: 0 auto;
+  display: block;
+  max-height: 100%;
+  max-width: 100%;
+}

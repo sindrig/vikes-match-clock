@@ -14,29 +14,32 @@ context("Basic navigation", () => {
   it("starts the clock and does some things", () => {
     cy.contains("Stillingar").click();
     cy.get("#view-selector-match").click();
+    cy.contains("Heim").click();
     cy.contains("Byrja").click();
     cy.tick(ONE_MINUTE / 2);
     cy.contains("Pása").should("have.length", 1);
     cy.tick(ONE_MINUTE);
     cy.get(".matchclock").should("have.text", "01:30");
+    cy.contains("Stillingar").click();
     cy.get("#team-selector-awayTeam").type("fram");
     cy.tick(ONE_MINUTE * 10);
     cy.get(".matchclock").should("have.text", "11:30");
     cy.get(".away img").should("have.length", 1);
     cy.get(".away img").should("have.attr", "src").should("include", "Fram");
     cy.get(".halfstops-input").should("have.length", 4);
-    cy.tick(ONE_MINUTE * 47);
+    cy.tick(ONE_MINUTE * 33.5);
     cy.get(".halfstops-input").should("have.length", 3);
+    cy.contains("Heim").click();
     cy.contains("Byrja").click();
     cy.tick(ONE_MINUTE);
-    cy.contains("+5mín").click();
+    cy.contains("+5m").click();
     cy.tick(ONE_MINUTE);
     cy.get(".matchclock").should("have.text", "52:00");
-    cy.contains("Uppbótartími").type("5");
+    cy.get(".longerInput").type("5");
     cy.get(".injury-time").should("have.text", "+5");
   });
 
-  it.only("uses the simple control panel and updates the clock", () => {
+  it("uses the simple control panel and updates the clock", () => {
     cy.contains("Stillingar").click();
     cy.get("#view-selector-match").click();
     cy.get(".match-type-selector").select("handball");
@@ -76,5 +79,22 @@ context("Basic navigation", () => {
     cy.tick(30000);
     cy.get(".team-timeout").should("have.length", 1);
     cy.get(".penalty").should("have.text", "01:30");
+  });
+
+  it("starts a countdown", () => {
+    cy.contains("Stillingar").click();
+    cy.get("#view-selector-match").click();
+    cy.contains("Heim").click();
+    cy.contains("Hefja niðurtalningu").click();
+    cy.get(".countdown img").should("exist");
+    cy.tick(5000);
+    for (let i = 10; i > 0; i--) {
+      cy.get(".countdown").should("have.text", i);
+      cy.tick(1000);
+    }
+    cy.get(".countdown").should("not.exist");
+    cy.get(".matchclock").should("have.text", "00:00");
+    cy.tick(1000);
+    cy.get(".matchclock").should("have.text", "00:01");
   });
 });

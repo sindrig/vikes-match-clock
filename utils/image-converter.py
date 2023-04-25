@@ -7,7 +7,10 @@ import typing
 from enum import StrEnum
 
 import bs4
+import cv2
+import numpy as np
 import requests
+import skimage.exposure
 from PIL import Image
 
 
@@ -17,6 +20,11 @@ class Type_(StrEnum):
     Vinstri = 'Vinstri'
     Fagn = 'Fagn'
     Kross = 'Kross'
+    beinn = 'Beinn'
+    hægri = 'Hægri'
+    vinstri = 'Vinstri'
+    fagn = 'Fagn'
+    kross = 'Kross'
 
 
 link_prefix = '/mot/leikmadur/?leikmadur='
@@ -46,18 +54,32 @@ def image_handler(f: typing.Callable[[pathlib.Path, pathlib.Path], None]) -> typ
 def convert_pids(fn: pathlib.Path, out_fldr: pathlib.Path):
     if '_' in fn.stem and ' ' in fn.stem:
         num_name, type_ = fn.stem.split('_')
-        _, name = num_name.split(maxsplit=1)
-        try:
-            Type_[type_]
-        except KeyError:
-            return
+    elif ' ' in fn.stem:
+        parts = fn.stem.split(' ')
+        type_ = parts[-1]
+        num_name = ' '.join(parts[:-1])
+    else:
+        raise RuntimeError(fn.stem)
+    num, name = num_name.split(maxsplit=1)
+    try:
+        Type_[type_]
+    except KeyError:
+        return
+    try:
         pid = find_player(name)
-        match Type_[type_]:
-            case Type_.Beinn:
-                new_type_name = ''
-            case _:
-                new_type_name = f'-{type_.lower()}'
-        shutil.copy(fn, out_fldr / f'{pid}{new_type_name}.png')
+    except ValueError:
+        if not num.isdigit():
+            print('Skipping', name)
+            return
+        else:
+            raise
+    match Type_[type_]:
+        case Type_.Beinn:
+            new_type_name = ''
+        case _:
+            new_type_name = f'-{type_.lower()}'
+    shutil.copy(fn, out_fldr / f'{pid}{new_type_name}.png')
+
 @image_handler
 def crop(fn: pathlib.Path, out_fldr: pathlib.Path):
     img = Image.open(fn)
@@ -67,6 +89,35 @@ def crop(fn: pathlib.Path, out_fldr: pathlib.Path):
     cropped = cropped_bbox.crop(box)
     resized = cropped.resize((240, 176))
     resized.save(out_fldr / fn.name)
+
+@image_handler
+def greenscreen(fn: pathlib.Path, out_fldr: pathlib.Path):
+    frame = cv2.imread(fname,cv2.COLOR_BGR2BGRA)
+    lab = cv2.cvtColor(frame, cv2.COLOR_BGR2LAB)
+
+    # extract A channel
+    A = lab[:, :, 1]
+
+    # threshold A channel
+    thresh = cv2.threshold(A, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[
+        1
+    ]
+
+    # blur threshold image
+    blur = cv2.GaussianBlur(
+        thresh, (0, 0), sigmaX=5, sigmaY=5, borderType=cv2.BORDER_DEFAULT
+    )
+
+    # stretch so that 255 -> 255 and 127.5 -> 0
+    mask = skimage.exposure.rescale_intensity(
+        blur, in_range=(127.5, 255), out_range=(0, 255)
+    ).astype(np.uint8)
+
+    # add mask to image as alpha channel
+    result = frame.copy()
+    result = cv2.cvtColor(frame_resized, cv2.COLOR_BGR2BGRA)
+    result[:, :, 3] = mask
+    cv2.imwrite(out_fldr / fn.name, result)
 
 
 if __name__ == '__main__':
@@ -81,6 +132,9 @@ if __name__ == '__main__':
 
     crops_parser = subparsers.add_parser('crop')
     crops_parser.set_defaults(func=crop)
+
+    crops_parser = subparsers.add_parser('greenscreen')
+    crops_parser.set_defaults(func=greenscreen)
 
     args = parser.parse_args()
     assert args.output_folder.exists()
