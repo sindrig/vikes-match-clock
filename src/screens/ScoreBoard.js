@@ -4,6 +4,7 @@ import { matchPropType, viewPortPropType } from "../propTypes";
 
 import Team from "../match/Team";
 import Clock from "../match/Clock";
+import Countdown from "../match/Countdown";
 import TimeoutClock from "../match/TimeoutClock";
 import AdImage from "../utils/AdImage";
 
@@ -24,38 +25,41 @@ const getTeam = (id, match) => {
   };
 };
 
-const ScoreBoard = ({ match, vp }) => (
-  <div
-    className={`scoreboard scoreboard-${match.matchType} scoreboard-${vp.key}`}
-  >
-    <AdImage imageType={IMAGE_TYPES.smallAds} />
-    <Team
-      className="home"
-      team={getTeam("home", match)}
-      score={match.homeScore}
-      penalties={match.home2min}
-      timeouts={match.homeTimeouts}
-    />
-    <Team
-      className="away"
-      team={getTeam("away", match)}
-      score={match.awayScore}
-      penalties={match.away2min}
-      timeouts={match.awayTimeouts}
-    />
-    {match.injuryTime ? (
-      <div className="injury-time">
-        <span>+{match.injuryTime}</span>
-      </div>
-    ) : null}
-    <Clock className="clock matchclock" />
-    {match.timeout ? <TimeoutClock className="clock timeoutclock" /> : null}
-    {match.matchType === SPORTS.handball &&
-      match.buzzer &&
-      Date.now() - match.buzzer < 3000 &&
-      Date.now() - match.buzzer >= 0 && <audio src={buzzer} autoPlay />}
-  </div>
-);
+const ScoreBoard = ({ match, vp }) =>
+  match.countdown ? (
+    <Countdown />
+  ) : (
+    <div
+      className={`scoreboard scoreboard-${match.matchType} scoreboard-${vp.key}`}
+    >
+      <AdImage imageType={IMAGE_TYPES.smallAds} />
+      <Team
+        className="home"
+        team={getTeam("home", match)}
+        score={match.homeScore}
+        penalties={match.home2min}
+        timeouts={match.homeTimeouts}
+      />
+      <Team
+        className="away"
+        team={getTeam("away", match)}
+        score={match.awayScore}
+        penalties={match.away2min}
+        timeouts={match.awayTimeouts}
+      />
+      {match.injuryTime ? (
+        <div className="injury-time">
+          <span>+{match.injuryTime}</span>
+        </div>
+      ) : null}
+      <Clock className="clock matchclock" />
+      {match.timeout ? <TimeoutClock className="clock timeoutclock" /> : null}
+      {match.matchType === SPORTS.handball &&
+        match.buzzer &&
+        Date.now() - match.buzzer < 3000 &&
+        Date.now() - match.buzzer >= 0 && <audio src={buzzer} autoPlay />}
+    </div>
+  );
 
 ScoreBoard.propTypes = {
   match: matchPropType.isRequired,

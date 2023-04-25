@@ -67,6 +67,7 @@ const MatchActions = ({
   renderAsset,
   homeTeam,
   awayTeam,
+  countdown,
 }) => {
   const [showScorerSelector, setShowScorerSelector] = useState(null);
   const [goalScorer, setGoalScorer] = useState(0);
@@ -203,6 +204,7 @@ const MatchActions = ({
                   homeTimeouts: 0,
                   awayTimeouts: 0,
                   buzzer: false,
+                  countdown: false,
                   halfStops: DEFAULT_HALFSTOPS[match.matchType],
                 })
               }
@@ -237,6 +239,19 @@ const MatchActions = ({
                     updateMatch({ injuryTime: parseInt(value, 10) })
                   }
                 />
+              </div>
+            ) : null}
+
+            {match.matchType === SPORTS.football && !match.started ? (
+              <div style={{ whiteSpace: "nowrap", width: "400px" }}>
+                <Button
+                  color="green"
+                  appearance="primary"
+                  placement="left"
+                  onClick={countdown}
+                >
+                  Hefja niðurtalningu
+                </Button>
               </div>
             ) : null}
           </div>
@@ -287,6 +302,7 @@ MatchActions.propTypes = {
   addGoal: PropTypes.func.isRequired,
   matchTimeout: PropTypes.func.isRequired,
   removeTimeout: PropTypes.func.isRequired,
+  countdown: PropTypes.func.isRequired,
   match: matchPropType.isRequired,
   view: PropTypes.string.isRequired,
   renderAsset: PropTypes.func.isRequired,
@@ -319,6 +335,7 @@ const dispatchToProps = (dispatch) =>
       addGoal: matchActions.addGoal,
       matchTimeout: matchActions.matchTimeout,
       removeTimeout: matchActions.removeTimeout,
+      countdown: matchActions.countdown,
       renderAsset: controllerActions.renderAsset,
     },
     dispatch

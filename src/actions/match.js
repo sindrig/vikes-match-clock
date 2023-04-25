@@ -32,6 +32,7 @@ const actions = {
   }),
   [ActionTypes.removeTimeout]: () => {},
   [ActionTypes.addGoal]: ({ team }) => ({ team }),
+  [ActionTypes.countdown]: () => {},
 };
 
 Object.keys(actions).forEach((type) => {

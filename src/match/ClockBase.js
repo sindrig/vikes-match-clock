@@ -31,6 +31,7 @@ export default class Clock extends Component {
   }
 
   componentDidMount() {
+    this.updateTime();
     this.interval = setInterval(this.updateTime, 100);
   }
 
@@ -57,10 +58,7 @@ export default class Clock extends Component {
     const { isTimeNull, zeroTime, className, fontSizeMax, fontSizeMin } =
       this.props;
     const { time } = this.state;
-    let displayedTime = formatMillisAsTime(zeroTime);
-    if (!isTimeNull) {
-      displayedTime = time || displayedTime;
-    }
+    const displayedTime = (!isTimeNull && time) || formatMillisAsTime(zeroTime);
     const style = {
       fontSize: displayedTime.length > 5 ? fontSizeMin : fontSizeMax,
     };

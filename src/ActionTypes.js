@@ -13,6 +13,7 @@ export const Match = keymirror({
   removeTimeout: null,
   buzz: null,
   addGoal: null,
+  countdown: null,
 });
 
 export const Controller = keymirror({
