@@ -86,7 +86,15 @@ class LoginPage extends Component {
     if (auth.isLoaded && !auth.isEmpty) {
       const emailprefix = auth.email.split("@")[0];
       if (emailprefix !== listenPrefix) {
-        setTimeout(firebase.logout, 1000);
+        setListenPrefix(email.split("@")[0]);
+        setTimeout(() => {
+          // This should not happen.
+          // However, the other thing should not have been happening either
+          // Let's keep an eye on this.
+          if (emailprefix !== listenPrefix) {
+            firebase.logout();
+          }
+        }, 3000);
       }
       return (
         <div>
