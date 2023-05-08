@@ -6,10 +6,12 @@ export const getPlayerAssetObject = async ({
   teamName,
   overlay,
   preferExt,
+  preferType,
 }) => {
   if (!player.name || !player.number) {
     return null;
   }
+  const imageType = preferType || "png";
   const playerAssetObjectFromPromise = async (p, fallback) => {
     try {
       return {
@@ -25,13 +27,20 @@ export const getPlayerAssetObject = async ({
     }
   };
   if (preferExt) {
+    const fallbackAttrs = { player, teamName, overlay };
+    if (preferType) {
+      // Fallback from PLAYER-EXT.TYPE to PLAYER-EXT.png
+      fallbackAttrs.preferExt = preferExt;
+    }
     return await playerAssetObjectFromPromise(
-      storage.ref(`players/${player.id}-${preferExt}.png`).getDownloadURL(),
-      () => getPlayerAssetObject({ player, teamName, overlay })
+      storage
+        .ref(`players/${player.id}-${preferExt}.${imageType}`)
+        .getDownloadURL(),
+      () => getPlayerAssetObject(fallbackAttrs)
     );
   }
   return await playerAssetObjectFromPromise(
-    storage.ref(`players/${player.id}.png`).getDownloadURL(),
+    storage.ref(`players/${player.id}.${imageType}`).getDownloadURL(),
     () => ({
       type: assetTypes.NO_IMAGE_PLAYER,
       key: `custom-${player.number}-${player.name}`,

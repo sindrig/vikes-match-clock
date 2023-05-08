@@ -77,6 +77,9 @@ class Asset extends Component {
           key={asset.key}
           overlay={asset.overlay}
         >
+          {asset.background ? (
+            <img src={asset.background} alt={asset.background} />
+          ) : null}
           <img src={asset.key} alt={asset.key} />
         </PlayerCard>
       );
@@ -92,6 +95,9 @@ class Asset extends Component {
           key={asset.key}
           overlay={asset.overlay}
         >
+          {asset.background ? (
+            <img src={asset.background} alt={asset.background} />
+          ) : null}
           {clubLogos[teamName] ? (
             <img src={clubLogos[teamName]} alt="teamName" />
           ) : null}

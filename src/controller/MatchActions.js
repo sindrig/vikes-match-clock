@@ -92,15 +92,17 @@ const MatchActions = ({
         getPlayerAssetObject({
           player,
           teamName: "víkingurr",
-          overlay: {
-            text: "",
-            blink: true,
-            effect: "blink",
-          },
+          // MAAAARK blink
+          // overlay: {
+          //   text: "",
+          //   blink: true,
+          //   effect: "blink",
+          // },
           preferExt: "fagn",
+          preferType: "gif",
         }).then((asset) => {
           renderAsset({
-            asset,
+            asset: { ...asset, background: baddi },
           });
           setShowScorerSelector(null);
         });
