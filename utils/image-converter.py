@@ -29,26 +29,49 @@ class Type_(StrEnum):
 
 link_prefix = '/mot/leikmadur/?leikmadur='
 
+
+def result_sorter(name: str):
+    def inner(result):
+        return result.text.startswith(name) + ('Víkingur' in result.text)
+
+    return inner
+
+
 @functools.cache
 def find_player(name: str) -> int:
     r = requests.get(
-        'https://www.ksi.is/leit/', params={'searchstring': name}
+        'https://www.ksi.is/leit/',
+        params={'searchstring': name, 'contentcategories': 'Leikmenn'},
     )
     r.raise_for_status()
     soup = bs4.BeautifulSoup(r.text, 'html.parser')
-    for result in soup.findAll('div', {'class': 'result-box'}):
+    sorted_results = list(
+        reversed(
+            sorted(
+                soup.findAll('div', {'class': 'result-box'}),
+                key=result_sorter(name),
+            )
+        )
+    )
+    for result in sorted_results:
         href = result.find('a')['href']
         if link_prefix in href:
             _, pid = href.split(link_prefix)
+            print('Matched', result.text, 'with', name, 'and pid', pid)
             return int(pid)
     raise ValueError(name)
 
-def image_handler(f: typing.Callable[[pathlib.Path, pathlib.Path], None]) -> typing.Callable[[pathlib.Path, pathlib.Path], None]:
+
+def image_handler(
+    f: typing.Callable[[pathlib.Path, pathlib.Path], None]
+) -> typing.Callable[[pathlib.Path, pathlib.Path], None]:
     def inner(in_fldr: pathlib.Path, out_fldr: pathlib.Path):
         files = glob.glob(str(in_fldr / '*.png'))
         for fn in files:
             f(pathlib.Path(fn), out_fldr)
+
     return inner
+
 
 @image_handler
 def convert_pids(fn: pathlib.Path, out_fldr: pathlib.Path):
@@ -73,12 +96,12 @@ def convert_pids(fn: pathlib.Path, out_fldr: pathlib.Path):
             return
         else:
             raise
-    match Type_[type_]:
-        case Type_.Beinn:
-            new_type_name = ''
-        case _:
-            new_type_name = f'-{type_.lower()}'
+    if Type_[type_] == Type_.Beinn:
+        new_type_name = ''
+    else:
+        new_type_name = f'-{type_.lower()}'
     shutil.copy(fn, out_fldr / f'{pid}{new_type_name}.png')
+
 
 @image_handler
 def crop(fn: pathlib.Path, out_fldr: pathlib.Path):
@@ -90,18 +113,17 @@ def crop(fn: pathlib.Path, out_fldr: pathlib.Path):
     resized = cropped.resize((240, 176))
     resized.save(out_fldr / fn.name)
 
+
 @image_handler
 def greenscreen(fn: pathlib.Path, out_fldr: pathlib.Path):
-    frame = cv2.imread(fname,cv2.COLOR_BGR2BGRA)
+    frame = cv2.imread(fname, cv2.COLOR_BGR2BGRA)
     lab = cv2.cvtColor(frame, cv2.COLOR_BGR2LAB)
 
     # extract A channel
     A = lab[:, :, 1]
 
     # threshold A channel
-    thresh = cv2.threshold(A, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[
-        1
-    ]
+    thresh = cv2.threshold(A, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
 
     # blur threshold image
     blur = cv2.GaussianBlur(

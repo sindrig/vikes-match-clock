@@ -27,8 +27,7 @@ def main():
             for fn in sorted(files, key=sort_key):
                 if include(fn):
                     relpath = os.path.relpath(
-                        os.path.join(root, fn),
-                        IMAGES_DIR
+                        os.path.join(root, fn), IMAGES_DIR
                     )
                     loc = os.path.dirname(relpath) or os.path.basename(root)
                     key = '%s/%s' % (loc, fn)
