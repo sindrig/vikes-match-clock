@@ -8,7 +8,7 @@ const compress = new Compress();
 const fileTypes = ["JPG", "PNG", "GIF"];
 
 const UploadManager = ({ prefix }) => {
-  const [doCompress, setDoCompress] = useState(true);
+  const [doCompress, setDoCompress] = useState(false);
   const [imageUrls, setImageUrls] = useState([]);
   const upload = (images) => {
     images.forEach((image) => {
