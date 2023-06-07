@@ -111,7 +111,9 @@ class PlayerCard extends Component {
         >
           {overlay.text}
         </span>
-        <span className="asset-player-number">{asset.number}</span>
+        <span className="asset-player-number">
+          {asset.number || (asset.role && asset.role[0])}
+        </span>
         <span className="asset-player-name" style={nameStyle}>
           {asset.name}
         </span>

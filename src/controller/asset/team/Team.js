@@ -104,11 +104,11 @@ class Team extends Component {
           ? team.map((p, i) => (
               // eslint-disable-next-line react/no-array-index-key
               <div className="player-whole-line" key={`${i}`}>
-                {selectPlayer && p.number && p.name ? (
+                {selectPlayer && p.name ? (
                   <Button
                     appearance="default"
                     onClick={() => selectPlayer(p, teamName)}
-                  >{`#${p.number} - ${p.name}`}</Button>
+                  >{`#${p.number || p.role[0]} - ${p.name}`}</Button>
                 ) : (
                   <TeamPlayer player={p} onChange={this.updatePlayer(i)} />
                 )}

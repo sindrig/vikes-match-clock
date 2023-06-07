@@ -8,7 +8,7 @@ export const getPlayerAssetObject = async ({
   preferExt,
   preferType,
 }) => {
-  if (!player.name || !player.number) {
+  if (!player.name) {
     return null;
   }
   const imageType = preferType || "png";
@@ -19,6 +19,7 @@ export const getPlayerAssetObject = async ({
         key: await p,
         name: player.name,
         number: player.number,
+        role: player.role,
         overlay: overlay || { text: "" },
         teamName,
       };
@@ -46,6 +47,7 @@ export const getPlayerAssetObject = async ({
       key: `custom-${player.number}-${player.name}`,
       name: player.name,
       number: player.number,
+      role: player.role,
       overlay: overlay || { text: "" },
       teamName,
     })

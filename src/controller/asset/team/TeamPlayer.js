@@ -27,7 +27,7 @@ const TeamPlayer = ({ player, onChange }) => (
     />
     <input
       type="text"
-      value={player.number || ""}
+      value={player.number || (player.role && player.role[0]) || ""}
       onChange={(e) => handler(onChange, "number", e)}
       className="team-player-number"
       placeholder="#"
