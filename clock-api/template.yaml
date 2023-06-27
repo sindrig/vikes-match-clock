@@ -1,0 +1,89 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  clock-api
+
+  All apps that help the clock run
+
+Globals:
+  Function:
+    Timeout: 45
+  Api:
+    Cors:
+      AllowMethods: "'DELETE,GET,HEAD,OPTIONS,PATCH,POST,PUT'"
+      AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+      AllowOrigin: "'*'"
+    Domain:
+      CertificateArn: arn:aws:acm:us-east-1:525422706348:certificate/627449e2-c9f7-4764-8e40-997696446424
+      DomainName: klukka-api.irdn.is
+      EndpointConfiguration: EDGE
+      Route53:
+        HostedZoneName: irdn.is.
+
+Resources:
+  MatchReportFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: match-report/
+      Handler: app.lambda_handler
+      Runtime: python3.9
+      Events:
+        MatchReport:
+          Type: Api
+          Properties:
+            Path: /match-report
+            Method: get
+      VpcConfig:
+        SecurityGroupIds:
+          - sg-03ecf18a377c6c35f
+        SubnetIds:
+          - subnet-0c45ac69865df1ecf
+          - subnet-09299f279812c8762
+          - subnet-0191832d9edda018a
+  WeatherFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: weather/
+      Handler: app.lambda_handler
+      Role: !GetAtt WeatherFunctionRole.Arn
+      Runtime: python3.9
+      Events:
+        MatchReport:
+          Type: Api
+          Properties:
+            Path: /currentWeather
+            Method: get
+
+  WeatherFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+      Policies:
+        - PolicyName: "WeatherFunctionParameterAccess"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "ssm:GetParameter*"
+                Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/vikes-match-clock/weather-api*"
+Outputs:
+  MatchReportApi:
+    Description: "API Gateway endpoint URL for Prod stage for Match Report function"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/match-report/"
+  MatchReportFunction:
+    Description: "Match Report Lambda Function ARN"
+    Value: !GetAtt MatchReportFunction.Arn
+  MatchReportFunctionIamRole:
+    Description: "Implicit IAM Role created for Match Report function"
+    Value: !GetAtt MatchReportFunctionRole.Arn

@@ -1,42 +1,48 @@
 .asset-controller .controls div {
-    float: none;
-    clear: both;
+  float: none;
+  clear: both;
 }
 
 .asset-controller > div {
-    display: inline-block;
+  display: inline-block;
+  overflow: auto;
 }
 
 .asset-controller {
-    height: calc(100vh - 110px);
-    width: 1070px;
-    overflow: scroll;
-    margin: 30px 5px 5px 5px;
-    float: left;
+  height: calc(100vh - 110px);
+  width: 100%;
+  overflow: scroll;
+  margin: 0px 5px 5px 5px;
+  float: left;
 }
 
 .asset-controller .view-selector {
-    position: absolute;
-    top: 105px;
-    left: -54px;
-    width: 54px;
+  position: relative;
+  float: left;
+}
+
+.asset-controller .assettabs {
+  clear: both;
+  width: 90%;
+  float: left;
+  margin: 10px;
 }
 
 .asset-controller .view-selector button {
-    float: right;
+  float: left;
 }
 
 .asset-controller .controls {
-    width: 130px;
-    float: left;
+  width: 130px;
+  float: left;
 }
 .asset-controller .controls select {
-    width: 130px;
+  width: 130px;
 }
 
 .asset-controller .upcoming-assets {
-    overflow: hidden;
-    width: 500px;
-    float: left;
-    margin-left: 10px;
+  position: relative;
+  width: 500px;
+  float: left;
+  margin-left: 10px;
 }

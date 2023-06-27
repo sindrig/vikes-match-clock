@@ -1,13 +1,13 @@
 .removable-asset div.asset-player-icon {
-    margin: 0;
-    height: 73px;
-    width: 100%;
+  margin: 0;
+  height: 73px;
+  width: 100%;
 }
 
 .overlay-container div.asset-player-icon {
-    margin: 0;
-    height: 100%;
-    width: 100%;
+  margin: 0;
+  height: 100%;
+  width: 100%;
 }
 
 .free-text-container {
@@ -25,90 +25,214 @@
 }
 
 div.asset-player-icon img {
-    position: absolute;
-    bottom: 0px;
-    right: 0px;
+  position: absolute;
+  bottom: 0px;
+  right: 0px;
 }
 
 .asset-player-icon span {
-    font-family: 'Anton', sans-serif;
-    position: absolute;
-    text-shadow: 2px 2px 5px black;
-    text-align: center;
-    color: white;
+  font-family: "Anton", sans-serif;
+  position: absolute;
+  text-shadow: 2px 2px 5px black;
+  text-align: center;
+  color: white;
 }
 
 span.asset-player-name {
-    font-size: 30px;
-    bottom: 5%;
-    left: 5%;
-    line-height: normal;
+  font-size: 30px;
+  bottom: 5%;
+  left: 5%;
+  line-height: normal;
 }
 
 .removable-asset span.asset-player-name {
-    top: 53px;
-    font-size: 12px;
-    left: 14px;
+  top: 53px;
+  font-size: 12px;
+  left: 14px;
 }
 
-
 span.asset-player-number {
-    font-size: 64px;
-    top: 20px;
-    left: 20px;
-    line-height: 90px;
+  font-size: 64px;
+  top: 20px;
+  left: 20px;
+  line-height: 90px;
 }
 
 .removable-asset span.asset-player-number {
-    top: 5px;
-    font-size: 33px;
-    left: 14px;
-    line-height: 50px;
+  top: 5px;
+  font-size: 33px;
+  left: 14px;
+  line-height: 50px;
 }
 
 .player-card-overlay {
-    transform: rotate(35deg);
-    top: 18%;
-    left: 18%;
-    z-index: 9999999;
-    text-shadow: 4px 4px 10px black;
-    font-size: 3rem;
+  transform: rotate(35deg);
+  top: 18%;
+  left: 18%;
+  z-index: 9999999;
+  text-shadow: 4px 4px 10px black;
+  font-size: 3rem;
 }
 
 .blink {
-    -webkit-animation: blink 2s linear infinite;
-    -moz-animation: blink 2s linear infinite;
-    -ms-animation: blink 2s linear infinite;
-    -o-animation: blink 2s linear infinite;
-     animation: blink 2s linear infinite;
+  -webkit-animation: blink 2s linear infinite;
+  -moz-animation: blink 2s linear infinite;
+  -ms-animation: blink 2s linear infinite;
+  -o-animation: blink 2s linear infinite;
+  animation: blink 2s linear infinite;
+}
+.blink::after {
+  content: "MAAAARK";
 }
 @-webkit-keyframes blink {
-    0% { opacity: 1; }
-    50% { opacity: 1; }
-    50.01% { opacity: 0; }
-    100% { opacity: 0; }
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 1;
+  }
+  50.01% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
 }
 @-moz-keyframes blink {
-    0% { opacity: 1; }
-    50% { opacity: 1; }
-    50.01% { opacity: 0; }
-    100% { opacity: 0; }
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 1;
+  }
+  50.01% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
 }
 @-ms-keyframes blink {
-    0% { opacity: 1; }
-    50% { opacity: 1; }
-    50.01% { opacity: 0; }
-    100% { opacity: 0; }
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 1;
+  }
+  50.01% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
 }
 @-o-keyframes blink {
-    0% { opacity: 1; }
-    50% { opacity: 1; }
-    50.01% { opacity: 0; }
-    100% { opacity: 0; }
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 1;
+  }
+  50.01% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
 }
 @keyframes blink {
-    0% { opacity: 1; }
-    50% { opacity: 1; }
-    50.01% { opacity: 0; }
-    100% { opacity: 0; }
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 1;
+  }
+  50.01% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
 }
+
+/* Sloppy shaker effect */
+.shaker {
+  animation-name: move_eye;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+  animation-duration: 0.6s;
+  transform: rotate(0deg);
+  left: 22%;
+  top: 30%;
+  font-size: 2.9rem;
+  -webkit-text-stroke-width: 2px;
+  -webkit-text-stroke-color: rgb(36, 36, 36);
+}
+.shaker::after {
+  content: "M A R K";
+}
+
+@-webkit-keyframes move_eye {
+  from {
+    margin-left: 12%;
+  }
+  to {
+    margin-left: 15%;
+  }
+}
+@keyframes move_eye {
+  from {
+    margin-left: 12%;
+  }
+  to {
+    margin-left: 15%;
+  }
+}
+/* Shaker ends */
+
+/* Scale in out */
+.asset-player-icon .scaleit {
+  top: 48%;
+  left: 62%;
+  z-index: 9999;
+  transform: translate(-50%, -50%);
+  font-size: 6vw;
+  color: #ffffff;
+  animation-name: slidein, wave;
+  animation-iteration-count: 1, infinite;
+  animation-timing-function: ease-in-out;
+  animation-duration: 1.5s, 2s;
+  animation-delay: 0.8s - (1 / 4);
+  -webkit-text-stroke-width: 3px;
+  -webkit-text-stroke-color: black;
+}
+
+.scaleit:after {
+  content: "MARK";
+}
+
+@keyframes wave {
+  40%,
+  50% {
+    transform: translate(-50%, -65%) scale(1.05);
+  }
+
+  0%,
+  90%,
+  100% {
+    transform: translate(-50%, -45%) scale(0.95);
+  }
+}
+
+@keyframes slidein {
+  from {
+    margin-left: 70%;
+    width: 300%;
+  }
+
+  to {
+    margin-left: 0%;
+    width: 100%;
+  }
+}
+/* Scale in out ends */

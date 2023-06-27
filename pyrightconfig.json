@@ -1,0 +1,9 @@
+{
+    "venvPath": ".",
+    "venv": ".venv",
+    "reportUnusedVariable": "error",
+    "reportUnusedImport": "error",
+    "reportUnusedClass": "error",
+    "reportUnusedFunction": "error",
+    "include": ["src/", "lib/"]
+}

@@ -1,288 +1,309 @@
 .team.home span.score {
-    left: 4%;
+  left: 4%;
 }
 
-.team.home img {
-    left: 6%;
+.team.home .img-wrapper {
+  left: 4%;
 }
 
 .team.away span.score {
-    right: 4%;
+  right: 4%;
 }
 
-.team.away img{
-    right: 6%;
+.team.away .img-wrapper {
+  right: 4%;
 }
 
 .team {
-    margin: 0 auto;
+  margin: 0 auto;
 }
 
 .team-name {
-    display: none;
+  /*display: none;*/
+  font-style: oblique;
 }
 
 .team-timeouts {
-    display: none;
-    position: absolute;
+  display: none;
+  position: absolute;
 }
 
 .team-timeout {
-    color: red;
-    line-height: .8rem
+  color: red;
+  line-height: 0.8rem;
 }
 
 .team span.score {
-    position:absolute;
-    background-color: black;
-    font-family: 'Anton', sans-serif;
-    font-size: 2.5rem;
-    color: white;
-    top: 57%;
-    height: 34%;
-    width: 25%;
-    /*line-height:60px;*/
-    text-align: center;
-    border: 1px solid white;
+  position: absolute;
+  background-color: black;
+  font-family: "Anton", sans-serif;
+  font-size: 2.5rem;
+  color: white;
+  top: 57%;
+  height: 34%;
+  width: 25%;
+  /*line-height:60px;*/
+  text-align: center;
+  border: 1px solid white;
+}
+
+.team .img-wrapper {
+  width: 25%;
+  position: absolute;
+  top: 10%;
+  height: 43%;
 }
 
 .team img {
-    position:absolute;
-    top: 10%;
-    height: 43%;
-    max-width: 26%;
+  display: block;
+  width: 100%;
+  max-height: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  margin-bottom: 0;
+  margin-top: auto;
 }
 
 .clock {
-    position:absolute;
-    background-color: black;
-    font-family: 'Anton', sans-serif;
-    color: white;
-    line-height:140%;
-    text-align: center;
-    border: 1px solid white;
+  position: absolute;
+  background-color: black;
+  font-family: "Anton", sans-serif;
+  color: white;
+  line-height: 140%;
+  text-align: center;
+  border: 1px solid white;
 }
 
 .matchclock {
-    top: 45.5%;
-    left: 33.5%;
-    height: 23%;
-    width: 33%;
+  top: 45.5%;
+  left: 33.5%;
+  height: 23%;
+  width: 33%;
 }
 
 .scoreboard-insidebig .timeoutclock {
-    top: 81%;
-    left: calc(37.5% - 1px);
-    height: 18%;
-    width: 25%;
-    line-height: 130%;
+  top: 81%;
+  left: calc(37.5% - 1px);
+  height: 18%;
+  width: 25%;
+  line-height: 130%;
 }
 
 img.ad {
-    display: none;
+  display: none;
 }
 
 .scoreboard-outside img.ad {
-    left: calc(33.5% + 1px);
-    height: 25%;
-    width: 33%;
-    bottom: 2%;
-    position: absolute;
-    display: block;
+  left: calc(33.5% + 1px);
+  height: 25%;
+  width: 33%;
+  bottom: 2%;
+  position: absolute;
+  display: block;
 }
 
-
 .scoreboard .injury-time span {
-    top: 18%;
-    left: 45%;
-    font-size: 2rem;
-    position: absolute;
-    color: white;
-    font-family: 'Anton', sans-serif;
+  top: 18%;
+  left: 45%;
+  font-size: 2rem;
+  position: absolute;
+  color: white;
+  font-family: "Anton", sans-serif;
 }
 
 .scoreboard .penalty {
-    display: none;
+  display: none;
 }
 
 .scoreboard-insidebig .team span.score {
-    top: 37%;
-    height: 23%;
-    width: 17%;
-    font-size: 1.5rem;
+  top: 37%;
+  height: 23%;
+  width: 17%;
+  font-size: 1.5rem;
 }
 
 .scoreboard-insidebig .team img {
-    height: 23%;
-    max-width: 17%;
-    top: 2%;
+  height: 23%;
+  max-width: 17%;
+  top: 2%;
 }
 
 .scoreboard-insidebig .team.home span.score {
-    left: 8%;
+  left: 8%;
 }
 
 .scoreboard-insidebig .team.home img {
-    left: 11%;
+  left: 11%;
 }
 
 .scoreboard-insidebig .team.away span.score {
-    right: 8%;
+  right: 8%;
 }
 
-.scoreboard-insidebig .team.away img{
-    right: 11%;
+.scoreboard-insidebig .team.away img {
+  right: 11%;
 }
 
 .scoreboard-insidebig .matchclock {
-    top: 30%;
+  top: 30%;
 }
 
 .scoreboard-insidebig .timeoutclock {
-    top: 55%;
+  top: 55%;
 }
 
 .scoreboard-insidebig .team div.team-name {
-    display: block;
-    top: 25%;
-    height: 11.5%;
-    width: 26%;
-    font-size: .7rem;
-    position: absolute;
-    color: white;
-    font-family: 'Anton', sans-serif;
-    text-align: center;
-    white-space: nowrap;
-    overflow: hidden;
+  display: block;
+  top: 25%;
+  height: 11.5%;
+  width: 26%;
+  font-size: 0.7rem;
+  position: absolute;
+  color: white;
+  font-family: "Anton", sans-serif;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 .scoreboard-insidebig .team.home div.team-name {
-    left: 4%;
+  left: 4%;
 }
 
 .scoreboard-insidebig .team.away div.team-name {
-    right: 4%;
+  right: 4%;
 }
 
 .scoreboard-insidebig .penalty {
-    display: block;
-    height: 12%;
-    width: calc(50% - 2px);
-    font-size: 0.9rem;
+  display: block;
+  height: 12%;
+  width: calc(50% - 2px);
+  font-size: 0.9rem;
 
-    /*position:absolute;*/
-    background-color: black;
-    font-family: 'Anton', sans-serif;
-    color: white;
-    line-height:140%;
-    text-align: center;
-    border: 1px solid white;
+  /*position:absolute;*/
+  background-color: black;
+  font-family: "Anton", sans-serif;
+  color: white;
+  line-height: 140%;
+  text-align: center;
+  border: 1px solid white;
 }
 
 .scoreboard-insidebig .penalties {
-    display: block;
-    position: absolute;
-    width: 34%;
-    top: 65%;
+  display: block;
+  position: absolute;
+  width: 34%;
+  top: 65%;
 }
 
 .scoreboard-insidebig .team.home .penalties {
-    left: 8%;
+  left: 8%;
 }
 
 .scoreboard-insidebig .team.home .penalties .penalty {
-    float: left;
+  float: left;
 }
 
 .scoreboard-insidebig .team.away .penalties {
-    right: 8%;
+  right: 8%;
 }
 
 .scoreboard-insidebig .team.away .penalties .penalty {
-    float: right;
+  float: right;
 }
 
 .scoreboard-insidebig .team-timeouts {
-    display: block;
-    top: 37%;
+  display: block;
+  top: 37%;
 }
 
 .scoreboard-insidebig .team-timeouts-home {
-    left: 3%;
+  left: 3%;
 }
 
 .scoreboard-insidebig .team-timeouts-away {
-    right: 3%;
+  right: 3%;
 }
 
-.penalty-manipulation button.remove-penalty {
-    display: block;
-    float: left;
+.penalty-manipulation div.manipulate-penalty {
+  display: block;
+  float: left;
+}
+
+.penalty-manipulation div#penalty-manipulation-box {
+  display: block;
+  position: absolute;
+  width: 400px;
+  height: 100px;
+  background-color: white;
+}
+
+.penalty-manipulation div#penalty-manipulation-box span {
+  font-weight: bold;
+  display: block;
+  margin-bottom: 20px;
 }
 
 .penalty-manipulation button.add-penalty {
-    clear: both;
-    float: left;
-    width: 100%;
+  clear: both;
+  float: left;
+  width: 100%;
 }
 
 .scoreboard-insidesmall .team span.score {
-    font-size: 2rem;
-    top: 35%;
-    height: 23%;
-    width: 40%;
-    line-height: 125%;
+  font-size: 2rem;
+  top: 35%;
+  height: 23%;
+  width: 40%;
+  line-height: 125%;
 }
 
 .scoreboard-insidesmall .team img {
-    top: 5%;
-    height: 30%;
-    max-width: 40%;
+  top: 5%;
+  height: 30%;
+  max-width: 40%;
 }
 
 .scoreboard-insidesmall .team.home img {
-    left: 13%;
+  left: 13%;
 }
 
 .scoreboard-insidesmall .team.away img {
-    right: 13%;
+  right: 13%;
 }
 
 .scoreboard-insidesmall .matchclock {
-    top: 73%;
-    left: 15%;
-    height: 20%;
-    width: 70%;
-    line-height: 125%;
+  top: 73%;
+  left: 15%;
+  height: 20%;
+  width: 70%;
+  line-height: 125%;
 }
-
 
 .scoreboard-insidesmall .timeoutclock {
-    top: 61%;
-    left: calc(35% - 1px);
-    height: 9%;
-    width: 30%;
-    line-height: 120%;
-    font-size: 0.9rem !important;
+  top: 61%;
+  left: calc(35% - 1px);
+  height: 9%;
+  width: 30%;
+  line-height: 120%;
+  font-size: 0.9rem !important;
 }
 
-
-
 .scoreboard-insidesmall .team-timeouts {
-    display: block;
-    top: 62%;
+  display: block;
+  top: 62%;
 }
 
 .scoreboard-insidesmall .team-timeout {
-    display: inline-block;
-    float: left;
-    margin: 0 .3rem .3rem 0;
+  display: inline-block;
+  float: left;
+  margin: 0 0.3rem 0.3rem 0;
 }
 
 .scoreboard-insidesmall .team-timeouts-home {
-    left: 3%;
+  left: 3%;
 }
 
 .scoreboard-insidesmall .team-timeouts-away {
-    right: 3%;
+  right: 3%;
 }

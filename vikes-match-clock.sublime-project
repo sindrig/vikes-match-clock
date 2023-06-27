@@ -1,0 +1,12 @@
+{
+	"folders":
+	[
+		{
+			"path": ".",
+			"folder_exclude_patterns": [".direnv", "node_modules"]
+		}
+	],
+    "settings": {
+        "sublack.black_on_save": true
+    }
+}

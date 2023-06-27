@@ -1,0 +1,10 @@
+.asset-image {
+  padding: 10px;
+  display: inline-block;
+  float: left;
+  clear: none !important;
+}
+
+.image-list {
+  max-width: 800px;
+}
