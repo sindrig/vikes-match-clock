@@ -1,6 +1,7 @@
 import React, { Component } from "react";
 import PropTypes from "prop-types";
 import assetTypes from "./AssetTypes";
+import Button from "rsuite/Button";
 
 export default class FreeTextController extends Component {
   static propTypes = {
@@ -44,9 +45,9 @@ export default class FreeTextController extends Component {
           value={value}
           style={{ width: "95px" }}
         />
-        <button type="button" onClick={this.addTextAsset}>
+        <Button appearance="default" type="button" onClick={this.addTextAsset}>
           Bæta við
-        </button>
+        </Button>
         <span>{error}</span>
       </div>
     );

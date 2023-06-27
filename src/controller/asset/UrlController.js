@@ -1,6 +1,7 @@
 import React, { Component } from "react";
 import PropTypes from "prop-types";
 import assetTypes from "./AssetTypes";
+import Button from "rsuite/Button";
 
 export default class UrlController extends Component {
   static propTypes = {
@@ -53,9 +54,9 @@ export default class UrlController extends Component {
           value={value}
           style={{ width: "95px" }}
         />
-        <button type="button" onClick={this.addUrlAsset}>
+        <Button appearance="default" type="button" onClick={this.addUrlAsset}>
           Bæta við
-        </button>
+        </Button>
         <span>{error}</span>
       </div>
     );

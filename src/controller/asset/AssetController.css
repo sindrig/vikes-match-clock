@@ -32,6 +32,11 @@
   float: left;
 }
 
+.asset-controller .controls button {
+  background-color: gray;
+  color: black;
+}
+
 .asset-controller .controls {
   width: 130px;
   float: left;
