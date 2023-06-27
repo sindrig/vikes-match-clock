@@ -32,7 +32,7 @@
   float: left;
 }
 
-.asset-controller .controls button {
+.asset-controller .controls .rs-btn-default {
   background-color: gray;
   color: black;
 }
