@@ -172,11 +172,22 @@ class Asset extends Component {
     return null;
   }
 
+  renderFreeText() {
+    const { asset, thumbnail } = this.props;
+
+    return (
+      <div className={`free-text-container ${thumbnail ? "thumbnail" : ""}`}>
+        {asset.key}
+      </div>
+    );
+  }
+
   render() {
     const { asset, thumbnail } = this.props;
     if (!asset) {
       return null;
     }
+
     if (asset.type === assetTypes.IMAGE) {
       return (
         <img
@@ -215,6 +226,9 @@ class Asset extends Component {
           )}
         </Substitution>
       );
+    }
+    if (asset.type === assetTypes.FREE_TEXT) {
+      return this.renderFreeText();
     }
     console.error("No type for item ", asset);
     return null;

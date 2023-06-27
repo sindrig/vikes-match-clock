@@ -3,6 +3,7 @@ import { bindActionCreators } from "redux";
 import { connect } from "react-redux";
 import PropTypes from "prop-types";
 
+import FreeTextController from "./FreeTextController";
 import AssetQueue from "./AssetQueue";
 import { addVideosFromPlaylist } from "./YoutubePlaylist";
 import { ASSET_VIEWS } from "../../reducers/controller";
@@ -134,7 +135,8 @@ const AssetController = ({
               Loop
             </Checkbox>
           </div>
-          <UrlController addAsset={addAssetKey} />
+          <UrlController addAsset={addAssetKey} />{" "}
+          <FreeTextController addAsset={addAssetKey} />
           <Button appearance="default" onClick={playRuv("ruv")}>
             RÚV
           </Button>
