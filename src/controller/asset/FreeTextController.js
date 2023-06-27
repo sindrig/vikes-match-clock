@@ -9,7 +9,7 @@ export default class FreeTextController extends Component {
 
   constructor(props) {
     super(props);
-    this.addUrlAsset = this.addUrlAsset.bind(this);
+    this.addTextAsset = this.addTextAsset.bind(this);
     this.onTextChange = this.onTextChange.bind(this);
   }
 
@@ -25,7 +25,7 @@ export default class FreeTextController extends Component {
     this.setState({ value });
   }
 
-  addUrlAsset() {
+  addTextAsset() {
     const { addAsset } = this.props;
     const { value } = this.state;
     const asset = { type: assetTypes.FREE_TEXT, key: value };
@@ -44,7 +44,7 @@ export default class FreeTextController extends Component {
           value={value}
           style={{ width: "95px" }}
         />
-        <button type="button" onClick={this.addUrlAsset}>
+        <button type="button" onClick={this.addTextAsset}>
           Bæta við
         </button>
         <span>{error}</span>

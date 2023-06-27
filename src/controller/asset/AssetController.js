@@ -136,7 +136,7 @@ const AssetController = ({
             </Checkbox>
           </div>
           <UrlController addAsset={addAssetKey} />{" "}
-          <FreeTextController addAsset={this.addAssetKey} />
+          <FreeTextController addAsset={addAssetKey} />
           <Button appearance="default" onClick={playRuv("ruv")}>
             RÚV
           </Button>
