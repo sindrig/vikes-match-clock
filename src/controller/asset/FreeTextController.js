@@ -1,8 +1,8 @@
-import React, { Component } from 'react';
-import PropTypes from 'prop-types';
-import assetTypes from './AssetTypes';
+import React, { Component } from "react";
+import PropTypes from "prop-types";
+import assetTypes from "./AssetTypes";
 
-export default class UrlController extends Component {
+export default class FreeTextController extends Component {
     static propTypes = {
         addAsset: PropTypes.func.isRequired,
     };
@@ -14,12 +14,14 @@ export default class UrlController extends Component {
     }
 
     state = {
-        value: '',
-        error: '',
+        value: "",
+        error: "",
     };
 
     onTextChange(e) {
-        const { target: { value } } = e;
+        const {
+            target: { value },
+        } = e;
         this.setState({ value });
     }
 
@@ -27,7 +29,7 @@ export default class UrlController extends Component {
         const { addAsset } = this.props;
         const { value } = this.state;
         const asset = { type: assetTypes.FREE_TEXT, key: value };
-        this.setState({ value: '', error: '' });
+        this.setState({ value: "", error: "" });
         return addAsset(asset);
     }
 
@@ -35,15 +37,16 @@ export default class UrlController extends Component {
         const { value, error } = this.state;
         return (
             <div>
-                Frjáls texti:
-                {' '}
+                Frjáls texti:{" "}
                 <input
                     type="text"
                     onChange={this.onTextChange}
                     value={value}
-                    style={{ width: '95px' }}
+                    style={{ width: "95px" }}
                 />
-                <button type="button" onClick={this.addUrlAsset}>Bæta við</button>
+                <button type="button" onClick={this.addUrlAsset}>
+                    Bæta við
+                </button>
                 <span>{error}</span>
             </div>
         );
