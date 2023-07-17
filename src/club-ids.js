@@ -1,4 +1,5 @@
 export default {
+  riga: "142300",
   levadiatallinn: "141601",
   antígvaogbarbúda: "146372",
   berserkirmídas: "149073",
