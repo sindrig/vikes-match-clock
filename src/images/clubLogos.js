@@ -381,6 +381,7 @@ import { default as tns_badgelarge01 } from "./club-logos/TNS_Badgelarge-01.png"
 import { default as afturelding } from "./club-logos/Afturelding.png";
 import { default as augnablik } from "./club-logos/Augnablik.png";
 import { default as lechpoznan } from "./club-logos/Lech-Poznan.png";
+import { default as riga } from "./club-logos/Riga.png";
 
 export default {
   afganistan,
@@ -641,6 +642,7 @@ export default {
   rb,
   reynirh,
   reynirs,
+  riga,
   rkv,
   réunion,
   rúanda,
