@@ -25,6 +25,7 @@ import AssetController from "./asset/AssetController";
 import { viewPortPropType } from "../propTypes";
 import "rsuite/dist/rsuite.min.css";
 import "./Controller.css";
+import AssetQueue from "./asset/AssetQueue";
 
 // eslint-disable-next-line
 const confirmRefresh = () => confirm("Are you absolutely sure?");
@@ -142,7 +143,7 @@ const Controller = ({
           <LoginPage />
         </div>
       )}
-      {showControls && <AssetController />}
+      {(showControls && <AssetController />) || <AssetQueue />}
     </div>
   );
 };

@@ -10,7 +10,12 @@ import RemoveAssetDropzone from "./RemoveAssetDropzone";
 import { assetPropType } from "../../propTypes";
 import controllerActions from "../../actions/controller";
 
-const AssetQueue = ({ removeAsset, selectedAssets, setSelectedAssets }) => {
+const AssetQueue = ({
+  removeAsset,
+  selectedAssets,
+  setSelectedAssets,
+  includeRemove,
+}) => {
   const moveAsset = useCallback(
     (dragIndex, hoverIndex) => {
       const newAssets = update(selectedAssets, {
@@ -49,9 +54,11 @@ const AssetQueue = ({ removeAsset, selectedAssets, setSelectedAssets }) => {
           renderRemovableAsset(asset, i)
         )}
       </div>
-      <div className="remove-asset-dropzone">
-        <RemoveAssetDropzone />
-      </div>
+      {includeRemove && (
+        <div className="remove-asset-dropzone">
+          <RemoveAssetDropzone />
+        </div>
+      )}
     </div>
   );
 };
@@ -60,6 +67,7 @@ AssetQueue.propTypes = {
   selectedAssets: PropTypes.arrayOf(assetPropType).isRequired,
   setSelectedAssets: PropTypes.func.isRequired,
   removeAsset: PropTypes.func.isRequired,
+  includeRemove: PropTypes.bool,
 };
 
 const stateToProps = ({ controller: { selectedAssets } }) => ({

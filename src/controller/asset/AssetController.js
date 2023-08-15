@@ -145,7 +145,7 @@ const AssetController = ({
           </Button>
         </div>
         <div className="upcoming-assets">
-          <AssetQueue />
+          <AssetQueue includeRemove />
         </div>
       </div>
     );
