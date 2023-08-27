@@ -1,4 +1,5 @@
 const ONE_MINUTE = 60000;
+const COUNTDOWN_SECOND = 1125;
 
 context("Basic navigation", () => {
   beforeEach(() => {
@@ -87,14 +88,14 @@ context("Basic navigation", () => {
     cy.contains("Heim").click();
     cy.contains("Hefja niðurtalningu").click();
     cy.get(".countdown img").should("exist");
-    cy.tick(5000);
+    cy.tick(4 * COUNTDOWN_SECOND);
     for (let i = 10; i > 0; i--) {
       cy.get(".countdown").should("have.text", i);
-      cy.tick(1000);
+      cy.tick(COUNTDOWN_SECOND);
     }
     cy.get(".countdown").should("not.exist");
     cy.get(".matchclock").should("have.text", "00:00");
-    cy.tick(1000);
+    cy.tick(COUNTDOWN_SECOND);
     cy.get(".matchclock").should("have.text", "00:01");
   });
 });
