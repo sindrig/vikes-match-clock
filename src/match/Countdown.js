@@ -28,7 +28,8 @@ class Clock extends Component {
     const { startMatch, started, timeElapsed } = this.props;
     let milliSecondsElapsed = timeElapsed;
     milliSecondsElapsed += Date.now() - started;
-    const secondsElapsed = -Math.floor(milliSecondsElapsed / 1000);
+    // Don't be alarmed - we want it slower
+    const secondsElapsed = -Math.floor(milliSecondsElapsed / 1125);
     const minutesElapsed = Math.floor(secondsElapsed / 60);
     if (minutesElapsed > 0 || secondsElapsed > 10) {
       return <img src={bestacountdown} alt="Vikes" />;
@@ -64,7 +65,7 @@ const dispatchToProps = (dispatch) =>
       startMatch: matchActions.startMatch,
       buzz: matchActions.buzz,
     },
-    dispatch
+    dispatch,
   );
 
 export default connect(stateToProps, dispatchToProps)(Clock);
