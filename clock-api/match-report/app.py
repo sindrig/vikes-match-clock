@@ -1,5 +1,6 @@
 import datetime
 import json
+import traceback
 import typing
 import urllib.request
 from collections import defaultdict, namedtuple
@@ -167,17 +168,20 @@ def main(query, context):
         'matches': {},
     }
     for match in matches:
-        players = ksi_client.get_players(match.match_id)
-        if players and 'error' not in players:
-            if str(home_team) not in players:
-                players[str(home_team)] = []
-            if str(away_team) not in players:
-                players[str(away_team)] = []
-            result['matches'][match.match_id] = {
-                'players': players,
-                'group': match.group,
-                'sex': match.sex,
-            }
+        try:
+            players = ksi_client.get_players(match.match_id)
+            if players and 'error' not in players:
+                if str(home_team) not in players:
+                    players[str(home_team)] = []
+                if str(away_team) not in players:
+                    players[str(away_team)] = []
+                result['matches'][match.match_id] = {
+                    'players': players,
+                    'group': match.group,
+                    'sex': match.sex,
+                }
+        except Exception as e:
+            traceback.print_exc()
     if not result['matches']:
         return no_match_found(home_team, away_team)
     return result
