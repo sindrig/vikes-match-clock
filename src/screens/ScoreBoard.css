@@ -151,6 +151,9 @@ img.ad {
 .scoreboard-insidebig .timeoutclock {
   top: 55%;
 }
+.scoreboard-insidesmall .team div.team-name {
+  display: none;
+}
 
 .scoreboard-insidebig .team div.team-name {
   display: block;
