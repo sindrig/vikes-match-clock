@@ -21,6 +21,7 @@ class Type_(StrEnum):
     Fagn = 'Fagn'
     Kross = 'Kross'
     beinn = 'Beinn'
+    bein = 'Beinn'
     hægri = 'Hægri'
     vinstri = 'Vinstri'
     fagn = 'Fagn'
