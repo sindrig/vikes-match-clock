@@ -7,7 +7,7 @@ data "aws_acm_certificate" "irdn" {
 
 module "webpage" {
   source  = "cloudposse/cloudfront-s3-cdn/aws"
-  version = "0.59.0"
+  version = "0.92.0"
 
   namespace         = "vikes"
   stage             = "prod"

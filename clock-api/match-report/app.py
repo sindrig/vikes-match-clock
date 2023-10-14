@@ -1,6 +1,5 @@
 import datetime
 import json
-import traceback
 import typing
 import urllib.request
 from collections import defaultdict, namedtuple
@@ -149,6 +148,13 @@ def main(query, context):
     try:
         home_team = int(query['homeTeam'])
         away_team = int(query['awayTeam'])
+    except KeyError:
+        return {
+            'error': {
+                'key': 'BAD_INPUT',
+                'text': 'homeTeam or awayTeam missing: {query}',
+            }
+        }
     except ValueError:
         return {
             'error': {
@@ -180,8 +186,8 @@ def main(query, context):
                     'group': match.group,
                     'sex': match.sex,
                 }
-        except Exception as e:
-            traceback.print_exc()
+        except:
+            pass
     if not result['matches']:
         return no_match_found(home_team, away_team)
     return result

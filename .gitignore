@@ -69,3 +69,4 @@ npm-debug.log*
 /vikes-match-clock.sublime-workspace
 /cypress/videos/
 /.venv
+/infra/builds/

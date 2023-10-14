@@ -1,3 +1,3 @@
 export default {
-  gateWayUrl: "https://klukka-api.irdn.is/",
+  gateWayUrl: "https://clock-api.irdn.is/",
 };
