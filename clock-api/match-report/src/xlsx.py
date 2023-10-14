@@ -22,7 +22,9 @@ def match_to_xlsx(match_id):
     worksheet = workbook.add_worksheet()
     for i, (club_id, players) in enumerate(match.items()):
         worksheet.write(0, i * 4, club_id)
-        for j, player in enumerate(players):
+        for j, player in enumerate(
+            sorted(players, key=lambda p: not p['show'])
+        ):
             fmt = bold if player['show'] else None
             worksheet.write(j + 1, i * 4 + 0, player['number'], fmt)
             worksheet.write(j + 1, i * 4 + 1, player['name'], fmt)
