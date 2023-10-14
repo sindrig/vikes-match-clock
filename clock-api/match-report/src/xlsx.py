@@ -17,11 +17,15 @@ def match_to_xlsx(match_id):
         traceback.print_exc()
         raise ApiError("Match not found")
     workbook = xlsxwriter.Workbook(excel_io)
+    bold = workbook.add_format({'bold': True})
+
     worksheet = workbook.add_worksheet()
     for i, (club_id, players) in enumerate(match.items()):
-        worksheet.write(i, i * 4, club_id)
+        worksheet.write(0, i * 4, club_id)
         for j, player in enumerate(players):
-            worksheet.write(i, i * 4 + j + 1, player['number'])
-            worksheet.write(i, i * 4 + j + 1, player['name'])
+            fmt = bold if player['show'] else None
+            worksheet.write(j + 1, i * 4 + 0, player['number'], fmt)
+            worksheet.write(j + 1, i * 4 + 1, player['name'], fmt)
+            worksheet.write(j + 1, i * 4 + 2, player['role'], fmt)
     workbook.close()
     return excel_io.getvalue()

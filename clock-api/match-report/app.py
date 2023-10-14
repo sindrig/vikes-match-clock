@@ -3,8 +3,8 @@ import datetime
 import json
 import urllib.request
 
-from .client import ksi_client
-from .xlsx import ApiError, match_to_xlsx
+from src.client import ksi_client
+from src.xlsx import ApiError, match_to_xlsx
 
 VIKES = '103'
 
