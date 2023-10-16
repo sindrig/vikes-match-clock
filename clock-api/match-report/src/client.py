@@ -4,6 +4,8 @@ from collections import defaultdict, namedtuple
 
 from suds.client import Client
 
+from .models import ErrorDict, Player
+
 WSDL_URL = 'http://www2.ksi.is/vefthjonustur/mot.asmx?WSDL'
 
 STARTER_ROLES = [
@@ -40,7 +42,7 @@ class KsiClient:
     def __init__(self):
         self.client = Client(WSDL_URL, timeout=10)
 
-    def get_player(self, player):
+    def get_player(self, player) -> Player:
         if player.TreyjuNumer:
             number = int(player.TreyjuNumer)
         else:
@@ -93,9 +95,7 @@ class KsiClient:
                 )
         return matches
 
-    def get_players(
-        self, match_id
-    ) -> dict[str, list] | dict[str, dict[str, str]]:
+    def get_players(self, match_id) -> dict[str, list[Player]] | ErrorDict:
         game = self.client.service.LeikurLeikmenn(LeikurNumer=match_id)
         result = defaultdict(list)
         captains = {}

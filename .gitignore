@@ -70,3 +70,4 @@ npm-debug.log*
 /cypress/videos/
 /.venv
 /infra/builds/
+/**/__pycache__/
