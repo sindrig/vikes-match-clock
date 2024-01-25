@@ -73,7 +73,10 @@ const MatchActions = ({
   const [goalScorer, setGoalScorer] = useState(0);
   const goal = (awayOrHome) => {
     addGoal({ team: awayOrHome });
-    if (match[`${awayOrHome}Team`] === "víkingurr") {
+    if (
+      match.matchType === SPORTS.football &&
+      match[`${awayOrHome}Team`] === "víkingurr"
+    ) {
       renderAsset({
         asset: {
           key: baddi,
