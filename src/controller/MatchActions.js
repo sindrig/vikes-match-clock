@@ -356,7 +356,7 @@ const dispatchToProps = (dispatch) =>
       countdown: matchActions.countdown,
       renderAsset: controllerActions.renderAsset,
     },
-    dispatch,
+    dispatch
   );
 
 export default connect(stateToProps, dispatchToProps)(MatchActions);
