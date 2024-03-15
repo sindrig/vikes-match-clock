@@ -184,15 +184,28 @@ const MatchActions = ({
                 <PauseIcon /> Pása
               </Button>
             ) : (
-              <Button
-                color="green"
-                appearance="primary"
-                placement="left"
-                onClick={startMatch}
-                disabled={!!match.timeout}
-              >
-                <PlayIcon /> Byrja
-              </Button>
+              <React.Fragment>
+                <Button
+                  color="green"
+                  appearance="primary"
+                  placement="left"
+                  onClick={startMatch}
+                  disabled={!!match.timeout}
+                >
+                  <PlayIcon /> Byrja
+                </Button>
+                {match.showInjuryTime ? (
+                  <Button
+                    color="blue"
+                    appearance="primary"
+                    placement="left"
+                    onClick={() => pauseMatch({ isHalfEnd: true })}
+                    disabled={!!match.timeout}
+                  >
+                    <PlayIcon /> Næsti hálfleikur
+                  </Button>
+                ) : null}
+              </React.Fragment>
             )}
             <IconButton
               size="xs"
@@ -343,7 +356,7 @@ const dispatchToProps = (dispatch) =>
       countdown: matchActions.countdown,
       renderAsset: controllerActions.renderAsset,
     },
-    dispatch
+    dispatch,
   );
 
 export default connect(stateToProps, dispatchToProps)(MatchActions);

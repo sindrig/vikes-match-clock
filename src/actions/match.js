@@ -25,7 +25,10 @@ const actions = {
     isHalfEnd: options && options.isHalfEnd,
   }),
   [ActionTypes.startMatch]: () => {},
-  [ActionTypes.setHalfStops]: (halfStops) => ({ halfStops }),
+  [ActionTypes.setHalfStops]: (halfStops, showInjuryTime) => ({
+    halfStops,
+    showInjuryTime,
+  }),
   [ActionTypes.updateHalfLength]: (currentValue, newValue) => ({
     currentValue,
     newValue,
@@ -43,7 +46,7 @@ actions.buzz = () => (dispatch) => {
   dispatch({ type: ActionTypes.buzz, payload: { on: true } });
   setTimeout(
     () => dispatch({ type: ActionTypes.buzz, payload: { on: false } }),
-    3000
+    3000,
   );
   return true;
 };

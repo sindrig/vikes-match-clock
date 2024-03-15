@@ -101,10 +101,10 @@ const actions = {
       return {
         ...state,
         home2min: state.home2min.map((t) =>
-          t.key === key ? { ...t, penaltyLength: t.penaltyLength + toAdd } : t
+          t.key === key ? { ...t, penaltyLength: t.penaltyLength + toAdd } : t,
         ),
         away2min: state.away2min.map((t) =>
-          t.key === key ? { ...t, penaltyLength: t.penaltyLength + toAdd } : t
+          t.key === key ? { ...t, penaltyLength: t.penaltyLength + toAdd } : t,
         ),
       };
     },
@@ -160,7 +160,7 @@ const actions = {
       return {
         ...state,
         halfStops: state.halfStops.map((v) =>
-          v === currentValueParsed ? newValueParsed : v
+          v === currentValueParsed ? newValueParsed : v,
         ),
       };
     },
@@ -173,10 +173,11 @@ const actions = {
       if (!payload) {
         return { ...state, pending: true };
       }
-      const { halfStops } = payload;
+      const { halfStops, showInjuryTime } = payload;
       return {
         ...state,
         halfStops,
+        showInjuryTime,
       };
     },
   },
@@ -208,6 +209,7 @@ const actions = {
       };
     },
   },
+
   [ActionTypes.buzz]: {
     next(state, { payload, error }) {
       if (error) {

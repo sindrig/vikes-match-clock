@@ -19,6 +19,7 @@ class Clock extends Component {
     // eslint-disable-next-line
     matchType: PropTypes.oneOf(Object.keys(SPORTS)).isRequired,
     halfStop: PropTypes.number.isRequired,
+    showInjuryTime: PropTypes.bool.isRequired,
   };
 
   static defaultProps = {
@@ -31,16 +32,19 @@ class Clock extends Component {
   }
 
   updateTime() {
-    const { started, halfStop, timeElapsed, pauseMatch, buzz } = this.props;
+    const { started, halfStop, timeElapsed, pauseMatch, buzz, showInjuryTime } =
+      this.props;
     let milliSecondsElapsed = timeElapsed;
     if (started) {
       milliSecondsElapsed += Date.now() - started;
     }
     const secondsElapsed = Math.floor(milliSecondsElapsed / 1000);
     const minutesElapsed = Math.floor(secondsElapsed / 60);
-    let minutes = Math.min(minutesElapsed, halfStop);
+    let minutes = showInjuryTime
+      ? minutesElapsed
+      : Math.min(minutesElapsed, halfStop);
     let seconds;
-    if (minutes >= halfStop && started) {
+    if (!showInjuryTime && minutes >= halfStop && started) {
       seconds = 0;
       pauseMatch({ isHalfEnd: true });
       buzz();
@@ -72,11 +76,12 @@ class Clock extends Component {
 }
 
 const stateToProps = ({
-  match: { started, halfStops, timeElapsed, matchType },
+  match: { started, halfStops, timeElapsed, matchType, showInjuryTime },
 }) => ({
   started,
   timeElapsed,
   matchType,
+  showInjuryTime,
   halfStop: halfStops[0],
 });
 
@@ -86,7 +91,7 @@ const dispatchToProps = (dispatch) =>
       pauseMatch: matchActions.pauseMatch,
       buzz: matchActions.buzz,
     },
-    dispatch
+    dispatch,
   );
 
 export default connect(stateToProps, dispatchToProps)(Clock);

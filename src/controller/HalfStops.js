@@ -8,6 +8,7 @@ import { SPORTS, HALFSTOPS } from "../constants";
 
 const HalfStops = ({
   halfStops,
+  showInjuryTime,
   updateHalfLength,
   matchType,
   setHalfStops,
@@ -19,7 +20,7 @@ const HalfStops = ({
         Klukkustopp:
         <select
           onChange={({ target: { value } }) =>
-            value && setHalfStops(autoHalfStops[value])
+            value && setHalfStops(autoHalfStops[value], showInjuryTime)
           }
           value=""
         >
@@ -42,6 +43,17 @@ const HalfStops = ({
           />
         ))}
       </div>
+      <label>
+        Sýna uppbótartíma{" "}
+        <input
+          type="checkbox"
+          value="showInjuryTime"
+          checked={showInjuryTime || false}
+          onChange={() => {
+            setHalfStops(halfStops, !showInjuryTime);
+          }}
+        />
+      </label>
     </React.Fragment>
   );
 };
@@ -49,13 +61,15 @@ const HalfStops = ({
 HalfStops.propTypes = {
   updateHalfLength: PropTypes.func.isRequired,
   setHalfStops: PropTypes.func.isRequired,
+  showInjuryTime: PropTypes.bool.isRequired,
   halfStops: PropTypes.arrayOf(PropTypes.number).isRequired,
   matchType: PropTypes.oneOf(Object.keys(SPORTS)).isRequired,
 };
 
-const stateToProps = ({ match: { halfStops, matchType } }) => ({
+const stateToProps = ({ match: { halfStops, matchType, showInjuryTime } }) => ({
   halfStops,
   matchType,
+  showInjuryTime,
 });
 const dispatchToProps = (dispatch) =>
   bindActionCreators(
@@ -63,7 +77,7 @@ const dispatchToProps = (dispatch) =>
       updateHalfLength: matchActions.updateHalfLength,
       setHalfStops: matchActions.setHalfStops,
     },
-    dispatch
+    dispatch,
   );
 
 export default connect(stateToProps, dispatchToProps)(HalfStops);
