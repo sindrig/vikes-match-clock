@@ -177,7 +177,7 @@ const actions = {
       return {
         ...state,
         halfStops,
-        showInjuryTime,
+        showInjuryTime: showInjuryTime || false,
       };
     },
   },
