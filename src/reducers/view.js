@@ -39,8 +39,20 @@ const defaultBackground = "Vikes 2024";
 export const BACKGROUNDS = {
   [defaultBackground]: {
     backgroundImage:
-      // "repeating-linear-gradient(90deg,rgba(199,0,15),rgba(199,0,15) 30px,#2D1201 30px,#2D1201 60px)",
       "repeating-linear-gradient(90deg, #2D1201, #2D1201 20px, rgba(199,0,15) 20px, rgba(199,0,15) 25px)",
+  },
+  ["Vikes 2024 - option 2"]: {
+    backgroundImage:
+      "repeating-linear-gradient(90deg, rgb(0,0,0), rgb(0,0,0) 20px, rgba(199,0,15) 20px, rgba(199,0,15) 23px)",
+  },
+  ["Vikes 2024 - option 3"]: {
+    backgroundImage:
+      "repeating-linear-gradient(90deg, rgb(0,0,0), rgb(0,0,0) 20px, rgba(170,0,12) 20px, rgba(170,0,12) 23px)",
+  },
+
+  ["Vikes 2024 - option 4"]: {
+    backgroundImage:
+      "repeating-linear-gradient(90deg, rgb(0,0,0), rgb(0,0,0) 20px, rgba(120,0,10) 20px, rgba(120,0,10) 23px)",
   },
 
   ["Vikes gradient"]: {
