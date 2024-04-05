@@ -39,10 +39,13 @@ def result_sorter(name: str):
 
 
 @functools.cache
-def find_player(name: str) -> int:
+def find_player(name: str, category: bool = True) -> int:
+    params = {'searchstring': name}
+    if category:
+        params['contentcategories'] = 'Leikmenn'
     r = requests.get(
         'https://www.ksi.is/leit/',
-        params={'searchstring': name, 'contentcategories': 'Leikmenn'},
+        params=params,
     )
     r.raise_for_status()
     soup = bs4.BeautifulSoup(r.text, 'html.parser')
@@ -60,6 +63,8 @@ def find_player(name: str) -> int:
             _, pid = href.split(link_prefix)
             print('Matched', result.text, 'with', name, 'and pid', pid)
             return int(pid)
+    if category:
+        return find_player(name, False)
     raise ValueError(name)
 
 
@@ -81,14 +86,21 @@ def convert_pids(fn: pathlib.Path, out_fldr: pathlib.Path):
     elif ' ' in fn.stem:
         parts = fn.stem.split(' ')
         type_ = parts[-1]
-        num_name = ' '.join(parts[:-1])
+        try:
+            Type_[type_]
+        except KeyError:
+            type_ = Type_.Beinn
+            num_name = fn.stem
+        else:
+            num_name = ' '.join(parts[:-1])
     else:
         raise RuntimeError(fn.stem)
-    num, name = num_name.split(maxsplit=1)
-    try:
-        Type_[type_]
-    except KeyError:
-        return
+    if num_name.split()[0].rstrip('.').isdigit():
+        num, name = num_name.split(maxsplit=1)
+        num = num.rstrip('.')
+    else:
+        num = 'not-num'
+        name = num_name
     try:
         pid = find_player(name)
     except ValueError:

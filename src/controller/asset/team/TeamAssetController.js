@@ -85,9 +85,7 @@ class TeamAssetController extends Component {
     ].map(({ team, teamName }) =>
       team
         .filter((p) => p.show)
-        .map((player) =>
-          getPlayerAssetObject({ player, teamName, preferExt: "vinstri" })
-        )
+        .map((player) => getPlayerAssetObject({ player, teamName }))
     );
     const flattened = [].concat(...teamAssets);
     if (!flattened.every((i) => i)) {
