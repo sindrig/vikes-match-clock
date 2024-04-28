@@ -191,7 +191,7 @@ class Asset extends Component {
     if (asset.type === assetTypes.IMAGE) {
       return (
         <img
-          src={asset.key}
+          src={asset.url || asset.key}
           alt={asset.key}
           key={asset.key}
           style={{ height: "100%", width: "100%" }}
