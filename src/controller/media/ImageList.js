@@ -45,7 +45,13 @@ const ImageList = ({ prefix, renderAsset, displayNow, addAssets }) => {
               src={imageUrl}
               alt={name}
               onClick={() => {
-                const asset = { key: imageUrl, type: assetTypes.IMAGE };
+                const asset = {
+                  // To be able to add the same image multiple times to the queue,
+                  // we need to make the key unique
+                  key: imageUrl + Date.now(),
+                  url: imageUrl,
+                  type: assetTypes.IMAGE,
+                };
                 if (displayNow) {
                   renderAsset({ asset });
                 } else {
