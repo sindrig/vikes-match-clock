@@ -54,7 +54,7 @@ export const availableMatchesPropType = PropTypes.objectOf(
   PropTypes.shape({
     group: PropTypes.string,
     players: PropTypes.objectOf(PropTypes.arrayOf(playerPropType)),
-  })
+  }),
 );
 
 export const viewPortPropType = PropTypes.shape({

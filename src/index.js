@@ -32,5 +32,5 @@ root.render(
         </DndProvider>
       </ReactReduxFirebaseProvider>
     </PersistGate>
-  </Provider>
+  </Provider>,
 );

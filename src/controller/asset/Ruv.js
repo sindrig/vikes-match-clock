@@ -112,7 +112,7 @@ const dispatchToProps = (dispatch) =>
     {
       getRuvUrl: controllerActions.getRuvUrl,
     },
-    dispatch
+    dispatch,
   );
 const stateToProps = ({ view: { vp } }) => ({ vp });
 

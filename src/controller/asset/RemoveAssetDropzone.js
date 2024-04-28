@@ -32,7 +32,7 @@ const dispatchToProps = (dispatch) =>
     {
       removeAsset: controllerActions.removeAsset,
     },
-    dispatch
+    dispatch,
   );
 
 export default connect(null, dispatchToProps)(RemoveAssetDropzone);

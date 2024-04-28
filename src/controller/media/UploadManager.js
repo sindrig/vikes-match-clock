@@ -39,8 +39,8 @@ const UploadManager = ({ prefix }) => {
                 resized.name = files[i].name;
                 return resized;
               })
-          : file
-      )
+          : file,
+      ),
     ).then((images) => {
       setImageUrls(images.map((image) => URL.createObjectURL(image)));
       upload(images);

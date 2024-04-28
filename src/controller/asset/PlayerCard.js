@@ -79,12 +79,12 @@ class PlayerCard extends Component {
       thumbnail: getMaxFontSize(
         name,
         THUMB_VP.width * widthMultiplier,
-        Math.floor(width / 14)
+        Math.floor(width / 14),
       ),
       regular: getMaxFontSize(
         name,
         width * widthMultiplier,
-        Math.floor(width / 5)
+        Math.floor(width / 5),
       ),
     };
     return { fontSizes };

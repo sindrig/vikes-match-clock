@@ -15,7 +15,7 @@ const normalize = (string) =>
 
 const noCaseSensMatch = (value) => {
   const foundLogo = Object.keys(clubLogos).filter(
-    (logo) => normalize(logo) === normalize(value)
+    (logo) => normalize(logo) === normalize(value),
   );
   if (foundLogo.length > 0) {
     return foundLogo[0];
@@ -68,7 +68,7 @@ const dispatchToProps = (dispatch) =>
     {
       updateMatch: matchActions.updateMatch,
     },
-    dispatch
+    dispatch,
   );
 
 export default connect(stateToProps, dispatchToProps)(TeamSelector);

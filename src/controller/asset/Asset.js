@@ -222,7 +222,7 @@ class Asset extends Component {
             this.getPlayerAsset({
               asset: subAsset,
               widthMultiplier: 0.7,
-            })
+            }),
           )}
         </Substitution>
       );
@@ -245,7 +245,7 @@ const dispatchToProps = (dispatch) =>
     {
       removeAssetAfterTimeout: controllerActions.removeAssetAfterTimeout,
     },
-    dispatch
+    dispatch,
   );
 
 export default connect(stateToProps, dispatchToProps)(Asset);

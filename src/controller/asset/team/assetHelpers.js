@@ -37,7 +37,7 @@ export const getPlayerAssetObject = async ({
       storage
         .ref(`players/${player.id}-${preferExt}.${imageType}`)
         .getDownloadURL(),
-      () => getPlayerAssetObject(fallbackAttrs)
+      () => getPlayerAssetObject(fallbackAttrs),
     );
   }
   return await playerAssetObjectFromPromise(
@@ -50,6 +50,6 @@ export const getPlayerAssetObject = async ({
       role: player.role,
       overlay: overlay || { text: "" },
       teamName,
-    })
+    }),
   );
 };

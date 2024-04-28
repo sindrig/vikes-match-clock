@@ -114,7 +114,7 @@ const dispatchToProps = (dispatch) =>
     {
       setViewPort: viewActions.setViewPort,
     },
-    dispatch
+    dispatch,
   );
 
 export default connect(stateToProps, dispatchToProps)(App);

@@ -87,7 +87,7 @@ const dispatchToProps = (dispatch) =>
     {
       removePenalty: matchActions.removePenalty,
     },
-    dispatch
+    dispatch,
   );
 
 export default connect(stateToProps, dispatchToProps)(TwoMinClock);

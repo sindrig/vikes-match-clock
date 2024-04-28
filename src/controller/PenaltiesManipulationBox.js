@@ -9,7 +9,7 @@ import { formatMillisAsTime } from "../utils/timeUtils";
 
 const teamToTimeoutKey = (team) => `${team}2min`;
 
-const translateTeam = (team) => ({ home: "Heima", away: "Úti" }[team] || team);
+const translateTeam = (team) => ({ home: "Heima", away: "Úti" })[team] || team;
 
 const MAX_TIMEOUTS_PER_TEAM = 4;
 
@@ -34,7 +34,7 @@ const PenaltiesManipulationBox = ({
               disabled={started}
             >
               {`Breyta: ${translateTeam(team)} (${formatMillisAsTime(
-                atTimeElapsed
+                atTimeElapsed,
               )})`}
             </button>
           </div>
@@ -43,7 +43,7 @@ const PenaltiesManipulationBox = ({
       {editingPenalty && (
         <div id="penalty-manipulation-box">
           <span>{`Breyta: ${translateTeam(team)} (${formatMillisAsTime(
-            editingPenalty.atTimeElapsed
+            editingPenalty.atTimeElapsed,
           )})`}</span>
           <button
             onClick={() =>
@@ -98,7 +98,7 @@ const dispatchToProps = (dispatch) =>
       removePenalty: matchActions.removePenalty,
       addToPenalty: matchActions.addToPenalty,
     },
-    dispatch
+    dispatch,
   );
 
 export default connect(stateToProps, dispatchToProps)(PenaltiesManipulationBox);

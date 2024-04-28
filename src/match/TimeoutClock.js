@@ -73,7 +73,7 @@ const dispatchToProps = (dispatch) =>
       removeTimeout: matchActions.removeTimeout,
       buzz: matchActions.buzz,
     },
-    dispatch
+    dispatch,
   );
 
 export default connect(stateToProps, dispatchToProps)(TimeoutClock);

@@ -30,9 +30,9 @@ const ImageList = ({ prefix, renderAsset, displayNow, addAssets }) => {
               name: item.name,
               imageUrl: downloadUrls[i],
               ref: item.fullPath,
-            }))
+            })),
           );
-        }
+        },
       );
     });
   }, [prefix]);
@@ -78,7 +78,7 @@ const dispatchToProps = (dispatch) =>
       renderAsset: controllerActions.renderAsset,
       addAssets: controllerActions.addAssets,
     },
-    dispatch
+    dispatch,
   );
 
 export default connect(() => ({}), dispatchToProps)(ImageList);

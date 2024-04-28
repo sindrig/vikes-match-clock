@@ -239,7 +239,7 @@ const dispatchToProps = (dispatch) =>
       showNextAsset: controllerActions.showNextAsset,
       renderAsset: controllerActions.renderAsset,
     },
-    dispatch
+    dispatch,
   );
 
 export default connect(stateToProps, dispatchToProps)(AssetController);

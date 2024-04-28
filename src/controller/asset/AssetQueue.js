@@ -26,7 +26,7 @@ const AssetQueue = ({
       });
       setSelectedAssets(newAssets);
     },
-    [setSelectedAssets, selectedAssets]
+    [setSelectedAssets, selectedAssets],
   );
   const renderRemovableAsset = useCallback(
     (asset, index) => {
@@ -42,7 +42,7 @@ const AssetQueue = ({
         </RemovableAsset>
       );
     },
-    [moveAsset, removeAsset]
+    [moveAsset, removeAsset],
   );
   if (!selectedAssets || selectedAssets.length === 0) {
     return null;
@@ -51,7 +51,7 @@ const AssetQueue = ({
     <div>
       <div className="removable-asset-container">
         {(selectedAssets || []).map((asset, i) =>
-          renderRemovableAsset(asset, i)
+          renderRemovableAsset(asset, i),
         )}
       </div>
       {includeRemove && (
@@ -80,7 +80,7 @@ const dispatchToProps = (dispatch) =>
       setSelectedAssets: controllerActions.setSelectedAssets,
       removeAsset: controllerActions.removeAsset,
     },
-    dispatch
+    dispatch,
   );
 
 export default connect(stateToProps, dispatchToProps)(AssetQueue);

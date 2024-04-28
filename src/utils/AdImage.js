@@ -52,8 +52,8 @@ const AdImage = ({ imageType, time, blankBetweenImages, postAdImg }) => {
       .listAll()
       .then((res) =>
         Promise.all(res.items.map((itemRef) => itemRef.getDownloadURL())).then(
-          setAssets
-        )
+          setAssets,
+        ),
       );
   }, [imageType]);
 

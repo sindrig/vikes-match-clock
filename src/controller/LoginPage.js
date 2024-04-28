@@ -168,7 +168,7 @@ const dispatchToProps = (dispatch) =>
       setSync: remoteActions.setSync,
       setListenPrefix: remoteActions.setListenPrefix,
     },
-    dispatch
+    dispatch,
   );
 
 export default withFirebase(connect(stateToProps, dispatchToProps)(LoginPage));

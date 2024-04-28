@@ -91,7 +91,7 @@ const dispatchToProps = (dispatch) =>
       pauseMatch: matchActions.pauseMatch,
       buzz: matchActions.buzz,
     },
-    dispatch
+    dispatch,
   );
 
 export default connect(stateToProps, dispatchToProps)(Clock);

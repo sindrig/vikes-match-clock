@@ -46,7 +46,7 @@ const Controller = ({
   const currentViewPortName = Object.keys(VPS).filter(
     (key) =>
       VPS[key].style.height === vp.style.height &&
-      VPS[key].style.width === vp.style.width
+      VPS[key].style.width === vp.style.width,
   )[0];
   const showControls = !sync || !auth.isEmpty;
   const showHome = tab === "home";
@@ -203,7 +203,7 @@ const dispatchToProps = (dispatch) =>
       renderAsset: controllerActions.renderAsset,
       setViewPort: viewActions.setViewPort,
     },
-    dispatch
+    dispatch,
   );
 
 export default connect(stateToProps, dispatchToProps)(Controller);

@@ -46,7 +46,7 @@ actions.buzz = () => (dispatch) => {
   dispatch({ type: ActionTypes.buzz, payload: { on: true } });
   setTimeout(
     () => dispatch({ type: ActionTypes.buzz, payload: { on: false } }),
-    3000
+    3000,
   );
   return true;
 };

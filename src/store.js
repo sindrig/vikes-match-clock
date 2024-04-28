@@ -59,8 +59,8 @@ export const store = createStore(
   {},
   compose(
     applyMiddleware(thunk, promiseMiddleware, firebaseMiddleware),
-    devTools
-  )
+    devTools,
+  ),
 );
 
 export const persistor = persistStore(store);

@@ -53,7 +53,7 @@ const dispatchToProps = (dispatch) =>
     {
       remoteRefresh: controllerActions.remoteRefresh,
     },
-    dispatch
+    dispatch,
   );
 
 export default connect(stateToProps, dispatchToProps)(RefreshHandler);

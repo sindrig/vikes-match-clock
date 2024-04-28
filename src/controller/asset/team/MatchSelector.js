@@ -45,7 +45,7 @@ const dispatchToProps = (dispatch) =>
     {
       selectMatch: controllerActions.selectMatch,
     },
-    dispatch
+    dispatch,
   );
 
 export default connect(stateToProps, dispatchToProps)(MatchSelector);

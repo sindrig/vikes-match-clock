@@ -63,7 +63,7 @@ const dispatchToProps = (dispatch) =>
       pauseMatch: matchActions.pauseMatch,
       startMatch: matchActions.startMatch,
     },
-    dispatch
+    dispatch,
   );
 
 export default connect(stateToProps, dispatchToProps)(MatchController);

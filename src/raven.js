@@ -8,7 +8,7 @@ class Raven {
           {
             release: "0-0-0",
             environment: "production",
-          }
+          },
         ).install();
         console.log("Raven registered");
         this.registered = true;

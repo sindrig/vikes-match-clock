@@ -139,7 +139,7 @@ class Team extends Component {
 
 const stateToProps = (
   { controller: { availableMatches, selectedMatch }, match },
-  ownProps
+  ownProps,
 ) => {
   const selectedMatchObj = availableMatches[selectedMatch];
   const teamId = match[`${ownProps.teamName}Id`];
@@ -158,7 +158,7 @@ const dispatchToProps = (dispatch) =>
       deletePlayer: controllerActions.deletePlayer,
       addPlayer: controllerActions.addPlayer,
     },
-    dispatch
+    dispatch,
   );
 
 export default connect(stateToProps, dispatchToProps)(Team);

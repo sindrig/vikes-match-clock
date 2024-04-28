@@ -77,7 +77,7 @@ const dispatchToProps = (dispatch) =>
       updateHalfLength: matchActions.updateHalfLength,
       setHalfStops: matchActions.setHalfStops,
     },
-    dispatch
+    dispatch,
   );
 
 export default connect(stateToProps, dispatchToProps)(HalfStops);

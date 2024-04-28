@@ -16,7 +16,7 @@ export function addVideosFromPlaylist(playlistId, addFn) {
             playlistId,
           },
           method: "GET",
-        })
+        }),
       )
       .catch((error) => console.log(error))
       .then(({ result: { items } }) =>
@@ -24,8 +24,8 @@ export function addVideosFromPlaylist(playlistId, addFn) {
           addFn({
             type: assetTypes.URL,
             key: `https://www.youtube.com/watch?v=${videoId}`,
-          })
-        )
+          }),
+        ),
       );
   window.gapi.load("client", start);
 }

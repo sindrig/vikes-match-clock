@@ -85,7 +85,7 @@ class TeamAssetController extends Component {
     ].map(({ team, teamName }) =>
       team
         .filter((p) => p.show)
-        .map((player) => getPlayerAssetObject({ player, teamName }))
+        .map((player) => getPlayerAssetObject({ player, teamName })),
     );
     const flattened = [].concat(...teamAssets);
     if (!flattened.every((i) => i)) {
@@ -119,7 +119,7 @@ class TeamAssetController extends Component {
       ],
       {
         showNow: true,
-      }
+      },
     );
     this.clearState();
   }
@@ -154,7 +154,7 @@ class TeamAssetController extends Component {
       ],
       {
         showNow: true,
-      }
+      },
     );
     this.clearState();
   }
@@ -175,7 +175,7 @@ class TeamAssetController extends Component {
       ],
       {
         showNow: true,
-      }
+      },
     );
     this.clearState();
   }
@@ -405,7 +405,7 @@ const dispatchToProps = (dispatch) =>
       clearMatchPlayers: controllerActions.clearMatchPlayers,
       getAvailableMatches: controllerActions.getAvailableMatches,
     },
-    dispatch
+    dispatch,
   );
 
 export default connect(stateToProps, dispatchToProps)(TeamAssetController);

@@ -92,7 +92,7 @@ const dispatchToProps = (dispatch) =>
       removeTimeout: matchActions.removeTimeout,
       setBackground: viewActions.setBackground,
     },
-    dispatch
+    dispatch,
   );
 
 export default connect(stateToProps, dispatchToProps)(MatchActionSettings);

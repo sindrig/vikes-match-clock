@@ -99,7 +99,7 @@ const actions = {
         payload: {
           data: { matches },
         },
-      }
+      },
     ) {
       return {
         ...state,
@@ -132,7 +132,7 @@ const actions = {
       // TODO why not immutable
       const match = JSON.parse(JSON.stringify(availableMatches[selectedMatch]));
       match.players[teamId] = match.players[teamId].filter(
-        (item, i) => i !== idx
+        (item, i) => i !== idx,
       );
       return {
         ...state,
@@ -224,7 +224,6 @@ const actions = {
   [ActionTypes.addAssets]: {
     next(state, { payload: { assets } }) {
       const updatedAssets = [...(state.selectedAssets || [])];
-      console.log("assets", assets);
       assets.forEach((asset) => {
         // Make sure that the asset type is in assetTypes
         // And make sure that the asset key is not null/undefined/empty
