@@ -3,21 +3,16 @@ import PropTypes from "prop-types";
 import { storage } from "../../firebase";
 import Compress from "compress.js";
 import { FileUploader } from "react-drag-drop-files";
+import CreateFolder from "./CreateFolder";
+import ReloadIcon from "@rsuite/icons/Reload";
+
+import "./UploadManager.css";
 
 const compress = new Compress();
 const fileTypes = ["JPG", "PNG", "GIF"];
 
-const UploadManager = ({ prefix }) => {
+const UploadManager = ({ prefix, refresh }) => {
   const [doCompress, setDoCompress] = useState(false);
-  const [imageUrls, setImageUrls] = useState([]);
-  const upload = (images) => {
-    images.forEach((image) => {
-      storage
-        .ref(`/${prefix}/${image.name}`)
-        .put(image)
-        .on("state_changed", console.log("upload success"), alert);
-    });
-  };
 
   const insertImages = (filelist) => {
     const files = [...filelist];
@@ -41,14 +36,19 @@ const UploadManager = ({ prefix }) => {
               })
           : file,
       ),
-    ).then((images) => {
-      setImageUrls(images.map((image) => URL.createObjectURL(image)));
-      upload(images);
-    });
+    )
+      .then((images) =>
+        Promise.all(
+          images.map((image) => {
+            storage.ref(`/${prefix}/${image.name}`).put(image);
+          }),
+        ),
+      )
+      .then(refresh);
   };
 
   return (
-    <div className="control-item withborder">
+    <div className="control-item withborder upload-manager">
       <label>
         <input
           type="checkbox"
@@ -63,14 +63,13 @@ const UploadManager = ({ prefix }) => {
         types={fileTypes}
         multiple
       />
-
-      {imageUrls.map((imageUrl) => (
-        <img src={imageUrl} key={imageUrl} alt={imageUrl} />
-      ))}
+      <CreateFolder prefix={prefix} refresh={refresh} />
+      <ReloadIcon onClick={refresh} className="reload" />
     </div>
   );
 };
 UploadManager.propTypes = {
   prefix: PropTypes.string,
+  refresh: PropTypes.func.isRequired,
 };
 export default UploadManager;

@@ -3,6 +3,22 @@
   display: inline-block;
   float: left;
   clear: none !important;
+  cursor: pointer;
+}
+
+.asset-image span {
+  display: block;
+}
+
+.asset-folder {
+  padding: 10px;
+  display: inline-block;
+  float: left;
+  clear: none !important;
+  cursor: pointer;
+}
+.asset-folder span {
+  padding-left: 5px;
 }
 
 .image-list {

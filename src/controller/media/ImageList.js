@@ -5,22 +5,37 @@ import PropTypes from "prop-types";
 import { storage } from "../../firebase";
 import controllerActions from "../../actions/controller";
 import assetTypes from "../asset/AssetTypes";
+import FolderFillIcon from "@rsuite/icons/FolderFill";
+import TrashIcon from "@rsuite/icons/Trash";
 
 import "./ImageList.css";
 
-const ImageList = ({ prefix, renderAsset, displayNow, addAssets }) => {
+const ImageList = ({
+  prefix,
+  renderAsset,
+  displayNow,
+  addAssets,
+  allowEdit,
+  appendPrefix,
+  ts,
+}) => {
   const [images, setImages] = useState([]);
+  const [folders, setFolders] = useState([]);
 
-  const deleteImage = (ref) => {
+  const deleteImage = (ref) =>
     storage
       .ref(ref)
       .delete()
       .then(() => {
         setImages(images.filter((img) => img.ref !== ref));
       });
+
+  const deleteFolder = (ref) => {
+    deleteImage(ref).then(() => appendPrefix(".."));
   };
 
   useEffect(() => {
+    console.log("t", ts);
     const listRef = storage.ref(prefix);
     listRef.listAll().then((res) => {
       Promise.all(res.items.map((itemRef) => itemRef.getDownloadURL())).then(
@@ -34,48 +49,81 @@ const ImageList = ({ prefix, renderAsset, displayNow, addAssets }) => {
           );
         },
       );
+      setFolders(res.prefixes);
     });
-  }, [prefix]);
+  }, [prefix, ts]);
   return (
-    <div className="control-item image-list">
-      {images.map(({ imageUrl, name, ref }) => (
-        <div className="asset-image withborder" key={name}>
-          <div>
-            <img
-              src={imageUrl}
-              alt={name}
-              onClick={() => {
-                const asset = {
-                  // To be able to add the same image multiple times to the queue,
-                  // we need to make the key unique
-                  key: imageUrl + Date.now(),
-                  url: imageUrl,
-                  type: assetTypes.IMAGE,
-                };
-                if (displayNow) {
-                  renderAsset({ asset });
-                } else {
-                  addAssets([asset]);
-                }
-              }}
-            />
+    <React.Fragment>
+      <div className="control-item image-list">
+        {folders.map(({ name, fullPath }) => (
+          <div className="asset-folder withborder" key={name}>
+            <div onClick={() => appendPrefix(name)}>
+              <FolderFillIcon />
+              <span>{name}</span>
+            </div>
+            {allowEdit ? (
+              <div>
+                <button onClick={() => deleteImage(fullPath)}>Eyða</button>
+              </div>
+            ) : null}
           </div>
-          <div>
-            <span>{name}</span>
-          </div>
-          <div>
-            <button onClick={() => deleteImage(ref)}>Eyða</button>
-          </div>
-        </div>
-      ))}
-    </div>
+        ))}
+      </div>
+      <div className="control-item image-list">
+        {images.map(({ imageUrl, name, ref }) =>
+          name === ".vikes" ? (
+            images.length === 1 &&
+            allowEdit && (
+              <div
+                className="asset-folder withborder"
+                onClick={() => deleteFolder(ref)}
+                key={name}
+              >
+                <TrashIcon />
+                <span>Eyða {prefix}</span>
+              </div>
+            )
+          ) : (
+            <div className="asset-image withborder" key={name}>
+              <div
+                onClick={() => {
+                  const asset = {
+                    // To be able to add the same image multiple times to the queue,
+                    // we need to make the key unique
+                    key: imageUrl + Date.now(),
+                    url: imageUrl,
+                    type: assetTypes.IMAGE,
+                  };
+                  if (displayNow) {
+                    renderAsset({ asset });
+                  } else {
+                    addAssets([asset]);
+                  }
+                }}
+              >
+                <img src={imageUrl} alt={name} />
+                <span>{name}</span>
+              </div>
+              {allowEdit ? (
+                <div>
+                  <button onClick={() => deleteImage(ref)}>Eyða</button>
+                </div>
+              ) : null}
+            </div>
+          ),
+        )}
+      </div>
+    </React.Fragment>
   );
 };
 ImageList.propTypes = {
   prefix: PropTypes.string.isRequired,
   renderAsset: PropTypes.func.isRequired,
   addAssets: PropTypes.func.isRequired,
+  appendPrefix: PropTypes.func.isRequired,
   displayNow: PropTypes.bool.isRequired,
+  allowEdit: PropTypes.bool.isRequired,
+  ts: PropTypes.any,
 };
 
 const dispatchToProps = (dispatch) =>
