@@ -35,7 +35,6 @@ const ImageList = ({
   };
 
   useEffect(() => {
-    console.log("t", ts);
     const listRef = storage.ref(prefix);
     listRef.listAll().then((res) => {
       Promise.all(res.items.map((itemRef) => itemRef.getDownloadURL())).then(
@@ -55,17 +54,12 @@ const ImageList = ({
   return (
     <React.Fragment>
       <div className="control-item image-list">
-        {folders.map(({ name, fullPath }) => (
+        {folders.map(({ name }) => (
           <div className="asset-folder withborder" key={name}>
             <div onClick={() => appendPrefix(name)}>
               <FolderFillIcon />
               <span>{name}</span>
             </div>
-            {allowEdit ? (
-              <div>
-                <button onClick={() => deleteImage(fullPath)}>Eyða</button>
-              </div>
-            ) : null}
           </div>
         ))}
       </div>
