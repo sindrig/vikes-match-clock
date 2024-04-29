@@ -63,7 +63,9 @@ const UploadManager = ({ prefix, refresh }) => {
         types={fileTypes}
         multiple
       />
-      <CreateFolder prefix={prefix} refresh={refresh} />
+      {prefix.startsWith("images") && (
+        <CreateFolder prefix={prefix} refresh={refresh} />
+      )}
       <ReloadIcon onClick={refresh} className="reload" />
     </div>
   );
