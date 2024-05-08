@@ -33,6 +33,15 @@ export const VPS = {
     fontSize: "130%",
     name: "Inni lítil",
   },
+  outsidesafamyri: {
+    style: {
+      height: 288,
+      width: 384,
+    },
+    key: "outsidesafamyri",
+    fontSize: "160%",
+    name: "Úti safamýri",
+  },
 };
 
 const defaultBackground = "Vikes 2024";
