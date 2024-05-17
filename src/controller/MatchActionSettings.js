@@ -10,13 +10,16 @@ import { VIEWS } from "../reducers/controller";
 import { BACKGROUNDS } from "../reducers/view";
 import { SPORTS } from "../constants";
 import HalfStops from "./HalfStops";
+import clubLogos from "../images/clubLogos";
 
 const MatchActionSettings = ({
   view,
   match,
   updateMatch,
   background,
+  idleImage,
   setBackground,
+  setIdleImage,
 }) => (
   <div className="control-item playerControls withborder">
     {view === VIEWS.match && (
@@ -58,6 +61,20 @@ const MatchActionSettings = ({
             ))}
           </select>
         </div>
+        <div>
+          Idle logo:
+          <select
+            className="idle-selector"
+            value={idleImage}
+            onChange={({ target: { value } }) => setIdleImage(value)}
+          >
+            {Object.keys(clubLogos).map((key) => (
+              <option value={key} key={key}>
+                {key}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
     </div>
   </div>
@@ -74,13 +91,15 @@ MatchActionSettings.propTypes = {
   view: PropTypes.string.isRequired,
   background: PropTypes.string.isRequired,
   setBackground: PropTypes.func.isRequired,
+  idleImage: PropTypes.string.isRequired,
+  setIdleImage: PropTypes.func.isRequired,
 };
 
 const stateToProps = ({
   controller: { view },
   match,
-  view: { background },
-}) => ({ view, match, background });
+  view: { background, idleImage },
+}) => ({ view, match, background, idleImage });
 const dispatchToProps = (dispatch) =>
   bindActionCreators(
     {
@@ -91,6 +110,7 @@ const dispatchToProps = (dispatch) =>
       matchTimeout: matchActions.matchTimeout,
       removeTimeout: matchActions.removeTimeout,
       setBackground: viewActions.setBackground,
+      setIdleImage: viewActions.setIdleImage,
     },
     dispatch,
   );

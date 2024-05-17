@@ -105,6 +105,7 @@ export const getBackground = (key) =>
 export const initialState = {
   vp: VPS.outside,
   background: BACKGROUNDS[defaultBackground],
+  idleImage: "víkingurr",
 };
 
 const actions = {
@@ -121,6 +122,14 @@ const actions = {
       return {
         ...state,
         background,
+      };
+    },
+  },
+  [ActionTypes.setIdleImage]: {
+    next(state, { payload: { idleImage } }) {
+      return {
+        ...state,
+        idleImage,
       };
     },
   },

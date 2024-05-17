@@ -1,6 +1,7 @@
 import React, { Component } from "react";
 import { connect } from "react-redux";
 import Clock from "react-live-clock";
+import PropTypes from "prop-types";
 import { viewPortPropType } from "../propTypes";
 import clubLogos from "../images/clubLogos";
 import AdImage from "../utils/AdImage";
@@ -18,6 +19,7 @@ const useRealTemperature = true;
 class Idle extends Component {
   static propTypes = {
     vp: viewPortPropType.isRequired,
+    idleImage: PropTypes.string.isRequired,
   };
 
   constructor(props) {
@@ -49,12 +51,16 @@ class Idle extends Component {
   }
 
   render() {
-    const { vp } = this.props;
+    const { vp, idleImage } = this.props;
     const { temperature } = this.state;
     return (
       <div className={`idle idle-${vp.key}`}>
         <AdImage imageType={IMAGE_TYPES.largeAds} blankBetweenImages time={8} />
-        <img src={clubLogos["víkingurr"]} alt="Vikes" className="idle-vikes" />
+        <img
+          src={clubLogos[idleImage] || clubLogos["víkingurr"]}
+          alt="Vikes"
+          className="idle-vikes"
+        />
         <img src={husasmidjan} alt="Vikes" className="idle-ad" />
         <div className="idle-text-container">
           <div className="idle-text-box idle-clock">
@@ -71,6 +77,10 @@ class Idle extends Component {
   }
 }
 
-const stateToProps = ({ match, view: { vp } }) => ({ match, vp });
+const stateToProps = ({ match, view: { vp, idleImage } }) => ({
+  match,
+  vp,
+  idleImage,
+});
 
 export default connect(stateToProps)(Idle);

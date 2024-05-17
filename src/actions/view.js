@@ -4,6 +4,7 @@ import ActionTypes from "../ActionTypes";
 const actions = {
   [ActionTypes.setViewPort]: (vp) => ({ vp }),
   [ActionTypes.setBackground]: (background) => ({ background }),
+  [ActionTypes.setIdleImage]: (idleImage) => ({ idleImage }),
 };
 
 Object.keys(actions).forEach((type) => {
