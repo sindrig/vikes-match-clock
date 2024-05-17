@@ -42,6 +42,15 @@ export const VPS = {
     fontSize: "160%",
     name: "Úti safamýri",
   },
+  ibv: {
+    style: {
+      height: 512,
+      width: 640,
+    },
+    key: "ibv",
+    fontSize: "290%",
+    name: "Hásteinsvöllur",
+  },
 };
 
 const defaultBackground = "Vikes 2024";
