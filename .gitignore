@@ -71,3 +71,4 @@ npm-debug.log*
 /.venv
 /infra/builds/
 /**/__pycache__/
+service-account-key.json

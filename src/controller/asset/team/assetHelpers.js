@@ -2,6 +2,7 @@ import { storage } from "../../../firebase";
 import assetTypes from "../AssetTypes";
 
 export const getPlayerAssetObject = async ({
+  listenPrefix,
   player,
   teamName,
   overlay,
@@ -28,20 +29,22 @@ export const getPlayerAssetObject = async ({
     }
   };
   if (preferExt) {
-    const fallbackAttrs = { player, teamName, overlay };
+    const fallbackAttrs = { player, teamName, overlay, listenPrefix };
     if (preferType) {
       // Fallback from PLAYER-EXT.TYPE to PLAYER-EXT.png
       fallbackAttrs.preferExt = preferExt;
     }
     return await playerAssetObjectFromPromise(
       storage
-        .ref(`players/${player.id}-${preferExt}.${imageType}`)
+        .ref(`${listenPrefix}/players/${player.id}-${preferExt}.${imageType}`)
         .getDownloadURL(),
       () => getPlayerAssetObject(fallbackAttrs),
     );
   }
   return await playerAssetObjectFromPromise(
-    storage.ref(`players/${player.id}.${imageType}`).getDownloadURL(),
+    storage
+      .ref(`${listenPrefix}/players/${player.id}.${imageType}`)
+      .getDownloadURL(),
     () => ({
       type: assetTypes.NO_IMAGE_PLAYER,
       key: `custom-${player.number}-${player.name}`,

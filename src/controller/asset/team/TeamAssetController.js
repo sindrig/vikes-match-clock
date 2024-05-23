@@ -23,6 +23,7 @@ class TeamAssetController extends Component {
     availableMatches: availableMatchesPropType,
     getAvailableMatches: PropTypes.func.isRequired,
     clearMatchPlayers: PropTypes.func.isRequired,
+    listenPrefix: PropTypes.string.isRequired,
   };
 
   static defaultProps = {
@@ -77,7 +78,7 @@ class TeamAssetController extends Component {
   }
 
   addPlayersToQ() {
-    const { match, addAssets, previousView } = this.props;
+    const { match, addAssets, previousView, listenPrefix } = this.props;
     const { homeTeam, awayTeam } = this.getTeamPlayers();
     const teamAssets = [
       { team: awayTeam, teamName: match.awayTeam },
@@ -85,7 +86,9 @@ class TeamAssetController extends Component {
     ].map(({ team, teamName }) =>
       team
         .filter((p) => p.show)
-        .map((player) => getPlayerAssetObject({ player, teamName })),
+        .map((player) =>
+          getPlayerAssetObject({ player, teamName, listenPrefix }),
+        ),
     );
     const flattened = [].concat(...teamAssets);
     if (!flattened.every((i) => i)) {
@@ -98,15 +101,17 @@ class TeamAssetController extends Component {
 
   async addSubAsset() {
     const { subIn, subOut } = this.state;
-    const { match, addAssets } = this.props;
+    const { match, addAssets, listenPrefix } = this.props;
     const subInObj = await getPlayerAssetObject({
       player: subIn,
       teamName: match[subIn.teamName],
+      listenPrefix,
     });
     const subOutObj = await getPlayerAssetObject({
       player: subOut,
       // NOTE: We use subIn teamName
       teamName: match[subIn.teamName],
+      listenPrefix,
     });
     addAssets(
       [
@@ -144,12 +149,13 @@ class TeamAssetController extends Component {
   }
 
   selectPlayerAsset(player, teamName) {
-    const { match, addAssets } = this.props;
+    const { match, addAssets, listenPrefix } = this.props;
     addAssets(
       [
         getPlayerAssetObject({
           player,
           teamName: match[teamName],
+          listenPrefix,
         }),
       ],
       {
@@ -160,7 +166,7 @@ class TeamAssetController extends Component {
   }
 
   selectGoalScorer(player, teamName) {
-    const { match, addAssets } = this.props;
+    const { match, addAssets, listenPrefix } = this.props;
     addAssets(
       [
         getPlayerAssetObject({
@@ -171,6 +177,7 @@ class TeamAssetController extends Component {
             blink: true,
             effect: this.state.effect,
           },
+          listenPrefix,
         }),
       ],
       {
@@ -393,10 +400,12 @@ class TeamAssetController extends Component {
 const stateToProps = ({
   match,
   controller: { availableMatches, selectedMatch },
+  remote: { listenPrefix },
 }) => ({
   match,
   availableMatches,
   selectedMatch,
+  listenPrefix,
 });
 
 const dispatchToProps = (dispatch) =>

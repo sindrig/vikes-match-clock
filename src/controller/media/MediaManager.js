@@ -6,8 +6,9 @@ import UploadManager from "./UploadManager";
 import ImageList from "./ImageList";
 import { IMAGE_TYPES } from ".";
 
-const MediaManager = ({ auth }) => {
+const MediaManager = ({ auth, listenPrefix }) => {
   const [tab, setTab] = useState(IMAGE_TYPES.images);
+  const finalTab = `${listenPrefix === "safamyri" ? "fotbolti" : listenPrefix}/${tab}`;
   const [prefix, setPrefix] = useState("");
   const [ts, setTs] = useState(null);
   const [displayNow, setDisplayNow] = useState(true);
@@ -35,7 +36,7 @@ const MediaManager = ({ auth }) => {
         <Nav.Item eventKey={IMAGE_TYPES.players}>Leikmenn</Nav.Item>
       </Nav>
       {!auth.isEmpty && (
-        <UploadManager prefix={`${tab}${prefix}`} refresh={refresh} />
+        <UploadManager prefix={`${finalTab}${prefix}`} refresh={refresh} />
       )}
       <div>
         <label>
@@ -57,7 +58,7 @@ const MediaManager = ({ auth }) => {
         </label>
       </div>
       <ImageList
-        prefix={`${tab}${prefix}`}
+        prefix={`${finalTab}${prefix}`}
         appendPrefix={appendPrefix}
         displayNow={displayNow}
         allowEdit={!auth.isEmpty}
@@ -71,10 +72,12 @@ MediaManager.propTypes = {
   auth: PropTypes.shape({
     isEmpty: PropTypes.bool,
   }).isRequired,
+  listenPrefix: PropTypes.string,
 };
 
-const stateToProps = ({ firebase: { auth } }) => ({
+const stateToProps = ({ firebase: { auth }, remote: { listenPrefix } }) => ({
   auth,
+  listenPrefix,
 });
 
 export default connect(stateToProps)(MediaManager);

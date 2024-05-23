@@ -68,6 +68,7 @@ const MatchActions = ({
   homeTeam,
   awayTeam,
   countdown,
+  listenPrefix,
 }) => {
   const [showScorerSelector, setShowScorerSelector] = useState(null);
   const [goalScorer, setGoalScorer] = useState(0);
@@ -93,6 +94,7 @@ const MatchActions = ({
     (showScorerSelector == "away" ? awayTeam : homeTeam).forEach((player) => {
       if (player.number === gs) {
         getPlayerAssetObject({
+          listenPrefix,
           player,
           teamName: "víkingurr",
           // MAAAARK blink
@@ -326,15 +328,18 @@ MatchActions.propTypes = {
   renderAsset: PropTypes.func.isRequired,
   homeTeam: PropTypes.arrayOf(playerPropType).isRequired,
   awayTeam: PropTypes.arrayOf(playerPropType).isRequired,
+  listenPrefix: PropTypes.string.isRequired,
 };
 
 const stateToProps = ({
   controller: { view, availableMatches, selectedMatch },
   match,
+  remote: { listenPrefix },
 }) => {
   const selectedMatchObj = availableMatches[selectedMatch];
   return {
     view,
+    listenPrefix,
     match,
     homeTeam: selectedMatchObj
       ? selectedMatchObj.players[match.homeTeamId] || []
