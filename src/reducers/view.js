@@ -80,6 +80,10 @@ export const BACKGROUNDS = {
     ].join(", "),
   },
   Svart: { backgroundColor: "black" },
+  // ["IBV 2024"]: {
+  //   backgroundImage:
+  //     "repeating-linear-gradient(90deg, rgba(0,0,0), rgba(0,0,0) 20px, rgb(255,255,255) 20px, rgba(255,255,255) 23px)",
+  // },
   Mynd: { backgroundImage: `url(${backgroundImage})` },
   //Ukraine
   Ukraine: {
