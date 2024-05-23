@@ -41,7 +41,7 @@ const actions = {
   [ActionTypes.setListenPrefix]: {
     next(state, { payload: { listenPrefix } }) {
       if (listenPrefix !== state.listenPrefix) {
-        setTimeout(() => window.location.reload(), 1000);
+        setTimeout(() => window.location.reload(), 2000);
       }
       return { ...state, listenPrefix };
     },

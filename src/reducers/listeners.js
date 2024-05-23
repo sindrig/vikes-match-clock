@@ -13,6 +13,13 @@ const handleRemote = {
         ...state,
         available: data.available.split(","),
       };
+    } else if (path.startsWith("auth/")) {
+      return {
+        ...state,
+        available: Object.entries(data)
+          .filter((kv) => kv[1] === true)
+          .map(([k]) => k),
+      };
     }
     return state;
   },

@@ -84,21 +84,10 @@ class LoginPage extends Component {
       auth,
     } = this.props;
     if (auth.isLoaded && !auth.isEmpty) {
-      const emailprefix = auth.email.split("@")[0];
-      if (emailprefix !== listenPrefix) {
-        setListenPrefix(email.split("@")[0]);
-        setTimeout(() => {
-          // This should not happen.
-          // However, the other thing should not have been happening either
-          // Let's keep an eye on this.
-          if (emailprefix !== listenPrefix) {
-            firebase.logout();
-          }
-        }, 3000);
-      }
       return (
         <div>
-          {this.renderIsRemoteCtrl()}[<b>{emailprefix}</b>][
+          {this.renderListenerCtrl()}
+          {this.renderIsRemoteCtrl()}[<b>{auth.email}</b>][
           {listenPrefix}]
           <br />
           <button type="button" onClick={() => firebase.logout()}>
