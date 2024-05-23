@@ -176,7 +176,7 @@ import { default as grenada } from "./club-logos/Grenada.svg";
 import { default as grikkland } from "./club-logos/Grikkland.svg";
 import { default as grænhöfðaeyjar } from "./club-logos/Grænhöfðaeyjar.svg";
 import { default as grænland } from "./club-logos/Grænland.svg";
-import { default as grótta } from "./club-logos/Grótta.png";
+import { default as grótta } from "./club-logos/Grótta.svg";
 import { default as gullfálkinn } from "./club-logos/Gullfálkinn.png";
 import { default as gvadelúpeyjar } from "./club-logos/Gvadelúpeyjar.svg";
 import { default as gvam } from "./club-logos/Gvam.svg";
