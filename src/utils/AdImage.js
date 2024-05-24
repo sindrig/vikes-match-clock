@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import PropTypes from "prop-types";
 import { storage } from "../firebase";
+import { connect } from "react-redux";
 
 function useInterval(callback, delay) {
   const savedCallback = useRef();
@@ -23,7 +24,13 @@ function useInterval(callback, delay) {
   }, [delay]);
 }
 
-const AdImage = ({ imageType, time, blankBetweenImages, postAdImg }) => {
+const AdImage = ({
+  imageType,
+  time,
+  blankBetweenImages,
+  postAdImg,
+  listenPrefix,
+}) => {
   const [assets, setAssets] = useState([]);
   const [img, setImg] = useState(0);
   const [isBlank, setBlank] = useState(blankBetweenImages);
@@ -47,7 +54,7 @@ const AdImage = ({ imageType, time, blankBetweenImages, postAdImg }) => {
   }, time * 1000);
 
   useEffect(() => {
-    const listRef = storage.ref(imageType);
+    const listRef = storage.ref(`${listenPrefix}/${imageType}`);
     listRef
       .listAll()
       .then((res) =>
@@ -69,6 +76,7 @@ AdImage.propTypes = {
   time: PropTypes.number,
   blankBetweenImages: PropTypes.bool,
   postAdImg: PropTypes.string,
+  listenPrefix: PropTypes.string,
 };
 
 AdImage.defaultProps = {
@@ -77,4 +85,7 @@ AdImage.defaultProps = {
   postAdImg: null,
 };
 
-export default AdImage;
+const stateToProps = ({ remote: { listenPrefix } }) => ({
+  listenPrefix,
+});
+export default connect(stateToProps)(AdImage);
