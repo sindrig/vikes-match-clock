@@ -93,8 +93,7 @@ img.ad {
   display: none;
 }
 
-.scoreboard-outside img.ad,
-.scoreboard-outsidesafamyri img.ad {
+.scoreboard img.ad {
   left: calc(33.5% + 1px);
   height: 25%;
   width: 33%;
