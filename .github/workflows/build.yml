@@ -78,8 +78,9 @@ jobs:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
         run: |
           curl -sL https://firebase.tools | bash
-          firebase -P vikes-match-clock-firebase database:set /fotbolti/controller/refreshToken -f -d '"'$(uuidgen)'"' --token $FIREBASE_TOKEN
-          firebase -P vikes-match-clock-firebase database:set /handbolti/controller/refreshToken -f -d '"'$(uuidgen)'"' --token $FIREBASE_TOKEN
+          for baseKey in fotbolti handbolti safamyri ibv; do
+            firebase -P vikes-match-clock-firebase database:set /$baseKey/controller/refreshToken -f -d '"'$(uuidgen)'"' --token $FIREBASE_TOKEN
+          done
 
   notify:
     runs-on: ubuntu-latest
