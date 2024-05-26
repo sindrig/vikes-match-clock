@@ -12,6 +12,13 @@
   "devDependencies": {
     "@nuxt/devtools": "latest",
     "@nuxt/ui": "^2.13.0",
-    "nuxt": "^3.10.1"
+    "nuxt": "^3.10.1",
+    "nuxt-vuefire": "^1.0.2"
+  },
+  "dependencies": {
+    "@firebase/app-types": "^0.9.2",
+    "firebase": "^10.12.1",
+    "firebase-admin": "^12.1.1",
+    "firebase-functions": "^5.0.1"
   }
 }
