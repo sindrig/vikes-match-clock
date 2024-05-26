@@ -91,7 +91,7 @@ jobs:
     runs-on: ubuntu-latest
     if: always()
     needs:
-      - build
+      - build-clock
     steps:
       - uses: actions/checkout@v2
 
