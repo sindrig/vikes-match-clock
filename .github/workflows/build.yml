@@ -36,19 +36,15 @@ jobs:
             ${{ runner.os }}-pnpm-store-
 
       - name: Install dependencies
-        working-directory: ./clock
         run: pnpm i
 
       - name: Lint
-        working-directory: ./clock
         run: pnpm lint
 
       - name: Format
-        working-directory: ./clock
         run: pnpm format-check
 
       - name: Build
-        working-directory: ./clock
         run: pnpm build
 
       - name: Cypress run
@@ -57,7 +53,6 @@ jobs:
           CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          working-directory: clock
           start: npx serve -s build
           record: ${{ secrets.CYPRESS_RECORD_KEY != '' }}
           install-command: pnpm i
