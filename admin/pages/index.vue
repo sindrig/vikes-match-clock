@@ -1,11 +1,14 @@
 <script lang="ts" setup>
 import { ref as databaseRef } from "firebase/database";
-
+import type { Screen } from "~/models/clock-config";
 const db = useDatabase();
 const router = useRouter();
 const user = useCurrentUser();
 const allowedClocks = useDatabaseObject<{ key: string }>(
   user.value ? databaseRef(db, `auth/${user.value.uid}`) : null,
+);
+const screens = useDatabaseObject<{ [key: string]: Screen }>(
+  user.value ? databaseRef(db, `screens`) : null,
 );
 
 const setLocation = (value: string) => {
@@ -29,11 +32,10 @@ const setLocation = (value: string) => {
           :key="clock"
         >
           <button @click="setLocation(clock)">
-            {{ clock }}
+            {{ screens && screens[clock] ? screens[clock].label : clock }}
           </button>
         </li>
       </ul>
     </div>
-    allowedClocks: {{ allowedClocks }} <br />
   </main>
 </template>

@@ -1,6 +1,7 @@
 import dataclasses
 import datetime
 import json
+import typing
 import urllib.parse
 import urllib.request
 
@@ -17,22 +18,7 @@ class EnhancedJSONEncoder(json.JSONEncoder):
         return super().default(o)
 
 
-# def get_report(match_id: str):
-#     players = ksi_client.get_players(match_id)
-#     if players and "error" not in players:
-#         if str(home_team) not in players:
-#             players[str(home_team)] = []
-#         if str(away_team) not in players:
-#             players[str(away_team)] = []
-#         result["matches"][match.match_id] = {
-#             "players": players,
-#             "group": match.group,
-#             "sex": match.sex,
-#         }
-
-
 def get_report(query: dict):
-    date = get_date(query)
     try:
         match_id = int(query["matchId"])
     except KeyError:
@@ -51,7 +37,7 @@ def get_report(query: dict):
         }
     players = ksi_client.get_players(match_id=match_id)
     if isinstance(players, Error):
-        return players
+        return {"error": players}
     return MatchReport(players=players)
 
 
@@ -63,7 +49,7 @@ def get_date(query):
 
 
 def get_team(cell: bs4.Tag) -> Team:
-    name = cell.text.strip()
+    name = cell.text.strip().rstrip(".")
     team_link = cell.find("a")
     team_id = None
     if team_link and isinstance(team_link, bs4.Tag):
@@ -74,7 +60,7 @@ def get_team(cell: bs4.Tag) -> Team:
     return Team(name=name, id=int(team_id))
 
 
-def get_matches(query: dict):
+def get_matches(query: dict) -> typing.Generator[MatchListMatch, None, None]:
     date = get_date(query)
     location = query["location"]
     assert isinstance(location, str) and location.isdigit()
@@ -139,7 +125,13 @@ def get_matches(query: dict):
             )
 
 
-def respond(status_code: int, body: dict):
+class IsDataclass(typing.Protocol):
+    # as already noted in comments, checking for this attribute is currently
+    # the most reliable way to ascertain that something is a dataclass
+    __dataclass_fields__: typing.ClassVar[dict[str, typing.Any]]
+
+
+def respond(status_code: int, body: dict | IsDataclass):
     return {
         "statusCode": status_code,
         "body": json.dumps(body, cls=EnhancedJSONEncoder),

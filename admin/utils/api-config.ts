@@ -1,1 +1,1 @@
-export const gateWayUrl = "https://clock-api.irdn.is/";
+export const gateWayUrl = "https://clock-api.irdn.is";

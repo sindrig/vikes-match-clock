@@ -8,7 +8,7 @@ export interface MatchListMatch {
 	time: string;
 	home: MatchListMatchTeam;
 	away: MatchListMatchTeam;
-	matchId?: string | null;
+	match_id: number;
 }
 
 export interface MatchList {

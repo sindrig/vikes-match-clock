@@ -5,11 +5,14 @@ export const googleAuthProvider = new GoogleAuthProvider();
 
 <script lang="ts" setup>
 import { signInWithPopup, signOut } from "firebase/auth";
+import { ref as databaseRef } from "firebase/database";
 import {
   useCurrentUser,
   useFirebaseAuth,
   useIsCurrentUserLoaded,
 } from "vuefire";
+import { update } from "firebase/database";
+import type { ControllerConfig } from "~/models/clock-config";
 
 definePageMeta({
   linkTitle: "Login",
@@ -19,6 +22,7 @@ definePageMeta({
 const auth = useFirebaseAuth()!; // only exists on client side
 const user = useCurrentUser();
 const isUserLoaded = useIsCurrentUserLoaded();
+const db = useDatabase();
 
 // display errors if any
 const error = ref<Error | null>(null);
@@ -31,19 +35,25 @@ function signinPopup() {
   });
 }
 const router = useRouter();
-const logout = () => {
-  // remove user from local storage
-  // localStorage.removeItem("user");
-  signOut(auth);
-  // redirect to login page
-  router.push("/login");
+const logout = async () => {
+  const location = useRoute().params.location as string;
+  console.log("update");
+  await update(
+    databaseRef(db),
+    transformPartialUpdates(location, {
+      controller: <ControllerConfig>{ view: "idle" },
+    }),
+  );
+  console.log("signout");
+  await signOut(auth);
+  // redirect to home page
+  console.log("router");
+  router.push("/");
 };
 </script>
 
 <template>
   <main>
-    <h2>Login</h2>
-
     <ClientOnly>
       <p v-if="!isUserLoaded">Loading</p>
     </ClientOnly>
@@ -52,15 +62,6 @@ const logout = () => {
 
     <template v-if="user">
       <div>
-        You are currently logged in as:
-        <br />
-        <img
-          class="avatar"
-          v-if="user.photoURL"
-          :src="user.photoURL"
-          referrerpolicy="no-referrer"
-        />
-        <br />
         <strong>{{ user.displayName }}</strong>
       </div>
       <button @click="logout">Log out and reset data</button>

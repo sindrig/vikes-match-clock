@@ -1,7 +1,19 @@
-import { ref as databaseRef, update, type Database } from "firebase/database";
+type InputValue = number | string | null | { [key: string]: any };
 
-export const stringSetter = (path: string, db: Database) => {
-	return (value: string) => {
-		update(databaseRef(db), { [path]: value });
-	};
+export const transformPartialUpdates = (
+	path: string,
+	updates: { [key: string]: InputValue },
+): { [key: string]: InputValue } => {
+	return Object.entries(updates).reduce((acc, [key, value]) => {
+		const toAdd =
+			value !== null
+				? Object.fromEntries(
+						Object.entries(value).map(([subKey, subValue]) => [
+							`${path}/${key}/${subKey}`,
+							subValue,
+						]),
+				  )
+				: { [`${path}/${key}`]: null };
+		return { ...acc, ...toAdd };
+	}, {});
 };

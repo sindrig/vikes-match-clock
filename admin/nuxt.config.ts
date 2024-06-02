@@ -6,7 +6,7 @@ export default defineNuxtConfig({
   },
   devtools: { enabled: true },
   // modules: ["@nuxt/ui"],
-  modules: ["@nuxt/ui", "nuxt-vuefire"],
+  modules: ["@nuxt/ui", "nuxt-vuefire", "@nuxt/test-utils/module"],
   // ssr: true,
   vuefire: {
     auth: {
