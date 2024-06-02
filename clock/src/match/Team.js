@@ -6,20 +6,6 @@ import { matchPropType, twoMinPropType } from "../propTypes";
 import { SPORTS } from "../constants";
 import TwoMinClock from "./TwoMinClock";
 
-const imageStyle = (team) => {
-  if (team.name === "HK-Víkingur") {
-    return {
-      maxWidth: "100px",
-    };
-  }
-  if (team.name === "Grikkland") {
-    return {
-      top: "14px",
-    };
-  }
-  return {};
-};
-
 const Team = ({
   score,
   className,
@@ -31,7 +17,7 @@ const Team = ({
   <div className={`team ${className}`}>
     {team.image && (
       <div className="img-wrapper">
-        <img src={team.image} alt={team.name} style={imageStyle(team)} />
+        <img src={team.image} alt={team.name} />
       </div>
     )}
     <div className="team-name">
