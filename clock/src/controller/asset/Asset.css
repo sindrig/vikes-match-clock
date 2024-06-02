@@ -29,10 +29,11 @@
 
 div.asset-player-icon img {
   position: absolute;
-  bottom: 0px;
+  top: 0px;
   right: 0px;
   z-index: 1;
   max-width: 90%;
+  max-height: 75%;
 }
 
 .asset-player-icon span {

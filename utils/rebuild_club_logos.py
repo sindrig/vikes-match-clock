@@ -31,7 +31,7 @@ def sort_key(fn):
 
 
 def main(outfile="clubLogos.js", image_locs="club-logos"):
-    importnames = []
+    importnames: dict[str, str] = {}
     image_folder = os.path.join(BASE, image_locs)
     with open(os.path.join(BASE, outfile), "w") as f:
         filenames: dict[str, list[str]] = defaultdict(list)
@@ -40,12 +40,13 @@ def main(outfile="clubLogos.js", image_locs="club-logos"):
         for _, fns in filenames.items():
             fn = sorted(fns, key=sort_key)[0]
             relfn = os.path.relpath(fn, BASE)
-            importname = sanitize(os.path.basename(fn))
+            base_name = os.path.basename(fn)
+            importname = sanitize(base_name)
             f.write(f'import {{ default as {importname} }} from "./{relfn}";\n')
-            importnames.append(importname)
+            importnames[os.path.splitext(base_name)[0]] = importname
         f.write("\nexport default {\n")
-        for n in sorted(importnames):
-            f.write(f"  {n},\n")
+        for k, v in sorted(importnames.items()):
+            f.write(f'  "{k}": {v},\n')
         f.write("};\n")
 
 

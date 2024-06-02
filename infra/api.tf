@@ -39,6 +39,12 @@ module "api_gateway" {
       timeout_milliseconds   = 12000
     }
 
+    "ANY /match-list" = {
+      lambda_arn             = module.match-list.lambda_function_arn
+      payload_format_version = "2.0"
+      timeout_milliseconds   = 12000
+    }
+
     "ANY /currentWeather" = {
       lambda_arn             = module.weather.lambda_function_arn
       payload_format_version = "2.0"
@@ -106,14 +112,15 @@ resource "aws_cloudwatch_log_group" "logs" {
 
 module "match-report" {
   source  = "terraform-aws-modules/lambda/aws"
-  version = "6.0.1"
+  version = "7.4.0"
 
   function_name = "${random_pet.this.id}-match-report"
   description   = "Match report"
   handler       = "app.lambda_handler"
-  runtime       = "python3.11"
+  runtime       = "python3.12"
 
   publish = true
+  timeout = 20
 
   build_in_docker = true
   source_path     = "${path.module}/../clock-api/match-report"
@@ -140,17 +147,43 @@ module "match-report" {
 
 module "weather" {
   source  = "terraform-aws-modules/lambda/aws"
-  version = "6.0.1"
+  version = "7.4.0"
 
   function_name = "${random_pet.this.id}-weather"
   description   = "Weather"
   handler       = "app.lambda_handler"
-  runtime       = "python3.11"
+  runtime       = "python3.12"
 
   publish = true
+  timeout = 10
 
   build_in_docker = true
   source_path     = "${path.module}/../clock-api/weather"
+
+  allowed_triggers = {
+    AllowExecutionFromAPIGateway = {
+      service    = "apigateway"
+      source_arn = "${module.api_gateway.apigatewayv2_api_execution_arn}/*/*"
+    }
+  }
+}
+
+
+module "match-list" {
+  source  = "terraform-aws-modules/lambda/aws"
+  version = "7.4.0"
+
+  function_name = "${random_pet.this.id}-match-list"
+  description   = "Match lists"
+  handler       = "app.lambda_handler"
+  runtime       = "python3.12"
+
+  publish = true
+
+  timeout = 10
+
+  build_in_docker = true
+  source_path     = "${path.module}/../clock-api/match-list"
 
   allowed_triggers = {
     AllowExecutionFromAPIGateway = {
