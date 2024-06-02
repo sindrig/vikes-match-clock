@@ -1,32 +1,45 @@
 import dataclasses
-import typing
+import datetime
 
 
-class Person(typing.TypedDict):
+@dataclasses.dataclass
+class Match:
+    match_id: int
+    group: str
+    sex: str
+    starts: datetime.datetime
+    home_team: str
+    away_team: str
+
+
+@dataclasses.dataclass
+class Team:
+    name: str
+    id: int | None
+
+
+@dataclasses.dataclass
+class MatchListMatch:
+    date: str
+    time: str
+    home: Team
+    away: Team
+    match_id: int | None
+
+
+@dataclasses.dataclass
+class Error:
+    error: dict[str, str]
+
+
+@dataclasses.dataclass
+class Person:
     id: int | str
     name: str
     role: str
     show: bool
 
 
+@dataclasses.dataclass
 class Player(Person):
     number: int
-
-
-class Referee(typing.TypedDict):
-    name: str
-    role: str
-
-
-class ErrorDict(typing.TypedDict):
-    error: dict[str, str]
-
-
-@dataclasses.dataclass
-class MatchInfo:
-    match_name: str
-    home_team_name: str
-    home_team: typing.Sequence[Person | Player]
-    away_team_name: str
-    away_team: typing.Sequence[Person | Player]
-    refs: list[Referee] | None = None
