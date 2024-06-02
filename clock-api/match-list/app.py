@@ -13,6 +13,17 @@ def get_date(query):
         return datetime.date.today()
 
 
+def get_team(cell: bs4.Tag):
+    name = cell.text.strip()
+    team_link = cell.find("a")
+    team_id = None
+    if team_link and isinstance(team_link, bs4.Tag):
+        parsed = urllib.parse.urlparse(team_link.attrs["href"])
+        qs = urllib.parse.parse_qs(parsed.query)
+        team_id = qs["lid"][0]
+    return {"name": name, "id": team_id}
+
+
 def get_matches(query: dict):
     date = get_date(query)
     r = requests.get(
@@ -35,7 +46,6 @@ def get_matches(query: dict):
             continue
         match_link = cells[6].find("a")
         match_id = None
-        breakpoint()
         if match_link and isinstance(match_link, bs4.Tag):
             parsed = urllib.parse.urlparse(match_link.attrs["href"])
             qs = urllib.parse.parse_qs(parsed.query)
@@ -43,31 +53,29 @@ def get_matches(query: dict):
         yield {
             "date": cells[0].text.strip(),
             "time": cells[1].text.strip(),
-            "home": cells[4].text.strip(),
-            "away": cells[5].text.strip(),
+            "home": get_team(cells[4]),
+            "away": get_team(cells[5]),
             "matchId": match_id,
         }
+
+
+def respond(status_code: int, body: dict):
+    return {
+        "statusCode": status_code,
+        "body": json.dumps(body),
+        "headers": {
+            "Access-Control-Allow-Origin": "*",
+            "Content-Type": "application/json",
+        },
+    }
 
 
 def lambda_handler(json_input, context):
     print(json_input)
     query = json_input.get("queryStringParameters") or {}
     if "location" in query:
-        return {
-            "statusCode": 200,
-            "body": json.dumps({"matches": list(get_matches(query))}),
-            "headers": {
-                "Access-Control-Allow-Origin": "*",
-            },
-        }
-
-    return {
-        "statusCode": 400,
-        "body": json.dumps({"error": "Missing location from query"}),
-        "headers": {
-            "Access-Control-Allow-Origin": "*",
-        },
-    }
+        return respond(200, {"matches": list(get_matches(query))})
+    return respond(400, {"error": "Missing location from query"})
 
 
 if __name__ == "__main__":

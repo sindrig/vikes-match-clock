@@ -1,25 +1,16 @@
 <script lang="ts" setup>
-import { ref as databaseRef, push, update } from "firebase/database";
-import type { UserState } from "~/models/user-data";
+import { ref as databaseRef } from "firebase/database";
 
 const db = useDatabase();
-
+const router = useRouter();
 const user = useCurrentUser();
 const allowedClocks = useDatabaseObject<{ key: string }>(
   user.value ? databaseRef(db, `auth/${user.value.uid}`) : null,
 );
-const state = useDatabaseObject<UserState>(
-  user.value ? databaseRef(db, `user_data/${user.value!.uid}`) : null,
-);
 
-const stringSetter = (attr: string) => {
-  return (value: string) => {
-    const path = ["user_data", user.value!.uid, attr].join("/");
-    update(databaseRef(db), { [path]: value });
-  };
+const setLocation = (value: string) => {
+  router.push(`/control/${value}`);
 };
-
-const setLocation = stringSetter("location");
 </script>
 
 <template>
@@ -28,7 +19,7 @@ const setLocation = stringSetter("location");
       There are no available locations for you. <br />
       Contact an admin and provide him with your user id: {{ user!.uid }}
     </div>
-    <div v-else-if="!state?.location">
+    <div v-else>
       <h1>Which clock do you want to control?</h1>
       <ul>
         <li
@@ -43,10 +34,6 @@ const setLocation = stringSetter("location");
         </li>
       </ul>
     </div>
-    <div v-else>
-      <h1>Controlling: {{ state.location }}</h1>
-    </div>
-    state: {{ state }} <br />
     allowedClocks: {{ allowedClocks }} <br />
   </main>
 </template>
