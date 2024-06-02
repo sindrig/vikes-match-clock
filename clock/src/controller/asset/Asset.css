@@ -31,9 +31,7 @@ div.asset-player-icon img {
   position: absolute;
   top: 0px;
   right: 0px;
-  z-index: 1;
-  max-width: 90%;
-  max-height: 75%;
+  max-width: 100%;
 }
 
 .asset-player-icon span {

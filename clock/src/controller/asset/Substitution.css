@@ -39,11 +39,11 @@
 }
 
 .asset-substitution > div.player-card-image:nth-child(1) img {
-  left: -10%;
+  left: -20%;
   right: auto;
 }
 .asset-substitution > div.player-card-image:nth-child(2) img {
-  right: -10%;
+  right: -20%;
 }
 
 .asset-substitution span.asset-player-number {

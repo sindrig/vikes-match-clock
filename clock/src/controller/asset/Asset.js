@@ -66,7 +66,7 @@ class Asset extends Component {
     }
   }
 
-  getPlayerAsset({ asset, widthMultiplier }) {
+  getPlayerAsset({ asset, widthMultiplier, includeBackground }) {
     const { thumbnail } = this.props;
     if (asset.type === assetTypes.PLAYER) {
       return (
@@ -76,6 +76,7 @@ class Asset extends Component {
           className="player-card-image"
           key={asset.key}
           overlay={asset.overlay}
+          includeBackground={includeBackground}
         >
           {asset.background ? (
             <img src={asset.background} alt={asset.background} />
@@ -94,6 +95,7 @@ class Asset extends Component {
           widthMultiplier={widthMultiplier}
           key={asset.key}
           overlay={asset.overlay}
+          includeBackground={includeBackground}
         >
           {asset.background ? (
             <img src={asset.background} alt={asset.background} />
@@ -222,6 +224,7 @@ class Asset extends Component {
             this.getPlayerAsset({
               asset: subAsset,
               widthMultiplier: 0.7,
+              includeBackground: false,
             }),
           )}
         </Substitution>
