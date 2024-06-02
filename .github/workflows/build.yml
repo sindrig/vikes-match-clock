@@ -96,7 +96,7 @@ jobs:
       - uses: actions/checkout@v2
 
       - name: Set error color
-        if: needs.build.result != 'success'
+        if: needs.build-clock.result != 'success'
         run: echo "SLACK_COLOR=#FF0000" >> $GITHUB_ENV
 
       - name: Slack Notification
