@@ -34,6 +34,12 @@ div.asset-player-icon img {
   max-width: 100%;
 }
 
+div.asset-player-icon.player-card-no-image img {
+  top: 5%;
+  right: 5%;
+  max-height: 70%;
+}
+
 .asset-player-icon span {
   font-family: "Anton", sans-serif;
   position: absolute;
