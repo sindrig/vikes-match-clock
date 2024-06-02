@@ -87,10 +87,10 @@ class KsiClient:
                 )
         return matches
 
-    def get_players(self, match_id) -> dict[str, list[Player]] | Error:
+    def get_players(self, match_id) -> dict[int, list[Player]] | Error:
         game = self.client.service.LeikurLeikmenn(LeikurNumer=match_id)
-        result: dict[str, list[Player]] = defaultdict(list)
-        captains = {}
+        result: dict[int, list[Player]] = defaultdict(list)
+        captains: dict[str, Player] = {}
         if not game.ArrayLeikurLeikmenn:
             return Error(
                 {
@@ -102,9 +102,9 @@ class KsiClient:
             game.ArrayLeikurLeikmenn.LeikurLeikmenn,
             key=player_sort_key,
         ):
-            club_id = str(player.FelagNumer)
+            club_id = player.FelagNumer
             player_dict = self.get_player(player)
-            if club_id in captains and captains[club_id]["number"] < player_dict.number:
+            if club_id in captains and captains[club_id].number < player_dict.number:
                 result[club_id].append(captains[club_id])
                 del captains[club_id]
             if player_dict.role == "Fyrirliði":

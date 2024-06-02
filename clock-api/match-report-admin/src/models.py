@@ -1,5 +1,6 @@
 import dataclasses
 import datetime
+import typing
 
 
 @dataclasses.dataclass
@@ -43,3 +44,8 @@ class Person:
 @dataclasses.dataclass
 class Player(Person):
     number: int
+
+
+@dataclasses.dataclass
+class MatchReport:
+    players: dict[int, list[Player]]

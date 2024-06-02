@@ -7,7 +7,7 @@ import urllib.request
 import bs4
 import requests
 from src.client import ksi_client
-from src.models import Error, Match, MatchListMatch, Team
+from src.models import Error, Match, MatchListMatch, MatchReport, Team
 
 
 class EnhancedJSONEncoder(json.JSONEncoder):
@@ -31,46 +31,28 @@ class EnhancedJSONEncoder(json.JSONEncoder):
 #         }
 
 
-def clock_main(query, context):
+def get_report(query: dict):
     date = get_date(query)
     try:
-        home_team = int(query["homeTeam"])
-        away_team = int(query["awayTeam"])
-        pitch_id = int(query["pitchId"])
+        match_id = int(query["matchId"])
     except KeyError:
         return {
             "error": {
                 "key": "BAD_INPUT",
-                "text": "homeTeam or awayTeam missing: {query}",
+                "text": "matchId missing: {query}",
             }
         }
     except ValueError:
         return {
             "error": {
                 "key": "BAD_INPUT",
-                "text": "homeTeam and awayTeam must be integers",
+                "text": "matchId must be integers",
             }
         }
-    pitch_id = None
-    matches = ksi_client.get_matches(home_team, away_team, date, pitch_id)
-    if not matches:
-        return no_match_found(home_team, away_team)
-    elif isinstance(matches, dict):
-        if "error" in matches:
-            return matches
-        raise ValueError(f"Unknown matches {matches}")
-    return {
-        "matches": [
-            {
-                "group": match.group,
-                "starts": match.starts,
-                "id": match.match_id,
-                "home": match.home_team,
-                "away": match.away_team,
-            }
-            for match in matches
-        ]
-    }
+    players = ksi_client.get_players(match_id=match_id)
+    if isinstance(players, Error):
+        return players
+    return MatchReport(players=players)
 
 
 def get_date(query):
@@ -175,7 +157,7 @@ def lambda_handler(json_input, context):
         case "get-matches":
             return respond(200, {"matches": list(get_matches(query))})
         case "get-report":
-            return respond(200, clock_main(query, context))
+            return respond(200, get_report(query))
     return respond(400, {"error": "Action not found"})
 
 
@@ -183,8 +165,8 @@ if __name__ == "__main__":
     print(
         lambda_handler(
             # {"queryStringParameters": {"location": 2621}},
-            {"queryStringParameters": {"location": "102", "action": "get-matches"}},
-            # {"queryStringParameters": {"matchId": "102", "action": "get-report"}},
+            # {"queryStringParameters": {"location": "102", "action": "get-matches"}},
+            {"queryStringParameters": {"matchId": "638172", "action": "get-report"}},
             {},
         )
     )
