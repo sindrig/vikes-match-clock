@@ -47,6 +47,7 @@ class PlayerCard extends Component {
     // eslint-disable-next-line
     vp: viewPortPropType.isRequired,
     background: PropTypes.string.isRequired,
+    includeBackground: PropTypes.bool.isRequired,
   };
 
   static defaultProps = {
@@ -58,6 +59,7 @@ class PlayerCard extends Component {
       text: "",
       blink: false,
     },
+    includeBackground: true,
   };
 
   state = {
@@ -91,17 +93,25 @@ class PlayerCard extends Component {
   }
 
   render() {
-    const { thumbnail, asset, children, className, overlay, background } =
-      this.props;
+    const {
+      thumbnail,
+      asset,
+      children,
+      className,
+      overlay,
+      background,
+      includeBackground,
+    } = this.props;
     const { fontSizes } = this.state;
     const nameStyle = {
       fontSize: `${thumbnail ? fontSizes.thumbnail : fontSizes.regular}px`,
     };
+    const style = includeBackground ? getBackground(background) : {};
     return (
       <div
         className={`asset-player-icon ${className}`}
         key={asset.key}
-        style={getBackground(background)}
+        style={style}
       >
         {children}
         <span
