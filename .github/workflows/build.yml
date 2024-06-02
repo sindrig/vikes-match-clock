@@ -57,7 +57,7 @@ jobs:
           CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          working-directory: ./clock
+          working-directory: clock
           start: npx serve -s build
           record: ${{ secrets.CYPRESS_RECORD_KEY != '' }}
           install-command: pnpm i
