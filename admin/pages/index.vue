@@ -43,6 +43,9 @@ const setLocation = stringSetter("location");
         </li>
       </ul>
     </div>
+    <div v-else>
+      <h1>Controlling: {{ state.location }}</h1>
+    </div>
     state: {{ state }} <br />
     allowedClocks: {{ allowedClocks }} <br />
   </main>
