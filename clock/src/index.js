@@ -11,13 +11,9 @@ import { firebase } from "./firebase";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 
-const rrfConfig = {
-  userProfile: "users",
-};
-
 const rrfProps = {
   firebase,
-  config: rrfConfig,
+  config: {},
   dispatch: store.dispatch,
 };
 

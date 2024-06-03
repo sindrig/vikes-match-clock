@@ -5,54 +5,6 @@ import backgroundImage from "../images/background_fade.png";
 import backgroundCLImage from "../images/background_cl.png";
 import backgroundELImage from "../images/background_el.png";
 
-export const VPS = {
-  outside: {
-    style: {
-      height: 176,
-      width: 240,
-    },
-    key: "outside",
-    fontSize: "100%",
-    name: "Klukka úti",
-  },
-  insidebig: {
-    style: {
-      height: 288,
-      width: 448,
-    },
-    key: "insidebig",
-    fontSize: "180%",
-    name: "Inni stór",
-  },
-  insidesmall: {
-    style: {
-      height: 224,
-      width: 288,
-    },
-    key: "insidesmall",
-    fontSize: "130%",
-    name: "Inni lítil",
-  },
-  outsidesafamyri: {
-    style: {
-      height: 288,
-      width: 384,
-    },
-    key: "outsidesafamyri",
-    fontSize: "160%",
-    name: "Úti safamýri",
-  },
-  ibv: {
-    style: {
-      height: 512,
-      width: 640,
-    },
-    key: "ibv",
-    fontSize: "290%",
-    name: "Hásteinsvöllur",
-  },
-};
-
 const defaultBackground = "Vikes 2024";
 export const BACKGROUNDS = {
   [defaultBackground]: {
@@ -107,7 +59,13 @@ export const getBackground = (key) =>
   BACKGROUNDS[key] || BACKGROUNDS[defaultBackground];
 
 export const initialState = {
-  vp: VPS.outside,
+  vp: {
+    key: "outside",
+    fontSize: "100%",
+    name: "Skjár",
+    height: 176,
+    width: 240,
+  },
   background: BACKGROUNDS[defaultBackground],
   idleImage: "víkingurr",
 };

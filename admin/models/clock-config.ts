@@ -22,7 +22,20 @@ export interface PitchConfig {
 	controller: ControllerConfig;
 }
 
+export interface Style {
+	height: number;
+	width: number;
+}
+
 export interface Screen {
+	name: string;
+	key: string;
+	fontSize: string;
+	style: Style;
+}
+
+export interface Location {
 	label: string;
-	pitch: number;
+	pitchIds: number[];
+	screens: Screen[];
 }

@@ -37,17 +37,16 @@ function signinPopup() {
 const router = useRouter();
 const logout = async () => {
   const location = useRoute().params.location as string;
-  console.log("update");
-  await update(
-    databaseRef(db),
-    transformPartialUpdates(location, {
-      controller: <ControllerConfig>{ view: "idle" },
-    }),
-  );
-  console.log("signout");
+  if (location) {
+    await update(
+      databaseRef(db),
+      transformPartialUpdates(location, {
+        controller: <ControllerConfig>{ view: "idle" },
+      }),
+    );
+  }
   await signOut(auth);
   // redirect to home page
-  console.log("router");
   router.push("/");
 };
 </script>

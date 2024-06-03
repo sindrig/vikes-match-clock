@@ -12,15 +12,14 @@ const emit = defineEmits<{
 const props = defineProps<{
   location: string;
 }>();
+const root = `states/${props.location}`;
 
 const db = useDatabase();
-const locationConfig = useDatabaseObject<PitchConfig>(
-  databaseRef(db, `${props.location}`),
-);
+const locationConfig = useDatabaseObject<PitchConfig>(databaseRef(db, root));
 const updateMatch = (match: Partial<MatchConfig>) => {
   update(
     databaseRef(db),
-    transformPartialUpdates(props.location, {
+    transformPartialUpdates(root, {
       match,
     }),
   );

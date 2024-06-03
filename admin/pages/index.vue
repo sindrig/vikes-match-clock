@@ -1,18 +1,31 @@
 <script lang="ts" setup>
 import { ref as databaseRef } from "firebase/database";
-import type { Screen } from "~/models/clock-config";
+import type { Location } from "~/models/clock-config";
 const db = useDatabase();
 const router = useRouter();
 const user = useCurrentUser();
 const allowedClocks = useDatabaseObject<{ key: string }>(
   user.value ? databaseRef(db, `auth/${user.value.uid}`) : null,
 );
-const screens = useDatabaseObject<{ [key: string]: Screen }>(
-  user.value ? databaseRef(db, `screens`) : null,
+const locations = useDatabaseObject<{ [key: string]: Location }>(
+  user.value ? databaseRef(db, `locations`) : null,
 );
 
-const setLocation = (value: string) => {
+const allowedClocksKeys = ref<string[]>([]);
+
+watch(
+  allowedClocks,
+  () =>
+    (allowedClocksKeys.value = Object.entries(allowedClocks)
+      .filter(([_, v]) => v)
+      .map(([k, _]) => k)),
+);
+
+const setLocation = (value: string | number) => {
   router.push(`/control/${value}`);
+};
+const requestLocation = (value: string | number) => {
+  console.log("value", value);
 };
 </script>
 
@@ -25,15 +38,15 @@ const setLocation = (value: string) => {
     <div v-else>
       <h1>Which clock do you want to control?</h1>
       <ul>
-        <li
-          v-for="clock in Object.entries(allowedClocks)
-            .filter(([_, v]) => v)
-            .map(([k, _]) => k)"
-          :key="clock"
-        >
-          <button @click="setLocation(clock)">
-            {{ screens && screens[clock] ? screens[clock].label : clock }}
-          </button>
+        <li v-for="(location, key) in locations" :key="key">
+          <UButton
+            @click="
+              key in allowedClocks ? setLocation(key) : requestLocation(key)
+            "
+            :color="key in allowedClocks ? 'green' : 'red'"
+          >
+            {{ location.label }}
+          </UButton>
         </li>
       </ul>
     </div>

@@ -21,15 +21,20 @@ const screenConfig = useDatabaseObject<Screen>(
   databaseRef(db, `screens/${props.location}`),
 );
 
+onMounted(() => {
+  if (screenConfig.value?.pitch) {
+    execute();
+  }
+});
+
 watch(screenConfig, () => {
-  console.log("screenConfig.value?.pitch", screenConfig.value?.pitch);
   execute();
 });
 
 const { data, error, execute } = useFetch<MatchList>(
   computed(
     () =>
-      `${gateWayUrl}/match-report/v2?action=get-matches&location=${screenConfig.value?.pitch}`,
+      `${gateWayUrl}/match-report/v2?action=get-matches&location=${screenConfig.value?.pitch}&date=2024-06-02`,
   ),
   {
     immediate: false,
@@ -62,4 +67,7 @@ const { data, error, execute } = useFetch<MatchList>(
     </div>
   </div>
   <div v-else>Loading...</div>
+  <CustomMatchCreator @update="(match) => emit('update', match, true)">
+    Custom match
+  </CustomMatchCreator>
 </template>
