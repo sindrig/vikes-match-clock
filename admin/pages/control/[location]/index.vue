@@ -29,7 +29,7 @@ const selectMatch = async (m: MatchListMatch, newMatch: boolean) => {
     selectedMatch: m.match_id,
   };
   await update(
-    databaseRef(db),
+    databaseRef(db, "states"),
     transformPartialUpdates(location, {
       match: matchConfig,
       controller: controllerConfig,

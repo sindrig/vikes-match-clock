@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 import { ref as databaseRef } from "firebase/database";
 
-import type { PitchConfig, Screen } from "~/models/clock-config";
+import type { Location, PitchConfig } from "~/models/clock-config";
 import { gateWayUrl } from "~/utils/api-config";
 import type { MatchList, MatchListMatch } from "~/models/api-responses";
 
@@ -14,27 +14,26 @@ const props = defineProps<{
 }>();
 
 const db = useDatabase();
-const locationConfig = useDatabaseObject<PitchConfig>(
-  databaseRef(db, `${props.location}`),
+
+const stateConfig = useDatabaseObject<PitchConfig>(
+  databaseRef(db, `states/${props.location}`),
 );
-const screenConfig = useDatabaseObject<Screen>(
-  databaseRef(db, `screens/${props.location}`),
+const locationConfig = useDatabaseObject<Location>(
+  databaseRef(db, `locations/${props.location}`),
 );
 
 onMounted(() => {
-  if (screenConfig.value?.pitch) {
+  if (locationConfig.value?.pitchIds) {
     execute();
   }
-});
-
-watch(screenConfig, () => {
-  execute();
 });
 
 const { data, error, execute } = useFetch<MatchList>(
   computed(
     () =>
-      `${gateWayUrl}/match-report/v2?action=get-matches&location=${screenConfig.value?.pitch}&date=2024-06-02`,
+      `${gateWayUrl}/match-report/v2?action=get-matches&${locationConfig.value?.pitchIds
+        .map((v) => `location=${v}`)
+        .join("&")}&date=2024-06-02`,
   ),
   {
     immediate: false,
@@ -45,14 +44,14 @@ const { data, error, execute } = useFetch<MatchList>(
 <template>
   <div
     v-if="
-      locationConfig?.match &&
-      locationConfig?.match.inProgress &&
-      locationConfig.controller.view === 'match'
+      stateConfig?.match &&
+      stateConfig?.match.inProgress &&
+      stateConfig.controller.view === 'match'
     "
   >
-    <button @click="emit('update', locationConfig.match.inProgress, false)">
-      Í gangi:{{ locationConfig?.match.homeTeam }} -
-      {{ locationConfig?.match.awayTeam }}
+    <button @click="emit('update', stateConfig.match.inProgress, false)">
+      Í gangi:{{ stateConfig?.match.homeTeam }} -
+      {{ stateConfig?.match.awayTeam }}
     </button>
   </div>
   <div v-if="error">Error: {{ error }}</div>

@@ -39,7 +39,7 @@ const logout = async () => {
   const location = useRoute().params.location as string;
   if (location) {
     await update(
-      databaseRef(db),
+      databaseRef(db, "states"),
       transformPartialUpdates(location, {
         controller: <ControllerConfig>{ view: "idle" },
       }),
