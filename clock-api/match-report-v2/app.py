@@ -118,6 +118,7 @@ def get_matches(query: dict) -> typing.Generator[MatchListMatch, None, None]:
         if match_id:
             yield MatchListMatch(
                 date=cells[0].text.strip(),
+                competition=cells[2].text.strip(),
                 time=time,
                 home=home_team,
                 away=away_team,

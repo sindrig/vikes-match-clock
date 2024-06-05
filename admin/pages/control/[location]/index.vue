@@ -10,7 +10,8 @@ const router = useRouter();
 
 const match = ref<MatchListMatch | null>(null);
 const resetMatch = ref<boolean>(false);
-const location = useRoute().params.location as string;
+const route = useRoute();
+const location = route.params.location as string;
 
 const { data, error, execute, pending } = useFetch<MatchReport>(
   computed(
@@ -78,6 +79,11 @@ watch([match, data], async () => {
       :description="error.message"
     />
     <UAlert v-if="match && pending" title="Loading match report.." />
-    <MatchSelector v-else @update="selectMatch" :location="location" />
+    <MatchSelector
+      v-else
+      @update="selectMatch"
+      :location="location"
+      :debug-date="route.query.date as string"
+    />
   </main>
 </template>

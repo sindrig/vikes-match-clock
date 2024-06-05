@@ -11,6 +11,7 @@ const emit = defineEmits<{
 
 const props = defineProps<{
   location: string;
+  debugDate?: string;
 }>();
 
 const db = useDatabase();
@@ -33,7 +34,7 @@ const { data, error, execute } = useFetch<MatchList>(
     () =>
       `${gateWayUrl}/match-report/v2?action=get-matches&${locationConfig.value?.pitchIds
         .map((v) => `location=${v}`)
-        .join("&")}&date=2024-06-02`,
+        .join("&")}${props.debugDate ? `&date=${props.debugDate}` : ""}`,
   ),
   {
     immediate: false,
@@ -49,10 +50,13 @@ const { data, error, execute } = useFetch<MatchList>(
       stateConfig.controller.view === 'match'
     "
   >
-    <button @click="emit('update', stateConfig.match.inProgress, false)">
+    <UButton
+      color="orange"
+      @click="emit('update', stateConfig.match.inProgress, false)"
+    >
       Í gangi:{{ stateConfig?.match.homeTeam }} -
       {{ stateConfig?.match.awayTeam }}
-    </button>
+    </UButton>
   </div>
   <div v-if="error">Error: {{ error }}</div>
   <div v-else-if="data">
@@ -60,9 +64,11 @@ const { data, error, execute } = useFetch<MatchList>(
       v-for="match in data.matches"
       :key="match.home.id + match.away.id + match.time"
     >
-      <button @click="emit('update', match, true)">
-        {{ match.time }}: {{ match.home.name }} - {{ match.away.name }}
-      </button>
+      <UButton @click="emit('update', match, true)">
+        {{ match.time }}: {{ match.home.name }} - {{ match.away.name }} ({{
+          match.competition
+        }})
+      </UButton>
     </div>
   </div>
   <div v-else>Loading...</div>

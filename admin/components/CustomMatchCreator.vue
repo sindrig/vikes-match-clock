@@ -35,7 +35,13 @@ async function onSubmit(
   const dateIso = new Date().toISOString().split("T");
   const date = dateIso[0];
   const time = dateIso[1].split(".")[0];
-  emit("update", { ...event.data, date, time, match_id: "custom" });
+  emit("update", {
+    ...event.data,
+    date,
+    time,
+    match_id: "custom",
+    competition: "",
+  });
 }
 </script>
 
@@ -57,7 +63,7 @@ async function onSubmit(
       <UButton type="submit"> Start custom match </UButton>
     </UForm>
   </div>
-  <button v-else @click="showForm = true">
+  <UButton color="red" v-else @click="showForm = true">
     <slot></slot>
-  </button>
+  </UButton>
 </template>

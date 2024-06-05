@@ -23,6 +23,7 @@ class Team:
 class MatchListMatch:
     date: str
     time: str
+    competition: str
     home: Team
     away: Team
     match_id: int | None

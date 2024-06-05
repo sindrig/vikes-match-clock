@@ -6,6 +6,7 @@ export interface MatchListMatchTeam {
 export interface MatchListMatch {
 	date: string;
 	time: string;
+	competition: string;
 	home: MatchListMatchTeam;
 	away: MatchListMatchTeam;
 	match_id: number | "custom";
