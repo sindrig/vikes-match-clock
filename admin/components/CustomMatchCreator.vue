@@ -23,8 +23,6 @@ const validate = (state: any): FormError[] => {
   const errors = [];
   if (!state.home) errors.push({ path: "home", message: "Required" });
   if (!state.away) errors.push({ path: "away", message: "Required" });
-  console.log("state.home", state.home);
-  console.log("state.away", state.away);
   return errors;
 };
 
@@ -37,7 +35,7 @@ async function onSubmit(
   const dateIso = new Date().toISOString().split("T");
   const date = dateIso[0];
   const time = dateIso[1].split(".")[0];
-  emit("update", { ...event.data, date, time, match_id: null });
+  emit("update", { ...event.data, date, time, match_id: "custom" });
 }
 </script>
 

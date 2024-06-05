@@ -76,7 +76,7 @@ const MatchActions = ({
     addGoal({ team: awayOrHome });
     if (
       match.matchType === SPORTS.football &&
-      match[`${awayOrHome}Team`] === "víkingurr"
+      match[`${awayOrHome}Team`] === "Víkingur R"
     ) {
       renderAsset({
         asset: {
@@ -96,7 +96,7 @@ const MatchActions = ({
         getPlayerAssetObject({
           listenPrefix,
           player,
-          teamName: "víkingurr",
+          teamName: "Víkingur R",
           // MAAAARK blink
           // overlay: {
           //   text: "",

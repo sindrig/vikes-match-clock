@@ -26,6 +26,7 @@ if (!key || !dbName) {
 		vikinni: {
 			label: "Víkin inni",
 			pitchIds: [102],
+			config: {},
 			screens: [
 				{
 					name: "Stóri",
@@ -50,6 +51,10 @@ if (!key || !dbName) {
 		vikuti: {
 			label: "Víkin úti",
 			pitchIds: [102],
+			config: {
+				homeTeam: 103,
+				goalScorerBackground: "config/baddi.gif",
+			},
 			screens: [
 				{
 					key: "outside",
@@ -65,6 +70,10 @@ if (!key || !dbName) {
 		safamyriuti: {
 			label: "Safamýri úti",
 			pitchIds: [7602, 8622],
+			config: {
+				homeTeam: 103,
+				goalScorerBackground: "config/baddi.gif",
+			},
 			screens: [
 				{
 					key: "outside",
@@ -80,6 +89,7 @@ if (!key || !dbName) {
 		hasteinsvollur: {
 			label: "Hásteinsvöllur",
 			pitchIds: [221],
+			config: {},
 			screens: [
 				{
 					key: "ibv",

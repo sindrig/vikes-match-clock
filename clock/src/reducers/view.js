@@ -67,7 +67,7 @@ export const initialState = {
     width: 240,
   },
   background: BACKGROUNDS[defaultBackground],
-  idleImage: "víkingurr",
+  idleImage: "Víkingur R",
 };
 
 const actions = {
