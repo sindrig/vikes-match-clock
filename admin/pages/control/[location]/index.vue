@@ -3,6 +3,7 @@ import type { MatchListMatch } from "~/models/api-responses";
 import type { MatchConfig, ControllerConfig } from "~/models/clock-config";
 import type { MatchReport } from "~/models/api-responses";
 import { transformPartialUpdates } from "~/utils/database";
+import defaultHalfStops, { groupStops } from "~/data/halfStops";
 import { ref as databaseRef, update } from "firebase/database";
 
 const db = useDatabase();
@@ -39,7 +40,12 @@ watch([match, data], async () => {
       homeTeamId: m.home.id,
       awayTeam: m.away.name,
       awayTeamId: m.away.id,
+      halfStops: defaultHalfStops,
     };
+    const group = parseInt(m.competition.slice(0, 1), 10);
+    if (group && !isNaN(group) && groupStops[group]) {
+      matchConfig.halfStops = groupStops[group];
+    }
     if (resetMatch.value) {
       matchConfig.started = 0;
       matchConfig.timeElapsed = 0;

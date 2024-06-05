@@ -13,6 +13,7 @@ export interface MatchConfig extends NumericMatchConfigAttrs {
 	homeTeam: string;
 	homeTeamId: string;
 	inProgress?: MatchListMatch;
+	halfStops: number[];
 }
 
 export enum AssetTypes {
