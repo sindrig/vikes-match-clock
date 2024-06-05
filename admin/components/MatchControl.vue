@@ -1,7 +1,11 @@
 <script lang="ts" setup>
 import { ref as databaseRef } from "firebase/database";
 
-import type { PitchConfig, MatchConfig } from "~/models/clock-config";
+import type {
+  PitchConfig,
+  MatchConfig,
+  NumericMatchConfigAttrs,
+} from "~/models/clock-config";
 import type { MatchListMatch } from "~/models/api-responses";
 import { update } from "firebase/database";
 
@@ -24,38 +28,19 @@ const updateMatch = (match: Partial<MatchConfig>) => {
     }),
   );
 };
+const updateNumber = (attr: keyof NumericMatchConfigAttrs, value: number) => {
+  if (locationConfig.value) {
+    updateMatch({ [attr]: (locationConfig.value.match[attr] || 0) + value });
+  }
+};
 </script>
 
 <template>
   <div v-if="locationConfig">
-    <button
-      @click="
-        updateMatch({ homeScore: (locationConfig.match.homeScore || 0) + 1 })
-      "
-    >
-      +1 home
-    </button>
-    <button
-      @click="
-        updateMatch({ homeScore: (locationConfig.match.homeScore || 0) - 1 })
-      "
-    >
-      -1 home
-    </button>
-    <button
-      @click="
-        updateMatch({ awayScore: (locationConfig.match.awayScore || 0) + 1 })
-      "
-    >
-      +1 away
-    </button>
-    <button
-      @click="
-        updateMatch({ awayScore: (locationConfig.match.awayScore || 0) - 1 })
-      "
-    >
-      -1 away
-    </button>
+    <button @click="updateNumber('homeScore', 1)">+1 home</button>
+    <button @click="updateNumber('homeScore', -1)">-1 home</button>
+    <button @click="updateNumber('awayScore', 1)">+1 away</button>
+    <button @click="updateNumber('awayScore', -1)">-1 away</button>
     <button @click="updateMatch({ started: Date.now() })">begin match</button>
     <button
       @click="

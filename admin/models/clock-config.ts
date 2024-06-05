@@ -1,15 +1,18 @@
 import type { MatchListMatch, MatchReport } from "./api-responses";
 
-export interface MatchConfig {
+export interface NumericMatchConfigAttrs {
+	awayScore: number;
+	homeScore: number;
+	started: number;
+	timeElapsed: number;
+}
+
+export interface MatchConfig extends NumericMatchConfigAttrs {
 	awayTeam: string;
 	awayTeamId: string;
 	homeTeam: string;
 	homeTeamId: string;
 	inProgress?: MatchListMatch;
-	awayScore: number;
-	homeScore: number;
-	started: number;
-	timeElapsed: number;
 }
 
 export enum AssetTypes {
