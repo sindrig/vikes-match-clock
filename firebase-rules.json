@@ -1,0 +1,20 @@
+{
+  "rules": {
+    "auth": {
+      "$user_id": {
+        ".read": "$user_id == auth.uid"
+      },
+      ".write": false,
+    },
+    "locations": {
+      ".read": true,
+      ".write": false,
+    },
+    "states": {
+     "$location": {
+        ".write": "root.child('auth').child(auth.uid).child($location).val() == true",
+        ".read": true
+      } 
+    }
+  }
+}

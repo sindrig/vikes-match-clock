@@ -9,7 +9,7 @@ export const initialState = {
   started: 0,
   timeElapsed: 0,
   halfStops: DEFAULT_HALFSTOPS[SPORTS.football],
-  homeTeam: "víkingurr",
+  homeTeam: "Víkingur R",
   awayTeam: "",
   homeTeamId: 103,
   awayTeamId: 0,
@@ -22,6 +22,7 @@ export const initialState = {
   awayTimeouts: 0,
   buzzer: false,
   countdown: false,
+  showInjuryTime: true,
 };
 
 const actions = {

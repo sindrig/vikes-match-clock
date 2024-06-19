@@ -15,7 +15,6 @@ import Button from "rsuite/Button";
 import { Tooltip, Whisper } from "rsuite";
 
 import { TABS, VIEWS } from "../reducers/controller";
-import { VPS } from "../reducers/view";
 import MatchActions from "./MatchActions";
 import MatchActionSettings from "./MatchActionSettings";
 import MediaManager from "./media/MediaManager";
@@ -38,16 +37,10 @@ const Controller = ({
   clearState,
   view,
   vp,
-  setViewPort,
   sync,
   auth,
   tab,
 }) => {
-  const currentViewPortName = Object.keys(VPS).filter(
-    (key) =>
-      VPS[key].style.height === vp.style.height &&
-      VPS[key].style.width === vp.style.width,
-  )[0];
   const showControls = !sync || !auth.isEmpty;
   const showHome = tab === "home";
   // If not logged in, only show the settings tab
@@ -114,20 +107,6 @@ const Controller = ({
               ))}
             </div>
           )}
-          <div className="viewport-select">
-            <select
-              value={currentViewPortName}
-              onChange={(e) =>
-                VPS[e.target.value] && setViewPort(VPS[e.target.value])
-              }
-            >
-              {Object.keys(VPS).map((VP) => (
-                <option value={VP} key={VP}>
-                  {VPS[VP].name}
-                </option>
-              ))}
-            </select>
-          </div>
           <Button
             color="red"
             appearance="primary"

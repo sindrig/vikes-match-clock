@@ -86,10 +86,13 @@ const actions = {
   },
   [ActionTypes.selectMatch]: {
     next(state, { payload }) {
-      return {
-        ...state,
-        selectedMatch: payload,
-      };
+      const selectedMatch = parseInt(payload, 10);
+      if (!isNaN(selectedMatch)) {
+        return {
+          ...state,
+          selectedMatch,
+        };
+      }
     },
   },
   [`${ActionTypes.getAvailableMatches}_${ActionType.Fulfilled}`]: {

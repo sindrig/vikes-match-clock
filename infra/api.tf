@@ -39,6 +39,12 @@ module "api_gateway" {
       timeout_milliseconds   = 12000
     }
 
+    "ANY /match-report/v2" = {
+      lambda_arn             = module.match-report-v2.lambda_function_arn
+      payload_format_version = "2.0"
+      timeout_milliseconds   = 12000
+    }
+
     "ANY /currentWeather" = {
       lambda_arn             = module.weather.lambda_function_arn
       payload_format_version = "2.0"
@@ -106,14 +112,15 @@ resource "aws_cloudwatch_log_group" "logs" {
 
 module "match-report" {
   source  = "terraform-aws-modules/lambda/aws"
-  version = "6.0.1"
+  version = "7.4.0"
 
   function_name = "${random_pet.this.id}-match-report"
   description   = "Match report"
   handler       = "app.lambda_handler"
-  runtime       = "python3.11"
+  runtime       = "python3.12"
 
   publish = true
+  timeout = 20
 
   build_in_docker = true
   source_path     = "${path.module}/../clock-api/match-report"
@@ -140,17 +147,54 @@ module "match-report" {
 
 module "weather" {
   source  = "terraform-aws-modules/lambda/aws"
-  version = "6.0.1"
+  version = "7.4.0"
 
   function_name = "${random_pet.this.id}-weather"
   description   = "Weather"
   handler       = "app.lambda_handler"
-  runtime       = "python3.11"
+  runtime       = "python3.12"
 
   publish = true
+  timeout = 10
 
   build_in_docker = true
   source_path     = "${path.module}/../clock-api/weather"
+
+  allowed_triggers = {
+    AllowExecutionFromAPIGateway = {
+      service    = "apigateway"
+      source_arn = "${module.api_gateway.apigatewayv2_api_execution_arn}/*/*"
+    }
+  }
+}
+
+module "match-report-v2" {
+  source  = "terraform-aws-modules/lambda/aws"
+  version = "7.4.0"
+
+  function_name = "${random_pet.this.id}-match-report-v2"
+  description   = "Match report for new admin interface"
+  handler       = "app.lambda_handler"
+  runtime       = "python3.12"
+
+  publish = true
+
+  timeout = 20
+
+  build_in_docker = true
+  source_path     = "${path.module}/../clock-api/match-report-v2"
+
+  vpc_security_group_ids = [
+    "sg-03ecf18a377c6c35f"
+  ]
+  vpc_subnet_ids = [
+    "subnet-0c45ac69865df1ecf",
+    "subnet-09299f279812c8762",
+    "subnet-0191832d9edda018a",
+  ]
+  attach_network_policy              = true
+  replace_security_groups_on_destroy = true
+  replacement_security_group_ids     = ["sg-03ecf18a377c6c35f"]
 
   allowed_triggers = {
     AllowExecutionFromAPIGateway = {

@@ -4,14 +4,20 @@ import ActionTypes from "../ActionTypes";
 
 export const initialState = {
   available: [],
+  screens: [],
 };
 
 const handleRemote = {
   next(state, { data, path }) {
-    if (path === "listeners" && data) {
+    if (path === "locations" && data) {
       return {
         ...state,
-        available: data.available.split(","),
+        available: Object.keys(data),
+        screens: Object.entries(data)
+          .map(([key, { label, screens }]) =>
+            screens.map((screen) => ({ screen, label, key })),
+          )
+          .reduce((a, b) => a.concat(b), []),
       };
     } else if (path.startsWith("auth/")) {
       return {

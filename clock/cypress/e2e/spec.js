@@ -28,7 +28,14 @@ context("Basic navigation", () => {
     cy.get(".away img").should("have.length", 1);
     cy.get(".away img").should("have.attr", "src").should("include", "Fram");
     cy.get(".halfstops-input").should("have.length", 4);
-    cy.tick(ONE_MINUTE * 33.5);
+    cy.tick(ONE_MINUTE * 35);
+    cy.get(".matchclock").should("have.text", "46:30");
+    cy.contains("Heim").click();
+    cy.contains("Pása").click();
+    cy.contains("Næsti hálfleikur").click();
+    cy.tick(ONE_MINUTE);
+    cy.get(".matchclock").should("have.text", "45:00");
+    cy.contains("Stillingar").click();
     cy.get(".halfstops-input").should("have.length", 3);
     cy.contains("Heim").click();
     cy.contains("Byrja").click();
@@ -44,7 +51,6 @@ context("Basic navigation", () => {
     cy.contains("Stillingar").click();
     cy.get("#view-selector-match").click();
     cy.get(".match-type-selector").select("handball");
-    cy.get(".viewport-select select").select("Inni stór");
     cy.get("#view-selector-control").click();
 
     cy.contains("Stop").should("have.length", 0);

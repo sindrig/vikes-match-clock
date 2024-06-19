@@ -12,11 +12,14 @@ export const initialState = {
 
 const handleRemote = {
   next(state, { data, path }) {
-    if (path === "listeners" && data && data.available && !state.listenPrefix) {
-      return {
-        ...state,
-        listenPrefix: data.available.split(",")[0],
-      };
+    if (path.startsWith("auth/") && data) {
+      const available = Object.entries(data).filter((kv) => kv[1] === true)[0];
+      if (!state.listenPrefix || available.indexOf(state.listenPrefix) === -1) {
+        return {
+          ...state,
+          listenPrefix: available[0],
+        };
+      }
     }
     return state;
   },

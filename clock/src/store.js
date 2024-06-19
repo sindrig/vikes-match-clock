@@ -13,7 +13,7 @@ const firebaseMiddleware = (store) => (next) => (action) => {
   const { type } = action;
   const result = next(action);
   const {
-    remote: { sync },
+    remote: { sync, listenPrefix },
     match,
     controller,
     view,
@@ -27,16 +27,14 @@ const firebaseMiddleware = (store) => (next) => (action) => {
   }
   if (firebase && sync) {
     if (auth.isLoaded && !auth.isEmpty) {
-      const { email } = auth;
-      const userPrefix = email.split("@")[0];
       if (Match[type]) {
-        firebase.set(`${userPrefix}/match`, match);
+        firebase.set(`states/${listenPrefix}/match`, match);
       }
       if (Controller[type]) {
-        firebase.set(`${userPrefix}/controller`, controller);
+        firebase.set(`states/${listenPrefix}/controller`, controller);
       }
       if (View[type]) {
-        firebase.set(`${userPrefix}/view`, view);
+        firebase.set(`states/${listenPrefix}/view`, view);
       }
     }
     if (type === rrfActionTypes.SET) {

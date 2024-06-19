@@ -23,7 +23,7 @@ const MatchSelector = ({ availableMatches, selectedMatch, selectMatch }) => (
 
 MatchSelector.propTypes = {
   availableMatches: availableMatchesPropType.isRequired,
-  selectedMatch: PropTypes.string,
+  selectedMatch: PropTypes.number,
   selectMatch: PropTypes.func.isRequired,
 };
 

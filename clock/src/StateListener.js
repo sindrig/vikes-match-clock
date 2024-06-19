@@ -10,19 +10,19 @@ const StateListener = ({ sync, listenPrefix, auth }) => {
   if (auth.isLoaded && !auth.isEmpty) {
     listens.push(`auth/${auth.uid}`);
   } else {
-    listens.push("listeners");
+    listens.push("locations");
   }
   if (listenPrefix) {
     listens.push({
-      path: `${listenPrefix}/match`,
+      path: `states/${listenPrefix}/match`,
       storeAs: "match",
     });
     listens.push({
-      path: `${listenPrefix}/controller`,
+      path: `states/${listenPrefix}/controller`,
       storeAs: "controller",
     });
     listens.push({
-      path: `${listenPrefix}/view`,
+      path: `states/${listenPrefix}/view`,
       storeAs: "view",
     });
   }

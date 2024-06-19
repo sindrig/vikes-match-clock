@@ -3,7 +3,7 @@ import { connect } from "react-redux";
 import { bindActionCreators } from "redux";
 import PropTypes from "prop-types";
 import { matchPropType } from "../propTypes";
-import clubLogos from "../images/clubLogos";
+import clubIds from "../club-ids";
 
 import matchActions from "../actions/match";
 
@@ -14,7 +14,7 @@ const normalize = (string) =>
     .replace(/[\u0300-\u036f]/g, "");
 
 const noCaseSensMatch = (value) => {
-  const foundLogo = Object.keys(clubLogos).filter(
+  const foundLogo = Object.keys(clubIds).filter(
     (logo) => normalize(logo) === normalize(value),
   );
   if (foundLogo.length > 0) {
@@ -24,7 +24,7 @@ const noCaseSensMatch = (value) => {
 };
 
 const filterOption = (key, currentValue) => {
-  if (currentValue && !clubLogos[currentValue]) {
+  if (currentValue && !clubIds[currentValue]) {
     return normalize(key).startsWith(normalize(currentValue));
   }
   return true;
@@ -37,7 +37,7 @@ const TeamSelector = ({ teamAttrName, match, updateMatch }) => (
       onChange={(event) => updateMatch({ [teamAttrName]: event.target.value })}
     >
       <option value="">Veldu lið...</option>
-      {Object.keys(clubLogos)
+      {Object.keys(clubIds)
         .filter((key) => filterOption(key, match[teamAttrName]))
         .map((key) => (
           <option value={key} key={key}>

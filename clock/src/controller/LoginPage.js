@@ -4,6 +4,8 @@ import { bindActionCreators } from "redux";
 import { connect } from "react-redux";
 import { withFirebase } from "react-redux-firebase";
 import remoteActions from "../actions/remote";
+import viewActions from "../actions/view";
+import { viewPortPropType } from "../propTypes";
 
 class LoginPage extends Component {
   static propTypes = {
@@ -19,6 +21,7 @@ class LoginPage extends Component {
       logout: PropTypes.func.isRequired,
     }).isRequired,
     available: PropTypes.arrayOf(PropTypes.string),
+    screens: PropTypes.arrayOf(PropTypes.object),
     listenPrefix: PropTypes.string.isRequired,
     setListenPrefix: PropTypes.func.isRequired,
     auth: PropTypes.shape({
@@ -26,6 +29,8 @@ class LoginPage extends Component {
       isEmpty: PropTypes.bool,
       email: PropTypes.string,
     }).isRequired,
+    setViewPort: PropTypes.func.isRequired,
+    vp: viewPortPropType.isRequired,
   };
 
   static defaultProps = {
@@ -51,25 +56,65 @@ class LoginPage extends Component {
   }
 
   renderListenerCtrl() {
-    const { setListenPrefix, available, listenPrefix } = this.props;
+    const {
+      setListenPrefix,
+      setViewPort,
+      available,
+      listenPrefix,
+      auth,
+      screens,
+      vp,
+    } = this.props;
     if (!available) {
       return null;
     }
-    return (
-      <div>
-        Stjórnandi:
-        <select
-          onChange={({ target: { value } }) => setListenPrefix(value)}
-          value={listenPrefix}
-        >
-          {available.map((a) => (
-            <option value={a} key={a}>
-              {a}
-            </option>
-          ))}
-        </select>
-      </div>
-    );
+    if (auth.isLoaded && !auth.isEmpty) {
+      return (
+        <div>
+          Stjórnandi:
+          <select
+            onChange={({ target: { value } }) => setListenPrefix(value)}
+            value={listenPrefix}
+          >
+            {available.map((a) => (
+              <option value={a} key={a}>
+                {a}
+              </option>
+            ))}
+          </select>
+        </div>
+      );
+    } else {
+      const matching = screens
+        .map((screen, i) => [screen, i])
+        .filter(([{ screen, key }]) => {
+          return (
+            key === listenPrefix &&
+            screen.style.height === vp.style.height &&
+            screen.style.width === vp.style.width
+          );
+        });
+      const currentScreenId = matching.length ? matching[0][1] : 0;
+      return (
+        <div>
+          Skjár:
+          <select
+            onChange={({ target: { value } }) => {
+              const screen = screens[value];
+              setListenPrefix(screen.key);
+              setViewPort(screen.screen);
+            }}
+            value={currentScreenId}
+          >
+            {screens.map(({ screen, label }, i) => (
+              <option value={i} key={i}>
+                {label} {screen.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      );
+    }
   }
 
   render() {
@@ -104,6 +149,14 @@ class LoginPage extends Component {
         .then(() => setListenPrefix(email.split("@")[0]))
         .catch((err) => alert(err.message));
     };
+    const loginWithGoogle = () => {
+      firebase
+        .login({
+          provider: "google",
+          type: "popup",
+        })
+        .then(() => console.log("logged in"));
+    };
     return (
       <div>
         <form onSubmit={login}>
@@ -132,6 +185,7 @@ class LoginPage extends Component {
             <button type="submit">Login</button>
           </div>
         </form>
+        <button onClick={loginWithGoogle}>Login (google)</button>
       </div>
     );
   }
@@ -139,14 +193,17 @@ class LoginPage extends Component {
 
 const stateToProps = ({
   remote: { email, password, sync, listenPrefix },
-  listeners: { available },
+  listeners: { available, screens },
   firebase,
+  view: { vp },
 }) => ({
   email,
   password,
   sync,
   listenPrefix,
   available,
+  screens,
+  vp,
   auth: firebase.auth,
 });
 const dispatchToProps = (dispatch) =>
@@ -156,6 +213,7 @@ const dispatchToProps = (dispatch) =>
       setPassword: remoteActions.setPassword,
       setSync: remoteActions.setSync,
       setListenPrefix: remoteActions.setListenPrefix,
+      setViewPort: viewActions.setViewPort,
     },
     dispatch,
   );
