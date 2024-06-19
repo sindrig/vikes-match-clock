@@ -84,7 +84,7 @@ jobs:
         run: |
           curl -sL https://firebase.tools | bash
           for baseKey in vikinn  vikutisafamyri utiihasteinsvollur do
-            firebase -P vikes-match-clock-firebase database:set /$baseKey/controller/refreshToken -f -d '"'$(uuidgen)'"' --token $FIREBASE_TOKEN
+            firebase -P vikes-match-clock-firebase database:set /states/$baseKey/controller/refreshToken -f -d '"'$(uuidgen)'"' --token $FIREBASE_TOKEN
           done
 
   notify:
