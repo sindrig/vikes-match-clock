@@ -22,6 +22,7 @@ export const initialState = {
   awayTimeouts: 0,
   buzzer: false,
   countdown: false,
+  showInjuryTime: true,
 };
 
 const actions = {
