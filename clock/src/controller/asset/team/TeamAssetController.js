@@ -19,7 +19,7 @@ class TeamAssetController extends Component {
     addAssets: PropTypes.func.isRequired,
     match: matchPropType.isRequired,
     previousView: PropTypes.func.isRequired,
-    selectedMatch: PropTypes.string,
+    selectedMatch: PropTypes.number,
     availableMatches: availableMatchesPropType,
     getAvailableMatches: PropTypes.func.isRequired,
     clearMatchPlayers: PropTypes.func.isRequired,
@@ -60,8 +60,8 @@ class TeamAssetController extends Component {
     } = this.props;
     const match = availableMatches[selectedMatch];
     return {
-      homeTeam: match ? match.players[clubIds[homeTeam]] || [] : [],
-      awayTeam: match ? match.players[clubIds[awayTeam]] || [] : [],
+      homeTeam: match?.players ? match.players[clubIds[homeTeam]] || [] : [],
+      awayTeam: match?.players ? match.players[clubIds[awayTeam]] || [] : [],
     };
   }
 

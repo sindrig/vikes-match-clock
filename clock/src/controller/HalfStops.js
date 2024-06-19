@@ -69,7 +69,7 @@ HalfStops.propTypes = {
 const stateToProps = ({ match: { halfStops, matchType, showInjuryTime } }) => ({
   halfStops,
   matchType,
-  showInjuryTime,
+  showInjuryTime: showInjuryTime || showInjuryTime === undefined,
 });
 const dispatchToProps = (dispatch) =>
   bindActionCreators(

@@ -20,7 +20,7 @@ class Team extends Component {
     selectPlayer: PropTypes.func,
     match: matchPropType.isRequired,
     teamId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-    selectedMatch: PropTypes.string,
+    selectedMatch: PropTypes.number,
   };
 
   static defaultProps = {
@@ -144,7 +144,9 @@ const stateToProps = (
   const selectedMatchObj = availableMatches[selectedMatch];
   const teamId = match[`${ownProps.teamName}Id`];
   return {
-    team: selectedMatchObj ? selectedMatchObj.players[teamId] || [] : [],
+    team: selectedMatchObj?.players
+      ? selectedMatchObj.players[teamId] || []
+      : [],
     match,
     teamId,
     selectedMatch,

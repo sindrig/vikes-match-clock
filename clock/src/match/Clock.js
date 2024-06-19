@@ -19,11 +19,12 @@ class Clock extends Component {
     // eslint-disable-next-line
     matchType: PropTypes.oneOf(Object.keys(SPORTS)).isRequired,
     halfStop: PropTypes.number.isRequired,
-    showInjuryTime: PropTypes.bool.isRequired,
+    showInjuryTime: PropTypes.bool,
   };
 
   static defaultProps = {
     started: null,
+    showInjuryTime: true,
   };
 
   constructor(props) {

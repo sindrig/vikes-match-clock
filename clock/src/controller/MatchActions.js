@@ -341,10 +341,10 @@ const stateToProps = ({
     view,
     listenPrefix,
     match,
-    homeTeam: selectedMatchObj
+    homeTeam: selectedMatchObj?.players
       ? selectedMatchObj.players[match.homeTeamId] || []
       : [],
-    awayTeam: selectedMatchObj
+    awayTeam: selectedMatchObj?.players
       ? selectedMatchObj.players[match.awayTeamId] || []
       : [],
   };

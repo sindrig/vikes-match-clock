@@ -60,13 +60,13 @@ export const getBackground = (key) =>
 
 export const initialState = {
   vp: {
-    key: "outside",
     fontSize: "100%",
-    name: "Skjár",
-    height: 176,
-    width: 240,
+    style: {
+      height: 176,
+      width: 240,
+    },
   },
-  background: BACKGROUNDS[defaultBackground],
+  background: defaultBackground,
   idleImage: "Víkingur R",
 };
 

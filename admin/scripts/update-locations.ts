@@ -80,8 +80,8 @@ if (!key || !dbName) {
 					fontSize: "100%",
 					name: "Skjár",
 					style: {
-						height: 176,
-						width: 240,
+						height: 288,
+						width: 384,
 					},
 				},
 			],
