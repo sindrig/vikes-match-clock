@@ -83,7 +83,7 @@ jobs:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
         run: |
           curl -sL https://firebase.tools | bash
-          for baseKey in vikinn  vikutisafamyri utiihasteinsvollur do
+          for baseKey in vikinni vikuti safamyriuti hasteinsvollur; do
             firebase -P vikes-match-clock-firebase database:set /states/$baseKey/controller/refreshToken -f -d '"'$(uuidgen)'"' --token $FIREBASE_TOKEN
           done
 
