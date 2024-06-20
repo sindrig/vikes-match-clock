@@ -77,7 +77,7 @@ if (!key || !dbName) {
 			screens: [
 				{
 					key: "outside",
-					fontSize: "100%",
+					fontSize: "160%",
 					name: "Skjár",
 					style: {
 						height: 288,
