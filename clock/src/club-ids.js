@@ -177,4 +177,5 @@ export default {
   Ægir: "822",
   Æskan: "139060",
   Örninn: "145472",
+  "Shamrock Rovers": "142447",
 };

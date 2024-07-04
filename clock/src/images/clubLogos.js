@@ -387,6 +387,7 @@ import { default as fhl } from "./club-logos/FHL.png";
 import { default as valur } from "./club-logos/Valur.png";
 import { default as valurreyðarf } from "./club-logos/Valur Reyðarf.png";
 import { default as þorlákur } from "./club-logos/Þorlákur.png";
+import {default as shamrockrovers} from "./club-logos/Shamrock Rovers.png";
 
 export default {
 	"Afganistan": afganistan,
@@ -778,4 +779,5 @@ export default {
 	"Þór Th": þórth,
 	"Þór-KA": þórka,
 	"Þýskaland": þýskaland,
+	"Shamrock Rovers": shamrockrovers,
 };
