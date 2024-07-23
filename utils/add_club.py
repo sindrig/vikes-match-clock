@@ -34,20 +34,25 @@ def main(club_id, out_folder, club_name=None):
         if not club_name:
             raise RuntimeError("Club name not found")
     club_name_var_name = club_name.replace(" ", "").lower()
+    img_url = None
     for img_tag in soup.findAll("img"):
         if img_tag.get("alt", "") == "Model.BasicInfo.ShortName":
             img_url = img_tag["src"]
             break
-    else:
-        raise RuntimeError("Did not find img!")
 
-    exts = [os.path.splitext(str(img_url))[1], ".svg"]
+    exts = [
+        os.path.splitext(str(img_url))[1],
+        ".svg",
+        ".png",
+    ]
     for ext in exts:
         path = os.path.join(out_folder, "%s%s" % (club_name, ext))
         if os.path.isfile(path):
             print("%s exists" % (path,))
             break
     else:
+        if not img_url:
+            raise RuntimeError("Did not find img!")
         path = os.path.join(out_folder, "%s%s" % (club_name, exts[0]))
         r2 = requests.get(get_absolute_url(img_url))
         r2.raise_for_status()

@@ -178,4 +178,5 @@ export default {
   Æskan: "139060",
   Örninn: "145472",
   "Shamrock Rovers": "142447",
+  "Egnatia": "150334",
 };
