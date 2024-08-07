@@ -179,4 +179,5 @@ export default {
   Örninn: "145472",
   "Shamrock Rovers": "142447",
   "Egnatia": "150334",
+  "Flora Tallinn": "148573",
 };
