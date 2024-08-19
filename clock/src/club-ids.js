@@ -180,4 +180,5 @@ export default {
   "Shamrock Rovers": "142447",
   "Egnatia": "150334",
   "Flora Tallinn": "148573",
+  "UE Santa Coloma": "149333",
 };
