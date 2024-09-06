@@ -181,4 +181,5 @@ export default {
   "Egnatia": "150334",
   "Flora Tallinn": "148573",
   "UE Santa Coloma": "149333",
+  "Danmörk": "2020",
 };
