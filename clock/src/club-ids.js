@@ -178,8 +178,9 @@ export default {
   Æskan: "139060",
   Örninn: "145472",
   "Shamrock Rovers": "142447",
-  "Egnatia": "150334",
+  Egnatia: "150334",
   "Flora Tallinn": "148573",
   "UE Santa Coloma": "149333",
-  "Danmörk": "2020",
+  Danmörk: "2020",
+  Wales: "137220",
 };
