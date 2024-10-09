@@ -183,4 +183,5 @@ export default {
   "UE Santa Coloma": "149333",
   Danmörk: "2020",
   Wales: "137220",
+  "Litháen": "137583",
 };

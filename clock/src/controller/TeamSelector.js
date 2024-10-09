@@ -39,6 +39,7 @@ const TeamSelector = ({ teamAttrName, match, updateMatch }) => (
       <option value="">Veldu lið...</option>
       {Object.keys(clubIds)
         .filter((key) => filterOption(key, match[teamAttrName]))
+        .sort((v1, v2) => v1.localeCompare(v2))
         .map((key) => (
           <option value={key} key={key}>
             {key}
