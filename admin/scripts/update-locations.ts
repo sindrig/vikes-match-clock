@@ -102,6 +102,22 @@ if (!key || !dbName) {
 				},
 			],
 		},
+		kopavogsvollur: {
+			label: "Kópavogsvöllur",
+			pitchIds: [52],
+			config: {},
+			screens: [
+				{
+					key: "blix1",
+					fontSize: "180%",
+					name: "Skjár",
+					style: {
+						height: 306,
+						width: 510,
+					},
+				},
+			],
+		},
 	};
 
 	await ref.set(locationConfig);

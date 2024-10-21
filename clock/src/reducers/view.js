@@ -53,6 +53,9 @@ export const BACKGROUNDS = {
   CL: { backgroundImage: `url(${backgroundCLImage})` },
   EuropaLeague: { backgroundImage: `url(${backgroundELImage})` },
   Ekkert: {},
+  Blackout: {
+    backgroundColor: "black",
+  },
 };
 
 export const getBackground = (key) =>

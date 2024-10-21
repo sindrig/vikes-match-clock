@@ -49,14 +49,16 @@ class App extends Component {
   }
 
   renderAppContents() {
-    const { view } = this.props;
+    const { view, background } = this.props;
     switch (view) {
       case VIEWS.match:
       case VIEWS.control:
         return <ScoreBoard />;
       case VIEWS.idle:
       default:
-        return <Idle />;
+        if (background !== "Blackout") {
+          return <Idle />;
+        }
     }
   }
 
