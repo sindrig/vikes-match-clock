@@ -14,6 +14,7 @@ import Ruv from "./Ruv";
 import controllerActions from "../../actions/controller";
 
 import "./Asset.css";
+import VideoPlayer from "./VideoPlayer";
 
 class Asset extends Component {
   static propTypes = {
@@ -60,7 +61,11 @@ class Asset extends Component {
     if (sync && auth.isEmpty) {
       return;
     }
-    const typeNeedsManualRemove = asset.type !== assetTypes.URL;
+    const typesWithoutManualRemove = [assetTypes.URL, assetTypes.VIDEO];
+    const typeNeedsManualRemove = !typesWithoutManualRemove.includes(
+      asset.type,
+    );
+
     if (time && !thumbnail && typeNeedsManualRemove) {
       this.timeout = setTimeout(removeAssetAfterTimeout, time * 1000);
     }
@@ -184,57 +189,71 @@ class Asset extends Component {
     );
   }
 
-  render() {
+  renderSub() {
     const { asset, thumbnail } = this.props;
+    const { subIn, subOut } = asset;
+    if (!subIn || !subOut) {
+      console.log("No subin or subout", asset);
+      return null;
+    }
+    return (
+      <Substitution thumbnail={thumbnail}>
+        {[subIn, subOut].map((subAsset) =>
+          this.getPlayerAsset({
+            asset: subAsset,
+            widthMultiplier: 0.7,
+            includeBackground: false,
+          }),
+        )}
+      </Substitution>
+    );
+  }
+
+  render() {
+    const { asset, thumbnail, removeAssetAfterTimeout } = this.props;
     if (!asset) {
       return null;
     }
 
-    if (asset.type === assetTypes.IMAGE) {
-      return (
-        <img
-          src={asset.url || asset.key}
-          alt={asset.key}
-          key={asset.key}
-          style={{ height: "100%", width: "100%" }}
-        />
-      );
-    }
-    if (asset.type === assetTypes.URL) {
-      return this.renderUrl();
-    }
-    if (asset.type === assetTypes.RUV) {
-      return this.renderRuv();
-    }
-    if (
-      asset.type === assetTypes.PLAYER ||
-      asset.type === assetTypes.NO_IMAGE_PLAYER
-    ) {
-      return this.getPlayerAsset({ asset, widthMultiplier: 1 });
-    }
-    if (asset.type === assetTypes.SUB) {
-      const { subIn, subOut } = asset;
-      if (!subIn || !subOut) {
-        console.log("No subin or subout", asset);
+    switch (asset.type) {
+      case assetTypes.IMAGE:
+        return (
+          <img
+            src={asset.url || asset.key}
+            alt={asset.key}
+            key={asset.key}
+            style={{ height: "100%", width: "100%" }}
+          />
+        );
+      case assetTypes.VIDEO:
+        return (
+          <VideoPlayer
+            asset={asset}
+            onEnded={removeAssetAfterTimeout}
+            thumbnail={thumbnail}
+          />
+        );
+
+      case assetTypes.URL:
+        return this.renderUrl();
+
+      case assetTypes.RUV:
+        return this.renderRuv();
+
+      case assetTypes.PLAYER:
+      case assetTypes.NO_IMAGE_PLAYER:
+        return this.getPlayerAsset({ asset, widthMultiplier: 1 });
+
+      case assetTypes.SUB:
+        return this.renderSub();
+
+      case assetTypes.FREE_TEXT:
+        return this.renderFreeText();
+
+      default:
+        console.error("No type for item ", asset);
         return null;
-      }
-      return (
-        <Substitution thumbnail={thumbnail}>
-          {[subIn, subOut].map((subAsset) =>
-            this.getPlayerAsset({
-              asset: subAsset,
-              widthMultiplier: 0.7,
-              includeBackground: false,
-            }),
-          )}
-        </Substitution>
-      );
     }
-    if (asset.type === assetTypes.FREE_TEXT) {
-      return this.renderFreeText();
-    }
-    console.error("No type for item ", asset);
-    return null;
   }
 }
 

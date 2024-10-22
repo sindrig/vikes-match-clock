@@ -4,6 +4,7 @@ export default {
   PLAYER: "PLAYER",
   NO_IMAGE_PLAYER: "NO_IMAGE_PLAYER",
   IMAGE: "IMAGE",
+  VIDEO: "VIDEO",
   SUB: "SUB",
   FREE_TEXT: "FREE_TEXT",
 };

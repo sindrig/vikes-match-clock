@@ -10,6 +10,10 @@ import TrashIcon from "@rsuite/icons/Trash";
 
 import "./ImageList.css";
 
+const AssetTypeSuffixMap = {
+  mp4: assetTypes.VIDEO,
+};
+
 const ImageList = ({
   prefix,
   renderAsset,
@@ -81,12 +85,15 @@ const ImageList = ({
             <div className="asset-image withborder" key={name}>
               <div
                 onClick={() => {
+                  const parts = name.split(".");
+                  const suffix = parts[parts.length - 1];
+                  const type = AssetTypeSuffixMap[suffix] || assetTypes.IMAGE;
                   const asset = {
                     // To be able to add the same image multiple times to the queue,
                     // we need to make the key unique
                     key: imageUrl + Date.now(),
                     url: imageUrl,
-                    type: assetTypes.IMAGE,
+                    type,
                   };
                   if (displayNow) {
                     renderAsset({ asset });
