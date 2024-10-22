@@ -83,12 +83,14 @@ jobs:
           dist-id: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
           invalidation: index.html
 
+      - uses: w9jds/setup-firebase@main
+        if: github.ref == 'refs/heads/master'
+        with:
+          tools-version: 11.9.0
+          firebase_token: ${{ secrets.FIREBASE_TOKEN }}
       - name: Restart all screens
         if: github.ref == 'refs/heads/master'
-        env:
-          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
         run: |
-          curl -sL https://firebase.tools | bash
           for baseKey in vikinni vikuti safamyriuti hasteinsvollur kopavogsvollur; do
             firebase -P vikes-match-clock-firebase database:set /states/$baseKey/controller/refreshToken -f -d '"'$(uuidgen)'"' --token $FIREBASE_TOKEN
           done
