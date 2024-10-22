@@ -7,7 +7,7 @@ import urllib.request
 
 import bs4
 import requests
-from src.client import ksi_client
+from src.client import ksi_client, sex_map_reverse
 from src.models import Error, Match, MatchListMatch, MatchReport, Team
 
 
@@ -126,6 +126,43 @@ def get_matches(query: dict) -> typing.Generator[MatchListMatch, None, None]:
             )
 
 
+def get_player_id(query: dict):
+    name = query.get("playerName")
+    if not name:
+        return {"error": "playerName parameter missing"}
+
+    team = query.get("teamId")
+    if not team or not team.isdigit():
+        return {"error": "teamId parameter missing or invalid"}
+    team = int(team)
+
+    group = query.get("group")
+    if not group:
+        return {"error": "group parameter missing"}
+
+    sex = query.get("sex")
+    if not sex or sex not in sex_map_reverse:
+        return {"error": "sex parameter missing or invalid"}
+
+    matches = ksi_client.get_matches(
+        home_team=team,
+        group=group,
+        sex=sex_map_reverse[sex],
+        date=datetime.datetime.now() - datetime.timedelta(days=40),
+        date_to=datetime.datetime.now(),
+        away_team=None,
+    )
+    if isinstance(matches, Error):
+        return {"error": matches}
+    for match in matches:
+        players = ksi_client.get_players(match_id=match.match_id)
+        if not isinstance(players, Error):
+            for player in players.get(team, []):
+                if player.name.strip() == name:
+                    return player
+    return {"error": "Player not found"}
+
+
 class IsDataclass(typing.Protocol):
     # as already noted in comments, checking for this attribute is currently
     # the most reliable way to ascertain that something is a dataclass
@@ -151,6 +188,8 @@ def lambda_handler(json_input, context):
             return respond(200, {"matches": list(get_matches(query))})
         case "get-report":
             return respond(200, get_report(query))
+        case "get-player-id":
+            return respond(200, {"id": get_player_id(query)})
     return respond(400, {"error": "Action not found"})
 
 
@@ -159,7 +198,16 @@ if __name__ == "__main__":
         lambda_handler(
             # {"queryStringParameters": {"location": 2621}},
             # {"queryStringParameters": {"location": "102", "action": "get-matches"}},
-            {"queryStringParameters": {"matchId": "638172", "action": "get-report"}},
+            # {"queryStringParameters": {"matchId": "638172", "action": "get-report"}},
+            {
+                "queryStringParameters": {
+                    "action": "get-player-id",
+                    "playerName": "Karl Friðleifur Gunnarsson",
+                    "teamId": "103",
+                    "group": "Meistaraflokkur",
+                    "sex": "kk",
+                }
+            },
             {},
         )
     )

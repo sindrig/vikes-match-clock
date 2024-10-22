@@ -19,6 +19,7 @@ sex_map = {
     0: "kvk",
     1: "kk",
 }
+sex_map_reverse = {v: k for k, v in sex_map.items()}
 
 
 def player_sort_key(p):
@@ -48,13 +49,20 @@ class KsiClient:
         )
 
     def get_matches(
-        self, home_team: int, away_team: int, date: datetime.date, pitch_id: int
+        self,
+        home_team: int,
+        away_team: int | None,
+        date: datetime.date,
+        pitch_id: int | str = "",
+        sex: int | str = "",
+        group: str = "",
+        date_to: datetime.date | None = None,
     ) -> list[Match] | Error:
         result = self.client.service.FelogLeikir(
             FelagNumer=home_team,
             DagsFra=date,
-            DagsTil=date + datetime.timedelta(1),
-            Kyn="",
+            DagsTil=date_to or date + datetime.timedelta(1),
+            Kyn=sex,
             FlokkurNumer="",
             VollurNumer=pitch_id,
         )
@@ -73,7 +81,18 @@ class KsiClient:
         matches: typing.List[Match] = []
         for game in games:
             print(game.MotKyn, ":", game.FelagHeimaNafn, "-", game.FelagUtiNafn)
-            if game.FelagHeimaNumer == home_team and game.FelagUtiNumer == away_team:
+            group_matches = not group or game.Flokkur == group
+            if away_team is None:
+                # Only looking for either team
+                teams_match = (
+                    game.FelagHeimaNumer == home_team or game.FelagUtiNumer == home_team
+                )
+            else:
+                teams_match = (
+                    game.FelagHeimaNumer == home_team
+                    and game.FelagUtiNumer == away_team
+                )
+            if group_matches and teams_match:
                 print("Found match: %s" % (game.LeikurNumer,))
                 matches.append(
                     Match(
