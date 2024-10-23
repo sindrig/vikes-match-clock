@@ -13,14 +13,14 @@ from src.models import ErrorDict, MatchInfo
 from src.uefa import get_match as get_uefa_match
 from src.xlsx import match_to_xlsx
 
-VIKES = '103'
+VIKES = "103"
 
 
 def no_match_found(home_team, away_team) -> ErrorDict:
     return {
-        'error': {
-            'key': 'NO_MATCH_FOUND',
-            'text': 'No match found for these teams (%s-%s)'
+        "error": {
+            "key": "NO_MATCH_FOUND",
+            "text": "No match found for these teams (%s-%s)"
             % (
                 home_team,
                 away_team,
@@ -30,89 +30,93 @@ def no_match_found(home_team, away_team) -> ErrorDict:
 
 
 def clock_main(query, context):
-    if 'date' in query:
-        date = datetime.datetime.strptime(query['date'], '%Y-%m-%d').date()
+    if "date" in query:
+        date = datetime.datetime.strptime(query["date"], "%Y-%m-%d").date()
     else:
         date = datetime.date.today()
     try:
-        home_team = int(query['homeTeam'])
-        away_team = int(query['awayTeam'])
+        home_team = int(query["homeTeam"])
+        away_team = int(query["awayTeam"])
     except KeyError:
         return {
-            'error': {
-                'key': 'BAD_INPUT',
-                'text': 'homeTeam or awayTeam missing: {query}',
+            "error": {
+                "key": "BAD_INPUT",
+                "text": "homeTeam or awayTeam missing: {query}",
             }
         }
     except ValueError:
         return {
-            'error': {
-                'key': 'BAD_INPUT',
-                'text': 'homeTeam and awayTeam must be integers',
+            "error": {
+                "key": "BAD_INPUT",
+                "text": "homeTeam and awayTeam must be integers",
             }
         }
     matches = ksi_client.get_matches(home_team, away_team, date)
     if not matches:
-        return no_match_found(home_team, away_team)
+        # If we don't find any match within the default range, try a longer period
+        matches = ksi_client.get_matches(home_team, away_team, date, back_days=120)
+        if not matches:
+            return no_match_found(home_team, away_team)
     elif isinstance(matches, dict):
-        if 'error' in matches:
+        if "error" in matches:
             return matches
-        raise ValueError(f'Unknown matches {matches}')
+        raise ValueError(f"Unknown matches {matches}")
     result = {
-        'matches': {},
+        "matches": {},
     }
     for match in matches:
         try:
             players = ksi_client.get_players(match.match_id)
-            if players and 'error' not in players:
+            if players and "error" not in players:
                 if str(home_team) not in players:
                     players[str(home_team)] = []
                 if str(away_team) not in players:
                     players[str(away_team)] = []
-                result['matches'][match.match_id] = {
-                    'players': players,
-                    'group': match.group,
-                    'sex': match.sex,
+                result["matches"][match.match_id] = {
+                    "players": players,
+                    "group": match.group,
+                    "sex": match.sex,
                 }
         except:
             pass
-    if not result['matches']:
+    if not result["matches"]:
         return no_match_found(home_team, away_team)
     return result
 
 
 def lambda_handler(json_input, context):
     print(json_input)
-    errors = ''
+    errors = ""
     match = None
-    query = json_input['queryStringParameters'] or {}
+    query = json_input["queryStringParameters"] or {}
     try:
-        if 'debug' in query:
-            errors = (
-                urllib.request.urlopen('https://api.ipify.org').read().decode()
-            )
-        elif 'homeTeam' in query and 'awayTeam' in query:
+        if "debug" in query:
+            errors = urllib.request.urlopen("https://api.ipify.org").read().decode()
+        elif "homeTeam" in query and "awayTeam" in query:
             data = clock_main(query, context)
             return {
-                'statusCode': 200,
-                'body': json.dumps(data),
-                'headers': {
-                    'Access-Control-Allow-Origin': '*',
+                "statusCode": 200,
+                "body": json.dumps(data),
+                "headers": {
+                    "Access-Control-Allow-Origin": "*",
                 },
             }
-        elif 'download' in query:
-            if query['download'].isdigit():
+        elif "download" in query:
+            if query["download"].isdigit():
                 try:
-                    info = ksi_client.get_players(query['download'])
-                    if 'error' in info:
+                    info = ksi_client.get_players(query["download"])
+                    if "error" in info:
                         errors = str(info)
                     else:
-                        (home_team_name, home_team), (
-                            away_team_name,
-                            away_team,
+                        (
+                            (home_team_name, home_team),
+                            (
+                                away_team_name,
+                                away_team,
+                            ),
                         ) = info.items()
                         match = MatchInfo(
-                            match_name=query['download'],
+                            match_name=query["download"],
                             home_team_name=home_team_name,
                             away_team_name=away_team_name,
                             home_team=home_team,
@@ -123,14 +127,11 @@ def lambda_handler(json_input, context):
                     traceback.print_exc()
                     errors = "Match not found"
             else:
-                parsed_url = urlparse(query['download'])
-                if parsed_url.netloc.endswith('uefa.com'):
+                parsed_url = urlparse(query["download"])
+                if parsed_url.netloc.endswith("uefa.com"):
                     parts = list(
                         itertools.chain(
-                            *[
-                                part.split('-')
-                                for part in parsed_url.path.split('/')
-                            ]
+                            *[part.split("-") for part in parsed_url.path.split("/")]
                         )
                     )
                     for part in parts:
@@ -141,48 +142,48 @@ def lambda_handler(json_input, context):
                                 errors = e
                             break
                     else:
-                        errors = 'No match found in query'
+                        errors = "No match found in query"
                 else:
                     errors = f"Unknown url to download: {query['download']}"
             if match:
                 buffer = match_to_xlsx(match)
                 return {
-                    'statusCode': 200,
-                    'headers': {
-                        'Access-Control-Allow-Origin': "*",
-                        'Access-Control-Allow-Methods': "*",
-                        'Content-type': "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        'Content-Disposition': f'attachment; filename="{match.match_name}.xlsx"',
+                    "statusCode": 200,
+                    "headers": {
+                        "Access-Control-Allow-Origin": "*",
+                        "Access-Control-Allow-Methods": "*",
+                        "Content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        "Content-Disposition": f'attachment; filename="{match.match_name}.xlsx"',
                     },
-                    'isBase64Encoded': True,
-                    'body': base64.b64encode(buffer),
+                    "isBase64Encoded": True,
+                    "body": base64.b64encode(buffer),
                 }
-        with open('index.html', 'r') as f:
+        with open("index.html", "r") as f:
             return {
-                'statusCode': 200,
-                'body': Template(f.read()).substitute(errors=errors),
-                'headers': {
-                    'Access-Control-Allow-Origin': '*',
-                    'Content-Type': 'text/html; charset=utf-8',
+                "statusCode": 200,
+                "body": Template(f.read()).substitute(errors=errors),
+                "headers": {
+                    "Access-Control-Allow-Origin": "*",
+                    "Content-Type": "text/html; charset=utf-8",
                 },
             }
 
     except ApiError:
         return {
-            'statusCode': 500,
-            'body': str(ApiError),
-            'headers': {
-                'Access-Control-Allow-Origin': '*',
+            "statusCode": 500,
+            "body": str(ApiError),
+            "headers": {
+                "Access-Control-Allow-Origin": "*",
             },
         }
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     print(
         lambda_handler(
             {
-                'queryStringParameters': {
-                    'download': 'https://www.uefa.com/european-qualifiers/match/2036448--iceland-vs-luxembourg/'
+                "queryStringParameters": {
+                    "download": "https://www.uefa.com/european-qualifiers/match/2036448--iceland-vs-luxembourg/"
                 }
             },
             {},
