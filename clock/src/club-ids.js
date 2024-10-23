@@ -184,4 +184,5 @@ export default {
   Danmörk: "2020",
   Wales: "137220",
   "Litháen": "137583",
+  "Cercle Brugge": "150393",
 };

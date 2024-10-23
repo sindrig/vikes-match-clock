@@ -391,6 +391,7 @@ import {default as shamrockrovers} from "./club-logos/Shamrock Rovers.png";
 import {default as egnatia} from "./club-logos/Egnatia.png";
 import {default as floratallinn} from "./club-logos/Flora Tallinn.png";
 import {default as uesantacoloma} from "./club-logos/UE Santa Coloma.png";
+import {default as cerclebrugge} from "./club-logos/Cercle Brugge.png";
 
 export default {
 	"Afganistan": afganistan,
@@ -786,4 +787,5 @@ export default {
 	"Egnatia": egnatia,
 	"Flora Tallinn": floratallinn,
 	"UE Santa Coloma": uesantacoloma,
+	"Cercle Brugge": cerclebrugge,
 };
