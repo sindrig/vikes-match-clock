@@ -392,6 +392,8 @@ import {default as egnatia} from "./club-logos/Egnatia.png";
 import {default as floratallinn} from "./club-logos/Flora Tallinn.png";
 import {default as uesantacoloma} from "./club-logos/UE Santa Coloma.png";
 import {default as cerclebrugge} from "./club-logos/Cercle Brugge.png";
+import {default as fkborac} from "./club-logos/FK Borac.png";
+import {default as djurgården} from "./club-logos/Djurgården.png";
 
 export default {
 	"Afganistan": afganistan,
@@ -788,4 +790,6 @@ export default {
 	"Flora Tallinn": floratallinn,
 	"UE Santa Coloma": uesantacoloma,
 	"Cercle Brugge": cerclebrugge,
+	"FK Borac": fkborac,
+	"Djurgården": djurgården,
 };

@@ -185,4 +185,6 @@ export default {
   Wales: "137220",
   "Litháen": "137583",
   "Cercle Brugge": "150393",
+  "FK Borac": "150394",
+  "Djurgården": "142479",
 };
