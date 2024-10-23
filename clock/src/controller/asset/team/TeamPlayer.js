@@ -38,6 +38,7 @@ const TeamPlayer = ({ player, onChange }) => (
       onChange={(e) => handler(onChange, "name", e)}
       className="team-player-name"
       placeholder="Nafn"
+      style={player.id ? {} : { backgroundColor: "red" }}
     />
     {false && (
       <input

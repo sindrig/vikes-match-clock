@@ -26,6 +26,7 @@ export const matchPropType = PropTypes.shape({
 
 export const playerPropType = PropTypes.shape({
   name: PropTypes.string.isRequired,
+  id: PropTypes.number,
   number: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
   role: PropTypes.string,
   show: PropTypes.bool,

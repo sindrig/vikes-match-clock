@@ -19,7 +19,7 @@ class TeamAssetController extends Component {
     addAssets: PropTypes.func.isRequired,
     match: matchPropType.isRequired,
     previousView: PropTypes.func.isRequired,
-    selectedMatch: PropTypes.number,
+    selectedMatch: PropTypes.string,
     availableMatches: availableMatchesPropType,
     getAvailableMatches: PropTypes.func.isRequired,
     clearMatchPlayers: PropTypes.func.isRequired,

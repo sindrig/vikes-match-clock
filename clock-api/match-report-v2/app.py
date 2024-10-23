@@ -126,8 +126,8 @@ def get_matches(query: dict) -> typing.Generator[MatchListMatch, None, None]:
             )
 
 
-def get_player_id(query: dict):
-    name = query.get("playerName")
+def search_for_player(query: dict):
+    name = query.get("playerName", "").lower()
     if not name:
         return {"error": "playerName parameter missing"}
 
@@ -158,7 +158,7 @@ def get_player_id(query: dict):
         players = ksi_client.get_players(match_id=match.match_id)
         if not isinstance(players, Error):
             for player in players.get(team, []):
-                if player.name.strip() == name:
+                if player.name.strip().lower() == name:
                     return player
     return {"error": "Player not found"}
 
@@ -188,8 +188,8 @@ def lambda_handler(json_input, context):
             return respond(200, {"matches": list(get_matches(query))})
         case "get-report":
             return respond(200, get_report(query))
-        case "get-player-id":
-            return respond(200, {"id": get_player_id(query)})
+        case "search-for-player":
+            return respond(200, search_for_player(query))
     return respond(400, {"error": "Action not found"})
 
 
@@ -201,7 +201,7 @@ if __name__ == "__main__":
             # {"queryStringParameters": {"matchId": "638172", "action": "get-report"}},
             {
                 "queryStringParameters": {
-                    "action": "get-player-id",
+                    "action": "search-for-player",
                     "playerName": "Karl Friðleifur Gunnarsson",
                     "teamId": "103",
                     "group": "Meistaraflokkur",

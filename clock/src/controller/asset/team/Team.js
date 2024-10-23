@@ -6,13 +6,18 @@ import { playerPropType, matchPropType } from "../../../propTypes";
 import controllerActions from "../../../actions/controller";
 import TeamPlayer from "./TeamPlayer";
 import CloseIcon from "@rsuite/icons/Close";
+import ReloadIcon from "@rsuite/icons/Reload";
 import { Button, IconButton } from "rsuite";
+import axios from "axios";
+import apiConfig from "../../../apiConfig";
 
 import "./Team.css";
 
 class Team extends Component {
   static propTypes = {
     team: PropTypes.arrayOf(playerPropType).isRequired,
+    group: PropTypes.string,
+    sex: PropTypes.string,
     editPlayer: PropTypes.func.isRequired,
     addPlayer: PropTypes.func.isRequired,
     deletePlayer: PropTypes.func.isRequired,
@@ -20,7 +25,7 @@ class Team extends Component {
     selectPlayer: PropTypes.func,
     match: matchPropType.isRequired,
     teamId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-    selectedMatch: PropTypes.number,
+    selectedMatch: PropTypes.string,
   };
 
   static defaultProps = {
@@ -38,6 +43,7 @@ class Team extends Component {
   state = {
     inputValue: "",
     error: "",
+    loading: false,
   };
 
   addEmptyLine() {
@@ -53,8 +59,41 @@ class Team extends Component {
   updatePlayer(idx) {
     return (updatedPlayer) => {
       const { editPlayer, teamId } = this.props;
+      console.log("updatedPlayer", updatedPlayer);
       editPlayer(teamId, idx, updatedPlayer);
     };
+  }
+
+  fetchPlayerId(idx) {
+    const { team, teamId, group, sex } = this.props;
+    const player = team[idx];
+    const options = {
+      params: {
+        playerName: player.name,
+        teamId,
+        group,
+        sex,
+      },
+    };
+    this.setState({ loading: true });
+    axios
+      .get(
+        `${apiConfig.gateWayUrl}match-report/v2?action=search-for-player`,
+        options,
+      )
+      .then((response) => {
+        if (response && response.data && response.data.id) {
+          this.updatePlayer(idx)({ ...response.data, show: player.show });
+        } else {
+          this.setState({ error: `No ID found for player ${player.name}` });
+        }
+      })
+      .catch((e) => {
+        this.setState({ error: e.message });
+      })
+      .finally(() => {
+        this.setState({ loading: false });
+      });
   }
 
   submitForm(event) {
@@ -94,9 +133,12 @@ class Team extends Component {
 
   render() {
     const { team, selectPlayer, teamName, match, selectedMatch } = this.props;
-    const { error } = this.state;
+    const { error, loading } = this.state;
     return (
-      <div className="team-asset-container">
+      <div
+        className="team-asset-container"
+        style={loading ? { backgroundColor: "grey" } : {}}
+      >
         <span>{error}</span>
         {selectPlayer ? this.renderForm() : null}
         <div className="team-name">{match[teamName]}</div>
@@ -111,6 +153,16 @@ class Team extends Component {
                   >{`#${p.number || p.role[0]} - ${p.name}`}</Button>
                 ) : (
                   <TeamPlayer player={p} onChange={this.updatePlayer(i)} />
+                )}
+                {!selectPlayer && !p.id && (
+                  <IconButton
+                    icon={<ReloadIcon />}
+                    size="xs"
+                    color="blue"
+                    appearance="primary"
+                    circle
+                    onClick={() => this.fetchPlayerId(i)}
+                  />
                 )}
                 {!selectPlayer && (
                   <IconButton
@@ -147,6 +199,8 @@ const stateToProps = (
     team: selectedMatchObj?.players
       ? selectedMatchObj.players[teamId] || []
       : [],
+    group: selectedMatchObj?.group,
+    sex: selectedMatchObj?.sex,
     match,
     teamId,
     selectedMatch,
