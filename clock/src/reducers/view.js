@@ -4,6 +4,9 @@ import ActionTypes from "../ActionTypes";
 import backgroundImage from "../images/background_fade.png";
 import backgroundCLImage from "../images/background_cl.png";
 import backgroundELImage from "../images/background_el.png";
+import backgroundConfImage1 from "../images/kop-back1.png";
+import backgroundConfImage2 from "../images/kop-back2.png";
+import backgroundConfImage3 from "../images/kop-back3.png";
 
 const defaultBackground = "Vikes 2024";
 export const BACKGROUNDS = {
@@ -52,6 +55,9 @@ export const BACKGROUNDS = {
   //CL
   CL: { backgroundImage: `url(${backgroundCLImage})` },
   EuropaLeague: { backgroundImage: `url(${backgroundELImage})` },
+  Sambandsdeild1: { backgroundImage: `url(${backgroundConfImage1})` },
+  Sambandsdeild2: { backgroundImage: `url(${backgroundConfImage2})` },
+  Sambandsdeild3: { backgroundImage: `url(${backgroundConfImage3})` },
   Ekkert: {},
   Blackout: {
     backgroundColor: "black",
