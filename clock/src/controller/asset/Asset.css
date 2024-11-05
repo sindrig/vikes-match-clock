@@ -31,7 +31,8 @@ div.asset-player-icon img {
   position: absolute;
   top: 0px;
   right: 0px;
-  max-width: 100%;
+  width: 100%;
+  height: 100%;
 }
 
 div.asset-player-icon.player-card-no-image img {

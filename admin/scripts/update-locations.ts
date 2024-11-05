@@ -112,8 +112,8 @@ if (!key || !dbName) {
 					fontSize: "180%",
 					name: "Skjár",
 					style: {
-						height: 306,
-						width: 510,
+						height: 288,
+						width: 500,
 					},
 				},
 			],
