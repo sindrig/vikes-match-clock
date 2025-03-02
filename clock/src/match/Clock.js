@@ -12,6 +12,7 @@ import ClockBase from "./ClockBase";
 class Clock extends Component {
   static propTypes = {
     started: PropTypes.number,
+    countdown: PropTypes.bool,
     timeElapsed: PropTypes.number.isRequired,
     className: PropTypes.string.isRequired,
     pauseMatch: PropTypes.func.isRequired,
@@ -24,6 +25,7 @@ class Clock extends Component {
 
   static defaultProps = {
     started: null,
+    countdown: false,
     showInjuryTime: true,
   };
 
@@ -33,8 +35,15 @@ class Clock extends Component {
   }
 
   updateTime() {
-    const { started, halfStop, timeElapsed, pauseMatch, buzz, showInjuryTime } =
-      this.props;
+    const {
+      started,
+      halfStop,
+      timeElapsed,
+      pauseMatch,
+      buzz,
+      showInjuryTime,
+      countdown,
+    } = this.props;
     let milliSecondsElapsed = timeElapsed;
     if (started) {
       milliSecondsElapsed += Date.now() - started;
@@ -52,13 +61,16 @@ class Clock extends Component {
     } else {
       seconds = secondsElapsed % 60;
     }
-    const isCountDown = false;
-    if (isCountDown) {
-      seconds = 60 - seconds;
-      minutes = halfStop - minutes - 1;
-      if (seconds === 60) {
-        minutes += 1;
+    if (countdown) {
+      seconds *= -1;
+      minutes *= -1;
+      if (seconds) {
+        minutes -= 1;
+      }
+      if (minutes <= 0 && seconds <= 0) {
+        minutes = 0;
         seconds = 0;
+        pauseMatch();
       }
     }
     return formatTime(minutes, seconds);
@@ -77,9 +89,17 @@ class Clock extends Component {
 }
 
 const stateToProps = ({
-  match: { started, halfStops, timeElapsed, matchType, showInjuryTime },
+  match: {
+    started,
+    halfStops,
+    timeElapsed,
+    matchType,
+    showInjuryTime,
+    countdown,
+  },
 }) => ({
   started,
+  countdown,
   timeElapsed,
   matchType,
   showInjuryTime,

@@ -111,6 +111,15 @@ const actions = {
       };
     },
   },
+  [ActionTypes.setAvailableMatches]: {
+    next(state, { payload: { matches } }) {
+      return {
+        ...state,
+        availableMatches: matches || {},
+        selectedMatch: Object.keys(matches || {})[0] || null,
+      };
+    },
+  },
   [ActionTypes.editPlayer]: {
     next(state, { payload: { teamId, idx, updatedPlayer } }) {
       const { availableMatches, selectedMatch } = state;

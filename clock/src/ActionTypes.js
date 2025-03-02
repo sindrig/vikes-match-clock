@@ -20,6 +20,7 @@ export const Controller = keymirror({
   selectView: null,
   selectAssetView: null,
   getAvailableMatches: null,
+  setAvailableMatches: null,
   getRuvUrl: null,
   clearMatchPlayers: null,
   selectMatch: null,

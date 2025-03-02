@@ -224,7 +224,6 @@ const MatchActions = ({
                   homeTimeouts: 0,
                   awayTimeouts: 0,
                   buzzer: false,
-                  countdown: false,
                   halfStops: DEFAULT_HALFSTOPS[match.matchType],
                 })
               }
@@ -262,7 +261,9 @@ const MatchActions = ({
               </div>
             ) : null}
 
-            {match.matchType === SPORTS.football && !match.started ? (
+            {match.matchType === SPORTS.football &&
+            !match.started &&
+            match.matchStartTime ? (
               <div style={{ whiteSpace: "nowrap", width: "400px" }}>
                 <Button
                   color="green"

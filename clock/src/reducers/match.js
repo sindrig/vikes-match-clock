@@ -1,3 +1,4 @@
+import moment from "moment";
 import { handleActions } from "redux-actions";
 import ActionTypes from "../ActionTypes";
 import clubIds from "../club-ids";
@@ -241,9 +242,14 @@ const actions = {
       if (error) {
         return { ...state, error };
       }
+      const momentTime = moment(state.matchStartTime, "HH:mm");
+      if (momentTime < moment()) {
+        momentTime.add(1, "days");
+      }
+      const timestamp = momentTime.valueOf();
       return {
         ...state,
-        started: Date.now() + 1000 * 15,
+        started: timestamp,
         countdown: true,
       };
     },
@@ -253,9 +259,7 @@ const actions = {
       if (path === "match" && data) {
         const results = { ...state, ...data };
         if (results.started > 0) {
-          if (results.countdown) {
-            results.started = Date.now() + 1000 * 15;
-          } else if (state.started === 0) {
+          if (state.started === 0) {
             // We just pressed start clock. Trust our own time.
             // Compensate for some small lag
             results.started = Date.now() - 150;

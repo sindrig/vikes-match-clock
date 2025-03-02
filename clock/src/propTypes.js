@@ -17,6 +17,7 @@ export const matchPropType = PropTypes.shape({
   awayTeam: PropTypes.string,
   injuryTime: PropTypes.number,
   matchType: PropTypes.oneOf(Object.keys(SPORTS)),
+  matchStartTime: PropTypes.string,
   home2min: PropTypes.arrayOf(twoMinPropType),
   away2min: PropTypes.arrayOf(twoMinPropType),
   timeout: PropTypes.number,

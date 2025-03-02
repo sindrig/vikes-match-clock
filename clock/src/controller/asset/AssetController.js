@@ -17,6 +17,7 @@ import Checkbox from "rsuite/Checkbox";
 import controllerActions from "../../actions/controller";
 
 import "./AssetController.css";
+import MatchesOnPitch from "./team/MatchesOnPitch";
 
 const AssetController = ({
   addAssets,
@@ -165,6 +166,9 @@ const AssetController = ({
         >
           Lið
         </button>
+      </div>
+      <div className="view-selector">
+        {assetView === ASSET_VIEWS.teams && <MatchesOnPitch />}
       </div>
       {assetView === ASSET_VIEWS.assets && renderAssetController()}
       {assetView === ASSET_VIEWS.teams && (

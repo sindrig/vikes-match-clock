@@ -1,5 +1,5 @@
 const ONE_MINUTE = 60000;
-const COUNTDOWN_SECOND = 1125;
+const SECOND = 1000;
 
 context("Basic navigation", () => {
   beforeEach(() => {
@@ -8,7 +8,7 @@ context("Basic navigation", () => {
     // https://on.cypress.io/visit
     cy.clearLocalStorage();
     // Need to start at 1 because 0 won't trigger started
-    cy.clock(1);
+    cy.clock(new Date(2025, 3, 10, 12, 0, 0).getTime());
     cy.visit("/");
   });
 
@@ -88,20 +88,22 @@ context("Basic navigation", () => {
     cy.get(".penalty").should("have.text", "01:30");
   });
 
-  it("starts a countdown", () => {
+  it.only("starts a countdown", () => {
     cy.contains("Stillingar").click();
+    cy.get(".match-start-time-selector").type("13:30");
     cy.get("#view-selector-match").click();
     cy.contains("Heim").click();
     cy.contains("Hefja niðurtalningu").click();
-    cy.get(".countdown img").should("exist");
-    cy.tick(4 * COUNTDOWN_SECOND);
-    for (let i = 10; i > 0; i--) {
-      cy.get(".countdown").should("have.text", i);
-      cy.tick(COUNTDOWN_SECOND);
-    }
-    cy.get(".countdown").should("not.exist");
+
+    cy.tick(SECOND);
+    cy.contains("Byrja").should("have.length", 0);
+    cy.get(".matchclock").should("have.text", "89:59");
+    cy.tick(60 * 60 * SECOND - 1);
+    cy.get(".matchclock").should("have.text", "30:00");
+    cy.tick(60 * 30 * SECOND);
     cy.get(".matchclock").should("have.text", "00:00");
-    cy.tick(COUNTDOWN_SECOND);
-    cy.get(".matchclock").should("have.text", "00:01");
+    cy.tick(30 * SECOND);
+    cy.get(".matchclock").should("have.text", "00:00");
+    cy.contains("Byrja").should("have.length", 1);
   });
 });

@@ -14,8 +14,8 @@ const handleRemote = {
         ...state,
         available: Object.keys(data),
         screens: Object.entries(data)
-          .map(([key, { label, screens }]) =>
-            screens.map((screen) => ({ screen, label, key })),
+          .map(([key, { label, screens, pitchIds }]) =>
+            screens.map((screen) => ({ screen, label, key, pitchIds })),
           )
           .reduce((a, b) => a.concat(b), []),
       };

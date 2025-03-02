@@ -36,6 +36,17 @@ const MatchActionSettings = ({
         <TeamSelector teamAttrName="homeTeam" />
         <TeamSelector teamAttrName="awayTeam" />
         <div>
+          Leikur hefst:
+          <input
+            type="text"
+            className="match-start-time-selector"
+            value={match.matchStartTime}
+            onChange={({ target: { value } }) =>
+              updateMatch({ matchStartTime: value })
+            }
+          />
+        </div>
+        <div>
           Íþrótt:
           <select
             className="match-type-selector"

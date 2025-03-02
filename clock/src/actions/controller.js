@@ -31,6 +31,7 @@ const actions = {
   [ActionTypes.setSelectedAssets]: (selectedAssets) => ({ selectedAssets }),
   [ActionTypes.addAssets]: (assets) => ({ assets }),
   [ActionTypes.removeAsset]: (asset) => ({ asset }),
+  [ActionTypes.setAvailableMatches]: (matches) => ({ matches }),
   [ActionTypes.getAvailableMatches]: (homeTeam, awayTeam) => {
     if (DEBUG) {
       return new Promise((resolve) => resolve(lambdaExample));
@@ -43,6 +44,7 @@ const actions = {
     };
     return axios.get(`${apiConfig.gateWayUrl}match-report`, options);
   },
+
   [ActionTypes.getRuvUrl]: (channel) =>
     new Promise((resolve, reject) => {
       try {
