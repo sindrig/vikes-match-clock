@@ -14,9 +14,12 @@ context("Basic navigation", () => {
 
   it("starts the clock and does some things", () => {
     cy.contains("Stillingar").click();
+    cy.get(".match-start-time-selector").type("12:30");
     cy.get("#view-selector-match").click();
     cy.contains("Heim").click();
+    cy.contains("Hefja niðurtalningu").should("have.length", 1);
     cy.contains("Byrja").click();
+    cy.contains("Hefja niðurtalningu").should("have.length", 0);
     cy.tick(ONE_MINUTE / 2);
     cy.contains("Pása").should("have.length", 1);
     cy.tick(ONE_MINUTE);
@@ -32,6 +35,7 @@ context("Basic navigation", () => {
     cy.get(".matchclock").should("have.text", "46:30");
     cy.contains("Heim").click();
     cy.contains("Pása").click();
+    cy.contains("Hefja niðurtalningu").should("have.length", 0);
     cy.contains("Næsti hálfleikur").click();
     cy.tick(ONE_MINUTE);
     cy.get(".matchclock").should("have.text", "45:00");
@@ -69,10 +73,13 @@ context("Basic navigation", () => {
     cy.get("audio").should("have.length", 1);
     cy.get(".timeoutclock").should("have.text", "00:59");
     cy.tick(30000);
+    cy.get(".timeoutclock").should("have.text", "00:29");
     cy.get("audio").should("have.length", 0);
     cy.tick(20000);
+    cy.get(".timeoutclock").should("have.text", "00:09");
     cy.get("audio").should("have.length", 1);
     cy.tick(5000);
+    cy.get(".timeoutclock").should("have.text", "00:04");
     cy.get("audio").should("have.length", 0);
     cy.tick(5000);
     cy.get("audio").should("have.length", 1);
@@ -88,7 +95,7 @@ context("Basic navigation", () => {
     cy.get(".penalty").should("have.text", "01:30");
   });
 
-  it.only("starts a countdown", () => {
+  it("starts a countdown", () => {
     cy.contains("Stillingar").click();
     cy.get(".match-start-time-selector").type("13:30");
     cy.get("#view-selector-match").click();

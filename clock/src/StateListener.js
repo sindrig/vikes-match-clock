@@ -6,11 +6,9 @@ import { useFirebaseConnect, isLoaded } from "react-redux-firebase";
 import "./StateListener.css";
 
 const StateListener = ({ sync, listenPrefix, auth }) => {
-  const listens = [];
+  const listens = ["locations"];
   if (auth.isLoaded && !auth.isEmpty) {
     listens.push(`auth/${auth.uid}`);
-  } else {
-    listens.push("locations");
   }
   if (listenPrefix) {
     listens.push({

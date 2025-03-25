@@ -123,8 +123,8 @@ img.ad {
 }
 
 .scoreboard-insidebig .team img {
-  height: 23%;
-  max-width: 17%;
+  height: 43%;
+  max-width: 57%;
   top: 2%;
 }
 
@@ -157,10 +157,10 @@ img.ad {
 
 .scoreboard-insidebig .team div.team-name {
   display: block;
-  top: 25%;
+  top: 28.5%;
   height: 11.5%;
   width: 26%;
-  font-size: 0.7rem;
+  font-size: 0.5rem;
   position: absolute;
   color: white;
   font-family: "Anton", sans-serif;

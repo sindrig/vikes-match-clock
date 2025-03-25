@@ -129,7 +129,7 @@ const actions = {
         if (newState.halfStops.length > 1) {
           newState.halfStops = newState.halfStops.slice(1);
         }
-      } else if (state.started) {
+      } else if (state.started && !state.countdown) {
         newState.timeElapsed =
           state.timeElapsed + Math.floor(Date.now() - state.started);
       }
@@ -259,12 +259,14 @@ const actions = {
       if (path === "match" && data) {
         const results = { ...state, ...data };
         if (results.started > 0) {
-          if (state.started === 0) {
-            // We just pressed start clock. Trust our own time.
-            // Compensate for some small lag
-            results.started = Date.now() - 150;
-          } else {
-            results.started = state.started;
+          if (!results.countdown) {
+            if (state.started === 0) {
+              // We just pressed start clock. Trust our own time.
+              // Compensate for some small lag
+              results.started = Date.now() - 150;
+            } else {
+              results.started = state.started;
+            }
           }
         }
         if (results.timeout > 0) {

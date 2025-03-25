@@ -54,6 +54,28 @@ class TeamAssetController extends Component {
       this.setState({ error: e.message });
     }
   };
+  fetchMatchReport = async () => {
+    const { setAvailableMatches } = this.props;
+    const matchId = prompt("ID á leikskýrslu");
+    this.setState({ loading: true });
+
+    const options = {
+      params: {
+        matchId,
+        action: "get-report",
+      },
+    };
+    try {
+      const {
+        data: { players },
+      } = await axios.get(`${apiConfig.gateWayUrl}match-report/v2`, options);
+      setAvailableMatches({ [matchId]: { players } });
+      this.setState({ error: "", loading: false, matches: [] });
+    } catch (e) {
+      this.setState({ error: e.message });
+    }
+    return this.setState({ loading: false });
+  };
 
   selectMatch = async (match) => {
     const { updateMatch, setAvailableMatches } = this.props;
@@ -93,6 +115,9 @@ class TeamAssetController extends Component {
           <div className="control-item stdbuttons">
             <button type="button" onClick={this.fetchMatchesOnPitch}>
               Sækja leiki á velli
+            </button>
+            <button type="button" onClick={this.fetchMatchReport}>
+              Slá inn ID leikskýrslu
             </button>
           </div>
           <span className="error">{error}</span>

@@ -263,7 +263,8 @@ const MatchActions = ({
 
             {match.matchType === SPORTS.football &&
             !match.started &&
-            match.matchStartTime ? (
+            match.matchStartTime &&
+            !match.timeElapsed ? (
               <div style={{ whiteSpace: "nowrap", width: "400px" }}>
                 <Button
                   color="green"
