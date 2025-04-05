@@ -29,6 +29,16 @@
 
 div.asset-player-icon img {
   height: 100%;
+  display: block;
+}
+
+div.asset-player-icon img:nth-child(1) {
+  position: relative;
+}
+div.asset-player-icon img:nth-child(2) {
+  position: absolute;
+  top: 0;
+  right: 0;
 }
 
 div.asset-player-icon.player-card-no-image img {
