@@ -56,3 +56,17 @@ export const getPlayerAssetObject = async ({
     }),
   );
 };
+
+export const getMOTMAsset = async ({ listenPrefix, player, teamName }) => {
+  const playerAssetObject = await getPlayerAssetObject({
+    listenPrefix,
+    player,
+    teamName,
+    preferExt: "fagn",
+  });
+  return {
+    ...playerAssetObject,
+    type: assetTypes.MOTM,
+    originalAssetType: playerAssetObject.type,
+  };
+};

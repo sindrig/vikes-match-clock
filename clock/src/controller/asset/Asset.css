@@ -21,6 +21,17 @@
   height: 100%;
 }
 
+.motm-container {
+  color: white;
+  /*  -webkit-text-stroke: 2px #882020;*/
+  font-size: 1.5vw;
+  font-weight: bold;
+  text-align: center;
+  background-color: #000000;
+  display: block;
+  height: 100%;
+}
+
 .free-text-container.thumbnail {
   font-weight: normal;
   -webkit-text-stroke: inherit;

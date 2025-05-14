@@ -3,6 +3,7 @@ export default {
   RUV: "RUV",
   PLAYER: "PLAYER",
   NO_IMAGE_PLAYER: "NO_IMAGE_PLAYER",
+  MOTM: "MOTM",
   IMAGE: "IMAGE",
   VIDEO: "VIDEO",
   SUB: "SUB",

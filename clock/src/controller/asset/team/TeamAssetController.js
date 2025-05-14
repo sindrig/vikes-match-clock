@@ -12,7 +12,7 @@ import SubView from "./SubView";
 import assetTypes from "../AssetTypes";
 import MatchSelector from "./MatchSelector";
 import controllerActions from "../../../actions/controller";
-import { getPlayerAssetObject } from "./assetHelpers";
+import { getMOTMAsset, getPlayerAssetObject } from "./assetHelpers";
 
 class TeamAssetController extends Component {
   static propTypes = {
@@ -42,6 +42,7 @@ class TeamAssetController extends Component {
       subOut: null,
       selectPlayerAsset: false,
       selectGoalScorer: false,
+      selectMOTM: false,
       effect: "blink",
     };
     this.autoFill = this.autoFill.bind(this);
@@ -50,6 +51,7 @@ class TeamAssetController extends Component {
     this.addSubAsset = this.addSubAsset.bind(this);
     this.selectPlayerAsset = this.selectPlayerAsset.bind(this);
     this.selectGoalScorer = this.selectGoalScorer.bind(this);
+    this.selectMOTM = this.selectMOTM.bind(this);
   }
 
   getTeamPlayers() {
@@ -74,6 +76,7 @@ class TeamAssetController extends Component {
       subOut: null,
       selectPlayerAsset: false,
       selectGoalScorer: false,
+      selectMOTM: false,
     });
   }
 
@@ -187,6 +190,17 @@ class TeamAssetController extends Component {
     this.clearState();
   }
 
+  selectMOTM(player, teamName) {
+    const { match, addAssets, listenPrefix } = this.props;
+    addAssets(
+      [getMOTMAsset({ player, teamName: match[teamName], listenPrefix })],
+      {
+        showNow: true,
+      },
+    );
+    this.clearState();
+  }
+
   autoFill() {
     const {
       match: { homeTeam, awayTeam },
@@ -247,7 +261,8 @@ class TeamAssetController extends Component {
   }
 
   renderActionButtons() {
-    const { selectSubs, selectPlayerAsset, selectGoalScorer } = this.state;
+    const { selectSubs, selectPlayerAsset, selectGoalScorer, selectMOTM } =
+      this.state;
     if (selectSubs) {
       return (
         <button
@@ -265,27 +280,15 @@ class TeamAssetController extends Component {
         </button>
       );
     }
-    if (selectPlayerAsset) {
+    if (selectPlayerAsset || selectGoalScorer || selectMOTM) {
       return (
         <button
           type="button"
           onClick={() =>
             this.setState({
               selectPlayerAsset: false,
-            })
-          }
-        >
-          Hætta við birtingu
-        </button>
-      );
-    }
-    if (selectGoalScorer) {
-      return (
-        <button
-          type="button"
-          onClick={() =>
-            this.setState({
               selectGoalScorer: false,
+              selectMOTM: false,
             })
           }
         >
@@ -317,6 +320,14 @@ class TeamAssetController extends Component {
             onClick={() => this.setState({ selectGoalScorer: true })}
           >
             Birta markaskorara
+          </button>
+        </div>
+        <div className="control-item stdbuttons">
+          <button
+            type="button"
+            onClick={() => this.setState({ selectMOTM: true })}
+          >
+            Birta mann leiksins
           </button>
         </div>
         <div className="control-item stdbuttons">
@@ -362,8 +373,13 @@ class TeamAssetController extends Component {
   }
 
   renderTeam(teamName) {
-    const { selectSubs, subTeam, selectPlayerAsset, selectGoalScorer } =
-      this.state;
+    const {
+      selectSubs,
+      subTeam,
+      selectPlayerAsset,
+      selectGoalScorer,
+      selectMOTM,
+    } = this.state;
     let selectPlayerAction = null;
     if (selectSubs) {
       if (!subTeam || subTeam === teamName) {
@@ -373,6 +389,8 @@ class TeamAssetController extends Component {
       selectPlayerAction = this.selectPlayerAsset;
     } else if (selectGoalScorer) {
       selectPlayerAction = this.selectGoalScorer;
+    } else if (selectMOTM) {
+      selectPlayerAction = this.selectMOTM;
     }
     return <Team teamName={teamName} selectPlayer={selectPlayerAction} />;
   }

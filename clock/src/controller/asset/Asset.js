@@ -5,6 +5,7 @@ import YouTube from "react-youtube";
 import { connect } from "react-redux";
 
 import { assetPropType, viewPortPropType } from "../../propTypes";
+import MOTM from "./MOTM";
 import PlayerCard from "./PlayerCard";
 import Substitution from "./Substitution";
 
@@ -111,7 +112,8 @@ class Asset extends Component {
         </PlayerCard>
       );
     }
-    throw new Error(`you should not get here: ${JSON.stringify(asset)}`);
+    console.error(`you should not get here: ${JSON.stringify(asset)}`);
+    return null;
   }
 
   renderRuv() {
@@ -243,6 +245,15 @@ class Asset extends Component {
       case assetTypes.PLAYER:
       case assetTypes.NO_IMAGE_PLAYER:
         return this.getPlayerAsset({ asset, widthMultiplier: 1 });
+      case assetTypes.MOTM:
+        return (
+          <MOTM>
+            {this.getPlayerAsset({
+              asset: { ...asset, type: asset.originalAssetType },
+              widthMultiplier: 1,
+            })}
+          </MOTM>
+        );
 
       case assetTypes.SUB:
         return this.renderSub();
