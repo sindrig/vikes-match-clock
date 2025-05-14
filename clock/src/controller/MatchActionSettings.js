@@ -79,6 +79,9 @@ const MatchActionSettings = ({
             value={idleImage}
             onChange={({ target: { value } }) => setIdleImage(value)}
           >
+            <option value={"null"} key={"null"}>
+              No idle logo between images
+            </option>
             {Object.keys(clubLogos).map((key) => (
               <option value={key} key={key}>
                 {key}

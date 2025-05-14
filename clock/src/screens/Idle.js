@@ -55,7 +55,11 @@ class Idle extends Component {
     const { temperature } = this.state;
     return (
       <div className={`idle idle-${vp.key}`}>
-        <AdImage imageType={IMAGE_TYPES.largeAds} blankBetweenImages time={8} />
+        <AdImage
+          imageType={IMAGE_TYPES.largeAds}
+          blankBetweenImages={idleImage !== "null"}
+          time={8}
+        />
         <img
           src={clubLogos[idleImage] || clubLogos["Víkingur R"]}
           alt="Vikes"
