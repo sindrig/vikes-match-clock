@@ -91,7 +91,7 @@ jobs:
       - name: Restart all screens
         if: github.ref == 'refs/heads/master'
         run: |
-          for baseKey in vikinni vikuti safamyriuti hasteinsvollur kopavogsvollur; do
+          for baseKey in vikinni vikuti safamyriuti hasteinsvollur kopavogsvollur krvollur meistaravellir; do
             firebase -P vikes-match-clock-firebase database:set /states/$baseKey/controller/refreshToken -f -d '"'$(uuidgen)'"' --token $FIREBASE_TOKEN
           done
 
