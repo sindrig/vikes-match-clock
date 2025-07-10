@@ -13,7 +13,9 @@ export const initialState = {
 const handleRemote = {
   next(state, { data, path }) {
     if (path.startsWith("auth/") && data) {
-      const available = Object.entries(data).filter((kv) => kv[1] === true)[0];
+      const available = Object.entries(data)
+        .filter((kv) => kv[1] === true)
+        .map(([k]) => k);
       if (!state.listenPrefix || available.indexOf(state.listenPrefix) === -1) {
         return {
           ...state,
