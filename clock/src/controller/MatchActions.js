@@ -76,7 +76,8 @@ const MatchActions = ({
     addGoal({ team: awayOrHome });
     if (
       match.matchType === SPORTS.football &&
-      match[`${awayOrHome}Team`] === "Víkingur R"
+      match[`${awayOrHome}Team`] === "Víkingur R" &&
+      listenPrefix.startsWith("vik")
     ) {
       renderAsset({
         asset: {
