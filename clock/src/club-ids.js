@@ -187,4 +187,5 @@ export default {
   "Cercle Brugge": "150393",
   "FK Borac": "150394",
   "Djurgården": "142479",
+  "FC Malisheva": "150833",
 };
