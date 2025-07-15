@@ -394,6 +394,7 @@ import { default as uesantacoloma } from "./club-logos/UE Santa Coloma.png";
 import { default as cerclebrugge } from "./club-logos/Cercle Brugge.png";
 import { default as fkborac } from "./club-logos/FK Borac.png";
 import { default as djurgården } from "./club-logos/Djurgården.png";
+import { default as malisheva } from "./club-logos/Malisheva.png";
 
 export default {
 	Afganistan: afganistan,
@@ -792,4 +793,5 @@ export default {
 	"Cercle Brugge": cerclebrugge,
 	"FK Borac": fkborac,
 	Djurgården: djurgården,
+	"FC Malisheva": malisheva,
 };
