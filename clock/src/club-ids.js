@@ -188,4 +188,5 @@ export default {
   "FK Borac": "150394",
   "Djurgården": "142479",
   "FC Malisheva": "150833",
+  "KF Vllaznia": "142493",
 };
