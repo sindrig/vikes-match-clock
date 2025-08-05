@@ -395,7 +395,8 @@ import { default as cerclebrugge } from "./club-logos/Cercle Brugge.png";
 import { default as fkborac } from "./club-logos/FK Borac.png";
 import { default as djurgården } from "./club-logos/Djurgården.png";
 import { default as malisheva } from "./club-logos/Malisheva.png";
-import {default as kfvllaznia} from "./club-logos/KF Vllaznia.svg";
+import { default as kfvllaznia } from "./club-logos/KF Vllaznia.svg";
+import { default as brondbyif } from "./club-logos/Brondby IF.svg";
 
 export default {
 	Afganistan: afganistan,
@@ -796,4 +797,5 @@ export default {
 	Djurgården: djurgården,
 	"FC Malisheva": malisheva,
 	"KF Vllaznia": kfvllaznia,
+	"Brondby IF": brondbyif,
 };

@@ -183,10 +183,11 @@ export default {
   "UE Santa Coloma": "149333",
   Danmörk: "2020",
   Wales: "137220",
-  "Litháen": "137583",
+  Litháen: "137583",
   "Cercle Brugge": "150393",
   "FK Borac": "150394",
-  "Djurgården": "142479",
+  Djurgården: "142479",
   "FC Malisheva": "150833",
   "KF Vllaznia": "142493",
+  "Brondby IF": "138860",
 };
