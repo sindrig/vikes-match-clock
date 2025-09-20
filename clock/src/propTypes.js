@@ -23,6 +23,8 @@ export const matchPropType = PropTypes.shape({
   timeout: PropTypes.number,
   homeTimeouts: PropTypes.number,
   awayTimeouts: PropTypes.number,
+  homeRedCards: PropTypes.number,
+  awayRedCards: PropTypes.number,
 });
 
 export const playerPropType = PropTypes.shape({

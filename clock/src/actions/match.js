@@ -36,6 +36,7 @@ const actions = {
   [ActionTypes.removeTimeout]: () => {},
   [ActionTypes.addGoal]: ({ team }) => ({ team }),
   [ActionTypes.countdown]: () => {},
+  [ActionTypes.updateRedCards]: (home, away) => ({ home, away }),
 };
 
 Object.keys(actions).forEach((type) => {

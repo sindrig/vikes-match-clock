@@ -34,6 +34,7 @@ const ScoreBoard = ({ match, vp }) => (
       score={match.homeScore}
       penalties={match.home2min}
       timeouts={match.homeTimeouts}
+      redCards={match.homeRedCards ?? 0}
     />
     <Team
       className="away"
@@ -41,6 +42,7 @@ const ScoreBoard = ({ match, vp }) => (
       score={match.awayScore}
       penalties={match.away2min}
       timeouts={match.awayTimeouts}
+      redCards={match.awayRedCards ?? 0}
     />
     {match.injuryTime ? (
       <div className="injury-time">

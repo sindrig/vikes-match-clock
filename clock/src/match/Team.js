@@ -5,6 +5,7 @@ import PropTypes from "prop-types";
 import { matchPropType, twoMinPropType } from "../propTypes";
 import { SPORTS } from "../constants";
 import TwoMinClock from "./TwoMinClock";
+import "./RedCard.css";
 
 const Team = ({
   score,
@@ -13,11 +14,19 @@ const Team = ({
   match: { matchType },
   penalties,
   timeouts,
+  redCards,
 }) => (
   <div className={`team ${className}`}>
     {team.image && (
       <div className="img-wrapper">
         <img src={team.image} alt={team.name} />
+      </div>
+    )}
+    {redCards > 0 && (
+      <div className="red-cards">
+        {[...Array(redCards).keys()].map((i) => (
+          <div className="red-card" key={i} />
+        ))}
       </div>
     )}
     <div className="team-name">
@@ -54,6 +63,7 @@ Team.propTypes = {
   match: matchPropType.isRequired,
   penalties: PropTypes.arrayOf(twoMinPropType),
   timeouts: PropTypes.number.isRequired,
+  redCards: PropTypes.number.isRequired,
 };
 
 Team.defaultProps = {

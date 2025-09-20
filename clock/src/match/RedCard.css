@@ -1,0 +1,32 @@
+.team .red-cards {
+  position: absolute;
+  top: 58%;
+  z-index: 9999;
+  height: 34%;
+  width: 25%;
+}
+
+.team.home .red-cards {
+  left: 5%;
+}
+
+.team.home .red-card {
+  float: left;
+  margin-right: 1px;
+}
+
+.team.away .red-cards {
+  right: 5%;
+}
+
+.team.away .red-card {
+  float: right;
+  margin-left: 2px;
+}
+
+.team .red-card {
+  height: 15%;
+  width: 8%;
+  background: #e60000;
+  display: block;
+}

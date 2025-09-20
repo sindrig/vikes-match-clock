@@ -254,6 +254,15 @@ const actions = {
       };
     },
   },
+  [ActionTypes.updateRedCards]: {
+    next(state, { payload: { home, away } }) {
+      return {
+        ...state,
+        homeRedCards: home,
+        awayRedCards: away,
+      };
+    },
+  },
   [ActionTypes.receiveRemoteData]: {
     next(state, { data, path }) {
       if (path === "match" && data) {

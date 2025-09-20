@@ -16,6 +16,7 @@ import { SPORTS, DEFAULT_HALFSTOPS } from "../constants";
 import assetTypes from "./asset/AssetTypes";
 import baddi from "../images/baddi.gif";
 import { getPlayerAssetObject } from "./asset/team/assetHelpers";
+import RedCardManipulation from "./RedCardManipulation";
 
 const roundMillisToSeconds = (millis) => Math.floor(millis / 1000) * 1000;
 const WRAPPER_CLASSNAME = "control-item playerControls withborder";
@@ -246,6 +247,7 @@ const MatchActions = ({
           {clockManipulationBox(5, match, updateMatch)}
           {clockManipulationBox(60, match, updateMatch)}
           {clockManipulationBox(60 * 5, match, updateMatch)}
+          <RedCardManipulation />
           <div className="control-item stdbuttons">
             {match.matchType === SPORTS.football ? (
               <div style={{ whiteSpace: "nowrap", width: "400px" }}>

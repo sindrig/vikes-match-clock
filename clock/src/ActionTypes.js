@@ -14,6 +14,7 @@ export const Match = keymirror({
   buzz: null,
   addGoal: null,
   countdown: null,
+  updateRedCards: null,
 });
 
 export const Controller = keymirror({
