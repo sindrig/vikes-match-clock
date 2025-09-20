@@ -18,6 +18,7 @@ import controllerActions from "../../actions/controller";
 
 import "./AssetController.css";
 import MatchesOnPitch from "./team/MatchesOnPitch";
+import GlobalShortcut from "../../GlobalShortcut";
 
 const AssetController = ({
   addAssets,
@@ -86,6 +87,15 @@ const AssetController = ({
     const selectedAssetsList = selectedAssets || [];
     return (
       <div className="withborder">
+        {selectedAssetsList.length ? (
+          <React.Fragment>
+            <GlobalShortcut
+              shortcut=" "
+              onTrigger={showNextAsset}
+              preventDefault
+            />
+          </React.Fragment>
+        ) : null}
         <div className="controls control-item">
           <span>{selectedAssetsList.length} í biðröð</span>
           {selectedAssetsList.length ? (
