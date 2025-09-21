@@ -9,7 +9,6 @@ export default function GlobalShortcut({
   useEffect(() => {
     function handleKeyDown(e) {
       // Example: combo === "Control+k"
-      console.log("event.key", e.key);
       const keys = shortcut.split("+");
       const ctrl = keys.includes("Control") ? e.ctrlKey : true;
       const alt = keys.includes("Alt") ? e.altKey : true;

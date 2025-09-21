@@ -37,6 +37,7 @@ const AssetController = ({
   showNextAsset,
   toggleAutoPlay,
   toggleCycle,
+  currentAsset,
 }) => {
   const addMultipleAssets = (assetList, options = { showNow: false }) => {
     Promise.all(assetList).then((resolvedAssets) => {
@@ -92,6 +93,14 @@ const AssetController = ({
             <GlobalShortcut
               shortcut=" "
               onTrigger={showNextAsset}
+              preventDefault
+            />
+          </React.Fragment>
+        ) : currentAsset ? (
+          <React.Fragment>
+            <GlobalShortcut
+              shortcut=" "
+              onTrigger={() => renderAsset(0)}
               preventDefault
             />
           </React.Fragment>
@@ -211,6 +220,7 @@ AssetController.propTypes = {
   showNextAsset: PropTypes.func.isRequired,
   setSelectedAssets: PropTypes.func.isRequired,
   addAssets: PropTypes.func.isRequired,
+  currentAsset: PropTypes.object,
 };
 
 AssetController.defaultProps = {
@@ -228,6 +238,7 @@ const stateToProps = ({
     cycle,
     imageSeconds,
     playing,
+    currentAsset,
   },
   match,
 }) => ({
@@ -238,6 +249,7 @@ const stateToProps = ({
   cycle,
   playing,
   imageSeconds,
+  currentAsset: currentAsset || null,
 });
 
 const dispatchToProps = (dispatch) =>
