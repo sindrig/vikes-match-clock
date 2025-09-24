@@ -5,6 +5,7 @@
 
 # production
 /build
+/clock/build
 
 # misc
 .DS_Store
