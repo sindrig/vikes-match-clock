@@ -2,6 +2,7 @@ import keymirror from "keymirror";
 import { handleActions, Action } from "redux-actions";
 
 import ActionTypes from "../ActionTypes";
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Workaround for redux-actions computed property names limitation
 const AT: any = ActionTypes;
 import assetTypes from "../controller/asset/AssetTypes";
 import type { ControllerState, Asset, CurrentAsset, Player } from "../types";
@@ -65,6 +66,7 @@ const getStateShowingNextAsset = (state: ControllerState): ControllerState => {
   return newState;
 };
 
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call -- AT is intentionally 'any' due to redux-actions limitations */
 const actions = {
   [AT.selectView]: {
     next(state: ControllerState, { payload: { view } }: Action<{ view: string }>) {
@@ -315,4 +317,5 @@ const actions = {
     },
   },
 };
+/* eslint-enable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call */
 export default handleActions(actions, initialState);

@@ -1,6 +1,7 @@
 import moment from "moment";
 import { Action, handleActions } from "redux-actions";
 import ActionTypes from "../ActionTypes";
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Workaround for redux-actions computed property names limitation
 const AT: any = ActionTypes;
 import clubIds from "../club-ids";
 import { Sports, DEFAULT_HALFSTOPS } from "../constants";
@@ -28,6 +29,8 @@ export const initialState: Match = {
   showInjuryTime: true,
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- AT is intentionally 'any' due to redux-actions limitations
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call */
 const actions: Record<string, any> = {
   [AT.updateMatch]: {
     next(state: Match, { payload, error }: Action<Partial<Match>>) {
@@ -322,5 +325,5 @@ const actions: Record<string, any> = {
     },
   },
 };
-
+/* eslint-enable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call */
 export default handleActions(actions, initialState);

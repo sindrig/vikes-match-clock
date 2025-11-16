@@ -185,10 +185,20 @@ class TeamAssetController extends Component<
         <div>
           <RingLoader loading={loading} />
           <div className="control-item stdbuttons">
-            <button type="button" onClick={this.fetchMatchesOnPitch}>
+            <button
+              type="button"
+              onClick={() => {
+                void this.fetchMatchesOnPitch();
+              }}
+            >
               Sækja leiki á velli
             </button>
-            <button type="button" onClick={this.fetchMatchReport}>
+            <button
+              type="button"
+              onClick={() => {
+                void this.fetchMatchReport();
+              }}
+            >
               Slá inn ID leikskýrslu
             </button>
           </div>
@@ -204,7 +214,9 @@ class TeamAssetController extends Component<
             <button
               type="button"
               key={match.match_id}
-              onClick={() => this.selectMatch(match)}
+              onClick={() => {
+                void this.selectMatch(match);
+              }}
             >
               {match.date} {match.time} {match.competition} [{match.home.name} -{" "}
               {match.away.name}]{" "}

@@ -7,7 +7,10 @@ interface ActionCreators {
   setListenPrefix: (listenPrefix: string) => Action<{ listenPrefix: string }>;
 }
 
-const actionPayloads: Record<string, ((...args: any[]) => any) | undefined> = {
+const actionPayloads: Record<
+  string,
+  ((...args: never[]) => unknown) | undefined
+> = {
   setEmail: (email: string) => ({ email }),
   setPassword: (password: string) => ({ password }),
   setSync: (sync: boolean) => ({ sync }),

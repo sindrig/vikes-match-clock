@@ -38,7 +38,7 @@ export default class UrlController extends Component<Props, State> {
       try {
         // eslint-disable-next-line no-new
         new URL(value);
-      } catch (e) {
+      } catch {
         this.setState({ error: `"${value}" is not a valid url` });
         return;
       }

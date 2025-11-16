@@ -46,7 +46,10 @@ interface ActionCreators {
   matchTimeout: (payload: { team: string }) => (dispatch: Dispatch) => void;
 }
 
-const actionPayloads: Record<string, ((...args: any[]) => any) | undefined> = {
+const actionPayloads: Record<
+  string,
+  ((...args: never[]) => unknown) | undefined
+> = {
   updateMatch: (partial: Partial<Match>) => partial,
   addPenalty: ({
     team,

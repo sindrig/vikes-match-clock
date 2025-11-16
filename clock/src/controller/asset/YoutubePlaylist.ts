@@ -35,8 +35,8 @@ export function addVideosFromPlaylist(
   playlistId: string,
   addFn: (asset: Asset) => void,
 ): void {
-  const start = () =>
-    window.gapi.client
+  const start = () => {
+    void window.gapi.client
       .init({
         apiKey: "AIzaSyDcoBecSRiDkx_c7jYEsX72gazus1DIBlE",
         discoveryDocs: ["https://people.googleapis.com/$discovery/rest"],
@@ -63,6 +63,7 @@ export function addVideosFromPlaylist(
           );
         }
       });
+  };
   window.gapi.load("client", start);
 }
 

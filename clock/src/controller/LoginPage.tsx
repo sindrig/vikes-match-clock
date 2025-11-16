@@ -123,7 +123,12 @@ const LoginPage = ({
         {renderListenerCtrl()}
         {renderIsRemoteCtrl()}[<b>{auth.email}</b>][{listenPrefix}]
         <br />
-        <button type="button" onClick={() => firebase.logout()}>
+        <button
+          type="button"
+          onClick={() => {
+            void firebase.logout();
+          }}
+        >
           Log out...
         </button>
       </div>
@@ -144,7 +149,7 @@ const LoginPage = ({
   };
 
   const loginWithGoogle = () => {
-    firebase
+    void firebase
       .login({
         provider: "google",
         type: "popup",

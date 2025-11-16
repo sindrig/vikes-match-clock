@@ -80,7 +80,7 @@ const AssetController = ({
   currentAsset,
 }: AssetControllerProps) => {
   const addMultipleAssets = (assetList: Promise<Asset>[], options: { showNow?: boolean } = { showNow: false }) => {
-    Promise.all(assetList).then((resolvedAssets) => {
+    void Promise.all(assetList).then((resolvedAssets) => {
       if (options.showNow && resolvedAssets.length === 1) {
         renderAsset(resolvedAssets[0] as any);
       } else {

@@ -46,7 +46,10 @@ interface ActionCreators {
   getRuvUrl: (channel: string) => Promise<string | undefined>;
 }
 
-const actionPayloads: Record<string, ((...args: any[]) => any) | undefined> = {
+const actionPayloads: Record<
+  string,
+  ((...args: never[]) => unknown) | undefined
+> = {
   selectView: (view: string) => ({ view }),
   selectTab: (tab: string) => ({ tab }),
   selectAssetView: (assetView: string) => ({ assetView }),

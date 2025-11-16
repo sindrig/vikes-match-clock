@@ -169,7 +169,7 @@ class AssetComponent extends Component<AssetProps> {
     let url: URL;
     try {
       url = new window.URL(asset.key);
-    } catch (e) {
+    } catch {
       console.error("Unknown url ", asset.key);
       return null;
     }

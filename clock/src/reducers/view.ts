@@ -1,6 +1,7 @@
 import { handleActions, Action } from "redux-actions";
 
 import ActionTypes from "../ActionTypes";
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Workaround for redux-actions computed property names limitation
 const AT: any = ActionTypes;
 import backgroundImage from "../images/background_fade.png";
 import backgroundCLImage from "../images/background_cl.png";
@@ -65,6 +66,7 @@ export const BACKGROUNDS = {
   },
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return -- Background object can return any image type
 export const getBackground = (key: string) =>
   (BACKGROUNDS as Record<string, any>)[key] || BACKGROUNDS[defaultBackground];
 
@@ -92,6 +94,8 @@ export const initialState: ViewState = {
   idleImage: "Víkingur R",
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- AT is intentionally 'any' due to redux-actions limitations
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call */
 const actions: Record<string, any> = {
   [AT.setViewPort]: {
     next(state: ViewState, { payload: { vp } }: Action<{ vp: ViewState["vp"] }>): ViewState {
@@ -132,4 +136,5 @@ const actions: Record<string, any> = {
     },
   },
 };
+/* eslint-enable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call */
 export default handleActions(actions, initialState);

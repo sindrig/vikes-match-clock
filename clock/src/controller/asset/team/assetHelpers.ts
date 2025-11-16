@@ -54,7 +54,7 @@ export const getPlayerAssetObject = async ({
         overlay: overlay || { text: "" },
         teamName,
       };
-    } catch (e) {
+    } catch {
       return await fallback();
     }
   };

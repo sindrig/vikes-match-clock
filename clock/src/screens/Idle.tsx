@@ -43,7 +43,7 @@ class Idle extends Component<IdleProps, IdleState> {
 
   componentDidMount(): void {
     this.updateTemp();
-    this.interval = setInterval(this.updateTemp, fetchTempInterval);
+    this.interval = setInterval(() => this.updateTemp(), fetchTempInterval);
   }
 
   componentWillUnmount(): void {
@@ -56,7 +56,7 @@ class Idle extends Component<IdleProps, IdleState> {
     if (!useRealTemperature) {
       return;
     }
-    getTemp().then((temperature) => {
+    void getTemp().then((temperature) => {
       if (temperature) {
         this.setState({ temperature });
       }

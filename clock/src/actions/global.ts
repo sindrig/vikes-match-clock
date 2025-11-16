@@ -5,7 +5,10 @@ interface ActionCreators {
   clearState: () => Action<Promise<void>>;
 }
 
-const actionPayloads: Record<string, ((...args: any[]) => any) | undefined> = {
+const actionPayloads: Record<
+  string,
+  ((...args: never[]) => unknown) | undefined
+> = {
   clearState: () => persistor.purge(),
 };
 

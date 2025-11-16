@@ -40,7 +40,7 @@ const firebaseMiddleware: Middleware<
   let firebase: ReturnType<typeof getFirebase> | null;
   try {
     firebase = getFirebase();
-  } catch (e) {
+  } catch {
     firebase = null;
   }
   if (firebase && sync) {

@@ -70,7 +70,7 @@ const AdImage: React.FC<AdImageProps> = ({
 
   useEffect(() => {
     const listRef = storage.ref(`${listenPrefix}/${imageType}`);
-    listRef
+    void listRef
       .listAll()
       .then((res) =>
         Promise.all(res.items.map((itemRef) => itemRef.getDownloadURL())).then(

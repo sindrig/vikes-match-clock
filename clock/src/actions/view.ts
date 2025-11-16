@@ -7,7 +7,10 @@ interface ActionCreators {
   setIdleImage: (idleImage: string) => Action<{ idleImage: string }>;
 }
 
-const actionPayloads: Record<string, ((...args: any[]) => any) | undefined> = {
+const actionPayloads: Record<
+  string,
+  ((...args: never[]) => unknown) | undefined
+> = {
   setViewPort: (vp: ViewPort) => ({ vp }),
   setBackground: (background: string) => ({ background }),
   setIdleImage: (idleImage: string) => ({ idleImage }),
