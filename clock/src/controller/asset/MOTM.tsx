@@ -12,9 +12,10 @@ const MOTM = ({ children }: MOTMProps): React.JSX.Element | null => {
   const [idx, setIdx] = useState(0);
 
   useEffect(() => {
+    const seconds = idxSeconds[idx] || 2;
     const timer = setTimeout(() => {
       setIdx((idx + 1) % idxSeconds.length);
-    }, idxSeconds[idx] * 1000);
+    }, seconds * 1000);
     return () => clearTimeout(timer);
   }, [idx]);
   switch (idx) {

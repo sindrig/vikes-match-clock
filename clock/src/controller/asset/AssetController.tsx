@@ -67,7 +67,6 @@ const AssetController = ({
   autoPlay,
   cycle,
   imageSeconds,
-  match,
   playing,
   renderAsset,
   selectAssetView,
@@ -113,7 +112,9 @@ const AssetController = ({
               .map((p) => p.split("="))
               .filter((kv) => kv[0] === "list")
               .map((kv) => kv[1])[0];
-            return addVideosFromPlaylist(listId, addAssetKey);
+            if (listId) {
+              return addVideosFromPlaylist(listId, addAssetKey);
+            }
           }
         } catch (e) {
           console.log(e);
@@ -232,8 +233,6 @@ const AssetController = ({
       {assetView === ASSET_VIEWS.teams && (
         <TeamAssetController
           addAssets={addMultipleAssets}
-          match={match}
-          controllerState={null}
           previousView={() =>
             setTimeout(() => selectAssetView(ASSET_VIEWS.assets), 500)
           }

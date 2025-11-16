@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import PropTypes from "prop-types";
 import { storage } from "../../firebase";
 import Compress from "compress.js";
 import { FileUploader } from "react-drag-drop-files";
@@ -11,12 +10,17 @@ import "./UploadManager.css";
 const compress = new Compress();
 const fileTypes = ["JPG", "PNG", "GIF"];
 
-const UploadManager = ({ prefix, refresh }) => {
+interface UploadManagerProps {
+  prefix: string;
+  refresh: () => void;
+}
+
+const UploadManager: React.FC<UploadManagerProps> = ({ prefix, refresh }) => {
   const [doCompress, setDoCompress] = useState(false);
 
-  const insertImages = (filelist) => {
-    const files = [...filelist];
-    Promise.all(
+  const insertImages = (filelist: FileList | File[]): void => {
+    const files = Array.isArray(filelist) ? filelist : [...filelist];
+    void Promise.all(
       files.map((file, i) =>
         file.type !== "image/gif" && doCompress
           ? compress
@@ -28,20 +32,21 @@ const UploadManager = ({ prefix, refresh }) => {
               })
               .then((resizedImage) => {
                 const img = resizedImage[0];
+                if (!img) {
+                  return file;
+                }
                 const base64str = img.data;
                 const imgExt = img.ext;
                 const resized = Compress.convertBase64ToFile(base64str, imgExt);
-                resized.name = files[i].name;
+                Object.defineProperty(resized, 'name', { value: files[i]?.name, writable: true });
                 return resized;
               })
-          : file,
+          : Promise.resolve(file),
       ),
     )
       .then((images) =>
         Promise.all(
-          images.map((image) => {
-            storage.ref(`/${prefix}/${image.name}`).put(image);
-          }),
+          images.map((image) => storage.ref(`/${prefix}/${image.name}`).put(image)),
         ),
       )
       .then(refresh);
@@ -70,8 +75,5 @@ const UploadManager = ({ prefix, refresh }) => {
     </div>
   );
 };
-UploadManager.propTypes = {
-  prefix: PropTypes.string,
-  refresh: PropTypes.func.isRequired,
-};
+
 export default UploadManager;

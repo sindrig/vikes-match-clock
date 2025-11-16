@@ -1,3 +1,4 @@
+import type React from "react";
 import { bindActionCreators, Dispatch } from "redux";
 import { connect } from "react-redux";
 import {
@@ -211,4 +212,6 @@ const dispatchToProps = (dispatch: Dispatch) =>
     dispatch,
   );
 
-export default withFirebase(connect(stateToProps, dispatchToProps)(LoginPage));
+export default withFirebase(
+  connect(stateToProps, dispatchToProps)(LoginPage),
+) as React.ComponentType;

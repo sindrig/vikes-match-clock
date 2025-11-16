@@ -65,6 +65,7 @@ export interface TeamPlayers {
 // Available match type
 export interface AvailableMatch {
   group?: string;
+  sex?: string;
   players: Record<string, Player[]>;
 }
 
@@ -134,7 +135,7 @@ export interface ListenersState {
     screen: ViewPort;
     label: string;
     key: string;
-    pitchIds?: unknown;
+    pitchIds?: string[];
   }>;
 }
 

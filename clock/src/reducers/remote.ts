@@ -1,8 +1,17 @@
-import { handleActions } from "redux-actions";
+import { handleActions, Action } from "redux-actions";
 
 import ActionTypes from "../ActionTypes";
+const AT: any = ActionTypes;
 
-export const initialState = {
+interface RemoteState {
+  email: string;
+  password: string;
+  sync: boolean;
+  syncedData: any;
+  listenPrefix: string;
+}
+
+export const initialState: RemoteState = {
   email: "",
   password: "",
   sync: false,
@@ -11,7 +20,7 @@ export const initialState = {
 };
 
 const handleRemote = {
-  next(state, { data, path }) {
+  next(state: RemoteState, { data, path }: { data: any; path: string }): RemoteState {
     if (path.startsWith("auth/") && data) {
       const available = Object.entries(data)
         .filter((kv) => kv[1] === true)
@@ -19,7 +28,7 @@ const handleRemote = {
       if (!state.listenPrefix || available.indexOf(state.listenPrefix) === -1) {
         return {
           ...state,
-          listenPrefix: available[0],
+          listenPrefix: available[0] || "",
         };
       }
     }
@@ -27,31 +36,31 @@ const handleRemote = {
   },
 };
 
-const actions = {
-  [ActionTypes.setEmail]: {
-    next(state, { payload: { email } }) {
+const actions: Record<string, any> = {
+  [AT.setEmail]: {
+    next(state: RemoteState, { payload: { email } }: Action<{ email: string }>): RemoteState {
       return { ...state, email };
     },
   },
-  [ActionTypes.setPassword]: {
-    next(state, { payload: { password } }) {
+  [AT.setPassword]: {
+    next(state: RemoteState, { payload: { password } }: Action<{ password: string }>): RemoteState {
       return { ...state, password };
     },
   },
-  [ActionTypes.setSync]: {
-    next(state, { payload: { sync } }) {
+  [AT.setSync]: {
+    next(state: RemoteState, { payload: { sync } }: Action<{ sync: boolean }>): RemoteState {
       return { ...state, sync };
     },
   },
-  [ActionTypes.setListenPrefix]: {
-    next(state, { payload: { listenPrefix } }) {
+  [AT.setListenPrefix]: {
+    next(state: RemoteState, { payload: { listenPrefix } }: Action<{ listenPrefix: string }>): RemoteState {
       if (listenPrefix !== state.listenPrefix) {
         setTimeout(() => window.location.reload(), 2000);
       }
       return { ...state, listenPrefix };
     },
   },
-  [ActionTypes.receiveRemoteData]: handleRemote,
+  [AT.receiveRemoteData]: handleRemote,
   // This can't be triggered by changing UI, so we need to listen here as well
   "@@reactReduxFirebase/SET": handleRemote,
 };

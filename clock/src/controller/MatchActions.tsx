@@ -25,7 +25,7 @@ const clockManipulationBox = (
   seconds: number,
   match: Match,
   updateMatch: (update: Partial<Match>) => void
-): JSX.Element => {
+): React.JSX.Element => {
   const unit = seconds >= 60 ? "m" : "s";
   const humanReadableSeconds = seconds >= 60 ? seconds / 60 : seconds;
   return (
@@ -143,7 +143,6 @@ const MatchActions: React.FC<PropsFromRedux> = ({
           listenPrefix,
           player,
           teamName: "Víkingur R",
-          overlay: null,
           preferExt: "fagn",
           preferType: "gif",
         }).then((asset: any) => {

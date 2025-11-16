@@ -1,9 +1,10 @@
 import moment from "moment";
 import { Action, handleActions } from "redux-actions";
 import ActionTypes from "../ActionTypes";
+const AT: any = ActionTypes;
 import clubIds from "../club-ids";
 import { Sports, DEFAULT_HALFSTOPS } from "../constants";
-import { Match, TwoMinPenalty } from "../types";
+import { Match } from "../types";
 
 export const initialState: Match = {
   homeScore: 0,
@@ -27,8 +28,8 @@ export const initialState: Match = {
   showInjuryTime: true,
 };
 
-const actions = {
-  [ActionTypes.updateMatch]: {
+const actions: Record<string, any> = {
+  [AT.updateMatch]: {
     next(state: Match, { payload, error }: Action<Partial<Match>>) {
       if (error) {
         return { ...state, error };
@@ -37,16 +38,17 @@ const actions = {
         return { ...state, pending: true };
       }
       const newState: Match = { ...state, ...payload };
+      const clubIdsMap = clubIds as Record<string, string>;
       newState.homeTeamId = newState.homeTeam
-        ? (clubIds as Record<string, number>)[newState.homeTeam] || 0
+        ? parseInt(clubIdsMap[newState.homeTeam] || "0", 10)
         : 0;
       newState.awayTeamId = newState.awayTeam
-        ? (clubIds as Record<string, number>)[newState.awayTeam] || 0
+        ? parseInt(clubIdsMap[newState.awayTeam] || "0", 10)
         : 0;
       if (Number.isNaN(newState.injuryTime)) {
         newState.injuryTime = 0;
       }
-      if (!(SPORTS as any)[newState.matchType]) {
+      if (!Object.values(Sports).includes(newState.matchType)) {
         newState.matchType = Sports.Football;
       }
       if (newState.matchType !== state.matchType) {
@@ -58,7 +60,7 @@ const actions = {
       return newState;
     },
   },
-  [ActionTypes.addPenalty]: {
+  [AT.addPenalty]: {
     next(
       state: Match,
       {
@@ -73,7 +75,7 @@ const actions = {
         return { ...state, pending: true };
       }
       const { team, key, penaltyLength } = payload;
-      const stateKey = `${team}2min` as "home2min" | "away2min";
+      const stateKey: "home2min" | "away2min" = `${team}2min`;
       const collection = [...state[stateKey]];
       collection.push({ atTimeElapsed: state.timeElapsed, key, penaltyLength });
       return {
@@ -82,7 +84,7 @@ const actions = {
       };
     },
   },
-  [ActionTypes.removePenalty]: {
+  [AT.removePenalty]: {
     next(state: Match, { payload, error }: Action<{ key: string }>) {
       if (error) {
         return { ...state, error };
@@ -98,7 +100,7 @@ const actions = {
       };
     },
   },
-  [ActionTypes.addToPenalty]: {
+  [AT.addToPenalty]: {
     next(state: Match, { payload, error }: Action<{ key: string; toAdd: number }>) {
       if (error) {
         return { ...state, error };
@@ -118,7 +120,7 @@ const actions = {
       };
     },
   },
-  [ActionTypes.pauseMatch]: {
+  [AT.pauseMatch]: {
     next(state: Match, { error, payload }: Action<{ isHalfEnd: boolean }>) {
       if (error) {
         return { ...state, error };
@@ -132,7 +134,7 @@ const actions = {
         started: 0,
       };
       if (isHalfEnd) {
-        newState.timeElapsed = newState.halfStops[0] * 60 * 1000;
+        newState.timeElapsed = (newState.halfStops[0] ?? 0) * 60 * 1000;
         if (newState.halfStops.length > 1) {
           newState.halfStops = newState.halfStops.slice(1);
         }
@@ -143,7 +145,7 @@ const actions = {
       return newState;
     },
   },
-  [ActionTypes.startMatch]: {
+  [AT.startMatch]: {
     next(state: Match) {
       return {
         ...state,
@@ -152,7 +154,7 @@ const actions = {
       };
     },
   },
-  [ActionTypes.updateHalfLength]: {
+  [AT.updateHalfLength]: {
     next(
       state: Match,
       { error, payload }: Action<{ currentValue: string; newValue: string }>
@@ -177,7 +179,7 @@ const actions = {
       };
     },
   },
-  [ActionTypes.setHalfStops]: {
+  [AT.setHalfStops]: {
     next(
       state: Match,
       { error, payload }: Action<{ halfStops: number[]; showInjuryTime: boolean }>
@@ -196,7 +198,7 @@ const actions = {
       };
     },
   },
-  [ActionTypes.matchTimeout]: {
+  [AT.matchTimeout]: {
     next(state: Match, { error, payload }: Action<{ team: "home" | "away" }>) {
       if (error) {
         return { ...state, error };
@@ -205,7 +207,7 @@ const actions = {
         return { ...state, pending: true };
       }
       const { team } = payload;
-      const stateKey = `${team}Timeouts` as "homeTimeouts" | "awayTimeouts";
+      const stateKey: "homeTimeouts" | "awayTimeouts" = `${team}Timeouts`;
       return {
         ...state,
         timeout: Date.now(),
@@ -213,7 +215,7 @@ const actions = {
       };
     },
   },
-  [ActionTypes.removeTimeout]: {
+  [AT.removeTimeout]: {
     next(state: Match, { error }: Action<void>) {
       if (error) {
         return { ...state, error };
@@ -225,7 +227,7 @@ const actions = {
     },
   },
 
-  [ActionTypes.buzz]: {
+  [AT.buzz]: {
     next(state: Match, { payload, error }: Action<{ on: boolean }>) {
       if (error) {
         return { ...state, error };
@@ -241,16 +243,16 @@ const actions = {
     },
   },
 
-  [ActionTypes.addGoal]: {
+  [AT.addGoal]: {
     next(state: Match, { payload: { team } }: Action<{ team: "home" | "away" }>) {
-      const key = `${team}Score` as "homeScore" | "awayScore";
+      const key: "homeScore" | "awayScore" = `${team}Score`;
       return {
         ...state,
         [key]: state[key] + 1,
       };
     },
   },
-  [ActionTypes.countdown]: {
+  [AT.countdown]: {
     next(state: Match, { error }: Action<void>) {
       if (error) {
         return { ...state, error };
@@ -267,7 +269,7 @@ const actions = {
       };
     },
   },
-  [ActionTypes.updateRedCards]: {
+  [AT.updateRedCards]: {
     next(state: Match, { payload: { home, away } }: Action<{ home: number; away: number }>) {
       return {
         ...state,
@@ -276,7 +278,7 @@ const actions = {
       };
     },
   },
-  [ActionTypes.receiveRemoteData]: {
+  [AT.receiveRemoteData]: {
     next(state: Match, action: any) {
       const { data, path } = action;
       if (path === "match" && data) {

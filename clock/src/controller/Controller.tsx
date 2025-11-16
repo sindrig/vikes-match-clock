@@ -22,7 +22,7 @@ import AssetController from "./asset/AssetController";
 import "rsuite/dist/rsuite.min.css";
 import "./Controller.css";
 import AssetQueue from "./asset/AssetQueue";
-import { RootState, ViewPort, CurrentAsset, FirebaseAuthState } from "../types";
+import { RootState, ViewPort, CurrentAsset, FirebaseAuthState, Asset } from "../types";
 
 // eslint-disable-next-line
 const confirmRefresh = () => confirm("Are you absolutely sure?");
@@ -30,9 +30,9 @@ const confirmRefresh = () => confirm("Are you absolutely sure?");
 interface ControllerProps {
   selectView: (view: string) => void;
   selectTab: (tab: string) => void;
-  renderAsset: (assetIndex: number) => void;
+  renderAsset: (asset: Asset | null) => void;
   currentAsset: CurrentAsset | null;
-  clearState: () => Promise<void>;
+  clearState: () => void;
   view: string;
   vp: ViewPort;
   sync: boolean;
@@ -91,7 +91,7 @@ const Controller = ({
               color="cyan"
               appearance="primary"
               size="sm"
-              onClick={() => renderAsset(0 as any)}
+              onClick={() => renderAsset(null)}
             >
               <CloseIcon /> Hreinsa virkt overlay
             </Button>
@@ -122,10 +122,12 @@ const Controller = ({
             color="red"
             appearance="primary"
             size="sm"
-            onClick={() =>
-              confirmRefresh() &&
-              clearState().then(() => window.location.reload())
-            }
+            onClick={() => {
+              if (confirmRefresh()) {
+                clearState();
+                window.location.reload();
+              }
+            }}
           >
             Hard refresh
           </Button>

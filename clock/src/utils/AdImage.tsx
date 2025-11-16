@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
-import PropTypes from "prop-types";
 import { storage } from "../firebase";
-import { connect } from "react-redux";
+import { connect, ConnectedProps } from "react-redux";
+import { RootState } from "../types";
 
-function useInterval(callback, delay) {
-  const savedCallback = useRef();
+function useInterval(callback: () => void, delay: number | null): void {
+  const savedCallback = useRef<(() => void) | undefined>(undefined);
 
   // Remember the latest callback.
   useEffect(() => {
@@ -13,8 +13,8 @@ function useInterval(callback, delay) {
 
   // Set up the interval.
   useEffect(() => {
-    function tick() {
-      savedCallback.current();
+    function tick(): void {
+      savedCallback.current?.();
     }
     if (delay !== null) {
       const id = setInterval(tick, delay);
@@ -24,14 +24,29 @@ function useInterval(callback, delay) {
   }, [delay]);
 }
 
-const AdImage = ({
+interface OwnProps {
+  imageType: string;
+  time?: number;
+  blankBetweenImages?: boolean;
+  postAdImg?: string | null;
+}
+
+const stateToProps = ({ remote: { listenPrefix } }: RootState) => ({
+  listenPrefix,
+});
+
+const connector = connect(stateToProps);
+
+type AdImageProps = ConnectedProps<typeof connector> & OwnProps;
+
+const AdImage: React.FC<AdImageProps> = ({
   imageType,
-  time,
-  blankBetweenImages,
-  postAdImg,
+  time = 5,
+  blankBetweenImages = false,
+  postAdImg = null,
   listenPrefix,
 }) => {
-  const [assets, setAssets] = useState([]);
+  const [assets, setAssets] = useState<string[]>([]);
   const [img, setImg] = useState(0);
   const [isBlank, setBlank] = useState(blankBetweenImages);
   const [isPost, setPost] = useState(!postAdImg);
@@ -62,7 +77,7 @@ const AdImage = ({
           setAssets,
         ),
       );
-  }, [imageType]);
+  }, [imageType, listenPrefix]);
 
   if (isBlank || assets.length === 0) {
     return null;
@@ -71,21 +86,4 @@ const AdImage = ({
   return <img src={src} className="ad" alt="Ad" />;
 };
 
-AdImage.propTypes = {
-  imageType: PropTypes.string.isRequired,
-  time: PropTypes.number,
-  blankBetweenImages: PropTypes.bool,
-  postAdImg: PropTypes.string,
-  listenPrefix: PropTypes.string,
-};
-
-AdImage.defaultProps = {
-  time: 5,
-  blankBetweenImages: false,
-  postAdImg: null,
-};
-
-const stateToProps = ({ remote: { listenPrefix } }) => ({
-  listenPrefix,
-});
-export default connect(stateToProps)(AdImage);
+export default connector(AdImage);

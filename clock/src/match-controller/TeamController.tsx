@@ -1,11 +1,26 @@
 import React from "react";
-import { connect } from "react-redux";
-import PropTypes from "prop-types";
+import { connect, ConnectedProps } from "react-redux";
 
 import ControlButton from "./ControlButton";
 import matchActions from "../actions/match";
+import type { AppDispatch } from "../store";
 
-const TeamController = ({ goal, penalty, timeout, started, team }) => (
+interface OwnProps {
+  team: string;
+  started: number | null;
+}
+
+const dispatchToProps = (dispatch: AppDispatch, { team }: OwnProps) => ({
+  goal: () => dispatch(matchActions.addGoal({ team })),
+  penalty: () => dispatch(matchActions.addPenalty({ team })),
+  timeout: () => dispatch(matchActions.matchTimeout({ team })),
+});
+
+const connector = connect(null, dispatchToProps);
+
+type TeamControllerProps = ConnectedProps<typeof connector> & OwnProps;
+
+const TeamController: React.FC<TeamControllerProps> = ({ goal, penalty, timeout, started, team }) => (
   <div className={`match-controller-box match-controller-box-${team}`}>
     <ControlButton className="yellow" onClick={goal}>
       Mark
@@ -19,22 +34,4 @@ const TeamController = ({ goal, penalty, timeout, started, team }) => (
   </div>
 );
 
-TeamController.propTypes = {
-  goal: PropTypes.func.isRequired,
-  penalty: PropTypes.func.isRequired,
-  timeout: PropTypes.func.isRequired,
-  started: PropTypes.number,
-  team: PropTypes.string.isRequired,
-};
-
-TeamController.defaultProps = {
-  started: null,
-};
-
-const dispatchToProps = (dispatch, { team }) => ({
-  goal: () => dispatch(matchActions.addGoal({ team })),
-  penalty: () => dispatch(matchActions.addPenalty({ team })),
-  timeout: () => dispatch(matchActions.matchTimeout({ team })),
-});
-
-export default connect(null, dispatchToProps)(TeamController);
+export default connector(TeamController);

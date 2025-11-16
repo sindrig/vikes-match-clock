@@ -1,29 +1,38 @@
 import React, { useState } from "react";
-import PropTypes from "prop-types";
-import { connect } from "react-redux";
+import { connect, ConnectedProps } from "react-redux";
 import { Nav } from "rsuite";
 import UploadManager from "./UploadManager";
 import ImageList from "./ImageList";
 import { IMAGE_TYPES } from ".";
+import { RootState } from "../../types";
 
-const MediaManager = ({ auth, listenPrefix }) => {
+const stateToProps = ({ firebase: { auth }, remote: { listenPrefix } }: RootState) => ({
+  auth,
+  listenPrefix,
+});
+
+const connector = connect(stateToProps);
+
+type MediaManagerProps = ConnectedProps<typeof connector>;
+
+const MediaManager: React.FC<MediaManagerProps> = ({ auth, listenPrefix }) => {
   const [tab, setTab] = useState(IMAGE_TYPES.images);
   const finalTab = `${listenPrefix === "safamyri" ? "fotbolti" : listenPrefix}/${tab}`;
   const [prefix, setPrefix] = useState("");
-  const [ts, setTs] = useState(null);
+  const [ts, setTs] = useState<number | null>(null);
   const [displayNow, setDisplayNow] = useState(true);
-  const selectTab = (tab) => {
+  const selectTab = (tab: string): void => {
     setPrefix("");
     setTab(tab);
   };
-  const appendPrefix = (newPrefix) => {
+  const appendPrefix = (newPrefix: string): void => {
     if (newPrefix === "..") {
       setPrefix(prefix.slice(0, prefix.lastIndexOf("/")));
     } else {
       setPrefix(`${prefix}/${newPrefix}`);
     }
   };
-  const refresh = () => {
+  const refresh = (): void => {
     // How stupid is this? sorry
     [2, 3, 5, 6].forEach((i) => setTimeout(() => setTs(Date.now()), 500 * i));
   };
@@ -68,16 +77,4 @@ const MediaManager = ({ auth, listenPrefix }) => {
   );
 };
 
-MediaManager.propTypes = {
-  auth: PropTypes.shape({
-    isEmpty: PropTypes.bool,
-  }).isRequired,
-  listenPrefix: PropTypes.string,
-};
-
-const stateToProps = ({ firebase: { auth }, remote: { listenPrefix } }) => ({
-  auth,
-  listenPrefix,
-});
-
-export default connect(stateToProps)(MediaManager);
+export default connector(MediaManager);

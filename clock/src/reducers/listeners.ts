@@ -1,23 +1,30 @@
 import { handleActions } from "redux-actions";
 
 import ActionTypes from "../ActionTypes";
+const AT: any = ActionTypes;
 
-export const initialState = {
+interface ListenersState {
+  available: string[];
+  screens: any[];
+}
+
+export const initialState: ListenersState = {
   available: [],
   screens: [],
 };
 
 const handleRemote = {
-  next(state, { data, path }) {
+  next(state: ListenersState, { data, path }: { data: any; path: string }): ListenersState {
     if (path === "locations" && data) {
       return {
         ...state,
         available: Object.keys(data),
         screens: Object.entries(data)
-          .map(([key, { label, screens, pitchIds }]) =>
-            screens.map((screen) => ({ screen, label, key, pitchIds })),
-          )
-          .reduce((a, b) => a.concat(b), []),
+          .map(([key, value]: [string, any]) => {
+            const { label, screens, pitchIds } = value;
+            return screens.map((screen: any) => ({ screen, label, key, pitchIds }));
+          })
+          .reduce((a: any[], b: any[]) => a.concat(b), []),
       };
     } else if (path.startsWith("auth/")) {
       return {
@@ -31,8 +38,8 @@ const handleRemote = {
   },
 };
 
-const actions = {
-  [ActionTypes.receiveRemoteData]: handleRemote,
+const actions: Record<string, any> = {
+  [AT.receiveRemoteData]: handleRemote,
   // This can't be triggered by changing UI, so we need to listen here as well
   "@@reactReduxFirebase/SET": handleRemote,
 };

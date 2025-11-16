@@ -36,9 +36,12 @@ const RemoveAssetDropzone = ({
       console.log(asset);
       removeAsset(asset);
     },
+    collect: (monitor) => ({
+      handlerId: monitor.getHandlerId(),
+    }),
   });
   return (
-    <div ref={drop} data-handler-id={handlerId}>
+    <div ref={drop as any} data-handler-id={handlerId}>
       <TrashIcon style={{ fontSize: "10em" }} />
     </div>
   );

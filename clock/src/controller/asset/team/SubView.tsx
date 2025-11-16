@@ -1,8 +1,12 @@
-import React from "react";
-import PropTypes from "prop-types";
-import { playerPropType } from "../../../propTypes";
+import { Player } from "../../../types";
 
-const SubView = ({ subTeam, subIn, subOut }) => (
+interface SubViewProps {
+  subTeam?: string | null;
+  subIn?: Player | null;
+  subOut?: Player | null;
+}
+
+const SubView = ({ subTeam, subIn, subOut }: SubViewProps): React.JSX.Element => (
   <div>
     {subTeam}
     {subIn && (
@@ -19,17 +23,5 @@ const SubView = ({ subTeam, subIn, subOut }) => (
     )}
   </div>
 );
-
-SubView.propTypes = {
-  subIn: playerPropType,
-  subOut: playerPropType,
-  subTeam: PropTypes.string,
-};
-
-SubView.defaultProps = {
-  subIn: null,
-  subOut: null,
-  subTeam: null,
-};
 
 export default SubView;

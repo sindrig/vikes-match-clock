@@ -1,6 +1,7 @@
-import { handleActions } from "redux-actions";
+import { handleActions, Action } from "redux-actions";
 
 import ActionTypes from "../ActionTypes";
+const AT: any = ActionTypes;
 import backgroundImage from "../images/background_fade.png";
 import backgroundCLImage from "../images/background_cl.png";
 import backgroundELImage from "../images/background_el.png";
@@ -64,10 +65,22 @@ export const BACKGROUNDS = {
   },
 };
 
-export const getBackground = (key) =>
-  BACKGROUNDS[key] || BACKGROUNDS[defaultBackground];
+export const getBackground = (key: string) =>
+  (BACKGROUNDS as Record<string, any>)[key] || BACKGROUNDS[defaultBackground];
 
-export const initialState = {
+interface ViewState {
+  vp: {
+    fontSize: string;
+    style: {
+      height: number;
+      width: number;
+    };
+  };
+  background: string;
+  idleImage: string;
+}
+
+export const initialState: ViewState = {
   vp: {
     fontSize: "100%",
     style: {
@@ -79,33 +92,34 @@ export const initialState = {
   idleImage: "Víkingur R",
 };
 
-const actions = {
-  [ActionTypes.setViewPort]: {
-    next(state, { payload: { vp } }) {
-      document
-        .getElementsByTagName("html")[0]
-        .setAttribute("style", `font-size: ${vp.fontSize}`);
+const actions: Record<string, any> = {
+  [AT.setViewPort]: {
+    next(state: ViewState, { payload: { vp } }: Action<{ vp: ViewState["vp"] }>): ViewState {
+      const htmlElement = document.getElementsByTagName("html")[0];
+      if (htmlElement) {
+        htmlElement.setAttribute("style", `font-size: ${vp.fontSize}`);
+      }
       return { ...state, vp };
     },
   },
-  [ActionTypes.setBackground]: {
-    next(state, { payload: { background } }) {
+  [AT.setBackground]: {
+    next(state: ViewState, { payload: { background } }: Action<{ background: string }>): ViewState {
       return {
         ...state,
         background,
       };
     },
   },
-  [ActionTypes.setIdleImage]: {
-    next(state, { payload: { idleImage } }) {
+  [AT.setIdleImage]: {
+    next(state: ViewState, { payload: { idleImage } }: Action<{ idleImage: string }>): ViewState {
       return {
         ...state,
         idleImage,
       };
     },
   },
-  [ActionTypes.receiveRemoteData]: {
-    next(state, { data, path }) {
+  [AT.receiveRemoteData]: {
+    next(state: ViewState, { data, path }: { data: any; path: string }): ViewState {
       if (path === "view" && data) {
         return {
           ...state,

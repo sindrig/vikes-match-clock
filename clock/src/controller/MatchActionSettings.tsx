@@ -3,13 +3,11 @@ import { bindActionCreators, Dispatch } from "redux";
 import matchActions from "../actions/match";
 import viewActions from "../actions/view";
 import TeamSelector from "./TeamSelector";
-import { VIEWS } from "../reducers/controller";
-import { BACKGROUNDS } from "../reducers/view";
-import { Sports } from "../constants";
 import HalfStops from "./HalfStops";
 import { Sports } from "../constants";
-import { VIEWS, BACKGROUNDS } from "../reducers/view";
 import clubLogos from "../images/clubLogos";
+import { VIEWS } from "../reducers/controller";
+import { BACKGROUNDS } from "../reducers/view";
 import { RootState } from "../types";
 
 const mapStateToProps = (state: RootState) => ({

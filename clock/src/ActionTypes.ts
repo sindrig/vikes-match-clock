@@ -119,6 +119,6 @@ const AllActionTypes = {
   ...View,
   ...Global,
   ...Remote,
-};
+} as const;
 
-export default AllActionTypes;
+export default AllActionTypes as any as Record<string, string>;

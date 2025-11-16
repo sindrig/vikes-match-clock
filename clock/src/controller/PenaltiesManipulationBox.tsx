@@ -95,7 +95,7 @@ const PenaltiesManipulationBox = ({
       <button
         type="button"
         onClick={() => addPenalty({ team })}
-        disabled={penalties.length >= MAX_TIMEOUTS_PER_TEAM || started}
+        disabled={penalties.length >= MAX_TIMEOUTS_PER_TEAM || !!started}
         className="add-penalty"
       >
         {`2 mín - ${translateTeam(team)}`}

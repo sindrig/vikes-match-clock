@@ -1,4 +1,5 @@
-import React, { Component } from "react";
+import { Component } from "react";
+import type React from "react";
 import { bindActionCreators, Dispatch } from "redux";
 import YouTube from "react-youtube";
 import { connect, ConnectedProps } from "react-redux";

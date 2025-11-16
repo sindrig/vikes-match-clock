@@ -7,7 +7,12 @@ import {
   getFirebase,
 } from "react-redux-firebase";
 import reducer from "./reducers/reducer";
-import { Controller, Match, Remote, View } from "./ActionTypes";
+import {
+  Controller,
+  Match,
+  RemoteActionType,
+  View,
+} from "./ActionTypes";
 import type { RootState } from "./types";
 
 // Extend window for Redux DevTools
@@ -22,7 +27,8 @@ const firebaseMiddleware: Middleware<
   RootState,
   ThunkDispatch<RootState, unknown, { type: string }>
 > = (store) => (next) => (action) => {
-  const { type } = action as { type: string };
+  const actionObj = action as Record<string, any> & { type: string };
+  const { type } = actionObj;
   const result = next(action);
   const {
     remote: { sync, listenPrefix },
@@ -51,8 +57,8 @@ const firebaseMiddleware: Middleware<
     }
     if (type === rrfActionTypes.SET) {
       store.dispatch({
-        ...action,
-        type: Remote.receiveRemoteData,
+        ...actionObj,
+        type: RemoteActionType.RECEIVE_REMOTE_DATA,
       });
     }
   }
@@ -61,12 +67,15 @@ const firebaseMiddleware: Middleware<
 
 const devTools = window.__REDUX_DEVTOOLS_EXTENSION__
   ? window.__REDUX_DEVTOOLS_EXTENSION__()
-  : (f: unknown) => f;
+  : <T,>(f: T): T => f;
 
 export const store = createStore(
   reducer,
   {},
-  compose(applyMiddleware(thunk, promiseMiddleware, firebaseMiddleware), devTools)
+  compose(
+    applyMiddleware(thunk, promiseMiddleware, firebaseMiddleware),
+    devTools as any
+  )
 );
 
 export const persistor = persistStore(store);

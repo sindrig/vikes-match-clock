@@ -37,11 +37,7 @@ interface State {
 }
 
 class Ruv extends Component<Props, State> {
-  static defaultProps: Partial<OwnProps> = {
-    thumbnail: false,
-  };
-
-  video: RefObject<HTMLVideoElement>;
+  video: RefObject<HTMLVideoElement | null>;
   hls: Hls | null;
 
   constructor(props: Props) {
@@ -49,7 +45,7 @@ class Ruv extends Component<Props, State> {
     this.state = {
       streamUrl: null,
     };
-    this.video = createRef();
+    this.video = createRef<HTMLVideoElement>();
     this.hls = null;
   }
 
@@ -93,11 +89,11 @@ class Ruv extends Component<Props, State> {
     const { getRuvUrl, channel } = this.props;
     getRuvUrl(channel)
       .then(({ value: { result } }: any) => {
-        this.setState({ streamUrl: result[0] || DEFAULT_URLS[channel] });
+        this.setState({ streamUrl: result[0] || DEFAULT_URLS[channel] || null });
       })
       .catch((e: Error) => {
         console.log("e", e);
-        this.setState({ streamUrl: DEFAULT_URLS[channel] });
+        this.setState({ streamUrl: DEFAULT_URLS[channel] || null });
       });
   }
 

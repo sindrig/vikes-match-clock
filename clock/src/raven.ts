@@ -1,4 +1,18 @@
+interface RavenStatic {
+  config(dsn: string, options: any): RavenStatic;
+  install(): void;
+  captureMessage(message: string): void;
+}
+
+declare global {
+  interface Window {
+    Raven?: RavenStatic;
+  }
+}
+
 class Raven {
+  registered: boolean;
+
   constructor() {
     this.registered = false;
     if (process.env.NODE_ENV === "production") {
@@ -20,8 +34,8 @@ class Raven {
     }
   }
 
-  captureMessage(message) {
-    if (this.registered) {
+  captureMessage(message: any): void {
+    if (this.registered && window.Raven) {
       window.Raven.captureMessage(JSON.stringify(message));
     } else {
       console.log("Raven not configured, not capturing message");

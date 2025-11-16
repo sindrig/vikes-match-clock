@@ -1,13 +1,30 @@
 import React from "react";
-import { connect } from "react-redux";
-import PropTypes from "prop-types";
+import { connect, ConnectedProps } from "react-redux";
 
-import { matchPropType, twoMinPropType } from "../propTypes";
 import { Sports } from "../constants";
 import TwoMinClock from "./TwoMinClock";
+import { RootState, TwoMinPenalty } from "../types";
 import "./RedCard.css";
 
-const Team = ({
+interface OwnProps {
+  score: number;
+  className: string;
+  team: {
+    image?: string;
+    name: string;
+  };
+  penalties: TwoMinPenalty[];
+  timeouts: number;
+  redCards: number;
+}
+
+const stateToProps = ({ match }: RootState) => ({ match });
+
+const connector = connect(stateToProps);
+
+type TeamProps = ConnectedProps<typeof connector> & OwnProps;
+
+const Team: React.FC<TeamProps> = ({
   score,
   className,
   team,
@@ -53,23 +70,4 @@ const Team = ({
   </div>
 );
 
-Team.propTypes = {
-  score: PropTypes.number.isRequired,
-  className: PropTypes.string.isRequired,
-  team: PropTypes.shape({
-    image: PropTypes.string,
-    name: PropTypes.string,
-  }).isRequired,
-  match: matchPropType.isRequired,
-  penalties: PropTypes.arrayOf(twoMinPropType),
-  timeouts: PropTypes.number.isRequired,
-  redCards: PropTypes.number.isRequired,
-};
-
-Team.defaultProps = {
-  penalties: [],
-};
-
-const stateToProps = ({ match }) => ({ match });
-
-export default connect(stateToProps)(Team);
+export default connector(Team);

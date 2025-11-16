@@ -1,18 +1,33 @@
 import React from "react";
-import PropTypes from "prop-types";
-import { connect } from "react-redux";
-import { bindActionCreators } from "redux";
+import { connect, ConnectedProps } from "react-redux";
+import { bindActionCreators, Dispatch } from "redux";
 import { VIEWS } from "../reducers/controller";
 
 import controllerActions from "../actions/controller";
 import matchActions from "../actions/match";
-import { matchPropType } from "../propTypes";
 import TeamController from "./TeamController";
 import ControlButton from "./ControlButton";
+import { RootState } from "../types";
 
 import "./MatchController.css";
 
-const MatchController = ({
+const stateToProps = ({ match }: RootState) => ({ match });
+
+const dispatchToProps = (dispatch: Dispatch) =>
+  bindActionCreators(
+    {
+      selectView: controllerActions.selectView,
+      pauseMatch: matchActions.pauseMatch,
+      startMatch: matchActions.startMatch,
+    },
+    dispatch,
+  );
+
+const connector = connect(stateToProps, dispatchToProps);
+
+type MatchControllerProps = ConnectedProps<typeof connector>;
+
+const MatchController: React.FC<MatchControllerProps> = ({
   match: { started, timeout },
   selectView,
   pauseMatch,
@@ -20,7 +35,6 @@ const MatchController = ({
 }) => (
   <div className="match-controller">
     <TeamController
-      className="match-controller-box"
       team="home"
       started={started}
     />
@@ -38,32 +52,10 @@ const MatchController = ({
       </ControlButton>
     </div>
     <TeamController
-      className="match-controller-box"
       team="away"
       started={started}
     />
   </div>
 );
 
-MatchController.propTypes = {
-  match: matchPropType.isRequired,
-  selectView: PropTypes.func.isRequired,
-  startMatch: PropTypes.func.isRequired,
-  pauseMatch: PropTypes.func.isRequired,
-};
-
-MatchController.defaultProps = {};
-
-const stateToProps = ({ match }) => ({ match });
-
-const dispatchToProps = (dispatch) =>
-  bindActionCreators(
-    {
-      selectView: controllerActions.selectView,
-      pauseMatch: matchActions.pauseMatch,
-      startMatch: matchActions.startMatch,
-    },
-    dispatch,
-  );
-
-export default connect(stateToProps, dispatchToProps)(MatchController);
+export default connector(MatchController);

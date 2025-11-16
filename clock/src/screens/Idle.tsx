@@ -1,28 +1,39 @@
-import React, { Component } from "react";
-import { connect } from "react-redux";
+import { Component } from "react";
+import type React from "react";
+import { connect, ConnectedProps } from "react-redux";
 import Clock from "react-live-clock";
-import PropTypes from "prop-types";
-import { viewPortPropType } from "../propTypes";
 import clubLogos from "../images/clubLogos";
 import AdImage from "../utils/AdImage";
 import { getTemp } from "../lib/weather";
 import husasmidjan from "../images/husa.png";
 import { IMAGE_TYPES } from "../controller/media";
+import { RootState } from "../types";
 
 import "./Idle.css";
 
 const fetchTempInterval = 5 * 60 * 1000;
 
-// Change this to true touse real temp
+// Change this to true to use real temp
 const useRealTemperature = true;
 
-class Idle extends Component {
-  static propTypes = {
-    vp: viewPortPropType.isRequired,
-    idleImage: PropTypes.string.isRequired,
-  };
+interface IdleState {
+  temperature: number;
+}
 
-  constructor(props) {
+const stateToProps = ({ match, view: { vp, idleImage } }: RootState) => ({
+  match,
+  vp,
+  idleImage,
+});
+
+const connector = connect(stateToProps);
+
+type IdleProps = ConnectedProps<typeof connector>;
+
+class Idle extends Component<IdleProps, IdleState> {
+  interval: NodeJS.Timeout | null = null;
+
+  constructor(props: IdleProps) {
     super(props);
     this.updateTemp = this.updateTemp.bind(this);
     this.state = {
@@ -30,16 +41,18 @@ class Idle extends Component {
     };
   }
 
-  componentDidMount() {
+  componentDidMount(): void {
     this.updateTemp();
     this.interval = setInterval(this.updateTemp, fetchTempInterval);
   }
 
-  componentWillUnmount() {
-    clearInterval(this.interval);
+  componentWillUnmount(): void {
+    if (this.interval) {
+      clearInterval(this.interval);
+    }
   }
 
-  updateTemp() {
+  updateTemp(): void {
     if (!useRealTemperature) {
       return;
     }
@@ -50,7 +63,7 @@ class Idle extends Component {
     });
   }
 
-  render() {
+  render(): React.JSX.Element {
     const { vp, idleImage } = this.props;
     const { temperature } = this.state;
     return (
@@ -61,7 +74,10 @@ class Idle extends Component {
           time={8}
         />
         <img
-          src={clubLogos[idleImage] || clubLogos["Víkingur R"]}
+          src={
+            (idleImage && (clubLogos as Record<string, string>)[idleImage]) ||
+            clubLogos["Víkingur R"]
+          }
           alt="Vikes"
           className="idle-vikes"
         />
@@ -81,10 +97,4 @@ class Idle extends Component {
   }
 }
 
-const stateToProps = ({ match, view: { vp, idleImage } }) => ({
-  match,
-  vp,
-  idleImage,
-});
-
-export default connect(stateToProps)(Idle);
+export default connector(Idle);

@@ -65,6 +65,12 @@ importers:
       immutability-helper:
         specifier: ^3.1.1
         version: 3.1.1
+      keymirror:
+        specifier: ^0.1.1
+        version: 0.1.1
+      moment:
+        specifier: ^2.30.1
+        version: 2.30.1
       postcss:
         specifier: ^8.4.49
         version: 8.5.6
@@ -97,10 +103,10 @@ importers:
         version: 19.2.0
       react-live-clock:
         specifier: ^6.1.23
-        version: 6.1.25(react-moment@1.1.3(moment@2.29.4)(prop-types@15.8.1)(react@19.2.0))(react@19.2.0)
+        version: 6.1.25(react-moment@1.1.3(moment@2.30.1)(prop-types@15.8.1)(react@19.2.0))(react@19.2.0)
       react-moment:
         specifier: ^1.1.3
-        version: 1.1.3(moment@2.29.4)(prop-types@15.8.1)(react@19.2.0)
+        version: 1.1.3(moment@2.30.1)(prop-types@15.8.1)(react@19.2.0)
       react-redux:
         specifier: ^9.1.2
         version: 9.2.0(@types/react@19.2.5)(react@19.2.0)(redux@5.0.1)
@@ -119,9 +125,15 @@ importers:
       redux:
         specifier: ^5.0.1
         version: 5.0.1
+      redux-actions:
+        specifier: ^3.0.3
+        version: 3.0.3
       redux-persist:
         specifier: ^6.0.0
         version: 6.0.0(react@19.2.0)(redux@5.0.1)
+      redux-promise-middleware:
+        specifier: ^6.2.0
+        version: 6.2.0(redux@5.0.1)
       redux-thunk:
         specifier: ^3.1.0
         version: 3.1.0(redux@5.0.1)
@@ -160,7 +172,7 @@ importers:
         specifier: ^8.18.1
         version: 8.46.4(eslint@8.57.1)(typescript@5.9.3)
       browserslist:
-        specifier: ^4.24.3
+        specifier: ^4.28.0
         version: 4.28.0
       cypress:
         specifier: ^13.17.0
@@ -2746,11 +2758,8 @@ packages:
   caniuse-api@3.0.0:
     resolution: {integrity: sha512-bsTwuIg/BZZK/vreVTYYbSWoe2F+71P7K5QGEX+pT250DZbfU1MQ5prOKpPR+LL6uWKK3KMwMCAS74QB3Um1uw==}
 
-  caniuse-lite@1.0.30001462:
-    resolution: {integrity: sha512-PDd20WuOBPiasZ7KbFnmQRyuLE7cFXW2PVd7dmALzbkUXEP46upAuCDm9eY9vho8fgNMGmbAX92QBZHzcnWIqw==}
-
-  caniuse-lite@1.0.30001754:
-    resolution: {integrity: sha512-x6OeBXueoAceOmotzx3PO4Zpt4rzpeIFsSr6AAePTZxSkXiYDUmpypEl7e2+8NCd9bD7bXjqyef8CJYPC1jfxg==}
+  caniuse-lite@1.0.30001755:
+    resolution: {integrity: sha512-44V+Jm6ctPj7R52Na4TLi3Zri4dWUljJd+RDm+j8LtNCc/ihLCT+X1TzoOAkRETEWqjuLnh9581Tl80FvK7jVA==}
 
   case-sensitive-paths-webpack-plugin@2.4.0:
     resolution: {integrity: sha512-roIFONhcxog0JSSWbvVAh3OocukmSgpqOH6YpMkCvav/ySIV3JKg4Dc8vYtQjYi/UxpNE36r/9v+VqTQqgkYmw==}
@@ -4835,6 +4844,12 @@ packages:
     resolution: {integrity: sha512-ZZow9HBI5O6EPgSJLUb8n2NKgmVWTwCvHGwFuJlMjvLFqlGG6pjirPhtdsseaLZjSibD8eegzmYpUZwoIlj2cQ==}
     engines: {node: '>=4.0'}
 
+  just-curry-it@5.3.0:
+    resolution: {integrity: sha512-silMIRiFjUWlfaDhkgSzpuAyQ6EX/o09Eu8ZBfmFwQMbax7+LQzeIU2CBrICT6Ne4l86ITCGvUCBpCubWYy0Yw==}
+
+  keymirror@0.1.1:
+    resolution: {integrity: sha512-vIkZAFWoDijgQT/Nvl2AHCMmnegN2ehgTPYuyy2hWQkQSntI0S7ESYqdLkoSe1HyEBFHHkCgSIvVdSEiWwKvCg==}
+
   kind-of@6.0.3:
     resolution: {integrity: sha512-dcS1ul+9tmeD95T+x28/ehLgd9mENa3LsvDTtzm3vyBEO7RPptvAD+t44WVXaUjTBRcrpFeFlC8WCruUR456hw==}
     engines: {node: '>=0.10.0'}
@@ -5081,8 +5096,8 @@ packages:
   moment-timezone@0.5.41:
     resolution: {integrity: sha512-e0jGNZDOHfBXJGz8vR/sIMXvBIGJJcqFjmlg9lmE+5KX1U7/RZNMswfD8nKnNCnQdKTIj50IaRKwl1fvMLyyRg==}
 
-  moment@2.29.4:
-    resolution: {integrity: sha512-5LC9SOxjSc2HF6vO2CyuTDNivEdoz2IvyJJGj6X8DJ0eFyfszE0QiEd+iXmBvUP3WHxSjFH/vIsA0EN00cgr8w==}
+  moment@2.30.1:
+    resolution: {integrity: sha512-uEmtNhbDOrWPFS+hdjFCBfy9f2YoyzRpwcl+DqpC6taX21FzsTLQVbMV/W7PzNSX6x/bhC1zA3c2UQ5NzH6how==}
 
   ms@2.0.0:
     resolution: {integrity: sha512-Tpp60P6IUJDTuOq/5Z8cdskzJujfwqfOTkrwIwj7IRISpnkJnT6SyJ4PCPnGMoFjC9ddhal5KVIYtAt97ix05A==}
@@ -6234,6 +6249,12 @@ packages:
   redent@3.0.0:
     resolution: {integrity: sha512-6tDA8g98We0zd0GvVeMT9arEOnTw9qM03L9cJXaCjrip1OO764RDBLBfrB4cwzNGDj5OA5ioymC9GkizgWJDUg==}
     engines: {node: '>=8'}
+
+  reduce-reducers@1.0.4:
+    resolution: {integrity: sha512-Mb2WZ2bJF597exiqX7owBzrqJ74DHLK3yOQjCyPAaNifRncE8OD0wFIuoMhXxTnHK07+8zZ2SJEKy/qtiyR7vw==}
+
+  redux-actions@3.0.3:
+    resolution: {integrity: sha512-ca+ySXmXWrxDqtauRA6lQtjmRO8Z9Ruog3wbb8wDq4RVW9Y677Nl/AXoJPlxJqH0mpY9QGkg03NkAJwTcyN2pQ==}
 
   redux-mock-store@1.5.4:
     resolution: {integrity: sha512-xmcA0O/tjCLXhh9Fuiq6pMrJCwFRaouA8436zcikdIpYWWCjU76CRk+i2bHx8EeiSiMGnB85/lZdU3wIJVXHTA==}
@@ -10345,7 +10366,7 @@ snapshots:
   autoprefixer@10.4.13(postcss@8.5.6):
     dependencies:
       browserslist: 4.28.0
-      caniuse-lite: 1.0.30001462
+      caniuse-lite: 1.0.30001755
       fraction.js: 4.2.0
       normalize-range: 0.1.2
       picocolors: 1.0.0
@@ -10355,7 +10376,7 @@ snapshots:
   autoprefixer@10.4.22(postcss@8.5.6):
     dependencies:
       browserslist: 4.28.0
-      caniuse-lite: 1.0.30001754
+      caniuse-lite: 1.0.30001755
       fraction.js: 5.3.4
       normalize-range: 0.1.2
       picocolors: 1.1.1
@@ -10590,7 +10611,7 @@ snapshots:
   browserslist@4.28.0:
     dependencies:
       baseline-browser-mapping: 2.8.28
-      caniuse-lite: 1.0.30001754
+      caniuse-lite: 1.0.30001755
       electron-to-chromium: 1.5.254
       node-releases: 2.0.27
       update-browserslist-db: 1.1.4(browserslist@4.28.0)
@@ -10658,13 +10679,11 @@ snapshots:
   caniuse-api@3.0.0:
     dependencies:
       browserslist: 4.28.0
-      caniuse-lite: 1.0.30001462
+      caniuse-lite: 1.0.30001755
       lodash.memoize: 4.1.2
       lodash.uniq: 4.5.0
 
-  caniuse-lite@1.0.30001462: {}
-
-  caniuse-lite@1.0.30001754: {}
+  caniuse-lite@1.0.30001755: {}
 
   case-sensitive-paths-webpack-plugin@2.4.0: {}
 
@@ -13384,6 +13403,10 @@ snapshots:
       object.assign: 4.1.4
       object.values: 1.1.6
 
+  just-curry-it@5.3.0: {}
+
+  keymirror@0.1.1: {}
+
   kind-of@6.0.3: {}
 
   kleur@3.0.3: {}
@@ -13591,9 +13614,9 @@ snapshots:
 
   moment-timezone@0.5.41:
     dependencies:
-      moment: 2.29.4
+      moment: 2.30.1
 
-  moment@2.29.4: {}
+  moment@2.30.1: {}
 
   ms@2.0.0: {}
 
@@ -14727,16 +14750,16 @@ snapshots:
 
   react-is@19.2.0: {}
 
-  react-live-clock@6.1.25(react-moment@1.1.3(moment@2.29.4)(prop-types@15.8.1)(react@19.2.0))(react@19.2.0):
+  react-live-clock@6.1.25(react-moment@1.1.3(moment@2.30.1)(prop-types@15.8.1)(react@19.2.0))(react@19.2.0):
     dependencies:
-      moment: 2.29.4
+      moment: 2.30.1
       moment-timezone: 0.5.41
       react: 19.2.0
-      react-moment: 1.1.3(moment@2.29.4)(prop-types@15.8.1)(react@19.2.0)
+      react-moment: 1.1.3(moment@2.30.1)(prop-types@15.8.1)(react@19.2.0)
 
-  react-moment@1.1.3(moment@2.29.4)(prop-types@15.8.1)(react@19.2.0):
+  react-moment@1.1.3(moment@2.30.1)(prop-types@15.8.1)(react@19.2.0):
     dependencies:
-      moment: 2.29.4
+      moment: 2.30.1
       prop-types: 15.8.1
       react: 19.2.0
 
@@ -14903,6 +14926,13 @@ snapshots:
     dependencies:
       indent-string: 4.0.0
       strip-indent: 3.0.0
+
+  reduce-reducers@1.0.4: {}
+
+  redux-actions@3.0.3:
+    dependencies:
+      just-curry-it: 5.3.0
+      reduce-reducers: 1.0.4
 
   redux-mock-store@1.5.4:
     dependencies:

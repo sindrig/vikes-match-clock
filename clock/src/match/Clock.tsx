@@ -1,40 +1,56 @@
-import React, { Component } from "react";
-import PropTypes from "prop-types";
-import { bindActionCreators } from "redux";
-import { connect } from "react-redux";
+import { Component } from "react";
+import type React from "react";
+import { bindActionCreators, Dispatch } from "redux";
+import { connect, ConnectedProps } from "react-redux";
 
 import matchActions from "../actions/match";
 
-import { Sports } from "../constants";
 import { formatTime } from "../utils/timeUtils";
 import ClockBase from "./ClockBase";
+import { RootState } from "../types";
 
-class Clock extends Component {
-  static propTypes = {
-    started: PropTypes.number,
-    countdown: PropTypes.bool,
-    timeElapsed: PropTypes.number.isRequired,
-    className: PropTypes.string.isRequired,
-    pauseMatch: PropTypes.func.isRequired,
-    buzz: PropTypes.func.isRequired,
-    // eslint-disable-next-line
-    matchType: PropTypes.oneOf(Object.keys(Sports)).isRequired,
-    halfStop: PropTypes.number.isRequired,
-    showInjuryTime: PropTypes.bool,
-  };
+interface OwnProps {
+  className: string;
+}
 
-  static defaultProps = {
-    started: null,
-    countdown: false,
-    showInjuryTime: true,
-  };
+const stateToProps = ({
+  match: {
+    started,
+    halfStops,
+    timeElapsed,
+    matchType,
+    showInjuryTime,
+    countdown,
+  },
+}: RootState) => ({
+  started,
+  countdown,
+  timeElapsed,
+  matchType,
+  showInjuryTime,
+  halfStop: halfStops[0],
+});
 
-  constructor(props) {
+const dispatchToProps = (dispatch: Dispatch) =>
+  bindActionCreators(
+    {
+      pauseMatch: matchActions.pauseMatch,
+      buzz: matchActions.buzz,
+    },
+    dispatch,
+  );
+
+const connector = connect(stateToProps, dispatchToProps);
+
+type ClockProps = ConnectedProps<typeof connector> & OwnProps;
+
+class Clock extends Component<ClockProps> {
+  constructor(props: ClockProps) {
     super(props);
     this.updateTime = this.updateTime.bind(this);
   }
 
-  updateTime() {
+  updateTime(): string {
     const {
       started,
       halfStop,
@@ -52,9 +68,9 @@ class Clock extends Component {
     const minutesElapsed = Math.floor(secondsElapsed / 60);
     let minutes = showInjuryTime
       ? minutesElapsed
-      : Math.min(minutesElapsed, halfStop);
+      : Math.min(minutesElapsed, halfStop ?? 0);
     let seconds;
-    if (!showInjuryTime && minutes >= halfStop && started) {
+    if (!showInjuryTime && halfStop && minutes >= halfStop && started) {
       seconds = 0;
       pauseMatch({ isHalfEnd: true });
       buzz();
@@ -76,7 +92,7 @@ class Clock extends Component {
     return formatTime(minutes, seconds);
   }
 
-  render() {
+  render(): React.JSX.Element {
     const { started, timeElapsed, className } = this.props;
     return (
       <ClockBase
@@ -88,31 +104,4 @@ class Clock extends Component {
   }
 }
 
-const stateToProps = ({
-  match: {
-    started,
-    halfStops,
-    timeElapsed,
-    matchType,
-    showInjuryTime,
-    countdown,
-  },
-}) => ({
-  started,
-  countdown,
-  timeElapsed,
-  matchType,
-  showInjuryTime,
-  halfStop: halfStops[0],
-});
-
-const dispatchToProps = (dispatch) =>
-  bindActionCreators(
-    {
-      pauseMatch: matchActions.pauseMatch,
-      buzz: matchActions.buzz,
-    },
-    dispatch,
-  );
-
-export default connect(stateToProps, dispatchToProps)(Clock);
+export default connector(Clock);

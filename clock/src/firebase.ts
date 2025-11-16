@@ -3,8 +3,6 @@ import firebase from "firebase/compat/app";
 import "firebase/compat/database";
 import "firebase/compat/auth";
 import "firebase/compat/storage";
-import type { FirebaseStorage } from "firebase/compat/storage";
-
 interface FirebaseConfig {
   apiKey: string;
   authDomain: string;
@@ -29,6 +27,6 @@ if (process.env.NODE_ENV !== "production") {
 
 firebase.initializeApp(fbConfig);
 
-const storage: FirebaseStorage = firebase.storage();
+const storage = firebase.storage();
 
 export { firebase, storage };

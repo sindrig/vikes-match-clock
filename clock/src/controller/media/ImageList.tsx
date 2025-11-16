@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { bindActionCreators } from "redux";
-import { connect } from "react-redux";
-import PropTypes from "prop-types";
+import { bindActionCreators, Dispatch } from "redux";
+import { connect, ConnectedProps } from "react-redux";
 import { storage } from "../../firebase";
 import controllerActions from "../../actions/controller";
 import assetTypes from "../asset/AssetTypes";
@@ -10,11 +9,42 @@ import TrashIcon from "@rsuite/icons/Trash";
 
 import "./ImageList.css";
 
-const AssetTypeSuffixMap = {
+const AssetTypeSuffixMap: Record<string, string> = {
   mp4: assetTypes.VIDEO,
 };
 
-const ImageList = ({
+interface ImageData {
+  name: string;
+  imageUrl: string;
+  ref: string;
+}
+
+interface FolderData {
+  name: string;
+}
+
+interface OwnProps {
+  prefix: string;
+  displayNow: boolean;
+  allowEdit: boolean;
+  appendPrefix: (prefix: string) => void;
+  ts: number | null;
+}
+
+const dispatchToProps = (dispatch: Dispatch) =>
+  bindActionCreators(
+    {
+      renderAsset: controllerActions.renderAsset,
+      addAssets: controllerActions.addAssets,
+    },
+    dispatch,
+  );
+
+const connector = connect(() => ({}), dispatchToProps);
+
+type ImageListProps = ConnectedProps<typeof connector> & OwnProps;
+
+const ImageList: React.FC<ImageListProps> = ({
   prefix,
   renderAsset,
   displayNow,
@@ -23,10 +53,10 @@ const ImageList = ({
   appendPrefix,
   ts,
 }) => {
-  const [images, setImages] = useState([]);
-  const [folders, setFolders] = useState([]);
+  const [images, setImages] = useState<ImageData[]>([]);
+  const [folders, setFolders] = useState<FolderData[]>([]);
 
-  const deleteImage = (ref) =>
+  const deleteImage = (ref: string): Promise<void> =>
     storage
       .ref(ref)
       .delete()
@@ -34,17 +64,17 @@ const ImageList = ({
         setImages(images.filter((img) => img.ref !== ref));
       });
 
-  const deleteFolder = (ref) => {
-    deleteImage(ref).then(() => appendPrefix(".."));
+  const deleteFolder = (ref: string): Promise<void> => {
+    return deleteImage(ref).then(() => appendPrefix(".."));
   };
 
   useEffect(() => {
     const listRef = storage.ref(prefix);
-    listRef.listAll().then((res) => {
-      Promise.all(res.items.map((itemRef) => itemRef.getDownloadURL())).then(
+    listRef.listAll().then((res: any) => {
+      Promise.all(res.items.map((itemRef: any) => itemRef.getDownloadURL())).then(
         (downloadUrls) => {
           setImages(
-            res.items.map((item, i) => ({
+            res.items.map((item: any, i: number) => ({
               name: item.name,
               imageUrl: downloadUrls[i],
               ref: item.fullPath,
@@ -52,9 +82,10 @@ const ImageList = ({
           );
         },
       );
-      setFolders(res.prefixes);
+      setFolders(res.prefixes.map((p: any) => ({ name: p.name })));
     });
   }, [prefix, ts]);
+
   return (
     <React.Fragment>
       <div className="control-item image-list">
@@ -87,7 +118,7 @@ const ImageList = ({
                 onClick={() => {
                   const parts = name.split(".");
                   const suffix = parts[parts.length - 1];
-                  const type = AssetTypeSuffixMap[suffix] || assetTypes.IMAGE;
+                  const type = suffix ? AssetTypeSuffixMap[suffix] || assetTypes.IMAGE : assetTypes.IMAGE;
                   const asset = {
                     // To be able to add the same image multiple times to the queue,
                     // we need to make the key unique
@@ -96,7 +127,7 @@ const ImageList = ({
                     type,
                   };
                   if (displayNow) {
-                    renderAsset({ asset });
+                    renderAsset(asset);
                   } else {
                     addAssets([asset]);
                   }
@@ -117,23 +148,5 @@ const ImageList = ({
     </React.Fragment>
   );
 };
-ImageList.propTypes = {
-  prefix: PropTypes.string.isRequired,
-  renderAsset: PropTypes.func.isRequired,
-  addAssets: PropTypes.func.isRequired,
-  appendPrefix: PropTypes.func.isRequired,
-  displayNow: PropTypes.bool.isRequired,
-  allowEdit: PropTypes.bool.isRequired,
-  ts: PropTypes.any,
-};
 
-const dispatchToProps = (dispatch) =>
-  bindActionCreators(
-    {
-      renderAsset: controllerActions.renderAsset,
-      addAssets: controllerActions.addAssets,
-    },
-    dispatch,
-  );
-
-export default connect(() => ({}), dispatchToProps)(ImageList);
+export default connector(ImageList);

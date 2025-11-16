@@ -3,11 +3,7 @@ import { connect, ConnectedProps } from "react-redux";
 
 import { THUMB_VP } from "../../constants";
 import { getBackground } from "../../reducers/view";
-import { RootState, ViewPort } from "../../types";
-
-interface GetTextWidthCanvas extends HTMLCanvasElement {
-  // Marker to extend canvas with cache property
-}
+import { RootState } from "../../types";
 
 const getTextWidth = (text: string, font: string): number => {
   // re-use canvas object for better performance
@@ -34,7 +30,7 @@ const getMaxFontSize = (text: string, width: number, max: number): number => {
 
 interface PlayerAsset {
   key: string;
-  name: string;
+  name?: string;
   number?: number | string;
   role?: string;
 }
@@ -74,18 +70,6 @@ interface State {
 }
 
 class PlayerCard extends Component<Props, State> {
-  static defaultProps: Partial<OwnProps> = {
-    thumbnail: false,
-    children: undefined,
-    className: "",
-    widthMultiplier: 1,
-    overlay: {
-      text: "",
-      blink: false,
-    },
-    includeBackground: true,
-  };
-
   state: State = {
     fontSizes: {
       thumbnail: 1,
@@ -95,7 +79,7 @@ class PlayerCard extends Component<Props, State> {
 
   static getDerivedStateFromProps(nextProps: Props): State {
     const {
-      asset: { name },
+      asset: { name = "" },
       widthMultiplier = 1,
       vp: {
         style: { width },

@@ -1,11 +1,15 @@
 import React, { useState } from "react";
-import PropTypes from "prop-types";
 import { storage } from "../../firebase";
 
-const CreateFolder = ({ prefix, refresh }) => {
+interface CreateFolderProps {
+  prefix: string;
+  refresh: () => void;
+}
+
+const CreateFolder: React.FC<CreateFolderProps> = ({ prefix, refresh }) => {
   const [creating, setCreating] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
-  const save = () => {
+  const save = (): void => {
     setCreating(false);
     storage
       .ref(`${prefix}/${newFolderName}/.vikes`)
@@ -28,8 +32,5 @@ const CreateFolder = ({ prefix, refresh }) => {
     </div>
   );
 };
-CreateFolder.propTypes = {
-  prefix: PropTypes.string.isRequired,
-  refresh: PropTypes.func.isRequired,
-};
+
 export default CreateFolder;

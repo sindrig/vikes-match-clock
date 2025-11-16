@@ -16,8 +16,8 @@ interface ActionCreators {
   editPlayer: (
     teamId: string,
     idx: number,
-    updatedPlayer: Player
-  ) => Action<{ teamId: string; idx: number; updatedPlayer: Player }>;
+    updatedPlayer: Partial<Player>
+  ) => Action<{ teamId: string; idx: number; updatedPlayer: Partial<Player> }>;
   deletePlayer: (
     teamId: string,
     idx: number
@@ -30,7 +30,7 @@ interface ActionCreators {
   showNextAsset: () => Action<Record<string, never>>;
   remoteRefresh: () => Action<Record<string, never>>;
   setPlaying: (playing: boolean) => Action<{ playing: boolean }>;
-  renderAsset: (asset: Asset) => Action<{ asset: Asset }>;
+  renderAsset: (asset: Asset | null) => Action<{ asset: Asset | null }>;
   setSelectedAssets: (
     selectedAssets: Asset[]
   ) => Action<{ selectedAssets: Asset[] }>;
@@ -52,7 +52,7 @@ const actionPayloads: Record<string, ((...args: any[]) => any) | undefined> = {
   selectAssetView: (assetView: string) => ({ assetView }),
   clearMatchPlayers: () => ({}),
   selectMatch: (matchId: string) => matchId,
-  editPlayer: (teamId: string, idx: number, updatedPlayer: Player) => ({
+  editPlayer: (teamId: string, idx: number, updatedPlayer: Partial<Player>) => ({
     teamId,
     idx,
     updatedPlayer,
@@ -69,7 +69,7 @@ const actionPayloads: Record<string, ((...args: any[]) => any) | undefined> = {
   showNextAsset: () => ({}),
   remoteRefresh: () => ({}),
   setPlaying: (playing: boolean) => ({ playing }),
-  renderAsset: (asset: Asset) => ({ asset }),
+  renderAsset: (asset: Asset | null) => ({ asset }),
   setSelectedAssets: (selectedAssets: Asset[]) => ({
     selectedAssets,
   }),

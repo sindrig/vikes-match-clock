@@ -1,25 +1,76 @@
-import React, { Component } from "react";
-import { connect } from "react-redux";
-import { bindActionCreators } from "redux";
-import PropTypes from "prop-types";
-
-import { RingLoader } from "react-spinners";
+import { Component } from "react";
+import type React from "react";
+import { connect, ConnectedProps } from "react-redux";
+import { bindActionCreators, Dispatch } from "redux";
 import axios from "axios";
+import { RingLoader } from "react-spinners";
 
 import apiConfig from "../../../apiConfig";
 import controllerActions from "../../../actions/controller";
 import matchActions from "../../../actions/match";
+import { RootState, Player } from "../../../types";
 
-class TeamAssetController extends Component {
-  static propTypes = {
-    setAvailableMatches: PropTypes.func.isRequired,
-    updateMatch: PropTypes.func.isRequired,
-    selectMatch: PropTypes.func.isRequired,
-    listenPrefix: PropTypes.string.isRequired,
-    screens: PropTypes.arrayOf(PropTypes.object),
+interface MatchesOnPitchState {
+  error: string;
+  loading: boolean;
+  matches: MatchData[];
+}
+
+interface MatchData {
+  match_id: string;
+  date: string;
+  time: string;
+  competition: string;
+  home: {
+    name: string;
   };
+  away: {
+    name: string;
+  };
+}
 
-  constructor(props) {
+interface MatchReportResponse {
+  players: Record<string, Player[]>;
+  group?: string;
+  sex?: string;
+}
+
+interface MatchesResponse {
+  matches: MatchData[];
+}
+
+const stateToProps = ({
+  match,
+  listeners: { screens },
+  controller: { availableMatches, selectedMatch },
+  remote: { listenPrefix },
+}: RootState) => ({
+  match,
+  availableMatches,
+  selectedMatch,
+  listenPrefix,
+  screens,
+});
+
+const dispatchToProps = (dispatch: Dispatch) =>
+  bindActionCreators(
+    {
+      setAvailableMatches: controllerActions.setAvailableMatches,
+      updateMatch: matchActions.updateMatch,
+      selectMatch: controllerActions.selectMatch,
+    },
+    dispatch,
+  );
+
+const connector = connect(stateToProps, dispatchToProps);
+
+type TeamAssetControllerProps = ConnectedProps<typeof connector>;
+
+class TeamAssetController extends Component<
+  TeamAssetControllerProps,
+  MatchesOnPitchState
+> {
+  constructor(props: TeamAssetControllerProps) {
     super(props);
     this.state = {
       error: "",
@@ -28,7 +79,7 @@ class TeamAssetController extends Component {
     };
   }
 
-  fetchMatchesOnPitch = async () => {
+  fetchMatchesOnPitch = async (): Promise<void> => {
     const { screens, listenPrefix } = this.props;
     const matching = screens.filter(({ key }) => {
       return key === listenPrefix;
@@ -39,24 +90,29 @@ class TeamAssetController extends Component {
     }
     this.setState({ loading: true });
 
+    const firstMatch = matching[0];
     const options = {
       params: {
-        location: matching[0].pitchIds[0],
+        location: firstMatch?.pitchIds?.[0],
         action: "get-matches",
       },
     };
     try {
       const {
         data: { matches },
-      } = await axios.get(`${apiConfig.gateWayUrl}match-report/v2`, options);
+      } = await axios.get<MatchesResponse>(`${apiConfig.gateWayUrl}match-report/v2`, options);
       this.setState({ error: "", matches, loading: false });
     } catch (e) {
-      this.setState({ error: e.message });
+      const error = e as Error;
+      this.setState({ error: error.message });
     }
   };
-  fetchMatchReport = async () => {
+
+  fetchMatchReport = async (): Promise<void> => {
     const { setAvailableMatches } = this.props;
     const matchId = prompt("ID á leikskýrslu");
+    if (!matchId) return;
+
     this.setState({ loading: true });
 
     const options = {
@@ -66,18 +122,26 @@ class TeamAssetController extends Component {
       },
     };
     try {
-      const {
-        data: { players },
-      } = await axios.get(`${apiConfig.gateWayUrl}match-report/v2`, options);
-      setAvailableMatches({ [matchId]: { players } });
+      const { data } = await axios.get<MatchReportResponse>(
+        `${apiConfig.gateWayUrl}match-report/v2`,
+        options,
+      );
+      setAvailableMatches({
+        [matchId]: {
+          players: data.players,
+          group: data.group,
+          sex: data.sex,
+        },
+      });
       this.setState({ error: "", loading: false, matches: [] });
     } catch (e) {
-      this.setState({ error: e.message });
+      const error = e as Error;
+      this.setState({ error: error.message });
     }
     return this.setState({ loading: false });
   };
 
-  selectMatch = async (match) => {
+  selectMatch = async (match: MatchData): Promise<void> => {
     const { updateMatch, setAvailableMatches } = this.props;
     this.setState({ loading: true });
     const home = match.home;
@@ -95,18 +159,26 @@ class TeamAssetController extends Component {
       },
     };
     try {
-      const {
-        data: { players },
-      } = await axios.get(`${apiConfig.gateWayUrl}match-report/v2`, options);
-      setAvailableMatches({ [match.match_id]: { players } });
+      const { data } = await axios.get<MatchReportResponse>(
+        `${apiConfig.gateWayUrl}match-report/v2`,
+        options,
+      );
+      setAvailableMatches({
+        [match.match_id]: {
+          players: data.players,
+          group: data.group,
+          sex: data.sex,
+        },
+      });
       this.setState({ error: "", loading: false, matches: [] });
     } catch (e) {
-      this.setState({ error: e.message });
+      const error = e as Error;
+      this.setState({ error: error.message });
     }
     return this.setState({ loading: false });
   };
 
-  render() {
+  render(): React.JSX.Element {
     const { matches, error, loading } = this.state;
     if (!matches.length) {
       return (
@@ -144,27 +216,4 @@ class TeamAssetController extends Component {
   }
 }
 
-const stateToProps = ({
-  match,
-  listeners: { screens },
-  controller: { availableMatches, selectedMatch },
-  remote: { listenPrefix },
-}) => ({
-  match,
-  availableMatches,
-  selectedMatch,
-  listenPrefix,
-  screens,
-});
-
-const dispatchToProps = (dispatch) =>
-  bindActionCreators(
-    {
-      setAvailableMatches: controllerActions.setAvailableMatches,
-      updateMatch: matchActions.updateMatch,
-      selectMatch: controllerActions.selectMatch,
-    },
-    dispatch,
-  );
-
-export default connect(stateToProps, dispatchToProps)(TeamAssetController);
+export default connector(TeamAssetController);

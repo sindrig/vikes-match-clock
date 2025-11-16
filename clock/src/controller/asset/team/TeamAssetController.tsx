@@ -1,4 +1,5 @@
-import React, { Component } from "react";
+import { Component } from "react";
+import type React from "react";
 import { connect, ConnectedProps } from "react-redux";
 import { bindActionCreators, Dispatch } from "redux";
 
@@ -11,7 +12,7 @@ import assetTypes from "../AssetTypes";
 import MatchSelector from "./MatchSelector";
 import controllerActions from "../../../actions/controller";
 import { getMOTMAsset, getPlayerAssetObject } from "./assetHelpers";
-import { RootState, Match, Player, AvailableMatches, Asset } from "../../../types";
+import { RootState, Player } from "../../../types";
 
 interface SubPlayer extends Player {
   teamName: string;
@@ -93,10 +94,12 @@ class TeamAssetController extends Component<
       match: { homeTeam, awayTeam },
     } = this.props;
     const match = selectedMatch ? availableMatches[selectedMatch] : undefined;
-    const clubIdsMap = clubIds as Record<string, number>;
+    const clubIdsMap = clubIds as Record<string, string>;
+    const homeTeamId = clubIdsMap[homeTeam];
+    const awayTeamId = clubIdsMap[awayTeam];
     return {
-      homeTeam: match?.players ? match.players[clubIdsMap[homeTeam]] || [] : [],
-      awayTeam: match?.players ? match.players[clubIdsMap[awayTeam]] || [] : [],
+      homeTeam: match?.players && homeTeamId ? match.players[homeTeamId] || [] : [],
+      awayTeam: match?.players && awayTeamId ? match.players[awayTeamId] || [] : [],
     };
   }
 
@@ -151,6 +154,7 @@ class TeamAssetController extends Component<
       teamName: (match as any)[subIn.teamName],
       listenPrefix,
     });
+    if (!subInObj || !subOutObj) return;
     addAssets(
       [
         {
@@ -252,7 +256,7 @@ class TeamAssetController extends Component<
       .then(() => this.setState({ loading: false }));
   }
 
-  renderControls(): JSX.Element {
+  renderControls(): React.JSX.Element {
     const { availableMatches, clearMatchPlayers } = this.props;
     const { homeTeam, awayTeam } = this.getTeamPlayers();
     return (
@@ -295,7 +299,7 @@ class TeamAssetController extends Component<
     );
   }
 
-  renderActionButtons(): JSX.Element {
+  renderActionButtons(): React.JSX.Element {
     const { selectSubs, selectPlayerAsset, selectGoalScorer, selectMOTM } =
       this.state;
     if (selectSubs) {
@@ -387,7 +391,7 @@ class TeamAssetController extends Component<
     );
   }
 
-  renderActionControllers(): JSX.Element {
+  renderActionControllers(): React.JSX.Element {
     const { subIn, subOut, selectSubs, subTeam } = this.state;
     const { match } = this.props;
     return (
@@ -398,7 +402,6 @@ class TeamAssetController extends Component<
             <SubView
               subIn={subIn}
               subOut={subOut}
-              addSubAsset={this.addSubAsset}
               subTeam={subTeam ? (match as any)[subTeam] : null}
             />
           </div>
@@ -407,7 +410,7 @@ class TeamAssetController extends Component<
     );
   }
 
-  renderTeam(teamName: string): JSX.Element {
+  renderTeam(teamName: "homeTeam" | "awayTeam"): React.JSX.Element {
     const {
       selectSubs,
       subTeam,
@@ -432,7 +435,7 @@ class TeamAssetController extends Component<
     return <Team teamName={teamName} selectPlayer={selectPlayerAction} />;
   }
 
-  render(): JSX.Element {
+  render(): React.JSX.Element {
     const { loading, error } = this.state;
     const { match } = this.props;
     if (!match.homeTeam || !match.awayTeam) {

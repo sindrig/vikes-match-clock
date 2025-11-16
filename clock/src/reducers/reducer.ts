@@ -9,7 +9,7 @@ import view from "./view";
 import remote from "./remote";
 import listeners from "./listeners";
 
-const persistConfig = (key) => ({
+const persistConfig = (key: string) => ({
   key,
   storage,
   serialize: true,

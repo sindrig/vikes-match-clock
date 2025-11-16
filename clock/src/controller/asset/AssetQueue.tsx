@@ -40,11 +40,13 @@ const AssetQueue = ({
 }: Props): React.JSX.Element | null => {
   const moveAsset = useCallback(
     (dragIndex: number, hoverIndex: number) => {
+      const draggedAsset = selectedAssets[dragIndex];
+      if (!draggedAsset) return;
       const newAssets = update(selectedAssets, {
         $splice: [
           [dragIndex, 1],
-          [hoverIndex, 0, selectedAssets[dragIndex]],
-        ],
+          [hoverIndex, 0, draggedAsset],
+        ] as [[number, number], [number, number, AssetType]],
       });
       setSelectedAssets(newAssets);
     },

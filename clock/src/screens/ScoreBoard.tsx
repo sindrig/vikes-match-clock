@@ -1,6 +1,4 @@
-import React from "react";
-import { connect } from "react-redux";
-import { matchPropType, viewPortPropType } from "../propTypes";
+import { connect, ConnectedProps } from "react-redux";
 
 import Team from "../match/Team";
 import Clock from "../match/Clock";
@@ -11,19 +9,25 @@ import clubLogos from "../images/clubLogos";
 import { Sports } from "../constants";
 import buzzer from "../sounds/buzzersound.mp3";
 import { IMAGE_TYPES } from "../controller/media";
+import { Match, RootState } from "../types";
 
 import "./ScoreBoard.css";
 
-const getTeam = (id, match) => {
+const getTeam = (id: "home" | "away", match: Match) => {
   const name = match[`${id}Team`];
   return {
-    image: clubLogos[name] || null,
+    image: (clubLogos as Record<string, string>)[name] || undefined,
     name,
-    id,
   };
 };
 
-const ScoreBoard = ({ match, vp }) => (
+const stateToProps = ({ match, view: { vp } }: RootState) => ({ match, vp });
+
+const connector = connect(stateToProps);
+
+type ScoreBoardProps = ConnectedProps<typeof connector>;
+
+const ScoreBoard = ({ match, vp }: ScoreBoardProps) => (
   <div
     className={`scoreboard scoreboard-${match.matchType} scoreboard-${vp.key}`}
   >
@@ -58,11 +62,4 @@ const ScoreBoard = ({ match, vp }) => (
   </div>
 );
 
-ScoreBoard.propTypes = {
-  match: matchPropType.isRequired,
-  vp: viewPortPropType.isRequired,
-};
-
-const stateToProps = ({ match, view: { vp } }) => ({ match, vp });
-
-export default connect(stateToProps)(ScoreBoard);
+export default connector(ScoreBoard);

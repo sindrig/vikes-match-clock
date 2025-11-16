@@ -1,27 +1,42 @@
-import React, { Component } from "react";
-import PropTypes from "prop-types";
-import { bindActionCreators } from "redux";
-import { connect } from "react-redux";
+import { Component } from "react";
+import type React from "react";
+import { bindActionCreators, Dispatch } from "redux";
+import { connect, ConnectedProps } from "react-redux";
 
 import matchActions from "../actions/match";
 
 import { formatMillisAsTime } from "../utils/timeUtils";
 import ClockBase from "./ClockBase";
 import { TIMEOUT_LENGTH } from "../constants";
+import { RootState } from "../types";
 
-class TimeoutClock extends Component {
-  static propTypes = {
-    timeout: PropTypes.number,
-    removeTimeout: PropTypes.func.isRequired,
-    buzz: PropTypes.func.isRequired,
-    className: PropTypes.string.isRequired,
-  };
+interface OwnProps {
+  className: string;
+}
 
-  static defaultProps = {
-    timeout: null,
-  };
+interface TimeoutClockState {
+  warningPlayed: boolean;
+}
 
-  constructor(props) {
+const stateToProps = ({ match: { timeout } }: RootState) => ({
+  timeout,
+});
+
+const dispatchToProps = (dispatch: Dispatch) =>
+  bindActionCreators(
+    {
+      removeTimeout: matchActions.removeTimeout,
+      buzz: matchActions.buzz,
+    },
+    dispatch,
+  );
+
+const connector = connect(stateToProps, dispatchToProps);
+
+type TimeoutClockProps = ConnectedProps<typeof connector> & OwnProps;
+
+class TimeoutClock extends Component<TimeoutClockProps, TimeoutClockState> {
+  constructor(props: TimeoutClockProps) {
     super(props);
     this.updateTime = this.updateTime.bind(this);
     this.state = {
@@ -29,7 +44,7 @@ class TimeoutClock extends Component {
     };
   }
 
-  updateTime() {
+  updateTime(): string | null {
     const { timeout, removeTimeout, buzz } = this.props;
     if (!timeout) {
       return null;
@@ -48,7 +63,7 @@ class TimeoutClock extends Component {
     return formatMillisAsTime(millisLeft);
   }
 
-  render() {
+  render(): React.JSX.Element {
     const { className } = this.props;
     return (
       <ClockBase
@@ -63,17 +78,4 @@ class TimeoutClock extends Component {
   }
 }
 
-const stateToProps = ({ match: { timeout } }) => ({
-  timeout,
-});
-
-const dispatchToProps = (dispatch) =>
-  bindActionCreators(
-    {
-      removeTimeout: matchActions.removeTimeout,
-      buzz: matchActions.buzz,
-    },
-    dispatch,
-  );
-
-export default connect(stateToProps, dispatchToProps)(TimeoutClock);
+export default connector(TimeoutClock);

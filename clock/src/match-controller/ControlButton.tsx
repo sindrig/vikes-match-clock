@@ -1,9 +1,22 @@
 import React from "react";
-import PropTypes from "prop-types";
 
 import "./MatchController.css";
 
-const ControlButton = ({ children, className, onClick, big, disabled }) => (
+interface ControlButtonProps {
+  children: React.ReactNode;
+  className?: string;
+  onClick: () => void;
+  big?: boolean;
+  disabled?: boolean;
+}
+
+const ControlButton: React.FC<ControlButtonProps> = ({ 
+  children, 
+  className = "", 
+  onClick, 
+  big = false, 
+  disabled = false 
+}) => (
   <div className={`match-controller-button-wrapper ${big ? "big" : ""}`}>
     <button
       type="button"
@@ -15,22 +28,5 @@ const ControlButton = ({ children, className, onClick, big, disabled }) => (
     </button>
   </div>
 );
-
-ControlButton.propTypes = {
-  children: PropTypes.oneOfType([
-    PropTypes.arrayOf(PropTypes.node),
-    PropTypes.node,
-  ]).isRequired,
-  className: PropTypes.string,
-  onClick: PropTypes.func.isRequired,
-  big: PropTypes.bool,
-  disabled: PropTypes.bool,
-};
-
-ControlButton.defaultProps = {
-  className: "",
-  big: false,
-  disabled: false,
-};
 
 export default ControlButton;
