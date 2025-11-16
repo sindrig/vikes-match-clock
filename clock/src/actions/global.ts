@@ -1,0 +1,21 @@
+import { createAction, Action } from "redux-actions";
+import { persistor } from "../store";
+
+interface ActionCreators {
+  clearState: () => Action<Promise<void>>;
+}
+
+const actionPayloads: Record<string, ((...args: any[]) => any) | undefined> = {
+  clearState: () => persistor.purge(),
+};
+
+const actionCreators: Record<string, any> = {};
+
+Object.keys(actionPayloads).forEach((key) => {
+  const payloadFn = actionPayloads[key];
+  actionCreators[key] = payloadFn
+    ? createAction(key, payloadFn as any)
+    : createAction(key);
+});
+
+export default actionCreators as unknown as ActionCreators;
