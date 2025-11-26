@@ -16,9 +16,9 @@ const connector = connect(stateToProps);
 type MediaManagerProps = ConnectedProps<typeof connector>;
 
 const MediaManager: React.FC<MediaManagerProps> = ({ auth, listenPrefix }) => {
-  const [tab, setTab] = useState(IMAGE_TYPES.images);
-  const finalTab = `${listenPrefix === "safamyri" ? "fotbolti" : listenPrefix}/${tab}`;
-  const [prefix, setPrefix] = useState("");
+  const [tab, setTab] = useState<string>(IMAGE_TYPES.images);
+  const finalTab = `${String(listenPrefix) === "safamyri" ? "fotbolti" : String(listenPrefix)}/${String(tab)}`;
+  const [prefix, setPrefix] = useState<string>("");
   const [ts, setTs] = useState<number | null>(null);
   const [displayNow, setDisplayNow] = useState(true);
   const selectTab = (tab: string): void => {
@@ -27,9 +27,9 @@ const MediaManager: React.FC<MediaManagerProps> = ({ auth, listenPrefix }) => {
   };
   const appendPrefix = (newPrefix: string): void => {
     if (newPrefix === "..") {
-      setPrefix(prefix.slice(0, prefix.lastIndexOf("/")));
+      setPrefix(String(prefix).slice(0, String(prefix).lastIndexOf("/")));
     } else {
-      setPrefix(`${prefix}/${newPrefix}`);
+      setPrefix(`${String(prefix)}/${String(newPrefix)}`);
     }
   };
   const refresh = (): void => {
@@ -45,7 +45,7 @@ const MediaManager: React.FC<MediaManagerProps> = ({ auth, listenPrefix }) => {
         <Nav.Item eventKey={IMAGE_TYPES.players}>Leikmenn</Nav.Item>
       </Nav>
       {!auth.isEmpty && (
-        <UploadManager prefix={`${finalTab}${prefix}`} refresh={refresh} />
+        <UploadManager prefix={`${String(finalTab)}${String(prefix)}`} refresh={refresh} />
       )}
       <div>
         <label>
@@ -67,7 +67,7 @@ const MediaManager: React.FC<MediaManagerProps> = ({ auth, listenPrefix }) => {
         </label>
       </div>
       <ImageList
-        prefix={`${finalTab}${prefix}`}
+        prefix={`${String(finalTab)}${String(prefix)}`}
         appendPrefix={appendPrefix}
         displayNow={displayNow}
         allowEdit={!auth.isEmpty}

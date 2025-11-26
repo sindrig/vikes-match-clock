@@ -14,7 +14,7 @@ type FirebaseListen = string | { path: string; storeAs: string };
 
 const StateListener = ({ sync, listenPrefix, auth }: StateListenerProps) => {
   const listens: FirebaseListen[] = ["locations"];
-  if (auth.isLoaded && !auth.isEmpty) {
+  if (auth.isLoaded && !auth.isEmpty && auth.uid) {
     listens.push(`auth/${auth.uid}`);
   }
   if (listenPrefix) {

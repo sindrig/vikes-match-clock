@@ -67,7 +67,7 @@ class Idle extends Component<IdleProps, IdleState> {
     const { vp, idleImage } = this.props;
     const { temperature } = this.state;
     return (
-      <div className={`idle idle-${vp.key}`}>
+      <div className={`idle idle-${String(vp.key)}`}>
         <AdImage
           imageType={IMAGE_TYPES.largeAds}
           blankBetweenImages={idleImage !== "null"}
@@ -88,7 +88,7 @@ class Idle extends Component<IdleProps, IdleState> {
           </div>
           <div className="idle-text-box idle-temp">
             <span className="idle-temperature">
-              {useRealTemperature ? `${temperature}°` : "17°"}
+              {useRealTemperature ? `${String(temperature)}°` : "17°"}
             </span>
           </div>
         </div>

@@ -78,7 +78,7 @@ const actions: Record<string, any> = {
         return { ...state, pending: true };
       }
       const { team, key, penaltyLength } = payload;
-      const stateKey: "home2min" | "away2min" = `${team}2min`;
+      const stateKey = `${String(team)}2min` as "home2min" | "away2min";
       const collection = [...state[stateKey]];
       collection.push({ atTimeElapsed: state.timeElapsed, key, penaltyLength });
       return {
@@ -210,7 +210,7 @@ const actions: Record<string, any> = {
         return { ...state, pending: true };
       }
       const { team } = payload;
-      const stateKey: "homeTimeouts" | "awayTimeouts" = `${team}Timeouts`;
+      const stateKey = `${String(team)}Timeouts` as "homeTimeouts" | "awayTimeouts";
       return {
         ...state,
         timeout: Date.now(),
@@ -248,7 +248,7 @@ const actions: Record<string, any> = {
 
   [AT.addGoal]: {
     next(state: Match, { payload: { team } }: Action<{ team: "home" | "away" }>) {
-      const key: "homeScore" | "awayScore" = `${team}Score`;
+      const key = `${String(team)}Score` as "homeScore" | "awayScore";
       return {
         ...state,
         [key]: state[key] + 1,

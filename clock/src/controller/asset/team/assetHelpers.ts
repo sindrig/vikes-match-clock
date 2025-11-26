@@ -36,7 +36,7 @@ export const getPlayerAssetObject = async ({
   preferExt,
   preferType,
 }: PlayerAssetParams): Promise<PlayerAsset | null> => {
-  if (!player.name) {
+  if (!player.name || player.id === undefined) {
     return null;
   }
   const imageType = preferType || "png";
@@ -79,7 +79,7 @@ export const getPlayerAssetObject = async ({
       .getDownloadURL(),
     () => Promise.resolve({
       type: assetTypes.NO_IMAGE_PLAYER,
-      key: `custom-${player.number}-${player.name}`,
+      key: `custom-${player.number ?? "no-number"}-${player.name}`,
       name: player.name,
       number: player.number,
       role: player.role,

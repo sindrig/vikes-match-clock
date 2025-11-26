@@ -117,14 +117,14 @@ class PlayerCard extends Component<Props, State> {
     const style = includeBackground ? getBackground(background) : {};
     return (
       <div
-        className={`asset-player-icon ${className}`}
+        className={`asset-player-icon ${String(className)}`}
         key={asset.key}
         style={style}
       >
         {children}
         <span
           className={`player-card-overlay ${
-            overlay.blink ? overlay.effect : ""
+            overlay.blink && overlay.effect ? String(overlay.effect) : ""
           }`}
         >
           {overlay.text}

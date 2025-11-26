@@ -30,7 +30,7 @@ class Raven {
         console.log("Was going to register Raven, but could not find it");
       }
     } else {
-      console.log(`${process.env.NODE_ENV} does not use Raven`);
+      console.log(`${String(process.env.NODE_ENV)} does not use Raven`);
     }
   }
 

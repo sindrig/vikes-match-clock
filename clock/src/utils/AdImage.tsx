@@ -69,7 +69,7 @@ const AdImage: React.FC<AdImageProps> = ({
   }, time * 1000);
 
   useEffect(() => {
-    const listRef = storage.ref(`${listenPrefix}/${imageType}`);
+    const listRef = storage.ref(`${String(listenPrefix)}/${String(imageType)}`);
     void listRef
       .listAll()
       .then((res) =>

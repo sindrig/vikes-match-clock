@@ -104,7 +104,7 @@ const actions = {
       return state;
     },
   },
-  [`${ActionTypes.getAvailableMatches}_FULFILLED`]: {
+  [`${String(ActionTypes.getAvailableMatches)}_FULFILLED`]: {
     next(
       state: ControllerState,
       {

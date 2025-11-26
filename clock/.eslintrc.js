@@ -59,7 +59,6 @@ module.exports = {
         "@typescript-eslint/no-misused-promises": "warn",
         "@typescript-eslint/unbound-method": "warn",
         "@typescript-eslint/no-unused-vars": "warn",
-        "@typescript-eslint/restrict-template-expressions": "warn",
         "@typescript-eslint/restrict-plus-operands": "warn",
         "@typescript-eslint/no-unnecessary-type-assertion": "warn",
         "@typescript-eslint/no-implied-eval": "warn",

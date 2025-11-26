@@ -33,16 +33,16 @@ const Team: React.FC<TeamProps> = ({
   timeouts,
   redCards,
 }) => (
-  <div className={`team ${className}`}>
+  <div className={`team ${String(className)}`}>
     {team.image && (
       <div className="img-wrapper">
-        <img src={team.image} alt={team.name} />
+        <img src={team.image} alt={String(team.name)} />
       </div>
     )}
     {redCards > 0 && (
       <div className="red-cards">
         {[...Array(redCards).keys()].map((i) => (
-          <div className="red-card" key={i} />
+          <div className="red-card" key={String(i)} />
         ))}
       </div>
     )}
@@ -50,9 +50,9 @@ const Team: React.FC<TeamProps> = ({
       {matchType === Sports.Handball && team.name}
     </div>
     <span className="score">{score}</span>
-    <div className={`team-timeouts team-timeouts-${className}`}>
+    <div className={`team-timeouts team-timeouts-${String(className)}`}>
       {[...Array(timeouts).keys()].map((i) => (
-        <div key={i} className="team-timeout">
+        <div key={String(i)} className="team-timeout">
           &#8226;
         </div>
       ))}

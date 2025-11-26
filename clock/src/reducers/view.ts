@@ -101,7 +101,7 @@ const actions: Record<string, any> = {
     next(state: ViewState, { payload: { vp } }: Action<{ vp: ViewState["vp"] }>): ViewState {
       const htmlElement = document.getElementsByTagName("html")[0];
       if (htmlElement) {
-        htmlElement.setAttribute("style", `font-size: ${vp.fontSize}`);
+        htmlElement.setAttribute("style", `font-size: ${String(vp.fontSize)}`);
       }
       return { ...state, vp };
     },

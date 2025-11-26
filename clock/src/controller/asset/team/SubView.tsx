@@ -12,13 +12,13 @@ const SubView = ({ subTeam, subIn, subOut }: SubViewProps): React.JSX.Element =>
     {subIn && (
       <div className="substition-player">
         Út:
-        {`#${subIn.number} - ${subIn.name}`}
+        {subIn.number !== undefined ? `#${subIn.number} - ${subIn.name}` : subIn.name}
       </div>
     )}
     {subOut && (
       <div className="substition-player">
         Inn:
-        {`#${subOut.number} - ${subOut.name}`}
+        {subOut.number !== undefined ? `#${subOut.number} - ${subOut.name}` : subOut.name}
       </div>
     )}
   </div>

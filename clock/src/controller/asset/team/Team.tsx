@@ -128,7 +128,7 @@ class Team extends Component<TeamProps, TeamState> {
           };
           this.updatePlayer(idx)(updatedPlayer);
         } else {
-          this.setState({ error: `No ID found for player ${player.name}` });
+          this.setState({ error: `No ID found for player ${String(player.name ?? 'unknown')}` });
         }
       })
       .catch((e: Error) => {
@@ -190,13 +190,13 @@ class Team extends Component<TeamProps, TeamState> {
         <div className="team-name">{match[teamName]}</div>
         {match[teamName]
           ? team.map((p, i) => (
-              // eslint-disable-next-line react/no-array-index-key
-              <div className="player-whole-line" key={`${i}`}>
+               // eslint-disable-next-line react/no-array-index-key
+              <div className="player-whole-line" key={String(i)}>
                 {selectPlayer && p.name ? (
                   <Button
                     appearance="default"
                     onClick={() => selectPlayer(p, teamName)}
-                  >{`#${p.number || (p.role ? p.role[0] : "")} - ${p.name}`}</Button>
+                  >{`#${String(p.number ?? (p.role ? p.role[0] : ""))} - ${String(p.name ?? '')}`}</Button>
                 ) : (
                   <TeamPlayer player={p} onChange={this.updatePlayer(i)} />
                 )}

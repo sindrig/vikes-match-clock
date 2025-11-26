@@ -12,7 +12,7 @@ const CreateFolder: React.FC<CreateFolderProps> = ({ prefix, refresh }) => {
   const save = (): void => {
     setCreating(false);
     storage
-      .ref(`${prefix}/${newFolderName}/.vikes`)
+      .ref(`${String(prefix)}/${String(newFolderName)}/.vikes`)
       .putString("")
       .on("state_changed", null, alert, refresh);
   };

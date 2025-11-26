@@ -46,7 +46,7 @@ const UploadManager: React.FC<UploadManagerProps> = ({ prefix, refresh }) => {
     )
       .then((images) =>
         Promise.all(
-          images.map((image) => storage.ref(`/${prefix}/${image.name}`).put(image)),
+          images.map((image) => storage.ref(`/${String(prefix)}/${String(image.name)}`).put(image)),
         ),
       )
       .then(refresh);
