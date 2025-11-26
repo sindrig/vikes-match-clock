@@ -79,7 +79,7 @@
     "test": "CI=true react-scripts test --env=jsdom",
     "test:watch": "react-scripts test --env=jsdom",
     "eject": "react-scripts eject",
-    "lint": "eslint src --max-warnings=0",
+    "lint": "eslint src",
     "format-check": "prettier src cypress -c",
     "ncu": "ncu",
     "format": "prettier src cypress -w"

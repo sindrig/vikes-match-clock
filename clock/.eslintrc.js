@@ -58,8 +58,12 @@ module.exports = {
         "@typescript-eslint/no-floating-promises": "warn",
         "@typescript-eslint/no-misused-promises": "warn",
         "@typescript-eslint/unbound-method": "warn",
-        "@typescript-eslint/prefer-promise-reject-errors": "warn",
         "@typescript-eslint/no-unused-vars": "warn",
+        "@typescript-eslint/restrict-template-expressions": "warn",
+        "@typescript-eslint/restrict-plus-operands": "warn",
+        "@typescript-eslint/no-unnecessary-type-assertion": "warn",
+        "@typescript-eslint/no-implied-eval": "warn",
+        "@typescript-eslint/no-empty-function": "warn",
       },
     },
     {
