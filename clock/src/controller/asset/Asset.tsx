@@ -189,20 +189,19 @@ class AssetComponent extends Component<AssetProps> {
             </a>
           );
         }
-        const opts: any = {
+        const opts: Record<string, unknown> = {
           height: "50",
           width: "100",
           playerVars: {
-            autoplay: 0,
+            autoplay: 1,
             modestbranding: 1,
             rel: 0,
             fs: 0,
             disablekb: 1,
+            showinfo: 0,
+            controls: 0,
           },
         };
-        opts.playerVars.showinfo = 0;
-        opts.playerVars.autoplay = 1;
-        opts.playerVars.controls = 0;
         opts.height = vp.style.height;
         opts.width = vp.style.width;
         return (

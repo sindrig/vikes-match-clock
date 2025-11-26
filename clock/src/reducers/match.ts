@@ -115,10 +115,10 @@ const actions: Record<string, any> = {
       return {
         ...state,
         home2min: state.home2min.map((t) =>
-          t.key === key ? { ...t, penaltyLength: t.penaltyLength + toAdd } : t
+          t.key === key ? { ...t, penaltyLength: Number(t.penaltyLength) + Number(toAdd) } : t
         ),
         away2min: state.away2min.map((t) =>
-          t.key === key ? { ...t, penaltyLength: t.penaltyLength + toAdd } : t
+          t.key === key ? { ...t, penaltyLength: Number(t.penaltyLength) + Number(toAdd) } : t
         ),
       };
     },
@@ -282,10 +282,10 @@ const actions: Record<string, any> = {
     },
   },
   [AT.receiveRemoteData]: {
-    next(state: Match, action: any) {
+    next(state: Match, action: { data: unknown; path: string }) {
       const { data, path } = action;
-      if (path === "match" && data) {
-        const results: Match = { ...state, ...data };
+      if (path === "match" && data && typeof data === "object") {
+        const results: Match = { ...state, ...(data as Partial<Match>) };
         if (results.started > 0) {
           if (!results.countdown) {
             if (state.started === 0) {

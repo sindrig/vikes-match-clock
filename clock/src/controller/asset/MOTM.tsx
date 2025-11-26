@@ -14,7 +14,7 @@ const MOTM = ({ children }: MOTMProps): React.JSX.Element | null => {
   useEffect(() => {
     const seconds = idxSeconds[idx] || 2;
     const timer = setTimeout(() => {
-      setIdx((idx + 1) % idxSeconds.length);
+      setIdx((Number(idx) + 1) % idxSeconds.length);
     }, seconds * 1000);
     return () => clearTimeout(timer);
   }, [idx]);

@@ -121,4 +121,4 @@ const AllActionTypes = {
   ...Remote,
 } as const;
 
-export default AllActionTypes as any as Record<string, string>;
+export default AllActionTypes as Record<string, string>;

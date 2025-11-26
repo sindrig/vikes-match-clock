@@ -27,7 +27,7 @@ const firebaseMiddleware: Middleware<
   RootState,
   ThunkDispatch<RootState, unknown, { type: string }>
 > = (store) => (next) => (action) => {
-  const actionObj = action as Record<string, any> & { type: string };
+  const actionObj = action as Record<string, unknown> & { type: string };
   const { type } = actionObj;
   const result = next(action);
   const {
@@ -74,7 +74,7 @@ export const store = createStore(
   {},
   compose(
     applyMiddleware(thunk, promiseMiddleware, firebaseMiddleware),
-    devTools as any
+    devTools as <T>(f: T) => T
   )
 );
 

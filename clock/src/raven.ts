@@ -1,5 +1,5 @@
 interface RavenStatic {
-  config(dsn: string, options: any): RavenStatic;
+  config(dsn: string, options: { release: string; environment: string }): RavenStatic;
   install(): void;
   captureMessage(message: string): void;
 }
@@ -34,7 +34,7 @@ class Raven {
     }
   }
 
-  captureMessage(message: any): void {
+  captureMessage(message: unknown): void {
     if (this.registered && window.Raven) {
       window.Raven.captureMessage(JSON.stringify(message));
     } else {

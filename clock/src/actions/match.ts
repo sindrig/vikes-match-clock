@@ -88,29 +88,29 @@ const actionPayloads: Record<
   }),
 };
 
-const actionCreators: Record<string, any> = {};
+const actionCreators: Record<string, unknown> = {};
 
 Object.keys(actionPayloads).forEach((key) => {
   const payloadFn = actionPayloads[key];
   actionCreators[key] = payloadFn
-    ? createAction(key, payloadFn as any)
+    ? createAction(key, payloadFn as (...args: never[]) => unknown)
     : createAction(key);
 });
 
 const actions = actionCreators as unknown as ActionCreators;
 
 actions.buzz = () => (dispatch: Dispatch) => {
-  dispatch({ type: "buzz", payload: { on: true } } as any);
-  setTimeout(() => dispatch({ type: "buzz", payload: { on: false } } as any), 3000);
+  dispatch({ type: "buzz", payload: { on: true } });
+  setTimeout(() => dispatch({ type: "buzz", payload: { on: false } }), 3000);
   return true;
 };
 
 actions.matchTimeout =
   ({ team }: { team: string }) =>
   (dispatch: Dispatch) => {
-    dispatch(actions.pauseMatch() as any);
-    dispatch(actions.buzz() as any);
-    dispatch({ type: "matchTimeout", payload: { team } } as any);
+    dispatch(actions.pauseMatch());
+    dispatch(actions.buzz());
+    dispatch({ type: "matchTimeout", payload: { team } });
   };
 
 export default actions;

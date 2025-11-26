@@ -64,7 +64,7 @@ const AdImage: React.FC<AdImageProps> = ({
         setBlank(false);
       }
     }
-    const nextImg = img + 1;
+    const nextImg = Number(img) + 1;
     return setImg(nextImg === assets.length ? 0 : nextImg);
   }, time * 1000);
 

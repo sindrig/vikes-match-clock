@@ -119,9 +119,10 @@ const MatchActions: React.FC<PropsFromRedux> = ({
 
   const goal = (awayOrHome: "home" | "away"): void => {
     addGoal({ team: awayOrHome });
+    const teamName = awayOrHome === "home" ? match.homeTeam : match.awayTeam;
     if (
       match.matchType === Sports.Football &&
-      (match as any)[`${awayOrHome}Team`] === "Víkingur R" &&
+      teamName === "Víkingur R" &&
       listenPrefix.startsWith("vik")
     ) {
       renderAsset({
@@ -145,7 +146,7 @@ const MatchActions: React.FC<PropsFromRedux> = ({
           teamName: "Víkingur R",
           preferExt: "fagn",
           preferType: "gif",
-        }).then((asset: any) => {
+        }).then((asset) => {
           renderAsset({ ...asset, background: baddi });
           setShowScorerSelector(null);
         });
@@ -173,7 +174,7 @@ const MatchActions: React.FC<PropsFromRedux> = ({
           />
           <button
             onClick={() => {
-              renderAsset(0 as any);
+              renderAsset(0);
               setShowScorerSelector(null);
             }}
             className="rs-btn rs-btn-primary rs-btn-red"

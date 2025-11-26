@@ -123,11 +123,11 @@ const actions: Record<string, any> = {
     },
   },
   [AT.receiveRemoteData]: {
-    next(state: ViewState, { data, path }: { data: any; path: string }): ViewState {
-      if (path === "view" && data) {
+    next(state: ViewState, { data, path }: { data: unknown; path: string }): ViewState {
+      if (path === "view" && data && typeof data === "object") {
         return {
           ...state,
-          ...data,
+          ...(data as Partial<ViewState>),
           // Never overwrite vp
           vp: state.vp,
         };

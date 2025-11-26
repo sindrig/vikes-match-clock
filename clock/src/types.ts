@@ -31,7 +31,7 @@ export interface Match {
   buzzer: number | false;
   countdown: boolean;
   showInjuryTime?: boolean;
-  error?: any;
+  error?: unknown;
   pending?: boolean;
 }
 

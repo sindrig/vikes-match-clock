@@ -16,12 +16,12 @@ const actionPayloads: Record<
   setIdleImage: (idleImage: string) => ({ idleImage }),
 };
 
-const actionCreators: Record<string, any> = {};
+const actionCreators: Record<string, unknown> = {};
 
 Object.keys(actionPayloads).forEach((key) => {
   const payloadFn = actionPayloads[key];
   actionCreators[key] = payloadFn
-    ? createAction(key, payloadFn as any)
+    ? createAction(key, payloadFn as (...args: never[]) => unknown)
     : createAction(key);
 });
 

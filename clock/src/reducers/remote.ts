@@ -9,7 +9,7 @@ interface RemoteState {
   password: string;
   sync: boolean;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Synced Firebase data can be any shape
-  syncedData: any;
+  syncedData: unknown;
   listenPrefix: string;
 }
 
@@ -23,9 +23,8 @@ export const initialState: RemoteState = {
 
 const handleRemote = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Firebase data is untyped
-  next(state: RemoteState, { data, path }: { data: any; path: string }): RemoteState {
-    if (path.startsWith("auth/") && data) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- Firebase data is untyped
+  next(state: RemoteState, { data, path }: { data: unknown; path: string }): RemoteState {
+    if (path.startsWith("auth/") && data && typeof data === "object") {
       const available = Object.entries(data)
         .filter((kv) => kv[1] === true)
         .map(([k]) => k);
@@ -42,7 +41,7 @@ const handleRemote = {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- AT is intentionally 'any' due to redux-actions limitations
 /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call */
-const actions: Record<string, any> = {
+const actions: Record<string, unknown> = {
   [AT.setEmail]: {
     next(state: RemoteState, { payload: { email } }: Action<{ email: string }>): RemoteState {
       return { ...state, email };

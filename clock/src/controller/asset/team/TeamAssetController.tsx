@@ -31,8 +31,16 @@ interface TeamAssetControllerState {
   effect: string;
 }
 
+interface AssetObject {
+  type?: string;
+  subIn?: unknown;
+  subOut?: unknown;
+  key?: string;
+  [key: string]: unknown;
+}
+
 interface OwnProps {
-  addAssets: (assets: any[], options?: { showNow?: boolean }) => void;
+  addAssets: (assets: AssetObject[], options?: { showNow?: boolean }) => void;
   previousView: () => void;
 }
 
@@ -129,7 +137,7 @@ class TeamAssetController extends Component<
           getPlayerAssetObject({ player, teamName, listenPrefix })
         )
     );
-    const flattened: any[] = ([] as any[]).concat(...teamAssets);
+    const flattened: unknown[] = ([] as unknown[]).concat(...teamAssets);
     if (!flattened.every((i) => i)) {
       this.setState({ error: "Missing name/number for some players to show" });
     } else {
@@ -143,15 +151,16 @@ class TeamAssetController extends Component<
     const { match, addAssets, listenPrefix } = this.props;
     if (!subIn || !subOut) return;
 
+    const teamName = subIn.teamName === "homeTeam" ? match.homeTeam : match.awayTeam;
     const subInObj = await getPlayerAssetObject({
       player: subIn,
-      teamName: (match as any)[subIn.teamName],
+      teamName,
       listenPrefix,
     });
     const subOutObj = await getPlayerAssetObject({
       player: subOut,
       // NOTE: We use subIn teamName
-      teamName: (match as any)[subIn.teamName],
+      teamName,
       listenPrefix,
     });
     if (!subInObj || !subOutObj) return;
@@ -192,11 +201,12 @@ class TeamAssetController extends Component<
 
   selectPlayerAsset(player: Player, teamName: string): void {
     const { match, addAssets, listenPrefix } = this.props;
+    const actualTeamName = teamName === "homeTeam" ? match.homeTeam : match.awayTeam;
     addAssets(
       [
         getPlayerAssetObject({
           player,
-          teamName: (match as any)[teamName],
+          teamName: actualTeamName,
           listenPrefix,
         }),
       ],
@@ -209,11 +219,12 @@ class TeamAssetController extends Component<
 
   selectGoalScorer(player: Player, teamName: string): void {
     const { match, addAssets, listenPrefix } = this.props;
+    const actualTeamName = teamName === "homeTeam" ? match.homeTeam : match.awayTeam;
     addAssets(
       [
         getPlayerAssetObject({
           player,
-          teamName: (match as any)[teamName],
+          teamName: actualTeamName,
           overlay: {
             text: "",
             blink: true,
@@ -231,8 +242,9 @@ class TeamAssetController extends Component<
 
   selectMOTM(player: Player, teamName: string): void {
     const { match, addAssets, listenPrefix } = this.props;
+    const actualTeamName = teamName === "homeTeam" ? match.homeTeam : match.awayTeam;
     addAssets(
-      [getMOTMAsset({ player, teamName: (match as any)[teamName], listenPrefix })],
+      [getMOTMAsset({ player, teamName: actualTeamName, listenPrefix })],
       {
         showNow: true,
       }
@@ -402,7 +414,7 @@ class TeamAssetController extends Component<
             <SubView
               subIn={subIn}
               subOut={subOut}
-              subTeam={subTeam ? (match as any)[subTeam] : null}
+              subTeam={subTeam ? (subTeam === "homeTeam" ? match.homeTeam : match.awayTeam) : null}
             />
           </div>
         ) : null}

@@ -23,6 +23,17 @@ interface FolderData {
   name: string;
 }
 
+interface StorageReference {
+  name: string;
+  fullPath: string;
+  getDownloadURL(): Promise<string>;
+}
+
+interface StorageListResult {
+  items: StorageReference[];
+  prefixes: Array<{ name: string }>;
+}
+
 interface OwnProps {
   prefix: string;
   displayNow: boolean;
@@ -70,11 +81,11 @@ const ImageList: React.FC<ImageListProps> = ({
 
   useEffect(() => {
     const listRef = storage.ref(prefix);
-    listRef.listAll().then((res: any) => {
-      Promise.all(res.items.map((itemRef: any) => itemRef.getDownloadURL())).then(
+    listRef.listAll().then((res: StorageListResult) => {
+      Promise.all(res.items.map((itemRef: StorageReference) => itemRef.getDownloadURL())).then(
         (downloadUrls) => {
           setImages(
-            res.items.map((item: any, i: number) => ({
+            res.items.map((item: StorageReference, i: number) => ({
               name: item.name,
               imageUrl: downloadUrls[i],
               ref: item.fullPath,
@@ -82,7 +93,7 @@ const ImageList: React.FC<ImageListProps> = ({
           );
         },
       );
-      setFolders(res.prefixes.map((p: any) => ({ name: p.name })));
+      setFolders(res.prefixes.map((p) => ({ name: p.name })));
     });
   }, [prefix, ts]);
 
@@ -122,7 +133,7 @@ const ImageList: React.FC<ImageListProps> = ({
                   const asset = {
                     // To be able to add the same image multiple times to the queue,
                     // we need to make the key unique
-                    key: imageUrl + Date.now(),
+                    key: String(imageUrl) + String(Date.now()),
                     url: imageUrl,
                     type,
                   };

@@ -5,7 +5,7 @@ import ActionTypes from "../ActionTypes";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Workaround for redux-actions computed property names limitation
 const AT: any = ActionTypes;
 import assetTypes from "../controller/asset/AssetTypes";
-import type { ControllerState, Asset, CurrentAsset, Player } from "../types";
+import type { ControllerState, Asset, CurrentAsset, Player, AvailableMatches } from "../types";
 
 export const ASSET_VIEWS = keymirror({
   assets: null,
@@ -111,7 +111,7 @@ const actions = {
         payload: {
           data: { matches },
         },
-      }: Action<{ data: { matches: any } }>,
+      }: Action<{ data: { matches: AvailableMatches } }>,
     ) {
       return {
         ...state,
@@ -121,7 +121,7 @@ const actions = {
     },
   },
   [AT.setAvailableMatches]: {
-    next(state: ControllerState, { payload: { matches } }: Action<{ matches: any }>) {
+    next(state: ControllerState, { payload: { matches } }: Action<{ matches: AvailableMatches }>) {
       return {
         ...state,
         availableMatches: matches || {},
@@ -153,7 +153,7 @@ const actions = {
       // TODO why not immutable
       const match = JSON.parse(JSON.stringify(availableMatches[selectedMatch!]));
       match.players[teamId] = match.players[teamId].filter(
-        (_item: any, i: number) => i !== idx,
+        (_item: Player, i: number) => i !== idx,
       );
       return {
         ...state,
@@ -275,9 +275,9 @@ const actions = {
     },
   },
   [AT.receiveRemoteData]: {
-    next(state: ControllerState, { data, path }: any) {
-      if (path === "controller" && data) {
-        const results = { ...state, ...data };
+    next(state: ControllerState, { data, path }: { data: unknown; path: string }) {
+      if (path === "controller" && data && typeof data === "object" && data !== null) {
+        const results = { ...state, ...(data as Partial<ControllerState>) };
         if (!results.selectedAssets) {
           results.selectedAssets = [];
         }
