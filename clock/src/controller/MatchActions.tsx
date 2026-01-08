@@ -24,7 +24,7 @@ const WRAPPER_CLASSNAME = "control-item playerControls withborder";
 const clockManipulationBox = (
   seconds: number,
   match: Match,
-  updateMatch: (update: Partial<Match>) => void
+  updateMatch: (update: Partial<Match>) => void,
 ): React.JSX.Element => {
   const unit = seconds >= 60 ? "m" : "s";
   const humanReadableSeconds = seconds >= 60 ? seconds / 60 : seconds;
@@ -65,7 +65,9 @@ const mapStateToProps = ({
   match,
   remote: { listenPrefix },
 }: RootState) => {
-  const selectedMatchObj = selectedMatch ? availableMatches[selectedMatch] : undefined;
+  const selectedMatchObj = selectedMatch
+    ? availableMatches[selectedMatch]
+    : undefined;
   return {
     view,
     listenPrefix,
@@ -91,7 +93,7 @@ const mapDispatchToProps = (dispatch: Dispatch) =>
       countdown: matchActions.countdown,
       renderAsset: controllerActions.renderAsset,
     },
-    dispatch
+    dispatch,
   );
 
 const connector = connect(mapStateToProps, mapDispatchToProps);
@@ -113,7 +115,7 @@ const MatchActions: React.FC<PropsFromRedux> = ({
   listenPrefix,
 }) => {
   const [showScorerSelector, setShowScorerSelector] = useState<string | null>(
-    null
+    null,
   );
   const [goalScorer, setGoalScorer] = useState<number | string>(0);
 
@@ -147,7 +149,9 @@ const MatchActions: React.FC<PropsFromRedux> = ({
           preferExt: "fagn",
           preferType: "gif",
         }).then((asset) => {
-          renderAsset({ ...asset, background: baddi });
+          if (asset) {
+            renderAsset({ ...asset, background: baddi } as typeof asset);
+          }
           setShowScorerSelector(null);
         });
       }
@@ -174,7 +178,7 @@ const MatchActions: React.FC<PropsFromRedux> = ({
           />
           <button
             onClick={() => {
-              renderAsset(0);
+              renderAsset(null);
               setShowScorerSelector(null);
             }}
             className="rs-btn rs-btn-primary rs-btn-red"
@@ -302,11 +306,7 @@ const MatchActions: React.FC<PropsFromRedux> = ({
             match.matchStartTime &&
             !match.timeElapsed ? (
               <div style={{ whiteSpace: "nowrap", width: "400px" }}>
-                <Button
-                  color="green"
-                  appearance="primary"
-                  onClick={countdown}
-                >
+                <Button color="green" appearance="primary" onClick={countdown}>
                   Hefja niðurtalningu
                 </Button>
               </div>

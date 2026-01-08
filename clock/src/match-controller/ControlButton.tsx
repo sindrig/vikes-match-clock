@@ -10,12 +10,12 @@ interface ControlButtonProps {
   disabled?: boolean;
 }
 
-const ControlButton: React.FC<ControlButtonProps> = ({ 
-  children, 
-  className = "", 
-  onClick, 
-  big = false, 
-  disabled = false 
+const ControlButton: React.FC<ControlButtonProps> = ({
+  children,
+  className = "",
+  onClick,
+  big = false,
+  disabled = false,
 }) => (
   <div className={`match-controller-button-wrapper ${big ? "big" : ""}`}>
     <button

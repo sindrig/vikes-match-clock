@@ -22,7 +22,12 @@ const mapDispatchToProps = (dispatch: Dispatch) =>
 const connector = connect(mapStateToProps, mapDispatchToProps);
 type PropsFromRedux = ConnectedProps<typeof connector>;
 
-const RefreshHandler = ({ refreshToken, sync, auth, remoteRefresh }: PropsFromRedux) => {
+const RefreshHandler = ({
+  refreshToken,
+  sync,
+  auth,
+  remoteRefresh,
+}: PropsFromRedux) => {
   const isInitialMount = useRef(true);
   useEffect(() => {
     if (isInitialMount.current) {

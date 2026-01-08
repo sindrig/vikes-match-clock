@@ -1,16 +1,35 @@
-import React from "react";
-import { Provider } from "react-redux";
-import configureStore from "redux-mock-store";
-import Enzyme, { mount } from "enzyme";
-import Adapter from "enzyme-adapter-react-16";
-
-Enzyme.configure({ adapter: new Adapter() });
+import "@testing-library/jest-dom";
 
 jest.mock("./lib/weather", () => ({
   getTemp: () => new Promise((resolve) => resolve(10)),
 }));
 
-window.mockStore = configureStore([]);
+jest.mock("redux-actions", () => ({
+  createAction: (type) => (payload) => ({ type, payload }),
+  handleActions: (handlers, initialState) => (state = initialState, action) => {
+    const handler = handlers[action.type];
+    if (handler && handler.next) {
+      return handler.next(state, action);
+    }
+    return state;
+  },
+}));
 
-window.mountWrapComponent = (component, store) =>
-  mount(<Provider store={store}>{component}</Provider>);
+jest.mock("axios", () => ({
+  get: jest.fn(() => Promise.resolve({ data: {} })),
+  post: jest.fn(() => Promise.resolve({ data: {} })),
+  default: {
+    get: jest.fn(() => Promise.resolve({ data: {} })),
+    post: jest.fn(() => Promise.resolve({ data: {} })),
+  },
+}));
+
+jest.mock("compress.js", () => {
+  return jest.fn().mockImplementation(() => ({
+    compress: jest.fn(() => Promise.resolve([{ data: "mock" }])),
+  }));
+});
+
+jest.mock("react-drag-drop-files", () => ({
+  FileUploader: ({ children }) => children,
+}));

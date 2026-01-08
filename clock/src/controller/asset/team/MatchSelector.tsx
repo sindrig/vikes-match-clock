@@ -25,7 +25,11 @@ const connector = connect(mapStateToProps, mapDispatchToProps);
 
 type PropsFromRedux = ConnectedProps<typeof connector>;
 
-const MatchSelector = ({ availableMatches, selectedMatch, selectMatch }: PropsFromRedux): React.JSX.Element => (
+const MatchSelector = ({
+  availableMatches,
+  selectedMatch,
+  selectMatch,
+}: PropsFromRedux): React.JSX.Element => (
   <div className="control-item">
     <select
       value={selectedMatch || ""}

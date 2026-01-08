@@ -88,8 +88,8 @@ class Ruv extends Component<Props, State> {
   updateStreamUrl(): void {
     const { getRuvUrl, channel } = this.props;
     getRuvUrl(channel)
-      .then(({ value: { result } }: { value: { result: string[] } }) => {
-        this.setState({ streamUrl: result[0] || DEFAULT_URLS[channel] || null });
+      .then((url: string | undefined) => {
+        this.setState({ streamUrl: url || DEFAULT_URLS[channel] || null });
       })
       .catch((e: Error) => {
         console.log("e", e);

@@ -17,7 +17,9 @@ interface TwoMinClockState {
   time: string | null;
 }
 
-const stateToProps = ({ match: { started, timeElapsed, matchType } }: RootState) => ({
+const stateToProps = ({
+  match: { started, timeElapsed, matchType },
+}: RootState) => ({
   started,
   timeElapsed,
   matchType,
@@ -56,7 +58,10 @@ class TwoMinClock extends Component<TwoMinClockProps, TwoMinClockState> {
     }
   }
 
-  static getDerivedStateFromProps({ started, timeElapsed }: TwoMinClockProps): TwoMinClockState | null {
+  static getDerivedStateFromProps({
+    started,
+    timeElapsed,
+  }: TwoMinClockProps): TwoMinClockState | null {
     if (!started && !timeElapsed) {
       return { time: null };
     }

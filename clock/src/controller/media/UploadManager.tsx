@@ -38,7 +38,10 @@ const UploadManager: React.FC<UploadManagerProps> = ({ prefix, refresh }) => {
                 const base64str = img.data;
                 const imgExt = img.ext;
                 const resized = Compress.convertBase64ToFile(base64str, imgExt);
-                Object.defineProperty(resized, 'name', { value: files[i]?.name, writable: true });
+                Object.defineProperty(resized, "name", {
+                  value: files[i]?.name,
+                  writable: true,
+                });
                 return resized;
               })
           : Promise.resolve(file),
@@ -46,7 +49,9 @@ const UploadManager: React.FC<UploadManagerProps> = ({ prefix, refresh }) => {
     )
       .then((images) =>
         Promise.all(
-          images.map((image) => storage.ref(`/${String(prefix)}/${String(image.name)}`).put(image)),
+          images.map((image) =>
+            storage.ref(`/${String(prefix)}/${String(image.name)}`).put(image),
+          ),
         ),
       )
       .then(refresh);

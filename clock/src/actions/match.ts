@@ -23,24 +23,24 @@ interface ActionCreators {
   removePenalty: (key: string) => Action<{ key: string }>;
   addToPenalty: (
     key: string,
-    toAdd?: number
+    toAdd?: number,
   ) => Action<{ key: string; toAdd: number }>;
   pauseMatch: (options?: PauseMatchOptions) => Action<{ isHalfEnd?: boolean }>;
   startMatch: () => Action<Record<string, never>>;
   setHalfStops: (
     halfStops: number[],
-    showInjuryTime: boolean
+    showInjuryTime: boolean,
   ) => Action<{ halfStops: number[]; showInjuryTime: boolean }>;
   updateHalfLength: (
     currentValue: number,
-    newValue: number
+    newValue: number,
   ) => Action<{ currentValue: number; newValue: number }>;
   removeTimeout: () => Action<Record<string, never>>;
   addGoal: (payload: { team: string }) => Action<{ team: string }>;
   countdown: () => Action<Record<string, never>>;
   updateRedCards: (
     home: number,
-    away: number
+    away: number,
   ) => Action<{ home: number; away: number }>;
   buzz: () => (dispatch: Dispatch) => boolean;
   matchTimeout: (payload: { team: string }) => (dispatch: Dispatch) => void;
@@ -108,8 +108,9 @@ actions.buzz = () => (dispatch: Dispatch) => {
 actions.matchTimeout =
   ({ team }: { team: string }) =>
   (dispatch: Dispatch) => {
-    dispatch(actions.pauseMatch());
-    dispatch(actions.buzz());
+    // TODO: Fix any usage [redux-actions Action type incompatible with redux Dispatch]
+    dispatch(actions.pauseMatch() as unknown as Parameters<typeof dispatch>[0]);
+    dispatch(actions.buzz() as unknown as Parameters<typeof dispatch>[0]);
     dispatch({ type: "matchTimeout", payload: { team } });
   };
 

@@ -16,11 +16,11 @@ interface ActionCreators {
   editPlayer: (
     teamId: string,
     idx: number,
-    updatedPlayer: Partial<Player>
+    updatedPlayer: Partial<Player>,
   ) => Action<{ teamId: string; idx: number; updatedPlayer: Partial<Player> }>;
   deletePlayer: (
     teamId: string,
-    idx: number
+    idx: number,
   ) => Action<{ teamId: string; idx: number }>;
   addPlayer: (teamId: string) => Action<{ teamId: string }>;
   toggleCycle: () => Action<Record<string, never>>;
@@ -32,16 +32,16 @@ interface ActionCreators {
   setPlaying: (playing: boolean) => Action<{ playing: boolean }>;
   renderAsset: (asset: Asset | null) => Action<{ asset: Asset | null }>;
   setSelectedAssets: (
-    selectedAssets: Asset[]
+    selectedAssets: Asset[],
   ) => Action<{ selectedAssets: Asset[] }>;
   addAssets: (assets: Asset[]) => Action<{ assets: Asset[] }>;
   removeAsset: (asset: Asset) => Action<{ asset: Asset }>;
   setAvailableMatches: (
-    matches: AvailableMatches
+    matches: AvailableMatches,
   ) => Action<{ matches: AvailableMatches }>;
   getAvailableMatches: (
     homeTeam: string,
-    awayTeam: string
+    awayTeam: string,
   ) => Promise<AxiosResponse | typeof lambdaExample>;
   getRuvUrl: (channel: string) => Promise<string | undefined>;
 }
@@ -55,7 +55,11 @@ const actionPayloads: Record<
   selectAssetView: (assetView: string) => ({ assetView }),
   clearMatchPlayers: () => ({}),
   selectMatch: (matchId: string) => matchId,
-  editPlayer: (teamId: string, idx: number, updatedPlayer: Partial<Player>) => ({
+  editPlayer: (
+    teamId: string,
+    idx: number,
+    updatedPlayer: Partial<Player>,
+  ) => ({
     teamId,
     idx,
     updatedPlayer,
@@ -114,7 +118,7 @@ const actionPayloads: Record<
           head.appendChild(script);
         }
       } catch (e) {
-        reject(e);
+        reject(e instanceof Error ? e : new Error(String(e)));
       }
     }),
 };

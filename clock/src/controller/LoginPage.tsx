@@ -1,10 +1,7 @@
 import type React from "react";
 import { bindActionCreators, Dispatch } from "redux";
 import { connect } from "react-redux";
-import {
-  withFirebase,
-  ExtendedFirebaseInstance,
-} from "react-redux-firebase";
+import { withFirebase, ExtendedFirebaseInstance } from "react-redux-firebase";
 import remoteActions from "../actions/remote";
 import viewActions from "../actions/view";
 import { RootState, ViewPort, FirebaseAuthState } from "../types";
@@ -60,7 +57,7 @@ const LoginPage = ({
         Fjarstjórn
       </label>
     );
-  }
+  };
 
   const renderListenerCtrl = () => {
     if (!available) {

@@ -34,10 +34,7 @@ const MatchController: React.FC<MatchControllerProps> = ({
   startMatch,
 }) => (
   <div className="match-controller">
-    <TeamController
-      team="home"
-      started={started}
-    />
+    <TeamController team="home" started={started} />
     <div className="match-controller-box">
       <ControlButton
         className="yellow"
@@ -51,10 +48,7 @@ const MatchController: React.FC<MatchControllerProps> = ({
         Leiðrétta
       </ControlButton>
     </div>
-    <TeamController
-      team="away"
-      started={started}
-    />
+    <TeamController team="away" started={started} />
   </div>
 );
 

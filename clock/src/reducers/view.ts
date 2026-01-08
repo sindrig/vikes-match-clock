@@ -98,7 +98,10 @@ export const initialState: ViewState = {
 /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call */
 const actions: Record<string, any> = {
   [AT.setViewPort]: {
-    next(state: ViewState, { payload: { vp } }: Action<{ vp: ViewState["vp"] }>): ViewState {
+    next(
+      state: ViewState,
+      { payload: { vp } }: Action<{ vp: ViewState["vp"] }>,
+    ): ViewState {
       const htmlElement = document.getElementsByTagName("html")[0];
       if (htmlElement) {
         htmlElement.setAttribute("style", `font-size: ${String(vp.fontSize)}`);
@@ -107,7 +110,10 @@ const actions: Record<string, any> = {
     },
   },
   [AT.setBackground]: {
-    next(state: ViewState, { payload: { background } }: Action<{ background: string }>): ViewState {
+    next(
+      state: ViewState,
+      { payload: { background } }: Action<{ background: string }>,
+    ): ViewState {
       return {
         ...state,
         background,
@@ -115,7 +121,10 @@ const actions: Record<string, any> = {
     },
   },
   [AT.setIdleImage]: {
-    next(state: ViewState, { payload: { idleImage } }: Action<{ idleImage: string }>): ViewState {
+    next(
+      state: ViewState,
+      { payload: { idleImage } }: Action<{ idleImage: string }>,
+    ): ViewState {
       return {
         ...state,
         idleImage,
@@ -123,7 +132,10 @@ const actions: Record<string, any> = {
     },
   },
   [AT.receiveRemoteData]: {
-    next(state: ViewState, { data, path }: { data: unknown; path: string }): ViewState {
+    next(
+      state: ViewState,
+      { data, path }: { data: unknown; path: string },
+    ): ViewState {
       if (path === "view" && data && typeof data === "object") {
         return {
           ...state,

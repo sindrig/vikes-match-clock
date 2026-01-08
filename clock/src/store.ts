@@ -1,4 +1,10 @@
-import { applyMiddleware, compose, createStore, Middleware } from "redux";
+import {
+  applyMiddleware,
+  compose,
+  createStore,
+  Middleware,
+  StoreEnhancer,
+} from "redux";
 import { persistStore } from "redux-persist";
 import promiseMiddleware from "redux-promise-middleware";
 import { thunk, type ThunkDispatch } from "redux-thunk";
@@ -7,18 +13,13 @@ import {
   getFirebase,
 } from "react-redux-firebase";
 import reducer from "./reducers/reducer";
-import {
-  Controller,
-  Match,
-  RemoteActionType,
-  View,
-} from "./ActionTypes";
+import { Controller, Match, RemoteActionType, View } from "./ActionTypes";
 import type { RootState } from "./types";
 
 // Extend window for Redux DevTools
 declare global {
   interface Window {
-    __REDUX_DEVTOOLS_EXTENSION__?: () => unknown;
+    __REDUX_DEVTOOLS_EXTENSION__?: () => ReturnType<typeof compose>;
   }
 }
 
@@ -65,18 +66,20 @@ const firebaseMiddleware: Middleware<
   return result;
 };
 
-const devTools = window.__REDUX_DEVTOOLS_EXTENSION__
-  ? window.__REDUX_DEVTOOLS_EXTENSION__()
-  : <T,>(f: T): T => f;
-
-export const store = createStore(
-  reducer,
-  {},
-  compose(
-    applyMiddleware(thunk, promiseMiddleware, firebaseMiddleware),
-    devTools as <T>(f: T) => T
-  )
+const middlewares = applyMiddleware(
+  thunk,
+  promiseMiddleware,
+  firebaseMiddleware,
 );
+
+const enhancer: StoreEnhancer = window.__REDUX_DEVTOOLS_EXTENSION__
+  ? (compose(
+      middlewares,
+      window.__REDUX_DEVTOOLS_EXTENSION__(),
+    ) as StoreEnhancer)
+  : middlewares;
+
+export const store = createStore(reducer, {}, enhancer);
 
 export const persistor = persistStore(store);
 

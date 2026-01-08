@@ -31,16 +31,10 @@ interface TeamAssetControllerState {
   effect: string;
 }
 
-interface AssetObject {
-  type?: string;
-  subIn?: unknown;
-  subOut?: unknown;
-  key?: string;
-  [key: string]: unknown;
-}
-
 interface OwnProps {
-  addAssets: (assets: AssetObject[], options?: { showNow?: boolean }) => void;
+  // TODO: Fix any usage [Asset types across components need unification - addAssets accepts mixed sync/async assets]
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  addAssets: (assets: any[], options?: { showNow?: boolean }) => void;
   previousView: () => void;
 }
 
@@ -61,7 +55,7 @@ const mapDispatchToProps = (dispatch: Dispatch) =>
       clearMatchPlayers: controllerActions.clearMatchPlayers,
       getAvailableMatches: controllerActions.getAvailableMatches,
     },
-    dispatch
+    dispatch,
   );
 
 const connector = connect(mapStateToProps, mapDispatchToProps);
@@ -106,8 +100,10 @@ class TeamAssetController extends Component<
     const homeTeamId = clubIdsMap[homeTeam];
     const awayTeamId = clubIdsMap[awayTeam];
     return {
-      homeTeam: match?.players && homeTeamId ? match.players[homeTeamId] || [] : [],
-      awayTeam: match?.players && awayTeamId ? match.players[awayTeamId] || [] : [],
+      homeTeam:
+        match?.players && homeTeamId ? match.players[homeTeamId] || [] : [],
+      awayTeam:
+        match?.players && awayTeamId ? match.players[awayTeamId] || [] : [],
     };
   }
 
@@ -134,10 +130,10 @@ class TeamAssetController extends Component<
       team
         .filter((p) => p.show)
         .map((player) =>
-          getPlayerAssetObject({ player, teamName, listenPrefix })
-        )
+          getPlayerAssetObject({ player, teamName, listenPrefix }),
+        ),
     );
-    const flattened: unknown[] = ([] as unknown[]).concat(...teamAssets);
+    const flattened = ([] as unknown[]).concat(...teamAssets);
     if (!flattened.every((i) => i)) {
       this.setState({ error: "Missing name/number for some players to show" });
     } else {
@@ -151,7 +147,8 @@ class TeamAssetController extends Component<
     const { match, addAssets, listenPrefix } = this.props;
     if (!subIn || !subOut) return;
 
-    const teamName = subIn.teamName === "homeTeam" ? match.homeTeam : match.awayTeam;
+    const teamName =
+      subIn.teamName === "homeTeam" ? match.homeTeam : match.awayTeam;
     const subInObj = await getPlayerAssetObject({
       player: subIn,
       teamName,
@@ -175,7 +172,7 @@ class TeamAssetController extends Component<
       ],
       {
         showNow: true,
-      }
+      },
     );
     this.clearState();
   }
@@ -201,7 +198,8 @@ class TeamAssetController extends Component<
 
   selectPlayerAsset(player: Player, teamName: string): void {
     const { match, addAssets, listenPrefix } = this.props;
-    const actualTeamName = teamName === "homeTeam" ? match.homeTeam : match.awayTeam;
+    const actualTeamName =
+      teamName === "homeTeam" ? match.homeTeam : match.awayTeam;
     addAssets(
       [
         getPlayerAssetObject({
@@ -212,14 +210,15 @@ class TeamAssetController extends Component<
       ],
       {
         showNow: true,
-      }
+      },
     );
     this.clearState();
   }
 
   selectGoalScorer(player: Player, teamName: string): void {
     const { match, addAssets, listenPrefix } = this.props;
-    const actualTeamName = teamName === "homeTeam" ? match.homeTeam : match.awayTeam;
+    const actualTeamName =
+      teamName === "homeTeam" ? match.homeTeam : match.awayTeam;
     addAssets(
       [
         getPlayerAssetObject({
@@ -235,19 +234,20 @@ class TeamAssetController extends Component<
       ],
       {
         showNow: true,
-      }
+      },
     );
     this.clearState();
   }
 
   selectMOTM(player: Player, teamName: string): void {
     const { match, addAssets, listenPrefix } = this.props;
-    const actualTeamName = teamName === "homeTeam" ? match.homeTeam : match.awayTeam;
+    const actualTeamName =
+      teamName === "homeTeam" ? match.homeTeam : match.awayTeam;
     addAssets(
       [getMOTMAsset({ player, teamName: actualTeamName, listenPrefix })],
       {
         showNow: true,
-      }
+      },
     );
     this.clearState();
   }
@@ -414,7 +414,13 @@ class TeamAssetController extends Component<
             <SubView
               subIn={subIn}
               subOut={subOut}
-              subTeam={subTeam ? (subTeam === "homeTeam" ? match.homeTeam : match.awayTeam) : null}
+              subTeam={
+                subTeam
+                  ? subTeam === "homeTeam"
+                    ? match.homeTeam
+                    : match.awayTeam
+                  : null
+              }
             />
           </div>
         ) : null}

@@ -35,7 +35,9 @@ const stateToProps = (
   { controller: { availableMatches, selectedMatch }, match }: RootState,
   ownProps: OwnProps,
 ) => {
-  const selectedMatchObj = selectedMatch ? availableMatches[selectedMatch] : undefined;
+  const selectedMatchObj = selectedMatch
+    ? availableMatches[selectedMatch]
+    : undefined;
   const teamId = match[`${ownProps.teamName}Id`];
   return {
     team: selectedMatchObj?.players
@@ -97,12 +99,12 @@ class Team extends Component<TeamProps, TeamState> {
   fetchPlayerId(idx: number): void {
     const { team, teamId, group, sex } = this.props;
     const player = team[idx];
-    
+
     if (!player || !player.name) {
       this.setState({ error: "Player not found or has no name" });
       return;
     }
-    
+
     const options = {
       params: {
         playerName: player.name,
@@ -128,7 +130,9 @@ class Team extends Component<TeamProps, TeamState> {
           };
           this.updatePlayer(idx)(updatedPlayer);
         } else {
-          this.setState({ error: `No ID found for player ${String(player.name ?? 'unknown')}` });
+          this.setState({
+            error: `No ID found for player ${String(player.name ?? "unknown")}`,
+          });
         }
       })
       .catch((e: Error) => {
@@ -146,10 +150,7 @@ class Team extends Component<TeamProps, TeamState> {
     const requestedNumber = parseInt(inputValue, 10);
     let found = false;
     team.forEach((player) => {
-      if (
-        requestedNumber ===
-        parseInt(String(player.number || 0), 10)
-      ) {
+      if (requestedNumber === parseInt(String(player.number || 0), 10)) {
         selectPlayer?.(player, teamName);
         found = true;
       }
@@ -190,13 +191,13 @@ class Team extends Component<TeamProps, TeamState> {
         <div className="team-name">{match[teamName]}</div>
         {match[teamName]
           ? team.map((p, i) => (
-               // eslint-disable-next-line react/no-array-index-key
+              // eslint-disable-next-line react/no-array-index-key
               <div className="player-whole-line" key={String(i)}>
                 {selectPlayer && p.name ? (
                   <Button
                     appearance="default"
                     onClick={() => selectPlayer(p, teamName)}
-                  >{`#${String(p.number ?? (p.role ? p.role[0] : ""))} - ${String(p.name ?? '')}`}</Button>
+                  >{`#${String(p.number ?? (p.role ? p.role[0] : ""))} - ${String(p.name ?? "")}`}</Button>
                 ) : (
                   <TeamPlayer player={p} onChange={this.updatePlayer(i)} />
                 )}

@@ -44,7 +44,10 @@ declare module "compress.js" {
   }
 
   class Compress {
-    compress(files: File[], options: CompressOptions): Promise<CompressedImage[]>;
+    compress(
+      files: File[],
+      options: CompressOptions,
+    ): Promise<CompressedImage[]>;
     static convertBase64ToFile(base64: string, mime: string): File;
   }
 

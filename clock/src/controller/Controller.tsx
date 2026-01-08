@@ -22,7 +22,13 @@ import AssetController from "./asset/AssetController";
 import "rsuite/dist/rsuite.min.css";
 import "./Controller.css";
 import AssetQueue from "./asset/AssetQueue";
-import { RootState, ViewPort, CurrentAsset, FirebaseAuthState, Asset } from "../types";
+import {
+  RootState,
+  ViewPort,
+  CurrentAsset,
+  FirebaseAuthState,
+  Asset,
+} from "../types";
 
 // eslint-disable-next-line
 const confirmRefresh = () => confirm("Are you absolutely sure?");

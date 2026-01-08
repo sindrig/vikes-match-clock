@@ -77,15 +77,16 @@ export const getPlayerAssetObject = async ({
     storage
       .ref(`${listenPrefix}/players/${player.id}.${imageType}`)
       .getDownloadURL(),
-    () => Promise.resolve({
-      type: assetTypes.NO_IMAGE_PLAYER,
-      key: `custom-${player.number ?? "no-number"}-${player.name}`,
-      name: player.name,
-      number: player.number,
-      role: player.role,
-      overlay: overlay || { text: "" },
-      teamName,
-    }),
+    () =>
+      Promise.resolve({
+        type: assetTypes.NO_IMAGE_PLAYER,
+        key: `custom-${player.number ?? "no-number"}-${player.name}`,
+        name: player.name,
+        number: player.number,
+        role: player.role,
+        overlay: overlay || { text: "" },
+        teamName,
+      }),
   );
 };
 
@@ -106,11 +107,11 @@ export const getMOTMAsset = async ({
     teamName,
     preferExt: "fagn",
   });
-  
+
   if (!playerAssetObject) {
     return null;
   }
-  
+
   return {
     ...playerAssetObject,
     type: assetTypes.MOTM,

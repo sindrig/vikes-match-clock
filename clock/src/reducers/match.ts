@@ -69,7 +69,7 @@ const actions: Record<string, any> = {
       {
         payload,
         error,
-      }: Action<{ team: "home" | "away"; key: string; penaltyLength: number }>
+      }: Action<{ team: "home" | "away"; key: string; penaltyLength: number }>,
     ) {
       if (error) {
         return { ...state, error };
@@ -104,7 +104,10 @@ const actions: Record<string, any> = {
     },
   },
   [AT.addToPenalty]: {
-    next(state: Match, { payload, error }: Action<{ key: string; toAdd: number }>) {
+    next(
+      state: Match,
+      { payload, error }: Action<{ key: string; toAdd: number }>,
+    ) {
       if (error) {
         return { ...state, error };
       }
@@ -115,10 +118,14 @@ const actions: Record<string, any> = {
       return {
         ...state,
         home2min: state.home2min.map((t) =>
-          t.key === key ? { ...t, penaltyLength: Number(t.penaltyLength) + Number(toAdd) } : t
+          t.key === key
+            ? { ...t, penaltyLength: Number(t.penaltyLength) + Number(toAdd) }
+            : t,
         ),
         away2min: state.away2min.map((t) =>
-          t.key === key ? { ...t, penaltyLength: Number(t.penaltyLength) + Number(toAdd) } : t
+          t.key === key
+            ? { ...t, penaltyLength: Number(t.penaltyLength) + Number(toAdd) }
+            : t,
         ),
       };
     },
@@ -160,7 +167,7 @@ const actions: Record<string, any> = {
   [AT.updateHalfLength]: {
     next(
       state: Match,
-      { error, payload }: Action<{ currentValue: string; newValue: string }>
+      { error, payload }: Action<{ currentValue: string; newValue: string }>,
     ) {
       if (error) {
         return { ...state, error };
@@ -177,7 +184,7 @@ const actions: Record<string, any> = {
       return {
         ...state,
         halfStops: state.halfStops.map((v) =>
-          v === currentValueParsed ? newValueParsed : v
+          v === currentValueParsed ? newValueParsed : v,
         ),
       };
     },
@@ -185,7 +192,10 @@ const actions: Record<string, any> = {
   [AT.setHalfStops]: {
     next(
       state: Match,
-      { error, payload }: Action<{ halfStops: number[]; showInjuryTime: boolean }>
+      {
+        error,
+        payload,
+      }: Action<{ halfStops: number[]; showInjuryTime: boolean }>,
     ) {
       if (error) {
         return { ...state, error };
@@ -210,7 +220,9 @@ const actions: Record<string, any> = {
         return { ...state, pending: true };
       }
       const { team } = payload;
-      const stateKey = `${String(team)}Timeouts` as "homeTimeouts" | "awayTimeouts";
+      const stateKey = `${String(team)}Timeouts` as
+        | "homeTimeouts"
+        | "awayTimeouts";
       return {
         ...state,
         timeout: Date.now(),
@@ -247,7 +259,10 @@ const actions: Record<string, any> = {
   },
 
   [AT.addGoal]: {
-    next(state: Match, { payload: { team } }: Action<{ team: "home" | "away" }>) {
+    next(
+      state: Match,
+      { payload: { team } }: Action<{ team: "home" | "away" }>,
+    ) {
       const key = `${String(team)}Score` as "homeScore" | "awayScore";
       return {
         ...state,
@@ -273,7 +288,10 @@ const actions: Record<string, any> = {
     },
   },
   [AT.updateRedCards]: {
-    next(state: Match, { payload: { home, away } }: Action<{ home: number; away: number }>) {
+    next(
+      state: Match,
+      { payload: { home, away } }: Action<{ home: number; away: number }>,
+    ) {
       return {
         ...state,
         homeRedCards: home,
@@ -313,10 +331,11 @@ const actions: Record<string, any> = {
             results.buzzer = state.buzzer;
           }
         }
-        if (!data.home2min) {
+        const dataObj = data as Partial<Match>;
+        if (!dataObj.home2min) {
           results.home2min = [];
         }
-        if (!data.away2min) {
+        if (!dataObj.away2min) {
           results.away2min = [];
         }
         return results;

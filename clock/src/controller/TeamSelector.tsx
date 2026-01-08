@@ -21,8 +21,15 @@ const noCaseSensMatch = (value: string) => {
   return value;
 };
 
-const filterOption = (key: string, currentValue: string | number | boolean | TwoMinPenalty[] | undefined) => {
-  if (currentValue && typeof currentValue === 'string' && !(clubIds as Record<string, string>)[currentValue]) {
+const filterOption = (
+  key: string,
+  currentValue: string | number | boolean | TwoMinPenalty[] | undefined,
+) => {
+  if (
+    currentValue &&
+    typeof currentValue === "string" &&
+    !(clubIds as Record<string, string>)[currentValue]
+  ) {
     return normalize(key).startsWith(normalize(currentValue));
   }
   return true;
@@ -45,7 +52,11 @@ const connector = connect(mapStateToProps, mapDispatchToProps);
 type PropsFromRedux = ConnectedProps<typeof connector>;
 type TeamSelectorProps = PropsFromRedux & OwnProps;
 
-const TeamSelector = ({ teamAttrName, match, updateMatch }: TeamSelectorProps) => (
+const TeamSelector = ({
+  teamAttrName,
+  match,
+  updateMatch,
+}: TeamSelectorProps) => (
   <div>
     <select
       value={(match[teamAttrName] as string) || ""}

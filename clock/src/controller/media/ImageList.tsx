@@ -82,17 +82,19 @@ const ImageList: React.FC<ImageListProps> = ({
   useEffect(() => {
     const listRef = storage.ref(prefix);
     listRef.listAll().then((res: StorageListResult) => {
-      Promise.all(res.items.map((itemRef: StorageReference) => itemRef.getDownloadURL())).then(
-        (downloadUrls) => {
-          setImages(
-            res.items.map((item: StorageReference, i: number) => ({
+      Promise.all(
+        res.items.map((itemRef: StorageReference) => itemRef.getDownloadURL()),
+      ).then((downloadUrls) => {
+        setImages(
+          res.items
+            .map((item: StorageReference, i: number) => ({
               name: item.name,
               imageUrl: downloadUrls[i],
               ref: item.fullPath,
-            })),
-          );
-        },
-      );
+            }))
+            .filter((img): img is ImageData => img.imageUrl !== undefined),
+        );
+      });
       setFolders(res.prefixes.map((p) => ({ name: p.name })));
     });
   }, [prefix, ts]);
@@ -129,7 +131,9 @@ const ImageList: React.FC<ImageListProps> = ({
                 onClick={() => {
                   const parts = name.split(".");
                   const suffix = parts[parts.length - 1];
-                  const type = suffix ? AssetTypeSuffixMap[suffix] || assetTypes.IMAGE : assetTypes.IMAGE;
+                  const type = suffix
+                    ? AssetTypeSuffixMap[suffix] || assetTypes.IMAGE
+                    : assetTypes.IMAGE;
                   const asset = {
                     // To be able to add the same image multiple times to the queue,
                     // we need to make the key unique

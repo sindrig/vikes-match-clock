@@ -79,12 +79,20 @@ const AssetController = ({
   toggleCycle,
   currentAsset,
 }: AssetControllerProps) => {
-  const addMultipleAssets = (assetList: Promise<Asset>[], options: { showNow?: boolean } = { showNow: false }) => {
-    void Promise.all(assetList).then((resolvedAssets) => {
-      if (options.showNow && resolvedAssets.length === 1) {
-        renderAsset(resolvedAssets[0] as any);
+  // TODO: Fix any usage [Asset types across components have incompatible shapes - needs unified asset type]
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const addMultipleAssets = (
+    assetList: any[],
+    options: { showNow?: boolean } = { showNow: false },
+  ) => {
+    void Promise.all(assetList).then((resolvedAssets: unknown[]) => {
+      const validAssets = resolvedAssets.filter(
+        (a): a is Asset => a !== null && typeof a === "object",
+      );
+      if (options.showNow && validAssets.length === 1 && validAssets[0]) {
+        renderAsset(validAssets[0]);
       } else {
-        addAssets(resolvedAssets);
+        addAssets(validAssets);
       }
     });
   };
@@ -140,7 +148,7 @@ const AssetController = ({
           <React.Fragment>
             <GlobalShortcut
               shortcut=" "
-              onTrigger={() => renderAsset(0 as any)}
+              onTrigger={() => renderAsset(null)}
               preventDefault
             />
           </React.Fragment>

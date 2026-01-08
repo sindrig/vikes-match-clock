@@ -100,7 +100,10 @@ class TeamAssetController extends Component<
     try {
       const {
         data: { matches },
-      } = await axios.get<MatchesResponse>(`${apiConfig.gateWayUrl}match-report/v2`, options);
+      } = await axios.get<MatchesResponse>(
+        `${apiConfig.gateWayUrl}match-report/v2`,
+        options,
+      );
       this.setState({ error: "", matches, loading: false });
     } catch (e) {
       const error = e as Error;

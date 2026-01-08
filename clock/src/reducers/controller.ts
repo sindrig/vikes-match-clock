@@ -5,7 +5,13 @@ import ActionTypes from "../ActionTypes";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Workaround for redux-actions computed property names limitation
 const AT: any = ActionTypes;
 import assetTypes from "../controller/asset/AssetTypes";
-import type { ControllerState, Asset, CurrentAsset, Player, AvailableMatches } from "../types";
+import type {
+  ControllerState,
+  Asset,
+  CurrentAsset,
+  Player,
+  AvailableMatches,
+} from "../types";
 
 export const ASSET_VIEWS = keymirror({
   assets: null,
@@ -69,17 +75,26 @@ const getStateShowingNextAsset = (state: ControllerState): ControllerState => {
 /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call -- AT is intentionally 'any' due to redux-actions limitations */
 const actions = {
   [AT.selectView]: {
-    next(state: ControllerState, { payload: { view } }: Action<{ view: string }>) {
+    next(
+      state: ControllerState,
+      { payload: { view } }: Action<{ view: string }>,
+    ) {
       return { ...state, view };
     },
   },
   [AT.selectAssetView]: {
-    next(state: ControllerState, { payload: { assetView } }: Action<{ assetView: string }>) {
+    next(
+      state: ControllerState,
+      { payload: { assetView } }: Action<{ assetView: string }>,
+    ) {
       return { ...state, assetView };
     },
   },
   [AT.selectTab]: {
-    next(state: ControllerState, { payload: { tab } }: Action<{ tab: string }>) {
+    next(
+      state: ControllerState,
+      { payload: { tab } }: Action<{ tab: string }>,
+    ) {
       return { ...state, tab };
     },
   },
@@ -121,7 +136,10 @@ const actions = {
     },
   },
   [AT.setAvailableMatches]: {
-    next(state: ControllerState, { payload: { matches } }: Action<{ matches: AvailableMatches }>) {
+    next(
+      state: ControllerState,
+      { payload: { matches } }: Action<{ matches: AvailableMatches }>,
+    ) {
       return {
         ...state,
         availableMatches: matches || {},
@@ -130,10 +148,21 @@ const actions = {
     },
   },
   [AT.editPlayer]: {
-    next(state: ControllerState, { payload: { teamId, idx, updatedPlayer } }: Action<{ teamId: string; idx: number; updatedPlayer: Partial<Player> }>) {
+    next(
+      state: ControllerState,
+      {
+        payload: { teamId, idx, updatedPlayer },
+      }: Action<{
+        teamId: string;
+        idx: number;
+        updatedPlayer: Partial<Player>;
+      }>,
+    ) {
       const { availableMatches, selectedMatch } = state;
       // TODO why not immutable
-      const match = JSON.parse(JSON.stringify(availableMatches[selectedMatch!]));
+      const match = JSON.parse(
+        JSON.stringify(availableMatches[selectedMatch!]),
+      );
       match.players[teamId][idx] = {
         ...match.players[teamId][idx],
         ...updatedPlayer,
@@ -148,10 +177,15 @@ const actions = {
     },
   },
   [AT.deletePlayer]: {
-    next(state: ControllerState, { payload: { teamId, idx } }: Action<{ teamId: string; idx: number }>) {
+    next(
+      state: ControllerState,
+      { payload: { teamId, idx } }: Action<{ teamId: string; idx: number }>,
+    ) {
       const { availableMatches, selectedMatch } = state;
       // TODO why not immutable
-      const match = JSON.parse(JSON.stringify(availableMatches[selectedMatch!]));
+      const match = JSON.parse(
+        JSON.stringify(availableMatches[selectedMatch!]),
+      );
       match.players[teamId] = match.players[teamId].filter(
         (_item: Player, i: number) => i !== idx,
       );
@@ -165,7 +199,10 @@ const actions = {
     },
   },
   [AT.addPlayer]: {
-    next(state: ControllerState, { payload: { teamId } }: Action<{ teamId: string }>) {
+    next(
+      state: ControllerState,
+      { payload: { teamId } }: Action<{ teamId: string }>,
+    ) {
       const { availableMatches, selectedMatch } = state;
       // TODO why not immutable
       if (!selectedMatch || !availableMatches[selectedMatch]) {
@@ -191,7 +228,10 @@ const actions = {
     },
   },
   [AT.updateAssets]: {
-    next(state: ControllerState, { payload }: Action<Partial<ControllerState>>) {
+    next(
+      state: ControllerState,
+      { payload }: Action<Partial<ControllerState>>,
+    ) {
       return {
         ...state,
         selectedAssets: [],
@@ -209,7 +249,10 @@ const actions = {
     },
   },
   [AT.setImageSeconds]: {
-    next(state: ControllerState, { payload: { imageSeconds } }: Action<{ imageSeconds: number }>) {
+    next(
+      state: ControllerState,
+      { payload: { imageSeconds } }: Action<{ imageSeconds: number }>,
+    ) {
       return {
         ...state,
         imageSeconds,
@@ -227,7 +270,10 @@ const actions = {
     },
   },
   [AT.setPlaying]: {
-    next(state: ControllerState, { payload: { playing } }: Action<{ playing: boolean }>) {
+    next(
+      state: ControllerState,
+      { payload: { playing } }: Action<{ playing: boolean }>,
+    ) {
       return {
         ...state,
         playing,
@@ -235,7 +281,10 @@ const actions = {
     },
   },
   [AT.setSelectedAssets]: {
-    next(state: ControllerState, { payload: { selectedAssets } }: Action<{ selectedAssets: Asset[] }>) {
+    next(
+      state: ControllerState,
+      { payload: { selectedAssets } }: Action<{ selectedAssets: Asset[] }>,
+    ) {
       return {
         ...state,
         selectedAssets: selectedAssets || [],
@@ -243,7 +292,10 @@ const actions = {
     },
   },
   [AT.addAssets]: {
-    next(state: ControllerState, { payload: { assets } }: Action<{ assets: Asset[] }>) {
+    next(
+      state: ControllerState,
+      { payload: { assets } }: Action<{ assets: Asset[] }>,
+    ) {
       const updatedAssets = [...(state.selectedAssets || [])];
       assets.forEach((asset: Asset) => {
         // Make sure that the asset type is in assetTypes
@@ -261,7 +313,10 @@ const actions = {
     },
   },
   [AT.removeAsset]: {
-    next(state: ControllerState, { payload: { asset } }: Action<{ asset: Asset }>) {
+    next(
+      state: ControllerState,
+      { payload: { asset } }: Action<{ asset: Asset }>,
+    ) {
       const idx = state.selectedAssets.map((a) => a.key).indexOf(asset.key);
       if (idx > -1) {
         const newAssets = [...state.selectedAssets];
@@ -275,8 +330,16 @@ const actions = {
     },
   },
   [AT.receiveRemoteData]: {
-    next(state: ControllerState, { data, path }: { data: unknown; path: string }) {
-      if (path === "controller" && data && typeof data === "object" && data !== null) {
+    next(
+      state: ControllerState,
+      { data, path }: { data: unknown; path: string },
+    ) {
+      if (
+        path === "controller" &&
+        data &&
+        typeof data === "object" &&
+        data !== null
+      ) {
         const results = { ...state, ...(data as Partial<ControllerState>) };
         if (!results.selectedAssets) {
           results.selectedAssets = [];
@@ -287,7 +350,10 @@ const actions = {
     },
   },
   [AT.renderAsset]: {
-    next(state: ControllerState, { payload: { asset } }: Action<{ asset: CurrentAsset | null }>) {
+    next(
+      state: ControllerState,
+      { payload: { asset } }: Action<{ asset: CurrentAsset | null }>,
+    ) {
       return { ...state, currentAsset: asset };
     },
   },

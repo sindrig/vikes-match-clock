@@ -1,5 +1,8 @@
 interface RavenStatic {
-  config(dsn: string, options: { release: string; environment: string }): RavenStatic;
+  config(
+    dsn: string,
+    options: { release: string; environment: string },
+  ): RavenStatic;
   install(): void;
   captureMessage(message: string): void;
 }

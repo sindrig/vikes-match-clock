@@ -46,7 +46,9 @@ export default class Clock extends Component<ClockBaseProps, ClockBaseState> {
     }
   }
 
-  static getDerivedStateFromProps({ isTimeNull }: ClockBaseProps): ClockBaseState | null {
+  static getDerivedStateFromProps({
+    isTimeNull,
+  }: ClockBaseProps): ClockBaseState | null {
     if (isTimeNull) {
       return { time: null };
     }
@@ -65,7 +67,8 @@ export default class Clock extends Component<ClockBaseProps, ClockBaseState> {
     const { isTimeNull, zeroTime, className, fontSizeMax, fontSizeMin } =
       this.props;
     const { time } = this.state;
-    const displayedTime = (!isTimeNull && time) || formatMillisAsTime(zeroTime || 0);
+    const displayedTime =
+      (!isTimeNull && time) || formatMillisAsTime(zeroTime || 0);
     const style = {
       fontSize: displayedTime.length > 5 ? fontSizeMin : fontSizeMax,
     };

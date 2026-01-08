@@ -6,7 +6,10 @@ import ImageList from "./ImageList";
 import { IMAGE_TYPES } from ".";
 import { RootState } from "../../types";
 
-const stateToProps = ({ firebase: { auth }, remote: { listenPrefix } }: RootState) => ({
+const stateToProps = ({
+  firebase: { auth },
+  remote: { listenPrefix },
+}: RootState) => ({
   auth,
   listenPrefix,
 });
@@ -45,7 +48,10 @@ const MediaManager: React.FC<MediaManagerProps> = ({ auth, listenPrefix }) => {
         <Nav.Item eventKey={IMAGE_TYPES.players}>Leikmenn</Nav.Item>
       </Nav>
       {!auth.isEmpty && (
-        <UploadManager prefix={`${String(finalTab)}${String(prefix)}`} refresh={refresh} />
+        <UploadManager
+          prefix={`${String(finalTab)}${String(prefix)}`}
+          refresh={refresh}
+        />
       )}
       <div>
         <label>

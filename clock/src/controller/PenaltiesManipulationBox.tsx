@@ -19,7 +19,7 @@ interface OwnProps {
 const teamToTimeoutKey = (team: string): string => `${team}2min`;
 
 const translateTeam = (team: string): string =>
-  ({ home: "Heima", away: "Úti" }[team] || team);
+  ({ home: "Heima", away: "Úti" })[team] || team;
 
 const MAX_TIMEOUTS_PER_TEAM = 4;
 

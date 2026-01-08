@@ -25,7 +25,10 @@ interface TeamPlayerProps {
   onChange: (update: Partial<Player>) => void;
 }
 
-const TeamPlayer = ({ player, onChange }: TeamPlayerProps): React.JSX.Element => (
+const TeamPlayer = ({
+  player,
+  onChange,
+}: TeamPlayerProps): React.JSX.Element => (
   <div className="team-player">
     <input
       type="checkbox"

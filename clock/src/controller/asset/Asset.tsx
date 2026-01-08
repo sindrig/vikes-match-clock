@@ -55,7 +55,7 @@ const mapDispatchToProps = (dispatch: Dispatch) =>
     {
       removeAssetAfterTimeout: controllerActions.removeAssetAfterTimeout,
     },
-    dispatch
+    dispatch,
   );
 
 const connector = connect(mapStateToProps, mapDispatchToProps);
@@ -95,7 +95,7 @@ class AssetComponent extends Component<AssetProps> {
     }
     const typesWithoutManualRemove = [assetTypes.URL, assetTypes.VIDEO];
     const typeNeedsManualRemove = !typesWithoutManualRemove.includes(
-      asset.type
+      asset.type,
     );
 
     if (time && !thumbnail && typeNeedsManualRemove) {
@@ -243,7 +243,7 @@ class AssetComponent extends Component<AssetProps> {
             asset: subAsset,
             widthMultiplier: 0.7,
             includeBackground: false,
-          })
+          }),
         )}
       </Substitution>
     );

@@ -20,7 +20,13 @@ const connector = connect(null, dispatchToProps);
 
 type TeamControllerProps = ConnectedProps<typeof connector> & OwnProps;
 
-const TeamController: React.FC<TeamControllerProps> = ({ goal, penalty, timeout, started, team }) => (
+const TeamController: React.FC<TeamControllerProps> = ({
+  goal,
+  penalty,
+  timeout,
+  started,
+  team,
+}) => (
   <div className={`match-controller-box match-controller-box-${String(team)}`}>
     <ControlButton className="yellow" onClick={goal}>
       Mark

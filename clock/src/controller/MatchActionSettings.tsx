@@ -78,9 +78,9 @@ const MatchActionSettings = ({
               updateMatch({ matchType: value as any })
             }
           >
-          {Object.keys(Sports).map((s) => (
-            <option key={s}>{s}</option>
-          ))}
+            {Object.keys(Sports).map((s) => (
+              <option key={s}>{s}</option>
+            ))}
           </select>
         </div>
         <div>

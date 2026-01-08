@@ -13,7 +13,12 @@ import { getBackground } from "./reducers/view";
 import StateListener from "./StateListener";
 import MatchController from "./match-controller/MatchController";
 
-import type { CurrentAsset, FirebaseAuthState, RootState, ViewPort } from "./types";
+import type {
+  CurrentAsset,
+  FirebaseAuthState,
+  RootState,
+  ViewPort,
+} from "./types";
 
 import "./App.css";
 
@@ -28,16 +33,17 @@ interface AppProps {
 
 function App() {
   const dispatch = useDispatch();
-  const { view, vp, background, asset, sync, auth } = useSelector<RootState, AppProps>(
-    (state) => ({
-      view: state.controller.view,
-      vp: state.view.vp,
-      background: state.view.background,
-      asset: state.controller.currentAsset || null,
-      sync: state.remote.sync,
-      auth: state.firebase.auth,
-    })
-  );
+  const { view, vp, background, asset, sync, auth } = useSelector<
+    RootState,
+    AppProps
+  >((state) => ({
+    view: state.controller.view,
+    vp: state.view.vp,
+    background: state.view.background,
+    asset: state.controller.currentAsset || null,
+    sync: state.remote.sync,
+    auth: state.firebase.auth,
+  }));
 
   useEffect(() => {
     dispatch(viewActions.setViewPort(vp) as any);

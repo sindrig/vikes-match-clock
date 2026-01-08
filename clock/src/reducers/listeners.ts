@@ -28,8 +28,16 @@ export const initialState: ListenersState = {
 };
 
 const handleRemote = {
-  next(state: ListenersState, { data, path }: { data: unknown; path: string }): ListenersState {
-    if (path === "locations" && data && typeof data === "object" && data !== null) {
+  next(
+    state: ListenersState,
+    { data, path }: { data: unknown; path: string },
+  ): ListenersState {
+    if (
+      path === "locations" &&
+      data &&
+      typeof data === "object" &&
+      data !== null
+    ) {
       return {
         ...state,
         available: Object.keys(data),
@@ -37,11 +45,21 @@ const handleRemote = {
           .map(([key, value]: [string, unknown]) => {
             const locationValue = value as LocationValue;
             const { label, screens, pitchIds } = locationValue;
-            return screens.map((screen: unknown) => ({ screen, label, key, pitchIds }));
+            return screens.map((screen: unknown) => ({
+              screen,
+              label,
+              key,
+              pitchIds,
+            }));
           })
           .reduce((a: ScreenData[], b: ScreenData[]) => a.concat(b), []),
       };
-    } else if (path.startsWith("auth/") && data && typeof data === "object" && data !== null) {
+    } else if (
+      path.startsWith("auth/") &&
+      data &&
+      typeof data === "object" &&
+      data !== null
+    ) {
       return {
         ...state,
         available: Object.entries(data)
@@ -53,11 +71,11 @@ const handleRemote = {
   },
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- AT is intentionally 'any' due to redux-actions limitations
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
-const actions: Record<string, unknown> = {
+// TODO: Fix any usage [redux-actions handleActions requires specific ReducerMap type that conflicts with computed property names]
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const actions: any = {
   [AT.receiveRemoteData]: handleRemote,
-  // This can't be triggered by changing UI, so we need to listen here as well
   "@@reactReduxFirebase/SET": handleRemote,
 };
 /* eslint-enable @typescript-eslint/no-unsafe-member-access */
