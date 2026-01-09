@@ -143,9 +143,7 @@ const LoginPage = ({
   };
 
   const loginWithGoogle = () => {
-    void firebaseAuth
-      .loginWithGoogle()
-      .then(() => console.log("logged in"));
+    void firebaseAuth.loginWithGoogle().then(() => console.log("logged in"));
   };
   return (
     <div>

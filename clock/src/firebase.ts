@@ -54,8 +54,7 @@ const storageHelpers = {
     uploadBytes(storageRef(storage, path), data),
   uploadString: (path: string, data: string) =>
     uploadString(storageRef(storage, path), data),
-  getDownloadURL: (path: string) =>
-    getDownloadURL(storageRef(storage, path)),
+  getDownloadURL: (path: string) => getDownloadURL(storageRef(storage, path)),
   listAll: (path: string): Promise<ListResult> =>
     listAll(storageRef(storage, path)),
   deleteObject: (path: string) => deleteObject(storageRef(storage, path)),

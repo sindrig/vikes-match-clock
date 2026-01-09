@@ -11,9 +11,12 @@ interface OwnProps {
 }
 
 const dispatchToProps = (dispatch: Dispatch, { team }: OwnProps) => ({
-  goal: () => dispatch(matchActions.addGoal({ team }) as unknown as UnknownAction),
-  penalty: () => dispatch(matchActions.addPenalty({ team }) as unknown as UnknownAction),
-  timeout: () => dispatch(matchActions.matchTimeout({ team }) as unknown as UnknownAction),
+  goal: () =>
+    dispatch(matchActions.addGoal({ team }) as unknown as UnknownAction),
+  penalty: () =>
+    dispatch(matchActions.addPenalty({ team }) as unknown as UnknownAction),
+  timeout: () =>
+    dispatch(matchActions.matchTimeout({ team }) as unknown as UnknownAction),
 });
 
 const connector = connect(null, dispatchToProps);

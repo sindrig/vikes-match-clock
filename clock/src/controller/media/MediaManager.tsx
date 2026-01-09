@@ -6,10 +6,7 @@ import ImageList from "./ImageList";
 import { IMAGE_TYPES } from ".";
 import { RootState } from "../../types";
 
-const stateToProps = ({
-  auth,
-  remote: { listenPrefix },
-}: RootState) => ({
+const stateToProps = ({ auth, remote: { listenPrefix } }: RootState) => ({
   auth,
   listenPrefix,
 });

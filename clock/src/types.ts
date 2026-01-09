@@ -148,5 +148,3 @@ export interface RootState {
   auth: FirebaseAuthState;
   listeners: ListenersState;
 }
-
-

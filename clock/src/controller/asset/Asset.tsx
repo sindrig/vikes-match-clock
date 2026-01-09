@@ -93,9 +93,8 @@ class AssetComponent extends Component<AssetProps> {
       return;
     }
     const typesWithoutManualRemove = [assetTypes.URL, assetTypes.VIDEO];
-    const typeNeedsManualRemove = asset && !typesWithoutManualRemove.includes(
-      asset.type,
-    );
+    const typeNeedsManualRemove =
+      asset && !typesWithoutManualRemove.includes(asset.type);
 
     if (time && !thumbnail && typeNeedsManualRemove) {
       this.timeout = setTimeout(removeAssetAfterTimeout, time * 1000);

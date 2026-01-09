@@ -6,11 +6,11 @@ import { firebaseDatabase } from "../firebaseDatabase";
 import { RootState, Match, ControllerState, ViewState } from "../types";
 import { RemoteActionType } from "../ActionTypes";
 
-
-
 export function useFirebaseSync() {
   const dispatch = useDispatch();
-  const { sync, listenPrefix } = useSelector((state: RootState) => state.remote);
+  const { sync, listenPrefix } = useSelector(
+    (state: RootState) => state.remote,
+  );
   const { isLoaded, isEmpty } = useSelector((state: RootState) => state.auth);
   const match = useSelector((state: RootState) => state.match);
   const controller = useSelector((state: RootState) => state.controller);

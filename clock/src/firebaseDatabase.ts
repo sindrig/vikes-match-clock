@@ -28,6 +28,10 @@ export const firebaseDatabase = {
     off(ref(database, path));
   },
 
-  syncState: (listenPrefix: string, stateType: "match" | "controller" | "view", data: unknown): Promise<void> =>
+  syncState: (
+    listenPrefix: string,
+    stateType: "match" | "controller" | "view",
+    data: unknown,
+  ): Promise<void> =>
     set(ref(database, `states/${listenPrefix}/${stateType}`), data),
 };

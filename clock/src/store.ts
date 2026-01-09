@@ -1,9 +1,4 @@
-import {
-  applyMiddleware,
-  compose,
-  createStore,
-  StoreEnhancer,
-} from "redux";
+import { applyMiddleware, compose, createStore, StoreEnhancer } from "redux";
 import { persistStore, Persistor } from "redux-persist";
 import promiseMiddleware from "redux-promise-middleware";
 import { thunk } from "redux-thunk";

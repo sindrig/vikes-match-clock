@@ -1,5 +1,8 @@
 import { useSelector } from "react-redux";
-import { useFirebaseSync, useFirebaseAuthListener } from "./hooks/useFirebaseSync";
+import {
+  useFirebaseSync,
+  useFirebaseAuthListener,
+} from "./hooks/useFirebaseSync";
 
 import "./StateListener.css";
 import { RootState } from "./types";
