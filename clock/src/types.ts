@@ -145,9 +145,7 @@ export interface RootState {
   controller: ControllerState;
   view: ViewState;
   remote: RemoteState;
-  firebase: {
-    auth: FirebaseAuthState;
-  };
+  auth: FirebaseAuthState;
   listeners: ListenersState;
 }
 

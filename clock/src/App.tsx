@@ -43,7 +43,7 @@ function App() {
     background: state.view.background,
     asset: state.controller.currentAsset || null,
     sync: state.remote.sync,
-    auth: state.firebase.auth,
+    auth: state.auth,
   }));
 
   useEffect(() => {

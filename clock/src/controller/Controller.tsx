@@ -150,7 +150,7 @@ const stateToProps = ({
   controller: { view, currentAsset, tab },
   view: { vp },
   remote: { sync },
-  firebase: { auth },
+  auth,
 }: RootState) => ({
   view,
   vp,

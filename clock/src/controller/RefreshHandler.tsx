@@ -7,7 +7,7 @@ import { RootState } from "../types";
 
 const mapStateToProps = (state: RootState) => ({
   refreshToken: state.controller.refreshToken,
-  auth: state.firebase.auth,
+  auth: state.auth,
   sync: state.remote.sync,
 });
 

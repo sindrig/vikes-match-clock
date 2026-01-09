@@ -1,4 +1,4 @@
-import { storage } from "../../../firebase";
+import { storageHelpers } from "../../../firebase";
 import assetTypes from "../AssetTypes";
 import { Player } from "../../../types";
 
@@ -67,16 +67,16 @@ export const getPlayerAssetObject = async ({
       ...(preferType ? { preferExt } : {}),
     };
     return await playerAssetObjectFromPromise(
-      storage
-        .ref(`${listenPrefix}/players/${player.id}-${preferExt}.${imageType}`)
-        .getDownloadURL(),
+      storageHelpers.getDownloadURL(
+        `${listenPrefix}/players/${player.id}-${preferExt}.${imageType}`,
+      ),
       () => getPlayerAssetObject(fallbackAttrs),
     );
   }
   return await playerAssetObjectFromPromise(
-    storage
-      .ref(`${listenPrefix}/players/${player.id}.${imageType}`)
-      .getDownloadURL(),
+    storageHelpers.getDownloadURL(
+      `${listenPrefix}/players/${player.id}.${imageType}`,
+    ),
     () =>
       Promise.resolve({
         type: assetTypes.NO_IMAGE_PLAYER,

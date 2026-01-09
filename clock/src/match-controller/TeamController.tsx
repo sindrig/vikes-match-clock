@@ -1,19 +1,19 @@
 import React from "react";
 import { connect, ConnectedProps } from "react-redux";
+import { Dispatch, UnknownAction } from "redux";
 
 import ControlButton from "./ControlButton";
 import matchActions from "../actions/match";
-import type { AppDispatch } from "../store";
 
 interface OwnProps {
   team: string;
   started: number | null;
 }
 
-const dispatchToProps = (dispatch: AppDispatch, { team }: OwnProps) => ({
-  goal: () => dispatch(matchActions.addGoal({ team })),
-  penalty: () => dispatch(matchActions.addPenalty({ team })),
-  timeout: () => dispatch(matchActions.matchTimeout({ team })),
+const dispatchToProps = (dispatch: Dispatch, { team }: OwnProps) => ({
+  goal: () => dispatch(matchActions.addGoal({ team }) as unknown as UnknownAction),
+  penalty: () => dispatch(matchActions.addPenalty({ team }) as unknown as UnknownAction),
+  timeout: () => dispatch(matchActions.matchTimeout({ team }) as unknown as UnknownAction),
 });
 
 const connector = connect(null, dispatchToProps);

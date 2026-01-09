@@ -7,7 +7,7 @@ import { IMAGE_TYPES } from ".";
 import { RootState } from "../../types";
 
 const stateToProps = ({
-  firebase: { auth },
+  auth,
   remote: { listenPrefix },
 }: RootState) => ({
   auth,

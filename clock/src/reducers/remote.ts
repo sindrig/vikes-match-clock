@@ -25,9 +25,10 @@ const handleRemote = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Firebase data is untyped
   next(
     state: RemoteState,
-    { data, path }: { data: unknown; path: string },
+    { data, storeAs }: { data: unknown; storeAs: string },
   ): RemoteState {
-    if (path.startsWith("auth/") && data && typeof data === "object") {
+    // Handle auth data - sets the available locations/prefixes
+    if (storeAs === "authData" && data && typeof data === "object") {
       const available = Object.entries(data)
         .filter((kv) => kv[1] === true)
         .map(([k]) => k);
@@ -82,8 +83,6 @@ const actions: any = {
     },
   },
   [AT.receiveRemoteData]: handleRemote,
-  // This can't be triggered by changing UI, so we need to listen here as well
-  "@@reactReduxFirebase/SET": handleRemote,
 };
 /* eslint-enable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call */
 export default handleActions(actions, initialState);

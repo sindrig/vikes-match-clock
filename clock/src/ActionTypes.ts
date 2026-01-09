@@ -64,13 +64,19 @@ export enum RemoteActionType {
   RECEIVE_REMOTE_DATA = "receiveRemoteData",
 }
 
+// Action Types for Auth
+export enum AuthActionType {
+  SET_AUTH_STATE = "setAuthState",
+}
+
 // Combined action types
 export type ActionType =
   | MatchActionType
   | ControllerActionType
   | ViewActionType
   | GlobalActionType
-  | RemoteActionType;
+  | RemoteActionType
+  | AuthActionType;
 
 // Export all action types as an object for backward compatibility
 export const Match = Object.values(MatchActionType).reduce(
@@ -113,12 +119,21 @@ export const Remote = Object.values(RemoteActionType).reduce(
   {} as Record<string, string>,
 );
 
+export const Auth = Object.values(AuthActionType).reduce(
+  (acc, val) => {
+    acc[val] = val;
+    return acc;
+  },
+  {} as Record<string, string>,
+);
+
 const AllActionTypes = {
   ...Match,
   ...Controller,
   ...View,
   ...Global,
   ...Remote,
+  ...Auth,
 } as const;
 
 export default AllActionTypes as Record<string, string>;

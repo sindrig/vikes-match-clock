@@ -1,9 +1,9 @@
 import type React from "react";
 import { bindActionCreators, Dispatch } from "redux";
 import { connect } from "react-redux";
-import { withFirebase, ExtendedFirebaseInstance } from "react-redux-firebase";
 import remoteActions from "../actions/remote";
 import viewActions from "../actions/view";
+import { firebaseAuth } from "../firebaseAuth";
 import { RootState, ViewPort, FirebaseAuthState } from "../types";
 
 interface Screen {
@@ -19,7 +19,6 @@ interface LoginPageProps {
   setSync: (sync: boolean) => void;
   setEmail: (email: string) => void;
   setPassword: (password: string) => void;
-  firebase: ExtendedFirebaseInstance;
   available?: string[];
   screens?: Screen[];
   listenPrefix: string;
@@ -36,7 +35,6 @@ const LoginPage = ({
   setSync,
   setEmail,
   setPassword,
-  firebase,
   available = [],
   screens = [],
   listenPrefix,
@@ -123,7 +121,7 @@ const LoginPage = ({
         <button
           type="button"
           onClick={() => {
-            void firebase.logout();
+            void firebaseAuth.logout();
           }}
         >
           Log out...
@@ -134,9 +132,8 @@ const LoginPage = ({
 
   const login = (e: React.FormEvent) => {
     e.preventDefault();
-    // eslint-disable-next-line
-    firebase
-      .login({ email, password })
+    firebaseAuth
+      .login(email, password)
       .then(() => {
         if (email) {
           setListenPrefix(email.split("@")[0] || "");
@@ -146,11 +143,8 @@ const LoginPage = ({
   };
 
   const loginWithGoogle = () => {
-    void firebase
-      .login({
-        provider: "google",
-        type: "popup",
-      })
+    void firebaseAuth
+      .loginWithGoogle()
       .then(() => console.log("logged in"));
   };
   return (
@@ -189,7 +183,7 @@ const LoginPage = ({
 const stateToProps = ({
   remote: { email, password, sync, listenPrefix },
   listeners: { available, screens },
-  firebase,
+  auth,
   view: { vp },
 }: RootState) => ({
   email,
@@ -199,7 +193,7 @@ const stateToProps = ({
   available,
   screens,
   vp,
-  auth: firebase.auth,
+  auth,
 });
 
 const dispatchToProps = (dispatch: Dispatch) =>
@@ -214,6 +208,4 @@ const dispatchToProps = (dispatch: Dispatch) =>
     dispatch,
   );
 
-export default withFirebase(
-  connect(stateToProps, dispatchToProps)(LoginPage),
-) as React.ComponentType;
+export default connect(stateToProps, dispatchToProps)(LoginPage);

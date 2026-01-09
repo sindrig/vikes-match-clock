@@ -47,27 +47,21 @@ vi.mock("react-drag-drop-files", () => ({
   FileUploader: ({ children }: { children: React.ReactNode }) => children,
 }));
 
-vi.mock("react-redux-firebase", () => ({
-  useFirebaseConnect: vi.fn(),
-  useFirebase: vi.fn(() => ({
-    login: vi.fn(),
-    logout: vi.fn(),
-    auth: vi.fn(),
-  })),
-  isLoaded: vi.fn(() => true),
-  isEmpty: vi.fn(() => true),
-  ReactReduxFirebaseProvider: ({ children }: { children: React.ReactNode }) =>
-    children,
-  firebaseReducer: (state = {}) => state,
-  withFirebase:
-    <P extends object>(Component: React.ComponentType<P>) =>
-    (props: P) =>
-      React.createElement(Component, { ...props, firebase: {} } as P),
-}));
-
 vi.mock("firebase/app", () => ({
   initializeApp: vi.fn(() => ({})),
   getApps: vi.fn(() => []),
+}));
+
+vi.mock("firebase/auth", () => ({
+  getAuth: vi.fn(() => ({})),
+  signInWithEmailAndPassword: vi.fn(() => Promise.resolve({ user: null })),
+  signInWithPopup: vi.fn(() => Promise.resolve({ user: null })),
+  signOut: vi.fn(() => Promise.resolve()),
+  onAuthStateChanged: vi.fn((_auth, callback) => {
+    callback(null);
+    return () => {};
+  }),
+  GoogleAuthProvider: vi.fn(),
 }));
 
 vi.mock("firebase/database", () => ({
@@ -79,9 +73,17 @@ vi.mock("firebase/database", () => ({
 
 vi.mock("firebase/storage", () => ({
   getStorage: vi.fn(() => ({})),
-  ref: vi.fn(),
-  uploadBytes: vi.fn(),
-  getDownloadURL: vi.fn(),
+  ref: vi.fn(() => ({ fullPath: "test/path" })),
+  uploadBytes: vi.fn(() => Promise.resolve({})),
+  uploadString: vi.fn(() => Promise.resolve({})),
+  getDownloadURL: vi.fn(() => Promise.resolve("https://example.com/test.png")),
+  listAll: vi.fn(() =>
+    Promise.resolve({
+      items: [],
+      prefixes: [],
+    }),
+  ),
+  deleteObject: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock("hls.js", () => {

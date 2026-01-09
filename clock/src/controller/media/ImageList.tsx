@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { bindActionCreators, Dispatch } from "redux";
 import { connect, ConnectedProps } from "react-redux";
-import { storage } from "../../firebase";
+import { storageHelpers, StorageReference, ListResult } from "../../firebase";
 import controllerActions from "../../actions/controller";
 import assetTypes from "../asset/AssetTypes";
 import FolderFillIcon from "@rsuite/icons/FolderFill";
@@ -21,17 +21,6 @@ interface ImageData {
 
 interface FolderData {
   name: string;
-}
-
-interface StorageReference {
-  name: string;
-  fullPath: string;
-  getDownloadURL(): Promise<string>;
-}
-
-interface StorageListResult {
-  items: StorageReference[];
-  prefixes: Array<{ name: string }>;
 }
 
 interface OwnProps {
@@ -67,23 +56,21 @@ const ImageList: React.FC<ImageListProps> = ({
   const [images, setImages] = useState<ImageData[]>([]);
   const [folders, setFolders] = useState<FolderData[]>([]);
 
-  const deleteImage = (ref: string): Promise<void> =>
-    storage
-      .ref(ref)
-      .delete()
-      .then(() => {
-        setImages(images.filter((img) => img.ref !== ref));
-      });
+  const deleteImage = (refPath: string): Promise<void> =>
+    storageHelpers.deleteObject(refPath).then(() => {
+      setImages(images.filter((img) => img.ref !== refPath));
+    });
 
-  const deleteFolder = (ref: string): Promise<void> => {
-    return deleteImage(ref).then(() => appendPrefix(".."));
+  const deleteFolder = (refPath: string): Promise<void> => {
+    return deleteImage(refPath).then(() => appendPrefix(".."));
   };
 
   useEffect(() => {
-    const listRef = storage.ref(prefix);
-    void listRef.listAll().then((res: StorageListResult) => {
+    void storageHelpers.listAll(prefix).then((res: ListResult) => {
       void Promise.all(
-        res.items.map((itemRef: StorageReference) => itemRef.getDownloadURL()),
+        res.items.map((itemRef: StorageReference) =>
+          storageHelpers.getDownloadURL(itemRef.fullPath),
+        ),
       ).then((downloadUrls) => {
         setImages(
           res.items
@@ -135,8 +122,6 @@ const ImageList: React.FC<ImageListProps> = ({
                     ? AssetTypeSuffixMap[suffix] || assetTypes.IMAGE
                     : assetTypes.IMAGE;
                   const asset = {
-                    // To be able to add the same image multiple times to the queue,
-                    // we need to make the key unique
                     key: String(imageUrl) + String(Date.now()),
                     url: imageUrl,
                     type,

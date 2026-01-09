@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { storage } from "../../firebase";
+import { storageHelpers } from "../../firebase";
 import Compress from "compress.js";
 import { FileUploader } from "react-drag-drop-files";
 import CreateFolder from "./CreateFolder";
@@ -25,8 +25,8 @@ const UploadManager: React.FC<UploadManagerProps> = ({ prefix, refresh }) => {
         file.type !== "image/gif" && doCompress
           ? compress
               .compress([file], {
-                size: 2, // the max size in MB, defaults to 2MB
-                quality: 1, // the quality of the image, max is 1,
+                size: 2,
+                quality: 1,
                 maxWidth: 240,
                 maxHeight: 176,
               })
@@ -50,7 +50,10 @@ const UploadManager: React.FC<UploadManagerProps> = ({ prefix, refresh }) => {
       .then((images) =>
         Promise.all(
           images.map((image) =>
-            storage.ref(`/${String(prefix)}/${String(image.name)}`).put(image),
+            storageHelpers.uploadBytes(
+              `/${String(prefix)}/${String(image.name)}`,
+              image,
+            ),
           ),
         ),
       )

@@ -10,6 +10,7 @@ import {
 import { initialState as matchInitialState } from "./reducers/match";
 import { initialState as viewInitialState } from "./reducers/view";
 import { initialState as remoteInitialState } from "./reducers/remote";
+import { initialState as authInitialState } from "./reducers/auth";
 
 const mockStore = configureStore([]);
 
@@ -26,7 +27,7 @@ it("renders settings tab with team selectors", () => {
     match: matchInitialState,
     view: viewInitialState,
     remote: remoteInitialState,
-    firebase: { auth: { isLoaded: true, isEmpty: true }, data: null },
+    auth: { ...authInitialState, isLoaded: true, isEmpty: true },
     listeners: { available: [], screens: [] },
   });
   renderWithStore(<App />, store);
@@ -42,13 +43,10 @@ it("renders team asset controller when assetView is teams", () => {
       assetView: "teams",
     },
     listeners: { available: [], screens: [] },
-    firebase: {
-      auth: {
-        isLoaded: true,
-        isEmpty: false,
-        email: "fotbolti@vikingur.is",
-      },
-      data: null,
+    auth: {
+      isLoaded: true,
+      isEmpty: false,
+      email: "fotbolti@vikingur.is",
     },
     match: matchInitialState,
     view: viewInitialState,

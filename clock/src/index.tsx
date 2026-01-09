@@ -2,19 +2,21 @@ import { createRoot } from "react-dom/client";
 import { Provider } from "react-redux";
 import { PersistGate } from "redux-persist/integration/react";
 import "./index.css";
-import { ReactReduxFirebaseProvider } from "react-redux-firebase";
 import { store, persistor } from "./store";
 import App from "./App";
 import "./raven";
-import { firebase } from "./firebase";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
+import { firebaseAuth } from "./firebaseAuth";
+import { AuthActionType } from "./ActionTypes";
 
-const rrfProps = {
-  firebase,
-  config: {},
-  dispatch: store.dispatch,
-};
+firebaseAuth.onAuthStateChanged((user) => {
+  const authState = firebaseAuth.userToAuthState(user);
+  store.dispatch({
+    type: AuthActionType.SET_AUTH_STATE,
+    payload: authState,
+  });
+});
 
 const container = document.getElementById("root");
 if (!container) {
@@ -24,11 +26,9 @@ const root = createRoot(container);
 root.render(
   <Provider store={store}>
     <PersistGate loading={null} persistor={persistor}>
-      <ReactReduxFirebaseProvider {...rrfProps}>
-        <DndProvider backend={HTML5Backend}>
-          <App />
-        </DndProvider>
-      </ReactReduxFirebaseProvider>
+      <DndProvider backend={HTML5Backend}>
+        <App />
+      </DndProvider>
     </PersistGate>
   </Provider>,
 );

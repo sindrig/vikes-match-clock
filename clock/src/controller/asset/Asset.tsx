@@ -46,7 +46,7 @@ interface OwnProps {
 const mapStateToProps = ({
   view: { vp },
   remote: { sync },
-  firebase: { auth },
+  auth,
 }: RootState) => ({ vp, sync, auth });
 
 const mapDispatchToProps = (dispatch: Dispatch) =>
@@ -93,7 +93,7 @@ class AssetComponent extends Component<AssetProps> {
       return;
     }
     const typesWithoutManualRemove = [assetTypes.URL, assetTypes.VIDEO];
-    const typeNeedsManualRemove = !typesWithoutManualRemove.includes(
+    const typeNeedsManualRemove = asset && !typesWithoutManualRemove.includes(
       asset.type,
     );
 

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { storage } from "../../firebase";
+import { storageHelpers } from "../../firebase";
 
 interface CreateFolderProps {
   prefix: string;
@@ -11,10 +11,10 @@ const CreateFolder: React.FC<CreateFolderProps> = ({ prefix, refresh }) => {
   const [newFolderName, setNewFolderName] = useState("");
   const save = (): void => {
     setCreating(false);
-    storage
-      .ref(`${String(prefix)}/${String(newFolderName)}/.vikes`)
-      .putString("")
-      .on("state_changed", null, alert, refresh);
+    storageHelpers
+      .uploadString(`${String(prefix)}/${String(newFolderName)}/.vikes`, "")
+      .then(refresh)
+      .catch(alert);
   };
   return (
     <div className="control-item withborder">

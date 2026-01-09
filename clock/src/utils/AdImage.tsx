@@ -1,17 +1,15 @@
 import React, { useState, useEffect, useRef } from "react";
-import { storage } from "../firebase";
+import { storageHelpers, StorageReference } from "../firebase";
 import { connect, ConnectedProps } from "react-redux";
 import { RootState } from "../types";
 
 function useInterval(callback: () => void, delay: number | null): void {
   const savedCallback = useRef<(() => void) | undefined>(undefined);
 
-  // Remember the latest callback.
   useEffect(() => {
     savedCallback.current = callback;
   }, [callback]);
 
-  // Set up the interval.
   useEffect(() => {
     function tick(): void {
       savedCallback.current?.();
@@ -69,13 +67,14 @@ const AdImage: React.FC<AdImageProps> = ({
   }, time * 1000);
 
   useEffect(() => {
-    const listRef = storage.ref(`${String(listenPrefix)}/${String(imageType)}`);
-    void listRef
-      .listAll()
+    void storageHelpers
+      .listAll(`${String(listenPrefix)}/${String(imageType)}`)
       .then((res) =>
-        Promise.all(res.items.map((itemRef) => itemRef.getDownloadURL())).then(
-          setAssets,
-        ),
+        Promise.all(
+          res.items.map((itemRef: StorageReference) =>
+            storageHelpers.getDownloadURL(itemRef.fullPath),
+          ),
+        ).then(setAssets),
       );
   }, [imageType, listenPrefix]);
 
