@@ -300,9 +300,9 @@ const actions: Record<string, any> = {
     },
   },
   [AT.receiveRemoteData]: {
-    next(state: Match, action: { data: unknown; path: string }) {
-      const { data, path } = action;
-      if (path === "match" && data && typeof data === "object") {
+    next(state: Match, action: { data: unknown; storeAs: string }) {
+      const { data, storeAs } = action;
+      if (storeAs === "match" && data && typeof data === "object") {
         const results: Match = { ...state, ...(data as Partial<Match>) };
         if (results.started > 0) {
           if (!results.countdown) {

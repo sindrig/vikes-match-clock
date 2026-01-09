@@ -134,9 +134,9 @@ const actions: Record<string, any> = {
   [AT.receiveRemoteData]: {
     next(
       state: ViewState,
-      { data, path }: { data: unknown; path: string },
+      { data, storeAs }: { data: unknown; storeAs: string },
     ): ViewState {
-      if (path === "view" && data && typeof data === "object") {
+      if (storeAs === "view" && data && typeof data === "object") {
         return {
           ...state,
           ...(data as Partial<ViewState>),

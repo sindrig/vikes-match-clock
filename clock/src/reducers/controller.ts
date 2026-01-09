@@ -332,10 +332,10 @@ const actions = {
   [AT.receiveRemoteData]: {
     next(
       state: ControllerState,
-      { data, path }: { data: unknown; path: string },
+      { data, storeAs }: { data: unknown; storeAs: string },
     ) {
       if (
-        path === "controller" &&
+        storeAs === "controller" &&
         data &&
         typeof data === "object" &&
         data !== null

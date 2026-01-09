@@ -30,10 +30,10 @@ export const initialState: ListenersState = {
 const handleRemote = {
   next(
     state: ListenersState,
-    { data, path }: { data: unknown; path: string },
+    { data, storeAs }: { data: unknown; storeAs: string },
   ): ListenersState {
     if (
-      path === "locations" &&
+      storeAs === "locations" &&
       data &&
       typeof data === "object" &&
       data !== null
@@ -55,7 +55,7 @@ const handleRemote = {
           .reduce((a: ScreenData[], b: ScreenData[]) => a.concat(b), []),
       };
     } else if (
-      path.startsWith("auth/") &&
+      storeAs === "authData" &&
       data &&
       typeof data === "object" &&
       data !== null
@@ -76,7 +76,6 @@ const handleRemote = {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const actions: any = {
   [AT.receiveRemoteData]: handleRemote,
-  "@@reactReduxFirebase/SET": handleRemote,
 };
 /* eslint-enable @typescript-eslint/no-unsafe-member-access */
 export default handleActions(actions, initialState);
