@@ -210,16 +210,6 @@ class AssetComponent extends Component<AssetProps> {
     return null;
   }
 
-  renderFreeText(): React.JSX.Element {
-    const { asset, thumbnail } = this.props;
-
-    return (
-      <div className={`free-text-container ${thumbnail ? "thumbnail" : ""}`}>
-        {asset.key}
-      </div>
-    );
-  }
-
   renderSub(): React.JSX.Element | null {
     const { asset, thumbnail } = this.props;
     const { subIn, subOut } = asset;
@@ -283,9 +273,6 @@ class AssetComponent extends Component<AssetProps> {
 
       case assetTypes.SUB:
         return this.renderSub();
-
-      case assetTypes.FREE_TEXT:
-        return this.renderFreeText();
 
       default:
         console.error("No type for item ", asset);

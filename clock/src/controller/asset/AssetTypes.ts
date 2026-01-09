@@ -6,5 +6,4 @@ export default {
   IMAGE: "IMAGE",
   VIDEO: "VIDEO",
   SUB: "SUB",
-  FREE_TEXT: "FREE_TEXT",
 };

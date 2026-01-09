@@ -17,7 +17,6 @@ export interface MatchConfig extends NumericMatchConfigAttrs {
 }
 
 export enum AssetTypes {
-	FREE_TEXT = "FREE_TEXT",
 	IMAGE = "IMAGE",
 	NO_IMAGE_PLAYER = "NO_IMAGE_PLAYER",
 	PLAYER = "PLAYER",
@@ -63,17 +62,12 @@ export interface SubAsset extends BaseAsset {
 	subOut: PlayerAsset;
 }
 
-export interface TextAsset extends BaseAsset {
-	type: AssetTypes.FREE_TEXT;
-}
-
 type Asset =
 	| ImageAsset
 	| UrlAsset
 	| RuvAsset
 	| PlayerAsset
-	| SubAsset
-	| TextAsset;
+	| SubAsset;
 
 export interface ControllerConfig {
 	selectedMatch: number | null;

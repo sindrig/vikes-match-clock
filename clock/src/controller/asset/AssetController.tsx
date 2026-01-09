@@ -2,7 +2,6 @@ import React from "react";
 import { bindActionCreators, Dispatch } from "redux";
 import { connect, ConnectedProps } from "react-redux";
 
-import FreeTextController from "./FreeTextController";
 import AssetQueue from "./AssetQueue";
 import { addVideosFromPlaylist } from "./YoutubePlaylist";
 import { ASSET_VIEWS } from "../../reducers/controller";
@@ -197,8 +196,7 @@ const AssetController = ({
               Loop
             </Checkbox>
           </div>
-          <UrlController addAsset={addAssetKey} />{" "}
-          <FreeTextController addAsset={addAssetKey} />
+          <UrlController addAsset={addAssetKey} />
         </div>
         <div className="upcoming-assets">
           <AssetQueue includeRemove />
