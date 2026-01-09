@@ -352,9 +352,12 @@ const actions = {
   [AT.renderAsset]: {
     next(
       state: ControllerState,
-      { payload: { asset } }: Action<{ asset: CurrentAsset | null }>,
+      { payload: { asset } }: Action<{ asset: Asset | null }>,
     ) {
-      return { ...state, currentAsset: asset };
+      return {
+        ...state,
+        currentAsset: asset ? { asset, time: null } : null,
+      };
     },
   },
   [AT.showNextAsset]: {
