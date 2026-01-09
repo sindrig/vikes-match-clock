@@ -343,6 +343,11 @@ const actions = {
         if (!results.selectedAssets) {
           results.selectedAssets = [];
         }
+        // Firebase removes null values, so if currentAsset is not in the incoming data,
+        // it means it was explicitly set to null and should be cleared
+        if (!("currentAsset" in (data as object))) {
+          results.currentAsset = null;
+        }
         return results;
       }
       return state;
