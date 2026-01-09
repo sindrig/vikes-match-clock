@@ -1,7 +1,7 @@
 import { Component } from "react";
 import type React from "react";
 import { connect, ConnectedProps } from "react-redux";
-import Clock from "react-live-clock";
+import Clock from "../components/LiveClock";
 import clubLogos from "../images/clubLogos";
 import AdImage from "../utils/AdImage";
 import { getTemp } from "../lib/weather";
