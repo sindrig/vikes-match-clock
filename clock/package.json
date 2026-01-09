@@ -91,6 +91,12 @@
     "ncu": "ncu",
     "format": "prettier src cypress -w"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "cypress",
+      "esbuild"
+    ]
+  },
   "browserslist": {
     "production": [
       ">0.2%",
