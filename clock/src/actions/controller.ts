@@ -43,7 +43,6 @@ interface ActionCreators {
     homeTeam: string,
     awayTeam: string,
   ) => Promise<AxiosResponse | typeof lambdaExample>;
-  getRuvUrl: (channel: string) => Promise<string | undefined>;
 }
 
 const actionPayloads: Record<
@@ -97,30 +96,6 @@ const actionPayloads: Record<
     };
     return axios.get(`${apiConfig.gateWayUrl}match-report`, options);
   },
-
-  getRuvUrl: (channel: string) =>
-    new Promise<string | undefined>((resolve, reject) => {
-      try {
-        const timeout = setTimeout(() => reject(new Error("Timeout")), 10000);
-        const script = document.createElement("script");
-        script.src = `http://www.ruv.is/sites/all/themes/at_ruv/scripts/ruv-stream.php?format=jsonp&channel=${channel}`;
-        script.onload = () => {
-          console.log(window.tengipunktur);
-          resolve(window.tengipunktur);
-          clearTimeout(timeout);
-        };
-        script.onerror = () => {
-          reject(new Error("Load error"));
-          clearTimeout(timeout);
-        };
-        const head = document.getElementsByTagName("head")[0];
-        if (head) {
-          head.appendChild(script);
-        }
-      } catch (e) {
-        reject(e instanceof Error ? e : new Error(String(e)));
-      }
-    }),
 };
 
 const actionCreators: Record<string, unknown> = {};

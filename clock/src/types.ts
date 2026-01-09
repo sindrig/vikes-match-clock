@@ -151,9 +151,4 @@ export interface RootState {
   listeners: ListenersState;
 }
 
-// Window extension for custom properties
-declare global {
-  interface Window {
-    tengipunktur?: string;
-  }
-}
+

@@ -97,12 +97,6 @@ const AssetController = ({
     });
   };
 
-  const playRuv = (key: string) => {
-    return () => {
-      renderAsset({ key, type: assetTypes.RUV } as any);
-    };
-  };
-
   const onImageSecondsChange = (value: string | number | null) => {
     if (value !== null) {
       setImageSeconds(Math.max(parseInt(String(value), 10), 1));
@@ -205,12 +199,6 @@ const AssetController = ({
           </div>
           <UrlController addAsset={addAssetKey} />{" "}
           <FreeTextController addAsset={addAssetKey} />
-          <Button appearance="default" onClick={playRuv("ruv")}>
-            RÚV
-          </Button>
-          <Button appearance="default" onClick={playRuv("ruv2")}>
-            RÚV 2
-          </Button>
         </div>
         <div className="upcoming-assets">
           <AssetQueue includeRemove />

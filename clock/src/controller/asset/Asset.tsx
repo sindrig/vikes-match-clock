@@ -10,7 +10,6 @@ import Substitution from "./Substitution";
 
 import assetTypes from "./AssetTypes";
 import clubLogos from "../../images/clubLogos";
-import Ruv from "./Ruv";
 import controllerActions from "../../actions/controller";
 
 import "./Asset.css";
@@ -155,14 +154,6 @@ class AssetComponent extends Component<AssetProps> {
     return null;
   }
 
-  renderRuv(): React.JSX.Element {
-    const {
-      asset: { key },
-      thumbnail,
-    } = this.props;
-    return <Ruv thumbnail={thumbnail} channel={key} />;
-  }
-
   renderUrl(): React.JSX.Element | null {
     const { asset, thumbnail, removeAssetAfterTimeout, vp } = this.props;
     // TODO can only handle youtube
@@ -276,9 +267,6 @@ class AssetComponent extends Component<AssetProps> {
 
       case assetTypes.URL:
         return this.renderUrl();
-
-      case assetTypes.RUV:
-        return this.renderRuv();
 
       case assetTypes.PLAYER:
       case assetTypes.NO_IMAGE_PLAYER:
