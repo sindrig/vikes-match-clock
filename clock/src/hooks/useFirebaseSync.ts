@@ -108,8 +108,6 @@ export function useFirebaseSync() {
   }, [sync, listenPrefix, dispatch]);
 
   useEffect(() => {
-    if (!listenPrefix) return;
-
     const locationsRef = ref(database, "locations");
     const unsubscribe = onValue(locationsRef, (snapshot) => {
       const data = snapshot.val();
@@ -123,7 +121,7 @@ export function useFirebaseSync() {
     });
 
     return () => unsubscribe();
-  }, [listenPrefix, dispatch]);
+  }, [dispatch]);
 }
 
 export function useFirebaseAuthListener() {
