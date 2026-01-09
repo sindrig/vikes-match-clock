@@ -32,7 +32,6 @@ export default class Clock extends Component<ClockBaseProps, ClockBaseState> {
     this.state = {
       time: null,
     };
-    this.updateTime = this.updateTime.bind(this);
   }
 
   componentDidMount(): void {
@@ -55,13 +54,13 @@ export default class Clock extends Component<ClockBaseProps, ClockBaseState> {
     return null;
   }
 
-  updateTime(): void {
+  updateTime = (): void => {
     const { updateTime } = this.props;
     const time = updateTime();
     if (time !== null) {
       this.setState({ time });
     }
-  }
+  };
 
   render(): React.JSX.Element {
     const { isTimeNull, zeroTime, className, fontSizeMax, fontSizeMin } =

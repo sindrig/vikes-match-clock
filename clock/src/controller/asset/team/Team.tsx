@@ -66,22 +66,16 @@ const connector = connect(stateToProps, dispatchToProps);
 type TeamProps = ConnectedProps<typeof connector> & OwnProps;
 
 class Team extends Component<TeamProps, TeamState> {
-  constructor(props: TeamProps) {
-    super(props);
-    this.addEmptyLine = this.addEmptyLine.bind(this);
-    this.submitForm = this.submitForm.bind(this);
-  }
-
   state: TeamState = {
     inputValue: "",
     error: "",
     loading: false,
   };
 
-  addEmptyLine(): void {
+  addEmptyLine = (): void => {
     const { addPlayer, teamId } = this.props;
     addPlayer(String(teamId));
-  }
+  };
 
   removePlayer(idx: number): void {
     const { deletePlayer, teamId } = this.props;
@@ -143,7 +137,7 @@ class Team extends Component<TeamProps, TeamState> {
       });
   }
 
-  submitForm(event: React.FormEvent<HTMLFormElement>): void {
+  submitForm = (event: React.FormEvent<HTMLFormElement>): void => {
     const { team, selectPlayer, teamName } = this.props;
     event.preventDefault();
     const { inputValue } = this.state;
@@ -159,7 +153,7 @@ class Team extends Component<TeamProps, TeamState> {
       error: found ? "" : `No player #${inputValue} found`,
       inputValue: "",
     });
-  }
+  };
 
   renderForm(): React.JSX.Element {
     const { inputValue } = this.state;

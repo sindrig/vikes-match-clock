@@ -72,7 +72,7 @@ class Ruv extends Component<Props, State> {
         console.log(this.video);
         console.log(this.video.current);
         console.log(this.video.current?.play);
-        this.video.current?.play();
+        void this.video.current?.play();
       });
 
       this.hls = hls;
@@ -85,7 +85,7 @@ class Ruv extends Component<Props, State> {
     }
   }
 
-  updateStreamUrl(): void {
+  updateStreamUrl = (): void => {
     const { getRuvUrl, channel } = this.props;
     getRuvUrl(channel)
       .then((url: string | undefined) => {
@@ -95,7 +95,7 @@ class Ruv extends Component<Props, State> {
         console.log("e", e);
         this.setState({ streamUrl: DEFAULT_URLS[channel] || null });
       });
-  }
+  };
 
   render(): React.JSX.Element {
     const {

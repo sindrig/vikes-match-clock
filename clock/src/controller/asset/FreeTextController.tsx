@@ -13,31 +13,25 @@ interface State {
 }
 
 export default class FreeTextController extends Component<Props, State> {
-  constructor(props: Props) {
-    super(props);
-    this.addTextAsset = this.addTextAsset.bind(this);
-    this.onTextChange = this.onTextChange.bind(this);
-  }
-
   state: State = {
     value: "",
     error: "",
   };
 
-  onTextChange(e: ChangeEvent<HTMLInputElement>): void {
+  onTextChange = (e: ChangeEvent<HTMLInputElement>): void => {
     const {
       target: { value },
     } = e;
     this.setState({ value });
-  }
+  };
 
-  addTextAsset(): void {
+  addTextAsset = (): void => {
     const { addAsset } = this.props;
     const { value } = this.state;
     const asset: Asset = { type: assetTypes.FREE_TEXT, key: value };
     this.setState({ value: "", error: "" });
     addAsset(asset);
-  }
+  };
 
   render(): React.JSX.Element {
     const { value, error } = this.state;

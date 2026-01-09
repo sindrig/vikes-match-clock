@@ -3,7 +3,10 @@ import { render, screen } from "@testing-library/react";
 import { Provider } from "react-redux";
 import configureStore from "redux-mock-store";
 import App from "./App";
-import { initialState as controllerInitialState } from "./reducers/controller";
+import {
+  initialState as controllerInitialState,
+  TABS,
+} from "./reducers/controller";
 import { initialState as matchInitialState } from "./reducers/match";
 import { initialState as viewInitialState } from "./reducers/view";
 import { initialState as remoteInitialState } from "./reducers/remote";
@@ -14,9 +17,12 @@ const renderWithStore = (component, store) => {
   return render(<Provider store={store}>{component}</Provider>);
 };
 
-it("renders idle view with team selectors", () => {
+it("renders settings tab with team selectors", () => {
   const store = mockStore({
-    controller: controllerInitialState,
+    controller: {
+      ...controllerInitialState,
+      tab: TABS.settings,
+    },
     match: matchInitialState,
     view: viewInitialState,
     remote: remoteInitialState,

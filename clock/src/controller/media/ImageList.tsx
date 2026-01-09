@@ -81,8 +81,8 @@ const ImageList: React.FC<ImageListProps> = ({
 
   useEffect(() => {
     const listRef = storage.ref(prefix);
-    listRef.listAll().then((res: StorageListResult) => {
-      Promise.all(
+    void listRef.listAll().then((res: StorageListResult) => {
+      void Promise.all(
         res.items.map((itemRef: StorageReference) => itemRef.getDownloadURL()),
       ).then((downloadUrls) => {
         setImages(

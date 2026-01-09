@@ -142,7 +142,7 @@ const MatchActions: React.FC<PropsFromRedux> = ({
 
     (showScorerSelector === "away" ? awayTeam : homeTeam).forEach((player) => {
       if (player.number === gs) {
-        getPlayerAssetObject({
+        void getPlayerAssetObject({
           listenPrefix,
           player,
           teamName: "Víkingur R",

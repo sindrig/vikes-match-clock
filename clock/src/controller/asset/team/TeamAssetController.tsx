@@ -80,13 +80,6 @@ class TeamAssetController extends Component<
       selectMOTM: false,
       effect: "blink",
     };
-    this.autoFill = this.autoFill.bind(this);
-    this.addPlayersToQ = this.addPlayersToQ.bind(this);
-    this.selectSubs = this.selectSubs.bind(this);
-    this.addSubAsset = this.addSubAsset.bind(this);
-    this.selectPlayerAsset = this.selectPlayerAsset.bind(this);
-    this.selectGoalScorer = this.selectGoalScorer.bind(this);
-    this.selectMOTM = this.selectMOTM.bind(this);
   }
 
   getTeamPlayers(): { homeTeam: Player[]; awayTeam: Player[] } {
@@ -107,7 +100,7 @@ class TeamAssetController extends Component<
     };
   }
 
-  clearState(): void {
+  clearState = (): void => {
     this.setState({
       error: "",
       selectSubs: false,
@@ -118,9 +111,9 @@ class TeamAssetController extends Component<
       selectGoalScorer: false,
       selectMOTM: false,
     });
-  }
+  };
 
-  addPlayersToQ(): void {
+  addPlayersToQ = (): void => {
     const { match, addAssets, previousView, listenPrefix } = this.props;
     const { homeTeam, awayTeam } = this.getTeamPlayers();
     const teamAssets = [
@@ -140,9 +133,9 @@ class TeamAssetController extends Component<
       addAssets(flattened);
       previousView();
     }
-  }
+  };
 
-  async addSubAsset(): Promise<void> {
+  addSubAsset = async (): Promise<void> => {
     const { subIn, subOut } = this.state;
     const { match, addAssets, listenPrefix } = this.props;
     if (!subIn || !subOut) return;
@@ -175,9 +168,9 @@ class TeamAssetController extends Component<
       },
     );
     this.clearState();
-  }
+  };
 
-  selectSubs(player: Player, teamName: string): void {
+  selectSubs = (player: Player, teamName: string): void => {
     const { subIn } = this.state;
     const asset: Player = {
       ...player,
@@ -194,9 +187,9 @@ class TeamAssetController extends Component<
         subTeam: teamName,
       });
     }
-  }
+  };
 
-  selectPlayerAsset(player: Player, teamName: string): void {
+  selectPlayerAsset = (player: Player, teamName: string): void => {
     const { match, addAssets, listenPrefix } = this.props;
     const actualTeamName =
       teamName === "homeTeam" ? match.homeTeam : match.awayTeam;
@@ -213,9 +206,9 @@ class TeamAssetController extends Component<
       },
     );
     this.clearState();
-  }
+  };
 
-  selectGoalScorer(player: Player, teamName: string): void {
+  selectGoalScorer = (player: Player, teamName: string): void => {
     const { match, addAssets, listenPrefix } = this.props;
     const actualTeamName =
       teamName === "homeTeam" ? match.homeTeam : match.awayTeam;
@@ -237,9 +230,9 @@ class TeamAssetController extends Component<
       },
     );
     this.clearState();
-  }
+  };
 
-  selectMOTM(player: Player, teamName: string): void {
+  selectMOTM = (player: Player, teamName: string): void => {
     const { match, addAssets, listenPrefix } = this.props;
     const actualTeamName =
       teamName === "homeTeam" ? match.homeTeam : match.awayTeam;
@@ -250,9 +243,9 @@ class TeamAssetController extends Component<
       },
     );
     this.clearState();
-  }
+  };
 
-  autoFill(): void {
+  autoFill = (): void => {
     const {
       match: { homeTeam, awayTeam },
       getAvailableMatches,
@@ -262,11 +255,11 @@ class TeamAssetController extends Component<
       return;
     }
     this.setState({ loading: true });
-    getAvailableMatches(homeTeam, awayTeam)
+    void getAvailableMatches(homeTeam, awayTeam)
       .then(() => this.setState({ error: "" }))
       .catch((e: Error) => this.setState({ error: e.message }))
       .then(() => this.setState({ loading: false }));
-  }
+  };
 
   renderControls(): React.JSX.Element {
     const { availableMatches, clearMatchPlayers } = this.props;

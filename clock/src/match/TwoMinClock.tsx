@@ -45,7 +45,6 @@ class TwoMinClock extends Component<TwoMinClockProps, TwoMinClockState> {
     this.state = {
       time: null,
     };
-    this.updateTime = this.updateTime.bind(this);
   }
 
   componentDidMount(): void {
@@ -68,7 +67,7 @@ class TwoMinClock extends Component<TwoMinClockProps, TwoMinClockState> {
     return null;
   }
 
-  updateTime(): null {
+  updateTime = (): null => {
     const {
       started,
       timeElapsed,
@@ -88,7 +87,7 @@ class TwoMinClock extends Component<TwoMinClockProps, TwoMinClockState> {
       this.setState({ time: formatMillisAsTime(milliSecondsLeft) });
     }
     return null;
-  }
+  };
 
   render(): React.JSX.Element {
     const { penaltyLength } = this.props;

@@ -13,25 +13,19 @@ interface State {
 }
 
 export default class UrlController extends Component<Props, State> {
-  constructor(props: Props) {
-    super(props);
-    this.addUrlAsset = this.addUrlAsset.bind(this);
-    this.onTextChange = this.onTextChange.bind(this);
-  }
-
   state: State = {
     value: "",
     error: "",
   };
 
-  onTextChange(e: ChangeEvent<HTMLInputElement>): void {
+  onTextChange = (e: ChangeEvent<HTMLInputElement>): void => {
     const {
       target: { value },
     } = e;
     this.setState({ value });
-  }
+  };
 
-  addUrlAsset(): void {
+  addUrlAsset = (): void => {
     const { addAsset } = this.props;
     const { value } = this.state;
     if (value !== "ruv") {
@@ -46,7 +40,7 @@ export default class UrlController extends Component<Props, State> {
     const asset: Asset = { type: assetTypes.URL, key: value };
     this.setState({ value: "", error: "" });
     addAsset(asset);
-  }
+  };
 
   render(): React.JSX.Element {
     const { value, error } = this.state;

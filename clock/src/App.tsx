@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import type { UnknownAction } from "redux";
 
 import viewActions from "./actions/view";
 import Controller from "./controller/Controller";
@@ -46,7 +47,7 @@ function App() {
   }));
 
   useEffect(() => {
-    dispatch(viewActions.setViewPort(vp) as any);
+    dispatch(viewActions.setViewPort(vp) as unknown as UnknownAction);
   }, [dispatch, vp]);
 
   const renderAppContents = () => {

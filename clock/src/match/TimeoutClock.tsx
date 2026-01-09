@@ -38,13 +38,12 @@ type TimeoutClockProps = ConnectedProps<typeof connector> & OwnProps;
 class TimeoutClock extends Component<TimeoutClockProps, TimeoutClockState> {
   constructor(props: TimeoutClockProps) {
     super(props);
-    this.updateTime = this.updateTime.bind(this);
     this.state = {
       warningPlayed: false,
     };
   }
 
-  updateTime(): string | null {
+  updateTime = (): string | null => {
     const { timeout, removeTimeout, buzz } = this.props;
     if (!timeout) {
       return null;
@@ -61,7 +60,7 @@ class TimeoutClock extends Component<TimeoutClockProps, TimeoutClockState> {
       buzz();
     }
     return formatMillisAsTime(millisLeft);
-  }
+  };
 
   render(): React.JSX.Element {
     const { className } = this.props;

@@ -45,12 +45,7 @@ const connector = connect(stateToProps, dispatchToProps);
 type ClockProps = ConnectedProps<typeof connector> & OwnProps;
 
 class Clock extends Component<ClockProps> {
-  constructor(props: ClockProps) {
-    super(props);
-    this.updateTime = this.updateTime.bind(this);
-  }
-
-  updateTime(): string {
+  updateTime = (): string => {
     const {
       started,
       halfStop,
@@ -90,7 +85,7 @@ class Clock extends Component<ClockProps> {
       }
     }
     return formatTime(minutes, seconds);
-  }
+  };
 
   render(): React.JSX.Element {
     const { started, timeElapsed, className } = this.props;
