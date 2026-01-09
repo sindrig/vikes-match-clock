@@ -113,6 +113,32 @@ To log in (use playwright):
 
 Once logged in, you'll see your email displayed and have access to authenticated features like the "Myndefni" (Media) image uploads and remote control functionality.
 
+### Playwright MCP Limitations for Multi-Session Testing
+
+This app requires testing scenarios with **two independent browser sessions** (e.g., admin controller + remote display). The Playwright MCP has limitations that make this difficult:
+
+1. **Tabs share browser context**: Multiple tabs opened via `browser_tabs` share localStorage, cookies, and session state. Since this app uses `redux-persist` with localStorage, both tabs will have identical Redux state.
+
+2. **Cannot control multiple contexts**: While you can create separate browser contexts via `browser_run_code`:
+   ```javascript
+   const newContext = await browser.newContext();
+   const newPage = await newContext.newPage();
+   ```
+   The MCP only tracks/controls the original page. The new context's page cannot be interacted with via standard MCP tools (`browser_click`, `browser_snapshot`, etc.).
+
+3. **Workarounds for multi-session testing**:
+   - **Manual testing**: Open two separate browser windows (or one incognito) and test manually
+   - **Cypress e2e tests**: Use the existing Cypress setup in `cypress/` which can handle multiple browser contexts
+   - **Single-session verification**: Test that actions dispatch correctly and state changes as expected, then rely on Firebase sync logic being correct
+
+4. **What CAN be tested with Playwright MCP**:
+   - Single-session UI flows (login, navigation, clicking buttons)
+   - Verifying UI state after actions
+   - Form interactions and validation
+   - Visual snapshots of single pages
+
+For testing Firebase sync between admin and display (e.g., "Hreinsa virkt overlay" clearing on remote), you'll need to either test manually or write Cypress tests that can manage multiple browser contexts.
+
 ## Related Systems
 
 - **`admin/`**: Modern Nuxt 3 admin interface (preferred for new features)
