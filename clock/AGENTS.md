@@ -18,14 +18,14 @@ State is managed in Redux but mirrored to Firebase Realtime Database.
 
 ### Redux Slices
 
-| Slice | Purpose |
-|-------|---------|
-| `match` | Source of truth for the game (clock time, scores, period, penalties, red cards) |
-| `controller` | Admin UI state, including active Asset and asset queue |
-| `view` | Display settings (viewport scaling, background themes) |
-| `remote` | Firebase paths and sync toggles |
-| `auth` | Firebase authentication state |
-| `listeners` | Available screens/locations |
+| Slice        | Purpose                                                                         |
+| ------------ | ------------------------------------------------------------------------------- |
+| `match`      | Source of truth for the game (clock time, scores, period, penalties, red cards) |
+| `controller` | Admin UI state, including active Asset and asset queue                          |
+| `view`       | Display settings (viewport scaling, background themes)                          |
+| `remote`     | Firebase paths and sync toggles                                                 |
+| `auth`       | Firebase authentication state                                                   |
+| `listeners`  | Available screens/locations                                                     |
 
 ### Persistence
 
@@ -40,6 +40,7 @@ The "Asset" system is a flexible overlay engine for non-match content.
 **Intent**: Display advertisements, starting lineups, player cards, substitutions, or custom text/videos over the scoreboard or during idle time.
 
 **Features**:
+
 - **Queue**: Assets can be queued, looped, or set to auto-play with specific durations
 - **Types**: Images, YouTube videos, "Free Text" (announcements), and "Team Assets" (lineups)
 - **Production Ready**: Designed for game-day operation where sponsors/announcements are prepared before kickoff
@@ -48,30 +49,33 @@ The "Asset" system is a flexible overlay engine for non-match content.
 
 The operational heart of the app.
 
-| Component | Purpose |
-|-----------|---------|
-| `ControlButton` | Standardized buttons for scores/match events |
-| `TeamController` | Per-team controls (names, logos, penalties) |
+| Component         | Purpose                                                              |
+| ----------------- | -------------------------------------------------------------------- |
+| `ControlButton`   | Standardized buttons for scores/match events                         |
+| `TeamController`  | Per-team controls (names, logos, penalties)                          |
 | `MatchController` | Main dashboard for clock start/stop, half-time/full-time transitions |
 
 ### 3. Display Screens (`src/screens/`)
 
-| Screen | Purpose |
-|--------|---------|
+| Screen       | Purpose                                                                                   |
+| ------------ | ----------------------------------------------------------------------------------------- |
 | `ScoreBoard` | Primary match interface - clock, scores, penalties. Designed for visibility from distance |
-| `Idle` | Pre/post match or breaks - club logos, weather, rotating sponsor ads |
+| `Idle`       | Pre/post match or breaks - club logos, weather, rotating sponsor ads                      |
 
 ### 4. Specialized Logic
 
 #### Clock Management (`src/match/Clock.tsx`)
+
 - Main match timer with "half stops" (auto-stop at 45:00/90:00)
 - Injury time logic
 
 #### Penalties/Red Cards
+
 - `RedCardManipulation.tsx`: Player discipline management
 - `PenaltiesManipulationBox.tsx`: Timed power plays (handball/futsal style)
 
 #### HalfStops (`src/controller/HalfStops.tsx`)
+
 Ensures the clock stops exactly at period end (e.g., 45:00) even if the controller doesn't click precisely.
 
 ### 5. Global Shortcuts (`src/GlobalShortcut.ts`)
@@ -81,14 +85,33 @@ Maps physical keyboard keys to Redux actions for fast operation (e.g., Space for
 ## Remote vs Local State
 
 The app handles "Controller" vs "Display" roles:
-- **Display instance**: Has `sync` enabled, only *receives* data
-- **Controller instance**: *Pushes* data to Firebase
+
+- **Display instance**: Has `sync` enabled, only _receives_ data
+- **Controller instance**: _Pushes_ data to Firebase
 
 ## Build & Tooling
 
 - **Bundler**: Vite (migrated from Create React App) - config in `vite.config.ts`
 - **Testing**: Vitest + Cypress for e2e
 - **Linting**: ESLint (airbnb-style) + Prettier
+
+## Testing & Development
+
+### Test Credentials (Staging/Development Only)
+
+For local development and testing against the staging Firebase instance:
+
+- **Email**: `fotbolti@vikingur.is`
+- **Password**: `fotbolti`
+
+To log in (use playwright):
+
+1. Navigate to `localhost:3000`
+2. Click **Stillingar** (Settings) tab
+3. Enter credentials in the E-mail and Password fields
+4. Click **Login**
+
+Once logged in, you'll see your email displayed and have access to authenticated features like the "Myndefni" (Media) image uploads and remote control functionality.
 
 ## Related Systems
 

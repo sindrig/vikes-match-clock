@@ -8,7 +8,6 @@ import assetTypes from "../controller/asset/AssetTypes";
 import type {
   ControllerState,
   Asset,
-  CurrentAsset,
   Player,
   AvailableMatches,
 } from "../types";
