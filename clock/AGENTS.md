@@ -1,0 +1,96 @@
+# Clock App Agent Guidelines
+
+> **Note for Agents**: If you modify any component, pattern, or system described in this document, you MUST update this file to reflect your changes. Keeping this documentation accurate is critical for future development.
+
+## Overview
+
+The `clock/` application is a dual-purpose React system: it acts as both the **stadium display** (Scoreboard/Idle screens) and the **legacy control interface**. It relies on real-time synchronization via Firebase.
+
+## Core Architecture Patterns
+
+### Bidirectional Firebase Sync
+
+State is managed in Redux but mirrored to Firebase Realtime Database.
+
+- `useFirebaseSync.ts`: Monitors Redux state and pushes changes to `states/{listenPrefix}/{stateType}`. It also listens for remote changes to update the local store.
+- This allows a controller in the booth to update the display on the field instantly.
+- The `listenPrefix` (usually a location name like `viken`) determines which match state the instance follows.
+
+### Redux Slices
+
+| Slice | Purpose |
+|-------|---------|
+| `match` | Source of truth for the game (clock time, scores, period, penalties, red cards) |
+| `controller` | Admin UI state, including active Asset and asset queue |
+| `view` | Display settings (viewport scaling, background themes) |
+| `remote` | Firebase paths and sync toggles |
+| `auth` | Firebase authentication state |
+| `listeners` | Available screens/locations |
+
+### Persistence
+
+`redux-persist` ensures clock state survives page refreshes, which is critical during live matches.
+
+## Key Component Systems
+
+### 1. The Asset System (`src/controller/asset/`)
+
+The "Asset" system is a flexible overlay engine for non-match content.
+
+**Intent**: Display advertisements, starting lineups, player cards, substitutions, or custom text/videos over the scoreboard or during idle time.
+
+**Features**:
+- **Queue**: Assets can be queued, looped, or set to auto-play with specific durations
+- **Types**: Images, YouTube videos, "Free Text" (announcements), and "Team Assets" (lineups)
+- **Production Ready**: Designed for game-day operation where sponsors/announcements are prepared before kickoff
+
+### 2. Match Control (`src/match-controller/`)
+
+The operational heart of the app.
+
+| Component | Purpose |
+|-----------|---------|
+| `ControlButton` | Standardized buttons for scores/match events |
+| `TeamController` | Per-team controls (names, logos, penalties) |
+| `MatchController` | Main dashboard for clock start/stop, half-time/full-time transitions |
+
+### 3. Display Screens (`src/screens/`)
+
+| Screen | Purpose |
+|--------|---------|
+| `ScoreBoard` | Primary match interface - clock, scores, penalties. Designed for visibility from distance |
+| `Idle` | Pre/post match or breaks - club logos, weather, rotating sponsor ads |
+
+### 4. Specialized Logic
+
+#### Clock Management (`src/match/Clock.tsx`)
+- Main match timer with "half stops" (auto-stop at 45:00/90:00)
+- Injury time logic
+
+#### Penalties/Red Cards
+- `RedCardManipulation.tsx`: Player discipline management
+- `PenaltiesManipulationBox.tsx`: Timed power plays (handball/futsal style)
+
+#### HalfStops (`src/controller/HalfStops.tsx`)
+Ensures the clock stops exactly at period end (e.g., 45:00) even if the controller doesn't click precisely.
+
+### 5. Global Shortcuts (`src/GlobalShortcut.ts`)
+
+Maps physical keyboard keys to Redux actions for fast operation (e.g., Space for start/stop).
+
+## Remote vs Local State
+
+The app handles "Controller" vs "Display" roles:
+- **Display instance**: Has `sync` enabled, only *receives* data
+- **Controller instance**: *Pushes* data to Firebase
+
+## Build & Tooling
+
+- **Bundler**: Vite (migrated from Create React App) - config in `vite.config.ts`
+- **Testing**: Vitest + Cypress for e2e
+- **Linting**: ESLint (airbnb-style) + Prettier
+
+## Related Systems
+
+- **`admin/`**: Modern Nuxt 3 admin interface (preferred for new features)
+- **`clock-api/`**: Python lambdas for match reports and weather data
