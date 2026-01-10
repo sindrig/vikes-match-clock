@@ -32,7 +32,7 @@ const handleRemote = {
     state: ListenersState,
     { data, storeAs }: { data: unknown; storeAs: string },
   ): ListenersState {
-    if (storeAs === "locations" && data !== null && typeof data === "object") {
+    if (storeAs === "locations" && data && typeof data === "object") {
       return {
         ...state,
         available: Object.keys(data),
@@ -49,11 +49,7 @@ const handleRemote = {
           })
           .reduce((a: ScreenData[], b: ScreenData[]) => a.concat(b), []),
       };
-    } else if (
-      storeAs === "authData" &&
-      data !== null &&
-      typeof data === "object"
-    ) {
+    } else if (storeAs === "authData" && data && typeof data === "object") {
       return {
         ...state,
         available: Object.entries(data)

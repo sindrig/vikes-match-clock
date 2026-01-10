@@ -340,7 +340,11 @@ const actions = {
         data !== null
       ) {
         const results = { ...state, ...(data as Partial<ControllerState>) };
-        if (!results.selectedAssets) {
+        // Firebase removes empty arrays, so if selectedAssets is not in the incoming data,
+        // it means it was explicitly set to [] and should be cleared
+        if (!("selectedAssets" in data)) {
+          results.selectedAssets = [];
+        } else if (!results.selectedAssets) {
           results.selectedAssets = [];
         }
         // Firebase removes null values, so if currentAsset is not in the incoming data,
