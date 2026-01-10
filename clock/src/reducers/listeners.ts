@@ -32,12 +32,7 @@ const handleRemote = {
     state: ListenersState,
     { data, storeAs }: { data: unknown; storeAs: string },
   ): ListenersState {
-    if (
-      storeAs === "locations" &&
-      data &&
-      typeof data === "object" &&
-      data !== null
-    ) {
+    if (storeAs === "locations" && data !== null && typeof data === "object") {
       return {
         ...state,
         available: Object.keys(data),
@@ -56,9 +51,8 @@ const handleRemote = {
       };
     } else if (
       storeAs === "authData" &&
-      data &&
-      typeof data === "object" &&
-      data !== null
+      data !== null &&
+      typeof data === "object"
     ) {
       return {
         ...state,
