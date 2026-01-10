@@ -3,7 +3,7 @@ import { storageHelpers, StorageReference } from "../firebase";
 import { connect, ConnectedProps } from "react-redux";
 import { RootState } from "../types";
 
-function useInterval(callback: () => void, delay: number | null): void {
+function useInterval(callback: () => void, delay: number): void {
   const savedCallback = useRef<(() => void) | undefined>(undefined);
 
   useEffect(() => {
@@ -14,11 +14,8 @@ function useInterval(callback: () => void, delay: number | null): void {
     function tick(): void {
       savedCallback.current?.();
     }
-    if (delay !== null) {
-      const id = setInterval(tick, delay);
-      return () => clearInterval(id);
-    }
-    return undefined;
+    const id = setInterval(tick, delay);
+    return () => clearInterval(id);
   }, [delay]);
 }
 
@@ -58,9 +55,7 @@ const AdImage: React.FC<AdImageProps> = ({
         }
         return setBlank(true);
       }
-      if (isBlank) {
-        setBlank(false);
-      }
+      setBlank(false);
     }
     const nextImg = Number(img) + 1;
     return setImg(nextImg === assets.length ? 0 : nextImg);
