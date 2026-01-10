@@ -1,0 +1,25 @@
+import { combineReducers } from "redux";
+import { persistReducer } from "redux-persist";
+import storage from "redux-persist/lib/storage";
+
+import match from "./match";
+import controller from "./controller";
+import view from "./view";
+import remote from "./remote";
+import listeners from "./listeners";
+import auth from "./auth";
+
+const persistConfig = (key: string) => ({
+  key,
+  storage,
+  serialize: true,
+});
+
+export default combineReducers({
+  match: persistReducer(persistConfig("match"), match),
+  controller: persistReducer(persistConfig("controller"), controller),
+  view: persistReducer(persistConfig("view"), view),
+  remote: persistReducer(persistConfig("remote"), remote),
+  listeners,
+  auth,
+});
