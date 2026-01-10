@@ -31,8 +31,6 @@ export interface Match {
   buzzer: number | false;
   countdown: boolean;
   showInjuryTime?: boolean;
-  error?: unknown;
-  pending?: boolean;
 }
 
 // Player type

@@ -33,11 +33,8 @@ export const initialState: Match = {
 const actions = {
   [AT.updateMatch]: {
     next(state: Match, { payload, error }: Action<Partial<Match>>) {
-      if (error) {
-        return { ...state, error };
-      }
-      if (!payload) {
-        return { ...state, pending: true };
+      if (error || !payload) {
+        return state;
       }
       const newState: Match = { ...state, ...payload };
       const clubIdsMap = clubIds as Record<string, string>;
@@ -70,11 +67,8 @@ const actions = {
         error,
       }: Action<{ team: "home" | "away"; key: string; penaltyLength: number }>,
     ) {
-      if (error) {
-        return { ...state, error };
-      }
-      if (!payload) {
-        return { ...state, pending: true };
+      if (error || !payload) {
+        return state;
       }
       const { team, key, penaltyLength } = payload;
       const stateKey = `${String(team)}2min` as "home2min" | "away2min";
@@ -88,11 +82,8 @@ const actions = {
   },
   [AT.removePenalty]: {
     next(state: Match, { payload, error }: Action<{ key: string }>) {
-      if (error) {
-        return { ...state, error };
-      }
-      if (!payload) {
-        return { ...state, pending: true };
+      if (error || !payload) {
+        return state;
       }
       const { key } = payload;
       return {
@@ -107,11 +98,8 @@ const actions = {
       state: Match,
       { payload, error }: Action<{ key: string; toAdd: number }>,
     ) {
-      if (error) {
-        return { ...state, error };
-      }
-      if (!payload) {
-        return { ...state, pending: true };
+      if (error || !payload) {
+        return state;
       }
       const { key, toAdd } = payload;
       return {
@@ -131,11 +119,8 @@ const actions = {
   },
   [AT.pauseMatch]: {
     next(state: Match, { error, payload }: Action<{ isHalfEnd: boolean }>) {
-      if (error) {
-        return { ...state, error };
-      }
-      if (!payload) {
-        return { ...state, pending: true };
+      if (error || !payload) {
+        return state;
       }
       const { isHalfEnd } = payload;
       const newState: Match = {
@@ -168,11 +153,8 @@ const actions = {
       state: Match,
       { error, payload }: Action<{ currentValue: string; newValue: string }>,
     ) {
-      if (error) {
-        return { ...state, error };
-      }
-      if (!payload) {
-        return { ...state, pending: true };
+      if (error || !payload) {
+        return state;
       }
       const { currentValue, newValue } = payload;
       const currentValueParsed = parseInt(currentValue, 10);
@@ -196,11 +178,8 @@ const actions = {
         payload,
       }: Action<{ halfStops: number[]; showInjuryTime: boolean }>,
     ) {
-      if (error) {
-        return { ...state, error };
-      }
-      if (!payload) {
-        return { ...state, pending: true };
+      if (error || !payload) {
+        return state;
       }
       const { halfStops, showInjuryTime } = payload;
       return {
@@ -212,11 +191,8 @@ const actions = {
   },
   [AT.matchTimeout]: {
     next(state: Match, { error, payload }: Action<{ team: "home" | "away" }>) {
-      if (error) {
-        return { ...state, error };
-      }
-      if (!payload) {
-        return { ...state, pending: true };
+      if (error || !payload) {
+        return state;
       }
       const { team } = payload;
       const stateKey = `${String(team)}Timeouts` as
@@ -232,7 +208,7 @@ const actions = {
   [AT.removeTimeout]: {
     next(state: Match, { error }: Action<void>) {
       if (error) {
-        return { ...state, error };
+        return state;
       }
       return {
         ...state,
@@ -243,11 +219,8 @@ const actions = {
 
   [AT.buzz]: {
     next(state: Match, { payload, error }: Action<{ on: boolean }>) {
-      if (error) {
-        return { ...state, error };
-      }
-      if (!payload) {
-        return { ...state, pending: true };
+      if (error || !payload) {
+        return state;
       }
       const { on } = payload;
       return {
@@ -272,7 +245,7 @@ const actions = {
   [AT.countdown]: {
     next(state: Match, { error }: Action<void>) {
       if (error) {
-        return { ...state, error };
+        return state;
       }
       const momentTime = moment(state.matchStartTime, "HH:mm");
       if (momentTime < moment()) {
