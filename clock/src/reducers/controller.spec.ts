@@ -378,7 +378,10 @@ describe("controller reducer", () => {
       });
 
       it("toggles cycle from true to false", () => {
-        const stateWithCycle: ControllerState = { ...initialState, cycle: true };
+        const stateWithCycle: ControllerState = {
+          ...initialState,
+          cycle: true,
+        };
 
         const state = controllerReducer(
           stateWithCycle,
@@ -529,8 +532,7 @@ describe("controller reducer", () => {
           createAction(ActionTypes.addPlayer, { teamId: "home" }),
         );
 
-        const players =
-          state.availableMatches["123"].players["home"];
+        const players = state.availableMatches["123"].players["home"];
         expect(players).toHaveLength(2);
         expect(players[1]).toEqual({
           name: "",
@@ -554,9 +556,7 @@ describe("controller reducer", () => {
           createAction(ActionTypes.addPlayer, { teamId: "home" }),
         );
 
-        expect(
-          state.availableMatches["123"].players["home"],
-        ).toHaveLength(1);
+        expect(state.availableMatches["123"].players["home"]).toHaveLength(1);
       });
 
       it("does nothing if no match selected", () => {
@@ -580,8 +580,7 @@ describe("controller reducer", () => {
           }),
         );
 
-        const player =
-          state.availableMatches["123"].players["home"][0];
+        const player = state.availableMatches["123"].players["home"][0];
         expect(player.name).toBe("Updated Name");
         expect(player.number).toBe("99");
         expect(player.role).toBe("starter");
@@ -595,9 +594,7 @@ describe("controller reducer", () => {
           createAction(ActionTypes.deletePlayer, { teamId: "home", idx: 0 }),
         );
 
-        expect(
-          state.availableMatches["123"].players["home"],
-        ).toHaveLength(0);
+        expect(state.availableMatches["123"].players["home"]).toHaveLength(0);
       });
     });
   });

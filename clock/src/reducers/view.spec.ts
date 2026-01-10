@@ -1,9 +1,5 @@
 import { describe, it, expect } from "vitest";
-import viewReducer, {
-  initialState,
-  BACKGROUNDS,
-  getBackground,
-} from "./view";
+import viewReducer, { initialState, BACKGROUNDS, getBackground } from "./view";
 import ActionTypes from "../ActionTypes";
 
 const createAction = (type: string, payload?: unknown) => ({

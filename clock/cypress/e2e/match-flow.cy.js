@@ -151,7 +151,9 @@ context("Match Flow - Complete Match Simulation", () => {
     cy.get("#team-selector-awayTeam").type("fram");
     cy.get("#view-selector-match").click();
 
-    cy.get(".team.away img").should("have.attr", "src").should("include", "Fram");
+    cy.get(".team.away img")
+      .should("have.attr", "src")
+      .should("include", "Fram");
   });
 
   it("uses Leiðrétta to switch to advanced controls", () => {

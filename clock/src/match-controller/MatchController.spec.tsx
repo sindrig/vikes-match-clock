@@ -10,7 +10,9 @@ import ActionTypes from "../ActionTypes";
 
 const mockStore = configureStore([]);
 
-const createMockState = (matchOverrides: Partial<Match> = {}): Partial<RootState> => ({
+const createMockState = (
+  matchOverrides: Partial<Match> = {},
+): Partial<RootState> => ({
   match: {
     ...matchInitialState,
     ...matchOverrides,

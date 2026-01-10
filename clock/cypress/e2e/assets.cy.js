@@ -13,7 +13,9 @@ context("Asset Overlay System", () => {
     cy.get(".asset-controller").within(() => {
       cy.contains("0 í biðröð");
 
-      cy.get('input[type="text"]').type("https://www.youtube.com/watch?v=test1");
+      cy.get('input[type="text"]').type(
+        "https://www.youtube.com/watch?v=test1",
+      );
       cy.contains("Bæta við").click();
 
       cy.contains("1 í biðröð");
@@ -24,13 +26,19 @@ context("Asset Overlay System", () => {
     cy.contains("Heim").click();
 
     cy.get(".asset-controller").within(() => {
-      cy.get('input[type="text"]').type("https://www.youtube.com/watch?v=test1");
+      cy.get('input[type="text"]').type(
+        "https://www.youtube.com/watch?v=test1",
+      );
       cy.contains("Bæta við").click();
 
-      cy.get('input[type="text"]').type("https://www.youtube.com/watch?v=test2");
+      cy.get('input[type="text"]').type(
+        "https://www.youtube.com/watch?v=test2",
+      );
       cy.contains("Bæta við").click();
 
-      cy.get('input[type="text"]').type("https://www.youtube.com/watch?v=test3");
+      cy.get('input[type="text"]').type(
+        "https://www.youtube.com/watch?v=test3",
+      );
       cy.contains("Bæta við").click();
 
       cy.contains("3 í biðröð");
@@ -41,10 +49,14 @@ context("Asset Overlay System", () => {
     cy.contains("Heim").click();
 
     cy.get(".asset-controller").within(() => {
-      cy.get('input[type="text"]').type("https://www.youtube.com/watch?v=test1");
+      cy.get('input[type="text"]').type(
+        "https://www.youtube.com/watch?v=test1",
+      );
       cy.contains("Bæta við").click();
 
-      cy.get('input[type="text"]').type("https://www.youtube.com/watch?v=test2");
+      cy.get('input[type="text"]').type(
+        "https://www.youtube.com/watch?v=test2",
+      );
       cy.contains("Bæta við").click();
 
       cy.contains("2 í biðröð");
@@ -64,7 +76,9 @@ context("Asset Overlay System", () => {
     cy.get(".asset-controller").within(() => {
       cy.contains("Birta").should("not.exist");
 
-      cy.get('input[type="text"]').type("https://www.youtube.com/watch?v=test1");
+      cy.get('input[type="text"]').type(
+        "https://www.youtube.com/watch?v=test1",
+      );
       cy.contains("Bæta við").click();
 
       cy.contains("Birta").should("exist");
@@ -86,7 +100,9 @@ context("Asset Overlay System", () => {
 
       cy.get(".rs-input-number").should("exist");
 
-      cy.contains("Loop").find('input[type="checkbox"]').should("not.be.checked");
+      cy.contains("Loop")
+        .find('input[type="checkbox"]')
+        .should("not.be.checked");
 
       cy.contains("Loop").click();
       cy.contains("Loop").find('input[type="checkbox"]').should("be.checked");
@@ -99,7 +115,9 @@ context("Asset Overlay System", () => {
     cy.contains("Hreinsa virkt overlay").should("not.exist");
 
     cy.get(".asset-controller").within(() => {
-      cy.get('input[type="text"]').type("https://www.youtube.com/watch?v=test1");
+      cy.get('input[type="text"]').type(
+        "https://www.youtube.com/watch?v=test1",
+      );
       cy.contains("Bæta við").click();
       cy.contains("Birta").click();
     });
@@ -111,7 +129,9 @@ context("Asset Overlay System", () => {
     cy.contains("Heim").click();
 
     cy.get(".asset-controller").within(() => {
-      cy.get('input[type="text"]').type("https://www.youtube.com/watch?v=test1");
+      cy.get('input[type="text"]').type(
+        "https://www.youtube.com/watch?v=test1",
+      );
       cy.contains("Bæta við").click();
       cy.contains("Birta").click();
     });

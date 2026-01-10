@@ -384,7 +384,9 @@ describe("match reducer", () => {
       it("removes a penalty by key from home team", () => {
         const stateWithPenalty: Match = {
           ...initialState,
-          home2min: [{ atTimeElapsed: 60000, key: "pen-1", penaltyLength: 120000 }],
+          home2min: [
+            { atTimeElapsed: 60000, key: "pen-1", penaltyLength: 120000 },
+          ],
         };
 
         const state = matchReducer(
@@ -398,7 +400,9 @@ describe("match reducer", () => {
       it("removes a penalty by key from away team", () => {
         const stateWithPenalty: Match = {
           ...initialState,
-          away2min: [{ atTimeElapsed: 60000, key: "pen-1", penaltyLength: 120000 }],
+          away2min: [
+            { atTimeElapsed: 60000, key: "pen-1", penaltyLength: 120000 },
+          ],
         };
 
         const state = matchReducer(
@@ -432,12 +436,17 @@ describe("match reducer", () => {
       it("adds time to an existing penalty", () => {
         const stateWithPenalty: Match = {
           ...initialState,
-          home2min: [{ atTimeElapsed: 60000, key: "pen-1", penaltyLength: 120000 }],
+          home2min: [
+            { atTimeElapsed: 60000, key: "pen-1", penaltyLength: 120000 },
+          ],
         };
 
         const state = matchReducer(
           stateWithPenalty,
-          createAction(ActionTypes.addToPenalty, { key: "pen-1", toAdd: 60000 }),
+          createAction(ActionTypes.addToPenalty, {
+            key: "pen-1",
+            toAdd: 60000,
+          }),
         );
 
         expect(state.home2min[0].penaltyLength).toBe(180000);
@@ -446,12 +455,17 @@ describe("match reducer", () => {
       it("works for away team penalties", () => {
         const stateWithPenalty: Match = {
           ...initialState,
-          away2min: [{ atTimeElapsed: 60000, key: "pen-1", penaltyLength: 120000 }],
+          away2min: [
+            { atTimeElapsed: 60000, key: "pen-1", penaltyLength: 120000 },
+          ],
         };
 
         const state = matchReducer(
           stateWithPenalty,
-          createAction(ActionTypes.addToPenalty, { key: "pen-1", toAdd: 60000 }),
+          createAction(ActionTypes.addToPenalty, {
+            key: "pen-1",
+            toAdd: 60000,
+          }),
         );
 
         expect(state.away2min[0].penaltyLength).toBe(180000);
@@ -499,7 +513,10 @@ describe("match reducer", () => {
 
     describe("removeTimeout", () => {
       it("clears the timeout", () => {
-        const stateWithTimeout: Match = { ...initialState, timeout: Date.now() };
+        const stateWithTimeout: Match = {
+          ...initialState,
+          timeout: Date.now(),
+        };
 
         const state = matchReducer(
           stateWithTimeout,

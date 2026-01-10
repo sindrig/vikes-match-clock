@@ -93,7 +93,9 @@ describe("remote reducer", () => {
 
       remoteReducer(
         stateWithPrefix,
-        createAction(ActionTypes.setListenPrefix, { listenPrefix: "new-prefix" }),
+        createAction(ActionTypes.setListenPrefix, {
+          listenPrefix: "new-prefix",
+        }),
       );
 
       vi.advanceTimersByTime(2000);
