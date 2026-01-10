@@ -3,7 +3,7 @@ import { storageHelpers, StorageReference } from "../firebase";
 import { connect, ConnectedProps } from "react-redux";
 import { RootState } from "../types";
 
-function useInterval(callback: () => void, delay: number | null): void {
+function useInterval(callback: () => void, delay: number): void {
   const savedCallback = useRef<(() => void) | undefined>(undefined);
 
   useEffect(() => {
@@ -14,11 +14,8 @@ function useInterval(callback: () => void, delay: number | null): void {
     function tick(): void {
       savedCallback.current?.();
     }
-    if (delay !== null) {
-      const id = setInterval(tick, delay);
-      return () => clearInterval(id);
-    }
-    return undefined;
+    const id = setInterval(tick, delay);
+    return () => clearInterval(id);
   }, [delay]);
 }
 
