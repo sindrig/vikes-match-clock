@@ -1,4 +1,4 @@
-import { handleActions, Action } from "redux-actions";
+import { handleActions, Action, ReducerMap } from "redux-actions";
 import ActionTypes from "../ActionTypes";
 import { FirebaseAuthState } from "../types";
 
@@ -10,15 +10,17 @@ export const initialState: FirebaseAuthState = {
   isEmpty: true,
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- AT is intentionally 'any' due to redux-actions limitations
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call */
-const actions: Record<string, any> = {
+/* eslint-disable @typescript-eslint/no-unsafe-member-access -- AT is intentionally 'any' due to redux-actions limitations */
+const actions = {
   [AT.setAuthState]: {
     next(_state: FirebaseAuthState, { payload }: Action<FirebaseAuthState>) {
       return payload;
     },
   },
 };
-/* eslint-enable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call */
+/* eslint-enable @typescript-eslint/no-unsafe-member-access */
 
-export default handleActions(actions, initialState);
+export default handleActions(
+  actions as unknown as ReducerMap<FirebaseAuthState, FirebaseAuthState>,
+  initialState,
+);

@@ -143,8 +143,11 @@ class AssetComponent extends Component<AssetProps> {
           {asset.background ? (
             <img src={asset.background} alt={asset.background} />
           ) : null}
-          {teamName && (clubLogos as any)[teamName] ? (
-            <img src={(clubLogos as any)[teamName]} alt="teamName" />
+          {teamName && teamName in clubLogos ? (
+            <img
+              src={clubLogos[teamName as keyof typeof clubLogos]}
+              alt="teamName"
+            />
           ) : null}
         </PlayerCard>
       );

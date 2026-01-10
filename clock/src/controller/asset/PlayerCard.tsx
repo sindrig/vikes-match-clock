@@ -5,15 +5,18 @@ import { THUMB_VP } from "../../constants";
 import { getBackground } from "../../reducers/view";
 import { RootState } from "../../types";
 
+// Cached canvas for text measurement performance
+let cachedCanvas: HTMLCanvasElement | null = null;
+
 const getTextWidth = (text: string, font: string): number => {
   // re-use canvas object for better performance
-  const canvas =
-    (getTextWidth as any).canvas ||
-    ((getTextWidth as any).canvas = document.createElement("canvas"));
-  const context = canvas.getContext("2d");
+  if (!cachedCanvas) {
+    cachedCanvas = document.createElement("canvas");
+  }
+  const context: CanvasRenderingContext2D | null = cachedCanvas.getContext("2d");
   if (!context) return 0;
   context.font = font;
-  const metrics = context.measureText(text);
+  const metrics: TextMetrics = context.measureText(text);
   return metrics.width;
 };
 
@@ -114,7 +117,9 @@ class PlayerCard extends Component<Props, State> {
     const nameStyle = {
       fontSize: `${thumbnail ? fontSizes.thumbnail : fontSizes.regular}px`,
     };
-    const style = includeBackground ? getBackground(background) : {};
+    const style: React.CSSProperties = includeBackground
+      ? (getBackground(background) as React.CSSProperties)
+      : {};
     return (
       <div
         className={`asset-player-icon ${String(className)}`}

@@ -78,10 +78,8 @@ const AssetController = ({
   toggleCycle,
   currentAsset,
 }: AssetControllerProps) => {
-  // TODO: Fix any usage [Asset types across components have incompatible shapes - needs unified asset type]
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const addMultipleAssets = (
-    assetList: any[],
+    assetList: Promise<Asset | null>[],
     options: { showNow?: boolean } = { showNow: false },
   ) => {
     void Promise.all(assetList).then((resolvedAssets: unknown[]) => {

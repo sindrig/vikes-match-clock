@@ -105,7 +105,7 @@ const ImageList: React.FC<ImageListProps> = ({
             allowEdit && (
               <div
                 className="asset-folder withborder"
-                onClick={() => deleteFolder(ref)}
+                onClick={() => void deleteFolder(ref)}
                 key={name}
               >
                 <TrashIcon />
@@ -138,7 +138,7 @@ const ImageList: React.FC<ImageListProps> = ({
               </div>
               {allowEdit ? (
                 <div>
-                  <button onClick={() => deleteImage(ref)}>Eyða</button>
+                  <button onClick={() => void deleteImage(ref)}>Eyða</button>
                 </div>
               ) : null}
             </div>

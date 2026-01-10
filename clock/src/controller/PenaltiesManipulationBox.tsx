@@ -25,7 +25,9 @@ const MAX_TIMEOUTS_PER_TEAM = 4;
 
 const mapStateToProps = (state: RootState, ownProps: OwnProps) => ({
   team: ownProps.team,
-  penalties: (state.match as any)[teamToTimeoutKey(ownProps.team)] as Penalty[],
+  penalties: state.match[
+    teamToTimeoutKey(ownProps.team) as keyof typeof state.match
+  ] as Penalty[],
   started: state.match.started,
 });
 

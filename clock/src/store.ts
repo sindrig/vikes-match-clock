@@ -1,4 +1,11 @@
-import { applyMiddleware, compose, createStore, StoreEnhancer } from "redux";
+import {
+  applyMiddleware,
+  compose,
+  createStore,
+  Store,
+  StoreEnhancer,
+  UnknownAction,
+} from "redux";
 import { persistStore, Persistor } from "redux-persist";
 import promiseMiddleware from "redux-promise-middleware";
 import { thunk } from "redux-thunk";
@@ -21,7 +28,9 @@ const enhancer: StoreEnhancer = window.__REDUX_DEVTOOLS_EXTENSION__
 
 export const store = createStore(reducer, {}, enhancer);
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- redux-persist types don't align with redux-actions Action types
-export const persistor: Persistor = persistStore(store as any);
+// redux-persist types expect Store<any, UnknownAction> but our store uses redux-actions Action types
+export const persistor: Persistor = persistStore(
+  store as unknown as Store<ReturnType<typeof reducer>, UnknownAction>,
+);
 
 export type AppDispatch = typeof store.dispatch;

@@ -64,7 +64,7 @@ function App() {
     }
   };
 
-  const style = {
+  const style: React.CSSProperties = {
     ...getBackground(background),
     ...vp.style,
   };

@@ -75,7 +75,7 @@ const MatchActionSettings = ({
             className="match-type-selector"
             value={match.matchType}
             onChange={({ target: { value } }) =>
-              updateMatch({ matchType: value as any })
+              updateMatch({ matchType: value as Sports })
             }
           >
             {Object.values(Sports).map((s) => (

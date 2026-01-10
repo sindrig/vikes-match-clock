@@ -180,7 +180,9 @@ class TeamAssetController extends Component<
         .join(" "),
     };
     if (subIn) {
-      this.setState({ subOut: asset }, this.addSubAsset);
+      this.setState({ subOut: asset }, () => {
+        void this.addSubAsset();
+      });
     } else {
       this.setState({
         subIn: { teamName, ...asset },

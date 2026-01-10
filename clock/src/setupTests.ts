@@ -57,17 +57,21 @@ vi.mock("firebase/auth", () => ({
   signInWithEmailAndPassword: vi.fn(() => Promise.resolve({ user: null })),
   signInWithPopup: vi.fn(() => Promise.resolve({ user: null })),
   signOut: vi.fn(() => Promise.resolve()),
-  onAuthStateChanged: vi.fn((_auth, callback) => {
-    callback(null);
-    return () => {};
-  }),
+  onAuthStateChanged: vi.fn(
+    (_auth: unknown, callback: (user: null) => void) => {
+      callback(null);
+      return () => {
+        /* unsubscribe noop */
+      };
+    },
+  ),
   GoogleAuthProvider: vi.fn(),
 }));
 
 vi.mock("firebase/database", () => ({
   getDatabase: vi.fn(() => ({})),
   ref: vi.fn(),
-  onValue: vi.fn(() => () => {}),
+  onValue: vi.fn(() => () => { /* unsubscribe noop */ }),
   set: vi.fn(),
 }));
 

@@ -1,4 +1,4 @@
-import { handleActions } from "redux-actions";
+import { handleActions, ReducerMap } from "redux-actions";
 
 import ActionTypes from "../ActionTypes";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Workaround for redux-actions computed property names limitation
@@ -78,4 +78,7 @@ const actions: any = {
   [AT.receiveRemoteData]: handleRemote,
 };
 /* eslint-enable @typescript-eslint/no-unsafe-member-access */
-export default handleActions(actions, initialState);
+export default handleActions<ListenersState, ListenersState>(
+  actions as ReducerMap<ListenersState, ListenersState>,
+  initialState,
+);

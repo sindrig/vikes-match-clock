@@ -1,5 +1,5 @@
 import moment from "moment";
-import { Action, handleActions } from "redux-actions";
+import { Action, handleActions, ReducerMap } from "redux-actions";
 import ActionTypes from "../ActionTypes";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Workaround for redux-actions computed property names limitation
 const AT: any = ActionTypes;
@@ -29,9 +29,8 @@ export const initialState: Match = {
   showInjuryTime: true,
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- AT is intentionally 'any' due to redux-actions limitations
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call */
-const actions: Record<string, any> = {
+/* eslint-disable @typescript-eslint/no-unsafe-member-access -- AT is intentionally 'any' due to redux-actions limitations */
+const actions = {
   [AT.updateMatch]: {
     next(state: Match, { payload, error }: Action<Partial<Match>>) {
       if (error) {
@@ -344,5 +343,9 @@ const actions: Record<string, any> = {
     },
   },
 };
-/* eslint-enable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call */
-export default handleActions(actions, initialState);
+/* eslint-enable @typescript-eslint/no-unsafe-member-access */
+
+export default handleActions(
+  actions as unknown as ReducerMap<Match, Match>,
+  initialState,
+);

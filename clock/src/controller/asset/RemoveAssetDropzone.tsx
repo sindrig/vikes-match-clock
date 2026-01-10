@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { useDrop } from "react-dnd";
 import { bindActionCreators, Dispatch } from "redux";
 import { connect, ConnectedProps } from "react-redux";
@@ -26,6 +27,7 @@ type PropsFromRedux = ConnectedProps<typeof connector>;
 const RemoveAssetDropzone = ({
   removeAsset,
 }: PropsFromRedux): React.JSX.Element => {
+  const ref = useRef<HTMLDivElement>(null);
   const [{ handlerId }, drop] = useDrop<
     DragItem,
     void,
@@ -40,8 +42,9 @@ const RemoveAssetDropzone = ({
       handlerId: monitor.getHandlerId(),
     }),
   });
+  drop(ref);
   return (
-    <div ref={drop as any} data-handler-id={handlerId}>
+    <div ref={ref} data-handler-id={handlerId}>
       <TrashIcon style={{ fontSize: "10em" }} />
     </div>
   );

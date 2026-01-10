@@ -6,6 +6,10 @@ import { firebaseDatabase } from "../firebaseDatabase";
 import { RootState, Match, ControllerState, ViewState } from "../types";
 import { RemoteActionType } from "../ActionTypes";
 
+type FirebaseStateData = Match | ControllerState | ViewState;
+type FirebaseLocationsData = Record<string, string>;
+type FirebaseAuthData = Record<string, unknown>;
+
 export function useFirebaseSync() {
   const dispatch = useDispatch();
   const { sync, listenPrefix } = useSelector(
@@ -86,7 +90,7 @@ export function useFirebaseSync() {
       const unsubscribe = onValue(
         dbRef,
         (snapshot) => {
-          const data = snapshot.val();
+          const data = snapshot.val() as FirebaseStateData | null;
           if (data !== null) {
             dispatch({
               type: RemoteActionType.RECEIVE_REMOTE_DATA,
@@ -110,7 +114,7 @@ export function useFirebaseSync() {
   useEffect(() => {
     const locationsRef = ref(database, "locations");
     const unsubscribe = onValue(locationsRef, (snapshot) => {
-      const data = snapshot.val();
+      const data = snapshot.val() as FirebaseLocationsData | null;
       if (data) {
         dispatch({
           type: RemoteActionType.RECEIVE_REMOTE_DATA,
@@ -133,7 +137,7 @@ export function useFirebaseAuthListener() {
 
     const authRef = ref(database, `auth/${uid}`);
     const unsubscribe = onValue(authRef, (snapshot) => {
-      const data = snapshot.val();
+      const data = snapshot.val() as FirebaseAuthData | null;
       if (data) {
         dispatch({
           type: RemoteActionType.RECEIVE_REMOTE_DATA,
