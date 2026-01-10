@@ -95,6 +95,8 @@ The app handles "Controller" vs "Display" roles:
 - **Testing**: Vitest + Cypress for e2e
 - **Linting**: ESLint (airbnb-style) + Prettier
 
+**Important**: Always run `pnpm format` after making changes. CI runs format checks and will fail if code is not properly formatted.
+
 ## Testing & Development
 
 ### Test Credentials (Staging/Development Only)

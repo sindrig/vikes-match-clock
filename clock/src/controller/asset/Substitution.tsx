@@ -29,7 +29,10 @@ const Substitution = ({
   if (Array.isArray(children) && children.length !== 2) {
     console.error("Children should have length 2, received ", children);
   }
-  const style: React.CSSProperties = { ...vp.style, ...getBackground(background) };
+  const style: React.CSSProperties = {
+    ...vp.style,
+    ...getBackground(background),
+  };
   return (
     <div
       className={`asset-substitution${thumbnail ? " thumbnail" : ""}`}

@@ -71,7 +71,9 @@ vi.mock("firebase/auth", () => ({
 vi.mock("firebase/database", () => ({
   getDatabase: vi.fn(() => ({})),
   ref: vi.fn(),
-  onValue: vi.fn(() => () => { /* unsubscribe noop */ }),
+  onValue: vi.fn(() => () => {
+    /* unsubscribe noop */
+  }),
   set: vi.fn(),
 }));
 

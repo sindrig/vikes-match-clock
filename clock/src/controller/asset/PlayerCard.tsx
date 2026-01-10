@@ -13,7 +13,8 @@ const getTextWidth = (text: string, font: string): number => {
   if (!cachedCanvas) {
     cachedCanvas = document.createElement("canvas");
   }
-  const context: CanvasRenderingContext2D | null = cachedCanvas.getContext("2d");
+  const context: CanvasRenderingContext2D | null =
+    cachedCanvas.getContext("2d");
   if (!context) return 0;
   context.font = font;
   const metrics: TextMetrics = context.measureText(text);
