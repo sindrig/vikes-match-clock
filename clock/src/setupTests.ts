@@ -67,7 +67,7 @@ vi.mock("firebase/auth", () => ({
 vi.mock("firebase/database", () => ({
   getDatabase: vi.fn(() => ({})),
   ref: vi.fn(),
-  onValue: vi.fn(),
+  onValue: vi.fn(() => () => {}),
   set: vi.fn(),
 }));
 
