@@ -77,3 +77,5 @@ clock/playwright-report/index.html
 clock/test-results/.last-run.json
 clock/coverage
 .envrc-local
+clock/playwright-report
+clock/test-results

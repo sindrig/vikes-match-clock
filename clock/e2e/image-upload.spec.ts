@@ -17,6 +17,8 @@ function getCredentials(): { email: string; password: string } {
 
 async function login(page: import("@playwright/test").Page) {
   const { email, password } = getCredentials();
+  const emailPrefix = email.split("@")[0];
+
   await page.getByRole("button", { name: "Stillingar" }).click();
   await page.getByPlaceholder("E-mail").fill(email);
   await page.getByPlaceholder("Password").fill(password);
@@ -24,6 +26,24 @@ async function login(page: import("@playwright/test").Page) {
   await expect(page.getByText(email)).toBeVisible({
     timeout: 15000,
   });
+
+  // Wait for listenPrefix to be set from Firebase authData (not just the email prefix).
+  // The prefix should change from email prefix to an authorized location.
+  // Then wait for any triggered page reload to complete.
+  await page.waitForFunction(
+    (prefix: string) => {
+      const text = document.body.innerText;
+      const match = text.match(/\[([^\]]+@[^\]]+)\]\[([^\]]+)\]/);
+      // Wait until prefix is set AND is NOT the email prefix (meaning authData has arrived)
+      return match && match[2] && match[2].length > 0 && match[2] !== prefix;
+    },
+    emailPrefix,
+    { timeout: 20000 },
+  );
+
+  // Wait for any page reload to complete (triggered when listenPrefix changes)
+  await page.waitForTimeout(3000);
+  await page.waitForLoadState("networkidle");
 }
 
 function createTestImage(filePath: string) {
@@ -43,19 +63,25 @@ async function goToMediaTab(page: import("@playwright/test").Page) {
   await expect(page.getByText("Birta strax")).toBeVisible({ timeout: 5000 });
 }
 
-async function deleteTestImages(page: import("@playwright/test").Page) {
+async function deleteTestImages(
+  page: import("@playwright/test").Page,
+  maxToDelete = 10,
+) {
   const testImageItems = page
     .locator(".asset-image")
     .filter({ hasText: /test-upload-|test-compressed-/ });
 
   let count = await testImageItems.count();
-  while (count > 0) {
+  let deleted = 0;
+
+  while (count > 0 && deleted < maxToDelete) {
     const deleteButton = testImageItems.first().getByRole("button", {
       name: "Eyða",
     });
     await deleteButton.click();
     await page.waitForTimeout(500);
     count = await testImageItems.count();
+    deleted++;
   }
 }
 
@@ -70,16 +96,20 @@ test.describe("Image Upload", () => {
   });
 
   test.afterAll(async ({ browser }) => {
+    test.setTimeout(120000); // Allow 2 minutes for cleanup of accumulated test images
+
     const context = await browser.newContext();
     const page = await context.newPage();
 
-    await page.goto("/");
-    await login(page);
-    await goToMediaTab(page);
-    await page.waitForTimeout(2000);
-    await deleteTestImages(page);
-
-    await context.close();
+    try {
+      await page.goto("/");
+      await login(page);
+      await goToMediaTab(page);
+      await page.waitForTimeout(2000);
+      await deleteTestImages(page);
+    } finally {
+      await context.close();
+    }
   });
 
   test("uploads image with correct filename preserved", async ({ page }) => {
@@ -102,15 +132,16 @@ test.describe("Image Upload", () => {
         timeout: 15000,
       });
 
-      await page.waitForTimeout(1000);
-      await goToMediaTab(page);
-      await page.waitForTimeout(2000);
-
       const expectedFilename = path.basename(testImagePath);
-      const imageItem = page
-        .locator(".asset-image")
-        .filter({ hasText: expectedFilename });
-      await expect(imageItem).toBeVisible({ timeout: 15000 });
+
+      await expect(async () => {
+        await page.locator(".upload-manager .reload").click();
+        await page.waitForTimeout(1000);
+        const imageItem = page
+          .locator(".asset-image")
+          .filter({ hasText: expectedFilename });
+        await expect(imageItem).toBeVisible({ timeout: 2000 });
+      }).toPass({ timeout: 20000 });
     } finally {
       if (fs.existsSync(testImagePath)) {
         fs.unlinkSync(testImagePath);
@@ -147,15 +178,16 @@ test.describe("Image Upload", () => {
         timeout: 15000,
       });
 
-      await page.waitForTimeout(1000);
-      await goToMediaTab(page);
-      await page.waitForTimeout(2000);
-
       const expectedFilename = path.basename(testImagePath);
-      const imageItem = page
-        .locator(".asset-image")
-        .filter({ hasText: expectedFilename });
-      await expect(imageItem).toBeVisible({ timeout: 15000 });
+
+      await expect(async () => {
+        await page.locator(".upload-manager .reload").click();
+        await page.waitForTimeout(1000);
+        const imageItem = page
+          .locator(".asset-image")
+          .filter({ hasText: expectedFilename });
+        await expect(imageItem).toBeVisible({ timeout: 2000 });
+      }).toPass({ timeout: 20000 });
     } finally {
       if (fs.existsSync(testImagePath)) {
         fs.unlinkSync(testImagePath);
