@@ -1,4 +1,3 @@
-import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, act } from "@testing-library/react";
 import { Provider } from "react-redux";
@@ -27,6 +26,7 @@ const createMockState = (
     ...viewInitialState,
     vp: {
       ...viewInitialState.vp,
+      name: "default",
       key: "default",
     },
     ...viewOverrides,
@@ -221,6 +221,7 @@ describe("ScoreBoard component", () => {
           {
             vp: {
               ...viewInitialState.vp,
+              name: "large-display",
               key: "large-display",
             },
           },
