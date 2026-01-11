@@ -2,12 +2,26 @@ import { test, expect } from "@playwright/test";
 import path from "path";
 import fs from "fs";
 
+function getCredentials(): { email: string; password: string } {
+  const envCredentials = process.env.TEST_CREDENTIALS;
+  if (envCredentials) {
+    const [email, password] = envCredentials.split(";");
+    if (email && password) {
+      return { email, password };
+    }
+  }
+  throw new Error(
+    "Could not find test credentials in TEST_CREDENTIALS env variable",
+  );
+}
+
 async function login(page: import("@playwright/test").Page) {
+  const { email, password } = getCredentials();
   await page.getByRole("button", { name: "Stillingar" }).click();
-  await page.getByPlaceholder("E-mail").fill("fotbolti@vikingur.is");
-  await page.getByPlaceholder("Password").fill("fotbolti");
+  await page.getByPlaceholder("E-mail").fill(email);
+  await page.getByPlaceholder("Password").fill(password);
   await page.getByRole("button", { name: "Login", exact: true }).click();
-  await expect(page.getByText("fotbolti@vikingur.is")).toBeVisible({
+  await expect(page.getByText(email)).toBeVisible({
     timeout: 15000,
   });
 }

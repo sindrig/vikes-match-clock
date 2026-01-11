@@ -99,14 +99,23 @@ The app handles "Controller" vs "Display" roles:
 
 ## Testing & Development
 
-### Test Credentials (Staging/Development Only)
+### Test Credentials
 
-For local development and testing against the staging Firebase instance:
+E2E tests that require authentication use the `TEST_CREDENTIALS` environment variable.
 
-- **Email**: `fotbolti@vikingur.is`
-- **Password**: `fotbolti`
+**Format**: `EMAIL;PASSWORD` (semicolon-separated)
 
-To log in (use playwright):
+**Local development**:
+
+```bash
+pnpm e2e
+```
+
+If `TEST_CREDENTIALS` is not set, tests fall back to default staging credentials.
+
+**GitHub Actions**: The `TEST_CREDENTIALS` secret must be configured in the repository settings. Format is the same: `EMAIL;PASSWORD`.
+
+To log in manually (use playwright):
 
 1. Navigate to `localhost:3000`
 2. Click **Stillingar** (Settings) tab
@@ -122,10 +131,12 @@ This app requires testing scenarios with **two independent browser sessions** (e
 1. **Tabs share browser context**: Multiple tabs opened via `browser_tabs` share localStorage, cookies, and session state. Since this app uses `redux-persist` with localStorage, both tabs will have identical Redux state.
 
 2. **Cannot control multiple contexts**: While you can create separate browser contexts via `browser_run_code`:
+
    ```javascript
    const newContext = await browser.newContext();
    const newPage = await newContext.newPage();
    ```
+
    The MCP only tracks/controls the original page. The new context's page cannot be interacted with via standard MCP tools (`browser_click`, `browser_snapshot`, etc.).
 
 3. **Workarounds for multi-session testing**:
