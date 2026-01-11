@@ -52,7 +52,15 @@ export function useFirebaseSync() {
       prevMatchRef.current = match;
       void syncToFirebase("match", match);
     }
-  }, [match, sync, isAuthenticated, listenPrefix, syncToFirebase]);
+  }, [
+    match,
+    controller,
+    view,
+    sync,
+    isAuthenticated,
+    listenPrefix,
+    syncToFirebase,
+  ]);
 
   useEffect(() => {
     if (!sync || !isAuthenticated || !listenPrefix) return;

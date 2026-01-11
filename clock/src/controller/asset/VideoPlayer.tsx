@@ -19,19 +19,19 @@ const VideoPlayer = ({
   onEnded,
 }: VideoPlayerProps): React.JSX.Element => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const videoSrc = url || key;
 
-  if (playbackSpeed !== 1) {
-    useEffect(() => {
-      if (videoRef.current && !thumbnail) {
-        videoRef.current.playbackRate = playbackSpeed; // Set the playback rate
-      }
-    }, [playbackSpeed, url || key, thumbnail]); // Update playback speed when it changes
-  }
+  useEffect(() => {
+    if (playbackSpeed !== 1 && videoRef.current && !thumbnail) {
+      videoRef.current.playbackRate = playbackSpeed;
+    }
+  }, [playbackSpeed, videoSrc, thumbnail]);
+
   return (
     <div style={{ height: "100%", width: "100%", backgroundColor: "black" }}>
       <video
         ref={videoRef}
-        src={url || key}
+        src={videoSrc}
         autoPlay={!thumbnail}
         loop={thumbnail}
         muted={thumbnail}

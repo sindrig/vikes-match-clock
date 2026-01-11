@@ -30,7 +30,6 @@ import {
   Asset,
 } from "../types";
 
-// eslint-disable-next-line
 const confirmRefresh = () => confirm("Are you absolutely sure?");
 
 interface ControllerProps {

@@ -18,8 +18,8 @@ interface UploadManagerProps {
 const UploadManager: React.FC<UploadManagerProps> = ({ prefix, refresh }) => {
   const [doCompress, setDoCompress] = useState(false);
 
-  const insertImages = (filelist: FileList | File[]): void => {
-    const files = Array.isArray(filelist) ? filelist : [...filelist];
+  const insertImages = (fileOrFiles: File | File[]): void => {
+    const files = Array.isArray(fileOrFiles) ? fileOrFiles : [fileOrFiles];
     void Promise.all(
       files.map((file, i) =>
         file.type !== "image/gif" && doCompress

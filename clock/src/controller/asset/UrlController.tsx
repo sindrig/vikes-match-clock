@@ -30,7 +30,6 @@ export default class UrlController extends Component<Props, State> {
     const { value } = this.state;
     if (value !== "ruv") {
       try {
-        // eslint-disable-next-line no-new
         new URL(value);
       } catch {
         this.setState({ error: `"${value}" is not a valid url` });
