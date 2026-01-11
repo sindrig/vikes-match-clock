@@ -47,6 +47,7 @@
     "typescript": "^5.7.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.57.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.1.0",
     "@testing-library/user-event": "^14.5.2",
@@ -57,9 +58,9 @@
     "@typescript-eslint/eslint-plugin": "^8.18.1",
     "@typescript-eslint/parser": "^8.18.1",
     "@vitejs/plugin-react": "^5.1.2",
+    "@vitest/coverage-v8": "^4.0.16",
     "@vitest/ui": "^4.0.16",
     "browserslist": "^4.28.0",
-    "cypress": "^13.17.0",
     "eslint": "^8.57.1",
     "eslint-config-airbnb": "^19.0.4",
     "eslint-config-airbnb-typescript": "^18.0.0",
@@ -78,19 +79,22 @@
   "scripts": {
     "preinstall": "npx only-allow pnpm",
     "start": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc -p tsconfig.build.json --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "lint": "eslint src",
-    "format-check": "prettier src cypress -c",
+    "format-check": "prettier src e2e -c",
     "ncu": "ncu",
-    "format": "prettier src cypress -w"
+    "format": "prettier src e2e -w",
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui",
+    "e2e:debug": "playwright test --debug"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
-      "cypress",
       "esbuild"
     ]
   },

@@ -1,7 +1,10 @@
 name: Build and deploy
 
 on:
-  - push
+  push:
+    branches:
+      - master
+  pull_request:
 
 jobs:
   build-clock:
@@ -35,19 +38,13 @@ jobs:
           restore-keys: |
             pnpm-${{ runner.os }}-
 
-      - name: Set up Cypress binary cache
-        uses: actions/cache@v3
-        with:
-          path: ~/.cache/Cypress
-          key: cypress-${{ runner.os }}-cypress-${{ hashFiles('**/pnpm-lock.yaml') }}
-
       - name: Install dependencies
         working-directory: ./clock
         run: pnpm i
 
-      - name: Install Cypress binary
+      - name: Install Playwright browsers
         working-directory: ./clock
-        run: pnpm exec cypress install
+        run: pnpm exec playwright install --with-deps chromium
 
       - name: Lint
         working-directory: ./clock
@@ -61,16 +58,29 @@ jobs:
         working-directory: ./clock
         run: pnpm build
 
-      - name: Cypress run
-        uses: cypress-io/github-action@v6
-        env:
-          CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Run unit tests with coverage
+        working-directory: ./clock
+        run: pnpm test:coverage
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
         with:
-          working-directory: clock
-          start: npx serve -s build
-          record: ${{ secrets.CYPRESS_RECORD_KEY != '' }}
-          install: false
+          files: ./clock/coverage/cobertura-coverage.xml
+          flags: unittests
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Run Playwright e2e tests
+        working-directory: ./clock
+        run: pnpm e2e
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: clock/playwright-report/
+          retention-days: 30
 
       - name: Deploy
         if: github.ref == 'refs/heads/master'
