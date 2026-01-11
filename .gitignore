@@ -76,3 +76,4 @@ service-account-key*.json
 clock/playwright-report/index.html
 clock/test-results/.last-run.json
 clock/coverage
+.envrc-local
