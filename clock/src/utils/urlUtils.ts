@@ -1,7 +1,19 @@
+const YOUTUBE_HOSTNAMES = [
+  "youtube.com",
+  "www.youtube.com",
+  "m.youtube.com",
+  "music.youtube.com",
+  "youtu.be",
+];
+
+function isYoutubeHostname(hostname: string): boolean {
+  return YOUTUBE_HOSTNAMES.includes(hostname);
+}
+
 export function parseYoutubePlaylistId(url: string): string | null {
   try {
     const parsed = new URL(url);
-    if (!parsed.hostname.includes("youtube")) {
+    if (!isYoutubeHostname(parsed.hostname)) {
       return null;
     }
     if (parsed.pathname !== "/playlist") {
@@ -15,5 +27,10 @@ export function parseYoutubePlaylistId(url: string): string | null {
 }
 
 export function isYoutubeUrl(url: string): boolean {
-  return url.includes("youtube") || url.includes("youtu.be");
+  try {
+    const parsed = new URL(url);
+    return isYoutubeHostname(parsed.hostname);
+  } catch {
+    return false;
+  }
 }

@@ -55,6 +55,23 @@ describe("urlUtils", () => {
         "https://music.youtube.com/playlist?list=PLmusictest&feature=share";
       expect(parseYoutubePlaylistId(url)).toBe("PLmusictest");
     });
+
+    it("returns null for lookalike domains containing youtube", () => {
+      expect(
+        parseYoutubePlaylistId("https://notyoutube.com/playlist?list=fake"),
+      ).toBeNull();
+      expect(
+        parseYoutubePlaylistId("https://fakeyoutube.net/playlist?list=fake"),
+      ).toBeNull();
+      expect(
+        parseYoutubePlaylistId("https://youtube.fake.com/playlist?list=fake"),
+      ).toBeNull();
+    });
+
+    it("handles m.youtube.com playlist URLs", () => {
+      const url = "https://m.youtube.com/playlist?list=PLmobile";
+      expect(parseYoutubePlaylistId(url)).toBe("PLmobile");
+    });
   });
 
   describe("isYoutubeUrl", () => {
@@ -70,12 +87,34 @@ describe("urlUtils", () => {
       expect(isYoutubeUrl("https://music.youtube.com/watch?v=test")).toBe(true);
     });
 
+    it("returns true for m.youtube.com URL", () => {
+      expect(isYoutubeUrl("https://m.youtube.com/watch?v=test")).toBe(true);
+    });
+
     it("returns false for non-YouTube URL", () => {
       expect(isYoutubeUrl("https://vimeo.com/123")).toBe(false);
     });
 
     it("returns false for empty string", () => {
       expect(isYoutubeUrl("")).toBe(false);
+    });
+
+    it("returns false for invalid URL", () => {
+      expect(isYoutubeUrl("not-a-url")).toBe(false);
+    });
+
+    it("returns false for lookalike domains containing youtube", () => {
+      expect(isYoutubeUrl("https://notyoutube.com/watch")).toBe(false);
+      expect(isYoutubeUrl("https://fakeyoutube.net/watch")).toBe(false);
+      expect(isYoutubeUrl("https://youtube.fake.com/watch")).toBe(false);
+    });
+
+    it("returns false for URLs with youtube in path or query", () => {
+      expect(isYoutubeUrl("https://example.com/youtube/video")).toBe(false);
+      expect(isYoutubeUrl("https://example.com?ref=youtube")).toBe(false);
+      expect(isYoutubeUrl("https://example.com/watch?source=youtu.be")).toBe(
+        false,
+      );
     });
   });
 });

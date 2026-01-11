@@ -46,7 +46,10 @@ export function isMatchResetDisabled(match: Match): boolean {
 }
 
 export function teamToStateKey(team: "home" | "away"): "home2min" | "away2min" {
-  return `${team}2min`;
+  if (team === "home") {
+    return "home2min";
+  }
+  return "away2min";
 }
 
 export function translateTeam(team: "home" | "away"): string {
