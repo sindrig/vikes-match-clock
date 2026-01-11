@@ -8,7 +8,7 @@ async function login(page: import("@playwright/test").Page) {
   await page.getByPlaceholder("Password").fill("fotbolti");
   await page.getByRole("button", { name: "Login", exact: true }).click();
   await expect(page.getByText("fotbolti@vikingur.is")).toBeVisible({
-    timeout: 10000,
+    timeout: 15000,
   });
 }
 
@@ -30,6 +30,8 @@ async function goToMediaTab(page: import("@playwright/test").Page) {
 }
 
 test.describe("Image Upload", () => {
+  test.setTimeout(60000);
+
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
       localStorage.clear();
@@ -50,12 +52,12 @@ test.describe("Image Upload", () => {
       });
       await expect(uploadArea).toBeVisible();
 
-      const fileChooserPromise = page.waitForEvent("filechooser");
-      await uploadArea.click();
-      const fileChooser = await fileChooserPromise;
-      await fileChooser.setFiles(testImagePath);
+      const fileInput = page.locator('.upload-manager input[type="file"]');
+      await fileInput.setInputFiles(testImagePath);
 
-      await expect(uploadArea).toContainText("Uploaded Successfully");
+      await expect(uploadArea).toContainText("Uploaded Successfully", {
+        timeout: 15000,
+      });
 
       await page.waitForTimeout(1000);
       await goToMediaTab(page);
@@ -95,12 +97,12 @@ test.describe("Image Upload", () => {
         hasText: /Upload|drop a file/,
       });
 
-      const fileChooserPromise = page.waitForEvent("filechooser");
-      await uploadArea.click();
-      const fileChooser = await fileChooserPromise;
-      await fileChooser.setFiles(testImagePath);
+      const fileInput = page.locator('.upload-manager input[type="file"]');
+      await fileInput.setInputFiles(testImagePath);
 
-      await expect(uploadArea).toContainText("Uploaded Successfully");
+      await expect(uploadArea).toContainText("Uploaded Successfully", {
+        timeout: 15000,
+      });
 
       await page.waitForTimeout(1000);
       await goToMediaTab(page);

@@ -105,7 +105,7 @@ test.describe("Asset Overlay System", () => {
         .locator('input[type="checkbox"]'),
     ).toBeChecked();
 
-    await expect(assetController.locator(".rs-input-number")).toBeVisible();
+    await expect(assetController.getByText("sek")).toBeVisible();
 
     await expect(
       assetController
