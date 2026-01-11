@@ -73,3 +73,5 @@ node_modules/
 /infra/builds/
 /**/__pycache__/
 service-account-key*.json
+clock/playwright-report/index.html
+clock/test-results/.last-run.json
