@@ -1,7 +1,8 @@
 name: Build and deploy
 
 on:
-  - push
+  push:
+  pull_request:
 
 jobs:
   build-clock:
@@ -55,9 +56,17 @@ jobs:
         working-directory: ./clock
         run: pnpm build
 
-      - name: Run unit tests
+      - name: Run unit tests with coverage
         working-directory: ./clock
-        run: pnpm test
+        run: pnpm test:coverage
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./clock/coverage/cobertura-coverage.xml
+          flags: unittests
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Run Playwright e2e tests
         working-directory: ./clock

@@ -10,7 +10,9 @@ export default defineConfig({
     setupFiles: ["./src/setupTests.ts"],
     include: ["src/**/*.{test,spec}.{js,ts,jsx,tsx}"],
     coverage: {
-      reporter: ["text", "json", "html"],
+      provider: "v8",
+      reporter: ["text", "json", "html", "cobertura"],
+      reportsDirectory: "./coverage",
     },
   },
   define: {
