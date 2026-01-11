@@ -4,6 +4,7 @@ import { bindActionCreators, Dispatch } from "redux";
 
 import matchActions from "../actions/match";
 import { formatMillisAsTime } from "../utils/timeUtils";
+import { teamToStateKey, translateTeam } from "../utils/matchUtils";
 import { RootState } from "../types";
 
 interface Penalty {
@@ -16,17 +17,12 @@ interface OwnProps {
   team: "home" | "away";
 }
 
-const teamToTimeoutKey = (team: string): string => `${team}2min`;
-
-const translateTeam = (team: string): string =>
-  ({ home: "Heima", away: "Úti" })[team] || team;
-
 const MAX_TIMEOUTS_PER_TEAM = 4;
 
 const mapStateToProps = (state: RootState, ownProps: OwnProps) => ({
   team: ownProps.team,
   penalties: state.match[
-    teamToTimeoutKey(ownProps.team) as keyof typeof state.match
+    teamToStateKey(ownProps.team) as keyof typeof state.match
   ] as Penalty[],
   started: state.match.started,
 });

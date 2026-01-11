@@ -13,6 +13,7 @@ import InputNumber from "rsuite/InputNumber";
 import Checkbox from "rsuite/Checkbox";
 import controllerActions from "../../actions/controller";
 import { RootState, Asset } from "../../types";
+import { parseYoutubePlaylistId, isYoutubeUrl } from "../../utils/urlUtils";
 
 import "./AssetController.css";
 import MatchesOnPitch from "./team/MatchesOnPitch";
@@ -101,23 +102,10 @@ const AssetController = ({
   };
 
   const addAssetKey = (asset: Asset) => {
-    if (asset.type === assetTypes.URL) {
-      if (asset.key.indexOf("youtube") > -1) {
-        try {
-          const url = new URL(asset.key);
-          if (url.pathname === "/playlist") {
-            const params = url.search.replace("?", "").split("&");
-            const listId = params
-              .map((p) => p.split("="))
-              .filter((kv) => kv[0] === "list")
-              .map((kv) => kv[1])[0];
-            if (listId) {
-              return addVideosFromPlaylist(listId, addAssetKey);
-            }
-          }
-        } catch (e) {
-          console.log(e);
-        }
+    if (asset.type === assetTypes.URL && isYoutubeUrl(asset.key)) {
+      const listId = parseYoutubePlaylistId(asset.key);
+      if (listId) {
+        return addVideosFromPlaylist(listId, addAssetKey);
       }
     }
     return addMultipleAssets([Promise.resolve(asset)]);

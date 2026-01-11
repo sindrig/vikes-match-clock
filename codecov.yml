@@ -10,3 +10,12 @@ coverage:
 comment:
   layout: "reach,diff,flags,files"
   behavior: default
+
+ignore:
+  - "clock/src/images/**/*"
+  - "clock/src/sounds/**/*"
+  - "**/*.css"
+  - "**/*.svg"
+  - "**/*.png"
+  - "**/*.jpg"
+  - "**/*.mp3"

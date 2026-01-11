@@ -16,9 +16,13 @@ import baddi from "../images/baddi.gif";
 import { getPlayerAssetObject } from "./asset/team/assetHelpers";
 import RedCardManipulation from "./RedCardManipulation";
 import { RootState, Match } from "../types";
+import {
+  roundMillisToSeconds,
+  formatTimeUnit,
+  shouldShowGoalCelebration,
+  isMatchResetDisabled,
+} from "../utils/matchUtils";
 
-const roundMillisToSeconds = (millis: number): number =>
-  Math.floor(millis / 1000) * 1000;
 const WRAPPER_CLASSNAME = "control-item playerControls withborder";
 
 const clockManipulationBox = (
@@ -26,8 +30,7 @@ const clockManipulationBox = (
   match: Match,
   updateMatch: (update: Partial<Match>) => void,
 ): React.JSX.Element => {
-  const unit = seconds >= 60 ? "m" : "s";
-  const humanReadableSeconds = seconds >= 60 ? seconds / 60 : seconds;
+  const { value, unit } = formatTimeUnit(seconds);
   return (
     <div className="control-item stdbuttons">
       <button
@@ -40,7 +43,7 @@ const clockManipulationBox = (
         }
         disabled={!!match.timeout}
       >
-        +{humanReadableSeconds}
+        +{value}
         {unit}
       </button>
       <button
@@ -53,7 +56,7 @@ const clockManipulationBox = (
         }
         disabled={!!match.timeout}
       >
-        -{humanReadableSeconds}
+        -{value}
         {unit}
       </button>
     </div>
@@ -122,11 +125,7 @@ const MatchActions: React.FC<PropsFromRedux> = ({
   const goal = (awayOrHome: "home" | "away"): void => {
     addGoal({ team: awayOrHome });
     const teamName = awayOrHome === "home" ? match.homeTeam : match.awayTeam;
-    if (
-      match.matchType === Sports.Football &&
-      teamName === "Víkingur R" &&
-      listenPrefix.startsWith("vik")
-    ) {
+    if (shouldShowGoalCelebration(match.matchType, teamName, listenPrefix)) {
       renderAsset({
         key: baddi,
         type: assetTypes.IMAGE,
@@ -266,14 +265,7 @@ const MatchActions: React.FC<PropsFromRedux> = ({
                   halfStops: DEFAULT_HALFSTOPS[match.matchType],
                 })
               }
-              disabled={
-                !match.started &&
-                !match.timeElapsed &&
-                DEFAULT_HALFSTOPS[match.matchType][0] === match.halfStops[0] &&
-                !match.timeout
-                  ? true
-                  : false
-              }
+              disabled={isMatchResetDisabled(match)}
               color="red"
               appearance="primary"
             >

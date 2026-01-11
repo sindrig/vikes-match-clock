@@ -4,12 +4,7 @@ import { connect, ConnectedProps } from "react-redux";
 
 import matchActions from "../actions/match";
 import { RootState } from "../types";
-
-function clampScore(value: string | number): number {
-  const num = Number(value);
-  if (isNaN(num)) return 0;
-  return Math.max(0, Math.min(11, num));
-}
+import { clampRedCards } from "../utils/matchUtils";
 
 const mapStateToProps = (state: RootState) => ({
   home: state.match.homeRedCards ?? 0,
@@ -31,12 +26,12 @@ function MatchScoreDialog({ onChange, home, away }: PropsFromRedux) {
   const [open, setOpen] = useState(false);
 
   function handleHomeChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const value = clampScore(e.target.value);
+    const value = clampRedCards(e.target.value);
     onChange(value, away);
   }
 
   function handleAwayChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const value = clampScore(e.target.value);
+    const value = clampRedCards(e.target.value);
     onChange(home, value);
   }
 
