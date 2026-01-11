@@ -29,6 +29,22 @@ async function goToMediaTab(page: import("@playwright/test").Page) {
   await expect(page.getByText("Birta strax")).toBeVisible({ timeout: 5000 });
 }
 
+async function deleteTestImages(page: import("@playwright/test").Page) {
+  const testImageItems = page
+    .locator(".asset-image")
+    .filter({ hasText: /test-upload-|test-compressed-/ });
+
+  let count = await testImageItems.count();
+  while (count > 0) {
+    const deleteButton = testImageItems.first().getByRole("button", {
+      name: "Eyða",
+    });
+    await deleteButton.click();
+    await page.waitForTimeout(500);
+    count = await testImageItems.count();
+  }
+}
+
 test.describe("Image Upload", () => {
   test.setTimeout(60000);
 
@@ -37,6 +53,19 @@ test.describe("Image Upload", () => {
       localStorage.clear();
     });
     await page.goto("/");
+  });
+
+  test.afterAll(async ({ browser }) => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+
+    await page.goto("/");
+    await login(page);
+    await goToMediaTab(page);
+    await page.waitForTimeout(2000);
+    await deleteTestImages(page);
+
+    await context.close();
   });
 
   test("uploads image with correct filename preserved", async ({ page }) => {
