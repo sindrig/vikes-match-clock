@@ -1,6 +1,5 @@
-import React from "react";
-import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, act } from "@testing-library/react";
 import { Provider } from "react-redux";
 import configureStore from "redux-mock-store";
 import ScoreBoard from "./ScoreBoard";
@@ -27,6 +26,7 @@ const createMockState = (
     ...viewInitialState,
     vp: {
       ...viewInitialState.vp,
+      name: "default",
       key: "default",
     },
     ...viewOverrides,
@@ -221,6 +221,7 @@ describe("ScoreBoard component", () => {
           {
             vp: {
               ...viewInitialState.vp,
+              name: "large-display",
               key: "large-display",
             },
           },
@@ -230,6 +231,150 @@ describe("ScoreBoard component", () => {
       expect(
         container.querySelector(".scoreboard-large-display"),
       ).toBeInTheDocument();
+    });
+  });
+
+  describe("buzzer sound", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("plays buzzer sound when buzzer is active in handball match", () => {
+      const now = Date.now();
+      vi.setSystemTime(now);
+
+      const { container } = renderWithStore(
+        createMockState({
+          matchType: Sports.Handball,
+          buzzer: now,
+        }),
+      );
+
+      const audio = container.querySelector("audio");
+      expect(audio).toBeInTheDocument();
+    });
+
+    it("does not play buzzer for football matches", () => {
+      const now = Date.now();
+      vi.setSystemTime(now);
+
+      const { container } = renderWithStore(
+        createMockState({
+          matchType: Sports.Football,
+          buzzer: now,
+        }),
+      );
+
+      const audio = container.querySelector("audio");
+      expect(audio).not.toBeInTheDocument();
+    });
+
+    it("does not play buzzer when buzzer timestamp is false", () => {
+      const { container } = renderWithStore(
+        createMockState({
+          matchType: Sports.Handball,
+          buzzer: false,
+        }),
+      );
+
+      const audio = container.querySelector("audio");
+      expect(audio).not.toBeInTheDocument();
+    });
+
+    it("stops playing buzzer after 3 seconds", () => {
+      const now = Date.now();
+      vi.setSystemTime(now);
+
+      const { container } = renderWithStore(
+        createMockState({
+          matchType: Sports.Handball,
+          buzzer: now,
+        }),
+      );
+
+      expect(container.querySelector("audio")).toBeInTheDocument();
+
+      act(() => {
+        vi.advanceTimersByTime(3001);
+      });
+
+      expect(container.querySelector("audio")).not.toBeInTheDocument();
+    });
+
+    it("does not play buzzer if timestamp is more than 3 seconds in the past", () => {
+      const now = Date.now();
+      vi.setSystemTime(now);
+      const fourSecondsAgo = now - 4000;
+
+      const { container } = renderWithStore(
+        createMockState({
+          matchType: Sports.Handball,
+          buzzer: fourSecondsAgo,
+        }),
+      );
+
+      const audio = container.querySelector("audio");
+      expect(audio).not.toBeInTheDocument();
+    });
+
+    it("plays buzzer for remaining duration when timestamp started 1 second ago", () => {
+      const now = Date.now();
+      vi.setSystemTime(now);
+      const oneSecondAgo = now - 1000;
+
+      const { container } = renderWithStore(
+        createMockState({
+          matchType: Sports.Handball,
+          buzzer: oneSecondAgo,
+        }),
+      );
+
+      expect(container.querySelector("audio")).toBeInTheDocument();
+
+      act(() => {
+        vi.advanceTimersByTime(2001);
+      });
+
+      expect(container.querySelector("audio")).not.toBeInTheDocument();
+    });
+
+    it("stops buzzer when buzzer timestamp becomes false", () => {
+      const now = Date.now();
+      vi.setSystemTime(now);
+
+      const store = mockStore(
+        createMockState({
+          matchType: Sports.Handball,
+          buzzer: now,
+        }),
+      );
+
+      const { container, rerender } = render(
+        <Provider store={store}>
+          <ScoreBoard />
+        </Provider>,
+      );
+
+      expect(container.querySelector("audio")).toBeInTheDocument();
+
+      const storeWithBuzzerOff = mockStore(
+        createMockState({
+          matchType: Sports.Handball,
+          buzzer: false,
+        }),
+      );
+
+      rerender(
+        <Provider store={storeWithBuzzerOff}>
+          <ScoreBoard />
+        </Provider>,
+      );
+
+      expect(container.querySelector("audio")).not.toBeInTheDocument();
     });
   });
 });

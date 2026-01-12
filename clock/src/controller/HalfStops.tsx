@@ -54,7 +54,7 @@ const HalfStops = ({
             onChange={({ target: { value } }) =>
               updateHalfLength(s, parseInt(value, 10))
             }
-            key={i} // eslint-disable-line
+            key={i}
             className="halfstops-input"
           />
         ))}

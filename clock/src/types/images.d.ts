@@ -29,26 +29,17 @@ declare module "*.mp3" {
 }
 
 declare module "compress.js" {
-  interface CompressedImage {
-    data: string;
-    ext: string;
-    alt: string;
-  }
-
   interface CompressOptions {
-    size?: number;
     quality?: number;
     maxWidth?: number;
     maxHeight?: number;
-    resize?: boolean;
+    crop?: boolean;
+    aspectRatio?: string;
   }
 
   class Compress {
-    compress(
-      files: File[],
-      options: CompressOptions,
-    ): Promise<CompressedImage[]>;
-    static convertBase64ToFile(base64: string, mime: string): File;
+    constructor(options?: CompressOptions);
+    compress(file: File, options?: CompressOptions): Promise<File>;
   }
 
   export default Compress;

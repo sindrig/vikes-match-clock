@@ -73,6 +73,8 @@ jobs:
       - name: Run Playwright e2e tests
         working-directory: ./clock
         run: pnpm e2e
+        env:
+          TEST_CREDENTIALS: ${{ secrets.TEST_CREDENTIALS }}
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4

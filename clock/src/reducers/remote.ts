@@ -8,7 +8,7 @@ interface RemoteState {
   email: string;
   password: string;
   sync: boolean;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Synced Firebase data can be any shape
+
   syncedData: unknown;
   listenPrefix: string;
 }
@@ -22,7 +22,6 @@ export const initialState: RemoteState = {
 };
 
 const handleRemote = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Firebase data is untyped
   next(
     state: RemoteState,
     { data, storeAs }: { data: unknown; storeAs: string },
@@ -43,7 +42,7 @@ const handleRemote = {
   },
 };
 
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 // TODO: Fix any usage [redux-actions handleActions requires specific ReducerMap type that conflicts with computed property names]
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const actions: any = {
@@ -84,7 +83,7 @@ const actions: any = {
   },
   [AT.receiveRemoteData]: handleRemote,
 };
-/* eslint-enable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call */
+/* eslint-enable @typescript-eslint/no-unsafe-member-access */
 export default handleActions<RemoteState, RemoteState>(
   actions as ReducerMap<RemoteState, RemoteState>,
   initialState,

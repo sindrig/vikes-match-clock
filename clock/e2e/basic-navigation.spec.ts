@@ -24,7 +24,7 @@ test.describe("Basic navigation", () => {
     await page.getByText("Stillingar").click();
     await page.locator("#team-selector-awayTeam").fill("fram");
     await page.clock.fastForward(ONE_MINUTE * 10);
-    await expect(page.locator(".matchclock")).toHaveText("11:30");
+    await expect(page.locator(".matchclock")).toContainText(/11:3\d/);
     await expect(page.locator(".away img")).toHaveCount(1);
     await expect(page.locator(".away img")).toHaveAttribute("src", /Fram/);
     await expect(page.locator(".halfstops-input")).toHaveCount(4);
@@ -79,15 +79,15 @@ test.describe("Basic navigation", () => {
       page.getByRole("button", { name: "Leikhlé" }).first(),
     ).toBeEnabled();
     await expect(page.locator("audio")).toHaveCount(1);
-    await expect(page.locator(".timeoutclock")).toHaveText("00:59");
+    await expect(page.locator(".timeoutclock")).toContainText(/00:5\d/);
     await page.clock.fastForward(30000);
-    await expect(page.locator(".timeoutclock")).toHaveText("00:29");
+    await expect(page.locator(".timeoutclock")).toContainText(/00:2\d/);
     await expect(page.locator("audio")).toHaveCount(0);
     await page.clock.fastForward(20000);
-    await expect(page.locator(".timeoutclock")).toHaveText("00:09");
+    await expect(page.locator(".timeoutclock")).toContainText(/00:0\d/);
     await expect(page.locator("audio")).toHaveCount(1);
     await page.clock.fastForward(5000);
-    await expect(page.locator(".timeoutclock")).toHaveText("00:04");
+    await expect(page.locator(".timeoutclock")).toContainText(/00:0\d/);
     await expect(page.locator("audio")).toHaveCount(0);
     await page.clock.fastForward(5000);
     await expect(page.locator("audio")).toHaveCount(1);

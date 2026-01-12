@@ -18,32 +18,19 @@ interface UploadManagerProps {
 const UploadManager: React.FC<UploadManagerProps> = ({ prefix, refresh }) => {
   const [doCompress, setDoCompress] = useState(false);
 
-  const insertImages = (filelist: FileList | File[]): void => {
-    const files = Array.isArray(filelist) ? filelist : [...filelist];
+  // react-drag-drop-files v3 with multiple prop passes FileList, not File[]
+  const insertImages = (fileOrFiles: File | FileList): void => {
+    const files: File[] =
+      fileOrFiles instanceof FileList ? Array.from(fileOrFiles) : [fileOrFiles];
+
     void Promise.all(
-      files.map((file, i) =>
+      files.map((file) =>
         file.type !== "image/gif" && doCompress
-          ? compress
-              .compress([file], {
-                size: 2,
-                quality: 1,
-                maxWidth: 240,
-                maxHeight: 176,
-              })
-              .then((resizedImage) => {
-                const img = resizedImage[0];
-                if (!img) {
-                  return file;
-                }
-                const base64str = img.data;
-                const imgExt = img.ext;
-                const resized = Compress.convertBase64ToFile(base64str, imgExt);
-                Object.defineProperty(resized, "name", {
-                  value: files[i]?.name,
-                  writable: true,
-                });
-                return resized;
-              })
+          ? compress.compress(file, {
+              quality: 1,
+              maxWidth: 240,
+              maxHeight: 176,
+            })
           : Promise.resolve(file),
       ),
     )
@@ -71,7 +58,7 @@ const UploadManager: React.FC<UploadManagerProps> = ({ prefix, refresh }) => {
         Compress automatically
       </label>
       <FileUploader
-        handleChange={insertImages}
+        handleChange={insertImages as (arg0: File | File[]) => void}
         name="file"
         types={fileTypes}
         multiple

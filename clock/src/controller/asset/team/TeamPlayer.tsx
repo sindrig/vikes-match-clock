@@ -51,14 +51,6 @@ const TeamPlayer = ({
       placeholder="Nafn"
       style={player.id ? {} : { backgroundColor: "red" }}
     />
-    {false && (
-      <input
-        type="text"
-        value={player.role || ""}
-        onChange={(e) => handler(onChange, "role", e)}
-        className="team-player-role"
-      />
-    )}
   </div>
 );
 

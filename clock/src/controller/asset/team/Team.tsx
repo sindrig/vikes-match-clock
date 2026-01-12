@@ -185,7 +185,6 @@ class Team extends Component<TeamProps, TeamState> {
         <div className="team-name">{match[teamName]}</div>
         {match[teamName]
           ? team.map((p, i) => (
-              // eslint-disable-next-line react/no-array-index-key
               <div className="player-whole-line" key={String(i)}>
                 {selectPlayer && p.name ? (
                   <Button
