@@ -50,3 +50,21 @@ class Player(Person):
 @dataclasses.dataclass
 class MatchReport:
     players: dict[int, list[Player]]
+
+
+@dataclasses.dataclass
+class PlayerMatch:
+    """A potential match for a searched player name."""
+
+    id: int
+    name: str
+    number: int
+    confidence: float  # 0-100 score from fuzzy matching
+
+
+@dataclasses.dataclass
+class PlayerSearchResult:
+    """Result of searching for a single player name."""
+
+    search_name: str
+    matches: list[PlayerMatch]

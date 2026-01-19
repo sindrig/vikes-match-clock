@@ -3,7 +3,7 @@ import axios, { AxiosResponse } from "axios";
 import apiConfig from "../apiConfig";
 import lambdaExample from "../debug/lambda-example";
 import clubIds from "../club-ids";
-import { Asset, AvailableMatches, Player } from "../types";
+import { Asset, AvailableMatches, Player, ClubRosterPlayer } from "../types";
 
 const DEBUG = false;
 
@@ -43,6 +43,11 @@ interface ActionCreators {
     homeTeam: string,
     awayTeam: string,
   ) => Promise<AxiosResponse | typeof lambdaExample>;
+  updateClubRosterPlayer: (
+    clubId: string,
+    ksiId: string,
+    player: ClubRosterPlayer,
+  ) => Action<{ clubId: string; ksiId: string; player: ClubRosterPlayer }>;
 }
 
 const actionPayloads: Record<
@@ -84,6 +89,11 @@ const actionPayloads: Record<
   setAvailableMatches: (matches: AvailableMatches) => ({
     matches,
   }),
+  updateClubRosterPlayer: (
+    clubId: string,
+    ksiId: string,
+    player: ClubRosterPlayer,
+  ) => ({ clubId, ksiId, player }),
   getAvailableMatches: (homeTeam: string, awayTeam: string) => {
     if (DEBUG) {
       return new Promise((resolve) => resolve(lambdaExample));

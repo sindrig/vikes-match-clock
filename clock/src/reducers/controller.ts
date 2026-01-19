@@ -10,6 +10,7 @@ import type {
   Asset,
   Player,
   AvailableMatches,
+  ClubRosterPlayer,
 } from "../types";
 
 export const ASSET_VIEWS = keymirror({
@@ -40,6 +41,7 @@ export const initialState: ControllerState = {
   selectedMatch: null,
   currentAsset: null,
   refreshToken: "",
+  rosters: {},
 };
 
 const getStateShowingNextAsset = (state: ControllerState): ControllerState => {
@@ -354,6 +356,17 @@ const actions = {
         }
         return results;
       }
+      if (
+        storeAs === "rosters" &&
+        data &&
+        typeof data === "object" &&
+        data !== null
+      ) {
+        return {
+          ...state,
+          rosters: data as ControllerState["rosters"],
+        };
+      }
       return state;
     },
   },
@@ -390,6 +403,29 @@ const actions = {
       return {
         ...state,
         refreshToken: (Math.random() + 1).toString(36).substring(2),
+      };
+    },
+  },
+  [AT.updateClubRosterPlayer]: {
+    next(
+      state: ControllerState,
+      {
+        payload: { clubId, ksiId, player },
+      }: Action<{ clubId: string; ksiId: string; player: ClubRosterPlayer }>,
+    ) {
+      const clubRoster = state.rosters[clubId] || { playersById: {} };
+      return {
+        ...state,
+        rosters: {
+          ...state.rosters,
+          [clubId]: {
+            ...clubRoster,
+            playersById: {
+              ...clubRoster.playersById,
+              [ksiId]: player,
+            },
+          },
+        },
       };
     },
   },

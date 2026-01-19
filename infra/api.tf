@@ -45,6 +45,12 @@ module "api_gateway" {
       timeout_milliseconds   = 12000
     }
 
+    "POST /parse-lineup" = {
+      lambda_arn             = module.parse-lineup.lambda_function_arn
+      payload_format_version = "2.0"
+      timeout_milliseconds   = 30000
+    }
+
     "ANY /currentWeather" = {
       lambda_arn             = module.weather.lambda_function_arn
       payload_format_version = "2.0"
@@ -195,6 +201,48 @@ module "match-report-v2" {
   attach_network_policy              = true
   replace_security_groups_on_destroy = true
   replacement_security_group_ids     = ["sg-03ecf18a377c6c35f"]
+
+  allowed_triggers = {
+    AllowExecutionFromAPIGateway = {
+      service    = "apigateway"
+      source_arn = "${module.api_gateway.apigatewayv2_api_execution_arn}/*/*"
+    }
+  }
+}
+
+resource "aws_secretsmanager_secret" "gemini_api_key" {
+  name        = "clock-api/gemini-api-key"
+  description = "Gemini API key for parse-lineup Lambda"
+}
+
+module "parse-lineup" {
+  source  = "terraform-aws-modules/lambda/aws"
+  version = "7.4.0"
+
+  function_name = "${random_pet.this.id}-parse-lineup"
+  description   = "Parse match lineup from image using Gemini"
+  handler       = "app.lambda_handler"
+  runtime       = "python3.12"
+
+  publish     = true
+  timeout     = 30
+  memory_size = 512
+
+  build_in_docker = true
+  source_path     = "${path.module}/../clock-api/parse-lineup"
+
+  environment_variables = {
+    GEMINI_API_KEY_SECRET_ARN = aws_secretsmanager_secret.gemini_api_key.arn
+  }
+
+  attach_policy_statements = true
+  policy_statements = {
+    secrets_manager = {
+      effect    = "Allow"
+      actions   = ["secretsmanager:GetSecretValue"]
+      resources = [aws_secretsmanager_secret.gemini_api_key.arn]
+    }
+  }
 
   allowed_triggers = {
     AllowExecutionFromAPIGateway = {

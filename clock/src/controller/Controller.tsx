@@ -59,7 +59,6 @@ const Controller = ({
 }: ControllerProps) => {
   const showControls = !sync || !auth.isEmpty;
   const showHome = tab === "home";
-  // If not logged in, only show the settings tab
   const showSettings = tab === "settings" || !showControls;
   const showMedia = tab === "media";
   const tooltipClear = <Tooltip>Birtir aftur stöðu leiksins á skjá.</Tooltip>;
