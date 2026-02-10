@@ -17,6 +17,25 @@ State is managed via React Context (`FirebaseStateContext`) and mirrored to Fire
 - This allows a controller in the booth to update the display on the field instantly.
 - The `listenPrefix` (usually a location name like `viken`) determines which match state the instance follows.
 
+#### Single Source of Truth
+
+**Firebase is the authoritative source** for all synced state. The architecture follows these principles:
+
+1. **Optimistic Updates**: When a controller makes a change, it updates local state immediately AND syncs to Firebase. This prevents UI lag and stale-ref race conditions.
+
+2. **Hydration Guards**: Before a client can write to Firebase, it must first receive the initial snapshot (hydration). This prevents a newly-connected controller from overwriting remote state with default values.
+
+3. **Empty Prefix Protection**: All write operations are blocked if `listenPrefix` is empty, preventing invalid Firebase paths like `states//match`.
+
+#### Multi-Controller Behavior
+
+Multiple controllers can connect to the same `listenPrefix` simultaneously. The system uses **last-write-wins** semantics:
+
+- All connected clients see the same state via Firebase subscriptions
+- If two controllers make conflicting changes, the last write to reach Firebase wins
+- There is no conflict resolution or operational transform
+- For production use, coordinate with your team to avoid simultaneous edits
+
 ### State Management
 
 | Context | Purpose |
