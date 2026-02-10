@@ -1,22 +1,30 @@
 import { createRoot } from "react-dom/client";
-import { Provider } from "react-redux";
-import { PersistGate } from "redux-persist/integration/react";
 import "./index.css";
-import { store, persistor } from "./store";
 import App from "./App";
 import "./raven";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
-import { firebaseAuth } from "./firebaseAuth";
-import { AuthActionType } from "./ActionTypes";
+import {
+  LocalStateProvider,
+  useLocalState,
+} from "./contexts/LocalStateContext";
+import { FirebaseStateProvider } from "./contexts/FirebaseStateContext";
 
-firebaseAuth.onAuthStateChanged((user) => {
-  const authState = firebaseAuth.userToAuthState(user);
-  store.dispatch({
-    type: AuthActionType.SET_AUTH_STATE,
-    payload: authState,
-  });
-});
+// Create a wrapper component that bridges LocalState to FirebaseState
+function AppWithProviders() {
+  const { sync, listenPrefix, auth } = useLocalState();
+  const isAuthenticated = auth.isLoaded && !auth.isEmpty;
+
+  return (
+    <FirebaseStateProvider
+      sync={sync}
+      listenPrefix={listenPrefix}
+      isAuthenticated={isAuthenticated}
+    >
+      <App />
+    </FirebaseStateProvider>
+  );
+}
 
 const container = document.getElementById("root");
 if (!container) {
@@ -24,11 +32,9 @@ if (!container) {
 }
 const root = createRoot(container);
 root.render(
-  <Provider store={store}>
-    <PersistGate loading={null} persistor={persistor}>
-      <DndProvider backend={HTML5Backend}>
-        <App />
-      </DndProvider>
-    </PersistGate>
-  </Provider>,
+  <LocalStateProvider>
+    <DndProvider backend={HTML5Backend}>
+      <AppWithProviders />
+    </DndProvider>
+  </LocalStateProvider>,
 );
