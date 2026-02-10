@@ -47,6 +47,7 @@ module "web" {
   }
 
   stage            = "staging"
+  name_suffix      = "-staging"
   frontend_domain  = "staging.irdn.is"
   api_domain       = "clock-api-staging.irdn.is"
   deploy_role_name = data.terraform_remote_state.access.outputs.staging_deploy_role_name

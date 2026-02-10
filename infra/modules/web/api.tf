@@ -15,14 +15,14 @@ resource "random_pet" "this" {
 }
 
 resource "aws_cloudwatch_log_group" "logs" {
-  name = "clock-api-${var.stage}-${random_pet.this.id}"
+  name = "clock-api-${random_pet.this.id}${var.name_suffix}"
 }
 
 module "api_gateway" {
   source  = "terraform-aws-modules/apigateway-v2/aws"
   version = "2.2.2"
 
-  name          = "${random_pet.this.id}-${var.stage}-http"
+  name          = "${random_pet.this.id}${var.name_suffix}-http"
   description   = "Clock API (${var.stage})"
   protocol_type = "HTTP"
 
@@ -90,7 +90,7 @@ module "match-report" {
   source  = "terraform-aws-modules/lambda/aws"
   version = "7.4.0"
 
-  function_name = "${random_pet.this.id}-${var.stage}-match-report"
+  function_name = "${random_pet.this.id}${var.name_suffix}-match-report"
   description   = "Match report (${var.stage})"
   handler       = "app.lambda_handler"
   runtime       = "python3.12"
@@ -119,7 +119,7 @@ module "weather" {
   source  = "terraform-aws-modules/lambda/aws"
   version = "7.4.0"
 
-  function_name = "${random_pet.this.id}-${var.stage}-weather"
+  function_name = "${random_pet.this.id}${var.name_suffix}-weather"
   description   = "Weather (${var.stage})"
   handler       = "app.lambda_handler"
   runtime       = "python3.12"
@@ -142,7 +142,7 @@ module "match-report-v2" {
   source  = "terraform-aws-modules/lambda/aws"
   version = "7.4.0"
 
-  function_name = "${random_pet.this.id}-${var.stage}-match-report-v2"
+  function_name = "${random_pet.this.id}${var.name_suffix}-match-report-v2"
   description   = "Match report v2 (${var.stage})"
   handler       = "app.lambda_handler"
   runtime       = "python3.12"

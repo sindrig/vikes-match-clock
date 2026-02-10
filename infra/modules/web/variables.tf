@@ -3,6 +3,12 @@ variable "stage" {
   type        = string
 }
 
+variable "name_suffix" {
+  description = "Optional suffix to add to resource names (e.g., '-staging'). Leave empty for prod to preserve existing resource names."
+  type        = string
+  default     = ""
+}
+
 variable "frontend_domain" {
   description = "Frontend domain (e.g., klukka.irdn.is or staging.irdn.is)"
   type        = string
