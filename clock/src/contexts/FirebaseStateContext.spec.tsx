@@ -13,6 +13,10 @@ vi.mock("../firebaseDatabase", () => ({
   },
 }));
 
+vi.mock("../firebase", () => ({
+  database: {},
+}));
+
 vi.mock("firebase/database", () => ({
   ref: vi.fn(),
   onValue: vi.fn(() => vi.fn()),
@@ -158,7 +162,11 @@ describe("FirebaseStateContext", () => {
 
       act(() => {
         matchApi!.addGoal("home");
+      });
+      act(() => {
         matchApi!.addGoal("home");
+      });
+      act(() => {
         matchApi!.addGoal("away");
       });
 
