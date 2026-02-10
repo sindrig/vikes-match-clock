@@ -9,7 +9,7 @@ variable "frontend_domain" {
 }
 
 variable "api_domain" {
-  description = "API domain (e.g., clock-api.irdn.is or klukka-staging.irdn.is)"
+  description = "API domain (e.g., clock-api.irdn.is or clock-api-staging.irdn.is)"
   type        = string
 }
 
