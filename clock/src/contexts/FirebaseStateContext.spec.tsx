@@ -58,7 +58,7 @@ describe("FirebaseStateContext", () => {
   });
 
   describe("empty listenPrefix protection", () => {
-    it("blocks match updates when listenPrefix is empty", async () => {
+    it("blocks match updates when listenPrefix is empty", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
 
       render(
