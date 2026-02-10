@@ -25,6 +25,12 @@ import {
 import { Sports, DEFAULT_HALFSTOPS } from "../constants";
 import clubIds from "../club-ids";
 import assetTypes from "../controller/asset/AssetTypes";
+import {
+  parseLocations,
+  parseMatch,
+  parseController,
+  parseView,
+} from "./firebaseParsers";
 
 const defaultMatch: Match = {
   homeScore: 0,
@@ -202,6 +208,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   }, [view]);
 
   // Reset hydration when listenPrefix changes
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     setIsMatchHydrated(false);
     setIsControllerHydrated(false);
@@ -211,27 +218,9 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   useEffect(() => {
     const locationsRef = ref(database, "locations");
     const unsubLocations = onValue(locationsRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data && typeof data === "object") {
-        const screens = Object.entries(data)
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          .map(([key, value]: [string, any]) => {
-            const { label, screens: locScreens, pitchIds } = value;
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            return locScreens.map((screen: any) => ({
-              screen,
-              label,
-              key,
-              pitchIds,
-            }));
-          })
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          .reduce((a: any[], b: any[]) => a.concat(b), []);
-
-        setListeners({
-          available: Object.keys(data),
-          screens,
-        });
+      const parsed = parseLocations(snapshot.val());
+      if (parsed) {
+        setListeners(parsed);
       }
     });
 
@@ -249,16 +238,8 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       const unsubMatch = onValue(
         ref(database, matchPath),
         (snapshot) => {
-          const data = snapshot.val();
-          if (data) {
-            const results: Match = {
-              ...defaultMatch,
-              ...(data as Partial<Match>),
-            };
-
-            if (!results.home2min) results.home2min = [];
-            if (!results.away2min) results.away2min = [];
-
+          const results = parseMatch(snapshot.val(), defaultMatch);
+          if (results) {
             if (results.started > 0 && !results.countdown) {
               if (matchRef.current.started === 0) {
                 results.started = Date.now() - 150;
@@ -291,17 +272,8 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       const unsubController = onValue(
         ref(database, controllerPath),
         (snapshot) => {
-          const data = snapshot.val();
-          if (data) {
-            const results = {
-              ...defaultController,
-              ...(data as Partial<ControllerState>),
-            };
-            if (!("selectedAssets" in data)) results.selectedAssets = [];
-            else if (!results.selectedAssets) results.selectedAssets = [];
-
-            if (!("currentAsset" in data)) results.currentAsset = null;
-
+          const results = parseController(snapshot.val(), defaultController);
+          if (results) {
             setController(results);
           }
           setIsControllerHydrated(true);
@@ -313,9 +285,9 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       const unsubView = onValue(
         ref(database, viewPath),
         (snapshot) => {
-          const data = snapshot.val();
-          if (data) {
-            setView({ ...defaultView, ...(data as Partial<ViewState>) });
+          const results = parseView(snapshot.val(), defaultView);
+          if (results) {
+            setView(results);
           }
           setIsViewHydrated(true);
         },
@@ -450,31 +422,33 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     [applyMatchUpdate],
   );
 
-  const addGoal = useCallback(
-    (team: "home" | "away") => {
-      applyMatchUpdate((prev) => {
-        const key = `${team}Score` as "homeScore" | "awayScore";
-        return { ...prev, [key]: prev[key] + 1 };
-      });
-    },
-    [applyMatchUpdate],
-  );
+   const addGoal = useCallback(
+     (team: "home" | "away") => {
+       applyMatchUpdate((prev) => {
+         // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+         const key = `${team}Score` as "homeScore" | "awayScore";
+         return { ...prev, [key]: prev[key] + 1 };
+       });
+     },
+     [applyMatchUpdate],
+   );
 
-  const addPenalty = useCallback(
-    (team: "home" | "away", key: string, penaltyLength: number) => {
-      applyMatchUpdate((prev) => {
-        const stateKey = `${team}2min` as "home2min" | "away2min";
-        const collection = [...prev[stateKey]];
-        collection.push({
-          atTimeElapsed: prev.timeElapsed,
-          key,
-          penaltyLength,
-        });
-        return { ...prev, [stateKey]: collection };
-      });
-    },
-    [applyMatchUpdate],
-  );
+   const addPenalty = useCallback(
+     (team: "home" | "away", key: string, penaltyLength: number) => {
+       applyMatchUpdate((prev) => {
+         // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+         const stateKey = `${team}2min` as "home2min" | "away2min";
+         const collection = [...prev[stateKey]];
+         collection.push({
+           atTimeElapsed: prev.timeElapsed,
+           key,
+           penaltyLength,
+         });
+         return { ...prev, [stateKey]: collection };
+       });
+     },
+     [applyMatchUpdate],
+   );
 
   const removePenalty = useCallback(
     (key: string) => {
@@ -536,19 +510,20 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     [applyMatchUpdate],
   );
 
-  const matchTimeout = useCallback(
-    (team: "home" | "away") => {
-      applyMatchUpdate((prev) => {
-        const stateKey = `${team}Timeouts` as "homeTimeouts" | "awayTimeouts";
-        return {
-          ...prev,
-          timeout: Date.now(),
-          [stateKey]: Math.min(prev[stateKey] + 1, 4),
-        };
-      });
-    },
-    [applyMatchUpdate],
-  );
+   const matchTimeout = useCallback(
+     (team: "home" | "away") => {
+       applyMatchUpdate((prev) => {
+         // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+         const stateKey = `${team}Timeouts` as "homeTimeouts" | "awayTimeouts";
+         return {
+           ...prev,
+           timeout: Date.now(),
+           [stateKey]: Math.min(prev[stateKey] + 1, 4),
+         };
+       });
+     },
+     [applyMatchUpdate],
+   );
 
   const removeTimeout = useCallback(() => {
     applyMatchUpdate((prev) => ({ ...prev, timeout: 0 }));
