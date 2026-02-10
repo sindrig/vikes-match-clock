@@ -1,20 +1,11 @@
-import { useSelector } from "react-redux";
-import {
-  useFirebaseSync,
-  useFirebaseAuthListener,
-} from "./hooks/useFirebaseSync";
-
+import { useLocalState } from "./contexts/LocalStateContext";
 import "./StateListener.css";
-import { RootState } from "./types";
 
 const StateListener = () => {
-  const { sync } = useSelector((state: RootState) => state.remote);
-  const { isLoaded, isEmpty } = useSelector((state: RootState) => state.auth);
+  const { sync, auth } = useLocalState();
+  const isAuthenticated = auth.isLoaded && !auth.isEmpty;
 
-  useFirebaseSync();
-  useFirebaseAuthListener();
-
-  if (sync && isLoaded && !isEmpty) {
+  if (sync && isAuthenticated) {
     return <div className="connect-indicator">&#8226;</div>;
   }
   return null;

@@ -1,81 +1,27 @@
-import { Component } from "react";
-import type React from "react";
-import { bindActionCreators, Dispatch } from "redux";
-import { connect, ConnectedProps } from "react-redux";
-
-import matchActions from "../actions/match";
+import React, { useState, useEffect, useCallback } from "react";
 import { formatMillisAsTime } from "../utils/timeUtils";
-import { RootState } from "../types";
+import { useMatch } from "../contexts/FirebaseStateContext";
 
-interface OwnProps {
+interface TwoMinClockProps {
   atTimeElapsed: number;
   penaltyLength: number;
   uniqueKey: string;
 }
 
-interface TwoMinClockState {
-  time: string | null;
-}
+const TwoMinClock: React.FC<TwoMinClockProps> = ({
+  atTimeElapsed,
+  penaltyLength,
+  uniqueKey,
+}) => {
+  const { match, removePenalty } = useMatch();
+  const { started, timeElapsed } = match;
+  const [time, setTime] = useState<string | null>(null);
 
-const stateToProps = ({
-  match: { started, timeElapsed, matchType },
-}: RootState) => ({
-  started,
-  timeElapsed,
-  matchType,
-});
-
-const dispatchToProps = (dispatch: Dispatch) =>
-  bindActionCreators(
-    {
-      removePenalty: matchActions.removePenalty,
-    },
-    dispatch,
-  );
-
-const connector = connect(stateToProps, dispatchToProps);
-
-type TwoMinClockProps = ConnectedProps<typeof connector> & OwnProps;
-
-class TwoMinClock extends Component<TwoMinClockProps, TwoMinClockState> {
-  interval: NodeJS.Timeout | null = null;
-
-  constructor(props: TwoMinClockProps) {
-    super(props);
-    this.state = {
-      time: null,
-    };
-  }
-
-  componentDidMount(): void {
-    this.interval = setInterval(this.updateTime, 100);
-  }
-
-  componentWillUnmount(): void {
-    if (this.interval) {
-      clearInterval(this.interval);
-    }
-  }
-
-  static getDerivedStateFromProps({
-    started,
-    timeElapsed,
-  }: TwoMinClockProps): TwoMinClockState | null {
+  const updateTime = useCallback(() => {
     if (!started && !timeElapsed) {
-      return { time: null };
+      setTime(null);
+      return;
     }
-    return null;
-  }
-
-  updateTime = (): null => {
-    const {
-      started,
-      timeElapsed,
-      atTimeElapsed,
-      penaltyLength,
-      removePenalty,
-      uniqueKey,
-    } = this.props;
     let milliSecondsElapsed = timeElapsed - atTimeElapsed;
     if (started) {
       milliSecondsElapsed += Date.now() - started;
@@ -84,17 +30,28 @@ class TwoMinClock extends Component<TwoMinClockProps, TwoMinClockState> {
     if (milliSecondsLeft < 0) {
       removePenalty(uniqueKey);
     } else {
-      this.setState({ time: formatMillisAsTime(milliSecondsLeft) });
+      setTime(formatMillisAsTime(milliSecondsLeft));
     }
-    return null;
-  };
+  }, [
+    started,
+    timeElapsed,
+    atTimeElapsed,
+    penaltyLength,
+    removePenalty,
+    uniqueKey,
+  ]);
 
-  render(): React.JSX.Element {
-    const { penaltyLength } = this.props;
-    const { time } = this.state;
-    const displayedTime = time || formatMillisAsTime(penaltyLength);
-    return <div className="penalty">{displayedTime}</div>;
+  useEffect(() => {
+    const interval = setInterval(updateTime, 100);
+    return () => clearInterval(interval);
+  }, [updateTime]);
+
+  if (!started && !timeElapsed && time !== null) {
+    setTime(null);
   }
-}
 
-export default connector(TwoMinClock);
+  const displayedTime = time || formatMillisAsTime(penaltyLength);
+  return <div className="penalty">{displayedTime}</div>;
+};
+
+export default TwoMinClock;

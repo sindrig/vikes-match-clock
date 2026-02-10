@@ -1,33 +1,13 @@
 import { useEffect, useRef } from "react";
-import { connect, ConnectedProps } from "react-redux";
-import { bindActionCreators, Dispatch } from "redux";
-import controllerActions from "../actions/controller";
 import Button from "rsuite/Button";
-import { RootState } from "../types";
+import { useController } from "../contexts/FirebaseStateContext";
+import { useLocalState } from "../contexts/LocalStateContext";
 
-const mapStateToProps = (state: RootState) => ({
-  refreshToken: state.controller.refreshToken,
-  auth: state.auth,
-  sync: state.remote.sync,
-});
+const RefreshHandler = () => {
+  const { controller, remoteRefresh } = useController();
+  const { sync, auth } = useLocalState();
+  const refreshToken = controller.refreshToken;
 
-const mapDispatchToProps = (dispatch: Dispatch) =>
-  bindActionCreators(
-    {
-      remoteRefresh: controllerActions.remoteRefresh,
-    },
-    dispatch,
-  );
-
-const connector = connect(mapStateToProps, mapDispatchToProps);
-type PropsFromRedux = ConnectedProps<typeof connector>;
-
-const RefreshHandler = ({
-  refreshToken,
-  sync,
-  auth,
-  remoteRefresh,
-}: PropsFromRedux) => {
   const isInitialMount = useRef(true);
   useEffect(() => {
     if (isInitialMount.current) {
@@ -36,6 +16,7 @@ const RefreshHandler = ({
       window.location.reload();
     }
   }, [refreshToken]);
+
   if (sync && !auth.isEmpty) {
     return (
       <Button
@@ -51,4 +32,4 @@ const RefreshHandler = ({
   return null;
 };
 
-export default connector(RefreshHandler);
+export default RefreshHandler;

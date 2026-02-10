@@ -10,10 +10,12 @@ import { VIEWS } from "./reducers/controller";
 import { getBackground } from "./reducers/view";
 import StateListener from "./StateListener";
 import MatchController from "./match-controller/MatchController";
+import useGlobalShortcuts from "./hooks/useGlobalShortcuts";
 
 import "./App.css";
 
 function App() {
+  useGlobalShortcuts();
   const { controller, view: viewState } = useFirebaseState();
   const { sync, auth } = useLocalState();
 

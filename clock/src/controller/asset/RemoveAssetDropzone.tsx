@@ -1,10 +1,8 @@
-import { useCallback } from "react";
+import React, { useCallback } from "react";
 import { useDrop } from "react-dnd";
-import { bindActionCreators, Dispatch } from "redux";
-import { connect, ConnectedProps } from "react-redux";
 import TrashIcon from "@rsuite/icons/Trash";
-import controllerActions from "../../actions/controller";
 import { Asset } from "../../types";
+import { useController } from "../../contexts/FirebaseStateContext";
 
 const assetItemType = "asset";
 
@@ -12,21 +10,8 @@ interface DragItem {
   asset: Asset;
 }
 
-const mapDispatchToProps = (dispatch: Dispatch) =>
-  bindActionCreators(
-    {
-      removeAsset: controllerActions.removeAsset,
-    },
-    dispatch,
-  );
-
-const connector = connect(null, mapDispatchToProps);
-
-type PropsFromRedux = ConnectedProps<typeof connector>;
-
-const RemoveAssetDropzone = ({
-  removeAsset,
-}: PropsFromRedux): React.JSX.Element => {
+const RemoveAssetDropzone = (): React.JSX.Element => {
+  const { removeAsset } = useController();
   const [{ handlerId }, drop] = useDrop<
     DragItem,
     void,
@@ -56,4 +41,4 @@ const RemoveAssetDropzone = ({
   );
 };
 
-export default connector(RemoveAssetDropzone);
+export default RemoveAssetDropzone;

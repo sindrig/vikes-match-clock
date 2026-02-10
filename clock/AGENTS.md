@@ -10,26 +10,23 @@ The `clock/` application is a dual-purpose React system: it acts as both the **s
 
 ### Bidirectional Firebase Sync
 
-State is managed in Redux but mirrored to Firebase Realtime Database.
+State is managed via React Context (`FirebaseStateContext`) and mirrored to Firebase Realtime Database.
 
-- `useFirebaseSync.ts`: Monitors Redux state and pushes changes to `states/{listenPrefix}/{stateType}`. It also listens for remote changes to update the local store.
+- `FirebaseStateContext.tsx`: Manages state (Match, Controller, View, Listeners) and handles synchronization.
+- `LocalStateContext.tsx`: Manages local settings (auth, sync toggle, listen prefix).
 - This allows a controller in the booth to update the display on the field instantly.
 - The `listenPrefix` (usually a location name like `viken`) determines which match state the instance follows.
 
-### Redux Slices
+### State Management (Migrating from Redux to Context)
 
-| Slice        | Purpose                                                                         |
-| ------------ | ------------------------------------------------------------------------------- |
-| `match`      | Source of truth for the game (clock time, scores, period, penalties, red cards) |
-| `controller` | Admin UI state, including active Asset and asset queue                          |
-| `view`       | Display settings (viewport scaling, background themes)                          |
-| `remote`     | Firebase paths and sync toggles                                                 |
-| `auth`       | Firebase authentication state                                                   |
-| `listeners`  | Available screens/locations                                                     |
+| Context | Purpose |
+| ------- | ------- |
+| `FirebaseStateContext` | Shared state synced via Firebase (Match, Controller, View, Listeners) |
+| `LocalStateContext` | Local app state (Auth, Sync settings) |
 
 ### Persistence
 
-`redux-persist` ensures clock state survives page refreshes, which is critical during live matches.
+`redux-persist` was used to ensure clock state survives page refreshes. The new Context implementation uses `localStorage` for local settings and Firebase re-sync for match state.
 
 ## Key Component Systems
 

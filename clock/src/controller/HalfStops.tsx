@@ -1,26 +1,11 @@
 import React from "react";
-import { connect } from "react-redux";
-import { bindActionCreators, Dispatch } from "redux";
+import { HALFSTOPS } from "../constants";
+import { useMatch } from "../contexts/FirebaseStateContext";
 
-import matchActions from "../actions/match";
-import { Sports, HALFSTOPS } from "../constants";
-import { RootState } from "../types";
+const HalfStops = () => {
+  const { match, updateHalfLength, setHalfStops } = useMatch();
+  const { halfStops, matchType, showInjuryTime } = match;
 
-interface HalfStopsProps {
-  halfStops: number[];
-  showInjuryTime: boolean;
-  updateHalfLength: (currentValue: number, newValue: number) => void;
-  matchType: Sports;
-  setHalfStops: (halfStops: number[], showInjuryTime: boolean) => void;
-}
-
-const HalfStops = ({
-  halfStops,
-  showInjuryTime,
-  updateHalfLength,
-  matchType,
-  setHalfStops,
-}: HalfStopsProps) => {
   const autoHalfStops: Record<number, number[]> = HALFSTOPS[matchType] || {};
   return (
     <React.Fragment>
@@ -32,7 +17,7 @@ const HalfStops = ({
               const numericKey = parseInt(value, 10);
               const stops = autoHalfStops[numericKey];
               if (stops) {
-                setHalfStops(stops, showInjuryTime);
+                setHalfStops(stops, showInjuryTime || false);
               }
             }
           }}
@@ -52,7 +37,7 @@ const HalfStops = ({
             type="number"
             value={s || ""}
             onChange={({ target: { value } }) =>
-              updateHalfLength(s, parseInt(value, 10))
+              updateHalfLength(String(s), value)
             }
             key={i}
             className="halfstops-input"
@@ -74,19 +59,4 @@ const HalfStops = ({
   );
 };
 
-const stateToProps = ({ match }: RootState) => ({
-  halfStops: match.halfStops,
-  matchType: match.matchType,
-  showInjuryTime: match.showInjuryTime ?? true,
-});
-
-const dispatchToProps = (dispatch: Dispatch) =>
-  bindActionCreators(
-    {
-      updateHalfLength: matchActions.updateHalfLength,
-      setHalfStops: matchActions.setHalfStops,
-    },
-    dispatch,
-  );
-
-export default connect(stateToProps, dispatchToProps)(HalfStops);
+export default HalfStops;

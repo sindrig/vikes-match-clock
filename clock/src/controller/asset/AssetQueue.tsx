@@ -1,43 +1,23 @@
-import { useCallback } from "react";
+import React, { useCallback } from "react";
 import update from "immutability-helper";
-import { bindActionCreators, Dispatch } from "redux";
-import { connect, ConnectedProps } from "react-redux";
 
 import Asset from "./Asset";
 import RemovableAsset from "./RemovableAsset";
 import RemoveAssetDropzone from "./RemoveAssetDropzone";
-import controllerActions from "../../actions/controller";
-import { RootState, Asset as AssetType } from "../../types";
+import { Asset as AssetType } from "../../types";
+import { useController } from "../../contexts/FirebaseStateContext";
 
 interface OwnProps {
   includeRemove?: boolean;
 }
 
-const mapStateToProps = ({ controller: { selectedAssets } }: RootState) => ({
-  selectedAssets,
-});
-
-const mapDispatchToProps = (dispatch: Dispatch) =>
-  bindActionCreators(
-    {
-      setSelectedAssets: controllerActions.setSelectedAssets,
-      removeAsset: controllerActions.removeAsset,
-    },
-    dispatch,
-  );
-
-const connector = connect(mapStateToProps, mapDispatchToProps);
-
-type PropsFromRedux = ConnectedProps<typeof connector>;
-
-type Props = PropsFromRedux & OwnProps;
+type Props = OwnProps;
 
 const AssetQueue = ({
-  removeAsset,
-  selectedAssets,
-  setSelectedAssets,
   includeRemove = false,
 }: Props): React.JSX.Element | null => {
+  const { controller: { selectedAssets }, setSelectedAssets, removeAsset } = useController();
+
   const moveAsset = useCallback(
     (dragIndex: number, hoverIndex: number) => {
       const draggedAsset = selectedAssets[dragIndex];
@@ -87,4 +67,4 @@ const AssetQueue = ({
   );
 };
 
-export default connector(AssetQueue);
+export default AssetQueue;

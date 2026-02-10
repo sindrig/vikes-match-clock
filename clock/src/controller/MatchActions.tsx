@@ -1,13 +1,9 @@
 import React, { useState } from "react";
-import { connect, ConnectedProps } from "react-redux";
-import { bindActionCreators, Dispatch } from "redux";
 import IconButton from "rsuite/IconButton";
 import Button from "rsuite/Button";
 import PlayIcon from "@rsuite/icons/PlayOutline";
 import PauseIcon from "@rsuite/icons/PauseRound";
 import HistoryIcon from "@rsuite/icons/History";
-import matchActions from "../actions/match";
-import controllerActions from "../actions/controller";
 import PenaltiesManipulationBox from "./PenaltiesManipulationBox";
 import { VIEWS } from "../reducers/controller";
 import { Sports, DEFAULT_HALFSTOPS } from "../constants";
@@ -15,13 +11,15 @@ import assetTypes from "./asset/AssetTypes";
 import baddi from "../images/baddi.gif";
 import { getPlayerAssetObject } from "./asset/team/assetHelpers";
 import RedCardManipulation from "./RedCardManipulation";
-import { RootState, Match } from "../types";
+import { Match } from "../types";
 import {
   roundMillisToSeconds,
   formatTimeUnit,
   shouldShowGoalCelebration,
   isMatchResetDisabled,
 } from "../utils/matchUtils";
+import { useMatch, useController } from "../contexts/FirebaseStateContext";
+import { useRemoteSettings } from "../contexts/LocalStateContext";
 
 const WRAPPER_CLASSNAME = "control-item playerControls withborder";
 
@@ -63,67 +61,41 @@ const clockManipulationBox = (
   );
 };
 
-const mapStateToProps = ({
-  controller: { view, availableMatches, selectedMatch },
-  match,
-  remote: { listenPrefix },
-}: RootState) => {
+const MatchActions = () => {
+  const {
+    match,
+    updateMatch,
+    pauseMatch,
+    startMatch,
+    addGoal,
+    matchTimeout,
+    removeTimeout,
+    countdown,
+  } = useMatch();
+
+  const { controller, renderAsset } = useController();
+  const { listenPrefix } = useRemoteSettings();
+
+  const { view, availableMatches, selectedMatch } = controller;
+
   const selectedMatchObj = selectedMatch
     ? availableMatches[selectedMatch]
     : undefined;
-  return {
-    view,
-    listenPrefix,
-    match,
-    homeTeam: selectedMatchObj?.players
-      ? selectedMatchObj.players[match.homeTeamId] || []
-      : [],
-    awayTeam: selectedMatchObj?.players
-      ? selectedMatchObj.players[match.awayTeamId] || []
-      : [],
-  };
-};
 
-const mapDispatchToProps = (dispatch: Dispatch) =>
-  bindActionCreators(
-    {
-      updateMatch: matchActions.updateMatch,
-      pauseMatch: matchActions.pauseMatch,
-      startMatch: matchActions.startMatch,
-      addGoal: matchActions.addGoal,
-      matchTimeout: matchActions.matchTimeout,
-      removeTimeout: matchActions.removeTimeout,
-      countdown: matchActions.countdown,
-      renderAsset: controllerActions.renderAsset,
-    },
-    dispatch,
-  );
+  const homeTeam = selectedMatchObj?.players
+    ? selectedMatchObj.players[match.homeTeamId] || []
+    : [];
+  const awayTeam = selectedMatchObj?.players
+    ? selectedMatchObj.players[match.awayTeamId] || []
+    : [];
 
-const connector = connect(mapStateToProps, mapDispatchToProps);
-type PropsFromRedux = ConnectedProps<typeof connector>;
-
-const MatchActions: React.FC<PropsFromRedux> = ({
-  view,
-  match,
-  updateMatch,
-  pauseMatch,
-  matchTimeout,
-  removeTimeout,
-  startMatch,
-  addGoal,
-  renderAsset,
-  homeTeam,
-  awayTeam,
-  countdown,
-  listenPrefix,
-}) => {
   const [showScorerSelector, setShowScorerSelector] = useState<string | null>(
     null,
   );
   const [goalScorer, setGoalScorer] = useState<number | string>(0);
 
   const goal = (awayOrHome: "home" | "away"): void => {
-    addGoal({ team: awayOrHome });
+    addGoal(awayOrHome);
     const teamName = awayOrHome === "home" ? match.homeTeam : match.awayTeam;
     if (shouldShowGoalCelebration(match.matchType, teamName, listenPrefix)) {
       renderAsset({
@@ -240,7 +212,7 @@ const MatchActions: React.FC<PropsFromRedux> = ({
                   <Button
                     color="blue"
                     appearance="primary"
-                    onClick={() => pauseMatch({ isHalfEnd: true })}
+                    onClick={() => pauseMatch(true)}
                     disabled={!!match.timeout}
                   >
                     <PlayIcon /> Næsti hálfleikur
@@ -330,7 +302,7 @@ const MatchActions: React.FC<PropsFromRedux> = ({
                   <button
                     type="button"
                     key={team}
-                    onClick={() => matchTimeout({ team })}
+                    onClick={() => matchTimeout(team)}
                   >
                     {`Leikhlé ${name}`}
                   </button>
@@ -344,4 +316,4 @@ const MatchActions: React.FC<PropsFromRedux> = ({
   );
 };
 
-export default connector(MatchActions);
+export default MatchActions;

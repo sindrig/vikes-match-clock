@@ -1,21 +1,12 @@
 import React, { useState } from "react";
-import { connect, ConnectedProps } from "react-redux";
 import { Nav } from "rsuite";
 import UploadManager from "./UploadManager";
 import ImageList from "./ImageList";
 import { IMAGE_TYPES } from ".";
-import { RootState } from "../../types";
+import { useLocalState } from "../../contexts/LocalStateContext";
 
-const stateToProps = ({ auth, remote: { listenPrefix } }: RootState) => ({
-  auth,
-  listenPrefix,
-});
-
-const connector = connect(stateToProps);
-
-type MediaManagerProps = ConnectedProps<typeof connector>;
-
-const MediaManager: React.FC<MediaManagerProps> = ({ auth, listenPrefix }) => {
+const MediaManager: React.FC = () => {
+  const { auth, listenPrefix } = useLocalState();
   const [tab, setTab] = useState<string>(IMAGE_TYPES.images);
   const finalTab = `${String(listenPrefix) === "safamyri" ? "fotbolti" : String(listenPrefix)}/${String(tab)}`;
   const [prefix, setPrefix] = useState<string>("");
@@ -80,4 +71,4 @@ const MediaManager: React.FC<MediaManagerProps> = ({ auth, listenPrefix }) => {
   );
 };
 
-export default connector(MediaManager);
+export default MediaManager;

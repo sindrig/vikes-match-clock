@@ -1,9 +1,8 @@
-import { Component } from "react";
-import { connect, ConnectedProps } from "react-redux";
+import React, { useMemo } from "react";
 
 import { THUMB_VP } from "../../constants";
 import { getBackground } from "../../reducers/view";
-import { RootState } from "../../types";
+import { useView } from "../../contexts/FirebaseStateContext";
 
 // Cached canvas for text measurement performance
 let cachedCanvas: HTMLCanvasElement | null = null;
@@ -55,41 +54,25 @@ interface OwnProps {
   includeBackground?: boolean;
 }
 
-const mapStateToProps = ({ view: { vp, background } }: RootState) => ({
-  vp,
-  background,
-});
+type Props = OwnProps;
 
-const connector = connect(mapStateToProps);
+const PlayerCard = (props: Props): React.JSX.Element => {
+  const {
+    thumbnail = false,
+    asset,
+    children,
+    className = "",
+    overlay = { text: "", blink: false },
+    includeBackground = true,
+    widthMultiplier = 1,
+  } = props;
 
-type PropsFromRedux = ConnectedProps<typeof connector>;
+  const { view: { vp, background } } = useView();
+  const width = vp.style.width;
 
-type Props = PropsFromRedux & OwnProps;
-
-interface State {
-  fontSizes: {
-    thumbnail: number;
-    regular: number;
-  };
-}
-
-class PlayerCard extends Component<Props, State> {
-  state: State = {
-    fontSizes: {
-      thumbnail: 1,
-      regular: 1,
-    },
-  };
-
-  static getDerivedStateFromProps(nextProps: Props): State {
-    const {
-      asset: { name = "" },
-      widthMultiplier = 1,
-      vp: {
-        style: { width },
-      },
-    } = nextProps;
-    const fontSizes = {
+  const fontSizes = useMemo(() => {
+    const name = asset.name || "";
+    return {
       thumbnail: getMaxFontSize(
         name,
         THUMB_VP.width * widthMultiplier,
@@ -101,49 +84,36 @@ class PlayerCard extends Component<Props, State> {
         Math.floor(width / 5),
       ),
     };
-    return { fontSizes };
-  }
+  }, [asset.name, widthMultiplier, width]);
 
-  render(): React.JSX.Element {
-    const {
-      thumbnail = false,
-      asset,
-      children,
-      className = "",
-      overlay = { text: "", blink: false },
-      background,
-      includeBackground = true,
-    } = this.props;
-    const { fontSizes } = this.state;
-    const nameStyle = {
-      fontSize: `${thumbnail ? fontSizes.thumbnail : fontSizes.regular}px`,
-    };
-    const style: React.CSSProperties = includeBackground
-      ? (getBackground(background) as React.CSSProperties)
-      : {};
-    return (
-      <div
-        className={`asset-player-icon ${String(className)}`}
-        key={asset.key}
-        style={style}
+  const nameStyle = {
+    fontSize: `${thumbnail ? fontSizes.thumbnail : fontSizes.regular}px`,
+  };
+  const style: React.CSSProperties = includeBackground
+    ? (getBackground(background) as React.CSSProperties)
+    : {};
+  return (
+    <div
+      className={`asset-player-icon ${String(className)}`}
+      key={asset.key}
+      style={style}
+    >
+      {children}
+      <span
+        className={`player-card-overlay ${
+          overlay.blink && overlay.effect ? String(overlay.effect) : ""
+        }`}
       >
-        {children}
-        <span
-          className={`player-card-overlay ${
-            overlay.blink && overlay.effect ? String(overlay.effect) : ""
-          }`}
-        >
-          {overlay.text}
-        </span>
-        <span className="asset-player-number">
-          {asset.number || (asset.role && asset.role[0])}
-        </span>
-        <span className="asset-player-name" style={nameStyle}>
-          {asset.name}
-        </span>
-      </div>
-    );
-  }
-}
+        {overlay.text}
+      </span>
+      <span className="asset-player-number">
+        {asset.number || (asset.role && asset.role[0])}
+      </span>
+      <span className="asset-player-name" style={nameStyle}>
+        {asset.name}
+      </span>
+    </div>
+  );
+};
 
-export default connector(PlayerCard);
+export default PlayerCard;
