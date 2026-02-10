@@ -85,7 +85,7 @@ describe("FirebaseStateContext", () => {
       expect(matchApi!.match.homeScore).toBe(0);
     });
 
-    it("blocks controller updates when listenPrefix is empty", async () => {
+    it("blocks controller updates when listenPrefix is empty", () => {
       let controllerApi: ReturnType<typeof useController> | null = null;
 
       render(
@@ -114,7 +114,7 @@ describe("FirebaseStateContext", () => {
   });
 
   describe("non-sync mode (local only)", () => {
-    it("allows match updates when listenPrefix is set and sync is false", async () => {
+    it("allows match updates when listenPrefix is set and sync is false", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
 
       render(
@@ -141,7 +141,7 @@ describe("FirebaseStateContext", () => {
       expect(matchApi!.match.homeScore).toBe(1);
     });
 
-    it("allows rapid sequential goal additions", async () => {
+    it("allows rapid sequential goal additions", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
 
       render(
@@ -174,7 +174,7 @@ describe("FirebaseStateContext", () => {
       expect(matchApi!.match.awayScore).toBe(1);
     });
 
-    it("allows controller view changes", async () => {
+    it("allows controller view changes", () => {
       let controllerApi: ReturnType<typeof useController> | null = null;
 
       render(
