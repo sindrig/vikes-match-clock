@@ -5,7 +5,7 @@ import PlayIcon from "@rsuite/icons/PlayOutline";
 import PauseIcon from "@rsuite/icons/PauseRound";
 import HistoryIcon from "@rsuite/icons/History";
 import PenaltiesManipulationBox from "./PenaltiesManipulationBox";
-import { VIEWS } from "../reducers/controller";
+import { VIEWS } from "../constants";
 import { Sports, DEFAULT_HALFSTOPS } from "../constants";
 import assetTypes from "./asset/AssetTypes";
 import baddi from "../images/baddi.gif";

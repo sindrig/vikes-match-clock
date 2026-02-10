@@ -16,7 +16,11 @@ type Props = OwnProps;
 const AssetQueue = ({
   includeRemove = false,
 }: Props): React.JSX.Element | null => {
-  const { controller: { selectedAssets }, setSelectedAssets, removeAsset } = useController();
+  const {
+    controller: { selectedAssets },
+    setSelectedAssets,
+    removeAsset,
+  } = useController();
 
   const moveAsset = useCallback(
     (dragIndex: number, hoverIndex: number) => {

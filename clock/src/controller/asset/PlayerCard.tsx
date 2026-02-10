@@ -1,7 +1,6 @@
 import React, { useMemo } from "react";
 
-import { THUMB_VP } from "../../constants";
-import { getBackground } from "../../reducers/view";
+import { THUMB_VP, getBackground } from "../../constants";
 import { useView } from "../../contexts/FirebaseStateContext";
 
 // Cached canvas for text measurement performance
@@ -67,7 +66,9 @@ const PlayerCard = (props: Props): React.JSX.Element => {
     widthMultiplier = 1,
   } = props;
 
-  const { view: { vp, background } } = useView();
+  const {
+    view: { vp, background },
+  } = useView();
   const width = vp.style.width;
 
   const fontSizes = useMemo(() => {

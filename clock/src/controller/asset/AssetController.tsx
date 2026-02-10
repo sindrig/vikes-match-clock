@@ -1,8 +1,6 @@
-import React from "react";
-
 import AssetQueue from "./AssetQueue";
 import { addVideosFromPlaylist } from "./YoutubePlaylist";
-import { ASSET_VIEWS } from "../../reducers/controller";
+import { ASSET_VIEWS } from "../../constants";
 import TeamAssetController from "./team/TeamAssetController";
 import UrlController from "./UrlController";
 import assetTypes from "./AssetTypes";
@@ -25,7 +23,6 @@ const AssetController = () => {
       cycle,
       imageSeconds,
       playing,
-      currentAsset,
     },
     selectAssetView,
     toggleCycle,

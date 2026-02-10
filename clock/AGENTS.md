@@ -17,16 +17,18 @@ State is managed via React Context (`FirebaseStateContext`) and mirrored to Fire
 - This allows a controller in the booth to update the display on the field instantly.
 - The `listenPrefix` (usually a location name like `viken`) determines which match state the instance follows.
 
-### State Management (Migrating from Redux to Context)
+### State Management
 
 | Context | Purpose |
 | ------- | ------- |
 | `FirebaseStateContext` | Shared state synced via Firebase (Match, Controller, View, Listeners) |
 | `LocalStateContext` | Local app state (Auth, Sync settings) |
 
+**Note**: Redux was fully removed from this codebase. All state is managed via React Context.
+
 ### Persistence
 
-`redux-persist` was used to ensure clock state survives page refreshes. The new Context implementation uses `localStorage` for local settings and Firebase re-sync for match state.
+Local settings (auth, sync toggle, listen prefix) are stored in `localStorage` via `LocalStateContext`. Match state is synced from Firebase on connection.
 
 ## Key Component Systems
 
@@ -75,9 +77,9 @@ The operational heart of the app.
 
 Ensures the clock stops exactly at period end (e.g., 45:00) even if the controller doesn't click precisely.
 
-### 5. Global Shortcuts (`src/GlobalShortcut.ts`)
+### 5. Global Shortcuts (`src/hooks/useGlobalShortcuts.ts`)
 
-Maps physical keyboard keys to Redux actions for fast operation (e.g., Space for start/stop).
+Maps physical keyboard keys to Context actions for fast operation (e.g., Space for start/stop).
 
 ## Remote vs Local State
 
@@ -125,7 +127,7 @@ Once logged in, you'll see your email displayed and have access to authenticated
 
 This app requires testing scenarios with **two independent browser sessions** (e.g., controller + remote display). The Playwright MCP has limitations that make this difficult:
 
-1. **Tabs share browser context**: Multiple tabs opened via `browser_tabs` share localStorage, cookies, and session state. Since this app uses `redux-persist` with localStorage, both tabs will have identical Redux state.
+1. **Tabs share browser context**: Multiple tabs opened via `browser_tabs` share localStorage, cookies, and session state. Both tabs will have identical local state.
 
 2. **Cannot control multiple contexts**: While you can create separate browser contexts via `browser_run_code`:
 

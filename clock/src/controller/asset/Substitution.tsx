@@ -1,5 +1,5 @@
 import React from "react";
-import { getBackground } from "../../reducers/view";
+import { getBackground } from "../../constants";
 import { useView } from "../../contexts/FirebaseStateContext";
 
 import "./Substitution.css";
@@ -15,8 +15,10 @@ const Substitution = ({
   children,
   thumbnail = false,
 }: Props): React.JSX.Element => {
-  const { view: { vp, background } } = useView();
-  
+  const {
+    view: { vp, background },
+  } = useView();
+
   if (Array.isArray(children) && children.length !== 2) {
     console.error("Children should have length 2, received ", children);
   }

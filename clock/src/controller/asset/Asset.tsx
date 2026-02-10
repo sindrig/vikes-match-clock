@@ -45,7 +45,9 @@ type AssetProps = OwnProps;
 const AssetComponent = (props: AssetProps) => {
   const { asset, thumbnail, time } = props;
   const { removeAssetAfterTimeout } = useController();
-  const { view: { vp } } = useView();
+  const {
+    view: { vp },
+  } = useView();
   const auth = useAuth();
   const { sync } = useRemoteSettings();
 

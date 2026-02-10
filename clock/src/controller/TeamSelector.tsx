@@ -44,7 +44,9 @@ const TeamSelector = ({ teamAttrName }: TeamSelectorProps) => {
     <div>
       <select
         value={(match[teamAttrName] as string) || ""}
-        onChange={(event) => updateMatch({ [teamAttrName]: event.target.value })}
+        onChange={(event) =>
+          updateMatch({ [teamAttrName]: event.target.value })
+        }
       >
         <option value="">Veldu lið...</option>
         {Object.keys(clubIds)

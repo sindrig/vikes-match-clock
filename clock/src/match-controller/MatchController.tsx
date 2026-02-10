@@ -1,6 +1,6 @@
 import React from "react";
 import { useMatch, useController } from "../contexts/FirebaseStateContext";
-import { VIEWS } from "../reducers/controller";
+import { VIEWS } from "../constants";
 
 import TeamController from "./TeamController";
 import ControlButton from "./ControlButton";

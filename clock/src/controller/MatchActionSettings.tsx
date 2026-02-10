@@ -1,10 +1,12 @@
 import TeamSelector from "./TeamSelector";
 import HalfStops from "./HalfStops";
-import { Sports } from "../constants";
 import clubLogos from "../images/clubLogos";
-import { VIEWS } from "../reducers/controller";
-import { BACKGROUNDS } from "../reducers/view";
-import { useMatch, useController, useView } from "../contexts/FirebaseStateContext";
+import { Sports, VIEWS, BACKGROUNDS } from "../constants";
+import {
+  useMatch,
+  useController,
+  useView,
+} from "../contexts/FirebaseStateContext";
 
 const MatchActionSettings = () => {
   const { match, updateMatch } = useMatch();

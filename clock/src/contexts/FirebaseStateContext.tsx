@@ -6,6 +6,7 @@ import React, {
   ReactNode,
   useCallback,
   useRef,
+  useMemo,
 } from "react";
 import moment from "moment";
 import { database } from "../firebase";
@@ -181,6 +182,11 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   const [view, setView] = useState<ViewState>(defaultView);
   const [listeners, setListeners] = useState<ListenersState>(defaultListeners);
 
+  // Hydration tracking: prevent writes before first Firebase snapshot
+  const [isMatchHydrated, setIsMatchHydrated] = useState(false);
+  const [isControllerHydrated, setIsControllerHydrated] = useState(false);
+  const [isViewHydrated, setIsViewHydrated] = useState(false);
+
   const matchRef = useRef(match);
   const controllerRef = useRef(controller);
   const viewRef = useRef(view);
@@ -194,6 +200,13 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   useEffect(() => {
     viewRef.current = view;
   }, [view]);
+
+  // Reset hydration when listenPrefix changes
+  useEffect(() => {
+    setIsMatchHydrated(false);
+    setIsControllerHydrated(false);
+    setIsViewHydrated(false);
+  }, [listenPrefix]);
 
   useEffect(() => {
     const locationsRef = ref(database, "locations");
@@ -233,42 +246,47 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       const controllerPath = `states/${listenPrefix}/controller`;
       const viewPath = `states/${listenPrefix}/view`;
 
-      const unsubMatch = onValue(ref(database, matchPath), (snapshot) => {
-        const data = snapshot.val();
-        if (data) {
-          const results: Match = {
-            ...defaultMatch,
-            ...(data as Partial<Match>),
-          };
+      const unsubMatch = onValue(
+        ref(database, matchPath),
+        (snapshot) => {
+          const data = snapshot.val();
+          if (data) {
+            const results: Match = {
+              ...defaultMatch,
+              ...(data as Partial<Match>),
+            };
 
-          if (!results.home2min) results.home2min = [];
-          if (!results.away2min) results.away2min = [];
+            if (!results.home2min) results.home2min = [];
+            if (!results.away2min) results.away2min = [];
 
-          if (results.started > 0 && !results.countdown) {
-            if (matchRef.current.started === 0) {
-              results.started = Date.now() - 150;
-            } else {
-              results.started = matchRef.current.started;
+            if (results.started > 0 && !results.countdown) {
+              if (matchRef.current.started === 0) {
+                results.started = Date.now() - 150;
+              } else {
+                results.started = matchRef.current.started;
+              }
             }
-          }
-          if (results.timeout > 0) {
-            if (matchRef.current.timeout === 0) {
-              results.timeout = Date.now() - 150;
-            } else {
-              results.timeout = matchRef.current.timeout;
+            if (results.timeout > 0) {
+              if (matchRef.current.timeout === 0) {
+                results.timeout = Date.now() - 150;
+              } else {
+                results.timeout = matchRef.current.timeout;
+              }
             }
-          }
-          if (results.buzzer) {
-            if (!matchRef.current.buzzer) {
-              results.buzzer = Date.now();
-            } else {
-              results.buzzer = matchRef.current.buzzer;
+            if (results.buzzer) {
+              if (!matchRef.current.buzzer) {
+                results.buzzer = Date.now();
+              } else {
+                results.buzzer = matchRef.current.buzzer;
+              }
             }
-          }
 
-          setMatch(results);
-        }
-      });
+            setMatch(results);
+          }
+          setIsMatchHydrated(true);
+        },
+        (error) => console.error("Firebase match subscription error:", error),
+      );
 
       const unsubController = onValue(
         ref(database, controllerPath),
@@ -286,15 +304,23 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
             setController(results);
           }
+          setIsControllerHydrated(true);
         },
+        (error) =>
+          console.error("Firebase controller subscription error:", error),
       );
 
-      const unsubView = onValue(ref(database, viewPath), (snapshot) => {
-        const data = snapshot.val();
-        if (data) {
-          setView({ ...defaultView, ...(data as Partial<ViewState>) });
-        }
-      });
+      const unsubView = onValue(
+        ref(database, viewPath),
+        (snapshot) => {
+          const data = snapshot.val();
+          if (data) {
+            setView({ ...defaultView, ...(data as Partial<ViewState>) });
+          }
+          setIsViewHydrated(true);
+        },
+        (error) => console.error("Firebase view subscription error:", error),
+      );
 
       return () => {
         unsubMatch();
@@ -306,38 +332,62 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   const applyMatchUpdate = useCallback(
     (getNewState: (prev: Match) => Match) => {
+      if (!listenPrefix) return;
+
       const newState = getNewState(matchRef.current);
       if (sync && isAuthenticated) {
-        firebaseDatabase.syncState(listenPrefix, "match", newState);
+        if (!isMatchHydrated) return;
+        // Optimistic update: update ref and local state immediately
+        matchRef.current = newState;
+        setMatch(newState);
+        firebaseDatabase
+          .syncState(listenPrefix, "match", newState)
+          .catch(console.error);
       } else {
         setMatch(newState);
       }
     },
-    [sync, isAuthenticated, listenPrefix],
+    [sync, isAuthenticated, listenPrefix, isMatchHydrated],
   );
 
   const applyControllerUpdate = useCallback(
     (getNewState: (prev: ControllerState) => ControllerState) => {
+      if (!listenPrefix) return;
+
       const newState = getNewState(controllerRef.current);
       if (sync && isAuthenticated) {
-        firebaseDatabase.syncState(listenPrefix, "controller", newState);
+        if (!isControllerHydrated) return;
+        // Optimistic update: update ref and local state immediately
+        controllerRef.current = newState;
+        setController(newState);
+        firebaseDatabase
+          .syncState(listenPrefix, "controller", newState)
+          .catch(console.error);
       } else {
         setController(newState);
       }
     },
-    [sync, isAuthenticated, listenPrefix],
+    [sync, isAuthenticated, listenPrefix, isControllerHydrated],
   );
 
   const applyViewUpdate = useCallback(
     (getNewState: (prev: ViewState) => ViewState) => {
+      if (!listenPrefix) return;
+
       const newState = getNewState(viewRef.current);
       if (sync && isAuthenticated) {
-        firebaseDatabase.syncState(listenPrefix, "view", newState);
+        if (!isViewHydrated) return;
+        // Optimistic update: update ref and local state immediately
+        viewRef.current = newState;
+        setView(newState);
+        firebaseDatabase
+          .syncState(listenPrefix, "view", newState)
+          .catch(console.error);
       } else {
         setView(newState);
       }
     },
-    [sync, isAuthenticated, listenPrefix],
+    [sync, isAuthenticated, listenPrefix, isViewHydrated],
   );
 
   const updateMatch = useCallback(
@@ -691,9 +741,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       applyControllerUpdate((prev) => {
         const { availableMatches, selectedMatch } = prev;
         if (!selectedMatch) return prev;
-        const match = JSON.parse(
-          JSON.stringify(availableMatches[selectedMatch]),
-        );
+        const match = structuredClone(availableMatches[selectedMatch]);
         match.players[teamId][idx] = {
           ...match.players[teamId][idx],
           ...updatedPlayer,
@@ -715,9 +763,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       applyControllerUpdate((prev) => {
         const { availableMatches, selectedMatch } = prev;
         if (!selectedMatch) return prev;
-        const match = JSON.parse(
-          JSON.stringify(availableMatches[selectedMatch]),
-        );
+        const match = structuredClone(availableMatches[selectedMatch]);
         match.players[teamId] = match.players[teamId].filter(
           (_: Player, i: number) => i !== idx,
         );
@@ -738,9 +784,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       applyControllerUpdate((prev) => {
         const { availableMatches, selectedMatch } = prev;
         if (!selectedMatch || !availableMatches[selectedMatch]) return prev;
-        const match = JSON.parse(
-          JSON.stringify(availableMatches[selectedMatch]),
-        );
+        const match = structuredClone(availableMatches[selectedMatch]);
         if (!match.players[teamId]) {
           match.players[teamId] = [];
         }
@@ -805,51 +849,98 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     [applyViewUpdate],
   );
 
-  const value = {
-    match,
-    controller,
-    view,
-    listeners,
-    updateMatch,
-    startMatch,
-    pauseMatch,
-    addGoal,
-    addPenalty,
-    removePenalty,
-    addToPenalty,
-    updateHalfLength,
-    setHalfStops,
-    matchTimeout,
-    removeTimeout,
-    buzz,
-    countdown,
-    updateRedCards,
-    updateController,
-    selectView,
-    selectAssetView,
-    setSelectedAssets,
-    addAssets,
-    removeAsset,
-    toggleCycle,
-    setImageSeconds,
-    toggleAutoPlay,
-    setPlaying,
-    renderAsset,
-    showNextAsset,
-    removeAssetAfterTimeout,
-    remoteRefresh,
-    setAvailableMatches,
-    selectMatch,
-    editPlayer,
-    deletePlayer,
-    addPlayer,
-    clearMatchPlayers,
-    selectTab,
-    updateView,
-    setViewPort,
-    setBackground,
-    setIdleImage,
-  };
+  const value = useMemo(
+    () => ({
+      match,
+      controller,
+      view,
+      listeners,
+      updateMatch,
+      startMatch,
+      pauseMatch,
+      addGoal,
+      addPenalty,
+      removePenalty,
+      addToPenalty,
+      updateHalfLength,
+      setHalfStops,
+      matchTimeout,
+      removeTimeout,
+      buzz,
+      countdown,
+      updateRedCards,
+      updateController,
+      selectView,
+      selectAssetView,
+      setSelectedAssets,
+      addAssets,
+      removeAsset,
+      toggleCycle,
+      setImageSeconds,
+      toggleAutoPlay,
+      setPlaying,
+      renderAsset,
+      showNextAsset,
+      removeAssetAfterTimeout,
+      remoteRefresh,
+      setAvailableMatches,
+      selectMatch,
+      editPlayer,
+      deletePlayer,
+      addPlayer,
+      clearMatchPlayers,
+      selectTab,
+      updateView,
+      setViewPort,
+      setBackground,
+      setIdleImage,
+    }),
+    [
+      match,
+      controller,
+      view,
+      listeners,
+      updateMatch,
+      startMatch,
+      pauseMatch,
+      addGoal,
+      addPenalty,
+      removePenalty,
+      addToPenalty,
+      updateHalfLength,
+      setHalfStops,
+      matchTimeout,
+      removeTimeout,
+      buzz,
+      countdown,
+      updateRedCards,
+      updateController,
+      selectView,
+      selectAssetView,
+      setSelectedAssets,
+      addAssets,
+      removeAsset,
+      toggleCycle,
+      setImageSeconds,
+      toggleAutoPlay,
+      setPlaying,
+      renderAsset,
+      showNextAsset,
+      removeAssetAfterTimeout,
+      remoteRefresh,
+      setAvailableMatches,
+      selectMatch,
+      editPlayer,
+      deletePlayer,
+      addPlayer,
+      clearMatchPlayers,
+      selectTab,
+      updateView,
+      setViewPort,
+      setBackground,
+      setIdleImage,
+    ],
+  );
 
   return (
     <FirebaseStateContext.Provider value={value}>

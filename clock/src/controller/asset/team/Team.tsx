@@ -9,7 +9,10 @@ import apiConfig from "../../../apiConfig";
 import { Player } from "../../../types";
 
 import "./Team.css";
-import { useController, useMatch } from "../../../contexts/FirebaseStateContext";
+import {
+  useController,
+  useMatch,
+} from "../../../contexts/FirebaseStateContext";
 
 interface OwnProps {
   teamName: "homeTeam" | "awayTeam";
@@ -23,10 +26,7 @@ interface PlayerResponse {
   role?: string;
 }
 
-const Team = ({
-  teamName,
-  selectPlayer,
-}: OwnProps): React.JSX.Element => {
+const Team = ({ teamName, selectPlayer }: OwnProps): React.JSX.Element => {
   const {
     controller: { availableMatches, selectedMatch },
     editPlayer,
@@ -42,13 +42,15 @@ const Team = ({
   const selectedMatchObj = selectedMatch
     ? availableMatches[selectedMatch]
     : undefined;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const teamId = (match as any)[`${teamName}Id`];
+  const teamId = teamName === "homeTeam" ? match.homeTeamId : match.awayTeamId;
   const team = selectedMatchObj?.players
     ? selectedMatchObj.players[String(teamId)] || []
     : [];
   const group = selectedMatchObj?.group;
   const sex = selectedMatchObj?.sex;
+
+  const displayTeamName =
+    teamName === "homeTeam" ? match.homeTeam : match.awayTeam;
 
   const addEmptyLine = (): void => {
     addPlayer(String(teamId));
@@ -58,7 +60,9 @@ const Team = ({
     deletePlayer(String(teamId), idx);
   };
 
-  const updatePlayer = (idx: number): ((updatedPlayer: Partial<Player>) => void) => {
+  const updatePlayer = (
+    idx: number,
+  ): ((updatedPlayer: Partial<Player>) => void) => {
     return (updatedPlayer: Partial<Player>) => {
       console.log("updatedPlayer", updatedPlayer);
       editPlayer(String(teamId), idx, updatedPlayer);
@@ -98,7 +102,9 @@ const Team = ({
           };
           updatePlayer(idx)(updatedPlayer);
         } else {
-          setError(`No ID found for player ${String(player.name ?? "unknown")}`);
+          setError(
+            `No ID found for player ${String(player.name ?? "unknown")}`,
+          );
         }
       })
       .catch((e: Error) => {
@@ -129,9 +135,7 @@ const Team = ({
         <input
           type="text"
           value={inputValue}
-          onChange={({ target: { value } }) =>
-            setInputValue(value)
-          }
+          onChange={({ target: { value } }) => setInputValue(value)}
           placeholder="# leikmanns og ENTER"
           className="player-input"
         />
@@ -146,10 +150,8 @@ const Team = ({
     >
       <span>{error}</span>
       {selectPlayer ? renderForm() : null}
-      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-      <div className="team-name">{(match as any)[teamName]}</div>
-      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-      {(match as any)[teamName]
+      <div className="team-name">{displayTeamName}</div>
+      {displayTeamName
         ? team.map((p, i) => (
             <div className="player-whole-line" key={String(i)}>
               {selectPlayer && p.name ? (
@@ -183,8 +185,7 @@ const Team = ({
             </div>
           ))
         : null}
-      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-      {(match as any)[teamName] && selectedMatch ? (
+      {displayTeamName && selectedMatch ? (
         <div>
           <button type="button" onClick={addEmptyLine}>
             Ný lína...

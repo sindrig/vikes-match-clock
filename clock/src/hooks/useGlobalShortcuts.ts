@@ -1,8 +1,10 @@
 import { useEffect } from "react";
 import { useMatch, useController } from "../contexts/FirebaseStateContext";
-import { VIEWS, ASSET_VIEWS } from "../reducers/controller";
+import { useLocalState } from "../contexts/LocalStateContext";
+import { VIEWS, ASSET_VIEWS } from "../constants";
 
 export default function useGlobalShortcuts() {
+  const { auth, sync } = useLocalState();
   const {
     match: { started },
     startMatch,
@@ -23,6 +25,12 @@ export default function useGlobalShortcuts() {
         event.target instanceof HTMLInputElement ||
         event.target instanceof HTMLTextAreaElement
       ) {
+        return;
+      }
+
+      // Check if controls should be active
+      const showControls = !sync || !auth.isEmpty;
+      if (!showControls) {
         return;
       }
 
@@ -77,5 +85,7 @@ export default function useGlobalShortcuts() {
     addGoal,
     showNextAsset,
     renderAsset,
+    auth,
+    sync,
   ]);
 }

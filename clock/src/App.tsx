@@ -6,8 +6,7 @@ import AssetComponent from "./controller/asset/Asset";
 import ScoreBoard from "./screens/ScoreBoard";
 import Idle from "./screens/Idle";
 
-import { VIEWS } from "./reducers/controller";
-import { getBackground } from "./reducers/view";
+import { VIEWS, getBackground } from "./constants";
 import StateListener from "./StateListener";
 import MatchController from "./match-controller/MatchController";
 import useGlobalShortcuts from "./hooks/useGlobalShortcuts";

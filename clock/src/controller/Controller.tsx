@@ -4,7 +4,7 @@ import MediaIcon from "@rsuite/icons/Media";
 import TimeIcon from "@rsuite/icons/Time";
 import CloseIcon from "@rsuite/icons/CloseOutline";
 
-import { TABS, VIEWS } from "../reducers/controller";
+import { TABS, VIEWS } from "../constants";
 import MatchActions from "./MatchActions";
 import MatchActionSettings from "./MatchActionSettings";
 import MediaManager from "./media/MediaManager";

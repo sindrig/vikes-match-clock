@@ -71,4 +71,4 @@ const AdImage: React.FC<AdImageProps> = ({
   return <img src={src} className="ad" alt="Ad" />;
 };
 
-export default connector(AdImage);
+export default AdImage;
