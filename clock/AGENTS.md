@@ -126,7 +126,7 @@ Once logged in, you'll see your email displayed and have access to authenticated
 
 ### Playwright MCP Limitations for Multi-Session Testing
 
-This app requires testing scenarios with **two independent browser sessions** (e.g., admin controller + remote display). The Playwright MCP has limitations that make this difficult:
+This app requires testing scenarios with **two independent browser sessions** (e.g., controller + remote display). The Playwright MCP has limitations that make this difficult:
 
 1. **Tabs share browser context**: Multiple tabs opened via `browser_tabs` share localStorage, cookies, and session state. Since this app uses `redux-persist` with localStorage, both tabs will have identical Redux state.
 
@@ -150,9 +150,8 @@ This app requires testing scenarios with **two independent browser sessions** (e
    - Form interactions and validation
    - Visual snapshots of single pages
 
-For testing Firebase sync between admin and display (e.g., "Hreinsa virkt overlay" clearing on remote), you'll need to either test manually or write Cypress tests that can manage multiple browser contexts.
+For testing Firebase sync between controller and display (e.g., "Hreinsa virkt overlay" clearing on remote), you'll need to either test manually or write Cypress tests that can manage multiple browser contexts.
 
 ## Related Systems
 
-- **`admin/`**: Modern Nuxt 3 admin interface (preferred for new features)
 - **`clock-api/`**: Python lambdas for match reports and weather data

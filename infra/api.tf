@@ -173,7 +173,7 @@ module "match-report-v2" {
   version = "7.4.0"
 
   function_name = "${random_pet.this.id}-match-report-v2"
-  description   = "Match report for new admin interface"
+  description   = "Match report v2"
   handler       = "app.lambda_handler"
   runtime       = "python3.12"
 
