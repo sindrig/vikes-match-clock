@@ -7,8 +7,17 @@ import urllib.request
 
 import bs4
 import requests
+from rapidfuzz import fuzz
 from src.client import ksi_client, sex_map_reverse
-from src.models import Error, Match, MatchListMatch, MatchReport, Team
+from src.models import (
+    Error,
+    Match,
+    MatchListMatch,
+    MatchReport,
+    PlayerMatch,
+    PlayerSearchResult,
+    Team,
+)
 
 
 class EnhancedJSONEncoder(json.JSONEncoder):
@@ -163,6 +172,84 @@ def search_for_player(query: dict):
     return {"error": "Player not found"}
 
 
+def _get_team_players(
+    team_id: int, group: str, sex: str
+) -> dict[int, tuple[str, int]] | Error:
+    """
+    Fetch all players from recent matches for a team.
+    Returns dict mapping player_id -> (name, number).
+    """
+    matches = ksi_client.get_matches(
+        home_team=team_id,
+        group=group,
+        sex=sex_map_reverse[sex],
+        date=datetime.datetime.now() - datetime.timedelta(days=60),
+        date_to=datetime.datetime.now(),
+        away_team=None,
+    )
+    if isinstance(matches, Error):
+        return matches
+
+    all_players: dict[int, tuple[str, int]] = {}
+    for match in matches:
+        players = ksi_client.get_players(match_id=match.match_id)
+        if not isinstance(players, Error):
+            for player in players.get(team_id, []):
+                all_players[player.id] = (player.name.strip(), player.number)
+    return all_players
+
+
+def batch_search_players(query: dict, body: dict) -> tuple[int, dict[str, typing.Any]]:
+    team = query.get("teamId")
+    if not team or not team.isdigit():
+        return (400, {"error": "teamId parameter missing or invalid"})
+    team_id = int(team)
+
+    group = query.get("group")
+    if not group:
+        return (400, {"error": "group parameter missing"})
+
+    sex = query.get("sex")
+    if not sex or sex not in sex_map_reverse:
+        return (400, {"error": "sex parameter missing or invalid"})
+
+    player_names = body.get("playerNames", [])
+    if not player_names or not isinstance(player_names, list):
+        return (400, {"error": "playerNames array required in request body"})
+
+    all_players = _get_team_players(team_id, group, sex)
+    if isinstance(all_players, Error):
+        return (502, {"error": all_players.error})
+
+    if not all_players:
+        return (404, {"error": "No players found in recent matches"})
+
+    results: list[PlayerSearchResult] = []
+    for search_name in player_names:
+        if not isinstance(search_name, str):
+            continue
+
+        scored_matches: list[tuple[float, int, str, int]] = []
+        for player_id, (name, number) in all_players.items():
+            score = fuzz.token_sort_ratio(search_name.lower(), name.lower())
+            scored_matches.append((score, player_id, name, number))
+
+        scored_matches.sort(key=lambda x: -x[0])
+        top_matches = [
+            PlayerMatch(
+                id=player_id,
+                name=name,
+                number=number,
+                confidence=score,
+            )
+            for score, player_id, name, number in scored_matches[:5]
+        ]
+
+        results.append(PlayerSearchResult(search_name=search_name, matches=top_matches))
+
+    return (200, {"results": results})
+
+
 class IsDataclass(typing.Protocol):
     # as already noted in comments, checking for this attribute is currently
     # the most reliable way to ascertain that something is a dataclass
@@ -183,6 +270,12 @@ def respond(status_code: int, body: dict | IsDataclass):
 def lambda_handler(json_input, context):
     print(json_input)
     query = json_input.get("queryStringParameters") or {}
+    body = {}
+    if json_input.get("body"):
+        try:
+            body = json.loads(json_input["body"])
+        except json.JSONDecodeError:
+            pass
     match query.get("action", "not-found"):
         case "get-matches":
             return respond(200, {"matches": list(get_matches(query))})
@@ -190,6 +283,9 @@ def lambda_handler(json_input, context):
             return respond(200, get_report(query))
         case "search-for-player":
             return respond(200, search_for_player(query))
+        case "batch-search-players":
+            status, result = batch_search_players(query, body)
+            return respond(status, result)
     return respond(400, {"error": "Action not found"})
 
 

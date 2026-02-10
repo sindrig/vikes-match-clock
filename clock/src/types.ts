@@ -42,6 +42,23 @@ export interface Player {
   show?: boolean;
 }
 
+// Club roster player type (additive set of known players per club)
+// Keyed by ksiId in Firebase for stable identity
+export interface ClubRosterPlayer {
+  name: string;
+  number?: number;
+  updatedAt?: number;
+}
+
+// Single club's roster with players keyed by ksiId
+// Firebase path: rosters/{ksiClubId}/playersById/{ksiId}
+export interface ClubRoster {
+  playersById: Record<string, ClubRosterPlayer>;
+}
+
+// Club rosters: keyed by ksiClubId
+export type ClubRosters = Record<string, ClubRoster>;
+
 // Asset type
 export interface Asset {
   key: string;
@@ -101,6 +118,7 @@ export interface ControllerState {
   currentAsset: CurrentAsset | null;
   refreshToken: string;
   tab?: string;
+  rosters: ClubRosters;
 }
 
 // View state type
