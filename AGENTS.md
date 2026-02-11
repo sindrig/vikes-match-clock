@@ -1,4 +1,6 @@
-# Agent Guidelines for vikes-match-clock
+# Vikes Match Clock
+
+A match clock application for Víkingur football club stadiums. Displays match information, time, and weather on stadium screens.
 
 ## Project Structure
 
@@ -6,12 +8,39 @@
 - **clock-api/**: Python lambdas for match reports and weather
 - **admin/**: Nuxt.js admin interface for match control (newer alternative to clock's controller)
 - **infra/**: Terraform infrastructure configuration
+```
+├── clock/              # React frontend application
+├── clock-api/          # Python Lambda functions
+│   ├── match-report/   # Fetches match data
+│   ├── match-report-v2/# Updated match report API
+│   └── weather/        # Weather forecast API
+├── infra/              # Terraform infrastructure (see infra/AGENTS.md)
+└── .github/workflows/  # CI/CD pipelines
+```
 
-## Build/Test Commands
+## Environments
 
-- **Clock (React)**: `cd clock && pnpm start` (dev), `pnpm build` (build), `pnpm test` (all), `pnpm test:watch` (watch), `CI=true pnpm test -- path/to/file.spec.js` (single)
-- **Lint**: `cd clock && pnpm lint` (ESLint), `pnpm format-check` (Prettier check), `pnpm format` (Prettier fix)
-- **Admin (Nuxt)**: `cd admin && pnpm dev` (dev), `pnpm build` (build), `pnpm test` (tests)
+| Environment | Frontend URL | API URL | Deployed From |
+|-------------|--------------|---------|---------------|
+| Production | klukka.irdn.is | clock-api.irdn.is | `master` branch |
+| Staging | staging-klukka.irdn.is | clock-api-staging.irdn.is | PRs with `sandbox-deploy` label |
+
+## Key Technologies
+
+- **Frontend**: React (in `clock/` directory)
+- **Backend**: Python 3.12 Lambda functions
+- **Infrastructure**: Terraform with S3 backend
+- **CI/CD**: GitHub Actions with OIDC authentication (no static AWS keys)
+- **Real-time**: Firebase Realtime Database for screen state management
+
+## Deployment
+
+Deployments are automatic:
+
+- Push to `master` → deploys to production
+- Add `sandbox-deploy` label to PR → deploys to staging
+
+The workflow uses OIDC to assume IAM roles, then fetches infrastructure details from Terraform outputs.
 
 ## Code Style
 

@@ -48,11 +48,14 @@ const emulatorConfig: FirebaseConfig = {
 
 const isTest = import.meta.env.VITE_USE_EMULATOR === "true";
 const isDev = !isTest && import.meta.env.MODE !== "production";
+const isStaging =
+  typeof window !== "undefined" &&
+  window.location.hostname === "staging-klukka.irdn.is";
 
 let fbConfig: FirebaseConfig;
 if (isTest) {
   fbConfig = emulatorConfig;
-} else if (isDev) {
+} else if (isDev || isStaging) {
   console.warn("Using development firebase, be advised");
   fbConfig = devConfig;
 } else {
