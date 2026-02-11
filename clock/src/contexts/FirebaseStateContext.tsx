@@ -208,8 +208,8 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   }, [view]);
 
   // Reset hydration when listenPrefix changes
-  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsMatchHydrated(false);
     setIsControllerHydrated(false);
     setIsViewHydrated(false);
@@ -422,33 +422,33 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     [applyMatchUpdate],
   );
 
-   const addGoal = useCallback(
-     (team: "home" | "away") => {
-       applyMatchUpdate((prev) => {
-         // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-         const key = `${team}Score` as "homeScore" | "awayScore";
-         return { ...prev, [key]: prev[key] + 1 };
-       });
-     },
-     [applyMatchUpdate],
-   );
+  const addGoal = useCallback(
+    (team: "home" | "away") => {
+      applyMatchUpdate((prev) => {
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+        const key = `${team}Score` as "homeScore" | "awayScore";
+        return { ...prev, [key]: prev[key] + 1 };
+      });
+    },
+    [applyMatchUpdate],
+  );
 
-   const addPenalty = useCallback(
-     (team: "home" | "away", key: string, penaltyLength: number) => {
-       applyMatchUpdate((prev) => {
-         // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-         const stateKey = `${team}2min` as "home2min" | "away2min";
-         const collection = [...prev[stateKey]];
-         collection.push({
-           atTimeElapsed: prev.timeElapsed,
-           key,
-           penaltyLength,
-         });
-         return { ...prev, [stateKey]: collection };
-       });
-     },
-     [applyMatchUpdate],
-   );
+  const addPenalty = useCallback(
+    (team: "home" | "away", key: string, penaltyLength: number) => {
+      applyMatchUpdate((prev) => {
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+        const stateKey = `${team}2min` as "home2min" | "away2min";
+        const collection = [...prev[stateKey]];
+        collection.push({
+          atTimeElapsed: prev.timeElapsed,
+          key,
+          penaltyLength,
+        });
+        return { ...prev, [stateKey]: collection };
+      });
+    },
+    [applyMatchUpdate],
+  );
 
   const removePenalty = useCallback(
     (key: string) => {
@@ -510,20 +510,20 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     [applyMatchUpdate],
   );
 
-   const matchTimeout = useCallback(
-     (team: "home" | "away") => {
-       applyMatchUpdate((prev) => {
-         // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-         const stateKey = `${team}Timeouts` as "homeTimeouts" | "awayTimeouts";
-         return {
-           ...prev,
-           timeout: Date.now(),
-           [stateKey]: Math.min(prev[stateKey] + 1, 4),
-         };
-       });
-     },
-     [applyMatchUpdate],
-   );
+  const matchTimeout = useCallback(
+    (team: "home" | "away") => {
+      applyMatchUpdate((prev) => {
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+        const stateKey = `${team}Timeouts` as "homeTimeouts" | "awayTimeouts";
+        return {
+          ...prev,
+          timeout: Date.now(),
+          [stateKey]: Math.min(prev[stateKey] + 1, 4),
+        };
+      });
+    },
+    [applyMatchUpdate],
+  );
 
   const removeTimeout = useCallback(() => {
     applyMatchUpdate((prev) => ({ ...prev, timeout: 0 }));
@@ -715,10 +715,12 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     (teamId: string, idx: number, updatedPlayer: Partial<Player>) => {
       applyControllerUpdate((prev) => {
         const { availableMatches, selectedMatch } = prev;
-        if (!selectedMatch) return prev;
+        if (!selectedMatch || !availableMatches[selectedMatch]) return prev;
         const match = structuredClone(availableMatches[selectedMatch]);
-        match.players[teamId][idx] = {
-          ...match.players[teamId][idx],
+        const players = match.players[teamId];
+        if (!players || !players[idx]) return prev;
+        players[idx] = {
+          ...players[idx],
           ...updatedPlayer,
         };
         return {
@@ -737,9 +739,11 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     (teamId: string, idx: number) => {
       applyControllerUpdate((prev) => {
         const { availableMatches, selectedMatch } = prev;
-        if (!selectedMatch) return prev;
+        if (!selectedMatch || !availableMatches[selectedMatch]) return prev;
         const match = structuredClone(availableMatches[selectedMatch]);
-        match.players[teamId] = match.players[teamId].filter(
+        const players = match.players[teamId];
+        if (!players) return prev;
+        match.players[teamId] = players.filter(
           (_: Player, i: number) => i !== idx,
         );
         return {
