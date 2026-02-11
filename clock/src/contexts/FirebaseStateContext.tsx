@@ -389,33 +389,33 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     [applyMatchUpdate],
   );
 
-  const addGoal = useCallback(
-    (team: "home" | "away") => {
-      applyMatchUpdate((prev) => {
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-        const key = `${team}Score` as "homeScore" | "awayScore";
-        return { ...prev, [key]: prev[key] + 1 };
-      });
-    },
-    [applyMatchUpdate],
-  );
+   const addGoal = useCallback(
+     (team: "home" | "away") => {
+       applyMatchUpdate((prev) => {
+         const scoreKeys = { home: "homeScore", away: "awayScore" } as const;
+         const key = scoreKeys[team];
+         return { ...prev, [key]: prev[key] + 1 };
+       });
+     },
+     [applyMatchUpdate],
+   );
 
-  const addPenalty = useCallback(
-    (team: "home" | "away", key: string, penaltyLength: number) => {
-      applyMatchUpdate((prev) => {
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-        const stateKey = `${team}2min` as "home2min" | "away2min";
-        const collection = [...prev[stateKey]];
-        collection.push({
-          atTimeElapsed: prev.timeElapsed,
-          key,
-          penaltyLength,
-        });
-        return { ...prev, [stateKey]: collection };
-      });
-    },
-    [applyMatchUpdate],
-  );
+   const addPenalty = useCallback(
+     (team: "home" | "away", key: string, penaltyLength: number) => {
+       applyMatchUpdate((prev) => {
+         const penaltyKeys = { home: "home2min", away: "away2min" } as const;
+         const stateKey = penaltyKeys[team];
+         const collection = [...prev[stateKey]];
+         collection.push({
+           atTimeElapsed: prev.timeElapsed,
+           key,
+           penaltyLength,
+         });
+         return { ...prev, [stateKey]: collection };
+       });
+     },
+     [applyMatchUpdate],
+   );
 
   const removePenalty = useCallback(
     (key: string) => {
@@ -477,20 +477,20 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     [applyMatchUpdate],
   );
 
-  const matchTimeout = useCallback(
-    (team: "home" | "away") => {
-      applyMatchUpdate((prev) => {
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-        const stateKey = `${team}Timeouts` as "homeTimeouts" | "awayTimeouts";
-        return {
-          ...prev,
-          timeout: Date.now(),
-          [stateKey]: Math.min(prev[stateKey] + 1, 4),
-        };
-      });
-    },
-    [applyMatchUpdate],
-  );
+   const matchTimeout = useCallback(
+     (team: "home" | "away") => {
+       applyMatchUpdate((prev) => {
+         const timeoutKeys = { home: "homeTimeouts", away: "awayTimeouts" } as const;
+         const stateKey = timeoutKeys[team];
+         return {
+           ...prev,
+           timeout: Date.now(),
+           [stateKey]: Math.min(prev[stateKey] + 1, 4),
+         };
+       });
+     },
+     [applyMatchUpdate],
+   );
 
   const removeTimeout = useCallback(() => {
     applyMatchUpdate((prev) => ({ ...prev, timeout: 0 }));
