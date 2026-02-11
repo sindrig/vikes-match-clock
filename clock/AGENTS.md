@@ -14,6 +14,7 @@ State is managed via React Context (`FirebaseStateContext`) and mirrored to Fire
 
 - `FirebaseStateContext.tsx`: Manages state (Match, Controller, View, Listeners) and handles synchronization.
 - `LocalStateContext.tsx`: Manages local settings (auth, sync toggle, listen prefix).
+- `firebaseParsers.ts`: Type-safe runtime validators for Firebase snapshot data.
 - This allows a controller in the booth to update the display on the field instantly.
 - The `listenPrefix` (usually a location name like `viken`) determines which match state the instance follows.
 
@@ -23,9 +24,11 @@ State is managed via React Context (`FirebaseStateContext`) and mirrored to Fire
 
 1. **Optimistic Updates**: When a controller makes a change, it updates local state immediately AND syncs to Firebase. This prevents UI lag and stale-ref race conditions.
 
-2. **Hydration Guards**: Before a client can write to Firebase, it must first receive the initial snapshot (hydration). This prevents a newly-connected controller from overwriting remote state with default values.
+2. **Hydration Guards**: Before a client can write to Firebase, it must first receive the initial snapshot (hydration). This prevents a newly-connected controller from overwriting remote state with default values. Tracked via `isMatchHydrated`, `isControllerHydrated`, `isViewHydrated` state.
 
 3. **Empty Prefix Protection**: All write operations are blocked if `listenPrefix` is empty, preventing invalid Firebase paths like `states//match`.
+
+4. **Type-Safe Parsing**: All Firebase snapshots are validated through `firebaseParsers.ts` before being applied to state. This provides runtime type checking for data from the database.
 
 #### Multi-Controller Behavior
 
@@ -44,6 +47,15 @@ Multiple controllers can connect to the same `listenPrefix` simultaneously. The 
 | `LocalStateContext` | Local app state (Auth, Sync settings) |
 
 **Note**: Redux was fully removed from this codebase. All state is managed via React Context.
+
+### Key Files
+
+| File | Purpose |
+| ---- | ------- |
+| `contexts/FirebaseStateContext.tsx` | Main state provider with Firebase sync, hydration guards, optimistic updates |
+| `contexts/LocalStateContext.tsx` | Local settings (auth, sync toggle, listen prefix) with localStorage persistence |
+| `contexts/firebaseParsers.ts` | Type-safe parsers for Firebase snapshots (parseMatch, parseController, parseView, parseLocations) |
+| `firebaseDatabase.ts` | Low-level Firebase write operations |
 
 ### Persistence
 
