@@ -787,7 +787,9 @@ describe("firebaseParsers", () => {
       };
 
       const result = parseController(data, defaultController);
-      expect(result!.availableMatches).toEqual(defaultController.availableMatches);
+      expect(result!.availableMatches).toEqual(
+        defaultController.availableMatches,
+      );
     });
 
     it("parses selectedMatch string", () => {
