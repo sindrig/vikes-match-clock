@@ -541,7 +541,22 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   const countdown = useCallback(() => {
     applyMatchUpdate((prev) => {
+      // Validate HH:mm format to prevent syncing invalid timestamp to Firebase
+      if (
+        !prev.matchStartTime ||
+        typeof prev.matchStartTime !== "string" ||
+        !/^\d{1,2}:\d{2}$/.test(prev.matchStartTime)
+      ) {
+        console.warn(
+          "countdown() called without valid matchStartTime, ignoring",
+        );
+        return prev;
+      }
       const momentTime = moment(prev.matchStartTime, "HH:mm");
+      if (!momentTime.isValid()) {
+        console.warn("countdown() invalid moment from matchStartTime");
+        return prev;
+      }
       if (momentTime < moment()) {
         momentTime.add(1, "days");
       }

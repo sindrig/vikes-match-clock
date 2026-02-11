@@ -35,6 +35,7 @@
 - Multiple controllers can connect to the same `listenPrefix`
 - Uses **last-write-wins** semantics (no conflict resolution)
 - Coordinate with team to avoid simultaneous edits in production
+- See `clock/AGENTS.md` for known limitations and edge cases
 
 ## Testing Patterns
 

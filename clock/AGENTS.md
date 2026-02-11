@@ -39,6 +39,14 @@ Multiple controllers can connect to the same `listenPrefix` simultaneously. The 
 - There is no conflict resolution or operational transform
 - For production use, coordinate with your team to avoid simultaneous edits
 
+**Known limitation**: If Controller A goes offline, makes changes, then reconnects while Controller B has also made changes, Controller A's stale changes may overwrite Controller B's newer state. For high-stakes matches, designate a single primary controller.
+
+#### Known Limitations
+
+1. **Optimistic Update Failure**: If a Firebase write fails (network issue, permission denied), local state remains "updated" while remote state didn't change. Errors are logged to console but no automatic rollback occurs.
+
+2. **listenPrefix Switch Race**: When switching `listenPrefix`, there's a brief window where stale callbacks from the old prefix subscription could theoretically affect state before the new subscription is established. In practice, hydration guards mitigate this.
+
 ### State Management
 
 | Context | Purpose |

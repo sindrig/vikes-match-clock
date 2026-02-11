@@ -147,9 +147,13 @@ export function parseMatch(data: unknown, defaultMatch: Match): Match | null {
         ? raw.awayTimeouts
         : defaultMatch.awayTimeouts,
     homeRedCards:
-      typeof raw.homeRedCards === "number" ? raw.homeRedCards : undefined,
+      typeof raw.homeRedCards === "number"
+        ? raw.homeRedCards
+        : defaultMatch.homeRedCards,
     awayRedCards:
-      typeof raw.awayRedCards === "number" ? raw.awayRedCards : undefined,
+      typeof raw.awayRedCards === "number"
+        ? raw.awayRedCards
+        : defaultMatch.awayRedCards,
     buzzer:
       typeof raw.buzzer === "number"
         ? raw.buzzer
@@ -161,7 +165,9 @@ export function parseMatch(data: unknown, defaultMatch: Match): Match | null {
         ? raw.countdown
         : defaultMatch.countdown,
     showInjuryTime:
-      typeof raw.showInjuryTime === "boolean" ? raw.showInjuryTime : undefined,
+      typeof raw.showInjuryTime === "boolean"
+        ? raw.showInjuryTime
+        : defaultMatch.showInjuryTime,
   };
 }
 

@@ -1,8 +1,14 @@
-# Firebase State Hardening
+# Firebase State Hardening: Redux → Context Migration
 
 ## Summary
 
-This PR hardens the Firebase-only state architecture following the Redux → Context migration. It addresses race conditions, type safety issues, and adds comprehensive guards to prevent state corruption in multi-controller scenarios.
+This PR completes a major architectural migration from Redux to React Context with Firebase as the single source of truth. It addresses race conditions, type safety issues, and adds comprehensive guards to prevent state corruption in multi-controller scenarios.
+
+**Key changes:**
+- Remove Redux entirely (+3,773 / -6,844 lines, net ~3k reduction)
+- Add hydration guards to prevent newly-connected controllers from clobbering remote state
+- Add type-safe Firebase snapshot parsing
+- Implement optimistic updates to prevent stale-ref race conditions
 
 ## Problem
 
@@ -51,16 +57,33 @@ After migrating from Redux to React Context with Firebase as the single source o
 ## Files Changed
 
 ### New Files
-- `clock/src/contexts/firebaseParsers.ts` - Type-safe Firebase snapshot parsers
-- `clock/src/contexts/FirebaseStateContext.spec.tsx` - Unit tests for state context
+- `clock/src/contexts/FirebaseStateContext.tsx` - Main state provider (1038 lines)
+- `clock/src/contexts/LocalStateContext.tsx` - Local settings context (154 lines)
+- `clock/src/contexts/firebaseParsers.ts` - Type-safe Firebase snapshot parsers (234 lines)
+- `clock/src/contexts/FirebaseStateContext.spec.tsx` - Unit tests (250 lines)
+- `clock/src/hooks/useGlobalShortcuts.ts` - Keyboard shortcuts (replaces GlobalShortcut.ts)
+- `clock/src/constants.ts` - Centralized constants
+
+### Deleted Files (~14 Redux files)
+- `src/store.ts`, `src/reducers/*`, `src/actions/*`, `src/hooks/useFirebaseSync.ts`
 
 ### Modified Files
 - `clock/src/contexts/FirebaseStateContext.tsx` - Main implementation with guards, optimistic updates
 - `clock/AGENTS.md` - Updated architecture documentation
 
-### Supporting Files
-- `.sisyphus/plans/firebase-hardening.md` - Completed plan
-- `.sisyphus/notepads/firebase-hardening/learnings.md` - Learnings for future reference
+## Known Limitations & Future Work
+
+Based on code review, the following limitation remains for future consideration:
+
+### 1. Optimistic Update Failure
+If a Firebase write fails (network issue, permission denied), local state remains "updated" while remote state didn't change. The next snapshot may reconcile unexpectedly.
+
+**Current behavior**: Errors are logged to console.
+
+**Options for future enhancement**:
+- **Option A (Simple)**: Force rehydrate on error - reset hydration flag and wait for next Firebase snapshot
+- **Option B (Medium)**: Rollback to previous state on error - store previous state in ref before update
+- **Option C (Full)**: Implement pending/confirmed state tracking with UI indicators
 
 ## Verification
 
@@ -85,3 +108,8 @@ For manual testing of multi-controller sync:
 4. Verify changes appear in the other window
 
 The hydration guards ensure that a newly-connected controller won't overwrite the existing match state.
+
+### Testing Gaps to Address in Future PRs
+- Hydration guards in sync mode: verify writes blocked before first snapshot when `sync=true && isAuthenticated=true`
+- Optimistic write failure scenarios: simulate Firebase rejection and verify UI recovery
+- `listenPrefix` switch: ensure stale callbacks from old prefix can't affect new prefix state
