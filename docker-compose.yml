@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  firebase-emulator:
+    image: node:20-slim
+    container_name: vikes-firebase-emulator
+    working_dir: /app
+    volumes:
+      - ./firebase.json:/app/firebase.json:ro
+      - ./firebase-rules.json:/app/firebase-rules.json:ro
+      - ./.firebaserc:/app/.firebaserc:ro
+      - firebase-cache:/root/.cache
+    ports:
+      - "9099:9099"  # Auth emulator
+      - "9000:9000"  # Realtime Database
+      - "4000:4000"  # Emulator UI
+    environment:
+      - FIREBASE_PROJECT=vikes-match-clock-test
+    command: >
+      sh -c "
+        apt-get update && apt-get install -y openjdk-17-jre-headless curl &&
+        npm install -g firebase-tools &&
+        firebase emulators:start --project vikes-match-clock-test
+      "
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+volumes:
+  firebase-cache:

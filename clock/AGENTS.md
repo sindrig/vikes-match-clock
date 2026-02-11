@@ -4,70 +4,74 @@
 
 ## Overview
 
-The `clock/` application is a dual-purpose React system: it acts as both the **stadium display** (Scoreboard/Idle screens) and the **legacy control interface**. It relies on real-time synchronization via Firebase.
+The `clock/` application is a dual-purpose React system: it acts as both the **stadium display** (Scoreboard/Idle screens) and the **control interface**. It relies on real-time synchronization via Firebase.
 
 ## Core Architecture Patterns
 
-### Bidirectional Firebase Sync
+### 100% Firebase Architecture
 
-State is managed via React Context (`FirebaseStateContext`) and mirrored to Firebase Realtime Database.
+**Firebase is the single source of truth.** There is no local state fallback.
 
-- `FirebaseStateContext.tsx`: Manages state (Match, Controller, View, Listeners) and handles synchronization.
-- `LocalStateContext.tsx`: Manages local settings (auth, sync toggle, listen prefix).
-- `firebaseParsers.ts`: Type-safe runtime validators for Firebase snapshot data.
-- This allows a controller in the booth to update the display on the field instantly.
-- The `listenPrefix` (usually a location name like `viken`) determines which match state the instance follows.
+State is managed via React Context (`FirebaseStateContext`) which subscribes to Firebase Realtime Database:
 
-#### Single Source of Truth
+- **Read path**: Firebase `onValue()` subscriptions → React state updates
+- **Write path**: Actions call `set()`/`update()` on Firebase → Firebase triggers `onValue()` → React state updates
+- State is **never** updated directly by action functions; all state changes flow through Firebase subscriptions
 
-**Firebase is the authoritative source** for all synced state. The architecture follows these principles:
+Key files:
+- `FirebaseStateContext.tsx`: Main state provider with Firebase subscriptions and write operations
+- `LocalStateContext.tsx`: Local settings (auth, listen prefix) with localStorage persistence
+- `firebaseParsers.ts`: Type-safe runtime validators for Firebase snapshot data
+- `firebase.ts`: Firebase initialization with emulator support
+- `firebaseDatabase.ts`: Low-level Firebase write operations
 
-1. **Optimistic Updates**: When a controller makes a change, it updates local state immediately AND syncs to Firebase. This prevents UI lag and stale-ref race conditions.
+### Why 100% Firebase?
 
-2. **Hydration Guards**: Before a client can write to Firebase, it must first receive the initial snapshot (hydration). This prevents a newly-connected controller from overwriting remote state with default values. Tracked via `isMatchHydrated`, `isControllerHydrated`, `isViewHydrated` state.
+This architecture eliminates several classes of bugs:
+- ~~Optimistic update divergence~~ - No local state to diverge
+- ~~Hydration race conditions~~ - No hydration guards needed
+- ~~Stale ref issues~~ - Refs only used for computing from latest state during rapid operations
+- ~~Complex rollback logic~~ - Firebase is authoritative; failures simply don't update state
 
-3. **Empty Prefix Protection**: All write operations are blocked if `listenPrefix` is empty, preventing invalid Firebase paths like `states//match`.
+### Write Operations
 
-4. **Type-Safe Parsing**: All Firebase snapshots are validated through `firebaseParsers.ts` before being applied to state. This provides runtime type checking for data from the database.
+When an authenticated controller calls an action (e.g., `startMatch()`):
+1. Action computes new state from current `ref.current`
+2. Action writes to Firebase via `firebaseDatabase.syncState()`
+3. Firebase triggers `onValue()` callback
+4. React state updates from Firebase snapshot
+5. UI re-renders with new state
 
-#### Multi-Controller Behavior
+**Important**: Unauthenticated clients are read-only. All write operations check `isAuthenticated` before proceeding.
 
-Multiple controllers can connect to the same `listenPrefix` simultaneously. The system uses **last-write-wins** semantics:
+### Multi-Controller Behavior
 
+Multiple controllers can connect to the same `listenPrefix` simultaneously:
 - All connected clients see the same state via Firebase subscriptions
-- If two controllers make conflicting changes, the last write to reach Firebase wins
-- There is no conflict resolution or operational transform
+- Uses **last-write-wins** semantics (no conflict resolution)
 - For production use, coordinate with your team to avoid simultaneous edits
 
-**Known limitation**: If Controller A goes offline, makes changes, then reconnects while Controller B has also made changes, Controller A's stale changes may overwrite Controller B's newer state. For high-stakes matches, designate a single primary controller.
+### The `listenPrefix` System
 
-#### Known Limitations
+The `listenPrefix` (e.g., `"vikinni"`, `"hasteinsvollur"`) determines which Firebase path the instance subscribes to:
+- `states/${listenPrefix}/match` - Match state (scores, clock, etc.)
+- `states/${listenPrefix}/controller` - Controller state (assets, view mode, etc.)
+- `states/${listenPrefix}/view` - View settings (viewport, background, etc.)
 
-1. **Optimistic Update Failure**: If a Firebase write fails (network issue, permission denied), local state remains "updated" while remote state didn't change. Errors are logged to console but no automatic rollback occurs.
-
-2. **listenPrefix Switch Race**: When switching `listenPrefix`, there's a brief window where stale callbacks from the old prefix subscription could theoretically affect state before the new subscription is established. In practice, hydration guards mitigate this.
+Empty `listenPrefix` blocks all write operations (prevents invalid paths like `states//match`).
 
 ### State Management
 
 | Context | Purpose |
 | ------- | ------- |
 | `FirebaseStateContext` | Shared state synced via Firebase (Match, Controller, View, Listeners) |
-| `LocalStateContext` | Local app state (Auth, Sync settings) |
+| `LocalStateContext` | Local app state (Auth, listen prefix) |
 
 **Note**: Redux was fully removed from this codebase. All state is managed via React Context.
 
-### Key Files
-
-| File | Purpose |
-| ---- | ------- |
-| `contexts/FirebaseStateContext.tsx` | Main state provider with Firebase sync, hydration guards, optimistic updates |
-| `contexts/LocalStateContext.tsx` | Local settings (auth, sync toggle, listen prefix) with localStorage persistence |
-| `contexts/firebaseParsers.ts` | Type-safe parsers for Firebase snapshots (parseMatch, parseController, parseView, parseLocations) |
-| `firebaseDatabase.ts` | Low-level Firebase write operations |
-
 ### Persistence
 
-Local settings (auth, sync toggle, listen prefix) are stored in `localStorage` via `LocalStateContext`. Match state is synced from Firebase on connection.
+Local settings (auth, listen prefix) are stored in `localStorage` via `LocalStateContext`. Match state is synced from Firebase on connection.
 
 ## Key Component Systems
 
@@ -120,22 +124,38 @@ Ensures the clock stops exactly at period end (e.g., 45:00) even if the controll
 
 Maps physical keyboard keys to Context actions for fast operation (e.g., Space for start/stop).
 
-## Remote vs Local State
-
-The app handles "Controller" vs "Display" roles:
-
-- **Display instance**: Has `sync` enabled, only _receives_ data
-- **Controller instance**: _Pushes_ data to Firebase
-
 ## Build & Tooling
 
 - **Bundler**: Vite (migrated from Create React App) - config in `vite.config.ts`
-- **Testing**: Vitest + Cypress for e2e
+- **Testing**: Vitest for unit tests, Playwright for e2e
 - **Linting**: ESLint (airbnb-style) + Prettier
 
 **Important**: Always run `pnpm format` after making changes. CI runs format checks and will fail if code is not properly formatted. To format only specific files: `pnpm exec prettier --write path/to/file.tsx`
 
 ## Testing & Development
+
+### Firebase Emulator
+
+For isolated local development and CI, use Firebase Emulator:
+
+```bash
+# Start emulator (from project root)
+firebase emulators:start --only auth,database --project vikes-match-clock-test
+
+# Or use Docker
+docker-compose up -d
+
+# Run app with emulator
+VITE_USE_EMULATOR=true pnpm start
+
+# Run e2e tests with emulator
+VITE_USE_EMULATOR=true pnpm e2e
+```
+
+Emulator ports:
+- Auth: 9099
+- Database: 9000
+- UI: 4000
 
 ### Test Credentials
 
@@ -179,7 +199,7 @@ This app requires testing scenarios with **two independent browser sessions** (e
 
 3. **Workarounds for multi-session testing**:
    - **Manual testing**: Open two separate browser windows (or one incognito) and test manually
-   - **Cypress e2e tests**: Use the existing Cypress setup in `cypress/` which can handle multiple browser contexts
+   - **Playwright e2e tests**: Use the Playwright test runner which can handle multiple browser contexts
    - **Single-session verification**: Test that actions dispatch correctly and state changes as expected, then rely on Firebase sync logic being correct
 
 4. **What CAN be tested with Playwright MCP**:
@@ -188,7 +208,7 @@ This app requires testing scenarios with **two independent browser sessions** (e
    - Form interactions and validation
    - Visual snapshots of single pages
 
-For testing Firebase sync between controller and display (e.g., "Hreinsa virkt overlay" clearing on remote), you'll need to either test manually or write Cypress tests that can manage multiple browser contexts.
+For testing Firebase sync between controller and display (e.g., "Hreinsa virkt overlay" clearing on remote), you'll need to either test manually or write Playwright tests that can manage multiple browser contexts.
 
 ## Related Systems
 

@@ -7,6 +7,8 @@ import {
   useController,
 } from "./FirebaseStateContext";
 
+import { firebaseDatabase } from "../firebaseDatabase";
+
 vi.mock("../firebaseDatabase", () => ({
   firebaseDatabase: {
     syncState: vi.fn().mockResolvedValue(undefined),
@@ -62,11 +64,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
 
       render(
-        <FirebaseStateProvider
-          sync={false}
-          listenPrefix=""
-          isAuthenticated={false}
-        >
+        <FirebaseStateProvider listenPrefix="" isAuthenticated={true}>
           <TestMatchConsumer
             onMount={(api) => {
               matchApi = api;
@@ -82,18 +80,14 @@ describe("FirebaseStateContext", () => {
         matchApi!.addGoal("home");
       });
 
-      expect(matchApi!.match.homeScore).toBe(0);
+      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
     });
 
     it("blocks controller updates when listenPrefix is empty", () => {
       let controllerApi: ReturnType<typeof useController> | null = null;
 
       render(
-        <FirebaseStateProvider
-          sync={false}
-          listenPrefix=""
-          isAuthenticated={false}
-        >
+        <FirebaseStateProvider listenPrefix="" isAuthenticated={true}>
           <TestControllerConsumer
             onMount={(api) => {
               controllerApi = api;
@@ -109,19 +103,18 @@ describe("FirebaseStateContext", () => {
         controllerApi!.selectView("scoreboard");
       });
 
-      expect(controllerApi!.controller.view).toBe("idle");
+      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
     });
   });
 
-  describe("non-sync mode (local only)", () => {
-    it("allows match updates when listenPrefix is set and sync is false", () => {
+  describe("authenticated mode", () => {
+    it("syncs match updates when listenPrefix is set and authenticated", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
 
       render(
         <FirebaseStateProvider
-          sync={false}
           listenPrefix="test-location"
-          isAuthenticated={false}
+          isAuthenticated={true}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -132,23 +125,25 @@ describe("FirebaseStateContext", () => {
       );
 
       expect(matchApi).not.toBeNull();
-      expect(matchApi!.match.homeScore).toBe(0);
 
       act(() => {
         matchApi!.addGoal("home");
       });
 
-      expect(matchApi!.match.homeScore).toBe(1);
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "match",
+        expect.objectContaining({ homeScore: 1 }),
+      );
     });
 
-    it("allows rapid sequential goal additions", () => {
+    it("allows rapid sequential goal additions (updates ref immediately)", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
 
       render(
         <FirebaseStateProvider
-          sync={false}
           listenPrefix="test-location"
-          isAuthenticated={false}
+          isAuthenticated={true}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -157,8 +152,6 @@ describe("FirebaseStateContext", () => {
           />
         </FirebaseStateProvider>,
       );
-
-      expect(matchApi!.match.homeScore).toBe(0);
 
       act(() => {
         matchApi!.addGoal("home");
@@ -170,18 +163,33 @@ describe("FirebaseStateContext", () => {
         matchApi!.addGoal("away");
       });
 
-      expect(matchApi!.match.homeScore).toBe(2);
-      expect(matchApi!.match.awayScore).toBe(1);
+      expect(firebaseDatabase.syncState).toHaveBeenNthCalledWith(
+        1,
+        "test-location",
+        "match",
+        expect.objectContaining({ homeScore: 1 }),
+      );
+      expect(firebaseDatabase.syncState).toHaveBeenNthCalledWith(
+        2,
+        "test-location",
+        "match",
+        expect.objectContaining({ homeScore: 2 }),
+      );
+      expect(firebaseDatabase.syncState).toHaveBeenNthCalledWith(
+        3,
+        "test-location",
+        "match",
+        expect.objectContaining({ homeScore: 2, awayScore: 1 }),
+      );
     });
 
-    it("allows controller view changes", () => {
+    it("syncs controller view changes", () => {
       let controllerApi: ReturnType<typeof useController> | null = null;
 
       render(
         <FirebaseStateProvider
-          sync={false}
           listenPrefix="test-location"
-          isAuthenticated={false}
+          isAuthenticated={true}
         >
           <TestControllerConsumer
             onMount={(api) => {
@@ -191,13 +199,15 @@ describe("FirebaseStateContext", () => {
         </FirebaseStateProvider>,
       );
 
-      expect(controllerApi!.controller.view).toBe("idle");
-
       act(() => {
         controllerApi!.selectView("scoreboard");
       });
 
-      expect(controllerApi!.controller.view).toBe("scoreboard");
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "controller",
+        expect.objectContaining({ view: "scoreboard" }),
+      );
     });
   });
 
@@ -206,11 +216,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
 
       render(
-        <FirebaseStateProvider
-          sync={false}
-          listenPrefix="test"
-          isAuthenticated={false}
-        >
+        <FirebaseStateProvider listenPrefix="test" isAuthenticated={false}>
           <TestMatchConsumer
             onMount={(api) => {
               matchApi = api;
@@ -229,11 +235,7 @@ describe("FirebaseStateContext", () => {
       let controllerApi: ReturnType<typeof useController> | null = null;
 
       render(
-        <FirebaseStateProvider
-          sync={false}
-          listenPrefix="test"
-          isAuthenticated={false}
-        >
+        <FirebaseStateProvider listenPrefix="test" isAuthenticated={false}>
           <TestControllerConsumer
             onMount={(api) => {
               controllerApi = api;

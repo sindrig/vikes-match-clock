@@ -172,14 +172,12 @@ const getStateShowingNextAsset = (state: ControllerState): ControllerState => {
 interface FirebaseStateProviderProps {
   children: ReactNode;
   listenPrefix: string;
-  sync: boolean;
   isAuthenticated: boolean;
 }
 
 export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   children,
   listenPrefix,
-  sync,
   isAuthenticated,
 }) => {
   const [match, setMatch] = useState<Match>(defaultMatch);
@@ -187,11 +185,6 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     useState<ControllerState>(defaultController);
   const [view, setView] = useState<ViewState>(defaultView);
   const [listeners, setListeners] = useState<ListenersState>(defaultListeners);
-
-  // Hydration tracking: prevent writes before first Firebase snapshot
-  const [isMatchHydrated, setIsMatchHydrated] = useState(false);
-  const [isControllerHydrated, setIsControllerHydrated] = useState(false);
-  const [isViewHydrated, setIsViewHydrated] = useState(false);
 
   const matchRef = useRef(match);
   const controllerRef = useRef(controller);
@@ -206,14 +199,6 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   useEffect(() => {
     viewRef.current = view;
   }, [view]);
-
-  // Reset hydration when listenPrefix changes
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setIsMatchHydrated(false);
-    setIsControllerHydrated(false);
-    setIsViewHydrated(false);
-  }, [listenPrefix]);
 
   useEffect(() => {
     const locationsRef = ref(database, "locations");
@@ -230,7 +215,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   }, []);
 
   useEffect(() => {
-    if (sync && listenPrefix) {
+    if (listenPrefix) {
       const matchPath = `states/${listenPrefix}/match`;
       const controllerPath = `states/${listenPrefix}/controller`;
       const viewPath = `states/${listenPrefix}/view`;
@@ -264,7 +249,6 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
             setMatch(results);
           }
-          setIsMatchHydrated(true);
         },
         (error) => console.error("Firebase match subscription error:", error),
       );
@@ -276,7 +260,6 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
           if (results) {
             setController(results);
           }
-          setIsControllerHydrated(true);
         },
         (error) =>
           console.error("Firebase controller subscription error:", error),
@@ -289,7 +272,6 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
           if (results) {
             setView(results);
           }
-          setIsViewHydrated(true);
         },
         (error) => console.error("Firebase view subscription error:", error),
       );
@@ -300,26 +282,21 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         unsubView();
       };
     }
-  }, [sync, listenPrefix]);
+  }, [listenPrefix]);
 
   const applyMatchUpdate = useCallback(
     (getNewState: (prev: Match) => Match) => {
       if (!listenPrefix) return;
 
       const newState = getNewState(matchRef.current);
-      if (sync && isAuthenticated) {
-        if (!isMatchHydrated) return;
-        // Optimistic update: update ref and local state immediately
+      if (isAuthenticated) {
         matchRef.current = newState;
-        setMatch(newState);
         firebaseDatabase
           .syncState(listenPrefix, "match", newState)
           .catch(console.error);
-      } else {
-        setMatch(newState);
       }
     },
-    [sync, isAuthenticated, listenPrefix, isMatchHydrated],
+    [isAuthenticated, listenPrefix],
   );
 
   const applyControllerUpdate = useCallback(
@@ -327,19 +304,14 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       if (!listenPrefix) return;
 
       const newState = getNewState(controllerRef.current);
-      if (sync && isAuthenticated) {
-        if (!isControllerHydrated) return;
-        // Optimistic update: update ref and local state immediately
+      if (isAuthenticated) {
         controllerRef.current = newState;
-        setController(newState);
         firebaseDatabase
           .syncState(listenPrefix, "controller", newState)
           .catch(console.error);
-      } else {
-        setController(newState);
       }
     },
-    [sync, isAuthenticated, listenPrefix, isControllerHydrated],
+    [isAuthenticated, listenPrefix],
   );
 
   const applyViewUpdate = useCallback(
@@ -347,19 +319,14 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       if (!listenPrefix) return;
 
       const newState = getNewState(viewRef.current);
-      if (sync && isAuthenticated) {
-        if (!isViewHydrated) return;
-        // Optimistic update: update ref and local state immediately
+      if (isAuthenticated) {
         viewRef.current = newState;
-        setView(newState);
         firebaseDatabase
           .syncState(listenPrefix, "view", newState)
           .catch(console.error);
-      } else {
-        setView(newState);
       }
     },
-    [sync, isAuthenticated, listenPrefix, isViewHydrated],
+    [isAuthenticated, listenPrefix],
   );
 
   const updateMatch = useCallback(

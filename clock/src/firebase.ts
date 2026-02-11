@@ -1,6 +1,10 @@
 import { initializeApp, FirebaseApp } from "firebase/app";
-import { getAuth, Auth } from "firebase/auth";
-import { getDatabase, Database } from "firebase/database";
+import { getAuth, Auth, connectAuthEmulator } from "firebase/auth";
+import {
+  getDatabase,
+  Database,
+  connectDatabaseEmulator,
+} from "firebase/database";
 import {
   getStorage,
   FirebaseStorage,
@@ -35,18 +39,35 @@ const devConfig: FirebaseConfig = {
   storageBucket: "vikes-match-clock-staging.appspot.com",
 };
 
-const isDev = process.env.NODE_ENV !== "production";
+const emulatorConfig: FirebaseConfig = {
+  apiKey: "test-api-key",
+  authDomain: "vikes-match-clock-test.firebaseapp.com",
+  databaseURL: "http://127.0.0.1:9000?ns=vikes-match-clock-test",
+  storageBucket: "vikes-match-clock-test.appspot.com",
+};
 
-if (isDev) {
+const isTest = import.meta.env.VITE_USE_EMULATOR === "true";
+const isDev = !isTest && import.meta.env.MODE !== "production";
+
+let fbConfig: FirebaseConfig;
+if (isTest) {
+  fbConfig = emulatorConfig;
+} else if (isDev) {
   console.warn("Using development firebase, be advised");
+  fbConfig = devConfig;
+} else {
+  fbConfig = prodConfig;
 }
-
-const fbConfig = isDev ? devConfig : prodConfig;
 
 const app: FirebaseApp = initializeApp(fbConfig);
 const auth: Auth = getAuth(app);
 const database: Database = getDatabase(app);
 const storage: FirebaseStorage = getStorage(app);
+
+if (isTest) {
+  connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
+  connectDatabaseEmulator(database, "127.0.0.1", 9000);
+}
 
 const storageHelpers = {
   ref: (path: string): StorageReference => storageRef(storage, path),

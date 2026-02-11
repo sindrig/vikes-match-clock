@@ -7,11 +7,7 @@ import App from "./App";
 it("renders without crashing", () => {
   const { container } = render(
     <LocalStateProvider>
-      <FirebaseStateProvider
-        sync={false}
-        listenPrefix=""
-        isAuthenticated={false}
-      >
+      <FirebaseStateProvider listenPrefix="" isAuthenticated={false}>
         <App />
       </FirebaseStateProvider>
     </LocalStateProvider>,
@@ -23,11 +19,7 @@ it("renders without crashing", () => {
 it("renders with Context providers instead of Redux", () => {
   const { container } = render(
     <LocalStateProvider>
-      <FirebaseStateProvider
-        sync={false}
-        listenPrefix=""
-        isAuthenticated={false}
-      >
+      <FirebaseStateProvider listenPrefix="" isAuthenticated={false}>
         <App />
       </FirebaseStateProvider>
     </LocalStateProvider>,

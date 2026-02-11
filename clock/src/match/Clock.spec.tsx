@@ -8,11 +8,7 @@ import { FirebaseStateProvider } from "../contexts/FirebaseStateContext";
 const renderWithProviders = (component: React.ReactElement) => {
   return render(
     <LocalStateProvider>
-      <FirebaseStateProvider
-        sync={false}
-        listenPrefix=""
-        isAuthenticated={false}
-      >
+      <FirebaseStateProvider listenPrefix="" isAuthenticated={false}>
         {component}
       </FirebaseStateProvider>
     </LocalStateProvider>,
