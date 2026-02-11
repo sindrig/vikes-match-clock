@@ -70,7 +70,7 @@ node_modules/
 /vikes-match-clock.sublime-workspace
 /cypress/videos/
 /.venv
-/infra/builds/
+/infra/*/builds/
 /**/__pycache__/
 service-account-key*.json
 clock/playwright-report/index.html

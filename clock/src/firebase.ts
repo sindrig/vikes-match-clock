@@ -36,12 +36,15 @@ const devConfig: FirebaseConfig = {
 };
 
 const isDev = process.env.NODE_ENV !== "production";
+const isStaging =
+  typeof window !== "undefined" &&
+  window.location.hostname === "staging-klukka.irdn.is";
 
-if (isDev) {
+if (isDev || isStaging) {
   console.warn("Using development firebase, be advised");
 }
 
-const fbConfig = isDev ? devConfig : prodConfig;
+const fbConfig = isDev || isStaging ? devConfig : prodConfig;
 
 const app: FirebaseApp = initializeApp(fbConfig);
 const auth: Auth = getAuth(app);
