@@ -56,8 +56,8 @@ The workflow uses OIDC to assume IAM roles, then fetches infrastructure details 
 
 ### Firebase State Sync (clock/)
 - **Single source of truth**: Firebase is authoritative for all synced state
-- **Optimistic updates**: Update local state immediately, then sync to Firebase
-- **Hydration guards**: Block writes until first Firebase snapshot received
+- **No optimistic updates**: All state changes flow through Firebase subscriptions (write → Firebase → onValue → state)
+- **No hydration guards**: 100% Firebase means no local state to hydrate
 - **Type-safe parsing**: All Firebase snapshots validated through `firebaseParsers.ts`
 
 ### Multi-Controller Support
@@ -76,4 +76,4 @@ The workflow uses OIDC to assume IAM roles, then fetches infrastructure details 
 ### E2E Tests
 - Playwright for browser automation
 - `TEST_CREDENTIALS` env var for authentication (format: `EMAIL;PASSWORD`)
-- Multi-session testing requires manual testing or Cypress (Playwright MCP limitations)
+- Multi-session testing requires manual testing or Playwright test runner (Playwright MCP limitations)
