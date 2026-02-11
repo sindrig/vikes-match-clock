@@ -4,7 +4,7 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "5.52.0"
+      version = "~> 6.28"
     }
     random = {
       source  = "hashicorp/random"
@@ -48,7 +48,7 @@ module "web" {
 
   stage            = "staging"
   name_suffix      = "-staging"
-  frontend_domain  = "staging.irdn.is"
+  frontend_domain  = "staging-klukka.irdn.is"
   api_domain       = "clock-api-staging.irdn.is"
   deploy_role_name = data.terraform_remote_state.access.outputs.staging_deploy_role_name
 }

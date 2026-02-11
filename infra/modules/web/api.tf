@@ -88,7 +88,7 @@ resource "aws_route53_record" "api" {
 
 module "match-report" {
   source  = "terraform-aws-modules/lambda/aws"
-  version = "7.4.0"
+  version = "8.5.0"
 
   function_name = "${random_pet.this.id}${var.name_suffix}-match-report"
   description   = "Match report (${var.stage})"
@@ -117,7 +117,7 @@ module "match-report" {
 
 module "weather" {
   source  = "terraform-aws-modules/lambda/aws"
-  version = "7.4.0"
+  version = "8.5.0"
 
   function_name = "${random_pet.this.id}${var.name_suffix}-weather"
   description   = "Weather (${var.stage})"
@@ -140,7 +140,7 @@ module "weather" {
 
 module "match-report-v2" {
   source  = "terraform-aws-modules/lambda/aws"
-  version = "7.4.0"
+  version = "8.5.0"
 
   function_name = "${random_pet.this.id}${var.name_suffix}-match-report-v2"
   description   = "Match report v2 (${var.stage})"

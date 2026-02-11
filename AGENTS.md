@@ -19,7 +19,7 @@ A match clock application for Víkingur football club stadiums. Displays match i
 | Environment | Frontend URL | API URL | Deployed From |
 |-------------|--------------|---------|---------------|
 | Production | klukka.irdn.is | clock-api.irdn.is | `master` branch |
-| Staging | staging.irdn.is | clock-api-staging.irdn.is | PRs with `sandbox-deploy` label |
+| Staging | staging-klukka.irdn.is | clock-api-staging.irdn.is | PRs with `sandbox-deploy` label |
 
 ## Key Technologies
 

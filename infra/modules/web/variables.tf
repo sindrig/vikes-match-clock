@@ -10,7 +10,7 @@ variable "name_suffix" {
 }
 
 variable "frontend_domain" {
-  description = "Frontend domain (e.g., klukka.irdn.is or staging.irdn.is)"
+  description = "Frontend domain (e.g., klukka.irdn.is or staging-klukka.irdn.is)"
   type        = string
 }
 
