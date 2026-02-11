@@ -52,6 +52,20 @@ The workflow uses OIDC to assume IAM roles, then fetches infrastructure details 
 - **Naming**: camelCase (JS/TS), PascalCase (components), snake_case (Python)
 - **Error handling**: Use try/catch for async operations, validate Firebase responses
 
+### ESLint Rules (CRITICAL)
+
+**`eslint-disable` is not an acceptable fix.** Instead:
+1. Fix the underlying code to satisfy the rule
+2. If the rule is genuinely wrong for this codebase, discuss disabling it globally in eslint config
+3. If you cannot fix without eslint-disable, STOP and ask for help
+
+**Exception**: With explicit user approval AND documented justification, a one-off eslint-disable may be acceptable for genuine false positives. This should be rare.
+
+Common fixable patterns:
+- `@typescript-eslint/no-unnecessary-type-assertion` → Use lookup objects instead of template literal type assertions
+- `@typescript-eslint/no-explicit-any` → Define proper types or use `unknown`
+- `react-hooks/*` → Restructure effect dependencies properly
+
 ## Architecture Notes
 
 ### Firebase State Sync (clock/)

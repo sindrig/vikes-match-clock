@@ -130,6 +130,43 @@ Maps physical keyboard keys to Context actions for fast operation (e.g., Space f
 - **Testing**: Vitest for unit tests, Playwright for e2e
 - **Linting**: ESLint (airbnb-style) + Prettier
 
+### ESLint Policy (MANDATORY)
+
+**DO NOT add `eslint-disable` comments** without explicit user approval. This project maintains strict linting standards.
+
+If you encounter an ESLint error:
+1. **Fix the code** - Most errors have proper TypeScript solutions
+2. **Check patterns** - Look for similar code in codebase that passes lint
+3. **Ask for help** - If genuinely stuck, stop and ask rather than suppressing
+
+**Exception Policy**: If you believe a rule is a genuine false positive:
+- Stop and explain the situation to the user
+- Get explicit approval before adding eslint-disable
+- Document the justification in a comment above the disable
+
+**Example fixes**:
+```typescript
+// BAD: Type assertion with eslint-disable
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+const key = `${team}Score` as "homeScore" | "awayScore";
+
+// GOOD: Lookup object pattern
+const scoreKeys = { home: "homeScore", away: "awayScore" } as const;
+const key = scoreKeys[team];
+```
+
+**For test mocks**, fix data shapes rather than casting:
+```typescript
+// BAD: Wrong type + eslint-disable
+mockedHook.mockReturnValue({ match: { started: false } } as any);  // started should be number!
+
+// GOOD: Correct types
+mockedHook.mockReturnValue({ match: { started: 0 } });
+
+// ACCEPTABLE (last resort): as unknown as Type (NOT as any)
+mockedHook.mockReturnValue({ ... } as unknown as ReturnType<typeof useHook>);
+```
+
 **Important**: Always run `pnpm format` after making changes. CI runs format checks and will fail if code is not properly formatted. To format only specific files: `pnpm exec prettier --write path/to/file.tsx`
 
 ## Testing & Development
