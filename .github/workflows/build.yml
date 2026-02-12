@@ -100,11 +100,28 @@ jobs:
           echo "Database emulator ready"
           echo "All Firebase emulators are ready"
 
+      - name: Start Vite dev server
+        working-directory: ./clock
+        run: |
+          VITE_USE_EMULATOR=true pnpm start &
+          echo $! > /tmp/vite.pid
+          
+      - name: Wait for Vite dev server
+        run: |
+          echo "Waiting for Vite dev server on port 3000..."
+          timeout 120 bash -c 'until curl -sf http://localhost:3000 > /dev/null 2>&1; do sleep 1; done'
+          echo "Vite dev server is ready"
+          
       - name: Run e2e tests
         working-directory: ./clock
-        run: VITE_USE_EMULATOR=true pnpm e2e
+        run: pnpm e2e
         env:
+          VITE_USE_EMULATOR: "true"
           TEST_CREDENTIALS: ${{ secrets.TEST_CREDENTIALS }}
+          
+      - name: Stop Vite dev server
+        if: always()
+        run: kill $(cat /tmp/vite.pid) 2>/dev/null || true
 
       - name: Stop Firebase Emulator
         if: always()

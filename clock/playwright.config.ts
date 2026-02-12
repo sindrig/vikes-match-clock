@@ -20,16 +20,20 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
     },
   ],
-  webServer: {
-    command: "pnpm start",
-    url: "http://localhost:3000",
-    reuseExistingServer: !process.env.CI,
-    timeout: 120 * 1000, // 2 minutes for CI runners
-    stdout: "pipe",
-    stderr: "pipe",
-    env: {
-      ...process.env,
-      VITE_USE_EMULATOR: process.env.VITE_USE_EMULATOR || "",
-    },
-  },
+  // In CI, Vite is started separately before running tests
+  // Locally, Playwright starts Vite via webServer config
+  webServer: process.env.CI
+    ? undefined
+    : {
+        command: "pnpm start",
+        url: "http://localhost:3000",
+        reuseExistingServer: true,
+        timeout: 120 * 1000,
+        stdout: "pipe",
+        stderr: "pipe",
+        env: {
+          ...process.env,
+          VITE_USE_EMULATOR: process.env.VITE_USE_EMULATOR || "",
+        },
+      },
 });
