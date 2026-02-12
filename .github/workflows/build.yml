@@ -92,12 +92,13 @@ jobs:
 
       - name: Wait for Firebase Emulator
         run: |
-          echo "Waiting for Emulator Hub on port 4400..."
-          timeout 120 bash -c 'until curl -sf http://127.0.0.1:4400 > /dev/null 2>&1; do sleep 1; done'
-          echo "Emulator Hub is ready, verifying emulators..."
-          curl -s http://127.0.0.1:4400/emulators | head -c 500
-          echo ""
-          echo "Firebase emulators are ready"
+          echo "Waiting for Auth emulator..."
+          timeout 120 bash -c 'until curl -sf http://127.0.0.1:9099 > /dev/null 2>&1; do sleep 1; done'
+          echo "Auth emulator ready"
+          echo "Waiting for Database emulator..."
+          timeout 120 bash -c 'until curl -sf http://127.0.0.1:9000/.json > /dev/null 2>&1; do sleep 1; done'
+          echo "Database emulator ready"
+          echo "All Firebase emulators are ready"
 
       - name: Run e2e tests
         working-directory: ./clock

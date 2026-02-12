@@ -21,15 +21,14 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: process.env.VITE_USE_EMULATOR
-      ? "VITE_USE_EMULATOR=true pnpm start"
-      : "pnpm start",
+    command: "pnpm start",
     url: "http://localhost:3000",
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000, // 2 minutes for CI runners
     stdout: "pipe",
     stderr: "pipe",
     env: {
+      ...process.env,
       VITE_USE_EMULATOR: process.env.VITE_USE_EMULATOR || "",
     },
   },
