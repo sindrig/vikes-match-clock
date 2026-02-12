@@ -112,9 +112,17 @@ jobs:
           timeout 120 bash -c 'until curl -sf http://localhost:3000 > /dev/null 2>&1; do sleep 1; done'
           echo "Vite dev server is ready"
           
+      - name: Verify Vite is using emulator config
+        run: |
+          echo "Checking if Vite app is using emulator..."
+          curl -s http://localhost:3000 | head -100
+          echo ""
+          echo "Checking if VITE_USE_EMULATOR is in bundle..."
+          curl -s http://localhost:3000/src/firebase.ts 2>/dev/null | head -20 || echo "Direct source not accessible (expected in bundled mode)"
+          
       - name: Run e2e tests
         working-directory: ./clock
-        run: pnpm e2e
+        run: DEBUG=pw:api pnpm e2e --reporter=list
         env:
           VITE_USE_EMULATOR: "true"
           TEST_CREDENTIALS: ${{ secrets.TEST_CREDENTIALS }}
