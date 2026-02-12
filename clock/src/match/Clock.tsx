@@ -1,60 +1,19 @@
-import { Component } from "react";
-import type React from "react";
-import { bindActionCreators, Dispatch } from "redux";
-import { connect, ConnectedProps } from "react-redux";
-
-import matchActions from "../actions/match";
-
+import React, { useCallback } from "react";
 import { formatTime } from "../utils/timeUtils";
 import ClockBase from "./ClockBase";
-import { RootState } from "../types";
+import { useMatch } from "../contexts/FirebaseStateContext";
 
-interface OwnProps {
+interface ClockProps {
   className: string;
 }
 
-const stateToProps = ({
-  match: {
-    started,
-    halfStops,
-    timeElapsed,
-    matchType,
-    showInjuryTime,
-    countdown,
-  },
-}: RootState) => ({
-  started,
-  countdown,
-  timeElapsed,
-  matchType,
-  showInjuryTime,
-  halfStop: halfStops[0],
-});
+const Clock: React.FC<ClockProps> = ({ className }) => {
+  const { match, pauseMatch, buzz } = useMatch();
+  const { started, halfStops, timeElapsed, showInjuryTime, countdown } = match;
 
-const dispatchToProps = (dispatch: Dispatch) =>
-  bindActionCreators(
-    {
-      pauseMatch: matchActions.pauseMatch,
-      buzz: matchActions.buzz,
-    },
-    dispatch,
-  );
+  const halfStop = halfStops[0];
 
-const connector = connect(stateToProps, dispatchToProps);
-
-type ClockProps = ConnectedProps<typeof connector> & OwnProps;
-
-class Clock extends Component<ClockProps> {
-  updateTime = (): string => {
-    const {
-      started,
-      halfStop,
-      timeElapsed,
-      pauseMatch,
-      buzz,
-      showInjuryTime,
-      countdown,
-    } = this.props;
+  const updateTime = useCallback((): string => {
     let milliSecondsElapsed = timeElapsed;
     if (started) {
       milliSecondsElapsed += Date.now() - started;
@@ -67,8 +26,8 @@ class Clock extends Component<ClockProps> {
     let seconds;
     if (!showInjuryTime && halfStop && minutes >= halfStop && started) {
       seconds = 0;
-      pauseMatch({ isHalfEnd: true });
-      buzz();
+      pauseMatch(true);
+      buzz(true);
     } else {
       seconds = secondsElapsed % 60;
     }
@@ -85,18 +44,23 @@ class Clock extends Component<ClockProps> {
       }
     }
     return formatTime(minutes, seconds);
-  };
+  }, [
+    started,
+    halfStop,
+    timeElapsed,
+    pauseMatch,
+    buzz,
+    showInjuryTime,
+    countdown,
+  ]);
 
-  render(): React.JSX.Element {
-    const { started, timeElapsed, className } = this.props;
-    return (
-      <ClockBase
-        updateTime={this.updateTime}
-        isTimeNull={!started && !timeElapsed}
-        className={className}
-      />
-    );
-  }
-}
+  return (
+    <ClockBase
+      updateTime={updateTime}
+      isTimeNull={!started && !timeElapsed}
+      className={className}
+    />
+  );
+};
 
-export default connector(Clock);
+export default Clock;

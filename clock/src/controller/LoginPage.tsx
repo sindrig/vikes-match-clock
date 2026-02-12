@@ -1,10 +1,8 @@
 import type React from "react";
-import { bindActionCreators, Dispatch } from "redux";
-import { connect } from "react-redux";
-import remoteActions from "../actions/remote";
-import viewActions from "../actions/view";
 import { firebaseAuth } from "../firebaseAuth";
-import { RootState, ViewPort, FirebaseAuthState } from "../types";
+import { ViewPort } from "../types";
+import { useLocalState } from "../contexts/LocalStateContext";
+import { useListeners, useView } from "../contexts/FirebaseStateContext";
 
 interface Screen {
   screen: ViewPort;
@@ -12,37 +10,24 @@ interface Screen {
   key: string;
 }
 
-interface LoginPageProps {
-  password?: string;
-  sync: boolean;
-  email?: string;
-  setSync: (sync: boolean) => void;
-  setEmail: (email: string) => void;
-  setPassword: (password: string) => void;
-  available?: string[];
-  screens?: Screen[];
-  listenPrefix: string;
-  setListenPrefix: (prefix: string) => void;
-  auth: FirebaseAuthState;
-  setViewPort: (vp: ViewPort) => void;
-  vp: ViewPort;
-}
+const LoginPage = () => {
+  const {
+    email,
+    setEmail,
+    password,
+    setPassword,
+    sync,
+    setSync,
+    listenPrefix,
+    setListenPrefix,
+    auth,
+    available,
+  } = useLocalState();
 
-const LoginPage = ({
-  password = "",
-  sync,
-  email = "",
-  setSync,
-  setEmail,
-  setPassword,
-  available = [],
-  screens = [],
-  listenPrefix,
-  setListenPrefix,
-  auth,
-  setViewPort,
-  vp,
-}: LoginPageProps) => {
+  const { screens } = useListeners();
+  const { view, setViewPort } = useView();
+  const { vp } = view;
+
   const renderIsRemoteCtrl = () => {
     return (
       <label htmlFor="set-synced">
@@ -78,7 +63,7 @@ const LoginPage = ({
         </div>
       );
     } else {
-      const matching = screens
+      const matching = (screens as Screen[])
         .map((screen, i): [Screen, number] => [screen, i])
         .filter(([{ screen: screenVp, key }]) => {
           return (
@@ -93,7 +78,7 @@ const LoginPage = ({
           Skjár:
           <select
             onChange={({ target: { value } }) => {
-              const screen = screens[parseInt(value, 10)];
+              const screen = (screens as Screen[])[parseInt(value, 10)];
               if (screen) {
                 setListenPrefix(screen.key);
                 setViewPort(screen.screen);
@@ -101,7 +86,7 @@ const LoginPage = ({
             }}
             value={currentScreenId}
           >
-            {screens.map(({ screen, label }, i) => (
+            {(screens as Screen[]).map(({ screen, label }, i) => (
               <option value={i} key={i}>
                 {label} {screen.name}
               </option>
@@ -178,32 +163,4 @@ const LoginPage = ({
   );
 };
 
-const stateToProps = ({
-  remote: { email, password, sync, listenPrefix },
-  listeners: { available, screens },
-  auth,
-  view: { vp },
-}: RootState) => ({
-  email,
-  password,
-  sync,
-  listenPrefix,
-  available,
-  screens,
-  vp,
-  auth,
-});
-
-const dispatchToProps = (dispatch: Dispatch) =>
-  bindActionCreators(
-    {
-      setEmail: remoteActions.setEmail,
-      setPassword: remoteActions.setPassword,
-      setSync: remoteActions.setSync,
-      setListenPrefix: remoteActions.setListenPrefix,
-      setViewPort: viewActions.setViewPort,
-    },
-    dispatch,
-  );
-
-export default connect(stateToProps, dispatchToProps)(LoginPage);
+export default LoginPage;

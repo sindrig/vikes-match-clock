@@ -1,80 +1,52 @@
-import { Component } from "react";
-import type React from "react";
-import { bindActionCreators, Dispatch } from "redux";
-import { connect, ConnectedProps } from "react-redux";
-
-import matchActions from "../actions/match";
+import React, { useState, useCallback } from "react";
 
 import { formatMillisAsTime } from "../utils/timeUtils";
 import ClockBase from "./ClockBase";
 import { TIMEOUT_LENGTH } from "../constants";
-import { RootState } from "../types";
+import { useMatch } from "../contexts/FirebaseStateContext";
 
-interface OwnProps {
+interface TimeoutClockProps {
   className: string;
 }
 
-interface TimeoutClockState {
-  warningPlayed: boolean;
-}
+const TimeoutClock: React.FC<TimeoutClockProps> = ({ className }) => {
+  const { match, removeTimeout, buzz } = useMatch();
+  const { timeout } = match;
+  const [warningPlayed, setWarningPlayed] = useState(false);
+  const [prevTimeout, setPrevTimeout] = useState(timeout);
 
-const stateToProps = ({ match: { timeout } }: RootState) => ({
-  timeout,
-});
-
-const dispatchToProps = (dispatch: Dispatch) =>
-  bindActionCreators(
-    {
-      removeTimeout: matchActions.removeTimeout,
-      buzz: matchActions.buzz,
-    },
-    dispatch,
-  );
-
-const connector = connect(stateToProps, dispatchToProps);
-
-type TimeoutClockProps = ConnectedProps<typeof connector> & OwnProps;
-
-class TimeoutClock extends Component<TimeoutClockProps, TimeoutClockState> {
-  constructor(props: TimeoutClockProps) {
-    super(props);
-    this.state = {
-      warningPlayed: false,
-    };
+  if (timeout !== prevTimeout) {
+    setPrevTimeout(timeout);
+    setWarningPlayed(false);
   }
 
-  updateTime = (): string | null => {
-    const { timeout, removeTimeout, buzz } = this.props;
+  const updateTime = useCallback((): string | null => {
     if (!timeout) {
       return null;
     }
-    const { warningPlayed } = this.state;
     const millisLeft = TIMEOUT_LENGTH - (Date.now() - timeout) + 1000;
     if (millisLeft <= 0) {
-      buzz();
+      buzz(true);
       // Allow us to update time first so we don't try state update on
       // unmounted clock.
-      setTimeout(removeTimeout, 10);
+      setTimeout(() => removeTimeout(), 10);
     } else if (!warningPlayed && millisLeft <= 10000) {
-      this.setState({ warningPlayed: true });
-      buzz();
+      setWarningPlayed(true);
+      buzz(true);
     }
     return formatMillisAsTime(millisLeft);
-  };
+  }, [timeout, removeTimeout, buzz, warningPlayed]);
 
-  render(): React.JSX.Element {
-    const { className } = this.props;
-    return (
-      <ClockBase
-        updateTime={this.updateTime}
-        isTimeNull={false}
-        className={className}
-        zeroTime={TIMEOUT_LENGTH}
-        fontSizeMin="1.3rem"
-        fontSizeMax="1.5rem"
-      />
-    );
-  }
-}
+  return (
+    <ClockBase
+      updateTime={updateTime}
+      isTimeNull={false}
+      className={className}
+      zeroTime={TIMEOUT_LENGTH}
+      fontSizeMin="1.3rem"
+      fontSizeMax="1.5rem"
+    />
+  );
+};
 
-export default connector(TimeoutClock);
+export default TimeoutClock;

@@ -1,46 +1,44 @@
 import React from "react";
-import { connect, ConnectedProps } from "react-redux";
-import { Dispatch, UnknownAction } from "redux";
+import { useMatch } from "../contexts/FirebaseStateContext";
+import { PENALTY_LENGTH } from "../constants";
 
 import ControlButton from "./ControlButton";
-import matchActions from "../actions/match";
 
-interface OwnProps {
+interface TeamControllerProps {
   team: string;
   started: number | null;
 }
 
-const dispatchToProps = (dispatch: Dispatch, { team }: OwnProps) => ({
-  goal: () =>
-    dispatch(matchActions.addGoal({ team }) as unknown as UnknownAction),
-  penalty: () =>
-    dispatch(matchActions.addPenalty({ team }) as unknown as UnknownAction),
-  timeout: () =>
-    dispatch(matchActions.matchTimeout({ team }) as unknown as UnknownAction),
-});
+const uuidv4 = (): string =>
+  "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
 
-const connector = connect(null, dispatchToProps);
+const TeamController: React.FC<TeamControllerProps> = ({ team, started }) => {
+  const { addGoal, addPenalty, matchTimeout } = useMatch();
+  const teamKey = team as "home" | "away";
 
-type TeamControllerProps = ConnectedProps<typeof connector> & OwnProps;
+  return (
+    <div
+      className={`match-controller-box match-controller-box-${String(team)}`}
+    >
+      <ControlButton className="yellow" onClick={() => addGoal(teamKey)}>
+        Mark
+      </ControlButton>
+      <ControlButton
+        className="red"
+        onClick={() => addPenalty(teamKey, uuidv4(), PENALTY_LENGTH)}
+        disabled={!!started}
+      >
+        Brottvísun
+      </ControlButton>
+      <ControlButton className="green" onClick={() => matchTimeout(teamKey)}>
+        Leikhlé
+      </ControlButton>
+    </div>
+  );
+};
 
-const TeamController: React.FC<TeamControllerProps> = ({
-  goal,
-  penalty,
-  timeout,
-  started,
-  team,
-}) => (
-  <div className={`match-controller-box match-controller-box-${String(team)}`}>
-    <ControlButton className="yellow" onClick={goal}>
-      Mark
-    </ControlButton>
-    <ControlButton className="red" onClick={penalty} disabled={!!started}>
-      Brottvísun
-    </ControlButton>
-    <ControlButton className="green" onClick={timeout}>
-      Leikhlé
-    </ControlButton>
-  </div>
-);
-
-export default connector(TeamController);
+export default TeamController;

@@ -1,54 +1,26 @@
-import { useEffect } from "react";
-import { useDispatch, useSelector } from "react-redux";
-import type { UnknownAction } from "redux";
-
-import viewActions from "./actions/view";
+import { useFirebaseState } from "./contexts/FirebaseStateContext";
+import { useLocalState } from "./contexts/LocalStateContext";
 import Controller from "./controller/Controller";
 import AssetComponent from "./controller/asset/Asset";
 
 import ScoreBoard from "./screens/ScoreBoard";
 import Idle from "./screens/Idle";
 
-import { VIEWS } from "./reducers/controller";
-import { getBackground } from "./reducers/view";
+import { VIEWS, getBackground } from "./constants";
 import StateListener from "./StateListener";
 import MatchController from "./match-controller/MatchController";
-
-import type {
-  CurrentAsset,
-  FirebaseAuthState,
-  RootState,
-  ViewPort,
-} from "./types";
+import useGlobalShortcuts from "./hooks/useGlobalShortcuts";
 
 import "./App.css";
 
-interface AppProps {
-  view: string;
-  background: string;
-  vp: ViewPort;
-  asset: CurrentAsset | null;
-  sync: boolean;
-  auth: FirebaseAuthState;
-}
-
 function App() {
-  const dispatch = useDispatch();
-  const { view, vp, background, asset, sync, auth } = useSelector<
-    RootState,
-    AppProps
-  >((state) => ({
-    view: state.controller.view,
-    vp: state.view.vp,
-    background: state.view.background,
-    asset: state.controller.currentAsset || null,
-    sync: state.remote.sync,
-    auth: state.auth,
-  }));
+  useGlobalShortcuts();
+  const { controller, view: viewState } = useFirebaseState();
+  const { sync, auth } = useLocalState();
 
-  useEffect(() => {
-    dispatch(viewActions.setViewPort(vp) as unknown as UnknownAction);
-  }, [dispatch, vp]);
+  const { view } = controller;
+  const { vp, background } = viewState;
+  const asset = controller.currentAsset || null;
 
   const renderAppContents = () => {
     switch (view) {

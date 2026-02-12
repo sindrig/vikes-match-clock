@@ -1,0 +1,37 @@
+services:
+  firebase-emulator:
+    image: node:22-bookworm
+    container_name: vikes-firebase-emulator
+    working_dir: /app
+    volumes:
+      - ./firebase.json:/app/firebase.json:ro
+      - ./firebase-rules.json:/app/firebase-rules.json:ro
+      - ./.firebaserc:/app/.firebaserc:ro
+      - firebase-cache:/root/.cache
+    ports:
+      - "9099:9099"
+      - "9000:9000"
+      - "4000:4000"
+      - "4400:4400"
+    environment:
+      - FIREBASE_PROJECT=vikes-match-clock-test
+    command: >
+      sh -c "
+        apt-get update &&
+        apt-get install -y wget apt-transport-https gpg &&
+        wget -qO - https://packages.adoptium.net/artifactory/api/gpg/key/public | gpg --dearmor -o /etc/apt/keyrings/adoptium.gpg &&
+        echo 'deb [signed-by=/etc/apt/keyrings/adoptium.gpg] https://packages.adoptium.net/artifactory/deb bookworm main' > /etc/apt/sources.list.d/adoptium.list &&
+        apt-get update &&
+        apt-get install -y temurin-21-jre curl &&
+        npm install -g firebase-tools &&
+        firebase emulators:start --project vikes-match-clock-test
+      "
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+volumes:
+  firebase-cache:

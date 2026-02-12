@@ -1,28 +1,13 @@
 import React, { useState } from "react";
-import { bindActionCreators, Dispatch } from "redux";
-import { connect, ConnectedProps } from "react-redux";
-
-import matchActions from "../actions/match";
-import { RootState } from "../types";
 import { clampRedCards } from "../utils/matchUtils";
+import { useMatch } from "../contexts/FirebaseStateContext";
 
-const mapStateToProps = (state: RootState) => ({
-  home: state.match.homeRedCards ?? 0,
-  away: state.match.awayRedCards ?? 0,
-});
+function MatchScoreDialog() {
+  const { match, updateRedCards } = useMatch();
+  const home = match.homeRedCards ?? 0;
+  const away = match.awayRedCards ?? 0;
+  const onChange = updateRedCards;
 
-const mapDispatchToProps = (dispatch: Dispatch) =>
-  bindActionCreators(
-    {
-      onChange: matchActions.updateRedCards,
-    },
-    dispatch,
-  );
-
-const connector = connect(mapStateToProps, mapDispatchToProps);
-type PropsFromRedux = ConnectedProps<typeof connector>;
-
-function MatchScoreDialog({ onChange, home, away }: PropsFromRedux) {
   const [open, setOpen] = useState(false);
 
   function handleHomeChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -90,7 +75,12 @@ function MatchScoreDialog({ onChange, home, away }: PropsFromRedux) {
               </label>
             </div>
             <div className="stdbuttons">
-              <button onClick={() => onChange(0, 0) && setOpen(false)}>
+              <button
+                onClick={() => {
+                  onChange(0, 0);
+                  setOpen(false);
+                }}
+              >
                 Hreinsa spjöld
               </button>
             </div>
@@ -101,4 +91,4 @@ function MatchScoreDialog({ onChange, home, away }: PropsFromRedux) {
   );
 }
 
-export default connector(MatchScoreDialog);
+export default MatchScoreDialog;

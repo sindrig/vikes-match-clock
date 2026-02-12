@@ -1,6 +1,6 @@
-import { connect, ConnectedProps } from "react-redux";
-import { getBackground } from "../../reducers/view";
-import { RootState } from "../../types";
+import React from "react";
+import { getBackground } from "../../constants";
+import { useView } from "../../contexts/FirebaseStateContext";
 
 import "./Substitution.css";
 
@@ -9,23 +9,16 @@ interface OwnProps {
   thumbnail?: boolean;
 }
 
-const mapStateToProps = ({ view: { vp, background } }: RootState) => ({
-  vp,
-  background,
-});
-
-const connector = connect(mapStateToProps);
-
-type PropsFromRedux = ConnectedProps<typeof connector>;
-
-type Props = PropsFromRedux & OwnProps;
+type Props = OwnProps;
 
 const Substitution = ({
   children,
   thumbnail = false,
-  vp,
-  background,
 }: Props): React.JSX.Element => {
+  const {
+    view: { vp, background },
+  } = useView();
+
   if (Array.isArray(children) && children.length !== 2) {
     console.error("Children should have length 2, received ", children);
   }
@@ -43,4 +36,4 @@ const Substitution = ({
   );
 };
 
-export default connector(Substitution);
+export default Substitution;

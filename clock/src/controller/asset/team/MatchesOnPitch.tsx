@@ -1,20 +1,15 @@
-import { Component } from "react";
-import type React from "react";
-import { connect, ConnectedProps } from "react-redux";
-import { bindActionCreators, Dispatch } from "redux";
+import React, { useState } from "react";
 import axios from "axios";
 import { RingLoader } from "react-spinners";
 
 import apiConfig from "../../../apiConfig";
-import controllerActions from "../../../actions/controller";
-import matchActions from "../../../actions/match";
-import { RootState, Player } from "../../../types";
-
-interface MatchesOnPitchState {
-  error: string;
-  loading: boolean;
-  matches: MatchData[];
-}
+import { Player } from "../../../types";
+import {
+  useController,
+  useMatch,
+  useListeners,
+} from "../../../contexts/FirebaseStateContext";
+import { useRemoteSettings } from "../../../contexts/LocalStateContext";
 
 interface MatchData {
   match_id: string;
@@ -39,56 +34,25 @@ interface MatchesResponse {
   matches: MatchData[];
 }
 
-const stateToProps = ({
-  match,
-  listeners: { screens },
-  controller: { availableMatches, selectedMatch },
-  remote: { listenPrefix },
-}: RootState) => ({
-  match,
-  availableMatches,
-  selectedMatch,
-  listenPrefix,
-  screens,
-});
+const MatchesOnPitch = (): React.JSX.Element => {
+  const { setAvailableMatches } = useController();
+  const { updateMatch } = useMatch();
+  const { screens } = useListeners();
+  const { listenPrefix } = useRemoteSettings();
 
-const dispatchToProps = (dispatch: Dispatch) =>
-  bindActionCreators(
-    {
-      setAvailableMatches: controllerActions.setAvailableMatches,
-      updateMatch: matchActions.updateMatch,
-      selectMatch: controllerActions.selectMatch,
-    },
-    dispatch,
-  );
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [matches, setMatches] = useState<MatchData[]>([]);
 
-const connector = connect(stateToProps, dispatchToProps);
-
-type TeamAssetControllerProps = ConnectedProps<typeof connector>;
-
-class TeamAssetController extends Component<
-  TeamAssetControllerProps,
-  MatchesOnPitchState
-> {
-  constructor(props: TeamAssetControllerProps) {
-    super(props);
-    this.state = {
-      error: "",
-      loading: false,
-      matches: [],
-    };
-  }
-
-  fetchMatchesOnPitch = async (): Promise<void> => {
-    const { screens, listenPrefix } = this.props;
+  const fetchMatchesOnPitch = async (): Promise<void> => {
     const matching = screens.filter(({ key }) => {
       return key === listenPrefix;
     });
     if (!matching.length) {
-      this.setState({ error: "No screen found" });
+      setError("No screen found");
       return;
     }
-    this.setState({ loading: true });
+    setLoading(true);
 
     const firstMatch = matching[0];
     const options = {
@@ -99,24 +63,26 @@ class TeamAssetController extends Component<
     };
     try {
       const {
-        data: { matches },
+        data: { matches: fetchedMatches },
       } = await axios.get<MatchesResponse>(
         `${apiConfig.gateWayUrl}match-report/v2`,
         options,
       );
-      this.setState({ error: "", matches, loading: false });
+      setError("");
+      setMatches(fetchedMatches);
+      setLoading(false);
     } catch (e) {
-      const error = e as Error;
-      this.setState({ error: error.message });
+      const err = e as Error;
+      setError(err.message);
+      setLoading(false);
     }
   };
 
-  fetchMatchReport = async (): Promise<void> => {
-    const { setAvailableMatches } = this.props;
+  const fetchMatchReport = async (): Promise<void> => {
     const matchId = prompt("ID á leikskýrslu");
     if (!matchId) return;
 
-    this.setState({ loading: true });
+    setLoading(true);
 
     const options = {
       params: {
@@ -136,17 +102,18 @@ class TeamAssetController extends Component<
           sex: data.sex,
         },
       });
-      this.setState({ error: "", loading: false, matches: [] });
+      setError("");
+      setLoading(false);
+      setMatches([]);
     } catch (e) {
-      const error = e as Error;
-      this.setState({ error: error.message });
+      const err = e as Error;
+      setError(err.message);
+      setLoading(false);
     }
-    return this.setState({ loading: false });
   };
 
-  selectMatch = async (match: MatchData): Promise<void> => {
-    const { updateMatch, setAvailableMatches } = this.props;
-    this.setState({ loading: true });
+  const selectMatchHandler = async (match: MatchData): Promise<void> => {
+    setLoading(true);
     const home = match.home;
     const away = match.away;
     updateMatch({
@@ -173,62 +140,61 @@ class TeamAssetController extends Component<
           sex: data.sex,
         },
       });
-      this.setState({ error: "", loading: false, matches: [] });
+      setError("");
+      setLoading(false);
+      setMatches([]);
     } catch (e) {
-      const error = e as Error;
-      this.setState({ error: error.message });
+      const err = e as Error;
+      setError(err.message);
+      setLoading(false);
     }
-    return this.setState({ loading: false });
   };
 
-  render(): React.JSX.Element {
-    const { matches, error, loading } = this.state;
-    if (!matches.length) {
-      return (
-        <div>
-          <RingLoader loading={loading} />
-          <div className="control-item stdbuttons">
-            <button
-              type="button"
-              onClick={() => {
-                void this.fetchMatchesOnPitch();
-              }}
-            >
-              Sækja leiki á velli
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                void this.fetchMatchReport();
-              }}
-            >
-              Slá inn ID leikskýrslu
-            </button>
-          </div>
-          <span className="error">{error}</span>
-        </div>
-      );
-    }
+  if (!matches.length) {
     return (
       <div>
         <RingLoader loading={loading} />
         <div className="control-item stdbuttons">
-          {matches.map((match) => (
-            <button
-              type="button"
-              key={match.match_id}
-              onClick={() => {
-                void this.selectMatch(match);
-              }}
-            >
-              {match.date} {match.time} {match.competition} [{match.home.name} -{" "}
-              {match.away.name}]{" "}
-            </button>
-          ))}
+          <button
+            type="button"
+            onClick={() => {
+              void fetchMatchesOnPitch();
+            }}
+          >
+            Sækja leiki á velli
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              void fetchMatchReport();
+            }}
+          >
+            Slá inn ID leikskýrslu
+          </button>
         </div>
+        <span className="error">{error}</span>
       </div>
     );
   }
-}
+  return (
+    <div>
+      <RingLoader loading={loading} />
+      <div className="control-item stdbuttons">
+        {matches.map((match) => (
+          <button
+            type="button"
+            key={match.match_id}
+            onClick={() => {
+              void selectMatchHandler(match);
+            }}
+          >
+            {match.date} {match.time} {match.competition} [{match.home.name} -{" "}
+            {match.away.name}]{" "}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
 
-export default connector(TeamAssetController);
+export default MatchesOnPitch;
