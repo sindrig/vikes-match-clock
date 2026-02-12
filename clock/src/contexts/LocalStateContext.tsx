@@ -85,35 +85,35 @@ export function LocalStateProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe();
   }, []);
 
-   // Available Locations Listener
-   useEffect(() => {
-     if (!auth.uid) {
-       return;
-     }
+  // Available Locations Listener
+  useEffect(() => {
+    if (!auth.uid) {
+      return;
+    }
 
-     const authRef = ref(database, `auth/${auth.uid}`);
-     const unsubscribe = onValue(authRef, (snapshot) => {
-       const data = snapshot.val() as Record<string, boolean> | null;
-       if (data && typeof data === "object") {
-         const locations = Object.entries(data)
-           .filter(([, value]) => value === true)
-           .map(([key]) => key);
-         setAvailable(locations);
+    const authRef = ref(database, `auth/${auth.uid}`);
+    const unsubscribe = onValue(authRef, (snapshot) => {
+      const data = snapshot.val() as Record<string, boolean> | null;
+      if (data && typeof data === "object") {
+        const locations = Object.entries(data)
+          .filter(([, value]) => value === true)
+          .map(([key]) => key);
+        setAvailable(locations);
 
-         // If current listenPrefix is not in available, set to first available
-         if (locations.length > 0 && !locations.includes(listenPrefix)) {
-           setListenPrefix(locations[0]!);
-         }
-       } else {
-         setAvailable([]);
-       }
-     });
+        // If current listenPrefix is not in available, set to first available
+        if (locations.length > 0 && !locations.includes(listenPrefix)) {
+          setListenPrefix(locations[0]!);
+        }
+      } else {
+        setAvailable([]);
+      }
+    });
 
-     return () => {
-       unsubscribe();
-       setAvailable([]);
-     };
-   }, [auth.uid, listenPrefix]);
+    return () => {
+      unsubscribe();
+      setAvailable([]);
+    };
+  }, [auth.uid, listenPrefix]);
 
   const value = {
     auth,

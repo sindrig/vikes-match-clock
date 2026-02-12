@@ -413,22 +413,22 @@ describe("LocalStateContext", () => {
       );
     });
 
-      it("throws error when used outside LocalStateProvider", () => {
-        const ThrowingComponent = () => {
-          useAuth();
-          return null;
-        };
+    it("throws error when used outside LocalStateProvider", () => {
+      const ThrowingComponent = () => {
+        useAuth();
+        return null;
+      };
 
-        const consoleError = vi.spyOn(console, "error").mockImplementation(() => {
-          // Suppress console errors for this test
-        });
-
-        expect(() => {
-          render(<ThrowingComponent />);
-        }).toThrow("useLocalState must be used within a LocalStateProvider");
-
-        consoleError.mockRestore();
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {
+        // Suppress console errors for this test
       });
+
+      expect(() => {
+        render(<ThrowingComponent />);
+      }).toThrow("useLocalState must be used within a LocalStateProvider");
+
+      consoleError.mockRestore();
+    });
   });
 
   describe("useRemoteSettings hook", () => {
@@ -453,22 +453,22 @@ describe("LocalStateContext", () => {
       expect(typeof settings!.setListenPrefix).toBe("function");
     });
 
-      it("throws error when used outside LocalStateProvider", () => {
-        const ThrowingComponent = () => {
-          useRemoteSettings();
-          return null;
-        };
+    it("throws error when used outside LocalStateProvider", () => {
+      const ThrowingComponent = () => {
+        useRemoteSettings();
+        return null;
+      };
 
-        const consoleError = vi.spyOn(console, "error").mockImplementation(() => {
-          // Suppress console errors for this test
-        });
-
-        expect(() => {
-          render(<ThrowingComponent />);
-        }).toThrow("useLocalState must be used within a LocalStateProvider");
-
-        consoleError.mockRestore();
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {
+        // Suppress console errors for this test
       });
+
+      expect(() => {
+        render(<ThrowingComponent />);
+      }).toThrow("useLocalState must be used within a LocalStateProvider");
+
+      consoleError.mockRestore();
+    });
 
     it("allows setting remote settings values", () => {
       let settings: ReturnType<typeof useRemoteSettings> | null = null;
@@ -496,22 +496,22 @@ describe("LocalStateContext", () => {
   });
 
   describe("useLocalState hook", () => {
-      it("throws error when used outside LocalStateProvider", () => {
-        const ThrowingComponent = () => {
-          useLocalState();
-          return null;
-        };
+    it("throws error when used outside LocalStateProvider", () => {
+      const ThrowingComponent = () => {
+        useLocalState();
+        return null;
+      };
 
-        const consoleError = vi.spyOn(console, "error").mockImplementation(() => {
-          // Suppress console errors for this test
-        });
-
-        expect(() => {
-          render(<ThrowingComponent />);
-        }).toThrow("useLocalState must be used within a LocalStateProvider");
-
-        consoleError.mockRestore();
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {
+        // Suppress console errors for this test
       });
+
+      expect(() => {
+        render(<ThrowingComponent />);
+      }).toThrow("useLocalState must be used within a LocalStateProvider");
+
+      consoleError.mockRestore();
+    });
 
     it("returns full context API", () => {
       let api: ReturnType<typeof useLocalState> | null = null;

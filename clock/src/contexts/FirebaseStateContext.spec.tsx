@@ -268,15 +268,15 @@ describe("FirebaseStateContext", () => {
       );
       act(() => {
         matchApi!.startMatch();
-       });
-       expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
-         "test-location",
-         "match",
-         expect.objectContaining({
-           started: expect.any(Number) as unknown,
-           countdown: false,
-         }),
-       );
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "match",
+        expect.objectContaining({
+          started: expect.any(Number) as unknown,
+          countdown: false,
+        }),
+      );
     });
 
     it("pauseMatch sets started to 0", () => {
@@ -368,11 +368,11 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.buzz(true);
       });
-        expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
-          "test-location",
-          "match",
-          expect.objectContaining({ buzzer: expect.any(Number) as unknown }),
-        );
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "match",
+        expect.objectContaining({ buzzer: expect.any(Number) as unknown }),
+      );
     });
 
     it("buzz(false) sets buzzer to false", () => {
@@ -440,14 +440,14 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.matchTimeout("home");
       });
-        expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
-          "test-location",
-          "match",
-          expect.objectContaining({
-            timeout: expect.any(Number) as unknown,
-            homeTimeouts: 1,
-          }),
-        );
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "match",
+        expect.objectContaining({
+          timeout: expect.any(Number) as unknown,
+          homeTimeouts: 1,
+        }),
+      );
     });
 
     it("removeTimeout clears timeout", () => {
@@ -515,15 +515,15 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.addPenalty("home", "pen-1", 120);
       });
-        expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
-          "test-location",
-          "match",
-          expect.objectContaining({
-            home2min: expect.arrayContaining([
-              expect.objectContaining({ key: "pen-1", penaltyLength: 120 }),
-            ]) as unknown,
-          }),
-        );
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "match",
+        expect.objectContaining({
+          home2min: expect.arrayContaining([
+            expect.objectContaining({ key: "pen-1", penaltyLength: 120 }),
+          ]) as unknown,
+        }),
+      );
     });
 
     it("removePenalty removes penalty by key", () => {
@@ -549,11 +549,11 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.removePenalty("pen-1");
       });
-        expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
-          "test-location",
-          "match",
-          expect.objectContaining({ home2min: [], away2min: [] }),
-        );
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "match",
+        expect.objectContaining({ home2min: [], away2min: [] }),
+      );
     });
   });
 
@@ -692,19 +692,19 @@ describe("FirebaseStateContext", () => {
           />
         </FirebaseStateProvider>,
       );
-        const asset = { type: "image", key: "asset-1" };
-        act(() => {
-          controllerApi!.renderAsset(asset as unknown as Asset);
-        });
-        expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
-          "test-location",
-          "controller",
-          expect.objectContaining({
-            currentAsset: expect.objectContaining({
-              asset,
-            }) as unknown,
-          }),
-        );
+      const asset = { type: "image", key: "asset-1" };
+      act(() => {
+        controllerApi!.renderAsset(asset as unknown as Asset);
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "controller",
+        expect.objectContaining({
+          currentAsset: expect.objectContaining({
+            asset,
+          }) as unknown,
+        }),
+      );
     });
 
     it("renderAsset(null) clears currentAsset", () => {
@@ -724,11 +724,11 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.renderAsset(null);
       });
-       expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
-         "test-location",
-         "controller",
-         expect.objectContaining({ currentAsset: null }),
-       );
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "controller",
+        expect.objectContaining({ currentAsset: null }),
+      );
     });
 
     it("setSelectedAssets sets assets array", () => {
@@ -745,15 +745,15 @@ describe("FirebaseStateContext", () => {
           />
         </FirebaseStateProvider>,
       );
-        const assets = [{ type: "image", key: "a1" }];
-        act(() => {
-          controllerApi!.setSelectedAssets(assets as unknown as Asset[]);
-        });
-        expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
-          "test-location",
-          "controller",
-          expect.objectContaining({ selectedAssets: assets }),
-        );
+      const assets = [{ type: "image", key: "a1" }];
+      act(() => {
+        controllerApi!.setSelectedAssets(assets as unknown as Asset[]);
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "controller",
+        expect.objectContaining({ selectedAssets: assets }),
+      );
     });
 
     it("selectTab updates tab", () => {
@@ -797,11 +797,13 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.remoteRefresh();
       });
-        expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
-          "test-location",
-          "controller",
-          expect.objectContaining({ refreshToken: expect.any(String) as unknown }),
-        );
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "controller",
+        expect.objectContaining({
+          refreshToken: expect.any(String) as unknown,
+        }),
+      );
     });
 
     it("clearMatchPlayers clears availableMatches and selectedMatch", () => {
