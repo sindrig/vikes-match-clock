@@ -119,10 +119,18 @@ jobs:
           echo ""
           echo "Checking if VITE_USE_EMULATOR is in bundle..."
           curl -s http://localhost:3000/src/firebase.ts 2>/dev/null | head -20 || echo "Direct source not accessible (expected in bundled mode)"
+
+      - name: Test browser connectivity
+        working-directory: ./clock
+        run: |
+          npx playwright test --list 2>&1 || echo "Listed tests"
+          echo "Running single test to verify connectivity..."
+          timeout 60 npx playwright test basic-navigation.spec.ts -g "starts a countdown" --reporter=line 2>&1 || echo "Test timed out or failed"
           
       - name: Run e2e tests
         working-directory: ./clock
-        run: DEBUG=pw:api pnpm e2e --reporter=list
+        run: pnpm e2e --reporter=list
+        timeout-minutes: 5
         env:
           VITE_USE_EMULATOR: "true"
           TEST_CREDENTIALS: ${{ secrets.TEST_CREDENTIALS }}
