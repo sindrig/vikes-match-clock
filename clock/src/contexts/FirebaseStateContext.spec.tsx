@@ -5,8 +5,10 @@ import {
   FirebaseStateProvider,
   useMatch,
   useController,
+  useView,
 } from "./FirebaseStateContext";
-import { Asset } from "../types";
+import { Asset, AvailableMatches, ViewPort } from "../types";
+import { Sports, DEFAULT_HALFSTOPS } from "../constants";
 
 import { firebaseDatabase } from "../firebaseDatabase";
 
@@ -52,6 +54,20 @@ const TestControllerConsumer = ({
     <div data-testid="controller-consumer">
       View: {controllerApi.controller.view}
     </div>
+  );
+};
+
+const TestViewConsumer = ({
+  onMount,
+}: {
+  onMount: (api: ReturnType<typeof useView>) => void;
+}) => {
+  const viewApi = useView();
+  React.useEffect(() => {
+    onMount(viewApi);
+  }, [viewApi, onMount]);
+  return (
+    <div data-testid="view-consumer">Background: {viewApi.view.background}</div>
   );
 };
 
@@ -827,6 +843,1369 @@ describe("FirebaseStateContext", () => {
         "test-location",
         "controller",
         expect.objectContaining({ availableMatches: {}, selectedMatch: null }),
+      );
+    });
+  });
+
+  describe("updateMatch", () => {
+    it("looks up homeTeamId from club-ids", () => {
+      let matchApi: ReturnType<typeof useMatch> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestMatchConsumer
+            onMount={(api) => {
+              matchApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        matchApi!.updateMatch({ homeTeam: "Valur" });
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "match",
+        expect.objectContaining({ homeTeam: "Valur", homeTeamId: 101 }),
+      );
+    });
+
+    it("looks up awayTeamId from club-ids", () => {
+      let matchApi: ReturnType<typeof useMatch> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestMatchConsumer
+            onMount={(api) => {
+              matchApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        matchApi!.updateMatch({ awayTeam: "KR" });
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "match",
+        expect.objectContaining({ awayTeam: "KR", awayTeamId: 107 }),
+      );
+    });
+
+    it("sets teamId to 0 for unknown team", () => {
+      let matchApi: ReturnType<typeof useMatch> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestMatchConsumer
+            onMount={(api) => {
+              matchApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        matchApi!.updateMatch({ awayTeam: "Unknown FC" });
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "match",
+        expect.objectContaining({ awayTeam: "Unknown FC", awayTeamId: 0 }),
+      );
+    });
+
+    it("sets awayTeamId to 0 for empty awayTeam", () => {
+      let matchApi: ReturnType<typeof useMatch> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestMatchConsumer
+            onMount={(api) => {
+              matchApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        matchApi!.updateMatch({ awayTeam: "" });
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "match",
+        expect.objectContaining({ awayTeam: "", awayTeamId: 0 }),
+      );
+    });
+
+    it("resets NaN injuryTime to 0", () => {
+      let matchApi: ReturnType<typeof useMatch> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestMatchConsumer
+            onMount={(api) => {
+              matchApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        matchApi!.updateMatch({ injuryTime: NaN });
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "match",
+        expect.objectContaining({ injuryTime: 0 }),
+      );
+    });
+
+    it("resets invalid matchType to Football", () => {
+      let matchApi: ReturnType<typeof useMatch> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestMatchConsumer
+            onMount={(api) => {
+              matchApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        matchApi!.updateMatch({
+          matchType: "basketball" as unknown as Sports,
+        });
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "match",
+        expect.objectContaining({ matchType: Sports.Football }),
+      );
+    });
+
+    it("updates halfStops when matchType changes", () => {
+      let matchApi: ReturnType<typeof useMatch> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestMatchConsumer
+            onMount={(api) => {
+              matchApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        matchApi!.updateMatch({ matchType: Sports.Handball });
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "match",
+        expect.objectContaining({
+          matchType: Sports.Handball,
+          halfStops: DEFAULT_HALFSTOPS[Sports.Handball],
+        }),
+      );
+    });
+
+    it("clears buzzer when started transitions from 0 to truthy", () => {
+      let matchApi: ReturnType<typeof useMatch> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestMatchConsumer
+            onMount={(api) => {
+              matchApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        matchApi!.buzz(true);
+      });
+      vi.clearAllMocks();
+      act(() => {
+        matchApi!.updateMatch({ started: Date.now() });
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "match",
+        expect.objectContaining({ buzzer: false }),
+      );
+    });
+  });
+
+  describe("pauseMatch with isHalfEnd", () => {
+    it("sets timeElapsed to first halfStop and slices halfStops", () => {
+      let matchApi: ReturnType<typeof useMatch> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestMatchConsumer
+            onMount={(api) => {
+              matchApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        matchApi!.startMatch();
+      });
+      vi.clearAllMocks();
+      act(() => {
+        matchApi!.pauseMatch(true);
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "match",
+        expect.objectContaining({
+          started: 0,
+          timeElapsed: 45 * 60 * 1000,
+          halfStops: [90, 105, 120],
+        }),
+      );
+    });
+
+    it("accumulates timeElapsed on normal pause", () => {
+      let matchApi: ReturnType<typeof useMatch> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestMatchConsumer
+            onMount={(api) => {
+              matchApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        matchApi!.startMatch();
+      });
+      vi.clearAllMocks();
+      act(() => {
+        matchApi!.pauseMatch();
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "match",
+        expect.objectContaining({
+          started: 0,
+          timeElapsed: expect.any(Number) as unknown,
+        }),
+      );
+    });
+  });
+
+  describe("countdown", () => {
+    it("does not change state when matchStartTime is not set", () => {
+      let matchApi: ReturnType<typeof useMatch> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestMatchConsumer
+            onMount={(api) => {
+              matchApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        matchApi!.countdown();
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "match",
+        expect.objectContaining({ countdown: false, started: 0 }),
+      );
+    });
+
+    it("does not change state when matchStartTime is invalid format", () => {
+      let matchApi: ReturnType<typeof useMatch> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestMatchConsumer
+            onMount={(api) => {
+              matchApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        matchApi!.updateMatch({ matchStartTime: "not-a-time" });
+      });
+      vi.clearAllMocks();
+      act(() => {
+        matchApi!.countdown();
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "match",
+        expect.objectContaining({ countdown: false, started: 0 }),
+      );
+    });
+
+    it("sets started and countdown=true for valid matchStartTime", () => {
+      let matchApi: ReturnType<typeof useMatch> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestMatchConsumer
+            onMount={(api) => {
+              matchApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        matchApi!.updateMatch({ matchStartTime: "23:59" });
+      });
+      vi.clearAllMocks();
+      act(() => {
+        matchApi!.countdown();
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "match",
+        expect.objectContaining({
+          started: expect.any(Number) as unknown,
+          countdown: true,
+        }),
+      );
+    });
+  });
+
+  describe("addAssets", () => {
+    it("adds valid assets to selectedAssets", () => {
+      let controllerApi: ReturnType<typeof useController> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestControllerConsumer
+            onMount={(api) => {
+              controllerApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      const assets: Asset[] = [
+        { type: "IMAGE", key: "img-1" },
+        { type: "VIDEO", key: "vid-1" },
+      ];
+      act(() => {
+        controllerApi!.addAssets(assets);
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "controller",
+        expect.objectContaining({
+          selectedAssets: [
+            { type: "IMAGE", key: "img-1" },
+            { type: "VIDEO", key: "vid-1" },
+          ],
+        }),
+      );
+    });
+
+    it("deduplicates assets with same key", () => {
+      let controllerApi: ReturnType<typeof useController> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestControllerConsumer
+            onMount={(api) => {
+              controllerApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        controllerApi!.addAssets([{ type: "IMAGE", key: "img-1" }]);
+      });
+      vi.clearAllMocks();
+      act(() => {
+        controllerApi!.addAssets([{ type: "IMAGE", key: "img-1" }]);
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "controller",
+        expect.objectContaining({
+          selectedAssets: [{ type: "IMAGE", key: "img-1" }],
+        }),
+      );
+    });
+
+    it("filters out assets with invalid type", () => {
+      let controllerApi: ReturnType<typeof useController> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestControllerConsumer
+            onMount={(api) => {
+              controllerApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        controllerApi!.addAssets([
+          { type: "INVALID_TYPE", key: "bad-1" },
+          { type: "IMAGE", key: "good-1" },
+        ]);
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "controller",
+        expect.objectContaining({
+          selectedAssets: [{ type: "IMAGE", key: "good-1" }],
+        }),
+      );
+    });
+
+    it("filters out assets with empty key", () => {
+      let controllerApi: ReturnType<typeof useController> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestControllerConsumer
+            onMount={(api) => {
+              controllerApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        controllerApi!.addAssets([{ type: "IMAGE", key: "" }]);
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "controller",
+        expect.objectContaining({ selectedAssets: [] }),
+      );
+    });
+  });
+
+  describe("removeAsset", () => {
+    it("removes asset by key", () => {
+      let controllerApi: ReturnType<typeof useController> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestControllerConsumer
+            onMount={(api) => {
+              controllerApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        controllerApi!.addAssets([
+          { type: "IMAGE", key: "img-1" },
+          { type: "IMAGE", key: "img-2" },
+        ]);
+      });
+      vi.clearAllMocks();
+      act(() => {
+        controllerApi!.removeAsset({ type: "IMAGE", key: "img-1" });
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "controller",
+        expect.objectContaining({
+          selectedAssets: [{ type: "IMAGE", key: "img-2" }],
+        }),
+      );
+    });
+
+    it("returns unchanged state when removing non-existent asset", () => {
+      let controllerApi: ReturnType<typeof useController> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestControllerConsumer
+            onMount={(api) => {
+              controllerApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        controllerApi!.removeAsset({ type: "IMAGE", key: "nonexistent" });
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "controller",
+        expect.objectContaining({ selectedAssets: [] }),
+      );
+    });
+  });
+
+  describe("showNextAsset", () => {
+    it("shifts next asset from queue to currentAsset", () => {
+      let controllerApi: ReturnType<typeof useController> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestControllerConsumer
+            onMount={(api) => {
+              controllerApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        controllerApi!.setSelectedAssets([
+          { type: "IMAGE", key: "img-1" },
+          { type: "IMAGE", key: "img-2" },
+        ]);
+      });
+      vi.clearAllMocks();
+      act(() => {
+        controllerApi!.showNextAsset();
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "controller",
+        expect.objectContaining({
+          currentAsset: expect.objectContaining({
+            asset: { type: "IMAGE", key: "img-1" },
+            time: null,
+          }) as unknown,
+          selectedAssets: [{ type: "IMAGE", key: "img-2" }],
+        }),
+      );
+    });
+
+    it("clears currentAsset and stops playing when queue is empty", () => {
+      let controllerApi: ReturnType<typeof useController> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestControllerConsumer
+            onMount={(api) => {
+              controllerApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        controllerApi!.showNextAsset();
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "controller",
+        expect.objectContaining({ currentAsset: null, playing: false }),
+      );
+    });
+
+    it("cycles asset to end of queue when cycle is enabled", () => {
+      let controllerApi: ReturnType<typeof useController> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestControllerConsumer
+            onMount={(api) => {
+              controllerApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        controllerApi!.toggleCycle();
+      });
+      act(() => {
+        controllerApi!.setSelectedAssets([
+          { type: "IMAGE", key: "img-1" },
+          { type: "IMAGE", key: "img-2" },
+        ]);
+      });
+      vi.clearAllMocks();
+      act(() => {
+        controllerApi!.showNextAsset();
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "controller",
+        expect.objectContaining({
+          currentAsset: expect.objectContaining({
+            asset: { type: "IMAGE", key: "img-1" },
+          }) as unknown,
+          selectedAssets: [
+            { type: "IMAGE", key: "img-2" },
+            { type: "IMAGE", key: "img-1" },
+          ],
+        }),
+      );
+    });
+
+    it("sets time from imageSeconds when autoPlay is enabled", () => {
+      let controllerApi: ReturnType<typeof useController> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestControllerConsumer
+            onMount={(api) => {
+              controllerApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        controllerApi!.toggleAutoPlay();
+      });
+      act(() => {
+        controllerApi!.setImageSeconds(5);
+      });
+      act(() => {
+        controllerApi!.setSelectedAssets([{ type: "IMAGE", key: "img-1" }]);
+      });
+      vi.clearAllMocks();
+      act(() => {
+        controllerApi!.showNextAsset();
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "controller",
+        expect.objectContaining({
+          currentAsset: expect.objectContaining({
+            asset: { type: "IMAGE", key: "img-1" },
+            time: 5,
+          }) as unknown,
+          playing: true,
+        }),
+      );
+    });
+  });
+
+  describe("removeAssetAfterTimeout", () => {
+    it("clears currentAsset when autoPlay is off", () => {
+      let controllerApi: ReturnType<typeof useController> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestControllerConsumer
+            onMount={(api) => {
+              controllerApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        controllerApi!.renderAsset({ type: "IMAGE", key: "img-1" });
+      });
+      vi.clearAllMocks();
+      act(() => {
+        controllerApi!.removeAssetAfterTimeout();
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "controller",
+        expect.objectContaining({ currentAsset: null }),
+      );
+    });
+
+    it("shows next asset when autoPlay is on and playing", () => {
+      let controllerApi: ReturnType<typeof useController> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestControllerConsumer
+            onMount={(api) => {
+              controllerApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        controllerApi!.toggleAutoPlay();
+      });
+      act(() => {
+        controllerApi!.setPlaying(true);
+      });
+      act(() => {
+        controllerApi!.setSelectedAssets([{ type: "IMAGE", key: "img-2" }]);
+      });
+      vi.clearAllMocks();
+      act(() => {
+        controllerApi!.removeAssetAfterTimeout();
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "controller",
+        expect.objectContaining({
+          currentAsset: expect.objectContaining({
+            asset: { type: "IMAGE", key: "img-2" },
+          }) as unknown,
+        }),
+      );
+    });
+
+    it("does nothing when autoPlay is on but not playing", () => {
+      let controllerApi: ReturnType<typeof useController> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestControllerConsumer
+            onMount={(api) => {
+              controllerApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        controllerApi!.toggleAutoPlay();
+      });
+      vi.clearAllMocks();
+      act(() => {
+        controllerApi!.removeAssetAfterTimeout();
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "controller",
+        expect.objectContaining({ autoPlay: true, playing: false }),
+      );
+    });
+  });
+
+  describe("player CRUD", () => {
+    const setupWithMatch = () => {
+      let controllerApi: ReturnType<typeof useController> | null = null;
+      const availableMatches: AvailableMatches = {
+        "123": {
+          group: "Premier",
+          players: {
+            home: [
+              { name: "Player A", number: "10", show: true, role: "FW" },
+              { name: "Player B", number: "7", show: true, role: "MF" },
+            ],
+            away: [{ name: "Player C", number: "1", show: true, role: "GK" }],
+          },
+        },
+      };
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestControllerConsumer
+            onMount={(api) => {
+              controllerApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        controllerApi!.setAvailableMatches(availableMatches);
+      });
+      vi.clearAllMocks();
+      return controllerApi!;
+    };
+
+    it("editPlayer updates a player field at index", () => {
+      const api = setupWithMatch();
+      act(() => {
+        api.editPlayer("home", 0, { name: "Updated Player" });
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "controller",
+        expect.objectContaining({
+          availableMatches: expect.objectContaining({
+            "123": expect.objectContaining({
+              players: expect.objectContaining({
+                home: expect.arrayContaining([
+                  expect.objectContaining({ name: "Updated Player" }),
+                ]) as unknown,
+              }) as unknown,
+            }) as unknown,
+          }) as unknown,
+        }),
+      );
+    });
+
+    it("editPlayer does nothing when selectedMatch is null", () => {
+      let controllerApi: ReturnType<typeof useController> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestControllerConsumer
+            onMount={(api) => {
+              controllerApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        controllerApi!.editPlayer("home", 0, { name: "Test" });
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "controller",
+        expect.objectContaining({ selectedMatch: null }),
+      );
+    });
+
+    it("editPlayer does nothing for invalid player index", () => {
+      const api = setupWithMatch();
+      act(() => {
+        api.editPlayer("home", 99, { name: "Ghost" });
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "controller",
+        expect.objectContaining({
+          availableMatches: expect.objectContaining({
+            "123": expect.objectContaining({
+              players: expect.objectContaining({
+                home: [
+                  expect.objectContaining({ name: "Player A" }),
+                  expect.objectContaining({ name: "Player B" }),
+                ],
+              }) as unknown,
+            }) as unknown,
+          }) as unknown,
+        }),
+      );
+    });
+
+    it("deletePlayer removes player at index", () => {
+      const api = setupWithMatch();
+      act(() => {
+        api.deletePlayer("home", 0);
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "controller",
+        expect.objectContaining({
+          availableMatches: expect.objectContaining({
+            "123": expect.objectContaining({
+              players: expect.objectContaining({
+                home: [
+                  expect.objectContaining({ name: "Player B", number: "7" }),
+                ],
+              }) as unknown,
+            }) as unknown,
+          }) as unknown,
+        }),
+      );
+    });
+
+    it("deletePlayer does nothing for non-existent teamId", () => {
+      const api = setupWithMatch();
+      act(() => {
+        api.deletePlayer("nonexistent", 0);
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "controller",
+        expect.objectContaining({
+          availableMatches: expect.objectContaining({
+            "123": expect.objectContaining({
+              players: expect.objectContaining({
+                home: expect.arrayContaining([
+                  expect.objectContaining({ name: "Player A" }),
+                ]) as unknown,
+              }) as unknown,
+            }) as unknown,
+          }) as unknown,
+        }),
+      );
+    });
+
+    it("addPlayer adds empty player to existing team", () => {
+      const api = setupWithMatch();
+      act(() => {
+        api.addPlayer("home");
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "controller",
+        expect.objectContaining({
+          availableMatches: expect.objectContaining({
+            "123": expect.objectContaining({
+              players: expect.objectContaining({
+                home: expect.arrayContaining([
+                  expect.objectContaining({
+                    name: "",
+                    number: "",
+                    show: false,
+                    role: "",
+                  }),
+                ]) as unknown,
+              }) as unknown,
+            }) as unknown,
+          }) as unknown,
+        }),
+      );
+    });
+
+    it("addPlayer creates team array if it does not exist", () => {
+      const api = setupWithMatch();
+      act(() => {
+        api.addPlayer("newteam");
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "controller",
+        expect.objectContaining({
+          availableMatches: expect.objectContaining({
+            "123": expect.objectContaining({
+              players: expect.objectContaining({
+                newteam: [{ name: "", number: "", show: false, role: "" }],
+              }) as unknown,
+            }) as unknown,
+          }) as unknown,
+        }),
+      );
+    });
+  });
+
+  describe("view actions", () => {
+    it("setViewPort updates viewport", () => {
+      let viewApi: ReturnType<typeof useView> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestViewConsumer
+            onMount={(api) => {
+              viewApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      const newVp: ViewPort = {
+        style: { height: 720, width: 1280 },
+        name: "720p",
+        key: "custom",
+      };
+      act(() => {
+        viewApi!.setViewPort(newVp);
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "view",
+        expect.objectContaining({ vp: newVp }),
+      );
+    });
+
+    it("setBackground updates background", () => {
+      let viewApi: ReturnType<typeof useView> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestViewConsumer
+            onMount={(api) => {
+              viewApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        viewApi!.setBackground("Svart");
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "view",
+        expect.objectContaining({ background: "Svart" }),
+      );
+    });
+
+    it("setIdleImage updates idleImage", () => {
+      let viewApi: ReturnType<typeof useView> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestViewConsumer
+            onMount={(api) => {
+              viewApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        viewApi!.setIdleImage("https://example.com/logo.png");
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "view",
+        expect.objectContaining({
+          idleImage: "https://example.com/logo.png",
+        }),
+      );
+    });
+
+    it("updateView merges partial view updates", () => {
+      let viewApi: ReturnType<typeof useView> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestViewConsumer
+            onMount={(api) => {
+              viewApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        viewApi!.updateView({ background: "Ekkert" });
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "view",
+        expect.objectContaining({ background: "Ekkert" }),
+      );
+    });
+  });
+
+  describe("additional match actions", () => {
+    it("addToPenalty increases penaltyLength for matching key", () => {
+      let matchApi: ReturnType<typeof useMatch> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestMatchConsumer
+            onMount={(api) => {
+              matchApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        matchApi!.addPenalty("home", "pen-1", 120);
+      });
+      vi.clearAllMocks();
+      act(() => {
+        matchApi!.addToPenalty("pen-1", 60);
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "match",
+        expect.objectContaining({
+          home2min: expect.arrayContaining([
+            expect.objectContaining({ key: "pen-1", penaltyLength: 180 }),
+          ]) as unknown,
+        }),
+      );
+    });
+
+    it("updateHalfLength replaces matching half stop value", () => {
+      let matchApi: ReturnType<typeof useMatch> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestMatchConsumer
+            onMount={(api) => {
+              matchApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        matchApi!.updateHalfLength("45", "50");
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "match",
+        expect.objectContaining({ halfStops: [50, 90, 105, 120] }),
+      );
+    });
+
+    it("updateHalfLength returns unchanged state for invalid new value", () => {
+      let matchApi: ReturnType<typeof useMatch> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestMatchConsumer
+            onMount={(api) => {
+              matchApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        matchApi!.updateHalfLength("45", "abc");
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "match",
+        expect.objectContaining({ halfStops: [45, 90, 105, 120] }),
+      );
+    });
+
+    it("updateHalfLength treats empty string as 0", () => {
+      let matchApi: ReturnType<typeof useMatch> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestMatchConsumer
+            onMount={(api) => {
+              matchApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        matchApi!.updateHalfLength("45", "");
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "match",
+        expect.objectContaining({ halfStops: [0, 90, 105, 120] }),
+      );
+    });
+
+    it("updateHalfLength returns unchanged state for negative values", () => {
+      let matchApi: ReturnType<typeof useMatch> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestMatchConsumer
+            onMount={(api) => {
+              matchApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        matchApi!.updateHalfLength("45", "-5");
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "match",
+        expect.objectContaining({ halfStops: [45, 90, 105, 120] }),
+      );
+    });
+
+    it("matchTimeout caps at 4 timeouts", () => {
+      let matchApi: ReturnType<typeof useMatch> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestMatchConsumer
+            onMount={(api) => {
+              matchApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      for (let i = 0; i < 5; i++) {
+        act(() => {
+          matchApi!.matchTimeout("away");
+        });
+      }
+      expect(firebaseDatabase.syncState).toHaveBeenLastCalledWith(
+        "test-location",
+        "match",
+        expect.objectContaining({ awayTimeouts: 4 }),
+      );
+    });
+  });
+
+  describe("additional controller actions", () => {
+    it("selectMatch stores matchId for valid numeric string", () => {
+      let controllerApi: ReturnType<typeof useController> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestControllerConsumer
+            onMount={(api) => {
+              controllerApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        controllerApi!.selectMatch("456");
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "controller",
+        expect.objectContaining({ selectedMatch: "456" }),
+      );
+    });
+
+    it("selectMatch ignores non-numeric matchId", () => {
+      let controllerApi: ReturnType<typeof useController> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestControllerConsumer
+            onMount={(api) => {
+              controllerApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        controllerApi!.selectMatch("not-a-number");
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "controller",
+        expect.objectContaining({ selectedMatch: null }),
+      );
+    });
+
+    it("setAvailableMatches sets matches and selects first key", () => {
+      let controllerApi: ReturnType<typeof useController> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestControllerConsumer
+            onMount={(api) => {
+              controllerApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      const matches: AvailableMatches = {
+        "100": { players: {} },
+        "200": { players: {} },
+      };
+      act(() => {
+        controllerApi!.setAvailableMatches(matches);
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "controller",
+        expect.objectContaining({
+          availableMatches: matches,
+          selectedMatch: "100",
+        }),
+      );
+    });
+
+    it("updateController merges updates and defaults selectedAssets to empty", () => {
+      let controllerApi: ReturnType<typeof useController> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestControllerConsumer
+            onMount={(api) => {
+              controllerApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        controllerApi!.updateController({ view: "match" });
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "controller",
+        expect.objectContaining({ view: "match", selectedAssets: [] }),
+      );
+    });
+
+    it("toggleAutoPlay turns off playing when disabling autoPlay", () => {
+      let controllerApi: ReturnType<typeof useController> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestControllerConsumer
+            onMount={(api) => {
+              controllerApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        controllerApi!.toggleAutoPlay();
+      });
+      act(() => {
+        controllerApi!.setPlaying(true);
+      });
+      vi.clearAllMocks();
+      act(() => {
+        controllerApi!.toggleAutoPlay();
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "controller",
+        expect.objectContaining({ autoPlay: false, playing: false }),
       );
     });
   });
