@@ -1,12 +1,27 @@
-import { test, expect, ONE_MINUTE } from "./fixtures/test-helpers";
+import {
+  test,
+  expect,
+  ONE_MINUTE,
+  ensureEmulatorUser,
+  clearEmulatorData,
+  loginWithEmulatorUser,
+} from "./fixtures/test-helpers";
 
 test.describe("Match Flow - Complete Match Simulation", () => {
+  test.beforeAll(async () => {
+    await ensureEmulatorUser();
+  });
+
   test.beforeEach(async ({ page }) => {
+    await clearEmulatorData();
     await page.addInitScript(() => {
       localStorage.clear();
+      localStorage.setItem("clock_listenPrefix", "test-e2e");
+      localStorage.setItem("clock_sync", "true");
     });
     await page.clock.install({ time: new Date(2025, 3, 10, 14, 0, 0) });
     await page.goto("/");
+    await loginWithEmulatorUser(page);
   });
 
   test("plays a complete football match with goals and half-time", async ({

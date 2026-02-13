@@ -1,12 +1,28 @@
-import { test, expect, ONE_MINUTE, SECOND } from "./fixtures/test-helpers";
+import {
+  test,
+  expect,
+  ONE_MINUTE,
+  SECOND,
+  ensureEmulatorUser,
+  clearEmulatorData,
+  loginWithEmulatorUser,
+} from "./fixtures/test-helpers";
 
 test.describe("Basic navigation", () => {
+  test.beforeAll(async () => {
+    await ensureEmulatorUser();
+  });
+
   test.beforeEach(async ({ page }) => {
+    await clearEmulatorData();
     await page.addInitScript(() => {
       localStorage.clear();
+      localStorage.setItem("clock_listenPrefix", "test-e2e");
+      localStorage.setItem("clock_sync", "true");
     });
     await page.clock.install({ time: new Date(2025, 3, 10, 12, 0, 0) });
     await page.goto("/");
+    await loginWithEmulatorUser(page);
   });
 
   test("starts the clock and does some things", async ({ page }) => {
@@ -16,6 +32,7 @@ test.describe("Basic navigation", () => {
     await page.getByRole("button", { name: "Heim", exact: true }).click();
     await expect(page.getByText("Hefja niðurtalningu")).toHaveCount(1);
     await page.getByText("Byrja").click();
+    await expect(page.getByText("Pása")).toBeVisible({ timeout: 10000 });
     await expect(page.getByText("Hefja niðurtalningu")).toHaveCount(0);
     await page.clock.fastForward(ONE_MINUTE / 2);
     await expect(page.getByText("Pása")).toHaveCount(1);
