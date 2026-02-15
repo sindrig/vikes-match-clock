@@ -38,7 +38,7 @@ const defaultMatch: Match = {
   started: 0,
   timeElapsed: 0,
   halfStops: DEFAULT_HALFSTOPS[Sports.Football],
-  homeTeam: "Vikingur R",
+  homeTeam: "Víkingur R",
   awayTeam: "",
   homeTeamId: 103,
   awayTeamId: 0,

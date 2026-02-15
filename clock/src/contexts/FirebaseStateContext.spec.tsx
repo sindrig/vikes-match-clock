@@ -245,7 +245,7 @@ describe("FirebaseStateContext", () => {
       expect(matchApi!.match.homeScore).toBe(0);
       expect(matchApi!.match.awayScore).toBe(0);
       expect(matchApi!.match.started).toBe(0);
-      expect(matchApi!.match.homeTeam).toBe("Vikingur R");
+      expect(matchApi!.match.homeTeam).toBe("Víkingur R");
     });
 
     it("initializes with default controller state", () => {
