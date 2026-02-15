@@ -484,6 +484,51 @@ describe("firebaseParsers", () => {
       expect(result!.matchType).toBe(defaultMatch.matchType);
     });
 
+    it("rejects invalid matchType 'basketball' and falls back to default", () => {
+      const data = {
+        matchType: "basketball",
+      };
+
+      const result = parseMatch(data, defaultMatch);
+      expect(result!.matchType).toBe(defaultMatch.matchType);
+    });
+
+    it("rejects empty matchType and falls back to default", () => {
+      const data = {
+        matchType: "",
+      };
+
+      const result = parseMatch(data, defaultMatch);
+      expect(result!.matchType).toBe(defaultMatch.matchType);
+    });
+
+    it("rejects partial matchType 'foot' and falls back to default", () => {
+      const data = {
+        matchType: "foot",
+      };
+
+      const result = parseMatch(data, defaultMatch);
+      expect(result!.matchType).toBe(defaultMatch.matchType);
+    });
+
+    it("accepts valid matchType 'football'", () => {
+      const data = {
+        matchType: "football",
+      };
+
+      const result = parseMatch(data, defaultMatch);
+      expect(result!.matchType).toBe("football");
+    });
+
+    it("accepts valid matchType 'handball'", () => {
+      const data = {
+        matchType: "handball",
+      };
+
+      const result = parseMatch(data, defaultMatch);
+      expect(result!.matchType).toBe("handball");
+    });
+
     it("parses optional matchStartTime", () => {
       const data = {
         matchStartTime: "2024-02-11T14:30:00Z",
