@@ -103,6 +103,7 @@ interface FirebaseStateContextType {
   buzz: (on: boolean) => void;
   countdown: () => void;
   updateRedCards: (home: number, away: number) => void;
+  getServerTime: () => number;
 
   updateController: (updates: Partial<ControllerState>) => void;
   selectView: (view: string) => void;
@@ -191,6 +192,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   const matchRef = useRef(match);
   const controllerRef = useRef(controller);
   const viewRef = useRef(view);
+  const serverTimeOffsetRef = useRef<number>(0);
   const [prevListenPrefix, setPrevListenPrefix] = useState(listenPrefix);
 
   // Reset ready when listenPrefix changes (using state comparison pattern per React docs)
@@ -224,6 +226,18 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   }, []);
 
   useEffect(() => {
+    const offsetRef = ref(database, ".info/serverTimeOffset");
+    const unsubOffset = onValue(offsetRef, (snapshot) => {
+      const offset = snapshot.val() as unknown as number;
+      serverTimeOffsetRef.current = offset ?? 0;
+    });
+
+    return () => {
+      unsubOffset();
+    };
+  }, []);
+
+  useEffect(() => {
     if (listenPrefix) {
       let matchReady = false;
       let controllerReady = false;
@@ -244,28 +258,6 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         (snapshot) => {
           const results = parseMatch(snapshot.val(), defaultMatch);
           if (results) {
-            if (results.started > 0 && !results.countdown) {
-              if (matchRef.current.started === 0) {
-                results.started = Date.now() - 150;
-              } else {
-                results.started = matchRef.current.started;
-              }
-            }
-            if (results.timeout > 0) {
-              if (matchRef.current.timeout === 0) {
-                results.timeout = Date.now() - 150;
-              } else {
-                results.timeout = matchRef.current.timeout;
-              }
-            }
-            if (results.buzzer) {
-              if (!matchRef.current.buzzer) {
-                results.buzzer = Date.now();
-              } else {
-                results.buzzer = matchRef.current.buzzer;
-              }
-            }
-
             setMatch(results);
           } else {
             setMatch(defaultMatch);
@@ -459,13 +451,18 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     [isAuthenticated, listenPrefix],
   );
 
+  const getServerTime = useCallback(
+    () => Date.now() + serverTimeOffsetRef.current,
+    [],
+  );
+
   const startMatch = useCallback(() => {
     applyMatchUpdate((prev) => ({
       ...prev,
-      started: Date.now(),
+      started: getServerTime(),
       countdown: false,
     }));
-  }, [applyMatchUpdate]);
+  }, [applyMatchUpdate, getServerTime]);
 
   const pauseMatch = useCallback(
     (isHalfEnd?: boolean) => {
@@ -478,12 +475,12 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
           }
         } else if (prev.started && !prev.countdown) {
           newState.timeElapsed =
-            prev.timeElapsed + Math.floor(Date.now() - prev.started);
+            prev.timeElapsed + Math.floor(getServerTime() - prev.started);
         }
         return newState;
       });
     },
-    [applyMatchUpdate],
+    [applyMatchUpdate, getServerTime],
   );
 
   const addGoal = useCallback(
@@ -584,12 +581,12 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         const stateKey = timeoutKeys[team];
         return {
           ...prev,
-          timeout: Date.now(),
+          timeout: getServerTime(),
           [stateKey]: Math.min(prev[stateKey] + 1, 4),
         };
       });
     },
-    [applyMatchUpdate],
+    [applyMatchUpdate, getServerTime],
   );
 
   const removeTimeout = useCallback(() => {
@@ -600,10 +597,10 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     (on: boolean) => {
       applyMatchUpdate((prev) => ({
         ...prev,
-        buzzer: on ? Date.now() : false,
+        buzzer: on ? getServerTime() : false,
       }));
     },
-    [applyMatchUpdate],
+    [applyMatchUpdate, getServerTime],
   );
 
   const countdown = useCallback(() => {
@@ -931,6 +928,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       buzz,
       countdown,
       updateRedCards,
+      getServerTime,
       updateController,
       selectView,
       selectAssetView,
@@ -977,6 +975,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       buzz,
       countdown,
       updateRedCards,
+      getServerTime,
       updateController,
       selectView,
       selectAssetView,
@@ -1039,6 +1038,7 @@ export const useMatch = () => {
     buzz,
     countdown,
     updateRedCards,
+    getServerTime,
   } = useFirebaseState();
   return {
     match,
@@ -1056,6 +1056,7 @@ export const useMatch = () => {
     buzz,
     countdown,
     updateRedCards,
+    getServerTime,
   };
 };
 
