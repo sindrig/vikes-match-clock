@@ -15,6 +15,7 @@ import { firebaseDatabase } from "../firebaseDatabase";
 vi.mock("../firebaseDatabase", () => ({
   firebaseDatabase: {
     syncState: vi.fn().mockResolvedValue(undefined),
+    syncPartialState: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
@@ -865,10 +866,10 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateMatch({ homeTeam: "Valur" });
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "match",
-        expect.objectContaining({ homeTeam: "Valur", homeTeamId: 101 }),
+        { homeTeam: "Valur", homeTeamId: 101 },
       );
     });
 
@@ -889,10 +890,10 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateMatch({ awayTeam: "KR" });
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "match",
-        expect.objectContaining({ awayTeam: "KR", awayTeamId: 107 }),
+        { awayTeam: "KR", awayTeamId: 107 },
       );
     });
 
@@ -913,10 +914,10 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateMatch({ awayTeam: "Unknown FC" });
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "match",
-        expect.objectContaining({ awayTeam: "Unknown FC", awayTeamId: 0 }),
+        { awayTeam: "Unknown FC", awayTeamId: 0 },
       );
     });
 
@@ -937,10 +938,10 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateMatch({ awayTeam: "" });
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "match",
-        expect.objectContaining({ awayTeam: "", awayTeamId: 0 }),
+        { awayTeam: "", awayTeamId: 0 },
       );
     });
 
@@ -961,10 +962,10 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateMatch({ injuryTime: NaN });
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "match",
-        expect.objectContaining({ injuryTime: 0 }),
+        { injuryTime: 0 },
       );
     });
 
@@ -987,10 +988,10 @@ describe("FirebaseStateContext", () => {
           matchType: "basketball" as unknown as Sports,
         });
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "match",
-        expect.objectContaining({ matchType: Sports.Football }),
+        { matchType: Sports.Football },
       );
     });
 
@@ -1011,13 +1012,13 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateMatch({ matchType: Sports.Handball });
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "match",
-        expect.objectContaining({
+        {
           matchType: Sports.Handball,
           halfStops: DEFAULT_HALFSTOPS[Sports.Handball],
-        }),
+        },
       );
     });
 
@@ -1042,11 +1043,107 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateMatch({ started: Date.now() });
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "match",
-        expect.objectContaining({ buzzer: false }),
+        expect.objectContaining({
+          started: expect.any(Number) as unknown,
+          buzzer: false,
+        }),
       );
+    });
+
+    it("syncs only homeTeam and homeTeamId when only homeTeam is updated", () => {
+      let matchApi: ReturnType<typeof useMatch> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestMatchConsumer
+            onMount={(api) => {
+              matchApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        matchApi!.updateMatch({ homeTeam: "Valur" });
+      });
+      const call = vi.mocked(firebaseDatabase.syncPartialState).mock.calls[0];
+      expect(Object.keys(call[2])).toEqual(
+        expect.arrayContaining(["homeTeam", "homeTeamId"]),
+      );
+      expect(Object.keys(call[2])).toHaveLength(2);
+    });
+
+    it("syncs only awayTeam and awayTeamId when only awayTeam is updated", () => {
+      let matchApi: ReturnType<typeof useMatch> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestMatchConsumer
+            onMount={(api) => {
+              matchApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        matchApi!.updateMatch({ awayTeam: "KR" });
+      });
+      const call = vi.mocked(firebaseDatabase.syncPartialState).mock.calls[0];
+      expect(Object.keys(call[2])).toEqual(
+        expect.arrayContaining(["awayTeam", "awayTeamId"]),
+      );
+      expect(Object.keys(call[2])).toHaveLength(2);
+    });
+
+    it("syncs matchType and halfStops when matchType changes", () => {
+      let matchApi: ReturnType<typeof useMatch> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestMatchConsumer
+            onMount={(api) => {
+              matchApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        matchApi!.updateMatch({ matchType: Sports.Handball });
+      });
+      const call = vi.mocked(firebaseDatabase.syncPartialState).mock.calls[0];
+      expect(call[2]).toEqual({
+        matchType: Sports.Handball,
+        halfStops: DEFAULT_HALFSTOPS[Sports.Handball],
+      });
+    });
+
+    it("normalizes NaN injuryTime to 0 in partial sync", () => {
+      let matchApi: ReturnType<typeof useMatch> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestMatchConsumer
+            onMount={(api) => {
+              matchApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        matchApi!.updateMatch({ injuryTime: NaN });
+      });
+      const call = vi.mocked(firebaseDatabase.syncPartialState).mock.calls[0];
+      expect(call[2]).toEqual({ injuryTime: 0 });
     });
   });
 
