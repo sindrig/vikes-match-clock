@@ -37,7 +37,6 @@ test.describe("Image Upload", () => {
     await clearEmulatorData();
     await page.addInitScript(() => {
       localStorage.clear();
-      localStorage.setItem("clock_listenPrefix", "test-e2e");
       localStorage.setItem("clock_sync", "true");
     });
     await page.goto("/");
