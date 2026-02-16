@@ -53,11 +53,9 @@ const defaultViewport = {
 
 function setupState1() {
   mockedUseLocalState.mockReturnValue({
-    sync: false,
     auth: { isLoaded: true, isEmpty: true },
     listenPrefix: "",
     setListenPrefix: vi.fn(),
-    setSync: vi.fn(),
     available: [],
     email: "",
     setEmail: vi.fn(),
@@ -76,11 +74,9 @@ function setupState2(
 ) {
   const setListenPrefix = overrides?.setListenPrefix ?? vi.fn();
   mockedUseLocalState.mockReturnValue({
-    sync: false,
     auth: { isLoaded: true, isEmpty: true },
     listenPrefix: "vikinni",
     setListenPrefix,
-    setSync: vi.fn(),
     available: [],
     email: "",
     setEmail: vi.fn(),
@@ -96,11 +92,9 @@ function setupState2(
 
 function setupState3(view = VIEWS.idle) {
   mockedUseLocalState.mockReturnValue({
-    sync: false,
     auth: { isLoaded: true, isEmpty: false, email: "test@test.com" },
     listenPrefix: "vikinni",
     setListenPrefix: vi.fn(),
-    setSync: vi.fn(),
     available: ["vikinni"],
     email: "test@test.com",
     setEmail: vi.fn(),

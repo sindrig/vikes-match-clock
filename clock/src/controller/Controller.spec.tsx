@@ -72,8 +72,6 @@ function setupState1() {
     listenPrefix: "",
     setListenPrefix: vi.fn(),
     auth: { isLoaded: true, isEmpty: true },
-    sync: false,
-    setSync: vi.fn(),
     available: [],
   });
   mockedUseController.mockReturnValue({
@@ -100,8 +98,6 @@ function setupState2() {
     listenPrefix: "vikinni",
     setListenPrefix: vi.fn(),
     auth: { isLoaded: true, isEmpty: true },
-    sync: false,
-    setSync: vi.fn(),
     available: [],
   });
   mockedUseController.mockReturnValue({
@@ -132,8 +128,6 @@ function setupState3() {
     listenPrefix: "vikinni",
     setListenPrefix: vi.fn(),
     auth: { isLoaded: true, isEmpty: false, email: "test@test.com" },
-    sync: false,
-    setSync: vi.fn(),
     available: ["vikinni"],
   });
   mockedUseController.mockReturnValue({

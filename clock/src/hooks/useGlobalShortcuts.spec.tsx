@@ -79,7 +79,6 @@ describe("useGlobalShortcuts", () => {
 
     mockedUseLocalState.mockReturnValue({
       auth: { isEmpty: false, isLoaded: true },
-      sync: false,
     } as unknown as ReturnType<typeof useLocalState>);
   });
 
@@ -414,11 +413,10 @@ describe("useGlobalShortcuts", () => {
       });
     });
 
-    describe("Auth/Sync blocking", () => {
-      it("blocks shortcuts when sync=true AND auth.isEmpty=true", () => {
+    describe("Auth blocking", () => {
+      it("blocks shortcuts when auth.isEmpty=true", () => {
         mockedUseLocalState.mockReturnValue({
           auth: { isEmpty: true, isLoaded: true },
-          sync: true,
         } as unknown as ReturnType<typeof useLocalState>);
 
         render(<TestComponent />);
@@ -429,23 +427,9 @@ describe("useGlobalShortcuts", () => {
         expect(mockPauseMatch).not.toHaveBeenCalled();
       });
 
-      it("allows shortcuts when sync=false", () => {
-        mockedUseLocalState.mockReturnValue({
-          auth: { isEmpty: true, isLoaded: true },
-          sync: false,
-        } as unknown as ReturnType<typeof useLocalState>);
-
-        render(<TestComponent />);
-
-        fireEvent.keyDown(window, { code: "Space" });
-
-        expect(mockStartMatch).toHaveBeenCalledTimes(1);
-      });
-
       it("allows shortcuts when auth.isEmpty=false", () => {
         mockedUseLocalState.mockReturnValue({
           auth: { isEmpty: false, isLoaded: true },
-          sync: true,
         } as unknown as ReturnType<typeof useLocalState>);
 
         render(<TestComponent />);
@@ -455,23 +439,9 @@ describe("useGlobalShortcuts", () => {
         expect(mockStartMatch).toHaveBeenCalledTimes(1);
       });
 
-      it("allows shortcuts when sync=true AND auth.isEmpty=false", () => {
-        mockedUseLocalState.mockReturnValue({
-          auth: { isEmpty: false, isLoaded: true },
-          sync: true,
-        } as unknown as ReturnType<typeof useLocalState>);
-
-        render(<TestComponent />);
-
-        fireEvent.keyDown(window, { code: "ArrowUp" });
-
-        expect(mockAddGoal).toHaveBeenCalledWith("home");
-      });
-
-      it("blocks all shortcuts when sync=true AND auth.isEmpty=true (ArrowUp)", () => {
+      it("blocks ArrowUp when auth.isEmpty=true", () => {
         mockedUseLocalState.mockReturnValue({
           auth: { isEmpty: true, isLoaded: true },
-          sync: true,
         } as unknown as ReturnType<typeof useLocalState>);
 
         render(<TestComponent />);
@@ -481,10 +451,9 @@ describe("useGlobalShortcuts", () => {
         expect(mockAddGoal).not.toHaveBeenCalled();
       });
 
-      it("blocks all shortcuts when sync=true AND auth.isEmpty=true (ArrowDown)", () => {
+      it("blocks ArrowDown when auth.isEmpty=true", () => {
         mockedUseLocalState.mockReturnValue({
           auth: { isEmpty: true, isLoaded: true },
-          sync: true,
         } as unknown as ReturnType<typeof useLocalState>);
 
         render(<TestComponent />);
@@ -494,10 +463,9 @@ describe("useGlobalShortcuts", () => {
         expect(mockAddGoal).not.toHaveBeenCalled();
       });
 
-      it("blocks asset view shortcuts when sync=true AND auth.isEmpty=true", () => {
+      it("blocks asset view shortcuts when auth.isEmpty=true", () => {
         mockedUseLocalState.mockReturnValue({
           auth: { isEmpty: true, isLoaded: true },
-          sync: true,
         } as unknown as ReturnType<typeof useLocalState>);
 
         mockedUseController.mockReturnValue({

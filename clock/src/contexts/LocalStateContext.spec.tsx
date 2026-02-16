@@ -101,23 +101,6 @@ describe("LocalStateContext", () => {
       expect(authState!.email).toBeUndefined();
     });
 
-    it("initializes sync from localStorage with default false", () => {
-      let api: ReturnType<typeof useLocalState> | null = null;
-
-      render(
-        <LocalStateProvider>
-          <TestLocalStateConsumer
-            onMount={(localStateApi) => {
-              api = localStateApi;
-            }}
-          />
-        </LocalStateProvider>,
-      );
-
-      expect(api).not.toBeNull();
-      expect(api!.sync).toBe(false);
-    });
-
     it("initializes listenPrefix from localStorage with default empty string", () => {
       let api: ReturnType<typeof useLocalState> | null = null;
 
@@ -172,25 +155,6 @@ describe("LocalStateContext", () => {
   });
 
   describe("localStorage persistence", () => {
-    it("loads sync state from localStorage on mount", () => {
-      localStorage.setItem("clock_sync", "true");
-
-      let api: ReturnType<typeof useLocalState> | null = null;
-
-      render(
-        <LocalStateProvider>
-          <TestLocalStateConsumer
-            onMount={(localStateApi) => {
-              api = localStateApi;
-            }}
-          />
-        </LocalStateProvider>,
-      );
-
-      expect(api).not.toBeNull();
-      expect(api!.sync).toBe(true);
-    });
-
     it("loads listenPrefix from localStorage on mount", () => {
       localStorage.setItem("clock_listenPrefix", "test-location");
 
@@ -208,29 +172,6 @@ describe("LocalStateContext", () => {
 
       expect(api).not.toBeNull();
       expect(api!.listenPrefix).toBe("test-location");
-    });
-
-    it("setSync persists to localStorage", () => {
-      let api: ReturnType<typeof useLocalState> | null = null;
-
-      render(
-        <LocalStateProvider>
-          <TestLocalStateConsumer
-            onMount={(localStateApi) => {
-              api = localStateApi;
-            }}
-          />
-        </LocalStateProvider>,
-      );
-
-      expect(api).not.toBeNull();
-
-      act(() => {
-        api!.setSync(true);
-      });
-
-      expect(api!.sync).toBe(true);
-      expect(localStorage.getItem("clock_sync")).toBe("true");
     });
 
     it("setListenPrefix persists to localStorage", () => {
@@ -254,31 +195,6 @@ describe("LocalStateContext", () => {
 
       expect(api!.listenPrefix).toBe("new-location");
       expect(localStorage.getItem("clock_listenPrefix")).toBe("new-location");
-    });
-
-    it("setSync(false) persists 'false' string to localStorage", () => {
-      localStorage.setItem("clock_sync", "true");
-
-      let api: ReturnType<typeof useLocalState> | null = null;
-
-      render(
-        <LocalStateProvider>
-          <TestLocalStateConsumer
-            onMount={(localStateApi) => {
-              api = localStateApi;
-            }}
-          />
-        </LocalStateProvider>,
-      );
-
-      expect(api).not.toBeNull();
-
-      act(() => {
-        api!.setSync(false);
-      });
-
-      expect(api!.sync).toBe(false);
-      expect(localStorage.getItem("clock_sync")).toBe("false");
     });
 
     it("setListenPrefix with empty string persists empty string", () => {
@@ -446,10 +362,8 @@ describe("LocalStateContext", () => {
       );
 
       expect(settings).not.toBeNull();
-      expect(settings!.sync).toBe(false);
       expect(settings!.listenPrefix).toBe("");
       expect(settings!.available).toEqual([]);
-      expect(typeof settings!.setSync).toBe("function");
       expect(typeof settings!.setListenPrefix).toBe("function");
     });
 
@@ -486,11 +400,9 @@ describe("LocalStateContext", () => {
       expect(settings).not.toBeNull();
 
       act(() => {
-        settings!.setSync(true);
         settings!.setListenPrefix("test-location");
       });
 
-      expect(settings!.sync).toBe(true);
       expect(settings!.listenPrefix).toBe("test-location");
     });
   });
@@ -528,8 +440,6 @@ describe("LocalStateContext", () => {
 
       expect(api).not.toBeNull();
       expect(api!.auth).toBeDefined();
-      expect(api!.sync).toBe(false);
-      expect(api!.setSync).toBeDefined();
       expect(api!.listenPrefix).toBe("");
       expect(api!.setListenPrefix).toBeDefined();
       expect(api!.available).toEqual([]);

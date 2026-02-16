@@ -173,11 +173,7 @@ describe("ScoreBoard component", () => {
 
       rerender(
         <LocalStateProvider>
-          <FirebaseStateProvider
-            sync={false}
-            listenPrefix=""
-            isAuthenticated={false}
-          >
+          <FirebaseStateProvider listenPrefix="" isAuthenticated={false}>
             <ScoreBoard />
           </FirebaseStateProvider>
         </LocalStateProvider>,

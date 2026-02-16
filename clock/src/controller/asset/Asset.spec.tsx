@@ -12,7 +12,6 @@ vi.mock("../../contexts/FirebaseStateContext", () => ({
 
 vi.mock("../../contexts/LocalStateContext", () => ({
   useAuth: vi.fn(),
-  useRemoteSettings: vi.fn(),
 }));
 
 // Mock child components
@@ -60,12 +59,11 @@ vi.mock("react-youtube", () => ({
 }));
 
 import { useController, useView } from "../../contexts/FirebaseStateContext";
-import { useAuth, useRemoteSettings } from "../../contexts/LocalStateContext";
+import { useAuth } from "../../contexts/LocalStateContext";
 
 const mockedUseController = vi.mocked(useController);
 const mockedUseView = vi.mocked(useView);
 const mockedUseAuth = vi.mocked(useAuth);
-const mockedUseRemoteSettings = vi.mocked(useRemoteSettings);
 
 describe("AssetComponent", () => {
   const mockRemoveAssetAfterTimeout = vi.fn();
@@ -92,10 +90,6 @@ describe("AssetComponent", () => {
       isEmpty: false,
       isLoaded: true,
     } as unknown as ReturnType<typeof useAuth>);
-
-    mockedUseRemoteSettings.mockReturnValue({
-      sync: false,
-    } as unknown as ReturnType<typeof useRemoteSettings>);
   });
 
   describe("Null/Empty Asset", () => {
@@ -487,11 +481,7 @@ describe("AssetComponent", () => {
       expect(mockRemoveAssetAfterTimeout).not.toHaveBeenCalled();
     });
 
-    it("blocks timeout when sync=true and auth.isEmpty=true", () => {
-      mockedUseRemoteSettings.mockReturnValue({
-        sync: true,
-      } as unknown as ReturnType<typeof useRemoteSettings>);
-
+    it("blocks timeout when auth.isEmpty=true", () => {
       mockedUseAuth.mockReturnValue({
         isEmpty: true,
         isLoaded: true,
@@ -510,13 +500,9 @@ describe("AssetComponent", () => {
       expect(mockRemoveAssetAfterTimeout).not.toHaveBeenCalled();
     });
 
-    it("allows timeout when sync=false regardless of auth state", () => {
-      mockedUseRemoteSettings.mockReturnValue({
-        sync: false,
-      } as unknown as ReturnType<typeof useRemoteSettings>);
-
+    it("allows timeout when auth.isEmpty=false", () => {
       mockedUseAuth.mockReturnValue({
-        isEmpty: true,
+        isEmpty: false,
         isLoaded: true,
       } as unknown as ReturnType<typeof useAuth>);
 
