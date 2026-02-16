@@ -8,6 +8,17 @@ const TEST_EMAIL = "e2e-test@test.com";
 const TEST_PASSWORD = "testpassword123";
 const EMAIL_PREFIX = TEST_EMAIL.split("@")[0];
 
+export class FakeClock {
+  constructor(private currentTime: Date) {}
+  get time() {
+    return this.currentTime.getTime();
+  }
+  async advance(page: Page, deltaMs: number) {
+    this.currentTime = new Date(this.currentTime.getTime() + deltaMs);
+    await page.clock.setFixedTime(this.currentTime);
+  }
+}
+
 async function clearEmulatorData(): Promise<void> {
   const apiContext = await request.newContext();
   try {
@@ -64,7 +75,7 @@ export const test = base.extend<{
       localStorage.setItem("clock_sync", "true");
     }, TEST_LISTEN_PREFIX);
 
-    await page.clock.install({ time: new Date(2025, 3, 10, 12, 0, 0) });
+    await page.clock.setFixedTime(new Date(2025, 3, 10, 12, 0, 0));
 
     await use(page);
   },
@@ -97,10 +108,29 @@ export async function selectView(
 
 export async function startClock(page: Page) {
   await page.getByText("Byrja").click();
+  await expect(page.getByText("Pása")).toBeVisible({ timeout: 5000 });
 }
 
 export async function pauseClock(page: Page) {
   await page.getByText("Pása").click();
+  await expect(page.getByText("Byrja")).toBeVisible({ timeout: 5000 });
+}
+
+export async function startSimpleClockAndWait(page: Page) {
+  await page.getByText("Start").click();
+  await expect(page.getByText("Stop")).toBeVisible({ timeout: 5000 });
+}
+
+export async function stopSimpleClockAndWait(page: Page) {
+  await page.getByText("Stop").click();
+  await expect(page.getByText("Start")).toBeVisible({ timeout: 5000 });
+}
+
+export async function startCountdownAndWait(page: Page) {
+  await page.getByText("Hefja niðurtalningu").click();
+  await expect(page.getByText("Hefja niðurtalningu")).toHaveCount(0, {
+    timeout: 5000,
+  });
 }
 
 export async function nextHalf(page: Page) {

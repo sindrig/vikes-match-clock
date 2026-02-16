@@ -2,9 +2,11 @@ import {
   test,
   expect,
   ONE_MINUTE,
+  FakeClock,
   ensureEmulatorUser,
   clearEmulatorData,
   loginWithEmulatorUser,
+  startClock,
 } from "./fixtures/test-helpers";
 
 test.describe("Match Flow - Complete Match Simulation", () => {
@@ -19,7 +21,7 @@ test.describe("Match Flow - Complete Match Simulation", () => {
       localStorage.setItem("clock_listenPrefix", "test-e2e");
       localStorage.setItem("clock_sync", "true");
     });
-    await page.clock.install({ time: new Date(2025, 3, 10, 14, 0, 0) });
+    await page.clock.setFixedTime(new Date(2025, 3, 10, 14, 0, 0));
     await page.goto("/");
     await loginWithEmulatorUser(page);
   });
@@ -27,33 +29,34 @@ test.describe("Match Flow - Complete Match Simulation", () => {
   test("plays a complete football match with goals and half-time", async ({
     page,
   }) => {
+    const fakeClock = new FakeClock(new Date(2025, 3, 10, 14, 0, 0));
     await page.getByText("Stillingar").click();
     await page.locator("#view-selector-match").click();
     await page.getByRole("button", { name: "Heim", exact: true }).click();
 
-    await page.getByText("Byrja").click();
-    await page.clock.fastForward(ONE_MINUTE * 10);
+    await startClock(page);
+    await fakeClock.advance(page, ONE_MINUTE * 10);
     await expect(page.locator(".matchclock")).toContainText(/10:0\d/);
 
     await page.getByText("H +1").click();
     await expect(page.locator(".team.home .score")).toHaveText("1");
     await expect(page.locator(".team.away .score")).toHaveText("0");
 
-    await page.clock.fastForward(ONE_MINUTE * 15);
+    await fakeClock.advance(page, ONE_MINUTE * 15);
     await expect(page.locator(".matchclock")).toContainText(/25:0\d/);
 
     await page.getByText("Ú +1").click();
     await expect(page.locator(".team.home .score")).toHaveText("1");
     await expect(page.locator(".team.away .score")).toHaveText("1");
 
-    await page.clock.fastForward(ONE_MINUTE * 15);
+    await fakeClock.advance(page, ONE_MINUTE * 15);
     await expect(page.locator(".matchclock")).toContainText(/40:0\d/);
 
     await page.getByText("H +1").click();
     await expect(page.locator(".team.home .score")).toHaveText("2");
     await expect(page.locator(".team.away .score")).toHaveText("1");
 
-    await page.clock.fastForward(ONE_MINUTE * 6);
+    await fakeClock.advance(page, ONE_MINUTE * 6);
     await expect(page.locator(".matchclock")).toContainText(/46:0\d/);
 
     await page.getByText("Pása").click();
@@ -63,16 +66,16 @@ test.describe("Match Flow - Complete Match Simulation", () => {
     await expect(page.locator(".halfstops-input")).toHaveCount(3);
 
     await page.getByRole("button", { name: "Heim", exact: true }).click();
-    await page.getByText("Byrja").click();
+    await startClock(page);
 
-    await page.clock.fastForward(ONE_MINUTE * 15);
+    await fakeClock.advance(page, ONE_MINUTE * 15);
     await expect(page.locator(".matchclock")).toContainText(/60:0\d/);
 
     await page.getByText("Ú +1").click();
     await expect(page.locator(".team.home .score")).toHaveText("2");
     await expect(page.locator(".team.away .score")).toHaveText("2");
 
-    await page.clock.fastForward(ONE_MINUTE * 25);
+    await fakeClock.advance(page, ONE_MINUTE * 25);
     await expect(page.locator(".matchclock")).toContainText(/85:0\d/);
 
     await page.locator(".longerInput").fill("3");
@@ -82,7 +85,7 @@ test.describe("Match Flow - Complete Match Simulation", () => {
     await expect(page.locator(".team.home .score")).toHaveText("3");
     await expect(page.locator(".team.away .score")).toHaveText("2");
 
-    await page.clock.fastForward(ONE_MINUTE * 6);
+    await fakeClock.advance(page, ONE_MINUTE * 6);
     await expect(page.locator(".matchclock")).toContainText(/91:0\d/);
 
     await expect(page.locator(".team.home .score")).toHaveText("3");
@@ -90,12 +93,13 @@ test.describe("Match Flow - Complete Match Simulation", () => {
   });
 
   test("handles goal corrections with H -1 button", async ({ page }) => {
+    const fakeClock = new FakeClock(new Date(2025, 3, 10, 14, 0, 0));
     await page.getByText("Stillingar").click();
     await page.locator("#view-selector-match").click();
     await page.getByRole("button", { name: "Heim", exact: true }).click();
 
-    await page.getByText("Byrja").click();
-    await page.clock.fastForward(ONE_MINUTE * 5);
+    await startClock(page);
+    await fakeClock.advance(page, ONE_MINUTE * 5);
 
     await page.getByText("H +1").click();
     await expect(page.locator(".team.home .score")).toHaveText("1");
@@ -107,14 +111,15 @@ test.describe("Match Flow - Complete Match Simulation", () => {
   test("plays a complete handball match with period transitions", async ({
     page,
   }) => {
+    const fakeClock = new FakeClock(new Date(2025, 3, 10, 14, 0, 0));
     await page.getByText("Stillingar").click();
     await page.locator(".match-type-selector").selectOption("handball");
     await page.locator("#view-selector-match").click();
     await page.getByRole("button", { name: "Heim", exact: true }).click();
 
-    await page.getByText("Byrja").click();
+    await startClock(page);
 
-    await page.clock.fastForward(ONE_MINUTE * 15);
+    await fakeClock.advance(page, ONE_MINUTE * 15);
     await expect(page.locator(".matchclock")).toContainText(/15:0\d/);
 
     await page.getByText("H +1").click();
@@ -123,14 +128,14 @@ test.describe("Match Flow - Complete Match Simulation", () => {
     await expect(page.locator(".team.home .score")).toHaveText("2");
     await expect(page.locator(".team.away .score")).toHaveText("1");
 
-    await page.clock.fastForward(ONE_MINUTE * 15);
+    await fakeClock.advance(page, ONE_MINUTE * 15);
     await expect(page.locator(".matchclock")).toContainText(/30:0\d/);
 
     await page.getByText("Pása").click();
     await page.getByText("Næsti hálfleikur").click();
 
-    await page.getByText("Byrja").click();
-    await page.clock.fastForward(ONE_MINUTE * 10);
+    await startClock(page);
+    await fakeClock.advance(page, ONE_MINUTE * 10);
     await expect(page.locator(".matchclock")).toContainText(/40:0\d/);
 
     await page.getByText("Ú +1").click();
@@ -138,31 +143,32 @@ test.describe("Match Flow - Complete Match Simulation", () => {
     await expect(page.locator(".team.home .score")).toHaveText("2");
     await expect(page.locator(".team.away .score")).toHaveText("3");
 
-    await page.clock.fastForward(ONE_MINUTE * 20);
+    await fakeClock.advance(page, ONE_MINUTE * 20);
     await expect(page.locator(".matchclock")).toContainText(/60:0\d/);
   });
 
   test("uses time adjustment buttons to modify elapsed time", async ({
     page,
   }) => {
+    const fakeClock = new FakeClock(new Date(2025, 3, 10, 14, 0, 0));
     await page.getByText("Stillingar").click();
     await page.locator("#view-selector-match").click();
     await page.getByRole("button", { name: "Heim", exact: true }).click();
 
-    await page.getByText("Byrja").click();
-    await page.clock.fastForward(ONE_MINUTE * 10);
+    await startClock(page);
+    await fakeClock.advance(page, ONE_MINUTE * 10);
     await expect(page.locator(".matchclock")).toContainText(/10:0\d/);
 
     await page.getByText("+5m").click();
-    await page.clock.fastForward(100);
+    await fakeClock.advance(page, 100);
     await expect(page.locator(".matchclock")).toContainText(/15:0\d/);
 
     await page.getByText("+5m").click();
-    await page.clock.fastForward(100);
+    await fakeClock.advance(page, 100);
     await expect(page.locator(".matchclock")).toContainText(/20:0\d/);
 
     await page.getByText("-5m").click();
-    await page.clock.fastForward(100);
+    await fakeClock.advance(page, 100);
     await expect(page.locator(".matchclock")).toContainText(/15:0\d/);
   });
 

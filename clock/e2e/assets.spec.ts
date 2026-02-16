@@ -18,7 +18,7 @@ test.describe("Asset Overlay System", () => {
       localStorage.setItem("clock_listenPrefix", "test-e2e");
       localStorage.setItem("clock_sync", "true");
     });
-    await page.clock.install({ time: new Date(2025, 3, 10, 14, 0, 0) });
+    await page.clock.setFixedTime(new Date(2025, 3, 10, 14, 0, 0));
     await page.goto("/");
     await loginWithEmulatorUser(page);
   });
