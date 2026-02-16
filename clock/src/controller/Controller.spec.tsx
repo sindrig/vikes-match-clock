@@ -183,7 +183,7 @@ describe("Controller", () => {
       expect(screen.getByText("Víkin Main")).toBeInTheDocument();
     });
 
-    it("sets listenPrefix when a screen is selected", () => {
+    it("sets listenPrefix when a screen is selected and button clicked", () => {
       const mockSetListenPrefix = vi.fn();
       setupState1();
       mockedUseLocalState.mockReturnValue({
@@ -195,7 +195,18 @@ describe("Controller", () => {
       const select = screen.getByRole("combobox");
       fireEvent.change(select, { target: { value: "0" } });
 
+      const button = screen.getByText("Birta skjá");
+      fireEvent.click(button);
+
       expect(mockSetListenPrefix).toHaveBeenCalledWith("vikinni");
+    });
+
+    it("disables Birta skjá button when no screen is selected", () => {
+      setupState1();
+      render(<Controller />);
+
+      const button = screen.getByText("Birta skjá");
+      expect(button).toBeDisabled();
     });
   });
 

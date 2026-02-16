@@ -40,6 +40,7 @@ const Controller = () => {
   const auth = useAuth();
 
   const [tab, setTab] = useState<string>(TABS.home);
+  const [selectedScreen, setSelectedScreen] = useState("");
 
   const { view, currentAsset } = controller;
   const { vp } = viewState;
@@ -71,23 +72,30 @@ const Controller = () => {
           <div>
             Skjár:
             <select
-              onChange={({ target: { value } }) => {
-                const screen = screens[parseInt(value, 10)];
-                if (screen) {
-                  setListenPrefix(screen.key);
-                }
-              }}
-              value={0}
+              onChange={({ target: { value } }) => setSelectedScreen(value)}
+              value={selectedScreen}
             >
               <option value="" disabled>
                 Veldu skjá
               </option>
               {screens.map(({ label, screen }, i) => (
-                <option value={i} key={i}>
+                <option value={String(i)} key={i}>
                   {label} {screen.name}
                 </option>
               ))}
             </select>
+            <button
+              type="button"
+              onClick={() => {
+                const screen = screens[parseInt(selectedScreen, 10)];
+                if (screen) {
+                  setListenPrefix(screen.key);
+                }
+              }}
+              disabled={selectedScreen === ""}
+            >
+              Birta skjá
+            </button>
           </div>
           <form onSubmit={login}>
             <div>
