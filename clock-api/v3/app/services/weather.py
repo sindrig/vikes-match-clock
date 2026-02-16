@@ -1,5 +1,3 @@
-"""Weather service integrating vedur.is and OpenWeatherMap."""
-
 import httpx
 from xml.dom import minidom
 
@@ -7,8 +5,6 @@ from app.models.weather import WeatherResponse
 
 
 async def get_weather(lat: float, lon: float, api_key: str) -> WeatherResponse:
-    """Get weather from vedur.is or OpenWeatherMap fallback."""
-    # Try vedur.is first (Iceland station 1472)
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
             r = await client.get(
@@ -27,7 +23,6 @@ async def get_weather(lat: float, lon: float, api_key: str) -> WeatherResponse:
     except Exception:
         pass
 
-    # Fallback to OpenWeatherMap
     async with httpx.AsyncClient(timeout=5.0) as client:
         r = await client.get(
             "https://api.openweathermap.org/data/2.5/weather",

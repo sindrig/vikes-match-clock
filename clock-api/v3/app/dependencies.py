@@ -1,5 +1,3 @@
-"""Dependency injection for FastAPI routes."""
-
 import boto3
 from functools import cache
 

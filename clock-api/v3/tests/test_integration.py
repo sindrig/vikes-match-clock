@@ -1,5 +1,3 @@
-"""Integration tests for FastAPI app."""
-
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -19,14 +17,12 @@ from app.models.matches import (
 
 @pytest.fixture
 def mock_ksi_client():
-    """Create a mock KsiClient for dependency injection."""
     client = AsyncMock()
     return client
 
 
 @pytest.fixture
 def test_client(mock_ksi_client):
-    """Create a TestClient with mocked KSI dependencies."""
     app.dependency_overrides[get_ksi_client] = lambda: mock_ksi_client
 
     with patch("app.routers.matches.get_ksi_api_key", return_value="test-key"):
@@ -37,15 +33,11 @@ def test_client(mock_ksi_client):
 
 @pytest.mark.skip(reason="Placeholder test")
 def test_health_check(client):
-    """Test health check endpoint."""
     pass
 
 
 class TestGetEvents:
-    """Tests for GET /{team_id}/matches/{match_id}/events endpoint."""
-
     def test_get_events_returns_event_list(self, test_client, mock_ksi_client):
-        """Test endpoint returns list of match events."""
         mock_ksi_client.get_events.return_value = [
             MatchEvent(
                 eventId=1,
@@ -71,7 +63,6 @@ class TestGetEvents:
         assert data[1]["eventType"]["name"] == "YELLOW_CARD"
 
     def test_get_events_empty(self, test_client, mock_ksi_client):
-        """Test endpoint returns empty list when no events."""
         mock_ksi_client.get_events.return_value = []
 
         response = test_client.get("/1/matches/12345/events")
@@ -82,7 +73,6 @@ class TestGetEvents:
     def test_get_events_calls_client_with_correct_args(
         self, test_client, mock_ksi_client
     ):
-        """Test endpoint passes correct match_id and api_key."""
         mock_ksi_client.get_events.return_value = []
 
         test_client.get("/42/matches/99999/events")
@@ -91,10 +81,7 @@ class TestGetEvents:
 
 
 class TestGetMatchInfo:
-    """Tests for GET /{team_id}/matches/{match_id}/info endpoint."""
-
     def test_get_match_info_returns_match(self, test_client, mock_ksi_client):
-        """Test endpoint returns match details."""
         mock_ksi_client.get_match_info.return_value = Match(
             id=12345,
             homeTeam=Team(id=1, name="Víkingur"),
@@ -122,7 +109,6 @@ class TestGetMatchInfo:
     def test_get_match_info_calls_client_with_correct_args(
         self, test_client, mock_ksi_client
     ):
-        """Test endpoint passes correct match_id and api_key."""
         mock_ksi_client.get_match_info.return_value = Match(
             id=12345,
             homeTeam=Team(id=1, name="Víkingur"),

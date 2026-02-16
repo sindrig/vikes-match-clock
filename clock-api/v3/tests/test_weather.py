@@ -1,5 +1,3 @@
-"""Tests for weather service and API endpoint."""
-
 import httpx
 import pytest
 import respx
@@ -24,13 +22,9 @@ LAT = 64.1175
 LON = -21.8537
 
 
-# --- Service tests ---
-
-
 @pytest.mark.asyncio
 @respx.mock
 async def test_get_weather_vedur_success():
-    """Test vedur.is returns temperature when available."""
     respx.get(VEDUR_URL).mock(return_value=Response(200, text=VEDUR_XML))
 
     result = await get_weather(LAT, LON, "test-key")
@@ -44,7 +38,6 @@ async def test_get_weather_vedur_success():
 @pytest.mark.asyncio
 @respx.mock
 async def test_get_weather_vedur_fails_owm_fallback():
-    """Test OpenWeatherMap fallback when vedur.is fails."""
     respx.get(VEDUR_URL).mock(return_value=Response(500, text="Server Error"))
     respx.get(OWM_URL).mock(
         return_value=Response(
@@ -66,7 +59,6 @@ async def test_get_weather_vedur_fails_owm_fallback():
 @pytest.mark.asyncio
 @respx.mock
 async def test_get_weather_vedur_bad_xml_owm_fallback():
-    """Test fallback when vedur.is returns invalid XML."""
     respx.get(VEDUR_URL).mock(
         return_value=Response(200, text="not xml at all")
     )
@@ -88,7 +80,6 @@ async def test_get_weather_vedur_bad_xml_owm_fallback():
 @pytest.mark.asyncio
 @respx.mock
 async def test_get_weather_both_fail():
-    """Test exception when both services fail."""
     respx.get(VEDUR_URL).mock(return_value=Response(500, text="Error"))
     respx.get(OWM_URL).mock(return_value=Response(500, text="Error"))
 
@@ -99,7 +90,6 @@ async def test_get_weather_both_fail():
 @pytest.mark.asyncio
 @respx.mock
 async def test_get_weather_owm_sends_correct_params():
-    """Test OWM request includes lat, lon, appid, units."""
     respx.get(VEDUR_URL).mock(return_value=Response(500, text="Error"))
     route = respx.get(OWM_URL).mock(
         return_value=Response(
@@ -118,12 +108,8 @@ async def test_get_weather_owm_sends_correct_params():
     assert "units=metric" in str(request.url)
 
 
-# --- Endpoint integration tests ---
-
-
 @respx.mock
 def test_weather_endpoint_vedur_success(client):
-    """Test GET /weather returns vedur.is data."""
     respx.get(VEDUR_URL).mock(return_value=Response(200, text=VEDUR_XML))
 
     with pytest.MonkeyPatch.context() as mp:
@@ -142,7 +128,6 @@ def test_weather_endpoint_vedur_success(client):
 
 @respx.mock
 def test_weather_endpoint_both_fail_returns_500(client):
-    """Test GET /weather returns 500 when both services fail."""
     respx.get(VEDUR_URL).mock(return_value=Response(500, text="Error"))
     respx.get(OWM_URL).mock(return_value=Response(500, text="Error"))
 
@@ -157,7 +142,6 @@ def test_weather_endpoint_both_fail_returns_500(client):
 
 
 def test_weather_endpoint_requires_params(client):
-    """Test GET /weather requires lat and lon params."""
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(
             "app.routers.weather.get_weather_api_key",

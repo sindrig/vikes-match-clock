@@ -1,5 +1,3 @@
-"""Shared test fixtures and configuration."""
-
 import pytest
 import pytest_asyncio
 from fastapi.testclient import TestClient
@@ -11,13 +9,11 @@ from app.services.ksi import KsiClient
 
 @pytest.fixture
 def client():
-    """Create a TestClient for testing FastAPI app."""
     return TestClient(app)
 
 
 @pytest.fixture
 def mock_ssm():
-    """Mock SSM Parameter Store for testing."""
     with patch("app.dependencies.ssm_client") as mock:
         mock.get_parameter.return_value = {
             "Parameter": {"Value": "test-api-key"}
@@ -27,7 +23,6 @@ def mock_ssm():
 
 @pytest.fixture
 def app_with_mocked_dependencies(mock_ssm):
-    """FastAPI app with mocked SSM dependencies."""
     from app.dependencies import get_ksi_api_key, get_weather_api_key
 
     def override_ksi_key():
@@ -44,8 +39,6 @@ def app_with_mocked_dependencies(mock_ssm):
 
 @pytest.fixture
 def mock_ksi_api_key():
-    """Mock SSM KSI API key lookup."""
-
     def _get_key(team_id: int) -> str:
         return f"mock-key-{team_id}"
 
@@ -54,13 +47,11 @@ def mock_ksi_api_key():
 
 @pytest.fixture
 def mock_weather_api_key():
-    """Mock SSM weather API key lookup."""
     return "mock-weather-key"
 
 
 @pytest_asyncio.fixture
 async def ksi_client():
-    """Create and close a KsiClient for testing."""
     client = KsiClient()
     yield client
     await client.close()

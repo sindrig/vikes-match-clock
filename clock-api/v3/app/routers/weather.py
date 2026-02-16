@@ -1,5 +1,3 @@
-"""Weather API router."""
-
 from fastapi import APIRouter, HTTPException
 
 from app.dependencies import get_weather_api_key

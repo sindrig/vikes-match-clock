@@ -1,5 +1,3 @@
-"""Tests for the KSI API client."""
-
 import httpx
 import pytest
 import respx
@@ -14,7 +12,6 @@ BASE_URL = "https://api-ksi.analyticom.de"
 @pytest.mark.asyncio
 @respx.mock
 async def test_get_matches_success(ksi_client):
-    """Test get_matches returns parsed Match objects."""
     respx.get(f"{BASE_URL}/api/live/matchList/20250615/0").mock(
         return_value=Response(
             200,
@@ -47,7 +44,6 @@ async def test_get_matches_success(ksi_client):
 @pytest.mark.asyncio
 @respx.mock
 async def test_get_matches_empty(ksi_client):
-    """Test get_matches returns empty list when no matches."""
     respx.get(f"{BASE_URL}/api/live/matchList/20250615/0").mock(
         return_value=Response(200, json=[])
     )
@@ -60,7 +56,6 @@ async def test_get_matches_empty(ksi_client):
 @pytest.mark.asyncio
 @respx.mock
 async def test_get_lineups_success(ksi_client):
-    """Test get_lineups returns parsed LineupsResponse."""
     respx.get(f"{BASE_URL}/api/live/match/12345/lineups").mock(
         return_value=Response(
             200,
@@ -98,7 +93,6 @@ async def test_get_lineups_success(ksi_client):
 @pytest.mark.asyncio
 @respx.mock
 async def test_get_events_success(ksi_client):
-    """Test get_events returns parsed MatchEvent list."""
     respx.get(f"{BASE_URL}/api/live/match/12345/events").mock(
         return_value=Response(
             200,
@@ -131,7 +125,6 @@ async def test_get_events_success(ksi_client):
 @pytest.mark.asyncio
 @respx.mock
 async def test_get_match_info_success(ksi_client):
-    """Test get_match_info returns single Match."""
     respx.get(f"{BASE_URL}/api/live/match/12345").mock(
         return_value=Response(
             200,
@@ -169,7 +162,6 @@ async def test_get_match_info_success(ksi_client):
 @pytest.mark.asyncio
 @respx.mock
 async def test_get_matches_http_error(ksi_client):
-    """Test client raises on HTTP 500 errors."""
     respx.get(f"{BASE_URL}/api/live/matchList/20250615/0").mock(
         return_value=Response(500, text="Internal Server Error")
     )
@@ -183,7 +175,6 @@ async def test_get_matches_http_error(ksi_client):
 @pytest.mark.asyncio
 @respx.mock
 async def test_get_match_info_not_found(ksi_client):
-    """Test client raises on HTTP 404 errors."""
     respx.get(f"{BASE_URL}/api/live/match/99999").mock(
         return_value=Response(404, text="Not Found")
     )
@@ -197,7 +188,6 @@ async def test_get_match_info_not_found(ksi_client):
 @pytest.mark.asyncio
 @respx.mock
 async def test_get_matches_sends_api_key_header(ksi_client):
-    """Test that API key is sent in the API_KEY header."""
     route = respx.get(f"{BASE_URL}/api/live/matchList/20250615/0").mock(
         return_value=Response(200, json=[])
     )
@@ -207,9 +197,6 @@ async def test_get_matches_sends_api_key_header(ksi_client):
     assert route.called
     request = route.calls[0].request
     assert request.headers["API_KEY"] == "my-secret-key"
-
-
-# --- Endpoint tests ---
 
 
 MOCK_MATCH_DATA = [
@@ -225,7 +212,6 @@ MOCK_MATCH_DATA = [
 
 
 def test_endpoint_get_matches_date_success(client):
-    """Test GET /{team_id}/matches/{date} endpoint returns matches."""
     from unittest.mock import AsyncMock, patch
 
     from app.dependencies import get_ksi_client
@@ -249,7 +235,6 @@ def test_endpoint_get_matches_date_success(client):
     assert data[0]["awayTeam"]["name"] == "KR"
     assert data[0]["liveStatus"] == "SCHEDULED"
 
-    # Verify ksi_client was called with correct args
     mock_client.get_matches.assert_called_once_with(
         "20250615", 0, 1, "test-key"
     )
@@ -258,7 +243,6 @@ def test_endpoint_get_matches_date_success(client):
 
 
 def test_endpoint_get_matches_date_with_utc_offset(client):
-    """Test GET /{team_id}/matches/{date}?utc_offset=-3 passes offset."""
     from unittest.mock import AsyncMock, patch
 
     from app.dependencies import get_ksi_client
@@ -282,7 +266,6 @@ def test_endpoint_get_matches_date_with_utc_offset(client):
 
 
 def test_endpoint_get_matches_date_empty(client):
-    """Test GET /{team_id}/matches/{date} returns empty list."""
     from unittest.mock import AsyncMock, patch
 
     from app.dependencies import get_ksi_client
@@ -302,7 +285,6 @@ def test_endpoint_get_matches_date_empty(client):
 
 
 def test_endpoint_get_lineups_success(client):
-    """Test GET /{team_id}/matches/{match_id}/lineups returns lineups."""
     from unittest.mock import AsyncMock, patch
 
     from app.dependencies import get_ksi_client
@@ -364,32 +346,27 @@ def test_endpoint_get_lineups_success(client):
     assert response.status_code == 200
     data = response.json()
 
-    # Verify home lineup
     assert len(data["home"]["players"]) == 2
     assert data["home"]["players"][0]["shirtNumber"] == 10
     assert data["home"]["players"][0]["captain"] is True
     assert data["home"]["players"][0]["person"]["name"] == "Player One"
     assert data["home"]["players"][1]["goalkeeper"] is True
 
-    # Verify home officials
     assert len(data["home"]["officials"]) == 1
     assert data["home"]["officials"][0]["person"]["name"] == "Coach One"
     assert data["home"]["officials"][0]["role"] == "Head Coach"
 
-    # Verify away lineup
     assert len(data["away"]["players"]) == 1
     assert data["away"]["players"][0]["shirtNumber"] == 9
     assert data["away"]["players"][0]["captain"] is True
     assert data["away"]["officials"] == []
 
-    # Verify ksi_client was called correctly
     mock_client.get_lineups.assert_called_once_with(12345, "test-key")
 
     app.dependency_overrides.clear()
 
 
 def test_endpoint_get_lineups_empty_lineups(client):
-    """Test GET /{team_id}/matches/{match_id}/lineups with empty lineups."""
     from unittest.mock import AsyncMock, patch
 
     from app.dependencies import get_ksi_client
@@ -419,18 +396,15 @@ def test_endpoint_get_lineups_empty_lineups(client):
 
 
 def test_endpoint_get_lineups_in_openapi():
-    """Test that lineups endpoint appears in OpenAPI spec with LineupsResponse."""
     from app.main import app
 
     schema = app.openapi()
     paths = schema["paths"]
 
-    # Check endpoint exists
     lineups_path = "/{team_id}/matches/{match_id}/lineups"
     assert lineups_path in paths
     assert "get" in paths[lineups_path]
 
-    # Check response model references LineupsResponse
     get_op = paths[lineups_path]["get"]
     resp_200 = get_op["responses"]["200"]
     content = resp_200["content"]["application/json"]["schema"]
@@ -438,7 +412,6 @@ def test_endpoint_get_lineups_in_openapi():
 
 
 def test_endpoint_get_matches_date_in_openapi():
-    """Test that matches endpoint appears in OpenAPI spec."""
     from app.main import app
 
     schema = app.openapi()

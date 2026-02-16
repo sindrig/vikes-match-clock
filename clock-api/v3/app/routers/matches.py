@@ -1,5 +1,3 @@
-"""Matches API router."""
-
 from fastapi import APIRouter, Depends
 
 from app.dependencies import get_ksi_api_key, get_ksi_client
@@ -16,14 +14,8 @@ async def get_matches(
     utc_offset: int = 0,
     ksi_client: KsiClient = Depends(get_ksi_client),
 ):
-    """Get matches for a team on a specific date."""
-    # Convert YYYY-MM-DD to yyyyMMdd
     date_formatted = date.replace("-", "")
-
-    # Get API key for this team
     api_key = get_ksi_api_key(team_id)
-
-    # Fetch from Analyticom
     matches = await ksi_client.get_matches(
         date_formatted, utc_offset, team_id, api_key
     )
@@ -39,7 +31,6 @@ async def get_lineups(
     match_id: int,
     ksi_client: KsiClient = Depends(get_ksi_client),
 ):
-    """Get lineups for a match."""
     api_key = get_ksi_api_key(team_id)
     lineups = await ksi_client.get_lineups(match_id, api_key)
     return lineups
@@ -54,7 +45,6 @@ async def get_events(
     match_id: int,
     ksi_client: KsiClient = Depends(get_ksi_client),
 ):
-    """Get events for a match."""
     api_key = get_ksi_api_key(team_id)
     events = await ksi_client.get_events(match_id, api_key)
     return events
@@ -66,7 +56,6 @@ async def get_match_info(
     match_id: int,
     ksi_client: KsiClient = Depends(get_ksi_client),
 ):
-    """Get detailed info for a match."""
     api_key = get_ksi_api_key(team_id)
     match = await ksi_client.get_match_info(match_id, api_key)
     return match
