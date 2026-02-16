@@ -1,10 +1,12 @@
 """Shared test fixtures and configuration."""
 
 import pytest
+import pytest_asyncio
 from fastapi.testclient import TestClient
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from app.main import app
+from app.services.ksi import KsiClient
 
 
 @pytest.fixture
@@ -36,3 +38,27 @@ def app_with_mocked_dependencies(mock_ssm):
     app.dependency_overrides[get_weather_api_key] = override_weather_key
     yield app
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def mock_ksi_api_key():
+    """Mock SSM KSI API key lookup."""
+
+    def _get_key(team_id: int) -> str:
+        return f"mock-key-{team_id}"
+
+    return _get_key
+
+
+@pytest.fixture
+def mock_weather_api_key():
+    """Mock SSM weather API key lookup."""
+    return "mock-weather-key"
+
+
+@pytest_asyncio.fixture
+async def ksi_client():
+    """Create and close a KsiClient for testing."""
+    client = KsiClient()
+    yield client
+    await client.close()

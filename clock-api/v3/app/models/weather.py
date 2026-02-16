@@ -3,7 +3,9 @@
 from pydantic import BaseModel
 
 
-class Weather(BaseModel):
-    """Weather model."""
+class WeatherResponse(BaseModel):
+    """Weather response with temperature and service info."""
 
-    pass
+    temp: float
+    service: str
+    main: dict  # Legacy compat: {"temp_max": "formatted_temp"}
