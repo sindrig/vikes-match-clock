@@ -83,6 +83,7 @@ interface FirebaseStateContextType {
   controller: ControllerState;
   view: ViewState;
   listeners: ListenersState;
+  ready: boolean;
 
   updateMatch: (updates: Partial<Match>) => void;
   startMatch: () => void;
@@ -185,10 +186,18 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     useState<ControllerState>(defaultController);
   const [view, setView] = useState<ViewState>(defaultView);
   const [listeners, setListeners] = useState<ListenersState>(defaultListeners);
+  const [ready, setReady] = useState(!listenPrefix);
 
   const matchRef = useRef(match);
   const controllerRef = useRef(controller);
   const viewRef = useRef(view);
+  const [prevListenPrefix, setPrevListenPrefix] = useState(listenPrefix);
+
+  // Reset ready when listenPrefix changes (using state comparison pattern per React docs)
+  if (prevListenPrefix !== listenPrefix) {
+    setPrevListenPrefix(listenPrefix);
+    setReady(!listenPrefix);
+  }
 
   useEffect(() => {
     matchRef.current = match;
@@ -216,6 +225,16 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   useEffect(() => {
     if (listenPrefix) {
+      let matchReady = false;
+      let controllerReady = false;
+      let viewReady = false;
+
+      const checkReady = () => {
+        if (matchReady && controllerReady && viewReady) {
+          setReady(true);
+        }
+      };
+
       const matchPath = `states/${listenPrefix}/match`;
       const controllerPath = `states/${listenPrefix}/controller`;
       const viewPath = `states/${listenPrefix}/view`;
@@ -251,6 +270,10 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
           } else {
             setMatch(defaultMatch);
           }
+          if (!matchReady) {
+            matchReady = true;
+            checkReady();
+          }
         },
         (error) => console.error("Firebase match subscription error:", error),
       );
@@ -260,6 +283,10 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         (snapshot) => {
           const results = parseController(snapshot.val(), defaultController);
           setController(results ?? defaultController);
+          if (!controllerReady) {
+            controllerReady = true;
+            checkReady();
+          }
         },
         (error) =>
           console.error("Firebase controller subscription error:", error),
@@ -270,6 +297,10 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         (snapshot) => {
           const results = parseView(snapshot.val(), defaultView);
           setView(results ?? defaultView);
+          if (!viewReady) {
+            viewReady = true;
+            checkReady();
+          }
         },
         (error) => console.error("Firebase view subscription error:", error),
       );
@@ -885,6 +916,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       controller,
       view,
       listeners,
+      ready,
       updateMatch,
       startMatch,
       pauseMatch,
@@ -930,6 +962,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       controller,
       view,
       listeners,
+      ready,
       updateMatch,
       startMatch,
       pauseMatch,

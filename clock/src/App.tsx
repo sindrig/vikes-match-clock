@@ -1,4 +1,5 @@
 import { Button } from "rsuite";
+import { RingLoader } from "react-spinners";
 import { useFirebaseState } from "./contexts/FirebaseStateContext";
 import { useLocalState } from "./contexts/LocalStateContext";
 import Controller from "./controller/Controller";
@@ -16,7 +17,7 @@ import "./App.css";
 
 function App() {
   useGlobalShortcuts();
-  const { controller, view: viewState } = useFirebaseState();
+  const { controller, view: viewState, ready } = useFirebaseState();
   const { auth, listenPrefix, setListenPrefix } = useLocalState();
 
   const { view } = controller;
@@ -31,6 +32,22 @@ function App() {
       <div>
         <Controller />
         <StateListener />
+      </div>
+    );
+  }
+
+  // Show spinner while waiting for auth state or Firebase data to load
+  if ((listenPrefix || isAuthenticated) && (!auth.isLoaded || !ready)) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          height: "100vh",
+        }}
+      >
+        <RingLoader color="#1675e0" size={80} />
       </div>
     );
   }
