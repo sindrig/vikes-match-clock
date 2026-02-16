@@ -41,7 +41,7 @@ Both roles have:
 Reusable module that creates:
 - CloudFront + S3 CDN for frontend
 - API Gateway (HTTP) with custom domain
-- Lambda functions: match-report, match-report-v2, weather
+- Lambda functions: match-report, match-report-v2, weather, clock-api-v3
 - ACM certificates
 - Route53 records
 - IAM deploy policy (attached to OIDC role)
@@ -98,3 +98,6 @@ Lambdas are built in Docker (`build_in_docker = true`) for consistent Python dep
 - Subnets: 3 subnets in eu-west-1
 
 The `weather` Lambda does NOT run in VPC (only needs internet access).
+
+The `clock-api-v3` Lambda does NOT run in VPC (only calls external APIs: Analyticom, vedur.is, OpenWeatherMap).
+

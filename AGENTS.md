@@ -11,9 +11,10 @@ A match clock application for Víkingur football club stadiums. Displays match i
 ```
 ├── clock/              # React frontend application
 ├── clock-api/          # Python Lambda functions
-│   ├── match-report/   # Fetches match data
-│   ├── match-report-v2/# Updated match report API
-│   └── weather/        # Weather forecast API
+│   ├── match-report/   # Fetches match data (legacy)
+│   ├── match-report-v2/# Updated match report API (legacy)
+│   ├── v3/             # FastAPI API — match data + weather (see clock-api/v3/AGENTS.md)
+│   └── weather/        # Weather forecast API (legacy)
 ├── infra/              # Terraform infrastructure (see infra/AGENTS.md)
 └── .github/workflows/  # CI/CD pipelines
 ```
@@ -28,7 +29,7 @@ A match clock application for Víkingur football club stadiums. Displays match i
 ## Key Technologies
 
 - **Frontend**: React (in `clock/` directory)
-- **Backend**: Python 3.12 Lambda functions
+- **Backend**: Python 3.12 Lambda functions (FastAPI + Mangum for v3, standalone for legacy)
 - **Infrastructure**: Terraform with S3 backend
 - **CI/CD**: GitHub Actions with OIDC authentication (no static AWS keys)
 - **Real-time**: Firebase Realtime Database for screen state management
