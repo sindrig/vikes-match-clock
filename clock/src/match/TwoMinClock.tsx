@@ -13,7 +13,7 @@ const TwoMinClock: React.FC<TwoMinClockProps> = ({
   penaltyLength,
   uniqueKey,
 }) => {
-  const { match, removePenalty } = useMatch();
+  const { match, removePenalty, getServerTime } = useMatch();
   const { started, timeElapsed } = match;
   const [time, setTime] = useState<string | null>(null);
 
@@ -24,7 +24,7 @@ const TwoMinClock: React.FC<TwoMinClockProps> = ({
     }
     let milliSecondsElapsed = timeElapsed - atTimeElapsed;
     if (started) {
-      milliSecondsElapsed += Date.now() - started;
+      milliSecondsElapsed += getServerTime() - started;
     }
     const milliSecondsLeft = penaltyLength - milliSecondsElapsed;
     if (milliSecondsLeft < 0) {
@@ -39,6 +39,7 @@ const TwoMinClock: React.FC<TwoMinClockProps> = ({
     penaltyLength,
     removePenalty,
     uniqueKey,
+    getServerTime,
   ]);
 
   useEffect(() => {

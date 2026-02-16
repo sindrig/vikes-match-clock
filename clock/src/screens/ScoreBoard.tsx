@@ -27,6 +27,7 @@ const BUZZER_DURATION = 3000;
 function useBuzzerTimer(buzzerTimestamp: number | false | null): boolean {
   const listenersRef = useRef(new Set<() => void>());
   const showBuzzerRef = useRef(false);
+  const { getServerTime } = useMatch();
 
   const subscribe = useCallback((callback: () => void) => {
     listenersRef.current.add(callback);
@@ -46,7 +47,7 @@ function useBuzzerTimer(buzzerTimestamp: number | false | null): boolean {
       return;
     }
 
-    const now = Date.now();
+    const now = getServerTime();
     const elapsed = now - buzzerTimestamp;
 
     if (elapsed >= 0 && elapsed < BUZZER_DURATION) {
@@ -65,7 +66,7 @@ function useBuzzerTimer(buzzerTimestamp: number | false | null): boolean {
         listenersRef.current.forEach((cb) => cb());
       }
     }
-  }, [buzzerTimestamp]);
+  }, [buzzerTimestamp, getServerTime]);
 
   return useSyncExternalStore(subscribe, getSnapshot);
 }

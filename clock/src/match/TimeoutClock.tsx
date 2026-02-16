@@ -10,7 +10,7 @@ interface TimeoutClockProps {
 }
 
 const TimeoutClock: React.FC<TimeoutClockProps> = ({ className }) => {
-  const { match, removeTimeout, buzz } = useMatch();
+  const { match, removeTimeout, buzz, getServerTime } = useMatch();
   const { timeout } = match;
   const [warningPlayed, setWarningPlayed] = useState(false);
   const [prevTimeout, setPrevTimeout] = useState(timeout);
@@ -24,7 +24,7 @@ const TimeoutClock: React.FC<TimeoutClockProps> = ({ className }) => {
     if (!timeout) {
       return null;
     }
-    const millisLeft = TIMEOUT_LENGTH - (Date.now() - timeout) + 1000;
+    const millisLeft = TIMEOUT_LENGTH - (getServerTime() - timeout) + 1000;
     if (millisLeft <= 0) {
       buzz(true);
       // Allow us to update time first so we don't try state update on
@@ -35,7 +35,7 @@ const TimeoutClock: React.FC<TimeoutClockProps> = ({ className }) => {
       buzz(true);
     }
     return formatMillisAsTime(millisLeft);
-  }, [timeout, removeTimeout, buzz, warningPlayed]);
+  }, [timeout, removeTimeout, buzz, warningPlayed, getServerTime]);
 
   return (
     <ClockBase
