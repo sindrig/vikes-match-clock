@@ -1,12 +1,26 @@
-import { test, expect } from "./fixtures/test-helpers";
+import {
+  test,
+  expect,
+  ensureEmulatorUser,
+  clearEmulatorData,
+  loginWithEmulatorUser,
+} from "./fixtures/test-helpers";
 
 test.describe("Asset Overlay System", () => {
+  test.beforeAll(async () => {
+    await ensureEmulatorUser();
+  });
+
   test.beforeEach(async ({ page }) => {
+    await clearEmulatorData();
     await page.addInitScript(() => {
       localStorage.clear();
+      localStorage.setItem("clock_listenPrefix", "test-e2e");
+      localStorage.setItem("clock_sync", "true");
     });
-    await page.clock.install({ time: new Date(2025, 3, 10, 14, 0, 0) });
+    await page.clock.setFixedTime(new Date(2025, 3, 10, 14, 0, 0));
     await page.goto("/");
+    await loginWithEmulatorUser(page);
   });
 
   test("adds a URL asset to the queue and displays queue count", async ({
@@ -171,11 +185,35 @@ test.describe("Asset Overlay System", () => {
     await expect(page.getByText("is not a valid url")).toBeVisible();
     await expect(assetController.getByText("0 í biðröð")).toBeVisible();
   });
+});
+
+test.describe("Asset Overlay System - Team Views", () => {
+  test.beforeAll(async () => {
+    await ensureEmulatorUser();
+  });
+
+  test.beforeEach(async ({ page }) => {
+    await clearEmulatorData();
+    await page.addInitScript(() => {
+      localStorage.clear();
+      localStorage.setItem("clock_listenPrefix", "test-e2e");
+      localStorage.setItem("clock_sync", "true");
+    });
+    await page.goto("/");
+    await loginWithEmulatorUser(page);
+  });
 
   test("switches between Biðröð and Lið views", async ({ page }) => {
     await page.getByText("Stillingar").click();
-    await page.locator("#team-selector-homeTeam").fill("vikingur");
-    await page.locator("#team-selector-awayTeam").fill("fram");
+    await page.locator("#team-selector-homeTeam").fill("Víkingur R");
+    await page.locator("#team-selector-awayTeam").fill("Fram");
+    await expect(page.locator("#team-selector-homeTeam")).toHaveValue(
+      "Víkingur R",
+      { timeout: 10000 },
+    );
+    await expect(page.locator("#team-selector-awayTeam")).toHaveValue("Fram", {
+      timeout: 10000,
+    });
 
     await page.getByRole("button", { name: "Heim", exact: true }).click();
 
@@ -189,7 +227,9 @@ test.describe("Asset Overlay System", () => {
 
     await assetController.getByRole("button", { name: "Lið" }).click();
 
-    await expect(page.locator(".team-asset-controller").first()).toBeVisible();
+    await expect(page.locator(".team-asset-controller").first()).toBeVisible({
+      timeout: 10000,
+    });
 
     await assetController.getByRole("button", { name: "Biðröð" }).click();
 

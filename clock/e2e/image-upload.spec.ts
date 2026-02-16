@@ -1,50 +1,13 @@
-import { test, expect } from "@playwright/test";
+import {
+  test,
+  expect,
+  ensureEmulatorUser,
+  clearEmulatorData,
+  loginWithEmulatorUser,
+} from "./fixtures/test-helpers";
+import type { Page } from "@playwright/test";
 import path from "path";
 import fs from "fs";
-
-function getCredentials(): { email: string; password: string } {
-  const envCredentials = process.env.TEST_CREDENTIALS;
-  if (envCredentials) {
-    const [email, password] = envCredentials.split(";");
-    if (email && password) {
-      return { email, password };
-    }
-  }
-  throw new Error(
-    "Could not find test credentials in TEST_CREDENTIALS env variable",
-  );
-}
-
-async function login(page: import("@playwright/test").Page) {
-  const { email, password } = getCredentials();
-  const emailPrefix = email.split("@")[0];
-
-  await page.getByRole("button", { name: "Stillingar" }).click();
-  await page.getByPlaceholder("E-mail").fill(email);
-  await page.getByPlaceholder("Password").fill(password);
-  await page.getByRole("button", { name: "Login", exact: true }).click();
-  await expect(page.getByText(email)).toBeVisible({
-    timeout: 15000,
-  });
-
-  // Wait for listenPrefix to be set from Firebase authData (not just the email prefix).
-  // The prefix should change from email prefix to an authorized location.
-  // Then wait for any triggered page reload to complete.
-  await page.waitForFunction(
-    (prefix: string) => {
-      const text = document.body.innerText;
-      const match = text.match(/\[([^\]]+@[^\]]+)\]\[([^\]]+)\]/);
-      // Wait until prefix is set AND is NOT the email prefix (meaning authData has arrived)
-      return match && match[2] && match[2].length > 0 && match[2] !== prefix;
-    },
-    emailPrefix,
-    { timeout: 20000 },
-  );
-
-  // Wait for any page reload to complete (triggered when listenPrefix changes)
-  await page.waitForTimeout(3000);
-  await page.waitForLoadState("networkidle");
-}
 
 function createTestImage(filePath: string) {
   const pngBuffer = Buffer.from([
@@ -58,58 +21,26 @@ function createTestImage(filePath: string) {
   fs.writeFileSync(filePath, pngBuffer);
 }
 
-async function goToMediaTab(page: import("@playwright/test").Page) {
+async function goToMediaTab(page: Page) {
   await page.getByRole("button", { name: "Myndefni" }).click();
   await expect(page.getByText("Birta strax")).toBeVisible({ timeout: 5000 });
 }
 
-async function deleteTestImages(
-  page: import("@playwright/test").Page,
-  maxToDelete = 10,
-) {
-  const testImageItems = page
-    .locator(".asset-image")
-    .filter({ hasText: /test-upload-|test-compressed-/ });
-
-  let count = await testImageItems.count();
-  let deleted = 0;
-
-  while (count > 0 && deleted < maxToDelete) {
-    const deleteButton = testImageItems.first().getByRole("button", {
-      name: "Eyða",
-    });
-    await deleteButton.click();
-    await page.waitForTimeout(500);
-    count = await testImageItems.count();
-    deleted++;
-  }
-}
+test.beforeAll(async () => {
+  await ensureEmulatorUser();
+});
 
 test.describe("Image Upload", () => {
   test.setTimeout(60000);
 
   test.beforeEach(async ({ page }) => {
+    await clearEmulatorData();
     await page.addInitScript(() => {
       localStorage.clear();
+      localStorage.setItem("clock_listenPrefix", "test-e2e");
+      localStorage.setItem("clock_sync", "true");
     });
     await page.goto("/");
-  });
-
-  test.afterAll(async ({ browser }) => {
-    test.setTimeout(120000); // Allow 2 minutes for cleanup of accumulated test images
-
-    const context = await browser.newContext();
-    const page = await context.newPage();
-
-    try {
-      await page.goto("/");
-      await login(page);
-      await goToMediaTab(page);
-      await page.waitForTimeout(2000);
-      await deleteTestImages(page);
-    } finally {
-      await context.close();
-    }
   });
 
   test("uploads image with correct filename preserved", async ({ page }) => {
@@ -117,7 +48,7 @@ test.describe("Image Upload", () => {
     createTestImage(testImagePath);
 
     try {
-      await login(page);
+      await loginWithEmulatorUser(page);
       await goToMediaTab(page);
 
       const uploadArea = page.locator("label").filter({
@@ -157,7 +88,7 @@ test.describe("Image Upload", () => {
     createTestImage(testImagePath);
 
     try {
-      await login(page);
+      await loginWithEmulatorUser(page);
       await goToMediaTab(page);
 
       await page

@@ -223,7 +223,7 @@ describe("TwoMinClock component", () => {
 
     it("calls removePenalty immediately if penalty already expired", () => {
       const mockRemovePenalty = vi.fn();
-      let currentTime = 1000000;
+      const currentTime = 1000000;
       vi.spyOn(Date, "now").mockImplementation(() => currentTime);
 
       mockedUseMatch.mockReturnValue({

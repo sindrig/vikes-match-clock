@@ -6,6 +6,7 @@ import type {
   Asset,
   ViewPort,
 } from "../types";
+import { Sports } from "../constants";
 
 interface LocationData {
   label: string;
@@ -129,7 +130,8 @@ export function parseMatch(data: unknown, defaultMatch: Match): Match | null {
         ? raw.injuryTime
         : defaultMatch.injuryTime,
     matchType:
-      typeof raw.matchType === "string"
+      typeof raw.matchType === "string" &&
+      Object.values(Sports).includes(raw.matchType as Sports)
         ? (raw.matchType as Match["matchType"])
         : defaultMatch.matchType,
     matchStartTime:
