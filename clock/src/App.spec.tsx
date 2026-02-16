@@ -20,6 +20,9 @@ vi.mock("./contexts/LocalStateContext", () => ({
 vi.mock("./controller/Controller", () => ({
   default: () => <div data-testid="controller">Controller</div>,
 }));
+vi.mock("./controller/RefreshHandler", () => ({
+  default: () => <div data-testid="refresh-handler">RefreshHandler</div>,
+}));
 vi.mock("./controller/asset/Asset", () => ({
   default: () => <div data-testid="asset-component">Asset</div>,
 }));

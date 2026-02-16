@@ -3,6 +3,7 @@ import { RingLoader } from "react-spinners";
 import { useFirebaseState } from "./contexts/FirebaseStateContext";
 import { useLocalState } from "./contexts/LocalStateContext";
 import Controller from "./controller/Controller";
+import RefreshHandler from "./controller/RefreshHandler";
 import AssetComponent from "./controller/asset/Asset";
 
 import ScoreBoard from "./screens/ScoreBoard";
@@ -83,6 +84,7 @@ function App() {
             <AssetComponent asset={asset.asset} time={asset.time} />
           </div>
         ) : null}
+        <RefreshHandler />
         <Button
           appearance="subtle"
           size="xs"
@@ -109,6 +111,7 @@ function App() {
           <AssetComponent asset={asset.asset} time={asset.time} />
         </div>
       ) : null}
+      <RefreshHandler />
       <StateListener />
     </div>
   );

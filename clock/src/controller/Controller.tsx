@@ -12,7 +12,7 @@ import MatchActions from "./MatchActions";
 import MatchActionSettings from "./MatchActionSettings";
 import MediaManager from "./media/MediaManager";
 import LoginPage from "./LoginPage";
-import RefreshHandler from "./RefreshHandler";
+
 import AssetController from "./asset/AssetController";
 import "rsuite/dist/rsuite.min.css";
 import "./Controller.css";
@@ -209,7 +209,6 @@ const Controller = () => {
           >
             Hard refresh
           </Button>
-          <RefreshHandler />
           <LoginPage />
         </div>
       )}
