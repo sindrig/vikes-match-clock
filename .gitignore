@@ -81,4 +81,5 @@ clock/playwright-report
 clock/test-results
 .sisyphus
 clock-api/v3/openapi.json
+clock/src/generated/api-types.ts
 **/.sisyphus/

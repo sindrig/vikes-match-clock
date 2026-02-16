@@ -104,6 +104,7 @@ pnpm run generate-api-types
 - No comments or docstrings. Code should be self-documenting through clear naming.
 - No module-level docstrings, no function/class/method docstrings, no inline comments.
 - `# type: ignore` is acceptable only when truly necessary.
+- Prefer `return await X` over `y = await X; return y` — avoid unnecessary intermediate variables for return values.
 
 ## Testing Patterns
 

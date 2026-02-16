@@ -16,10 +16,9 @@ async def get_matches(
 ):
     date_formatted = date.replace("-", "")
     api_key = get_ksi_api_key(team_id)
-    matches = await ksi_client.get_matches(
+    return await ksi_client.get_matches(
         date_formatted, utc_offset, team_id, api_key
     )
-    return matches
 
 
 @router.get(
@@ -32,8 +31,7 @@ async def get_lineups(
     ksi_client: KsiClient = Depends(get_ksi_client),
 ):
     api_key = get_ksi_api_key(team_id)
-    lineups = await ksi_client.get_lineups(match_id, api_key)
-    return lineups
+    return await ksi_client.get_lineups(match_id, api_key)
 
 
 @router.get(
@@ -46,8 +44,7 @@ async def get_events(
     ksi_client: KsiClient = Depends(get_ksi_client),
 ):
     api_key = get_ksi_api_key(team_id)
-    events = await ksi_client.get_events(match_id, api_key)
-    return events
+    return await ksi_client.get_events(match_id, api_key)
 
 
 @router.get("/{team_id}/matches/{match_id}/info", response_model=Match)
@@ -57,5 +54,4 @@ async def get_match_info(
     ksi_client: KsiClient = Depends(get_ksi_client),
 ):
     api_key = get_ksi_api_key(team_id)
-    match = await ksi_client.get_match_info(match_id, api_key)
-    return match
+    return await ksi_client.get_match_info(match_id, api_key)
