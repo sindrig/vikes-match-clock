@@ -331,35 +331,62 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   const updateMatch = useCallback(
     (updates: Partial<Match>) => {
-      applyMatchUpdate((prev) => {
-        const newState: Match = { ...prev, ...updates };
-        const clubIdsMap = clubIds as Record<string, string>;
-        newState.homeTeamId = newState.homeTeam
-          ? parseInt(clubIdsMap[newState.homeTeam] || "0", 10)
-          : 0;
-        newState.awayTeamId = newState.awayTeam
-          ? parseInt(clubIdsMap[newState.awayTeam] || "0", 10)
-          : 0;
+      if (!listenPrefix || !isAuthenticated) return;
 
-        if (Number.isNaN(newState.injuryTime)) {
-          newState.injuryTime = 0;
-        }
+      const prev = matchRef.current;
+      const newState: Match = { ...prev, ...updates };
+      const clubIdsMap = clubIds as Record<string, string>;
+      newState.homeTeamId = newState.homeTeam
+        ? parseInt(clubIdsMap[newState.homeTeam] || "0", 10)
+        : 0;
+      newState.awayTeamId = newState.awayTeam
+        ? parseInt(clubIdsMap[newState.awayTeam] || "0", 10)
+        : 0;
 
-        if (!Object.values(Sports).includes(newState.matchType)) {
-          newState.matchType = Sports.Football;
-        }
+      if (Number.isNaN(newState.injuryTime)) {
+        newState.injuryTime = 0;
+      }
 
-        if (newState.matchType !== prev.matchType) {
-          newState.halfStops = DEFAULT_HALFSTOPS[newState.matchType];
-        }
+      if (!Object.values(Sports).includes(newState.matchType)) {
+        newState.matchType = Sports.Football;
+      }
 
-        if (newState.started && !prev.started) {
-          newState.buzzer = false;
-        }
-        return newState;
-      });
+      if (newState.matchType !== prev.matchType) {
+        newState.halfStops = DEFAULT_HALFSTOPS[newState.matchType];
+      }
+
+      if (newState.started && !prev.started) {
+        newState.buzzer = false;
+      }
+
+      const partialData: Record<string, unknown> = {};
+      for (const key of Object.keys(updates) as (keyof Match)[]) {
+        partialData[key] = newState[key];
+      }
+
+      if ("homeTeam" in updates) {
+        partialData.homeTeamId = newState.homeTeamId;
+      }
+      if ("awayTeam" in updates) {
+        partialData.awayTeamId = newState.awayTeamId;
+      }
+      if ("matchType" in updates && newState.matchType !== prev.matchType) {
+        partialData.halfStops = newState.halfStops;
+      }
+      if ("injuryTime" in updates && Number.isNaN(updates.injuryTime)) {
+        partialData.injuryTime = 0;
+      }
+      if ("started" in updates && newState.started && !prev.started) {
+        partialData.buzzer = false;
+      }
+
+      matchRef.current = newState;
+
+      firebaseDatabase
+        .syncPartialState(listenPrefix, "match", partialData)
+        .catch(console.error);
     },
-    [applyMatchUpdate],
+    [isAuthenticated, listenPrefix],
   );
 
   const startMatch = useCallback(() => {
