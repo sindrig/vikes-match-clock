@@ -41,3 +41,30 @@ async def get_lineups(
     api_key = get_ksi_api_key(team_id)
     lineups = await ksi_client.get_lineups(match_id, api_key)
     return lineups
+
+
+@router.get(
+    "/{team_id}/matches/{match_id}/events",
+    response_model=list[MatchEvent],
+)
+async def get_events(
+    team_id: int,
+    match_id: int,
+    ksi_client: KsiClient = Depends(get_ksi_client),
+):
+    """Get events for a match."""
+    api_key = get_ksi_api_key(team_id)
+    events = await ksi_client.get_events(match_id, api_key)
+    return events
+
+
+@router.get("/{team_id}/matches/{match_id}/info", response_model=Match)
+async def get_match_info(
+    team_id: int,
+    match_id: int,
+    ksi_client: KsiClient = Depends(get_ksi_client),
+):
+    """Get detailed info for a match."""
+    api_key = get_ksi_api_key(team_id)
+    match = await ksi_client.get_match_info(match_id, api_key)
+    return match

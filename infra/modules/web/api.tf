@@ -63,6 +63,12 @@ module "api_gateway" {
       timeout_milliseconds   = 12000
     }
 
+    "ANY /v3/{proxy+}" = {
+      lambda_arn             = module.clock-api-v3.lambda_function_arn
+      payload_format_version = "2.0"
+      timeout_milliseconds   = 12000
+    }
+
     "$default" = {
       lambda_arn = module.match-report.lambda_function_arn
     }
@@ -129,6 +135,39 @@ module "weather" {
 
   build_in_docker = true
   source_path     = "${path.module}/../../../clock-api/weather"
+
+  allowed_triggers = {
+    AllowExecutionFromAPIGateway = {
+      service    = "apigateway"
+      source_arn = "${module.api_gateway.apigatewayv2_api_execution_arn}/*/*"
+    }
+  }
+}
+
+module "clock-api-v3" {
+  source  = "terraform-aws-modules/lambda/aws"
+  version = "8.5.0"
+
+  function_name = "${random_pet.this.id}${var.name_suffix}-clock-api-v3"
+  description   = "Clock API v3 - FastAPI (${var.stage})"
+  handler       = "app.main.handler"
+  runtime       = "python3.12"
+
+  publish = true
+  timeout = 20
+
+  build_in_docker = true
+  source_path     = "${path.module}/../../../clock-api/v3"
+
+  attach_policy_json = true
+  policy_json = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["ssm:GetParameter"]
+      Resource = "arn:aws:ssm:*:*:parameter/vikes-match-clock/*"
+    }]
+  })
 
   allowed_triggers = {
     AllowExecutionFromAPIGateway = {

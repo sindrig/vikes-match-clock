@@ -1,0 +1,91 @@
+# Task 1: FastAPI v3 Scaffolding - VERIFICATION SUMMARY
+
+## ✅ COMPLETED ITEMS
+
+### Directory Structure
+- [x] clock-api/v3/app/ (main application code)
+- [x] clock-api/v3/app/routers/ (API route handlers)
+- [x] clock-api/v3/app/services/ (business logic)
+- [x] clock-api/v3/app/models/ (Pydantic models)
+- [x] clock-api/v3/tests/ (test suite)
+- [x] .sisyphus/notepads/new-ksi-api/ (learnings documentation)
+- [x] .sisyphus/evidence/ (QA evidence)
+
+### Core Files Created
+- [x] app/__init__.py - Package marker
+- [x] app/main.py - FastAPI app with Mangum handler, CORS, health endpoint
+- [x] app/dependencies.py - SSM dependency injection with @cache decorator
+- [x] app/routers/matches.py - Matches API router (placeholder)
+- [x] app/routers/weather.py - Weather API router (placeholder)
+- [x] app/services/ksi.py - KSI client service (placeholder)
+- [x] app/services/weather.py - Weather service (placeholder)
+- [x] app/models/matches.py - Match Pydantic model (placeholder)
+- [x] app/models/weather.py - Weather Pydantic model (placeholder)
+- [x] tests/conftest.py - pytest fixtures and mocks
+- [x] tests/test_matches.py - Matches tests (skipped)
+- [x] tests/test_weather.py - Weather tests (skipped)
+- [x] tests/test_integration.py - Integration tests (skipped)
+- [x] requirements.txt - Production dependencies
+- [x] requirements-dev.txt - Dev/test dependencies
+- [x] pyproject.toml - Black config (79 chars, skip-string-normalization)
+
+### FastAPI Configuration
+- [x] App title: "Clock API v3"
+- [x] root_path="/v3" for API Gateway path prefix
+- [x] CORSMiddleware with allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]
+- [x] Health check endpoint: GET /health → {"status": "ok"}
+- [x] Mangum handler export with lifespan="off"
+
+### Dependencies Installed
+Production (requirements.txt):
+- [x] fastapi==0.104.1
+- [x] mangum==0.17.0
+- [x] httpx==0.25.2
+- [x] pydantic==2.12.5
+- [x] boto3==1.29.7
+
+Development (requirements-dev.txt):
+- [x] pytest==7.4.3
+- [x] pytest-asyncio==0.21.1
+- [x] respx==0.21.1
+- [x] moto==4.2.9
+
+### QA Verification Results
+
+#### Scenario 1: FastAPI app imports and creates handler successfully
+Command: python -c "from app.main import app, handler; print('App title:', app.title); print('Handler type:', type(handler).__name__)"
+Result: ✅ PASS
+- App title: Clock API v3
+- Handler type: Mangum
+
+#### Scenario 2: Health check responds correctly
+Command: TestClient against FastAPI app
+Result: ✅ PASS
+- Status Code: 200
+- Body: {'status': 'ok'}
+
+#### Scenario 3: Pytest runs successfully
+Command: python -m pytest tests/ -v
+Result: ✅ PASS
+- 3 skipped tests (placeholder tests)
+- 0 errors
+- All tests collected successfully
+
+#### Scenario 4: Pip install succeeds
+Command: pip install -r requirements.txt -r requirements-dev.txt
+Result: ✅ PASS
+- All 37 packages installed successfully
+- No build errors or conflicts
+
+### Documentation
+- [x] learnings.md updated with implementation details, gotchas, and solutions
+
+### Git Commit
+- [x] Committed with message: "feat(api): scaffold FastAPI v3 project with Mangum adapter"
+- [x] Commit includes: 24 files changed, 246 insertions
+
+## Notes for Next Tasks
+- Pydantic 2.12.5 used (compatible with Python 3.14; 2.5.0 had build issues)
+- Mangum handler requires proper async event loop or TestClient wrapper
+- SSM dependency pattern from clock-api/weather/app.py correctly replicated
+- All placeholder files ready for implementation in Tasks 2-6

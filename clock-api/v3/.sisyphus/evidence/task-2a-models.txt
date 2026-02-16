@@ -1,0 +1,5 @@
+PASS: All models imported and validated
+Models: Match, Team, Person, Result, MatchPhase, Competition, Facility
+Models: TeamPlayer, MatchAndTeamOfficial, TeamLineup, LineupsResponse
+Models: MatchEventType, MatchEvent
+Models: WeatherResponse

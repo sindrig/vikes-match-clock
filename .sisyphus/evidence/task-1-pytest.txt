@@ -1,0 +1,33 @@
+/home/sindri/dev/worktrees/vikes-match-clock/new-api/.direnv/python-3.14/lib/python3.14/site-packages/anyio/from_thread.py:118: SyntaxWarning: 'return' in a 'finally' block
+  return result
+============================= test session starts ==============================
+platform linux -- Python 3.14.2, pytest-7.4.3, pluggy-1.6.0 -- /home/sindri/dev/worktrees/vikes-match-clock/new-api/.direnv/python-3.14/bin/python
+cachedir: .pytest_cache
+rootdir: /home/sindri/dev/worktrees/vikes-match-clock/new-api/clock-api/v3
+plugins: anyio-3.7.1, asyncio-0.21.1, respx-0.21.1
+asyncio: mode=Mode.STRICT
+collecting ... collected 3 items
+
+tests/test_integration.py::test_health_check SKIPPED (Placeholder test)  [ 33%]
+tests/test_matches.py::test_list_matches SKIPPED (Placeholder test)      [ 66%]
+tests/test_weather.py::test_get_weather SKIPPED (Placeholder test)       [100%]
+
+=============================== warnings summary ===============================
+../../.direnv/python-3.14/lib/python3.14/site-packages/starlette/_utils.py:17
+../../.direnv/python-3.14/lib/python3.14/site-packages/starlette/_utils.py:17
+../../.direnv/python-3.14/lib/python3.14/site-packages/starlette/_utils.py:17
+../../.direnv/python-3.14/lib/python3.14/site-packages/starlette/_utils.py:17
+../../.direnv/python-3.14/lib/python3.14/site-packages/starlette/_utils.py:17
+  /home/sindri/dev/worktrees/vikes-match-clock/new-api/.direnv/python-3.14/lib/python3.14/site-packages/starlette/_utils.py:17: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+    return asyncio.iscoroutinefunction(obj) or (
+
+../../.direnv/python-3.14/lib/python3.14/site-packages/fastapi/routing.py:211
+  /home/sindri/dev/worktrees/vikes-match-clock/new-api/.direnv/python-3.14/lib/python3.14/site-packages/fastapi/routing.py:211: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+    is_coroutine = asyncio.iscoroutinefunction(dependant.call)
+
+../../.direnv/python-3.14/lib/python3.14/site-packages/pytest_asyncio/plugin.py:156: 87 warnings
+  /home/sindri/dev/worktrees/vikes-match-clock/new-api/.direnv/python-3.14/lib/python3.14/site-packages/pytest_asyncio/plugin.py:156: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+    return asyncio.iscoroutinefunction(obj)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================= 3 skipped, 93 warnings in 0.04s ========================
