@@ -29,7 +29,7 @@ A match clock application for Víkingur football club stadiums. Displays match i
 ## Key Technologies
 
 - **Frontend**: React (in `clock/` directory)
-- **Backend**: Python 3.12 Lambda functions (FastAPI + Mangum for v3, standalone for legacy)
+- **Backend**: Python 3.12 Lambda functions (FastAPI + Lambda Web Adapter for v3, standalone for legacy)
 - **Infrastructure**: Terraform with S3 backend
 - **CI/CD**: GitHub Actions with OIDC authentication (no static AWS keys)
 - **Real-time**: Firebase Realtime Database for screen state management

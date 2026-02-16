@@ -1,13 +1,13 @@
 # clock-api/v3
 
-FastAPI application wrapping the Analyticom KSI REST API for match data and weather. Deployed as a single Lambda behind API Gateway via Mangum.
+FastAPI application wrapping the Analyticom KSI REST API for match data and weather. Deployed as a single Lambda behind API Gateway via Lambda Web Adapter (LWA) + uvicorn.
 
 ## Architecture
 
 ```
 clock-api/v3/
 ├── app/
-│   ├── main.py            # FastAPI app + Mangum handler
+│   ├── main.py            # FastAPI app
 │   ├── dependencies.py    # SSM lookups (cached), client factories
 │   ├── models/
 │   │   ├── matches.py     # Pydantic models for KSI match data
@@ -23,7 +23,8 @@ clock-api/v3/
 │   ├── test_matches.py    # KSI client + match endpoint tests
 │   ├── test_weather.py    # Weather service + endpoint tests
 │   ├── test_integration.py # Cross-endpoint integration tests
-│   └── test_handler.py    # Mangum Lambda handler tests
+│   └── test_handler.py    # App config + LWA setup tests
+├── run.sh                 # uvicorn startup script for Lambda Web Adapter
 ├── export-openapi.py      # Generates openapi.json from app
 ├── requirements.txt       # Production deps
 ├── requirements-dev.txt   # Test deps (includes production)
@@ -68,7 +69,7 @@ REST API for Icelandic football data. Requires `API_KEY` header on all requests.
 
 **Pydantic v2**: `X | None = None` for optional fields, `model_validate()` for JSON conversion. FastAPI auto-generates OpenAPI spec from models.
 
-**Lambda Deployment**: Mangum adapter at `app.main.handler`, `lifespan="off"`. No uvicorn in production.
+**Lambda Deployment**: Lambda Web Adapter (LWA) runs `run.sh` which starts uvicorn serving `app.main:app`. The LWA layer translates Lambda events to HTTP requests. No Mangum needed.
 
 ## Development
 
@@ -98,12 +99,18 @@ Generating TypeScript types (from `clock/` directory):
 pnpm run generate-api-types
 ```
 
+## Code Style
+
+- No comments or docstrings. Code should be self-documenting through clear naming.
+- No module-level docstrings, no function/class/method docstrings, no inline comments.
+- `# type: ignore` is acceptable only when truly necessary.
+
 ## Testing Patterns
 
 - httpx mocking: `respx` for async httpx calls
 - Endpoint testing: `TestClient` with dependency overrides
 - Weather mocking: Mock both vedur.is and OpenWeatherMap to test fallback chain
-- Handler testing: Mangum handler with Lambda v2.0 event format
+- App config testing: Verify FastAPI setup, CORS, root_path, run.sh existence
 
 ## Related
 
