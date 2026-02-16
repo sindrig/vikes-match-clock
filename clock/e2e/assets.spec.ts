@@ -203,26 +203,10 @@ test.describe("Asset Overlay System - Team Views", () => {
     await loginWithEmulatorUser(page);
   });
 
-  test("switches between Biðröð and Lið views", async ({ page, request }) => {
-    // Bypass UI race condition: setting both teams via UI fails due to Firebase set() + onValue sync
-    await request.patch(
-      "http://127.0.0.1:9000/states/test-e2e/match.json?ns=vikes-match-clock-test",
-      {
-        data: {
-          homeTeam: "Víkingur R",
-          homeTeamId: 103,
-          awayTeam: "Fram",
-          awayTeamId: 107,
-        },
-      },
-    );
-
-    await page.reload();
-    await page
-      .getByRole("button", { name: "Heim", exact: true })
-      .waitFor({ state: "visible", timeout: 10000 });
-
+  test("switches between Biðröð and Lið views", async ({ page }) => {
     await page.getByText("Stillingar").click();
+    await page.locator("#team-selector-homeTeam").fill("Víkingur R");
+    await page.locator("#team-selector-awayTeam").fill("Fram");
     await expect(page.locator("#team-selector-homeTeam")).toHaveValue(
       "Víkingur R",
       { timeout: 10000 },
@@ -243,9 +227,9 @@ test.describe("Asset Overlay System - Team Views", () => {
 
     await assetController.getByRole("button", { name: "Lið" }).click();
 
-    await expect(
-      page.locator(".team-asset-controller").first(),
-    ).toBeVisible({ timeout: 10000 });
+    await expect(page.locator(".team-asset-controller").first()).toBeVisible({
+      timeout: 10000,
+    });
 
     await assetController.getByRole("button", { name: "Biðröð" }).click();
 
