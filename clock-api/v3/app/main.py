@@ -4,7 +4,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from mangum import Mangum
 
+from app.routers import matches
+
 app = FastAPI(title="Clock API v3", root_path="/v3")
+
+app.include_router(matches.router, tags=["matches"])
 
 # Add CORS middleware
 app.add_middleware(

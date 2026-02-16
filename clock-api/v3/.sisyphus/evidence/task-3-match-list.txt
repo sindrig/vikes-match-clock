@@ -1,0 +1,96 @@
+============================= test session starts ==============================
+platform linux -- Python 3.14.2, pytest-7.4.3, pluggy-1.6.0 -- /home/sindri/dev/worktrees/vikes-match-clock/new-api/.direnv/python-3.14/bin/python
+cachedir: .pytest_cache
+rootdir: /home/sindri/dev/worktrees/vikes-match-clock/new-api/clock-api/v3
+plugins: anyio-3.7.1, asyncio-0.21.1, respx-0.21.1
+asyncio: mode=Mode.STRICT
+collecting ... collected 15 items
+
+tests/test_matches.py::test_get_matches_success PASSED                   [  6%]
+tests/test_matches.py::test_get_matches_empty PASSED                     [ 13%]
+tests/test_matches.py::test_get_lineups_success PASSED                   [ 20%]
+tests/test_matches.py::test_get_events_success PASSED                    [ 26%]
+tests/test_matches.py::test_get_match_info_success PASSED                [ 33%]
+tests/test_matches.py::test_get_matches_http_error PASSED                [ 40%]
+tests/test_matches.py::test_get_match_info_not_found PASSED              [ 46%]
+tests/test_matches.py::test_get_matches_sends_api_key_header PASSED      [ 53%]
+tests/test_matches.py::test_endpoint_get_matches_date_success PASSED     [ 60%]
+tests/test_matches.py::test_endpoint_get_matches_date_with_utc_offset PASSED [ 66%]
+tests/test_matches.py::test_endpoint_get_matches_date_empty PASSED       [ 73%]
+tests/test_matches.py::test_endpoint_get_lineups_success PASSED          [ 80%]
+tests/test_matches.py::test_endpoint_get_lineups_empty_lineups PASSED    [ 86%]
+tests/test_matches.py::test_endpoint_get_lineups_in_openapi PASSED       [ 93%]
+tests/test_matches.py::test_endpoint_get_matches_date_in_openapi PASSED  [100%]
+
+=============================== warnings summary ===============================
+../../.direnv/python-3.14/lib/python3.14/site-packages/fastapi/routing.py:211
+../../.direnv/python-3.14/lib/python3.14/site-packages/fastapi/routing.py:211
+../../.direnv/python-3.14/lib/python3.14/site-packages/fastapi/routing.py:211
+../../.direnv/python-3.14/lib/python3.14/site-packages/fastapi/routing.py:211
+../../.direnv/python-3.14/lib/python3.14/site-packages/fastapi/routing.py:211
+  /home/sindri/dev/worktrees/vikes-match-clock/new-api/.direnv/python-3.14/lib/python3.14/site-packages/fastapi/routing.py:211: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+    is_coroutine = asyncio.iscoroutinefunction(dependant.call)
+
+../../.direnv/python-3.14/lib/python3.14/site-packages/starlette/_utils.py:17: 9 warnings
+tests/test_matches.py: 5 warnings
+  /home/sindri/dev/worktrees/vikes-match-clock/new-api/.direnv/python-3.14/lib/python3.14/site-packages/starlette/_utils.py:17: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+    return asyncio.iscoroutinefunction(obj) or (
+
+../../.direnv/python-3.14/lib/python3.14/site-packages/pytest_asyncio/plugin.py:156: 466 warnings
+  /home/sindri/dev/worktrees/vikes-match-clock/new-api/.direnv/python-3.14/lib/python3.14/site-packages/pytest_asyncio/plugin.py:156: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+    return asyncio.iscoroutinefunction(obj)
+
+tests/test_matches.py::test_get_matches_success
+tests/test_matches.py::test_get_matches_empty
+tests/test_matches.py::test_get_lineups_success
+tests/test_matches.py::test_get_events_success
+tests/test_matches.py::test_get_match_info_success
+tests/test_matches.py::test_get_matches_http_error
+tests/test_matches.py::test_get_match_info_not_found
+tests/test_matches.py::test_get_matches_sends_api_key_header
+  /home/sindri/dev/worktrees/vikes-match-clock/new-api/.direnv/python-3.14/lib/python3.14/site-packages/pytest_asyncio/plugin.py:567: DeprecationWarning: 'asyncio.get_event_loop_policy' is deprecated and slated for removal in Python 3.16
+    loop = asyncio.get_event_loop_policy().new_event_loop()
+
+tests/test_matches.py::test_get_matches_success
+tests/test_matches.py::test_get_matches_empty
+tests/test_matches.py::test_get_lineups_success
+tests/test_matches.py::test_get_events_success
+tests/test_matches.py::test_get_match_info_success
+tests/test_matches.py::test_get_matches_http_error
+tests/test_matches.py::test_get_match_info_not_found
+tests/test_matches.py::test_get_matches_sends_api_key_header
+  /home/sindri/dev/worktrees/vikes-match-clock/new-api/.direnv/python-3.14/lib/python3.14/site-packages/pytest_asyncio/plugin.py:398: DeprecationWarning: 'asyncio.get_event_loop_policy' is deprecated and slated for removal in Python 3.16
+    policy = asyncio.get_event_loop_policy()
+
+tests/test_matches.py::test_get_matches_success
+tests/test_matches.py::test_get_matches_empty
+tests/test_matches.py::test_get_lineups_success
+tests/test_matches.py::test_get_events_success
+tests/test_matches.py::test_get_match_info_success
+tests/test_matches.py::test_get_matches_http_error
+tests/test_matches.py::test_get_match_info_not_found
+tests/test_matches.py::test_get_matches_sends_api_key_header
+  /home/sindri/dev/worktrees/vikes-match-clock/new-api/.direnv/python-3.14/lib/python3.14/site-packages/pytest_asyncio/plugin.py:444: DeprecationWarning: 'asyncio.get_event_loop_policy' is deprecated and slated for removal in Python 3.16
+    policy = asyncio.get_event_loop_policy()
+
+tests/test_matches.py::test_get_matches_success
+tests/test_matches.py::test_get_matches_empty
+tests/test_matches.py::test_get_lineups_success
+tests/test_matches.py::test_get_events_success
+tests/test_matches.py::test_get_match_info_success
+tests/test_matches.py::test_get_matches_http_error
+tests/test_matches.py::test_get_match_info_not_found
+tests/test_matches.py::test_get_matches_sends_api_key_header
+  /home/sindri/dev/worktrees/vikes-match-clock/new-api/.direnv/python-3.14/lib/python3.14/site-packages/pytest_asyncio/plugin.py:465: DeprecationWarning: 'asyncio.get_event_loop_policy' is deprecated and slated for removal in Python 3.16
+    policy = asyncio.get_event_loop_policy()
+
+tests/test_matches.py::test_endpoint_get_matches_date_success
+tests/test_matches.py::test_endpoint_get_matches_date_with_utc_offset
+tests/test_matches.py::test_endpoint_get_matches_date_empty
+tests/test_matches.py::test_endpoint_get_lineups_success
+tests/test_matches.py::test_endpoint_get_lineups_empty_lineups
+  /home/sindri/dev/worktrees/vikes-match-clock/new-api/.direnv/python-3.14/lib/python3.14/site-packages/starlette/_utils.py:18: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+    callable(obj) and asyncio.iscoroutinefunction(obj.__call__)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================= 15 passed, 522 warnings in 0.51s =======================
