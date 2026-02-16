@@ -1,0 +1,10 @@
+Total paths: 6
+  /health
+  /weather/
+  /{team_id}/matches/{date}
+  /{team_id}/matches/{match_id}/events
+  /{team_id}/matches/{match_id}/info
+  /{team_id}/matches/{match_id}/lineups
+
+✓ All expected endpoints present in OpenAPI spec
+✓ OpenAPI spec saved

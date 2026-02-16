@@ -1,0 +1,56 @@
+============================= test session starts ==============================
+platform linux -- Python 3.14.2, pytest-7.4.3, pluggy-1.6.0 -- /home/sindri/dev/worktrees/vikes-match-clock/new-api/.direnv/python-3.14/bin/python
+cachedir: .pytest_cache
+rootdir: /home/sindri/dev/worktrees/vikes-match-clock/new-api/clock-api/v3
+plugins: anyio-3.7.1, asyncio-0.21.1, respx-0.21.1
+asyncio: mode=Mode.STRICT
+collecting ... collected 7 items
+
+tests/test_handler.py::TestMangumHandler::test_handler_health_check PASSED [ 14%]
+tests/test_handler.py::TestMangumHandler::test_handler_returns_lambda_response_structure PASSED [ 28%]
+tests/test_handler.py::TestMangumHandler::test_handler_404_not_found PASSED [ 42%]
+tests/test_handler.py::TestMangumHandler::test_handler_with_post_request PASSED [ 57%]
+tests/test_handler.py::TestMangumHandler::test_handler_context_parameter PASSED [ 71%]
+tests/test_handler.py::TestMangumHandler::test_handler_imports_successfully PASSED [ 85%]
+tests/test_handler.py::TestMangumHandler::test_handler_is_mangum_instance PASSED [100%]
+
+=============================== warnings summary ===============================
+../../.direnv/python-3.14/lib/python3.14/site-packages/fastapi/routing.py:211: 11 warnings
+  /home/sindri/dev/worktrees/vikes-match-clock/new-api/.direnv/python-3.14/lib/python3.14/site-packages/fastapi/routing.py:211: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+    is_coroutine = asyncio.iscoroutinefunction(dependant.call)
+
+../../.direnv/python-3.14/lib/python3.14/site-packages/starlette/_utils.py:17: 15 warnings
+tests/test_handler.py: 2 warnings
+  /home/sindri/dev/worktrees/vikes-match-clock/new-api/.direnv/python-3.14/lib/python3.14/site-packages/starlette/_utils.py:17: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+    return asyncio.iscoroutinefunction(obj) or (
+
+../../.direnv/python-3.14/lib/python3.14/site-packages/pytest_asyncio/plugin.py:156: 225 warnings
+  /home/sindri/dev/worktrees/vikes-match-clock/new-api/.direnv/python-3.14/lib/python3.14/site-packages/pytest_asyncio/plugin.py:156: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+    return asyncio.iscoroutinefunction(obj)
+
+tests/test_handler.py::TestMangumHandler::test_handler_health_check
+tests/test_handler.py::TestMangumHandler::test_handler_returns_lambda_response_structure
+tests/test_handler.py::TestMangumHandler::test_handler_404_not_found
+tests/test_handler.py::TestMangumHandler::test_handler_with_post_request
+tests/test_handler.py::TestMangumHandler::test_handler_context_parameter
+  /home/sindri/dev/worktrees/vikes-match-clock/new-api/.direnv/python-3.14/lib/python3.14/site-packages/pytest_asyncio/plugin.py:398: DeprecationWarning: 'asyncio.get_event_loop_policy' is deprecated and slated for removal in Python 3.16
+    policy = asyncio.get_event_loop_policy()
+
+tests/test_handler.py::TestMangumHandler::test_handler_health_check
+tests/test_handler.py::TestMangumHandler::test_handler_returns_lambda_response_structure
+tests/test_handler.py::TestMangumHandler::test_handler_404_not_found
+tests/test_handler.py::TestMangumHandler::test_handler_with_post_request
+tests/test_handler.py::TestMangumHandler::test_handler_context_parameter
+  /home/sindri/dev/worktrees/vikes-match-clock/new-api/.direnv/python-3.14/lib/python3.14/site-packages/pytest_asyncio/plugin.py:444: DeprecationWarning: 'asyncio.get_event_loop_policy' is deprecated and slated for removal in Python 3.16
+    policy = asyncio.get_event_loop_policy()
+
+tests/test_handler.py::TestMangumHandler::test_handler_health_check
+tests/test_handler.py::TestMangumHandler::test_handler_returns_lambda_response_structure
+tests/test_handler.py::TestMangumHandler::test_handler_404_not_found
+tests/test_handler.py::TestMangumHandler::test_handler_with_post_request
+tests/test_handler.py::TestMangumHandler::test_handler_context_parameter
+  /home/sindri/dev/worktrees/vikes-match-clock/new-api/.direnv/python-3.14/lib/python3.14/site-packages/pytest_asyncio/plugin.py:465: DeprecationWarning: 'asyncio.get_event_loop_policy' is deprecated and slated for removal in Python 3.16
+    policy = asyncio.get_event_loop_policy()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================= 7 passed, 268 warnings in 0.10s ========================
