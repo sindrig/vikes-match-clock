@@ -1,144 +1,37 @@
-"""Tests for Mangum handler and AWS Lambda integration."""
+import os
 
-import asyncio
-import json
-from unittest.mock import patch
+from fastapi.testclient import TestClient
 
-import pytest
-
-from app.main import handler
+from app.main import app
 
 
-@pytest.fixture
-def event_loop():
-    """Create an event loop for async tests."""
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
+class TestAppConfig:
+    def test_app_has_correct_title(self):
+        assert app.title == "Clock API v3"
 
+    def test_app_has_correct_root_path(self):
+        assert app.root_path == "/v3"
 
-class TestMangumHandler:
-    """Tests for Mangum handler with AWS Lambda events."""
+    def test_health_endpoint_responds(self):
+        client = TestClient(app)
+        response = client.get("/health")
+        assert response.status_code == 200
+        assert response.json() == {"status": "ok"}
 
-    def test_handler_health_check(self, event_loop):
-        """Test Mangum handler with health check endpoint."""
-        event = {
-            "version": "2.0",
-            "requestContext": {
-                "http": {
-                    "method": "GET",
-                    "path": "/health",
-                    "sourceIp": "127.0.0.1",
-                }
+    def test_cors_middleware_configured(self):
+        client = TestClient(app)
+        response = client.options(
+            "/health",
+            headers={
+                "Origin": "http://example.com",
+                "Access-Control-Request-Method": "GET",
             },
-            "rawPath": "/health",
-            "rawQueryString": "",
-            "headers": {},
-        }
+        )
+        assert response.headers.get("access-control-allow-origin") == "*"
 
-        result = handler(event, None)  # type: ignore
-
-        assert result["statusCode"] == 200
-        body = json.loads(result["body"])
-        assert body["status"] == "ok"
-
-    def test_handler_returns_lambda_response_structure(self, event_loop):
-        """Test handler returns proper API Gateway v2 response format."""
-        event = {
-            "version": "2.0",
-            "requestContext": {
-                "http": {
-                    "method": "GET",
-                    "path": "/health",
-                    "sourceIp": "127.0.0.1",
-                }
-            },
-            "rawPath": "/health",
-            "rawQueryString": "",
-            "headers": {},
-        }
-
-        result = handler(event, None)  # type: ignore
-
-        # Verify Lambda response structure
-        assert "statusCode" in result
-        assert "body" in result
-        assert isinstance(result["statusCode"], int)
-        assert isinstance(result["body"], str)
-        assert result["statusCode"] == 200
-
-    def test_handler_404_not_found(self, event_loop):
-        """Test handler returns 404 for non-existent routes."""
-        event = {
-            "version": "2.0",
-            "requestContext": {
-                "http": {
-                    "method": "GET",
-                    "path": "/v3/nonexistent",
-                    "sourceIp": "127.0.0.1",
-                }
-            },
-            "rawPath": "/v3/nonexistent",
-            "rawQueryString": "",
-            "headers": {},
-        }
-
-        result = handler(event, None)  # type: ignore
-
-        assert result["statusCode"] == 404
-
-    def test_handler_with_post_request(self, event_loop):
-        """Test handler handles POST requests."""
-        event = {
-            "version": "2.0",
-            "requestContext": {
-                "http": {
-                    "method": "POST",
-                    "path": "/health",
-                    "sourceIp": "127.0.0.1",
-                }
-            },
-            "rawPath": "/health",
-            "rawQueryString": "",
-            "headers": {"content-type": "application/json"},
-            "body": json.dumps({"key": "value"}),
-        }
-
-        result = handler(event, None)  # type: ignore
-
-        # POST to GET endpoint should fail
-        assert result["statusCode"] in [405, 404]
-
-    def test_handler_context_parameter(self, event_loop):
-        """Test handler accepts context parameter from Lambda."""
-        event = {
-            "version": "2.0",
-            "requestContext": {
-                "http": {
-                    "method": "GET",
-                    "path": "/health",
-                    "sourceIp": "127.0.0.1",
-                }
-            },
-            "rawPath": "/health",
-            "rawQueryString": "",
-            "headers": {},
-        }
-
-        result = handler(event, None)  # type: ignore
-
-        assert result["statusCode"] == 200
-        assert json.loads(result["body"])["status"] == "ok"
-
-    def test_handler_imports_successfully(self):
-        """Test handler is properly imported from app.main."""
-        from app.main import handler as imported_handler
-
-        assert imported_handler is not None
-        assert callable(imported_handler)
-
-    def test_handler_is_mangum_instance(self):
-        """Test handler is a Mangum instance."""
-        from mangum import Mangum
-
-        assert isinstance(handler, Mangum)
+    def test_run_script_exists(self):
+        run_sh = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)), "run.sh"
+        )
+        assert os.path.isfile(run_sh)
+        assert os.access(run_sh, os.X_OK)

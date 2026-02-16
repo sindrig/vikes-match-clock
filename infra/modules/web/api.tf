@@ -150,7 +150,7 @@ module "clock-api-v3" {
 
   function_name = "${random_pet.this.id}${var.name_suffix}-clock-api-v3"
   description   = "Clock API v3 - FastAPI (${var.stage})"
-  handler       = "app.main.handler"
+  handler       = "run.sh"
   runtime       = "python3.12"
 
   publish = true
@@ -158,6 +158,15 @@ module "clock-api-v3" {
 
   build_in_docker = true
   source_path     = "${path.module}/../../../clock-api/v3"
+
+  layers = [
+    "arn:aws:lambda:eu-west-1:753240598075:layer:LambdaAdapterLayerX86:20"
+  ]
+
+  environment_variables = {
+    AWS_LAMBDA_EXEC_WRAPPER = "/opt/bootstrap"
+    PORT                    = "8000"
+  }
 
   attach_policy_json = true
   policy_json = jsonencode({
