@@ -1,3 +1,4 @@
+import { Button } from "rsuite";
 import { useFirebaseState } from "./contexts/FirebaseStateContext";
 import { useLocalState } from "./contexts/LocalStateContext";
 import Controller from "./controller/Controller";
@@ -16,11 +17,23 @@ import "./App.css";
 function App() {
   useGlobalShortcuts();
   const { controller, view: viewState } = useFirebaseState();
-  const { sync, auth } = useLocalState();
+  const { sync, auth, listenPrefix, setListenPrefix } = useLocalState();
 
   const { view } = controller;
   const { vp, background } = viewState;
   const asset = controller.currentAsset || null;
+
+  const isAuthenticated = auth.isLoaded && !auth.isEmpty;
+
+  // State 1: no listenPrefix, not authenticated — Controller handles screen selector + login
+  if (!listenPrefix && !isAuthenticated) {
+    return (
+      <div>
+        <Controller />
+        <StateListener />
+      </div>
+    );
+  }
 
   const renderAppContents = () => {
     switch (view) {
@@ -41,6 +54,32 @@ function App() {
     ...vp.style,
   };
 
+  // State 2: listenPrefix set, not authenticated — display screen + disconnect button only
+  if (!isAuthenticated) {
+    return (
+      <div>
+        <div className="App" style={style}>
+          {renderAppContents()}
+        </div>
+        {asset ? (
+          <div className="overlay-container" style={vp.style}>
+            <AssetComponent asset={asset.asset} time={asset.time} />
+          </div>
+        ) : null}
+        <Button
+          appearance="subtle"
+          size="xs"
+          onClick={() => setListenPrefix("")}
+          style={{ position: "fixed", bottom: 8, right: 8, zIndex: 9999 }}
+        >
+          Aftengja skjá
+        </Button>
+        <StateListener />
+      </div>
+    );
+  }
+
+  // State 3: authenticated — full UI unchanged
   return (
     <div>
       {view === VIEWS.control &&

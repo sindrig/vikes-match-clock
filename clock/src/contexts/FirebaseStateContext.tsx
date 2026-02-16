@@ -248,6 +248,8 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
             }
 
             setMatch(results);
+          } else {
+            setMatch(defaultMatch);
           }
         },
         (error) => console.error("Firebase match subscription error:", error),
@@ -257,9 +259,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         ref(database, controllerPath),
         (snapshot) => {
           const results = parseController(snapshot.val(), defaultController);
-          if (results) {
-            setController(results);
-          }
+          setController(results ?? defaultController);
         },
         (error) =>
           console.error("Firebase controller subscription error:", error),
@@ -269,9 +269,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         ref(database, viewPath),
         (snapshot) => {
           const results = parseView(snapshot.val(), defaultView);
-          if (results) {
-            setView(results);
-          }
+          setView(results ?? defaultView);
         },
         (error) => console.error("Firebase view subscription error:", error),
       );

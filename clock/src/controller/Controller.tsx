@@ -1,3 +1,5 @@
+import type React from "react";
+import { useState } from "react";
 import { Nav, Tooltip, Whisper, Button } from "rsuite";
 import GearIcon from "@rsuite/icons/Gear";
 import MediaIcon from "@rsuite/icons/Media";
@@ -5,6 +7,7 @@ import TimeIcon from "@rsuite/icons/Time";
 import CloseIcon from "@rsuite/icons/CloseOutline";
 
 import { TABS, VIEWS } from "../constants";
+import { firebaseAuth } from "../firebaseAuth";
 import MatchActions from "./MatchActions";
 import MatchActionSettings from "./MatchActionSettings";
 import MediaManager from "./media/MediaManager";
@@ -13,39 +16,128 @@ import RefreshHandler from "./RefreshHandler";
 import AssetController from "./asset/AssetController";
 import "rsuite/dist/rsuite.min.css";
 import "./Controller.css";
-import AssetQueue from "./asset/AssetQueue";
-import { useController, useView } from "../contexts/FirebaseStateContext";
-import { useAuth, useRemoteSettings } from "../contexts/LocalStateContext";
+import {
+  useController,
+  useListeners,
+  useView,
+} from "../contexts/FirebaseStateContext";
+import { useAuth, useLocalState } from "../contexts/LocalStateContext";
 
 const confirmRefresh = () => confirm("Are you absolutely sure?");
 
 const Controller = () => {
-  const { controller, selectView, selectTab, renderAsset } = useController();
+  const { controller, selectView, renderAsset } = useController();
   const { view: viewState } = useView();
-  const { sync } = useRemoteSettings();
+  const { screens } = useListeners();
+  const {
+    email,
+    setEmail,
+    password,
+    setPassword,
+    listenPrefix,
+    setListenPrefix,
+  } = useLocalState();
   const auth = useAuth();
 
-  const { view, currentAsset, tab } = controller;
+  const [tab, setTab] = useState<string>(TABS.home);
+
+  const { view, currentAsset } = controller;
   const { vp } = viewState;
 
+  const isAuthenticated = auth.isLoaded && !auth.isEmpty;
+
+  // State 1: no listenPrefix, not authenticated — screen selector + login form only
+  if (!listenPrefix && !isAuthenticated) {
+    const login = (e: React.FormEvent) => {
+      e.preventDefault();
+      firebaseAuth
+        .login(email, password)
+        .then(() => {
+          if (email) {
+            setListenPrefix(email.split("@")[0] || "");
+          }
+        })
+        .catch((err: Error) => alert(err.message));
+    };
+
+    const loginWithGoogle = () => {
+      void firebaseAuth.loginWithGoogle().then(() => console.log("logged in"));
+    };
+
+    return (
+      <div className="controller">
+        <div className="dummyDiv" style={vp.style}></div>
+        <div className="control-item">
+          <div>
+            Skjár:
+            <select
+              onChange={({ target: { value } }) => {
+                const screen = screens[parseInt(value, 10)];
+                if (screen) {
+                  setListenPrefix(screen.key);
+                }
+              }}
+              value={0}
+            >
+              <option value="" disabled>
+                Veldu skjá
+              </option>
+              {screens.map(({ label, screen }, i) => (
+                <option value={i} key={i}>
+                  {label} {screen.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <form onSubmit={login}>
+            <div>
+              <input
+                name="email"
+                autoComplete="email"
+                placeholder="E-mail"
+                value={email}
+                onChange={({ target: { value } }) => setEmail(value)}
+              />
+              <input
+                name="password"
+                placeholder="Password"
+                autoComplete="current-password"
+                type="password"
+                value={password}
+                onChange={({ target: { value } }) => setPassword(value)}
+              />
+            </div>
+            <div>
+              <button type="submit">Login</button>
+            </div>
+          </form>
+          <button type="button" onClick={loginWithGoogle}>
+            Login (google)
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // State 2: listenPrefix set, not authenticated — Controller renders nothing
+  // (disconnect button lives in App.tsx)
+  if (!isAuthenticated) {
+    return null;
+  }
+
+  // State 3: authenticated — full UI with local tab state
   const clearState = () => {
     localStorage.clear();
   };
 
-  const showControls = !sync || !auth.isEmpty;
-  const showHome = (tab || TABS.home) === "home";
-  // If not logged in, only show the settings tab
-  const showSettings = (tab || TABS.home) === "settings" || !showControls;
+  const showHome = tab === "home";
+  const showSettings = tab === "settings";
   const showMedia = tab === "media";
   const tooltipClear = <Tooltip>Birtir aftur stöðu leiksins á skjá.</Tooltip>;
   return (
     <div className="controller">
       <div className="dummyDiv" style={vp.style}></div>
-      <Nav
-        appearance="tabs"
-        onSelect={selectTab}
-        activeKey={showControls ? tab || TABS.home : "settings"}
-      >
+      <Nav appearance="tabs" onSelect={setTab} activeKey={tab}>
         <Nav.Item eventKey="home" icon={<TimeIcon />}>
           Heim
         </Nav.Item>
@@ -56,10 +148,10 @@ const Controller = () => {
           Stillingar
         </Nav.Item>
       </Nav>
-      {showControls && showHome && <MatchActions />}
-      {showControls && showSettings && <MatchActionSettings />}
-      {showControls && showMedia && <MediaManager />}
-      {showControls && currentAsset && (
+      {showHome && <MatchActions />}
+      {showSettings && <MatchActionSettings />}
+      {showMedia && <MediaManager />}
+      {currentAsset && (
         <div className="control-item">
           <Whisper
             placement="bottom"
@@ -80,24 +172,22 @@ const Controller = () => {
       )}
       {showSettings && (
         <div className="page-actions control-item withborder">
-          {showControls && (
-            <div className="view-selector">
-              {Object.keys(VIEWS).map((VIEW) => (
-                <label htmlFor={`view-selector-${VIEW}`} key={VIEW}>
-                  <input
-                    type="radio"
-                    value={VIEW}
-                    checked={VIEW === view}
-                    onChange={(e) => selectView(e.target.value)}
-                    className="view-selector-input"
-                    id={`view-selector-${VIEW}`}
-                    name="view-selector"
-                  />
-                  {VIEW}
-                </label>
-              ))}
-            </div>
-          )}
+          <div className="view-selector">
+            {Object.keys(VIEWS).map((VIEW) => (
+              <label htmlFor={`view-selector-${VIEW}`} key={VIEW}>
+                <input
+                  type="radio"
+                  value={VIEW}
+                  checked={VIEW === view}
+                  onChange={(e) => selectView(e.target.value)}
+                  className="view-selector-input"
+                  id={`view-selector-${VIEW}`}
+                  name="view-selector"
+                />
+                {VIEW}
+              </label>
+            ))}
+          </div>
           <Button
             color="red"
             appearance="primary"
@@ -115,7 +205,7 @@ const Controller = () => {
           <LoginPage />
         </div>
       )}
-      {(showControls && <AssetController />) || <AssetQueue />}
+      <AssetController />
     </div>
   );
 };

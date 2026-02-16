@@ -2084,11 +2084,21 @@ describe("FirebaseStateContext", () => {
           matchApi!.matchTimeout("away");
         });
       }
-      expect(firebaseDatabase.syncPartialState).toHaveBeenLastCalledWith(
+      // The 4th call sets awayTimeouts from 3→4 (the cap).
+      // The 5th call keeps awayTimeouts at 4 (unchanged), so the diff
+      // optimization excludes it — only `timeout` is sent.
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({ awayTimeouts: 4 }),
       );
+      // Verify the value never exceeds 4
+      const allCalls = vi.mocked(firebaseDatabase.syncPartialState).mock.calls;
+      const allAwayTimeouts = allCalls
+        .filter(([, section]) => section === "match")
+        .map(([, , data]) => data.awayTimeouts)
+        .filter((v) => v !== undefined);
+      expect(Math.max(...(allAwayTimeouts as number[]))).toBe(4);
     });
   });
 

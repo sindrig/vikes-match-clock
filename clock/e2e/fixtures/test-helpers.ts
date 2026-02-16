@@ -67,13 +67,10 @@ export const test = base.extend<{
   clockPage: Page;
 }>({
   clockPage: async ({ page }, use) => {
-    await page.addInitScript((listenPrefix) => {
+    await page.addInitScript(() => {
       localStorage.clear();
-      localStorage.setItem("clock_listenPrefix", listenPrefix);
-      // Enable sync mode so unauthenticated users see the login form
-      // (showControls=false when sync=true && auth.isEmpty=true)
       localStorage.setItem("clock_sync", "true");
-    }, TEST_LISTEN_PREFIX);
+    });
 
     await page.clock.setFixedTime(new Date(2025, 3, 10, 12, 0, 0));
 

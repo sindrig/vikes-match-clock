@@ -15,7 +15,6 @@ test.describe("Asset Overlay System", () => {
     await clearEmulatorData();
     await page.addInitScript(() => {
       localStorage.clear();
-      localStorage.setItem("clock_listenPrefix", "test-e2e");
       localStorage.setItem("clock_sync", "true");
     });
     await page.clock.setFixedTime(new Date(2025, 3, 10, 14, 0, 0));
@@ -196,7 +195,6 @@ test.describe("Asset Overlay System - Team Views", () => {
     await clearEmulatorData();
     await page.addInitScript(() => {
       localStorage.clear();
-      localStorage.setItem("clock_listenPrefix", "test-e2e");
       localStorage.setItem("clock_sync", "true");
     });
     await page.goto("/");
