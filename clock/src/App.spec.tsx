@@ -38,6 +38,11 @@ vi.mock("./match-controller/MatchController", () => ({
 vi.mock("./hooks/useGlobalShortcuts", () => ({
   default: vi.fn(),
 }));
+vi.mock("react-spinners", () => ({
+  RingLoader: ({ color, size }: { color: string; size: number }) => (
+    <div data-testid="ring-loader" data-color={color} data-size={size} />
+  ),
+}));
 
 import { useFirebaseState } from "./contexts/FirebaseStateContext";
 import { useLocalState } from "./contexts/LocalStateContext";
@@ -65,6 +70,7 @@ function setupState1() {
   mockedUseFirebaseState.mockReturnValue({
     controller: { view: VIEWS.idle, currentAsset: null },
     view: { vp: defaultViewport, background: "Default" },
+    ready: true,
   } as unknown as ReturnType<typeof useFirebaseState>);
 }
 
@@ -86,6 +92,7 @@ function setupState2(
   mockedUseFirebaseState.mockReturnValue({
     controller: { view, currentAsset: null },
     view: { vp: defaultViewport, background: "Default" },
+    ready: true,
   } as unknown as ReturnType<typeof useFirebaseState>);
   return { setListenPrefix };
 }
@@ -104,6 +111,7 @@ function setupState3(view = VIEWS.idle) {
   mockedUseFirebaseState.mockReturnValue({
     controller: { view, currentAsset: null },
     view: { vp: defaultViewport, background: "Default" },
+    ready: true,
   } as unknown as ReturnType<typeof useFirebaseState>);
 }
 
@@ -225,6 +233,68 @@ describe("App", () => {
       render(<App />);
 
       expect(screen.queryByTestId("controller")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("Loading spinner", () => {
+    it("shows spinner when listenPrefix is set but firebase is not ready", () => {
+      mockedUseLocalState.mockReturnValue({
+        auth: { isLoaded: true, isEmpty: true },
+        listenPrefix: "vikinni",
+        setListenPrefix: vi.fn(),
+        available: [],
+        email: "",
+        setEmail: vi.fn(),
+        password: "",
+        setPassword: vi.fn(),
+      });
+      mockedUseFirebaseState.mockReturnValue({
+        controller: { view: VIEWS.idle, currentAsset: null },
+        view: { vp: defaultViewport, background: "Default" },
+        ready: false,
+      } as unknown as ReturnType<typeof useFirebaseState>);
+
+      render(<App />);
+
+      expect(screen.getByTestId("ring-loader")).toBeInTheDocument();
+      expect(screen.queryByTestId("idle")).not.toBeInTheDocument();
+    });
+
+    it("shows spinner when auth is not yet loaded", () => {
+      mockedUseLocalState.mockReturnValue({
+        auth: { isLoaded: false, isEmpty: true },
+        listenPrefix: "vikinni",
+        setListenPrefix: vi.fn(),
+        available: [],
+        email: "",
+        setEmail: vi.fn(),
+        password: "",
+        setPassword: vi.fn(),
+      });
+      mockedUseFirebaseState.mockReturnValue({
+        controller: { view: VIEWS.idle, currentAsset: null },
+        view: { vp: defaultViewport, background: "Default" },
+        ready: true,
+      } as unknown as ReturnType<typeof useFirebaseState>);
+
+      render(<App />);
+
+      expect(screen.getByTestId("ring-loader")).toBeInTheDocument();
+    });
+
+    it("does not show spinner when no listenPrefix and not authenticated", () => {
+      setupState1();
+      render(<App />);
+
+      expect(screen.queryByTestId("ring-loader")).not.toBeInTheDocument();
+    });
+
+    it("does not show spinner when ready and auth loaded", () => {
+      setupState2();
+      render(<App />);
+
+      expect(screen.queryByTestId("ring-loader")).not.toBeInTheDocument();
+      expect(screen.getByTestId("idle")).toBeInTheDocument();
     });
   });
 });
