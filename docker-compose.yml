@@ -6,11 +6,13 @@ services:
     volumes:
       - ./firebase.json:/app/firebase.json:ro
       - ./firebase-rules.json:/app/firebase-rules.json:ro
+      - ./storage.rules:/app/storage.rules:ro
       - ./.firebaserc:/app/.firebaserc:ro
       - firebase-cache:/root/.cache
     ports:
       - "9099:9099"
       - "9000:9000"
+      - "9199:9199"
       - "4000:4000"
       - "4400:4400"
     environment:

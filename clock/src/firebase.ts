@@ -16,6 +16,7 @@ import {
   deleteObject,
   ListResult,
   StorageReference,
+  connectStorageEmulator,
 } from "firebase/storage";
 
 interface FirebaseConfig {
@@ -70,6 +71,7 @@ const storage: FirebaseStorage = getStorage(app);
 if (isTest) {
   connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
   connectDatabaseEmulator(database, "127.0.0.1", 9000);
+  connectStorageEmulator(storage, "127.0.0.1", 9199);
 }
 
 const storageHelpers = {
