@@ -1,0 +1,5 @@
+fastapi==0.104.1
+mangum==0.17.0
+httpx==0.25.2
+pydantic==2.12.5
+boto3==1.29.7
