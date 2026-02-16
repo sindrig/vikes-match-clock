@@ -1,0 +1,93 @@
+============================= test session starts ==============================
+platform linux -- Python 3.14.2, pytest-7.4.3, pluggy-1.6.0 -- /home/sindri/dev/worktrees/vikes-match-clock/new-api/.direnv/python-3.14/bin/python
+cachedir: .pytest_cache
+rootdir: /home/sindri/dev/worktrees/vikes-match-clock/new-api/clock-api/v3
+plugins: anyio-3.7.1, asyncio-0.21.1, respx-0.21.1
+asyncio: mode=Mode.STRICT
+collecting ... collected 36 items
+
+tests/test_handler.py::TestMangumHandler::test_handler_health_check PASSED [  2%]
+tests/test_handler.py::TestMangumHandler::test_handler_returns_lambda_response_structure PASSED [  5%]
+tests/test_handler.py::TestMangumHandler::test_handler_404_not_found PASSED [  8%]
+tests/test_handler.py::TestMangumHandler::test_handler_with_post_request PASSED [ 11%]
+tests/test_handler.py::TestMangumHandler::test_handler_context_parameter PASSED [ 13%]
+tests/test_handler.py::TestMangumHandler::test_handler_imports_successfully PASSED [ 16%]
+tests/test_handler.py::TestMangumHandler::test_handler_is_mangum_instance PASSED [ 19%]
+tests/test_integration.py::test_health_check SKIPPED (Placeholder test)  [ 22%]
+tests/test_integration.py::TestGetEvents::test_get_events_returns_event_list PASSED [ 25%]
+tests/test_integration.py::TestGetEvents::test_get_events_empty PASSED   [ 27%]
+tests/test_integration.py::TestGetEvents::test_get_events_calls_client_with_correct_args PASSED [ 30%]
+tests/test_integration.py::TestGetMatchInfo::test_get_match_info_returns_match PASSED [ 33%]
+tests/test_integration.py::TestGetMatchInfo::test_get_match_info_calls_client_with_correct_args PASSED [ 36%]
+tests/test_matches.py::test_get_matches_success PASSED                   [ 38%]
+tests/test_matches.py::test_get_matches_empty PASSED                     [ 41%]
+tests/test_matches.py::test_get_lineups_success PASSED                   [ 44%]
+tests/test_matches.py::test_get_events_success PASSED                    [ 47%]
+tests/test_matches.py::test_get_match_info_success PASSED                [ 50%]
+tests/test_matches.py::test_get_matches_http_error PASSED                [ 52%]
+tests/test_matches.py::test_get_match_info_not_found PASSED              [ 55%]
+tests/test_matches.py::test_get_matches_sends_api_key_header PASSED      [ 58%]
+tests/test_matches.py::test_endpoint_get_matches_date_success PASSED     [ 61%]
+tests/test_matches.py::test_endpoint_get_matches_date_with_utc_offset PASSED [ 63%]
+tests/test_matches.py::test_endpoint_get_matches_date_empty PASSED       [ 66%]
+tests/test_matches.py::test_endpoint_get_lineups_success PASSED          [ 69%]
+tests/test_matches.py::test_endpoint_get_lineups_empty_lineups PASSED    [ 72%]
+tests/test_matches.py::test_endpoint_get_lineups_in_openapi PASSED       [ 75%]
+tests/test_matches.py::test_endpoint_get_matches_date_in_openapi PASSED  [ 77%]
+tests/test_weather.py::test_get_weather_vedur_success PASSED             [ 80%]
+tests/test_weather.py::test_get_weather_vedur_fails_owm_fallback PASSED  [ 83%]
+tests/test_weather.py::test_get_weather_vedur_bad_xml_owm_fallback PASSED [ 86%]
+tests/test_weather.py::test_get_weather_both_fail PASSED                 [ 88%]
+tests/test_weather.py::test_get_weather_owm_sends_correct_params PASSED  [ 91%]
+tests/test_weather.py::test_weather_endpoint_vedur_success PASSED        [ 94%]
+tests/test_weather.py::test_weather_endpoint_both_fail_returns_500 PASSED [ 97%]
+tests/test_weather.py::test_weather_endpoint_requires_params PASSED      [100%]
+
+=============================== warnings summary ===============================
+../../.direnv/python-3.14/lib/python3.14/site-packages/fastapi/routing.py:211: 11 warnings
+  /home/sindri/dev/worktrees/vikes-match-clock/new-api/.direnv/python-3.14/lib/python3.14/site-packages/fastapi/routing.py:211: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+    is_coroutine = asyncio.iscoroutinefunction(dependant.call)
+
+../../.direnv/python-3.14/lib/python3.14/site-packages/starlette/_utils.py:17: 15 warnings
+tests/test_handler.py: 2 warnings
+tests/test_integration.py: 5 warnings
+tests/test_matches.py: 5 warnings
+tests/test_weather.py: 5 warnings
+  /home/sindri/dev/worktrees/vikes-match-clock/new-api/.direnv/python-3.14/lib/python3.14/site-packages/starlette/_utils.py:17: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+    return asyncio.iscoroutinefunction(obj) or (
+
+../../.direnv/python-3.14/lib/python3.14/site-packages/pytest_asyncio/plugin.py:156: 1245 warnings
+  /home/sindri/dev/worktrees/vikes-match-clock/new-api/.direnv/python-3.14/lib/python3.14/site-packages/pytest_asyncio/plugin.py:156: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+    return asyncio.iscoroutinefunction(obj)
+
+tests/test_handler.py: 5 warnings
+tests/test_matches.py: 8 warnings
+tests/test_weather.py: 5 warnings
+  /home/sindri/dev/worktrees/vikes-match-clock/new-api/.direnv/python-3.14/lib/python3.14/site-packages/pytest_asyncio/plugin.py:398: DeprecationWarning: 'asyncio.get_event_loop_policy' is deprecated and slated for removal in Python 3.16
+    policy = asyncio.get_event_loop_policy()
+
+tests/test_handler.py: 5 warnings
+tests/test_matches.py: 8 warnings
+tests/test_weather.py: 5 warnings
+  /home/sindri/dev/worktrees/vikes-match-clock/new-api/.direnv/python-3.14/lib/python3.14/site-packages/pytest_asyncio/plugin.py:444: DeprecationWarning: 'asyncio.get_event_loop_policy' is deprecated and slated for removal in Python 3.16
+    policy = asyncio.get_event_loop_policy()
+
+tests/test_handler.py: 5 warnings
+tests/test_matches.py: 8 warnings
+tests/test_weather.py: 5 warnings
+  /home/sindri/dev/worktrees/vikes-match-clock/new-api/.direnv/python-3.14/lib/python3.14/site-packages/pytest_asyncio/plugin.py:465: DeprecationWarning: 'asyncio.get_event_loop_policy' is deprecated and slated for removal in Python 3.16
+    policy = asyncio.get_event_loop_policy()
+
+tests/test_integration.py: 5 warnings
+tests/test_matches.py: 5 warnings
+tests/test_weather.py: 3 warnings
+  /home/sindri/dev/worktrees/vikes-match-clock/new-api/.direnv/python-3.14/lib/python3.14/site-packages/starlette/_utils.py:18: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+    callable(obj) and asyncio.iscoroutinefunction(obj.__call__)
+
+tests/test_matches.py: 8 warnings
+tests/test_weather.py: 5 warnings
+  /home/sindri/dev/worktrees/vikes-match-clock/new-api/.direnv/python-3.14/lib/python3.14/site-packages/pytest_asyncio/plugin.py:567: DeprecationWarning: 'asyncio.get_event_loop_policy' is deprecated and slated for removal in Python 3.16
+    loop = asyncio.get_event_loop_policy().new_event_loop()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================= 35 passed, 1 skipped, 1368 warnings in 0.86s =================

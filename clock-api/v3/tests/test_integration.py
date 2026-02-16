@@ -134,4 +134,6 @@ class TestGetMatchInfo:
 
         test_client.get("/42/matches/12345/info")
 
-        mock_ksi_client.get_match_info.assert_called_once_with(12345, "test-key")
+        mock_ksi_client.get_match_info.assert_called_once_with(
+            12345, "test-key"
+        )

@@ -1,0 +1,7 @@
+PASS: /health -> 200, status=ok
+PASS: /nonexistent -> 404
+PASS: /weather/ without params -> 422 (validation error)
+PASS: POST /health -> 405 (method not allowed)
+PASS: Lambda response structure correct (statusCode, body)
+
+ALL HANDLER TESTS PASSED

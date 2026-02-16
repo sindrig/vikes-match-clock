@@ -1,0 +1,7 @@
+PASS: clock-api-v3 module
+PASS: ANY /v3/{proxy+} route
+PASS: SSM IAM policy
+PASS: handler path
+PASS: python3.12 runtime
+
+OVERALL: PASS

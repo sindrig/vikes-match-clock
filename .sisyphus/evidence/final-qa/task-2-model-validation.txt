@@ -1,0 +1,3 @@
+PASS: Match model validates correctly
+  competition: Besta deild
+  status: SCHEDULED

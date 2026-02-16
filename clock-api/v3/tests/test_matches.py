@@ -250,7 +250,9 @@ def test_endpoint_get_matches_date_success(client):
     assert data[0]["liveStatus"] == "SCHEDULED"
 
     # Verify ksi_client was called with correct args
-    mock_client.get_matches.assert_called_once_with("20250615", 0, 1, "test-key")
+    mock_client.get_matches.assert_called_once_with(
+        "20250615", 0, 1, "test-key"
+    )
 
     app.dependency_overrides.clear()
 
@@ -272,7 +274,9 @@ def test_endpoint_get_matches_date_with_utc_offset(client):
     assert response.status_code == 200
     assert response.json() == []
 
-    mock_client.get_matches.assert_called_once_with("20250615", -3, 1, "test-key")
+    mock_client.get_matches.assert_called_once_with(
+        "20250615", -3, 1, "test-key"
+    )
 
     app.dependency_overrides.clear()
 

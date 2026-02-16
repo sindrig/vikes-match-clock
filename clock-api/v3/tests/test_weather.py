@@ -8,7 +8,9 @@ from httpx import Response
 from app.models.weather import WeatherResponse
 from app.services.weather import get_weather
 
-VEDUR_URL = "https://xmlweather.vedur.is/?op_w=xml&type=obs&lang=is&view=xml&ids=1472"
+VEDUR_URL = (
+    "https://xmlweather.vedur.is/?op_w=xml&type=obs&lang=is&view=xml&ids=1472"
+)
 OWM_URL = "https://api.openweathermap.org/data/2.5/weather"
 
 VEDUR_XML = """<?xml version="1.0" encoding="utf-8"?>
@@ -65,7 +67,9 @@ async def test_get_weather_vedur_fails_owm_fallback():
 @respx.mock
 async def test_get_weather_vedur_bad_xml_owm_fallback():
     """Test fallback when vedur.is returns invalid XML."""
-    respx.get(VEDUR_URL).mock(return_value=Response(200, text="not xml at all"))
+    respx.get(VEDUR_URL).mock(
+        return_value=Response(200, text="not xml at all")
+    )
     respx.get(OWM_URL).mock(
         return_value=Response(
             200,

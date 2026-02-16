@@ -25,7 +25,11 @@ class TestMangumHandler:
         event = {
             "version": "2.0",
             "requestContext": {
-                "http": {"method": "GET", "path": "/health", "sourceIp": "127.0.0.1"}
+                "http": {
+                    "method": "GET",
+                    "path": "/health",
+                    "sourceIp": "127.0.0.1",
+                }
             },
             "rawPath": "/health",
             "rawQueryString": "",
@@ -43,7 +47,11 @@ class TestMangumHandler:
         event = {
             "version": "2.0",
             "requestContext": {
-                "http": {"method": "GET", "path": "/health", "sourceIp": "127.0.0.1"}
+                "http": {
+                    "method": "GET",
+                    "path": "/health",
+                    "sourceIp": "127.0.0.1",
+                }
             },
             "rawPath": "/health",
             "rawQueryString": "",
@@ -106,7 +114,11 @@ class TestMangumHandler:
         event = {
             "version": "2.0",
             "requestContext": {
-                "http": {"method": "GET", "path": "/health", "sourceIp": "127.0.0.1"}
+                "http": {
+                    "method": "GET",
+                    "path": "/health",
+                    "sourceIp": "127.0.0.1",
+                }
             },
             "rawPath": "/health",
             "rawQueryString": "",

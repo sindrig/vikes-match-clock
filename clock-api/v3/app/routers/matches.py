@@ -24,7 +24,9 @@ async def get_matches(
     api_key = get_ksi_api_key(team_id)
 
     # Fetch from Analyticom
-    matches = await ksi_client.get_matches(date_formatted, utc_offset, team_id, api_key)
+    matches = await ksi_client.get_matches(
+        date_formatted, utc_offset, team_id, api_key
+    )
     return matches
 
 

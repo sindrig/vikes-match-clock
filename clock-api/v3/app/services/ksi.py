@@ -24,7 +24,9 @@ class KsiClient:
         response.raise_for_status()
         return [Match.model_validate(m) for m in response.json()]
 
-    async def get_lineups(self, match_id: int, api_key: str) -> LineupsResponse:
+    async def get_lineups(
+        self, match_id: int, api_key: str
+    ) -> LineupsResponse:
         """Get lineups for a match."""
         response = await self.client.get(
             f"/api/live/match/{match_id}/lineups",
@@ -33,7 +35,9 @@ class KsiClient:
         response.raise_for_status()
         return LineupsResponse.model_validate(response.json())
 
-    async def get_events(self, match_id: int, api_key: str) -> list[MatchEvent]:
+    async def get_events(
+        self, match_id: int, api_key: str
+    ) -> list[MatchEvent]:
         """Get events for a match."""
         response = await self.client.get(
             f"/api/live/match/{match_id}/events",
