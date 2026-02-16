@@ -111,7 +111,6 @@ function App() {
           <AssetComponent asset={asset.asset} time={asset.time} />
         </div>
       ) : null}
-      <RefreshHandler />
       <StateListener />
     </div>
   );

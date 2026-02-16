@@ -36,6 +36,9 @@ vi.mock("./media/MediaManager", () => ({
 vi.mock("./LoginPage", () => ({
   default: () => <div data-testid="login-page">LoginPage</div>,
 }));
+vi.mock("./RefreshHandler", () => ({
+  default: () => <div data-testid="refresh-handler">RefreshHandler</div>,
+}));
 vi.mock("./asset/AssetController", () => ({
   default: () => <div data-testid="asset-controller">AssetController</div>,
 }));
