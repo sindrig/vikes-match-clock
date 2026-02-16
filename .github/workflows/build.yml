@@ -86,7 +86,7 @@ jobs:
 
       - name: Start Firebase Emulator
         run: |
-          firebase emulators:start --only auth,database,storage --project vikes-match-clock-test &
+          firebase emulators:start --only auth,database,storage --project vikes-match-clock-test > /tmp/emulator.log 2>&1 &
           echo $! > /tmp/emulator.pid
 
       - name: Wait for Firebase Emulator
@@ -98,7 +98,11 @@ jobs:
           timeout 120 bash -c 'until curl -sf http://127.0.0.1:9000/.json > /dev/null 2>&1; do sleep 1; done'
           echo "Database emulator ready"
           echo "Waiting for Storage emulator..."
-          timeout 120 bash -c 'until curl -sf http://127.0.0.1:9199 > /dev/null 2>&1; do sleep 1; done'
+          timeout 120 bash -c 'until curl -sf http://127.0.0.1:9199 > /dev/null 2>&1; do sleep 1; done' || {
+            echo "=== Storage emulator failed to start. Full emulator log: ==="
+            cat /tmp/emulator.log
+            exit 1
+          }
           echo "Storage emulator ready"
           echo "All Firebase emulators are ready"
 
