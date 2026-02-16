@@ -1,9 +1,12 @@
+import { useState } from "react";
 import { firebaseAuth } from "../firebaseAuth";
 import { useLocalState } from "../contexts/LocalStateContext";
 
 const LoginPage = () => {
-  const { sync, setSync, listenPrefix, setListenPrefix, auth, available } =
-    useLocalState();
+  const { listenPrefix, setListenPrefix, auth, available } = useLocalState();
+  const [selectedScreen, setSelectedScreen] = useState(
+    listenPrefix || available[0] || "",
+  );
 
   if (!auth.isLoaded || auth.isEmpty) {
     return null;
@@ -15,8 +18,8 @@ const LoginPage = () => {
         <div>
           Stjórnandi:
           <select
-            onChange={({ target: { value } }) => setListenPrefix(value)}
-            value={listenPrefix}
+            onChange={({ target: { value } }) => setSelectedScreen(value)}
+            value={selectedScreen}
           >
             {available.map((a) => (
               <option value={a} key={a}>
@@ -24,17 +27,11 @@ const LoginPage = () => {
               </option>
             ))}
           </select>
+          <button type="button" onClick={() => setListenPrefix(selectedScreen)}>
+            Birta skjá
+          </button>
         </div>
       )}
-      <label htmlFor="set-synced">
-        <input
-          type="checkbox"
-          checked={sync}
-          onChange={() => setSync(!sync)}
-          id="set-synced"
-        />
-        Fjarstjórn
-      </label>
       [<b>{auth.email}</b>][{listenPrefix}]
       <br />
       <button
