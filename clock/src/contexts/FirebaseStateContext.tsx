@@ -288,12 +288,27 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     (getNewState: (prev: Match) => Match) => {
       if (!listenPrefix) return;
 
-      const newState = getNewState(matchRef.current);
+      const prev = matchRef.current;
+      const newState = getNewState(prev);
       if (isAuthenticated) {
         matchRef.current = newState;
-        firebaseDatabase
-          .syncState(listenPrefix, "match", newState)
-          .catch(console.error);
+
+        // Compute diff: only send changed fields to avoid Firebase
+        // emulator issues with full-object update() calls
+        const diff: Record<string, unknown> = {};
+        for (const key of Object.keys(newState) as (keyof Match)[]) {
+          const oldVal = prev[key];
+          const newVal = newState[key];
+          if (oldVal !== newVal) {
+            diff[key] = newVal;
+          }
+        }
+
+        if (Object.keys(diff).length > 0) {
+          firebaseDatabase
+            .syncPartialState(listenPrefix, "match", diff)
+            .catch(console.error);
+        }
       }
     },
     [isAuthenticated, listenPrefix],
@@ -303,12 +318,25 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     (getNewState: (prev: ControllerState) => ControllerState) => {
       if (!listenPrefix) return;
 
-      const newState = getNewState(controllerRef.current);
+      const prev = controllerRef.current;
+      const newState = getNewState(prev);
       if (isAuthenticated) {
         controllerRef.current = newState;
-        firebaseDatabase
-          .syncState(listenPrefix, "controller", newState)
-          .catch(console.error);
+
+        const diff: Record<string, unknown> = {};
+        for (const key of Object.keys(newState) as (keyof ControllerState)[]) {
+          const oldVal = prev[key];
+          const newVal = newState[key];
+          if (oldVal !== newVal) {
+            diff[key] = newVal;
+          }
+        }
+
+        if (Object.keys(diff).length > 0) {
+          firebaseDatabase
+            .syncPartialState(listenPrefix, "controller", diff)
+            .catch(console.error);
+        }
       }
     },
     [isAuthenticated, listenPrefix],
@@ -318,12 +346,25 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     (getNewState: (prev: ViewState) => ViewState) => {
       if (!listenPrefix) return;
 
-      const newState = getNewState(viewRef.current);
+      const prev = viewRef.current;
+      const newState = getNewState(prev);
       if (isAuthenticated) {
         viewRef.current = newState;
-        firebaseDatabase
-          .syncState(listenPrefix, "view", newState)
-          .catch(console.error);
+
+        const diff: Record<string, unknown> = {};
+        for (const key of Object.keys(newState) as (keyof ViewState)[]) {
+          const oldVal = prev[key];
+          const newVal = newState[key];
+          if (oldVal !== newVal) {
+            diff[key] = newVal;
+          }
+        }
+
+        if (Object.keys(diff).length > 0) {
+          firebaseDatabase
+            .syncPartialState(listenPrefix, "view", diff)
+            .catch(console.error);
+        }
       }
     },
     [isAuthenticated, listenPrefix],

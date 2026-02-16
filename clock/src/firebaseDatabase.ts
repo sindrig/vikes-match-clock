@@ -38,9 +38,9 @@ export const firebaseDatabase = {
   syncState: (
     listenPrefix: string,
     stateType: "match" | "controller" | "view",
-    data: unknown,
+    data: Record<string, unknown>,
   ): Promise<void> =>
-    set(ref(database, `states/${listenPrefix}/${stateType}`), data),
+    update(ref(database, `states/${listenPrefix}/${stateType}`), data),
 
   syncPartialState: (
     listenPrefix: string,
