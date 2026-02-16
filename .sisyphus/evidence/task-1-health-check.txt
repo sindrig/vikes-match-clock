@@ -1,3 +1,0 @@
-Status Code: 200
-Body: {'status': 'ok'}
-PASS: Health check endpoint works correctly

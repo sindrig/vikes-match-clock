@@ -1,7 +1,0 @@
-
-> match-clock@0.1.0 generate-api-types /home/sindri/dev/worktrees/vikes-match-clock/new-api/clock
-> cd ../clock-api/v3 && python export-openapi.py && cd ../../clock && npx openapi-typescript ../clock-api/v3/openapi.json -o src/generated/api-types.ts
-
-OpenAPI spec exported to openapi.json
-✨ openapi-typescript 7.13.0
-🚀 ../clock-api/v3/openapi.json → src/generated/api-types.ts [121.9ms]

@@ -1,2 +1,0 @@
-App title: Clock API v3
-Handler type: Mangum

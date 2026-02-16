@@ -1,8 +1,0 @@
-Line 66: "ANY /v3/{proxy+}" = {
-Line 67: lambda_arn             = module.clock-api-v3.lambda_function_arn
-Line 147: module "clock-api-v3" {
-Line 151: function_name = "${random_pet.this.id}${var.name_suffix}-clock-api-v3"
-
-Module found: True
-Route found: True
-PASS: New resources added correctly
