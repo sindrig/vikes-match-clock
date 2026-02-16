@@ -1,6 +1,0 @@
-Client base URL: https://api-ksi.analyticom.de
-Has get_matches: True
-Has get_lineups: True
-Has get_events: True
-Has get_match_info: True
-PASS: KSI client and dependencies ready
