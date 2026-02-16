@@ -39,7 +39,7 @@ const Controller = () => {
   } = useLocalState();
   const auth = useAuth();
 
-  const [tab, setTab] = useState(TABS.home);
+  const [tab, setTab] = useState<string>(TABS.home);
 
   const { view, currentAsset } = controller;
   const { vp } = viewState;
