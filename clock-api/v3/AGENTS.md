@@ -17,7 +17,7 @@ clock-api/v3/
 │   │   └── weather.py     # Weather endpoint
 │   └── services/
 │       ├── ksi.py         # Async httpx client for Analyticom API
-│       └── weather.py     # vedur.is → OpenWeatherMap fallback
+│       └── weather.py     # OpenWeatherMap → vedur.is fallback
 ├── tests/
 │   ├── conftest.py        # TestClient fixture, dependency overrides
 │   ├── test_matches.py    # KSI client + match endpoint tests
@@ -40,7 +40,7 @@ clock-api/v3/
 | GET | `/{team_id}/matches/{match_id}/lineups` | Lineups for a match |
 | GET | `/{team_id}/matches/{match_id}/events` | Events (goals, cards, subs) for a match |
 | GET | `/{team_id}/matches/{match_id}/info` | Detailed match info |
-| GET | `/weather?lat=&lon=` | Weather at coordinates (vedur.is with OpenWeatherMap fallback) |
+| GET | `/weather?lat=&lon=` | Weather at coordinates (OpenWeatherMap with vedur.is fallback) |
 
 Note: App is mounted at `root_path="/v3"`, so full production paths are `/v3/health`, `/v3/{team_id}/matches/...`, etc.
 
@@ -56,8 +56,8 @@ REST API for Icelandic football data. Requires `API_KEY` header on all requests.
 - API docs: `https://api-ksi.analyticom.de/v3/api-docs/live`
 
 **Weather** — two-source fallback:
-1. vedur.is (Icelandic Met Office) — XML API, station 1472, no auth needed
-2. OpenWeatherMap — JSON API, uses lat/lon from request, requires API key
+1. OpenWeatherMap — JSON API, uses lat/lon from request, requires API key
+2. vedur.is (Icelandic Met Office) — XML API, station 1472, no auth needed
 
 ## Key Patterns
 
@@ -110,7 +110,7 @@ pnpm run generate-api-types
 
 - httpx mocking: `respx` for async httpx calls
 - Endpoint testing: `TestClient` with dependency overrides
-- Weather mocking: Mock both vedur.is and OpenWeatherMap to test fallback chain
+- Weather mocking: Mock both OpenWeatherMap and vedur.is to test fallback chain
 - App config testing: Verify FastAPI setup, CORS, root_path, run.sh existence
 
 ## Related
