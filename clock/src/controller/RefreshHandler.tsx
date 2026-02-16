@@ -5,7 +5,7 @@ import { useLocalState } from "../contexts/LocalStateContext";
 
 const RefreshHandler = () => {
   const { controller, remoteRefresh } = useController();
-  const { sync, auth } = useLocalState();
+  const { auth } = useLocalState();
   const refreshToken = controller.refreshToken;
 
   const isInitialMount = useRef(true);
@@ -17,7 +17,7 @@ const RefreshHandler = () => {
     }
   }, [refreshToken]);
 
-  if (sync && !auth.isEmpty) {
+  if (!auth.isEmpty) {
     return (
       <Button
         color="orange"

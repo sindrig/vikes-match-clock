@@ -22,8 +22,6 @@ interface LocalStateContextType {
   auth: FirebaseAuthState;
 
   // Remote settings
-  sync: boolean;
-  setSync: (sync: boolean) => void;
   listenPrefix: string;
   setListenPrefix: (prefix: string) => void;
   available: string[];
@@ -39,7 +37,6 @@ const LocalStateContext = createContext<LocalStateContextType | undefined>(
   undefined,
 );
 
-const SYNC_KEY = "clock_sync";
 const LISTEN_PREFIX_KEY = "clock_listenPrefix";
 
 export function LocalStateProvider({ children }: { children: ReactNode }) {
@@ -50,11 +47,6 @@ export function LocalStateProvider({ children }: { children: ReactNode }) {
   });
 
   // Remote Settings
-  const [sync, setSyncState] = useState<boolean>(() => {
-    const saved = localStorage.getItem(SYNC_KEY);
-    return saved === "true";
-  });
-
   const [listenPrefix, setListenPrefixState] = useState<string>(() => {
     return localStorage.getItem(LISTEN_PREFIX_KEY) || "";
   });
@@ -66,11 +58,6 @@ export function LocalStateProvider({ children }: { children: ReactNode }) {
   const [password, setPassword] = useState("");
 
   // Persist setters
-  const setSync = (newSync: boolean) => {
-    setSyncState(newSync);
-    localStorage.setItem(SYNC_KEY, String(newSync));
-  };
-
   const setListenPrefix = (newPrefix: string) => {
     setListenPrefixState(newPrefix);
     localStorage.setItem(LISTEN_PREFIX_KEY, newPrefix);
@@ -117,8 +104,6 @@ export function LocalStateProvider({ children }: { children: ReactNode }) {
 
   const value = {
     auth,
-    sync,
-    setSync,
     listenPrefix,
     setListenPrefix,
     available,
@@ -149,7 +134,6 @@ export function useAuth() {
 }
 
 export function useRemoteSettings() {
-  const { sync, setSync, listenPrefix, setListenPrefix, available } =
-    useLocalState();
-  return { sync, setSync, listenPrefix, setListenPrefix, available };
+  const { listenPrefix, setListenPrefix, available } = useLocalState();
+  return { listenPrefix, setListenPrefix, available };
 }

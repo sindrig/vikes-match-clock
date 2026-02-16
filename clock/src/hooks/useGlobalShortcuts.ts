@@ -4,7 +4,7 @@ import { useLocalState } from "../contexts/LocalStateContext";
 import { VIEWS, ASSET_VIEWS } from "../constants";
 
 export default function useGlobalShortcuts() {
-  const { auth, sync } = useLocalState();
+  const { auth } = useLocalState();
   const {
     match: { started },
     startMatch,
@@ -29,7 +29,7 @@ export default function useGlobalShortcuts() {
       }
 
       // Check if controls should be active
-      const showControls = !sync || !auth.isEmpty;
+      const showControls = !auth.isEmpty;
       if (!showControls) {
         return;
       }
@@ -86,6 +86,5 @@ export default function useGlobalShortcuts() {
     showNextAsset,
     renderAsset,
     auth,
-    sync,
   ]);
 }

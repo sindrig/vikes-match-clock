@@ -17,7 +17,7 @@ import "./App.css";
 function App() {
   useGlobalShortcuts();
   const { controller, view: viewState } = useFirebaseState();
-  const { sync, auth, listenPrefix, setListenPrefix } = useLocalState();
+  const { auth, listenPrefix, setListenPrefix } = useLocalState();
 
   const { view } = controller;
   const { vp, background } = viewState;
@@ -82,10 +82,7 @@ function App() {
   // State 3: authenticated — full UI unchanged
   return (
     <div>
-      {view === VIEWS.control &&
-      (sync ? auth.isLoaded && !auth.isEmpty : true) ? (
-        <MatchController />
-      ) : null}
+      {view === VIEWS.control ? <MatchController /> : null}
       <div className="App" style={style}>
         {renderAppContents()}
       </div>

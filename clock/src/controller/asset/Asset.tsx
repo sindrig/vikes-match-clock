@@ -11,7 +11,7 @@ import clubLogos from "../../images/clubLogos";
 import "./Asset.css";
 import VideoPlayer from "./VideoPlayer";
 import { useController, useView } from "../../contexts/FirebaseStateContext";
-import { useAuth, useRemoteSettings } from "../../contexts/LocalStateContext";
+import { useAuth } from "../../contexts/LocalStateContext";
 
 interface Overlay {
   text: string;
@@ -49,10 +49,9 @@ const AssetComponent = (props: AssetProps) => {
     view: { vp },
   } = useView();
   const auth = useAuth();
-  const { sync } = useRemoteSettings();
 
   useEffect(() => {
-    if (sync && auth.isEmpty) {
+    if (auth.isEmpty) {
       return;
     }
     const typesWithoutManualRemove = [assetTypes.URL, assetTypes.VIDEO];
@@ -63,7 +62,7 @@ const AssetComponent = (props: AssetProps) => {
       const timeout = setTimeout(removeAssetAfterTimeout, time * 1000);
       return () => clearTimeout(timeout);
     }
-  }, [time, thumbnail, removeAssetAfterTimeout, asset, sync, auth.isEmpty]);
+  }, [time, thumbnail, removeAssetAfterTimeout, asset, auth.isEmpty]);
 
   const getPlayerAsset = ({
     asset: playerAsset,
