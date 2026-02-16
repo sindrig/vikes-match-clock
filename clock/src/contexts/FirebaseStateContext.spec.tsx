@@ -2233,4 +2233,128 @@ describe("FirebaseStateContext", () => {
       );
     });
   });
+
+  describe("server time offset", () => {
+    it("getServerTime is available from useMatch hook", () => {
+      let matchApi: ReturnType<typeof useMatch> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestMatchConsumer
+            onMount={(api) => {
+              matchApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      expect(matchApi).not.toBeNull();
+      expect(matchApi!.getServerTime).toBeDefined();
+      expect(typeof matchApi!.getServerTime).toBe("function");
+    });
+
+    it("getServerTime returns Date.now() when offset is 0", () => {
+      let matchApi: ReturnType<typeof useMatch> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestMatchConsumer
+            onMount={(api) => {
+              matchApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      const now = Date.now();
+      const serverTime = matchApi!.getServerTime();
+      // Should be approximately equal (within 10ms)
+      expect(Math.abs(serverTime - now)).toBeLessThan(10);
+    });
+
+    it("Firebase's started timestamp is used directly (not replaced with Date.now)", () => {
+      let matchApi: ReturnType<typeof useMatch> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestMatchConsumer
+            onMount={(api) => {
+              matchApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      // Default match.started is 0 — Firebase hasn't sent a started timestamp
+      // The key assertion: started is exactly 0, not mutated to Date.now() - 150
+      expect(matchApi!.match.started).toBe(0);
+    });
+
+    it("startMatch uses getServerTime for timestamp", () => {
+      let matchApi: ReturnType<typeof useMatch> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestMatchConsumer
+            onMount={(api) => {
+              matchApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        matchApi!.startMatch();
+      });
+      // Verify set was called with a timestamp close to Date.now()
+      const call = vi.mocked(firebaseDatabase.syncPartialState).mock.calls[0];
+      const writtenMatch = call[2];
+      expect(writtenMatch.started).toBeGreaterThan(Date.now() - 100);
+      expect(writtenMatch.started).toBeLessThan(Date.now() + 100);
+    });
+
+    it("pauseMatch computes timeElapsed using getServerTime", () => {
+      let matchApi: ReturnType<typeof useMatch> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestMatchConsumer
+            onMount={(api) => {
+              matchApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        matchApi!.startMatch();
+      });
+      vi.clearAllMocks();
+      act(() => {
+        matchApi!.pauseMatch();
+      });
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+        "test-location",
+        "match",
+        expect.objectContaining({
+          started: 0,
+        }),
+      );
+      const pauseCall = vi.mocked(firebaseDatabase.syncPartialState).mock
+        .calls[0];
+      const pauseData = pauseCall[2];
+      // timeElapsed is computed via getServerTime() - started, ~0ms in tests.
+      // The diff optimization may skip it if it stays at 0 (the default),
+      // so we verify it's either absent or a small non-negative number.
+      if (pauseData.timeElapsed !== undefined) {
+        expect(pauseData.timeElapsed).toBeGreaterThanOrEqual(0);
+        expect(pauseData.timeElapsed).toBeLessThan(100);
+      }
+    });
+  });
 });

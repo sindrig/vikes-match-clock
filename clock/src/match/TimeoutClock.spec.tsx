@@ -9,6 +9,8 @@ vi.mock("../contexts/FirebaseStateContext", () => ({
   useMatch: vi.fn(),
 }));
 
+const makeGetServerTime = () => () => Date.now();
+
 vi.mock("./ClockBase", () => ({
   default: ({
     updateTime,
@@ -40,6 +42,7 @@ describe("TimeoutClock", () => {
         match: { timeout: 0 },
         removeTimeout: vi.fn(),
         buzz: vi.fn(),
+        getServerTime: makeGetServerTime(),
       } as unknown as ReturnType<typeof useMatch>);
 
       render(<TimeoutClock className="timeout-clock" />);
@@ -52,6 +55,7 @@ describe("TimeoutClock", () => {
         match: { timeout: Date.now() },
         removeTimeout: vi.fn(),
         buzz: vi.fn(),
+        getServerTime: makeGetServerTime(),
       } as unknown as ReturnType<typeof useMatch>);
 
       const { container } = render(
@@ -71,6 +75,7 @@ describe("TimeoutClock", () => {
         match: { timeout: now },
         removeTimeout: vi.fn(),
         buzz: vi.fn(),
+        getServerTime: makeGetServerTime(),
       } as unknown as ReturnType<typeof useMatch>);
 
       render(<TimeoutClock className="timeout-clock" />);
@@ -91,6 +96,7 @@ describe("TimeoutClock", () => {
         match: { timeout: startTime },
         removeTimeout,
         buzz,
+        getServerTime: makeGetServerTime(),
       } as unknown as ReturnType<typeof useMatch>);
 
       const { rerender } = render(<TimeoutClock className="timeout-clock" />);
@@ -114,6 +120,7 @@ describe("TimeoutClock", () => {
         match: { timeout: startTime },
         removeTimeout,
         buzz,
+        getServerTime: makeGetServerTime(),
       } as unknown as ReturnType<typeof useMatch>);
 
       const { rerender } = render(<TimeoutClock className="timeout-clock" />);
@@ -142,6 +149,7 @@ describe("TimeoutClock", () => {
         match: { timeout: startTime },
         removeTimeout,
         buzz,
+        getServerTime: makeGetServerTime(),
       } as unknown as ReturnType<typeof useMatch>);
 
       const { rerender } = render(<TimeoutClock className="timeout-clock" />);
@@ -166,6 +174,7 @@ describe("TimeoutClock", () => {
         match: { timeout: startTime },
         removeTimeout,
         buzz,
+        getServerTime: makeGetServerTime(),
       } as unknown as ReturnType<typeof useMatch>);
 
       const { rerender } = render(<TimeoutClock className="timeout-clock" />);
@@ -194,6 +203,7 @@ describe("TimeoutClock", () => {
         match: { timeout: startTime },
         removeTimeout,
         buzz,
+        getServerTime: makeGetServerTime(),
       } as unknown as ReturnType<typeof useMatch>);
 
       const { rerender } = render(<TimeoutClock className="timeout-clock" />);
@@ -217,6 +227,7 @@ describe("TimeoutClock", () => {
         match: { timeout: startTime },
         removeTimeout,
         buzz,
+        getServerTime: makeGetServerTime(),
       } as unknown as ReturnType<typeof useMatch>);
 
       const { rerender } = render(<TimeoutClock className="timeout-clock" />);
@@ -243,6 +254,7 @@ describe("TimeoutClock", () => {
         match: { timeout: startTime },
         removeTimeout,
         buzz,
+        getServerTime: makeGetServerTime(),
       } as unknown as ReturnType<typeof useMatch>);
 
       const { rerender } = render(<TimeoutClock className="timeout-clock" />);
@@ -273,6 +285,7 @@ describe("TimeoutClock", () => {
         match: { timeout: startTime1 },
         removeTimeout,
         buzz,
+        getServerTime: makeGetServerTime(),
       } as unknown as ReturnType<typeof useMatch>);
 
       const { rerender } = render(<TimeoutClock className="timeout-clock" />);
@@ -287,6 +300,7 @@ describe("TimeoutClock", () => {
         match: { timeout: startTime2 },
         removeTimeout,
         buzz,
+        getServerTime: makeGetServerTime(),
       } as unknown as ReturnType<typeof useMatch>);
 
       rerender(<TimeoutClock className="timeout-clock" />);
@@ -308,6 +322,7 @@ describe("TimeoutClock", () => {
         match: { timeout: startTime },
         removeTimeout,
         buzz,
+        getServerTime: makeGetServerTime(),
       } as unknown as ReturnType<typeof useMatch>);
 
       const { rerender } = render(<TimeoutClock className="timeout-clock" />);
@@ -320,6 +335,7 @@ describe("TimeoutClock", () => {
         match: { timeout: 0 },
         removeTimeout,
         buzz,
+        getServerTime: makeGetServerTime(),
       } as unknown as ReturnType<typeof useMatch>);
 
       rerender(<TimeoutClock className="timeout-clock" />);
@@ -329,6 +345,7 @@ describe("TimeoutClock", () => {
         match: { timeout: newStartTime },
         removeTimeout,
         buzz,
+        getServerTime: makeGetServerTime(),
       } as unknown as ReturnType<typeof useMatch>);
 
       rerender(<TimeoutClock className="timeout-clock" />);
@@ -349,6 +366,7 @@ describe("TimeoutClock", () => {
         match: { timeout: startTime },
         removeTimeout: vi.fn(),
         buzz: vi.fn(),
+        getServerTime: makeGetServerTime(),
       } as unknown as ReturnType<typeof useMatch>);
 
       render(<TimeoutClock className="timeout-clock" />);
@@ -365,6 +383,7 @@ describe("TimeoutClock", () => {
         match: { timeout: startTime },
         removeTimeout: vi.fn(),
         buzz: vi.fn(),
+        getServerTime: makeGetServerTime(),
       } as unknown as ReturnType<typeof useMatch>);
 
       const { rerender } = render(<TimeoutClock className="timeout-clock" />);
