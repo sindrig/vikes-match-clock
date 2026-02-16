@@ -98,7 +98,7 @@ describe("FirebaseStateContext", () => {
         matchApi!.addGoal("home");
       });
 
-      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
+      expect(firebaseDatabase.syncPartialState).not.toHaveBeenCalled();
     });
 
     it("blocks controller updates when listenPrefix is empty", () => {
@@ -121,7 +121,7 @@ describe("FirebaseStateContext", () => {
         controllerApi!.selectView("scoreboard");
       });
 
-      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
+      expect(firebaseDatabase.syncPartialState).not.toHaveBeenCalled();
     });
   });
 
@@ -148,7 +148,7 @@ describe("FirebaseStateContext", () => {
         matchApi!.addGoal("home");
       });
 
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({ homeScore: 1 }),
@@ -181,23 +181,23 @@ describe("FirebaseStateContext", () => {
         matchApi!.addGoal("away");
       });
 
-      expect(firebaseDatabase.syncState).toHaveBeenNthCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenNthCalledWith(
         1,
         "test-location",
         "match",
         expect.objectContaining({ homeScore: 1 }),
       );
-      expect(firebaseDatabase.syncState).toHaveBeenNthCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenNthCalledWith(
         2,
         "test-location",
         "match",
         expect.objectContaining({ homeScore: 2 }),
       );
-      expect(firebaseDatabase.syncState).toHaveBeenNthCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenNthCalledWith(
         3,
         "test-location",
         "match",
-        expect.objectContaining({ homeScore: 2, awayScore: 1 }),
+        expect.objectContaining({ awayScore: 1 }),
       );
     });
 
@@ -221,7 +221,7 @@ describe("FirebaseStateContext", () => {
         controllerApi!.selectView("scoreboard");
       });
 
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({ view: "scoreboard" }),
@@ -286,12 +286,11 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.startMatch();
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({
           started: expect.any(Number) as unknown,
-          countdown: false,
         }),
       );
     });
@@ -313,11 +312,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.pauseMatch();
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
-        "test-location",
-        "match",
-        expect.objectContaining({ started: 0 }),
-      );
+      expect(firebaseDatabase.syncPartialState).not.toHaveBeenCalled();
     });
 
     it("addGoal increments homeScore", () => {
@@ -337,7 +332,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.addGoal("home");
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({ homeScore: 1 }),
@@ -361,7 +356,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.addGoal("away");
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({ awayScore: 1 }),
@@ -385,7 +380,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.buzz(true);
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({ buzzer: expect.any(Number) as unknown }),
@@ -409,11 +404,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.buzz(false);
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
-        "test-location",
-        "match",
-        expect.objectContaining({ buzzer: false }),
-      );
+      expect(firebaseDatabase.syncPartialState).not.toHaveBeenCalled();
     });
 
     it("setHalfStops updates halfStops and showInjuryTime", () => {
@@ -433,10 +424,10 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.setHalfStops([30, 60], true);
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "match",
-        expect.objectContaining({ halfStops: [30, 60], showInjuryTime: true }),
+        expect.objectContaining({ halfStops: [30, 60] }),
       );
     });
 
@@ -457,7 +448,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.matchTimeout("home");
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({
@@ -484,11 +475,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.removeTimeout();
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
-        "test-location",
-        "match",
-        expect.objectContaining({ timeout: 0 }),
-      );
+      expect(firebaseDatabase.syncPartialState).not.toHaveBeenCalled();
     });
 
     it("updateRedCards sets home and away red cards", () => {
@@ -508,7 +495,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateRedCards(2, 1);
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({ homeRedCards: 2, awayRedCards: 1 }),
@@ -532,7 +519,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.addPenalty("home", "pen-1", 120);
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({
@@ -566,7 +553,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.removePenalty("pen-1");
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({ home2min: [], away2min: [] }),
@@ -592,7 +579,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.selectAssetView("teams");
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({ assetView: "teams" }),
@@ -616,7 +603,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.toggleCycle();
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({ cycle: true }),
@@ -640,7 +627,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.setImageSeconds(10);
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({ imageSeconds: 10 }),
@@ -664,7 +651,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.toggleAutoPlay();
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({ autoPlay: true }),
@@ -688,7 +675,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.setPlaying(true);
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({ playing: true }),
@@ -713,7 +700,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.renderAsset(asset as unknown as Asset);
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({
@@ -741,11 +728,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.renderAsset(null);
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
-        "test-location",
-        "controller",
-        expect.objectContaining({ currentAsset: null }),
-      );
+      expect(firebaseDatabase.syncPartialState).not.toHaveBeenCalled();
     });
 
     it("setSelectedAssets sets assets array", () => {
@@ -766,7 +749,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.setSelectedAssets(assets as unknown as Asset[]);
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({ selectedAssets: assets }),
@@ -790,7 +773,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.selectTab("settings");
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({ tab: "settings" }),
@@ -814,7 +797,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.remoteRefresh();
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({
@@ -840,10 +823,10 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.clearMatchPlayers();
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "controller",
-        expect.objectContaining({ availableMatches: {}, selectedMatch: null }),
+        expect.objectContaining({ availableMatches: {} }),
       );
     });
   });
@@ -1169,7 +1152,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.pauseMatch(true);
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({
@@ -1201,12 +1184,11 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.pauseMatch();
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({
           started: 0,
-          timeElapsed: expect.any(Number) as unknown,
         }),
       );
     });
@@ -1230,11 +1212,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.countdown();
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
-        "test-location",
-        "match",
-        expect.objectContaining({ countdown: false, started: 0 }),
-      );
+      expect(firebaseDatabase.syncPartialState).not.toHaveBeenCalled();
     });
 
     it("does not change state when matchStartTime is invalid format", () => {
@@ -1258,11 +1236,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.countdown();
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
-        "test-location",
-        "match",
-        expect.objectContaining({ countdown: false, started: 0 }),
-      );
+      expect(firebaseDatabase.syncPartialState).not.toHaveBeenCalled();
     });
 
     it("sets started and countdown=true for valid matchStartTime", () => {
@@ -1286,7 +1260,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.countdown();
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({
@@ -1319,7 +1293,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.addAssets(assets);
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({
@@ -1352,7 +1326,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.addAssets([{ type: "IMAGE", key: "img-1" }]);
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({
@@ -1381,7 +1355,7 @@ describe("FirebaseStateContext", () => {
           { type: "IMAGE", key: "good-1" },
         ]);
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({
@@ -1407,7 +1381,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.addAssets([{ type: "IMAGE", key: "" }]);
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({ selectedAssets: [] }),
@@ -1440,7 +1414,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.removeAsset({ type: "IMAGE", key: "img-1" });
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({
@@ -1466,11 +1440,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.removeAsset({ type: "IMAGE", key: "nonexistent" });
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
-        "test-location",
-        "controller",
-        expect.objectContaining({ selectedAssets: [] }),
-      );
+      expect(firebaseDatabase.syncPartialState).not.toHaveBeenCalled();
     });
   });
 
@@ -1499,7 +1469,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.showNextAsset();
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({
@@ -1529,11 +1499,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.showNextAsset();
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
-        "test-location",
-        "controller",
-        expect.objectContaining({ currentAsset: null, playing: false }),
-      );
+      expect(firebaseDatabase.syncPartialState).not.toHaveBeenCalled();
     });
 
     it("cycles asset to end of queue when cycle is enabled", () => {
@@ -1563,7 +1529,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.showNextAsset();
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({
@@ -1605,7 +1571,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.showNextAsset();
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({
@@ -1641,7 +1607,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.removeAssetAfterTimeout();
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({ currentAsset: null }),
@@ -1675,7 +1641,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.removeAssetAfterTimeout();
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({
@@ -1707,11 +1673,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.removeAssetAfterTimeout();
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
-        "test-location",
-        "controller",
-        expect.objectContaining({ autoPlay: true, playing: false }),
-      );
+      expect(firebaseDatabase.syncPartialState).not.toHaveBeenCalled();
     });
   });
 
@@ -1754,7 +1716,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         api.editPlayer("home", 0, { name: "Updated Player" });
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({
@@ -1788,11 +1750,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.editPlayer("home", 0, { name: "Test" });
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
-        "test-location",
-        "controller",
-        expect.objectContaining({ selectedMatch: null }),
-      );
+      expect(firebaseDatabase.syncPartialState).not.toHaveBeenCalled();
     });
 
     it("editPlayer does nothing for invalid player index", () => {
@@ -1800,22 +1758,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         api.editPlayer("home", 99, { name: "Ghost" });
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
-        "test-location",
-        "controller",
-        expect.objectContaining({
-          availableMatches: expect.objectContaining({
-            "123": expect.objectContaining({
-              players: expect.objectContaining({
-                home: [
-                  expect.objectContaining({ name: "Player A" }),
-                  expect.objectContaining({ name: "Player B" }),
-                ],
-              }) as unknown,
-            }) as unknown,
-          }) as unknown,
-        }),
-      );
+      expect(firebaseDatabase.syncPartialState).not.toHaveBeenCalled();
     });
 
     it("deletePlayer removes player at index", () => {
@@ -1823,7 +1766,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         api.deletePlayer("home", 0);
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({
@@ -1845,21 +1788,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         api.deletePlayer("nonexistent", 0);
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
-        "test-location",
-        "controller",
-        expect.objectContaining({
-          availableMatches: expect.objectContaining({
-            "123": expect.objectContaining({
-              players: expect.objectContaining({
-                home: expect.arrayContaining([
-                  expect.objectContaining({ name: "Player A" }),
-                ]) as unknown,
-              }) as unknown,
-            }) as unknown,
-          }) as unknown,
-        }),
-      );
+      expect(firebaseDatabase.syncPartialState).not.toHaveBeenCalled();
     });
 
     it("addPlayer adds empty player to existing team", () => {
@@ -1867,7 +1796,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         api.addPlayer("home");
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({
@@ -1894,7 +1823,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         api.addPlayer("newteam");
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({
@@ -1933,7 +1862,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         viewApi!.setViewPort(newVp);
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "view",
         expect.objectContaining({ vp: newVp }),
@@ -1957,7 +1886,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         viewApi!.setBackground("Svart");
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "view",
         expect.objectContaining({ background: "Svart" }),
@@ -1981,7 +1910,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         viewApi!.setIdleImage("https://example.com/logo.png");
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "view",
         expect.objectContaining({
@@ -2007,7 +1936,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         viewApi!.updateView({ background: "Ekkert" });
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "view",
         expect.objectContaining({ background: "Ekkert" }),
@@ -2037,7 +1966,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.addToPenalty("pen-1", 60);
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({
@@ -2065,7 +1994,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateHalfLength("45", "50");
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({ halfStops: [50, 90, 105, 120] }),
@@ -2089,11 +2018,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateHalfLength("45", "abc");
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
-        "test-location",
-        "match",
-        expect.objectContaining({ halfStops: [45, 90, 105, 120] }),
-      );
+      expect(firebaseDatabase.syncPartialState).not.toHaveBeenCalled();
     });
 
     it("updateHalfLength treats empty string as 0", () => {
@@ -2113,7 +2038,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateHalfLength("45", "");
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({ halfStops: [0, 90, 105, 120] }),
@@ -2137,11 +2062,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateHalfLength("45", "-5");
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
-        "test-location",
-        "match",
-        expect.objectContaining({ halfStops: [45, 90, 105, 120] }),
-      );
+      expect(firebaseDatabase.syncPartialState).not.toHaveBeenCalled();
     });
 
     it("matchTimeout caps at 4 timeouts", () => {
@@ -2163,7 +2084,7 @@ describe("FirebaseStateContext", () => {
           matchApi!.matchTimeout("away");
         });
       }
-      expect(firebaseDatabase.syncState).toHaveBeenLastCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenLastCalledWith(
         "test-location",
         "match",
         expect.objectContaining({ awayTimeouts: 4 }),
@@ -2189,7 +2110,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.selectMatch("456");
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({ selectedMatch: "456" }),
@@ -2213,11 +2134,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.selectMatch("not-a-number");
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
-        "test-location",
-        "controller",
-        expect.objectContaining({ selectedMatch: null }),
-      );
+      expect(firebaseDatabase.syncPartialState).not.toHaveBeenCalled();
     });
 
     it("setAvailableMatches sets matches and selects first key", () => {
@@ -2241,7 +2158,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.setAvailableMatches(matches);
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({
@@ -2268,7 +2185,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.updateController({ view: "match" });
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({ view: "match", selectedAssets: [] }),
@@ -2299,7 +2216,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.toggleAutoPlay();
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({ autoPlay: false, playing: false }),
