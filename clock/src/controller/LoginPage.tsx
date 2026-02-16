@@ -25,7 +25,7 @@ const LoginPage = () => {
   } = useLocalState();
 
   const { screens } = useListeners();
-  const { view, setViewPort } = useView();
+  const { view } = useView();
   const { vp } = view;
 
   const renderIsRemoteCtrl = () => {
@@ -81,7 +81,6 @@ const LoginPage = () => {
               const screen = (screens as Screen[])[parseInt(value, 10)];
               if (screen) {
                 setListenPrefix(screen.key);
-                setViewPort(screen.screen);
               }
             }}
             value={currentScreenId}
