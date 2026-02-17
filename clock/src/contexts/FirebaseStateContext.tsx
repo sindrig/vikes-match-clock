@@ -21,6 +21,7 @@ import {
   Asset,
   Player,
   AvailableMatches,
+  TwoMinPenalty,
 } from "../types";
 import { Sports, DEFAULT_HALFSTOPS } from "../constants";
 import clubIds from "../club-ids";
@@ -513,30 +514,38 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   const removePenalty = useCallback(
     (key: string) => {
-      applyMatchUpdate((prev) => ({
-        ...prev,
-        home2min: prev.home2min.filter((t) => t.key !== key),
-        away2min: prev.away2min.filter((t) => t.key !== key),
-      }));
+      applyMatchUpdate((prev) => {
+        const homeHasKey = prev.home2min.some((t) => t.key === key);
+        const awayHasKey = prev.away2min.some((t) => t.key === key);
+        return {
+          ...prev,
+          ...(homeHasKey && {
+            home2min: prev.home2min.filter((t) => t.key !== key),
+          }),
+          ...(awayHasKey && {
+            away2min: prev.away2min.filter((t) => t.key !== key),
+          }),
+        };
+      });
     },
     [applyMatchUpdate],
   );
 
   const addToPenalty = useCallback(
     (key: string, toAdd: number) => {
-      applyMatchUpdate((prev) => ({
-        ...prev,
-        home2min: prev.home2min.map((t) =>
+      applyMatchUpdate((prev) => {
+        const homeHasKey = prev.home2min.some((t) => t.key === key);
+        const awayHasKey = prev.away2min.some((t) => t.key === key);
+        const mapFn = (t: TwoMinPenalty) =>
           t.key === key
             ? { ...t, penaltyLength: Number(t.penaltyLength) + Number(toAdd) }
-            : t,
-        ),
-        away2min: prev.away2min.map((t) =>
-          t.key === key
-            ? { ...t, penaltyLength: Number(t.penaltyLength) + Number(toAdd) }
-            : t,
-        ),
-      }));
+            : t;
+        return {
+          ...prev,
+          ...(homeHasKey && { home2min: prev.home2min.map(mapFn) }),
+          ...(awayHasKey && { away2min: prev.away2min.map(mapFn) }),
+        };
+      });
     },
     [applyMatchUpdate],
   );

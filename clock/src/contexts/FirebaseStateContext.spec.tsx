@@ -555,7 +555,7 @@ describe("FirebaseStateContext", () => {
       expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "match",
-        expect.objectContaining({ home2min: [], away2min: [] }),
+        expect.objectContaining({ home2min: [] }),
       );
     });
   });
