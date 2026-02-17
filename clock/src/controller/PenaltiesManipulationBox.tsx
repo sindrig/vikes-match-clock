@@ -16,13 +16,6 @@ interface OwnProps {
 
 const MAX_TIMEOUTS_PER_TEAM = 4;
 
-const uuidv4 = (): string =>
-  "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === "x" ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-
 const PenaltiesManipulationBox = ({ team }: OwnProps) => {
   const { match, addPenalty, removePenalty, addToPenalty } = useMatch();
   const started = match.started;
@@ -73,12 +66,12 @@ const PenaltiesManipulationBox = ({ team }: OwnProps) => {
           </button>
         </div>
       )}
-      <button
-        type="button"
-        onClick={() => addPenalty(team, uuidv4(), PENALTY_LENGTH)}
-        disabled={penalties.length >= MAX_TIMEOUTS_PER_TEAM || !!started}
-        className="add-penalty"
-      >
+       <button
+         type="button"
+         onClick={() => addPenalty(team, crypto.randomUUID(), PENALTY_LENGTH)}
+         disabled={penalties.length >= MAX_TIMEOUTS_PER_TEAM || !!started}
+         className="add-penalty"
+       >
         {`2 mín - ${translateTeam(team)}`}
       </button>
     </div>
