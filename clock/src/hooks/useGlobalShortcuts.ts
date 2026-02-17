@@ -18,6 +18,11 @@ export default function useGlobalShortcuts() {
     renderAsset,
   } = useController();
 
+  // Extract primitives to stabilize dependency array
+  const hasSelectedAssets = selectedAssets.length > 0;
+  const hasCurrentAsset = !!currentAsset;
+  const isLoggedIn = !auth.isEmpty;
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       // Ignore if typing in an input
@@ -29,8 +34,7 @@ export default function useGlobalShortcuts() {
       }
 
       // Check if controls should be active
-      const showControls = !auth.isEmpty;
-      if (!showControls) {
+      if (!isLoggedIn) {
         return;
       }
 
@@ -61,11 +65,11 @@ export default function useGlobalShortcuts() {
         (view === VIEWS.match || view === VIEWS.idle) &&
         assetView === ASSET_VIEWS.assets
       ) {
-        if (event.code === "Space") {
+       if (event.code === "Space") {
           event.preventDefault();
-          if (selectedAssets.length > 0) {
+          if (hasSelectedAssets) {
             showNextAsset();
-          } else if (currentAsset) {
+          } else if (hasCurrentAsset) {
             renderAsset(null);
           }
         }
@@ -77,14 +81,14 @@ export default function useGlobalShortcuts() {
   }, [
     view,
     assetView,
-    selectedAssets,
-    currentAsset,
+    hasSelectedAssets,
+    hasCurrentAsset,
     started,
     startMatch,
     pauseMatch,
     addGoal,
     showNextAsset,
     renderAsset,
-    auth,
+    isLoggedIn,
   ]);
 }
