@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef, useEffect } from "react";
 
 import { formatMillisAsTime } from "../utils/timeUtils";
 import ClockBase from "./ClockBase";
@@ -14,11 +14,17 @@ const TimeoutClock: React.FC<TimeoutClockProps> = ({ className }) => {
   const { timeout } = match;
   const [warningPlayed, setWarningPlayed] = useState(false);
   const [prevTimeout, setPrevTimeout] = useState(timeout);
+  const hasFiredEnd = useRef(false);
 
   if (timeout !== prevTimeout) {
     setPrevTimeout(timeout);
     setWarningPlayed(false);
   }
+
+  // Reset latch when timeout changes
+  useEffect(() => {
+    hasFiredEnd.current = false;
+  }, [timeout]);
 
   const updateTime = useCallback((): string | null => {
     if (!timeout) {
@@ -26,10 +32,13 @@ const TimeoutClock: React.FC<TimeoutClockProps> = ({ className }) => {
     }
     const millisLeft = TIMEOUT_LENGTH - (getServerTime() - timeout) + 1000;
     if (millisLeft <= 0) {
-      buzz(true);
-      // Allow us to update time first so we don't try state update on
-      // unmounted clock.
-      setTimeout(() => removeTimeout(), 10);
+      if (!hasFiredEnd.current) {
+        hasFiredEnd.current = true;
+        buzz(true);
+        // Allow us to update time first so we don't try state update on
+        // unmounted clock.
+        setTimeout(() => removeTimeout(), 10);
+      }
     } else if (!warningPlayed && millisLeft <= 10000) {
       setWarningPlayed(true);
       buzz(true);
