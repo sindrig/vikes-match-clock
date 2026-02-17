@@ -10,7 +10,7 @@ import SubView from "./SubView";
 import assetTypes from "../AssetTypes";
 import MatchSelector from "./MatchSelector";
 import { getMOTMAsset, getPlayerAssetObject } from "./assetHelpers";
-import { Player, AvailableMatches } from "../../../types";
+import { Asset, Player, AvailableMatches } from "../../../types";
 import {
   useController,
   useMatch,
@@ -22,9 +22,7 @@ interface SubPlayer extends Player {
 }
 
 interface OwnProps {
-  // TODO: Fix any usage [Asset types across components need unification - addAssets accepts mixed sync/async assets]
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  addAssets: (assets: any[], options?: { showNow?: boolean }) => void;
+  addAssets: (assets: Asset[], options?: { showNow?: boolean }) => void;
   previousView: () => void;
 }
 
