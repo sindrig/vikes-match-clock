@@ -36,9 +36,7 @@ const HalfStops = () => {
           <input
             type="number"
             value={s || ""}
-            onChange={({ target: { value } }) =>
-              updateHalfLength(s, value)
-            }
+            onChange={({ target: { value } }) => updateHalfLength(s, value)}
             key={i}
             className="halfstops-input"
           />

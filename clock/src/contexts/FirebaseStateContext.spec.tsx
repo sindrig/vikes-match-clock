@@ -1990,9 +1990,9 @@ describe("FirebaseStateContext", () => {
           />
         </FirebaseStateProvider>,
       );
-       act(() => {
-         matchApi!.updateHalfLength(45, "50");
-       });
+      act(() => {
+        matchApi!.updateHalfLength(45, "50");
+      });
       expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "match",
@@ -2014,9 +2014,9 @@ describe("FirebaseStateContext", () => {
           />
         </FirebaseStateProvider>,
       );
-       act(() => {
-         matchApi!.updateHalfLength(45, "abc");
-       });
+      act(() => {
+        matchApi!.updateHalfLength(45, "abc");
+      });
       expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
     });
 
@@ -2034,9 +2034,9 @@ describe("FirebaseStateContext", () => {
           />
         </FirebaseStateProvider>,
       );
-       act(() => {
-         matchApi!.updateHalfLength(45, "");
-       });
+      act(() => {
+        matchApi!.updateHalfLength(45, "");
+      });
       expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "match",
@@ -2058,9 +2058,9 @@ describe("FirebaseStateContext", () => {
           />
         </FirebaseStateProvider>,
       );
-       act(() => {
-         matchApi!.updateHalfLength(45, "-5");
-       });
+      act(() => {
+        matchApi!.updateHalfLength(45, "-5");
+      });
       expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
     });
 
@@ -2344,8 +2344,7 @@ describe("FirebaseStateContext", () => {
           started: 0,
         }),
       );
-      const pauseCall = vi.mocked(firebaseDatabase.syncState).mock
-        .calls[0];
+      const pauseCall = vi.mocked(firebaseDatabase.syncState).mock.calls[0];
       const pauseData = pauseCall[2];
       // timeElapsed is computed via getServerTime() - started, ~0ms in tests.
       // The diff optimization may skip it if it stays at 0 (the default),

@@ -65,7 +65,7 @@ export default function useGlobalShortcuts() {
         (view === VIEWS.match || view === VIEWS.idle) &&
         assetView === ASSET_VIEWS.assets
       ) {
-       if (event.code === "Space") {
+        if (event.code === "Space") {
           event.preventDefault();
           if (hasSelectedAssets) {
             showNextAsset();
