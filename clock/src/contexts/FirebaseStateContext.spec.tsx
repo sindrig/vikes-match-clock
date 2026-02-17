@@ -15,7 +15,6 @@ import { firebaseDatabase } from "../firebaseDatabase";
 vi.mock("../firebaseDatabase", () => ({
   firebaseDatabase: {
     syncState: vi.fn().mockResolvedValue(undefined),
-    syncPartialState: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
@@ -98,7 +97,7 @@ describe("FirebaseStateContext", () => {
         matchApi!.addGoal("home");
       });
 
-      expect(firebaseDatabase.syncPartialState).not.toHaveBeenCalled();
+      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
     });
 
     it("blocks controller updates when listenPrefix is empty", () => {
@@ -121,7 +120,7 @@ describe("FirebaseStateContext", () => {
         controllerApi!.selectView("scoreboard");
       });
 
-      expect(firebaseDatabase.syncPartialState).not.toHaveBeenCalled();
+      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
     });
   });
 
@@ -148,7 +147,7 @@ describe("FirebaseStateContext", () => {
         matchApi!.addGoal("home");
       });
 
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({ homeScore: 1 }),
@@ -181,19 +180,19 @@ describe("FirebaseStateContext", () => {
         matchApi!.addGoal("away");
       });
 
-      expect(firebaseDatabase.syncPartialState).toHaveBeenNthCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenNthCalledWith(
         1,
         "test-location",
         "match",
         expect.objectContaining({ homeScore: 1 }),
       );
-      expect(firebaseDatabase.syncPartialState).toHaveBeenNthCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenNthCalledWith(
         2,
         "test-location",
         "match",
         expect.objectContaining({ homeScore: 2 }),
       );
-      expect(firebaseDatabase.syncPartialState).toHaveBeenNthCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenNthCalledWith(
         3,
         "test-location",
         "match",
@@ -221,7 +220,7 @@ describe("FirebaseStateContext", () => {
         controllerApi!.selectView("scoreboard");
       });
 
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({ view: "scoreboard" }),
@@ -286,7 +285,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.startMatch();
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({
@@ -312,7 +311,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.pauseMatch();
       });
-      expect(firebaseDatabase.syncPartialState).not.toHaveBeenCalled();
+      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
     });
 
     it("addGoal increments homeScore", () => {
@@ -332,7 +331,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.addGoal("home");
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({ homeScore: 1 }),
@@ -356,7 +355,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.addGoal("away");
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({ awayScore: 1 }),
@@ -380,7 +379,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.buzz(true);
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({ buzzer: expect.any(Number) as unknown }),
@@ -404,7 +403,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.buzz(false);
       });
-      expect(firebaseDatabase.syncPartialState).not.toHaveBeenCalled();
+      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
     });
 
     it("setHalfStops updates halfStops and showInjuryTime", () => {
@@ -424,7 +423,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.setHalfStops([30, 60], true);
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({ halfStops: [30, 60] }),
@@ -448,7 +447,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.matchTimeout("home");
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({
@@ -475,7 +474,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.removeTimeout();
       });
-      expect(firebaseDatabase.syncPartialState).not.toHaveBeenCalled();
+      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
     });
 
     it("updateRedCards sets home and away red cards", () => {
@@ -495,7 +494,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateRedCards(2, 1);
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({ homeRedCards: 2, awayRedCards: 1 }),
@@ -519,7 +518,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.addPenalty("home", "pen-1", 120);
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({
@@ -553,7 +552,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.removePenalty("pen-1");
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({ home2min: [], away2min: [] }),
@@ -579,7 +578,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.selectAssetView("teams");
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({ assetView: "teams" }),
@@ -603,7 +602,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.toggleCycle();
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({ cycle: true }),
@@ -627,7 +626,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.setImageSeconds(10);
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({ imageSeconds: 10 }),
@@ -651,7 +650,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.toggleAutoPlay();
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({ autoPlay: true }),
@@ -675,7 +674,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.setPlaying(true);
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({ playing: true }),
@@ -700,7 +699,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.renderAsset(asset as unknown as Asset);
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({
@@ -728,7 +727,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.renderAsset(null);
       });
-      expect(firebaseDatabase.syncPartialState).not.toHaveBeenCalled();
+      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
     });
 
     it("setSelectedAssets sets assets array", () => {
@@ -749,7 +748,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.setSelectedAssets(assets as unknown as Asset[]);
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({ selectedAssets: assets }),
@@ -773,7 +772,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.selectTab("settings");
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({ tab: "settings" }),
@@ -797,7 +796,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.remoteRefresh();
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({
@@ -823,7 +822,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.clearMatchPlayers();
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({ availableMatches: {} }),
@@ -849,7 +848,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateMatch({ homeTeam: "Valur" });
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "match",
         { homeTeam: "Valur", homeTeamId: 101 },
@@ -873,7 +872,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateMatch({ awayTeam: "KR" });
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "match",
         { awayTeam: "KR", awayTeamId: 107 },
@@ -897,7 +896,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateMatch({ awayTeam: "Unknown FC" });
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "match",
         { awayTeam: "Unknown FC", awayTeamId: 0 },
@@ -921,7 +920,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateMatch({ awayTeam: "" });
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "match",
         { awayTeam: "", awayTeamId: 0 },
@@ -945,7 +944,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateMatch({ injuryTime: NaN });
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "match",
         { injuryTime: 0 },
@@ -971,7 +970,7 @@ describe("FirebaseStateContext", () => {
           matchType: "basketball" as unknown as Sports,
         });
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "match",
         { matchType: Sports.Football },
@@ -995,7 +994,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateMatch({ matchType: Sports.Handball });
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "match",
         {
@@ -1026,7 +1025,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateMatch({ started: Date.now() });
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({
@@ -1053,7 +1052,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateMatch({ homeTeam: "Valur" });
       });
-      const call = vi.mocked(firebaseDatabase.syncPartialState).mock.calls[0];
+      const call = vi.mocked(firebaseDatabase.syncState).mock.calls[0];
       expect(Object.keys(call[2])).toEqual(
         expect.arrayContaining(["homeTeam", "homeTeamId"]),
       );
@@ -1077,7 +1076,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateMatch({ awayTeam: "KR" });
       });
-      const call = vi.mocked(firebaseDatabase.syncPartialState).mock.calls[0];
+      const call = vi.mocked(firebaseDatabase.syncState).mock.calls[0];
       expect(Object.keys(call[2])).toEqual(
         expect.arrayContaining(["awayTeam", "awayTeamId"]),
       );
@@ -1101,7 +1100,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateMatch({ matchType: Sports.Handball });
       });
-      const call = vi.mocked(firebaseDatabase.syncPartialState).mock.calls[0];
+      const call = vi.mocked(firebaseDatabase.syncState).mock.calls[0];
       expect(call[2]).toEqual({
         matchType: Sports.Handball,
         halfStops: DEFAULT_HALFSTOPS[Sports.Handball],
@@ -1125,7 +1124,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateMatch({ injuryTime: NaN });
       });
-      const call = vi.mocked(firebaseDatabase.syncPartialState).mock.calls[0];
+      const call = vi.mocked(firebaseDatabase.syncState).mock.calls[0];
       expect(call[2]).toEqual({ injuryTime: 0 });
     });
   });
@@ -1152,7 +1151,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.pauseMatch(true);
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({
@@ -1184,7 +1183,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.pauseMatch();
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({
@@ -1212,7 +1211,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.countdown();
       });
-      expect(firebaseDatabase.syncPartialState).not.toHaveBeenCalled();
+      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
     });
 
     it("does not change state when matchStartTime is invalid format", () => {
@@ -1236,7 +1235,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.countdown();
       });
-      expect(firebaseDatabase.syncPartialState).not.toHaveBeenCalled();
+      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
     });
 
     it("sets started and countdown=true for valid matchStartTime", () => {
@@ -1260,7 +1259,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.countdown();
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({
@@ -1293,7 +1292,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.addAssets(assets);
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({
@@ -1326,7 +1325,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.addAssets([{ type: "IMAGE", key: "img-1" }]);
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({
@@ -1355,7 +1354,7 @@ describe("FirebaseStateContext", () => {
           { type: "IMAGE", key: "good-1" },
         ]);
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({
@@ -1381,7 +1380,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.addAssets([{ type: "IMAGE", key: "" }]);
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({ selectedAssets: [] }),
@@ -1414,7 +1413,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.removeAsset({ type: "IMAGE", key: "img-1" });
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({
@@ -1440,7 +1439,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.removeAsset({ type: "IMAGE", key: "nonexistent" });
       });
-      expect(firebaseDatabase.syncPartialState).not.toHaveBeenCalled();
+      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
     });
   });
 
@@ -1469,7 +1468,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.showNextAsset();
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({
@@ -1499,7 +1498,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.showNextAsset();
       });
-      expect(firebaseDatabase.syncPartialState).not.toHaveBeenCalled();
+      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
     });
 
     it("cycles asset to end of queue when cycle is enabled", () => {
@@ -1529,7 +1528,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.showNextAsset();
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({
@@ -1571,7 +1570,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.showNextAsset();
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({
@@ -1607,7 +1606,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.removeAssetAfterTimeout();
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({ currentAsset: null }),
@@ -1641,7 +1640,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.removeAssetAfterTimeout();
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({
@@ -1673,7 +1672,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.removeAssetAfterTimeout();
       });
-      expect(firebaseDatabase.syncPartialState).not.toHaveBeenCalled();
+      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
     });
   });
 
@@ -1716,7 +1715,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         api.editPlayer("home", 0, { name: "Updated Player" });
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({
@@ -1750,7 +1749,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.editPlayer("home", 0, { name: "Test" });
       });
-      expect(firebaseDatabase.syncPartialState).not.toHaveBeenCalled();
+      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
     });
 
     it("editPlayer does nothing for invalid player index", () => {
@@ -1758,7 +1757,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         api.editPlayer("home", 99, { name: "Ghost" });
       });
-      expect(firebaseDatabase.syncPartialState).not.toHaveBeenCalled();
+      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
     });
 
     it("deletePlayer removes player at index", () => {
@@ -1766,7 +1765,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         api.deletePlayer("home", 0);
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({
@@ -1788,7 +1787,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         api.deletePlayer("nonexistent", 0);
       });
-      expect(firebaseDatabase.syncPartialState).not.toHaveBeenCalled();
+      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
     });
 
     it("addPlayer adds empty player to existing team", () => {
@@ -1796,7 +1795,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         api.addPlayer("home");
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({
@@ -1823,7 +1822,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         api.addPlayer("newteam");
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({
@@ -1862,7 +1861,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         viewApi!.setViewPort(newVp);
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "view",
         expect.objectContaining({ vp: newVp }),
@@ -1886,7 +1885,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         viewApi!.setBackground("Svart");
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "view",
         expect.objectContaining({ background: "Svart" }),
@@ -1910,7 +1909,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         viewApi!.setIdleImage("https://example.com/logo.png");
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "view",
         expect.objectContaining({
@@ -1936,7 +1935,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         viewApi!.updateView({ background: "Ekkert" });
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "view",
         expect.objectContaining({ background: "Ekkert" }),
@@ -1966,7 +1965,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.addToPenalty("pen-1", 60);
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({
@@ -1991,10 +1990,10 @@ describe("FirebaseStateContext", () => {
           />
         </FirebaseStateProvider>,
       );
-      act(() => {
-        matchApi!.updateHalfLength("45", "50");
-      });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+       act(() => {
+         matchApi!.updateHalfLength(45, "50");
+       });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({ halfStops: [50, 90, 105, 120] }),
@@ -2015,10 +2014,10 @@ describe("FirebaseStateContext", () => {
           />
         </FirebaseStateProvider>,
       );
-      act(() => {
-        matchApi!.updateHalfLength("45", "abc");
-      });
-      expect(firebaseDatabase.syncPartialState).not.toHaveBeenCalled();
+       act(() => {
+         matchApi!.updateHalfLength(45, "abc");
+       });
+      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
     });
 
     it("updateHalfLength treats empty string as 0", () => {
@@ -2035,10 +2034,10 @@ describe("FirebaseStateContext", () => {
           />
         </FirebaseStateProvider>,
       );
-      act(() => {
-        matchApi!.updateHalfLength("45", "");
-      });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+       act(() => {
+         matchApi!.updateHalfLength(45, "");
+       });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({ halfStops: [0, 90, 105, 120] }),
@@ -2059,10 +2058,10 @@ describe("FirebaseStateContext", () => {
           />
         </FirebaseStateProvider>,
       );
-      act(() => {
-        matchApi!.updateHalfLength("45", "-5");
-      });
-      expect(firebaseDatabase.syncPartialState).not.toHaveBeenCalled();
+       act(() => {
+         matchApi!.updateHalfLength(45, "-5");
+       });
+      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
     });
 
     it("matchTimeout caps at 4 timeouts", () => {
@@ -2087,13 +2086,13 @@ describe("FirebaseStateContext", () => {
       // The 4th call sets awayTimeouts from 3→4 (the cap).
       // The 5th call keeps awayTimeouts at 4 (unchanged), so the diff
       // optimization excludes it — only `timeout` is sent.
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({ awayTimeouts: 4 }),
       );
       // Verify the value never exceeds 4
-      const allCalls = vi.mocked(firebaseDatabase.syncPartialState).mock.calls;
+      const allCalls = vi.mocked(firebaseDatabase.syncState).mock.calls;
       const allAwayTimeouts = allCalls
         .filter(([, section]) => section === "match")
         .map(([, , data]) => data.awayTimeouts)
@@ -2120,7 +2119,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.selectMatch("456");
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({ selectedMatch: "456" }),
@@ -2144,7 +2143,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.selectMatch("not-a-number");
       });
-      expect(firebaseDatabase.syncPartialState).not.toHaveBeenCalled();
+      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
     });
 
     it("setAvailableMatches sets matches and selects first key", () => {
@@ -2168,7 +2167,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.setAvailableMatches(matches);
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({
@@ -2195,7 +2194,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.updateController({ view: "match" });
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({ view: "match", selectedAssets: [] }),
@@ -2226,7 +2225,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.toggleAutoPlay();
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({ autoPlay: false, playing: false }),
@@ -2311,7 +2310,7 @@ describe("FirebaseStateContext", () => {
         matchApi!.startMatch();
       });
       // Verify set was called with a timestamp close to Date.now()
-      const call = vi.mocked(firebaseDatabase.syncPartialState).mock.calls[0];
+      const call = vi.mocked(firebaseDatabase.syncState).mock.calls[0];
       const writtenMatch = call[2];
       expect(writtenMatch.started).toBeGreaterThan(Date.now() - 100);
       expect(writtenMatch.started).toBeLessThan(Date.now() + 100);
@@ -2338,14 +2337,14 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.pauseMatch();
       });
-      expect(firebaseDatabase.syncPartialState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({
           started: 0,
         }),
       );
-      const pauseCall = vi.mocked(firebaseDatabase.syncPartialState).mock
+      const pauseCall = vi.mocked(firebaseDatabase.syncState).mock
         .calls[0];
       const pauseData = pauseCall[2];
       // timeElapsed is computed via getServerTime() - started, ~0ms in tests.

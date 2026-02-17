@@ -41,11 +41,4 @@ export const firebaseDatabase = {
     data: Record<string, unknown>,
   ): Promise<void> =>
     update(ref(database, `states/${listenPrefix}/${stateType}`), data),
-
-  syncPartialState: (
-    listenPrefix: string,
-    stateType: "match" | "controller" | "view",
-    data: Record<string, unknown>,
-  ): Promise<void> =>
-    update(ref(database, `states/${listenPrefix}/${stateType}`), data),
 };

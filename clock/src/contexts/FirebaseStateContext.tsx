@@ -96,7 +96,7 @@ interface FirebaseStateContextType {
   ) => void;
   removePenalty: (key: string) => void;
   addToPenalty: (key: string, toAdd: number) => void;
-  updateHalfLength: (currentValue: string, newValue: string) => void;
+   updateHalfLength: (currentValue: number, newValue: string) => void;
   setHalfStops: (halfStops: number[], showInjuryTime: boolean) => void;
   matchTimeout: (team: "home" | "away") => void;
   removeTimeout: () => void;
@@ -325,11 +325,11 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
           }
         }
 
-        if (Object.keys(diff).length > 0) {
-          firebaseDatabase
-            .syncPartialState(listenPrefix, "match", diff)
-            .catch(console.error);
-        }
+         if (Object.keys(diff).length > 0) {
+           firebaseDatabase
+             .syncState(listenPrefix, "match", diff)
+             .catch(console.error);
+         }
       }
     },
     [isAuthenticated, listenPrefix],
@@ -353,11 +353,11 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
           }
         }
 
-        if (Object.keys(diff).length > 0) {
-          firebaseDatabase
-            .syncPartialState(listenPrefix, "controller", diff)
-            .catch(console.error);
-        }
+         if (Object.keys(diff).length > 0) {
+           firebaseDatabase
+             .syncState(listenPrefix, "controller", diff)
+             .catch(console.error);
+         }
       }
     },
     [isAuthenticated, listenPrefix],
@@ -381,11 +381,11 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
           }
         }
 
-        if (Object.keys(diff).length > 0) {
-          firebaseDatabase
-            .syncPartialState(listenPrefix, "view", diff)
-            .catch(console.error);
-        }
+         if (Object.keys(diff).length > 0) {
+           firebaseDatabase
+             .syncState(listenPrefix, "view", diff)
+             .catch(console.error);
+         }
       }
     },
     [isAuthenticated, listenPrefix],
@@ -444,9 +444,9 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
       matchRef.current = newState;
 
-      firebaseDatabase
-        .syncPartialState(listenPrefix, "match", partialData)
-        .catch(console.error);
+       firebaseDatabase
+         .syncState(listenPrefix, "match", partialData)
+         .catch(console.error);
     },
     [isAuthenticated, listenPrefix],
   );
@@ -541,24 +541,23 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     [applyMatchUpdate],
   );
 
-  const updateHalfLength = useCallback(
-    (currentValue: string, newValue: string) => {
-      applyMatchUpdate((prev) => {
-        const currentValueParsed = parseInt(currentValue, 10);
-        const newValueParsed = newValue === "" ? 0 : parseInt(newValue, 10);
-        if (Number.isNaN(newValueParsed) || newValueParsed < 0) {
-          return prev;
-        }
-        return {
-          ...prev,
-          halfStops: prev.halfStops.map((v) =>
-            v === currentValueParsed ? newValueParsed : v,
-          ),
-        };
-      });
-    },
-    [applyMatchUpdate],
-  );
+   const updateHalfLength = useCallback(
+     (currentValue: number, newValue: string) => {
+       applyMatchUpdate((prev) => {
+         const newValueParsed = newValue === "" ? 0 : parseInt(newValue, 10);
+         if (Number.isNaN(newValueParsed) || newValueParsed < 0) {
+           return prev;
+         }
+         return {
+           ...prev,
+           halfStops: prev.halfStops.map((v) =>
+             v === currentValue ? newValueParsed : v,
+           ),
+         };
+       });
+     },
+     [applyMatchUpdate],
+   );
 
   const setHalfStops = useCallback(
     (halfStops: number[], showInjuryTime: boolean) => {
