@@ -66,12 +66,12 @@ const PenaltiesManipulationBox = ({ team }: OwnProps) => {
           </button>
         </div>
       )}
-       <button
-         type="button"
-         onClick={() => addPenalty(team, crypto.randomUUID(), PENALTY_LENGTH)}
-         disabled={penalties.length >= MAX_TIMEOUTS_PER_TEAM || !!started}
-         className="add-penalty"
-       >
+      <button
+        type="button"
+        onClick={() => addPenalty(team, crypto.randomUUID(), PENALTY_LENGTH)}
+        disabled={penalties.length >= MAX_TIMEOUTS_PER_TEAM || !!started}
+        className="add-penalty"
+      >
         {`2 mín - ${translateTeam(team)}`}
       </button>
     </div>
