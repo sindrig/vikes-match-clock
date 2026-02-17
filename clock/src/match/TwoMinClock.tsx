@@ -47,10 +47,6 @@ const TwoMinClock: React.FC<TwoMinClockProps> = ({
     return () => clearInterval(interval);
   }, [updateTime]);
 
-  if (!started && !timeElapsed && time !== null) {
-    setTime(null);
-  }
-
   const displayedTime = time || formatMillisAsTime(penaltyLength);
   return <div className="penalty">{displayedTime}</div>;
 };
