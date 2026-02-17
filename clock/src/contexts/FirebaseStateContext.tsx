@@ -616,17 +616,28 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         );
         return prev;
       }
+      // Compute how far in the future the match starts using local time
+      // (Date.now / moment()), which reflects what the user sees in the UI.
+      // Then place "started" in the server-time coordinate system used by
+      // Clock.tsx (getServerTime()) so elapsed = getServerTime() - started
+      // gives the correct negative countdown value.
+      const localNow = moment();
       const momentTime = moment(prev.matchStartTime, "HH:mm");
       if (!momentTime.isValid()) {
         console.warn("countdown() invalid moment from matchStartTime");
         return prev;
       }
-      if (momentTime < moment()) {
+      if (momentTime < localNow) {
         momentTime.add(1, "days");
       }
-      return { ...prev, started: momentTime.valueOf(), countdown: true };
+      const duration = momentTime.valueOf() - localNow.valueOf();
+      return {
+        ...prev,
+        started: getServerTime() + duration,
+        countdown: true,
+      };
     });
-  }, [applyMatchUpdate]);
+  }, [applyMatchUpdate, getServerTime]);
 
   const updateRedCards = useCallback(
     (home: number, away: number) => {
