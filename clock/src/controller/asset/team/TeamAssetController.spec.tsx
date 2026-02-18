@@ -4,7 +4,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import axios from "axios";
 
 import TeamAssetController from "./TeamAssetController";
-import { Player, AvailableMatches } from "../../../types";
+import { Asset, Player, AvailableMatches } from "../../../types";
 import {
   useController,
   useMatch,
@@ -205,12 +205,22 @@ function setupMocks(overrides?: {
 }
 
 describe("TeamAssetController", () => {
-  let mockAddAssets: ReturnType<typeof vi.fn>;
+  let mockAddAssets: ReturnType<
+    typeof vi.fn<
+      (assets: Promise<Asset | null>[], options?: { showNow?: boolean }) => void
+    >
+  >;
   let mockPreviousView: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockAddAssets = vi.fn();
+    mockAddAssets =
+      vi.fn<
+        (
+          assets: Promise<Asset | null>[],
+          options?: { showNow?: boolean },
+        ) => void
+      >();
     mockPreviousView = vi.fn();
   });
 
@@ -475,15 +485,26 @@ describe("TeamAssetController", () => {
       expect(mockPreviousView).toHaveBeenCalled();
     });
 
-    it("shows error when getPlayerAssetObject returns null for some players", () => {
+    it("shows error when some players have missing name or id", () => {
+      const playersWithMissingData: Player[] = [
+        ...mockPlayers,
+        { name: "", id: 999, number: 99, role: "midfielder", show: true },
+      ];
+      const matchesWithBadPlayers: AvailableMatches = {
+        "1": {
+          group: "Úrvalsdeild",
+          sex: "M",
+          players: {
+            "103": playersWithMissingData,
+            "107": mockAwayPlayers,
+          },
+        },
+      };
+
       setupMocks({
-        availableMatches: mockAvailableMatches,
+        availableMatches: matchesWithBadPlayers,
         selectedMatch: "1",
       });
-
-      mockedGetPlayerAssetObject.mockReturnValue(
-        null as unknown as ReturnType<typeof getPlayerAssetObject>,
-      );
 
       render(
         <TeamAssetController

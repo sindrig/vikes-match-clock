@@ -97,10 +97,18 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
 
   const addPlayersToQ = (): void => {
     const { homeTeam, awayTeam } = getTeamPlayers();
-    const teamAssets = [
+    const teams = [
       { team: awayTeam, teamName: match.awayTeam },
       { team: homeTeam, teamName: match.homeTeam },
-    ].map(({ team, teamName }) =>
+    ];
+    const playersToShow = teams.flatMap(({ team }) =>
+      team.filter((p) => p.show),
+    );
+    if (playersToShow.some((p) => !p.name || p.id === undefined)) {
+      setError("Missing name/number for some players to show");
+      return;
+    }
+    const teamAssets = teams.map(({ team, teamName }) =>
       team
         .filter((p) => p.show)
         .map((player) =>
@@ -108,12 +116,8 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
         ),
     );
     const flattened = ([] as Promise<Asset | null>[]).concat(...teamAssets);
-    if (!flattened.every((i) => i)) {
-      setError("Missing name/number for some players to show");
-    } else {
-      addAssets(flattened);
-      previousView();
-    }
+    addAssets(flattened);
+    previousView();
   };
 
   const selectSubsAction = (player: Player, teamName: string): void => {
