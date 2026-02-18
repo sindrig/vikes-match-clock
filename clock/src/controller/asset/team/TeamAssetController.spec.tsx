@@ -695,17 +695,19 @@ describe("TeamAssetController", () => {
       fireEvent.click(screen.getByTestId("select-player-homeTeam"));
 
       await waitFor(() => {
-        expect(mockAddAssets).toHaveBeenCalledWith(
-          [
-            expect.objectContaining({
-              type: "SUB",
-              subIn: subInAsset,
-              subOut: subOutAsset,
-            }),
-          ],
-          { showNow: true },
-        );
+        expect(mockAddAssets).toHaveBeenCalled();
       });
+
+      const callArgs = mockAddAssets.mock.calls[0];
+      expect(callArgs[1]).toEqual({ showNow: true });
+      const resolved = await callArgs[0][0];
+      expect(resolved).toEqual(
+        expect.objectContaining({
+          type: "SUB",
+          subIn: subInAsset,
+          subOut: subOutAsset,
+        }),
+      );
     });
 
     it("does not call addAssets if getPlayerAssetObject returns null for subIn", async () => {

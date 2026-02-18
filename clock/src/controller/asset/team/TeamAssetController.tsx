@@ -22,7 +22,10 @@ interface SubPlayer extends Player {
 }
 
 interface OwnProps {
-  addAssets: (assets: Asset[], options?: { showNow?: boolean }) => void;
+  addAssets: (
+    assets: Promise<Asset | null>[],
+    options?: { showNow?: boolean },
+  ) => void;
   previousView: () => void;
 }
 
@@ -104,7 +107,7 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
           getPlayerAssetObject({ player, teamName, listenPrefix }),
         ),
     );
-    const flattened = ([] as unknown[]).concat(...teamAssets);
+    const flattened = ([] as Promise<Asset | null>[]).concat(...teamAssets);
     if (!flattened.every((i) => i)) {
       setError("Missing name/number for some players to show");
     } else {
@@ -142,12 +145,12 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
         if (!subInObj || !subOutObj) return;
         addAssets(
           [
-            {
+            Promise.resolve({
               type: assetTypes.SUB,
               subIn: subInObj,
               subOut: subOutObj,
               key: `sub-${subInObj.key}-${subOutObj.key}`,
-            },
+            }),
           ],
           {
             showNow: true,
