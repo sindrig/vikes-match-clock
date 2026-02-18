@@ -1,46 +1,36 @@
 import React from "react";
-import { connect, ConnectedProps } from "react-redux";
-import { Dispatch, UnknownAction } from "redux";
+import { useMatch } from "../contexts/FirebaseStateContext";
+import { PENALTY_LENGTH } from "../constants";
 
 import ControlButton from "./ControlButton";
-import matchActions from "../actions/match";
 
-interface OwnProps {
-  team: string;
+interface TeamControllerProps {
+  team: "home" | "away";
   started: number | null;
 }
 
-const dispatchToProps = (dispatch: Dispatch, { team }: OwnProps) => ({
-  goal: () =>
-    dispatch(matchActions.addGoal({ team }) as unknown as UnknownAction),
-  penalty: () =>
-    dispatch(matchActions.addPenalty({ team }) as unknown as UnknownAction),
-  timeout: () =>
-    dispatch(matchActions.matchTimeout({ team }) as unknown as UnknownAction),
-});
+const TeamController: React.FC<TeamControllerProps> = ({ team, started }) => {
+  const { addGoal, addPenalty, matchTimeout } = useMatch();
 
-const connector = connect(null, dispatchToProps);
+  return (
+    <div
+      className={`match-controller-box match-controller-box-${String(team)}`}
+    >
+      <ControlButton className="yellow" onClick={() => addGoal(team)}>
+        Mark
+      </ControlButton>
+      <ControlButton
+        className="red"
+        onClick={() => addPenalty(team, crypto.randomUUID(), PENALTY_LENGTH)}
+        disabled={!!started}
+      >
+        Brottvísun
+      </ControlButton>
+      <ControlButton className="green" onClick={() => matchTimeout(team)}>
+        Leikhlé
+      </ControlButton>
+    </div>
+  );
+};
 
-type TeamControllerProps = ConnectedProps<typeof connector> & OwnProps;
-
-const TeamController: React.FC<TeamControllerProps> = ({
-  goal,
-  penalty,
-  timeout,
-  started,
-  team,
-}) => (
-  <div className={`match-controller-box match-controller-box-${String(team)}`}>
-    <ControlButton className="yellow" onClick={goal}>
-      Mark
-    </ControlButton>
-    <ControlButton className="red" onClick={penalty} disabled={!!started}>
-      Brottvísun
-    </ControlButton>
-    <ControlButton className="green" onClick={timeout}>
-      Leikhlé
-    </ControlButton>
-  </div>
-);
-
-export default connector(TeamController);
+export default TeamController;

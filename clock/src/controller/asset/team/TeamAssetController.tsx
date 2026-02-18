@@ -1,177 +1,126 @@
-import { Component } from "react";
-import type React from "react";
-import { connect, ConnectedProps } from "react-redux";
-import { bindActionCreators, Dispatch } from "redux";
+import React, { useState } from "react";
+import axios from "axios";
 
 import { RingLoader } from "react-spinners";
 import clubIds from "../../../club-ids";
+import apiConfig from "../../../apiConfig";
 
 import Team from "./Team";
 import SubView from "./SubView";
 import assetTypes from "../AssetTypes";
 import MatchSelector from "./MatchSelector";
-import controllerActions from "../../../actions/controller";
 import { getMOTMAsset, getPlayerAssetObject } from "./assetHelpers";
-import { RootState, Player } from "../../../types";
+import { Asset, Player, AvailableMatches } from "../../../types";
+import {
+  useController,
+  useMatch,
+} from "../../../contexts/FirebaseStateContext";
+import { useRemoteSettings } from "../../../contexts/LocalStateContext";
 
 interface SubPlayer extends Player {
   teamName: string;
 }
 
-interface TeamAssetControllerState {
-  loading: boolean;
-  error: string;
-  selectSubs: boolean;
-  subTeam: string | null;
-  subIn: SubPlayer | null;
-  subOut: Player | null;
-  selectPlayerAsset: boolean;
-  selectGoalScorer: boolean;
-  selectMOTM: boolean;
-  effect: string;
-}
-
 interface OwnProps {
-  // TODO: Fix any usage [Asset types across components need unification - addAssets accepts mixed sync/async assets]
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  addAssets: (assets: any[], options?: { showNow?: boolean }) => void;
+  addAssets: (
+    assets: Promise<Asset | null>[],
+    options?: { showNow?: boolean },
+  ) => void;
   previousView: () => void;
 }
 
-const mapStateToProps = ({
-  match,
-  controller: { availableMatches, selectedMatch },
-  remote: { listenPrefix },
-}: RootState) => ({
-  match,
-  availableMatches,
-  selectedMatch,
-  listenPrefix,
-});
+const TeamAssetController = (props: OwnProps): React.JSX.Element => {
+  const { addAssets, previousView } = props;
+  const { match } = useMatch();
+  const {
+    controller: { availableMatches, selectedMatch },
+    clearMatchPlayers,
+    setAvailableMatches,
+  } = useController();
+  const { listenPrefix } = useRemoteSettings();
 
-const mapDispatchToProps = (dispatch: Dispatch) =>
-  bindActionCreators(
-    {
-      clearMatchPlayers: controllerActions.clearMatchPlayers,
-      getAvailableMatches: controllerActions.getAvailableMatches,
-    },
-    dispatch,
-  );
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [selectSubs, setSelectSubs] = useState(false);
+  const [subTeam, setSubTeam] = useState<string | null>(null);
+  const [subIn, setSubIn] = useState<SubPlayer | null>(null);
+  const [subOut, setSubOut] = useState<Player | null>(null);
+  const [selectPlayerAsset, setSelectPlayerAsset] = useState(false);
+  const [selectGoalScorer, setSelectGoalScorer] = useState(false);
+  const [selectMOTM, setSelectMOTM] = useState(false);
+  const [effect, setEffect] = useState("blink");
 
-const connector = connect(mapStateToProps, mapDispatchToProps);
-type PropsFromRedux = ConnectedProps<typeof connector>;
-type TeamAssetControllerProps = PropsFromRedux & OwnProps;
-
-class TeamAssetController extends Component<
-  TeamAssetControllerProps,
-  TeamAssetControllerState
-> {
-  constructor(props: TeamAssetControllerProps) {
-    super(props);
-    this.state = {
-      loading: false,
-      error: "",
-      selectSubs: false,
-      subTeam: null,
-      subIn: null,
-      subOut: null,
-      selectPlayerAsset: false,
-      selectGoalScorer: false,
-      selectMOTM: false,
-      effect: "blink",
+  const getAvailableMatches = (homeTeam: string, awayTeam: string) => {
+    const options = {
+      params: {
+        homeTeam: clubIds[homeTeam as keyof typeof clubIds],
+        awayTeam: clubIds[awayTeam as keyof typeof clubIds],
+      },
     };
-  }
+    return axios
+      .get<AvailableMatches>(`${apiConfig.gateWayUrl}match-report`, options)
+      .then((response) => {
+        setAvailableMatches(response.data);
+      });
+  };
 
-  getTeamPlayers(): { homeTeam: Player[]; awayTeam: Player[] } {
-    const {
-      selectedMatch,
-      availableMatches,
-      match: { homeTeam, awayTeam },
-    } = this.props;
-    const match = selectedMatch ? availableMatches[selectedMatch] : undefined;
+  const getTeamPlayers = (): { homeTeam: Player[]; awayTeam: Player[] } => {
+    const { homeTeam, awayTeam } = match;
+    const selectedMatchObj = selectedMatch
+      ? availableMatches[selectedMatch]
+      : undefined;
     const clubIdsMap = clubIds as Record<string, string>;
     const homeTeamId = clubIdsMap[homeTeam];
     const awayTeamId = clubIdsMap[awayTeam];
     return {
       homeTeam:
-        match?.players && homeTeamId ? match.players[homeTeamId] || [] : [],
+        selectedMatchObj?.players && homeTeamId
+          ? selectedMatchObj.players[homeTeamId] || []
+          : [],
       awayTeam:
-        match?.players && awayTeamId ? match.players[awayTeamId] || [] : [],
+        selectedMatchObj?.players && awayTeamId
+          ? selectedMatchObj.players[awayTeamId] || []
+          : [],
     };
-  }
-
-  clearState = (): void => {
-    this.setState({
-      error: "",
-      selectSubs: false,
-      subTeam: null,
-      subIn: null,
-      subOut: null,
-      selectPlayerAsset: false,
-      selectGoalScorer: false,
-      selectMOTM: false,
-    });
   };
 
-  addPlayersToQ = (): void => {
-    const { match, addAssets, previousView, listenPrefix } = this.props;
-    const { homeTeam, awayTeam } = this.getTeamPlayers();
-    const teamAssets = [
+  const clearState = (): void => {
+    setError("");
+    setSelectSubs(false);
+    setSubTeam(null);
+    setSubIn(null);
+    setSubOut(null);
+    setSelectPlayerAsset(false);
+    setSelectGoalScorer(false);
+    setSelectMOTM(false);
+  };
+
+  const addPlayersToQ = (): void => {
+    const { homeTeam, awayTeam } = getTeamPlayers();
+    const teams = [
       { team: awayTeam, teamName: match.awayTeam },
       { team: homeTeam, teamName: match.homeTeam },
-    ].map(({ team, teamName }) =>
+    ];
+    const playersToShow = teams.flatMap(({ team }) =>
+      team.filter((p) => p.show),
+    );
+    if (playersToShow.some((p) => !p.name || p.id === undefined)) {
+      setError("Missing name/number for some players to show");
+      return;
+    }
+    const teamAssets = teams.map(({ team, teamName }) =>
       team
         .filter((p) => p.show)
         .map((player) =>
           getPlayerAssetObject({ player, teamName, listenPrefix }),
         ),
     );
-    const flattened = ([] as unknown[]).concat(...teamAssets);
-    if (!flattened.every((i) => i)) {
-      this.setState({ error: "Missing name/number for some players to show" });
-    } else {
-      addAssets(flattened);
-      previousView();
-    }
+    const flattened = ([] as Promise<Asset | null>[]).concat(...teamAssets);
+    addAssets(flattened);
+    previousView();
   };
 
-  addSubAsset = async (): Promise<void> => {
-    const { subIn, subOut } = this.state;
-    const { match, addAssets, listenPrefix } = this.props;
-    if (!subIn || !subOut) return;
-
-    const teamName =
-      subIn.teamName === "homeTeam" ? match.homeTeam : match.awayTeam;
-    const subInObj = await getPlayerAssetObject({
-      player: subIn,
-      teamName,
-      listenPrefix,
-    });
-    const subOutObj = await getPlayerAssetObject({
-      player: subOut,
-      // NOTE: We use subIn teamName
-      teamName,
-      listenPrefix,
-    });
-    if (!subInObj || !subOutObj) return;
-    addAssets(
-      [
-        {
-          type: assetTypes.SUB,
-          subIn: subInObj,
-          subOut: subOutObj,
-          key: `sub-${subInObj.key}-${subOutObj.key}`,
-        },
-      ],
-      {
-        showNow: true,
-      },
-    );
-    this.clearState();
-  };
-
-  selectSubs = (player: Player, teamName: string): void => {
-    const { subIn } = this.state;
+  const selectSubsAction = (player: Player, teamName: string): void => {
     const asset: Player = {
       ...player,
       name: player.name
@@ -180,19 +129,46 @@ class TeamAssetController extends Component<
         .join(" "),
     };
     if (subIn) {
-      this.setState({ subOut: asset }, () => {
-        void this.addSubAsset();
-      });
+      setSubOut(asset);
+      void (async () => {
+        const currentSubOut = asset;
+        if (!subIn) return;
+
+        const tName =
+          subIn.teamName === "homeTeam" ? match.homeTeam : match.awayTeam;
+        const subInObj = await getPlayerAssetObject({
+          player: subIn,
+          teamName: tName,
+          listenPrefix,
+        });
+        const subOutObj = await getPlayerAssetObject({
+          player: currentSubOut,
+          teamName: tName,
+          listenPrefix,
+        });
+        if (!subInObj || !subOutObj) return;
+        addAssets(
+          [
+            Promise.resolve({
+              type: assetTypes.SUB,
+              subIn: subInObj,
+              subOut: subOutObj,
+              key: `sub-${subInObj.key}-${subOutObj.key}`,
+            }),
+          ],
+          {
+            showNow: true,
+          },
+        );
+        clearState();
+      })();
     } else {
-      this.setState({
-        subIn: { teamName, ...asset },
-        subTeam: teamName,
-      });
+      setSubIn({ teamName, ...asset });
+      setSubTeam(teamName);
     }
   };
 
-  selectPlayerAsset = (player: Player, teamName: string): void => {
-    const { match, addAssets, listenPrefix } = this.props;
+  const selectPlayerAssetAction = (player: Player, teamName: string): void => {
     const actualTeamName =
       teamName === "homeTeam" ? match.homeTeam : match.awayTeam;
     addAssets(
@@ -207,11 +183,10 @@ class TeamAssetController extends Component<
         showNow: true,
       },
     );
-    this.clearState();
+    clearState();
   };
 
-  selectGoalScorer = (player: Player, teamName: string): void => {
-    const { match, addAssets, listenPrefix } = this.props;
+  const selectGoalScorerAction = (player: Player, teamName: string): void => {
     const actualTeamName =
       teamName === "homeTeam" ? match.homeTeam : match.awayTeam;
     addAssets(
@@ -222,7 +197,7 @@ class TeamAssetController extends Component<
           overlay: {
             text: "",
             blink: true,
-            effect: this.state.effect,
+            effect: effect,
           },
           listenPrefix,
         }),
@@ -231,11 +206,10 @@ class TeamAssetController extends Component<
         showNow: true,
       },
     );
-    this.clearState();
+    clearState();
   };
 
-  selectMOTM = (player: Player, teamName: string): void => {
-    const { match, addAssets, listenPrefix } = this.props;
+  const selectMOTMAction = (player: Player, teamName: string): void => {
     const actualTeamName =
       teamName === "homeTeam" ? match.homeTeam : match.awayTeam;
     addAssets(
@@ -244,33 +218,124 @@ class TeamAssetController extends Component<
         showNow: true,
       },
     );
-    this.clearState();
+    clearState();
   };
 
-  autoFill = (): void => {
-    const {
-      match: { homeTeam, awayTeam },
-      getAvailableMatches,
-    } = this.props;
+  const autoFill = (): void => {
+    const { homeTeam, awayTeam } = match;
     if (!homeTeam || !awayTeam) {
-      this.setState({ error: "Choose teams first" });
+      setError("Choose teams first");
       return;
     }
-    this.setState({ loading: true });
+    setLoading(true);
     void getAvailableMatches(homeTeam, awayTeam)
-      .then(() => this.setState({ error: "" }))
-      .catch((e: Error) => this.setState({ error: e.message }))
-      .then(() => this.setState({ loading: false }));
+      .then(() => setError(""))
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setLoading(false));
   };
 
-  renderControls(): React.JSX.Element {
-    const { availableMatches, clearMatchPlayers } = this.props;
-    const { homeTeam, awayTeam } = this.getTeamPlayers();
+  const renderActionButtons = (): React.JSX.Element => {
+    if (selectSubs) {
+      return (
+        <button
+          type="button"
+          onClick={() => {
+            setSelectSubs(false);
+            setSubIn(null);
+            setSubOut(null);
+            setSubTeam(null);
+          }}
+        >
+          Hætta við skiptingu
+        </button>
+      );
+    }
+    if (selectPlayerAsset || selectGoalScorer || selectMOTM) {
+      return (
+        <button
+          type="button"
+          onClick={() => {
+            setSelectPlayerAsset(false);
+            setSelectGoalScorer(false);
+            setSelectMOTM(false);
+          }}
+        >
+          Hætta við birtingu
+        </button>
+      );
+    }
+    return (
+      <div>
+        <div className="control-item stdbuttons">
+          <button type="button" onClick={() => setSelectSubs(true)}>
+            Skipting
+          </button>
+        </div>
+        <div className="control-item stdbuttons">
+          <button type="button" onClick={() => setSelectPlayerAsset(true)}>
+            Birta leikmann
+          </button>
+        </div>
+        <div className="control-item stdbuttons">
+          <button type="button" onClick={() => setSelectGoalScorer(true)}>
+            Birta markaskorara
+          </button>
+        </div>
+        <div className="control-item stdbuttons">
+          <button type="button" onClick={() => setSelectMOTM(true)}>
+            Birta mann leiksins
+          </button>
+        </div>
+        <div className="control-item stdbuttons">
+          <select
+            onChange={({ target: { value } }) => setEffect(value)}
+            value={effect}
+          >
+            <option value="blink" key="Blink">
+              Blink
+            </option>
+            <option value="shaker" key="Shaker">
+              Shaker
+            </option>
+            <option value="scaleit" key="Scale Up">
+              Scale Up
+            </option>
+          </select>
+        </div>
+      </div>
+    );
+  };
+
+  const renderActionControllers = (): React.JSX.Element => {
+    return (
+      <div className="sub-controller control-item stdbuttons">
+        {renderActionButtons()}
+        {selectSubs ? (
+          <div className="control-item">
+            <SubView
+              subIn={subIn}
+              subOut={subOut}
+              subTeam={
+                subTeam
+                  ? subTeam === "homeTeam"
+                    ? match.homeTeam
+                    : match.awayTeam
+                  : null
+              }
+            />
+          </div>
+        ) : null}
+      </div>
+    );
+  };
+
+  const renderControls = (): React.JSX.Element => {
+    const { homeTeam, awayTeam } = getTeamPlayers();
     return (
       <div>
         {!(homeTeam.length || awayTeam.length) ? (
           <div className="control-item stdbuttons">
-            <button type="button" onClick={this.autoFill}>
+            <button type="button" onClick={autoFill}>
               Sækja lið
             </button>
           </div>
@@ -291,7 +356,7 @@ class TeamAssetController extends Component<
         ) : null}
         {homeTeam.length || awayTeam.length ? (
           <div className="control-item stdbuttons">
-            <button type="button" onClick={this.addPlayersToQ}>
+            <button type="button" onClick={addPlayersToQ}>
               Setja lið í biðröð
             </button>
           </div>
@@ -299,173 +364,43 @@ class TeamAssetController extends Component<
         {availableMatches && Object.keys(availableMatches || {}).length > 1 ? (
           <MatchSelector />
         ) : null}
-        {homeTeam.length || awayTeam.length
-          ? this.renderActionControllers()
-          : null}
+        {homeTeam.length || awayTeam.length ? renderActionControllers() : null}
       </div>
     );
-  }
+  };
 
-  renderActionButtons(): React.JSX.Element {
-    const { selectSubs, selectPlayerAsset, selectGoalScorer, selectMOTM } =
-      this.state;
-    if (selectSubs) {
-      return (
-        <button
-          type="button"
-          onClick={() =>
-            this.setState({
-              selectSubs: false,
-              subIn: null,
-              subOut: null,
-              subTeam: null,
-            })
-          }
-        >
-          Hætta við skiptingu
-        </button>
-      );
-    }
-    if (selectPlayerAsset || selectGoalScorer || selectMOTM) {
-      return (
-        <button
-          type="button"
-          onClick={() =>
-            this.setState({
-              selectPlayerAsset: false,
-              selectGoalScorer: false,
-              selectMOTM: false,
-            })
-          }
-        >
-          Hætta við birtingu
-        </button>
-      );
-    }
-    return (
-      <div>
-        <div className="control-item stdbuttons">
-          <button
-            type="button"
-            onClick={() => this.setState({ selectSubs: true })}
-          >
-            Skipting
-          </button>
-        </div>
-        <div className="control-item stdbuttons">
-          <button
-            type="button"
-            onClick={() => this.setState({ selectPlayerAsset: true })}
-          >
-            Birta leikmann
-          </button>
-        </div>
-        <div className="control-item stdbuttons">
-          <button
-            type="button"
-            onClick={() => this.setState({ selectGoalScorer: true })}
-          >
-            Birta markaskorara
-          </button>
-        </div>
-        <div className="control-item stdbuttons">
-          <button
-            type="button"
-            onClick={() => this.setState({ selectMOTM: true })}
-          >
-            Birta mann leiksins
-          </button>
-        </div>
-        <div className="control-item stdbuttons">
-          <select
-            onChange={({ target: { value } }) =>
-              this.setState({ effect: value })
-            }
-            value={this.state.effect}
-          >
-            <option value="blink" key="Blink">
-              Blink
-            </option>
-            <option value="shaker" key="Shaker">
-              Shaker
-            </option>
-            <option value="scaleit" key="Scale Up">
-              Scale Up
-            </option>
-          </select>
-        </div>
-      </div>
-    );
-  }
-
-  renderActionControllers(): React.JSX.Element {
-    const { subIn, subOut, selectSubs, subTeam } = this.state;
-    const { match } = this.props;
-    return (
-      <div className="sub-controller control-item stdbuttons">
-        {this.renderActionButtons()}
-        {selectSubs ? (
-          <div className="control-item">
-            <SubView
-              subIn={subIn}
-              subOut={subOut}
-              subTeam={
-                subTeam
-                  ? subTeam === "homeTeam"
-                    ? match.homeTeam
-                    : match.awayTeam
-                  : null
-              }
-            />
-          </div>
-        ) : null}
-      </div>
-    );
-  }
-
-  renderTeam(teamName: "homeTeam" | "awayTeam"): React.JSX.Element {
-    const {
-      selectSubs,
-      subTeam,
-      selectPlayerAsset,
-      selectGoalScorer,
-      selectMOTM,
-    } = this.state;
+  const renderTeam = (teamName: "homeTeam" | "awayTeam"): React.JSX.Element => {
     let selectPlayerAction:
       | ((player: Player, teamName: string) => void)
       | null = null;
     if (selectSubs) {
       if (!subTeam || subTeam === teamName) {
-        selectPlayerAction = this.selectSubs;
+        selectPlayerAction = selectSubsAction;
       }
     } else if (selectPlayerAsset) {
-      selectPlayerAction = this.selectPlayerAsset;
+      selectPlayerAction = selectPlayerAssetAction;
     } else if (selectGoalScorer) {
-      selectPlayerAction = this.selectGoalScorer;
+      selectPlayerAction = selectGoalScorerAction;
     } else if (selectMOTM) {
-      selectPlayerAction = this.selectMOTM;
+      selectPlayerAction = selectMOTMAction;
     }
     return <Team teamName={teamName} selectPlayer={selectPlayerAction} />;
-  }
+  };
 
-  render(): React.JSX.Element {
-    const { loading, error } = this.state;
-    const { match } = this.props;
-    if (!match.homeTeam || !match.awayTeam) {
-      return <div>Veldu lið fyrst</div>;
-    }
-    return (
+  if (!match.homeTeam || !match.awayTeam) {
+    return <div>Veldu lið fyrst</div>;
+  }
+  return (
+    <div className="team-asset-controller">
+      <RingLoader loading={loading} />
+      {!loading && renderControls()}
+      <span className="error">{error}</span>
       <div className="team-asset-controller">
-        <RingLoader loading={loading} />
-        {!loading && this.renderControls()}
-        <span className="error">{error}</span>
-        <div className="team-asset-controller">
-          {this.renderTeam("homeTeam")}
-          {this.renderTeam("awayTeam")}
-        </div>
+        {renderTeam("homeTeam")}
+        {renderTeam("awayTeam")}
       </div>
-    );
-  }
-}
+    </div>
+  );
+};
 
-export default connector(TeamAssetController);
+export default TeamAssetController;

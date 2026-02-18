@@ -1,84 +1,40 @@
-import React from "react";
-import { bindActionCreators, Dispatch } from "redux";
-import { connect, ConnectedProps } from "react-redux";
-
 import AssetQueue from "./AssetQueue";
 import { addVideosFromPlaylist } from "./YoutubePlaylist";
-import { ASSET_VIEWS } from "../../reducers/controller";
+import { ASSET_VIEWS } from "../../constants";
 import TeamAssetController from "./team/TeamAssetController";
 import UrlController from "./UrlController";
 import assetTypes from "./AssetTypes";
 import Button from "rsuite/Button";
 import InputNumber from "rsuite/InputNumber";
 import Checkbox from "rsuite/Checkbox";
-import controllerActions from "../../actions/controller";
-import { RootState, Asset } from "../../types";
+import { Asset } from "../../types";
 import { parseYoutubePlaylistId, isYoutubeUrl } from "../../utils/urlUtils";
 
 import "./AssetController.css";
 import MatchesOnPitch from "./team/MatchesOnPitch";
-import GlobalShortcut from "../../GlobalShortcut";
+import { useController } from "../../contexts/FirebaseStateContext";
 
-const mapStateToProps = ({
-  controller: {
-    assetView,
-    selectedAssets,
-    autoPlay,
-    cycle,
-    imageSeconds,
-    playing,
-    currentAsset,
-  },
-  match,
-}: RootState) => ({
-  assetView,
-  match,
-  selectedAssets,
-  autoPlay,
-  cycle,
-  playing,
-  imageSeconds,
-  currentAsset: currentAsset || null,
-});
-
-const mapDispatchToProps = (dispatch: Dispatch) =>
-  bindActionCreators(
-    {
-      selectAssetView: controllerActions.selectAssetView,
-      toggleCycle: controllerActions.toggleCycle,
-      setImageSeconds: controllerActions.setImageSeconds,
-      toggleAutoPlay: controllerActions.toggleAutoPlay,
-      setPlaying: controllerActions.setPlaying,
-      setSelectedAssets: controllerActions.setSelectedAssets,
-      addAssets: controllerActions.addAssets,
-      showNextAsset: controllerActions.showNextAsset,
-      renderAsset: controllerActions.renderAsset,
+const AssetController = () => {
+  const {
+    controller: {
+      assetView,
+      selectedAssets,
+      autoPlay,
+      cycle,
+      imageSeconds,
+      playing,
     },
-    dispatch,
-  );
+    selectAssetView,
+    toggleCycle,
+    setImageSeconds,
+    toggleAutoPlay,
+    setPlaying,
+    setSelectedAssets,
+    addAssets,
+    showNextAsset,
+    renderAsset,
+  } = useController();
 
-const connector = connect(mapStateToProps, mapDispatchToProps);
-type PropsFromRedux = ConnectedProps<typeof connector>;
-type AssetControllerProps = PropsFromRedux;
-
-const AssetController = ({
-  addAssets,
-  assetView,
-  autoPlay,
-  cycle,
-  imageSeconds,
-  playing,
-  renderAsset,
-  selectAssetView,
-  selectedAssets,
-  setImageSeconds,
-  setPlaying,
-  setSelectedAssets,
-  showNextAsset,
-  toggleAutoPlay,
-  toggleCycle,
-  currentAsset,
-}: AssetControllerProps) => {
   const addMultipleAssets = (
     assetList: Promise<Asset | null>[],
     options: { showNow?: boolean } = { showNow: false },
@@ -115,23 +71,6 @@ const AssetController = ({
     const selectedAssetsList = selectedAssets || [];
     return (
       <div className="withborder">
-        {selectedAssetsList.length ? (
-          <React.Fragment>
-            <GlobalShortcut
-              shortcut=" "
-              onTrigger={showNextAsset}
-              preventDefault
-            />
-          </React.Fragment>
-        ) : currentAsset ? (
-          <React.Fragment>
-            <GlobalShortcut
-              shortcut=" "
-              onTrigger={() => renderAsset(null)}
-              preventDefault
-            />
-          </React.Fragment>
-        ) : null}
         <div className="controls control-item">
           <span>{selectedAssetsList.length} í biðröð</span>
           {selectedAssetsList.length ? (
@@ -221,4 +160,4 @@ const AssetController = ({
     </div>
   );
 };
-export default connector(AssetController);
+export default AssetController;

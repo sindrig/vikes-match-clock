@@ -42,10 +42,27 @@ export interface Player {
   show?: boolean;
 }
 
+// Overlay on player assets
+export interface AssetOverlay {
+  text: string;
+  blink?: boolean;
+  effect?: string;
+}
+
 // Asset type
 export interface Asset {
   key: string;
   type: string;
+  url?: string;
+  background?: string;
+  name?: string;
+  number?: number | string;
+  role?: string;
+  overlay?: AssetOverlay | null;
+  teamName?: string;
+  originalAssetType?: string;
+  subIn?: Asset;
+  subOut?: Asset;
 }
 
 // Current asset with timing

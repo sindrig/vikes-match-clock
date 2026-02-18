@@ -1,4 +1,11 @@
-import { ref, onValue, set, off, DatabaseReference } from "firebase/database";
+import {
+  ref,
+  onValue,
+  set,
+  update,
+  off,
+  DatabaseReference,
+} from "firebase/database";
 import { database } from "./firebase";
 
 export interface FirebaseSyncConfig {
@@ -31,7 +38,7 @@ export const firebaseDatabase = {
   syncState: (
     listenPrefix: string,
     stateType: "match" | "controller" | "view",
-    data: unknown,
+    data: Record<string, unknown>,
   ): Promise<void> =>
-    set(ref(database, `states/${listenPrefix}/${stateType}`), data),
+    update(ref(database, `states/${listenPrefix}/${stateType}`), data),
 };

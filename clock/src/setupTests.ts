@@ -6,25 +6,6 @@ vi.mock("./lib/weather", () => ({
   getTemp: () => new Promise((resolve) => resolve(10)),
 }));
 
-vi.mock("redux-actions", () => ({
-  createAction: (type: string) => (payload: unknown) => ({ type, payload }),
-  handleActions:
-    (
-      handlers: Record<
-        string,
-        { next?: (state: unknown, action: unknown) => unknown }
-      >,
-      initialState: unknown,
-    ) =>
-    (state = initialState, action: { type: string }) => {
-      const handler = handlers[action.type];
-      if (handler && handler.next) {
-        return handler.next(state, action);
-      }
-      return state;
-    },
-}));
-
 vi.mock("axios", () => ({
   get: vi.fn(() => Promise.resolve({ data: {} })),
   post: vi.fn(() => Promise.resolve({ data: {} })),

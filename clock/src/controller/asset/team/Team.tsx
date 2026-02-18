@@ -1,27 +1,22 @@
-import { Component } from "react";
-import { connect, ConnectedProps } from "react-redux";
-import { bindActionCreators, Dispatch } from "redux";
+import React, { useState } from "react";
 import axios from "axios";
 import CloseIcon from "@rsuite/icons/Close";
 import ReloadIcon from "@rsuite/icons/Reload";
 import { Button, IconButton } from "rsuite";
 
-import controllerActions from "../../../actions/controller";
 import TeamPlayer from "./TeamPlayer";
 import apiConfig from "../../../apiConfig";
-import { Player, RootState } from "../../../types";
+import { Player } from "../../../types";
 
 import "./Team.css";
+import {
+  useController,
+  useMatch,
+} from "../../../contexts/FirebaseStateContext";
 
 interface OwnProps {
   teamName: "homeTeam" | "awayTeam";
   selectPlayer?: ((player: Player, teamName: string) => void) | null;
-}
-
-interface TeamState {
-  inputValue: string;
-  error: string;
-  loading: boolean;
 }
 
 interface PlayerResponse {
@@ -31,71 +26,54 @@ interface PlayerResponse {
   role?: string;
 }
 
-const stateToProps = (
-  { controller: { availableMatches, selectedMatch }, match }: RootState,
-  ownProps: OwnProps,
-) => {
+const Team = ({ teamName, selectPlayer }: OwnProps): React.JSX.Element => {
+  const {
+    controller: { availableMatches, selectedMatch },
+    editPlayer,
+    deletePlayer,
+    addPlayer,
+  } = useController();
+  const { match } = useMatch();
+
+  const [inputValue, setInputValue] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
   const selectedMatchObj = selectedMatch
     ? availableMatches[selectedMatch]
     : undefined;
-  const teamId = match[`${ownProps.teamName}Id`];
-  return {
-    team: selectedMatchObj?.players
-      ? selectedMatchObj.players[String(teamId)] || []
-      : [],
-    group: selectedMatchObj?.group,
-    sex: selectedMatchObj?.sex,
-    match,
-    teamId,
-    selectedMatch,
-  };
-};
+  const teamId = teamName === "homeTeam" ? match.homeTeamId : match.awayTeamId;
+  const team = selectedMatchObj?.players
+    ? selectedMatchObj.players[String(teamId)] || []
+    : [];
+  const group = selectedMatchObj?.group;
+  const sex = selectedMatchObj?.sex;
 
-const dispatchToProps = (dispatch: Dispatch) =>
-  bindActionCreators(
-    {
-      editPlayer: controllerActions.editPlayer,
-      deletePlayer: controllerActions.deletePlayer,
-      addPlayer: controllerActions.addPlayer,
-    },
-    dispatch,
-  );
+  const displayTeamName =
+    teamName === "homeTeam" ? match.homeTeam : match.awayTeam;
 
-const connector = connect(stateToProps, dispatchToProps);
-
-type TeamProps = ConnectedProps<typeof connector> & OwnProps;
-
-class Team extends Component<TeamProps, TeamState> {
-  state: TeamState = {
-    inputValue: "",
-    error: "",
-    loading: false,
-  };
-
-  addEmptyLine = (): void => {
-    const { addPlayer, teamId } = this.props;
+  const addEmptyLine = (): void => {
     addPlayer(String(teamId));
   };
 
-  removePlayer(idx: number): void {
-    const { deletePlayer, teamId } = this.props;
+  const removePlayer = (idx: number): void => {
     deletePlayer(String(teamId), idx);
-  }
+  };
 
-  updatePlayer(idx: number): (updatedPlayer: Partial<Player>) => void {
+  const updatePlayer = (
+    idx: number,
+  ): ((updatedPlayer: Partial<Player>) => void) => {
     return (updatedPlayer: Partial<Player>) => {
-      const { editPlayer, teamId } = this.props;
       console.log("updatedPlayer", updatedPlayer);
       editPlayer(String(teamId), idx, updatedPlayer);
     };
-  }
+  };
 
-  fetchPlayerId(idx: number): void {
-    const { team, teamId, group, sex } = this.props;
+  const fetchPlayerId = (idx: number): void => {
     const player = team[idx];
 
     if (!player || !player.name) {
-      this.setState({ error: "Player not found or has no name" });
+      setError("Player not found or has no name");
       return;
     }
 
@@ -107,7 +85,7 @@ class Team extends Component<TeamProps, TeamState> {
         sex,
       },
     };
-    this.setState({ loading: true });
+    setLoading(true);
     axios
       .get<PlayerResponse>(
         `${apiConfig.gateWayUrl}match-report/v2?action=search-for-player`,
@@ -122,25 +100,23 @@ class Team extends Component<TeamProps, TeamState> {
             role: response.data.role || player.role,
             show: player.show,
           };
-          this.updatePlayer(idx)(updatedPlayer);
+          updatePlayer(idx)(updatedPlayer);
         } else {
-          this.setState({
-            error: `No ID found for player ${String(player.name ?? "unknown")}`,
-          });
+          setError(
+            `No ID found for player ${String(player.name ?? "unknown")}`,
+          );
         }
       })
       .catch((e: Error) => {
-        this.setState({ error: e.message });
+        setError(e.message);
       })
       .finally(() => {
-        this.setState({ loading: false });
+        setLoading(false);
       });
-  }
+  };
 
-  submitForm = (event: React.FormEvent<HTMLFormElement>): void => {
-    const { team, selectPlayer, teamName } = this.props;
+  const submitForm = (event: React.FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
-    const { inputValue } = this.state;
     const requestedNumber = parseInt(inputValue, 10);
     let found = false;
     team.forEach((player) => {
@@ -149,84 +125,75 @@ class Team extends Component<TeamProps, TeamState> {
         found = true;
       }
     });
-    this.setState({
-      error: found ? "" : `No player #${inputValue} found`,
-      inputValue: "",
-    });
+    setError(found ? "" : `No player #${inputValue} found`);
+    setInputValue("");
   };
 
-  renderForm(): React.JSX.Element {
-    const { inputValue } = this.state;
+  const renderForm = (): React.JSX.Element => {
     return (
-      <form onSubmit={this.submitForm}>
+      <form onSubmit={submitForm}>
         <input
           type="text"
           value={inputValue}
-          onChange={({ target: { value } }) =>
-            this.setState({ inputValue: value })
-          }
+          onChange={({ target: { value } }) => setInputValue(value)}
           placeholder="# leikmanns og ENTER"
           className="player-input"
         />
       </form>
     );
-  }
+  };
 
-  render(): React.JSX.Element {
-    const { team, selectPlayer, teamName, match, selectedMatch } = this.props;
-    const { error, loading } = this.state;
-    return (
-      <div
-        className="team-asset-container"
-        style={loading ? { backgroundColor: "grey" } : {}}
-      >
-        <span>{error}</span>
-        {selectPlayer ? this.renderForm() : null}
-        <div className="team-name">{match[teamName]}</div>
-        {match[teamName]
-          ? team.map((p, i) => (
-              <div className="player-whole-line" key={String(i)}>
-                {selectPlayer && p.name ? (
-                  <Button
-                    appearance="default"
-                    onClick={() => selectPlayer(p, teamName)}
-                  >{`#${String(p.number ?? (p.role ? p.role[0] : ""))} - ${String(p.name ?? "")}`}</Button>
-                ) : (
-                  <TeamPlayer player={p} onChange={this.updatePlayer(i)} />
-                )}
-                {!selectPlayer && !p.id && (
-                  <IconButton
-                    icon={<ReloadIcon />}
-                    size="xs"
-                    color="blue"
-                    appearance="primary"
-                    circle
-                    onClick={() => this.fetchPlayerId(i)}
-                  />
-                )}
-                {!selectPlayer && (
-                  <IconButton
-                    icon={<CloseIcon />}
-                    size="xs"
-                    color="red"
-                    appearance="primary"
-                    circle
-                    onClick={() => this.removePlayer(i)}
-                  />
-                )}
-              </div>
-            ))
-          : null}
-        {match[teamName] && selectedMatch ? (
-          <div>
-            <button type="button" onClick={this.addEmptyLine}>
-              Ný lína...
-            </button>
-          </div>
-        ) : null}
-      </div>
-    );
-  }
-}
+  return (
+    <div
+      className="team-asset-container"
+      style={loading ? { backgroundColor: "grey" } : {}}
+    >
+      <span>{error}</span>
+      {selectPlayer ? renderForm() : null}
+      <div className="team-name">{displayTeamName}</div>
+      {displayTeamName
+        ? team.map((p, i) => (
+            <div className="player-whole-line" key={String(i)}>
+              {selectPlayer && p.name ? (
+                <Button
+                  appearance="default"
+                  onClick={() => selectPlayer(p, teamName)}
+                >{`#${String(p.number ?? (p.role ? p.role[0] : ""))} - ${String(p.name ?? "")}`}</Button>
+              ) : (
+                <TeamPlayer player={p} onChange={updatePlayer(i)} />
+              )}
+              {!selectPlayer && !p.id && (
+                <IconButton
+                  icon={<ReloadIcon />}
+                  size="xs"
+                  color="blue"
+                  appearance="primary"
+                  circle
+                  onClick={() => fetchPlayerId(i)}
+                />
+              )}
+              {!selectPlayer && (
+                <IconButton
+                  icon={<CloseIcon />}
+                  size="xs"
+                  color="red"
+                  appearance="primary"
+                  circle
+                  onClick={() => removePlayer(i)}
+                />
+              )}
+            </div>
+          ))
+        : null}
+      {displayTeamName && selectedMatch ? (
+        <div>
+          <button type="button" onClick={addEmptyLine}>
+            Ný lína...
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+};
 
-export default connector(Team);
+export default Team;

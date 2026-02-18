@@ -1,8 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { bindActionCreators, Dispatch } from "redux";
-import { connect, ConnectedProps } from "react-redux";
 import { storageHelpers, StorageReference, ListResult } from "../../firebase";
-import controllerActions from "../../actions/controller";
+import { useController } from "../../contexts/FirebaseStateContext";
 import assetTypes from "../asset/AssetTypes";
 import FolderFillIcon from "@rsuite/icons/FolderFill";
 import TrashIcon from "@rsuite/icons/Trash";
@@ -23,7 +21,7 @@ interface FolderData {
   name: string;
 }
 
-interface OwnProps {
+interface ImageListProps {
   prefix: string;
   displayNow: boolean;
   allowEdit: boolean;
@@ -31,28 +29,14 @@ interface OwnProps {
   ts: number | null;
 }
 
-const dispatchToProps = (dispatch: Dispatch) =>
-  bindActionCreators(
-    {
-      renderAsset: controllerActions.renderAsset,
-      addAssets: controllerActions.addAssets,
-    },
-    dispatch,
-  );
-
-const connector = connect(() => ({}), dispatchToProps);
-
-type ImageListProps = ConnectedProps<typeof connector> & OwnProps;
-
 const ImageList: React.FC<ImageListProps> = ({
   prefix,
-  renderAsset,
   displayNow,
-  addAssets,
   allowEdit,
   appendPrefix,
   ts,
 }) => {
+  const { renderAsset, addAssets } = useController();
   const [images, setImages] = useState<ImageData[]>([]);
   const [folders, setFolders] = useState<FolderData[]>([]);
 
@@ -149,4 +133,4 @@ const ImageList: React.FC<ImageListProps> = ({
   );
 };
 
-export default connector(ImageList);
+export default ImageList;

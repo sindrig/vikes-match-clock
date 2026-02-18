@@ -1,11 +1,8 @@
 import { useState } from "react";
-import { connect, ConnectedProps } from "react-redux";
-import { bindActionCreators, Dispatch } from "redux";
-
-import matchActions from "../actions/match";
 import { formatMillisAsTime } from "../utils/timeUtils";
 import { teamToStateKey, translateTeam } from "../utils/matchUtils";
-import { RootState } from "../types";
+import { useMatch } from "../contexts/FirebaseStateContext";
+import { PENALTY_LENGTH } from "../constants";
 
 interface Penalty {
   key: string;
@@ -19,36 +16,15 @@ interface OwnProps {
 
 const MAX_TIMEOUTS_PER_TEAM = 4;
 
-const mapStateToProps = (state: RootState, ownProps: OwnProps) => ({
-  team: ownProps.team,
-  penalties: state.match[
-    teamToStateKey(ownProps.team) as keyof typeof state.match
-  ] as Penalty[],
-  started: state.match.started,
-});
+const PenaltiesManipulationBox = ({ team }: OwnProps) => {
+  const { match, addPenalty, removePenalty, addToPenalty } = useMatch();
+  const started = match.started;
+  const penalties = match[
+    teamToStateKey(team) as keyof typeof match
+  ] as Penalty[];
 
-const mapDispatchToProps = (dispatch: Dispatch) =>
-  bindActionCreators(
-    {
-      addPenalty: matchActions.addPenalty,
-      removePenalty: matchActions.removePenalty,
-      addToPenalty: matchActions.addToPenalty,
-    },
-    dispatch,
-  );
-
-const connector = connect(mapStateToProps, mapDispatchToProps);
-type PropsFromRedux = ConnectedProps<typeof connector>;
-
-const PenaltiesManipulationBox = ({
-  penalties,
-  team,
-  addPenalty,
-  started,
-  removePenalty,
-  addToPenalty,
-}: PropsFromRedux) => {
   const [editingPenalty, setEditingPenalty] = useState<Penalty | null>(null);
+
   return (
     <div className="penalty-manipulation">
       {penalties.map((penalty) => {
@@ -82,7 +58,7 @@ const PenaltiesManipulationBox = ({
           </button>
           <button
             onClick={() => {
-              addToPenalty(editingPenalty.key);
+              addToPenalty(editingPenalty.key, PENALTY_LENGTH);
               setEditingPenalty(null);
             }}
           >
@@ -92,7 +68,7 @@ const PenaltiesManipulationBox = ({
       )}
       <button
         type="button"
-        onClick={() => addPenalty({ team })}
+        onClick={() => addPenalty(team, crypto.randomUUID(), PENALTY_LENGTH)}
         disabled={penalties.length >= MAX_TIMEOUTS_PER_TEAM || !!started}
         className="add-penalty"
       >
@@ -102,4 +78,4 @@ const PenaltiesManipulationBox = ({
   );
 };
 
-export default connector(PenaltiesManipulationBox);
+export default PenaltiesManipulationBox;

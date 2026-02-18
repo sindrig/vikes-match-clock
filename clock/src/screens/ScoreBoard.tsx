@@ -1,5 +1,4 @@
 import { useSyncExternalStore, useCallback, useRef, useEffect } from "react";
-import { connect, ConnectedProps } from "react-redux";
 
 import Team from "../match/Team";
 import Clock from "../match/Clock";
@@ -10,7 +9,8 @@ import clubLogos from "../images/clubLogos";
 import { Sports } from "../constants";
 import buzzer from "../sounds/buzzersound.mp3";
 import { IMAGE_TYPES } from "../controller/media";
-import { Match, RootState } from "../types";
+import { Match } from "../types";
+import { useMatch, useView } from "../contexts/FirebaseStateContext";
 
 import "./ScoreBoard.css";
 
@@ -22,17 +22,12 @@ const getTeam = (id: "home" | "away", match: Match) => {
   };
 };
 
-const stateToProps = ({ match, view: { vp } }: RootState) => ({ match, vp });
-
-const connector = connect(stateToProps);
-
-type ScoreBoardProps = ConnectedProps<typeof connector>;
-
 const BUZZER_DURATION = 3000;
 
 function useBuzzerTimer(buzzerTimestamp: number | false | null): boolean {
   const listenersRef = useRef(new Set<() => void>());
   const showBuzzerRef = useRef(false);
+  const { getServerTime } = useMatch();
 
   const subscribe = useCallback((callback: () => void) => {
     listenersRef.current.add(callback);
@@ -52,7 +47,7 @@ function useBuzzerTimer(buzzerTimestamp: number | false | null): boolean {
       return;
     }
 
-    const now = Date.now();
+    const now = getServerTime();
     const elapsed = now - buzzerTimestamp;
 
     if (elapsed >= 0 && elapsed < BUZZER_DURATION) {
@@ -71,12 +66,17 @@ function useBuzzerTimer(buzzerTimestamp: number | false | null): boolean {
         listenersRef.current.forEach((cb) => cb());
       }
     }
-  }, [buzzerTimestamp]);
+  }, [buzzerTimestamp, getServerTime]);
 
   return useSyncExternalStore(subscribe, getSnapshot);
 }
 
-const ScoreBoard = ({ match, vp }: ScoreBoardProps) => {
+const ScoreBoard = () => {
+  const { match } = useMatch();
+  const {
+    view: { vp },
+  } = useView();
+
   const buzzerTimestamp =
     match.matchType === Sports.Handball ? match.buzzer : null;
   const showBuzzer = useBuzzerTimer(buzzerTimestamp);
@@ -114,4 +114,4 @@ const ScoreBoard = ({ match, vp }: ScoreBoardProps) => {
   );
 };
 
-export default connector(ScoreBoard);
+export default ScoreBoard;

@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { storageHelpers, StorageReference } from "../firebase";
-import { connect, ConnectedProps } from "react-redux";
-import { RootState } from "../types";
+import { useLocalState } from "../contexts/LocalStateContext";
 
 function useInterval(callback: () => void, delay: number): void {
   const savedCallback = useRef<(() => void) | undefined>(undefined);
@@ -19,28 +18,20 @@ function useInterval(callback: () => void, delay: number): void {
   }, [delay]);
 }
 
-interface OwnProps {
+interface AdImageProps {
   imageType: string;
   time?: number;
   blankBetweenImages?: boolean;
   postAdImg?: string | null;
 }
 
-const stateToProps = ({ remote: { listenPrefix } }: RootState) => ({
-  listenPrefix,
-});
-
-const connector = connect(stateToProps);
-
-type AdImageProps = ConnectedProps<typeof connector> & OwnProps;
-
 const AdImage: React.FC<AdImageProps> = ({
   imageType,
   time = 5,
   blankBetweenImages = false,
   postAdImg = null,
-  listenPrefix,
 }) => {
+  const { listenPrefix } = useLocalState();
   const [assets, setAssets] = useState<string[]>([]);
   const [img, setImg] = useState(0);
   const [isBlank, setBlank] = useState(blankBetweenImages);
@@ -80,4 +71,4 @@ const AdImage: React.FC<AdImageProps> = ({
   return <img src={src} className="ad" alt="Ad" />;
 };
 
-export default connector(AdImage);
+export default AdImage;
