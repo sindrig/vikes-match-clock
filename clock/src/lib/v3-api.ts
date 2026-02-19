@@ -1,6 +1,6 @@
 import axios from "axios";
 import apiConfig from "../apiConfig";
-import { AvailableMatches, Player } from "../types";
+import { AvailableMatches, ListenersState, Player } from "../types";
 
 interface Person {
   id: number;
@@ -92,8 +92,10 @@ interface WeatherResponse {
   main: Record<string, unknown>;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function getTeamId(screens: any[], listenPrefix: string): number {
+export function getTeamId(
+  screens: ListenersState["screens"],
+  listenPrefix: string,
+): number {
   const screen = screens.find((s: { key?: string }) => s.key === listenPrefix);
   return screen?.teamId ?? 2492;
 }
