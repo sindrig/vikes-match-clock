@@ -2,15 +2,14 @@ import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import axios from "axios";
 import MatchesOnPitch from "./MatchesOnPitch";
-import apiConfig from "../../../apiConfig";
 
-// Mock axios
-vi.mock("axios");
-const mockedAxios = axios as unknown as {
-  get: ReturnType<typeof vi.fn>;
-};
+vi.mock("../../../lib/v3-api", () => ({
+  fetchMatchesByTeam: vi.fn(),
+  fetchLineups: vi.fn(),
+  transformLineups: vi.fn(),
+  getTeamId: vi.fn(),
+}));
 
 // Mock Firebase context hooks
 vi.mock("../../../contexts/FirebaseStateContext", () => ({
@@ -35,11 +34,21 @@ import {
   useListeners,
 } from "../../../contexts/FirebaseStateContext";
 import { useRemoteSettings } from "../../../contexts/LocalStateContext";
+import {
+  fetchMatchesByTeam,
+  fetchLineups,
+  transformLineups,
+  getTeamId,
+} from "../../../lib/v3-api";
 
 const mockedUseController = vi.mocked(useController);
 const mockedUseMatch = vi.mocked(useMatch);
 const mockedUseListeners = vi.mocked(useListeners);
 const mockedUseRemoteSettings = vi.mocked(useRemoteSettings);
+const mockedFetchMatchesByTeam = vi.mocked(fetchMatchesByTeam);
+const mockedFetchLineups = vi.mocked(fetchLineups);
+const mockedTransformLineups = vi.mocked(transformLineups);
+const mockedGetTeamId = vi.mocked(getTeamId);
 
 describe("MatchesOnPitch", () => {
   const mockSetAvailableMatches = vi.fn();
@@ -75,6 +84,8 @@ describe("MatchesOnPitch", () => {
     mockedUseRemoteSettings.mockReturnValue({
       listenPrefix: "vikinni",
     } as unknown as ReturnType<typeof useRemoteSettings>);
+
+    mockedGetTeamId.mockReturnValue(2492);
   });
 
   describe("Initial render", () => {
@@ -101,28 +112,24 @@ describe("MatchesOnPitch", () => {
 
   describe("fetchMatchesOnPitch", () => {
     it("fetches and displays matches on button click", async () => {
-      const mockMatches = [
-        {
-          match_id: "match-1",
-          date: "2024-01-15",
-          time: "19:00",
-          competition: "Úrvalsdeild",
-          home: { name: "Víkingur" },
-          away: { name: "KR" },
-        },
-        {
-          match_id: "match-2",
-          date: "2024-01-20",
-          time: "15:00",
-          competition: "Bikarinn",
-          home: { name: "ÍBV" },
-          away: { name: "Víkingur" },
-        },
-      ];
+      const v3Match1 = {
+        id: 100,
+        dateTimeUTC: "2024-01-15T19:00:00Z",
+        competition: { id: 1, name: "Úrvalsdeild" },
+        homeTeam: { id: 10, name: "Víkingur" },
+        awayTeam: { id: 20, name: "KR" },
+        liveStatus: "not_started",
+      };
+      const v3Match2 = {
+        id: 200,
+        dateTimeUTC: "2024-01-20T15:00:00Z",
+        competition: { id: 2, name: "Bikarinn" },
+        homeTeam: { id: 30, name: "ÍBV" },
+        awayTeam: { id: 10, name: "Víkingur" },
+        liveStatus: "not_started",
+      };
 
-      mockedAxios.get.mockResolvedValueOnce({
-        data: { matches: mockMatches },
-      });
+      mockedFetchMatchesByTeam.mockResolvedValueOnce([v3Match1, v3Match2]);
 
       const user = userEvent.setup();
       render(<MatchesOnPitch />);
@@ -133,26 +140,35 @@ describe("MatchesOnPitch", () => {
       await user.click(fetchButton);
 
       await waitFor(() => {
-        expect(mockedAxios.get).toHaveBeenCalledWith(
-          `${apiConfig.gateWayUrl}match-report/v2`,
-          {
-            params: {
-              location: "pitch-123",
-              action: "get-matches",
-            },
-          },
-        );
+        expect(mockedFetchMatchesByTeam).toHaveBeenCalledWith(2492);
       });
+
+      const dt1 = new Date(v3Match1.dateTimeUTC);
+      const dt2 = new Date(v3Match2.dateTimeUTC);
+      const label1 = `${dt1.toLocaleDateString("is-IS")} ${dt1.toLocaleTimeString(
+        "is-IS",
+        {
+          hour: "2-digit",
+          minute: "2-digit",
+        },
+      )} ${v3Match1.competition.name} [${v3Match1.homeTeam.name} - ${v3Match1.awayTeam.name}]`;
+      const label2 = `${dt2.toLocaleDateString("is-IS")} ${dt2.toLocaleTimeString(
+        "is-IS",
+        {
+          hour: "2-digit",
+          minute: "2-digit",
+        },
+      )} ${v3Match2.competition.name} [${v3Match2.homeTeam.name} - ${v3Match2.awayTeam.name}]`;
 
       await waitFor(() => {
         expect(
           screen.getByRole("button", {
-            name: /2024-01-15 19:00 Úrvalsdeild \[Víkingur - KR\]/i,
+            name: label1,
           }),
         ).toBeInTheDocument();
         expect(
           screen.getByRole("button", {
-            name: /2024-01-20 15:00 Bikarinn \[ÍBV - Víkingur\]/i,
+            name: label2,
           }),
         ).toBeInTheDocument();
       });
@@ -160,10 +176,8 @@ describe("MatchesOnPitch", () => {
 
     it("shows loading spinner during fetch", async () => {
       const mockImplementationFn = () =>
-        new Promise<{ data: { matches: unknown[] } }>((resolve) =>
-          setTimeout(() => resolve({ data: { matches: [] } }), 100),
-        );
-      mockedAxios.get.mockImplementation(
+        new Promise((resolve) => setTimeout(() => resolve([]), 100));
+      mockedFetchMatchesByTeam.mockImplementation(
         mockImplementationFn as ReturnType<typeof vi.fn>,
       );
 
@@ -183,7 +197,9 @@ describe("MatchesOnPitch", () => {
     });
 
     it("displays error when fetch fails", async () => {
-      mockedAxios.get.mockRejectedValueOnce(new Error("Network error"));
+      mockedFetchMatchesByTeam.mockRejectedValueOnce(
+        new Error("Network error"),
+      );
 
       const user = userEvent.setup();
       render(<MatchesOnPitch />);
@@ -196,37 +212,6 @@ describe("MatchesOnPitch", () => {
       await waitFor(() => {
         expect(screen.getByText("Network error")).toBeInTheDocument();
       });
-    });
-
-    it("displays error when no screen is found", async () => {
-      mockedUseListeners.mockReturnValue({
-        screens: [
-          {
-            screen: {
-              style: { height: 1080, width: 1920 },
-              name: "Other Screen",
-              key: "other-screen",
-            },
-            label: "Other Screen",
-            key: "other-key",
-            pitchIds: ["other-pitch"],
-          },
-        ],
-      } as unknown as ReturnType<typeof useListeners>);
-
-      const user = userEvent.setup();
-      render(<MatchesOnPitch />);
-
-      const fetchButton = screen.getByRole("button", {
-        name: /Sækja leiki á velli/i,
-      });
-      await user.click(fetchButton);
-
-      await waitFor(() => {
-        expect(screen.getByText("No screen found")).toBeInTheDocument();
-      });
-
-      expect(mockedAxios.get).not.toHaveBeenCalled();
     });
   });
 
@@ -242,23 +227,28 @@ describe("MatchesOnPitch", () => {
     });
 
     it("prompts for match ID and fetches report", async () => {
-      promptSpy.mockReturnValue("match-123");
+      promptSpy.mockReturnValue("123");
 
       const mockReportData = {
-        players: {
-          home: [
-            { name: "Player 1", number: 10 },
-            { name: "Player 2", number: 7 },
-          ],
-          away: [{ name: "Player 3", number: 9 }],
-        },
-        group: "U19",
-        sex: "M",
+        home: { players: [], officials: [] },
+        away: { players: [], officials: [] },
+      };
+      const mockPlayers = {
+        "10": [{ name: "Player 1", number: 10, show: true }],
+        "20": [{ name: "Player 3", number: 9, show: true }],
+      };
+      const v3Match = {
+        id: 123,
+        dateTimeUTC: "2024-01-15T19:00:00Z",
+        competition: { id: 1, name: "U19" },
+        homeTeam: { id: 10, name: "Víkingur" },
+        awayTeam: { id: 20, name: "KR" },
+        liveStatus: "not_started",
       };
 
-      mockedAxios.get.mockResolvedValueOnce({
-        data: mockReportData,
-      });
+      mockedFetchLineups.mockResolvedValueOnce(mockReportData);
+      mockedFetchMatchesByTeam.mockResolvedValueOnce([v3Match]);
+      mockedTransformLineups.mockReturnValue(mockPlayers);
 
       const user = userEvent.setup();
       render(<MatchesOnPitch />);
@@ -271,23 +261,14 @@ describe("MatchesOnPitch", () => {
       expect(promptSpy).toHaveBeenCalledWith("ID á leikskýrslu");
 
       await waitFor(() => {
-        expect(mockedAxios.get).toHaveBeenCalledWith(
-          `${apiConfig.gateWayUrl}match-report/v2`,
-          {
-            params: {
-              matchId: "match-123",
-              action: "get-report",
-            },
-          },
-        );
+        expect(mockedFetchLineups).toHaveBeenCalledWith(2492, 123);
       });
 
       await waitFor(() => {
         expect(mockSetAvailableMatches).toHaveBeenCalledWith({
-          "match-123": {
-            players: mockReportData.players,
-            group: mockReportData.group,
-            sex: mockReportData.sex,
+          "123": {
+            players: mockPlayers,
+            group: "U19",
           },
         });
       });
@@ -305,7 +286,7 @@ describe("MatchesOnPitch", () => {
       await user.click(reportButton);
 
       expect(promptSpy).toHaveBeenCalledWith("ID á leikskýrslu");
-      expect(mockedAxios.get).not.toHaveBeenCalled();
+      expect(mockedFetchLineups).not.toHaveBeenCalled();
     });
 
     it("does nothing when prompt returns empty string", async () => {
@@ -320,12 +301,12 @@ describe("MatchesOnPitch", () => {
       await user.click(reportButton);
 
       expect(promptSpy).toHaveBeenCalledWith("ID á leikskýrslu");
-      expect(mockedAxios.get).not.toHaveBeenCalled();
+      expect(mockedFetchLineups).not.toHaveBeenCalled();
     });
 
     it("displays error when fetch fails", async () => {
       promptSpy.mockReturnValue("match-123");
-      mockedAxios.get.mockRejectedValueOnce(new Error("API error"));
+      mockedFetchLineups.mockRejectedValueOnce(new Error("API error"));
 
       const user = userEvent.setup();
       render(<MatchesOnPitch />);

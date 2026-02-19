@@ -1,26 +1,30 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import axios from "axios";
-
 import TeamAssetController from "./TeamAssetController";
 import { Asset, Player, AvailableMatches } from "../../../types";
 import {
   useController,
   useMatch,
+  useListeners,
 } from "../../../contexts/FirebaseStateContext";
 import { useRemoteSettings } from "../../../contexts/LocalStateContext";
+import { fetchAvailableMatches, getTeamId } from "../../../lib/v3-api";
 
 vi.mock("../../../contexts/FirebaseStateContext", () => ({
   useMatch: vi.fn(),
   useController: vi.fn(),
+  useListeners: vi.fn(),
 }));
 
 vi.mock("../../../contexts/LocalStateContext", () => ({
   useRemoteSettings: vi.fn(),
 }));
 
-vi.mock("axios");
+vi.mock("../../../lib/v3-api", () => ({
+  fetchAvailableMatches: vi.fn(),
+  getTeamId: vi.fn(),
+}));
 
 vi.mock("./Team", () => ({
   default: ({
@@ -90,9 +94,10 @@ import { getPlayerAssetObject, getMOTMAsset } from "./assetHelpers";
 
 const mockedUseMatch = vi.mocked(useMatch);
 const mockedUseController = vi.mocked(useController);
+const mockedUseListeners = vi.mocked(useListeners);
 const mockedUseRemoteSettings = vi.mocked(useRemoteSettings);
-const mockedAxiosGet = vi.fn<typeof axios.get>();
-axios.get = mockedAxiosGet;
+const mockedFetchAvailableMatches = vi.mocked(fetchAvailableMatches);
+const mockedGetTeamId = vi.mocked(getTeamId);
 const mockedGetPlayerAssetObject = vi.mocked(getPlayerAssetObject);
 const mockedGetMOTMAsset = vi.mocked(getMOTMAsset);
 
@@ -200,6 +205,12 @@ function setupMocks(overrides?: {
   mockedUseRemoteSettings.mockReturnValue({
     listenPrefix: "vikinni",
   } as unknown as ReturnType<typeof useRemoteSettings>);
+
+  mockedUseListeners.mockReturnValue({
+    screens: [{ key: "vikinni", teamId: 2492 }],
+  } as unknown as ReturnType<typeof useListeners>);
+
+  mockedGetTeamId.mockReturnValue(2492);
 
   return { mockClearMatchPlayers, mockSetAvailableMatches };
 }
@@ -331,7 +342,7 @@ describe("TeamAssetController", () => {
     it("calls axios and sets available matches on success", async () => {
       const { mockSetAvailableMatches } = setupMocks();
 
-      mockedAxiosGet.mockResolvedValueOnce({ data: mockAvailableMatches });
+      mockedFetchAvailableMatches.mockResolvedValueOnce(mockAvailableMatches);
 
       render(
         <TeamAssetController
@@ -348,10 +359,7 @@ describe("TeamAssetController", () => {
         expect(screen.queryByTestId("ring-loader")).not.toBeInTheDocument();
       });
 
-      expect(mockedAxiosGet).toHaveBeenCalledWith(
-        "https://clock-api.irdn.is/match-report",
-        { params: { homeTeam: "103", awayTeam: "107" } },
-      );
+      expect(mockedFetchAvailableMatches).toHaveBeenCalledWith(2492);
 
       expect(mockSetAvailableMatches).toHaveBeenCalledWith(
         mockAvailableMatches,
@@ -361,7 +369,9 @@ describe("TeamAssetController", () => {
     it("shows error on API failure", async () => {
       setupMocks();
 
-      mockedAxiosGet.mockRejectedValueOnce(new Error("Network error"));
+      mockedFetchAvailableMatches.mockRejectedValueOnce(
+        new Error("Network error"),
+      );
 
       render(
         <TeamAssetController
@@ -1088,7 +1098,7 @@ describe("TeamAssetController", () => {
       const neverResolves = new Promise<never>(
         Function.prototype as () => void,
       );
-      mockedAxiosGet.mockReturnValue(neverResolves);
+      mockedFetchAvailableMatches.mockReturnValue(neverResolves);
 
       render(
         <TeamAssetController
@@ -1108,7 +1118,7 @@ describe("TeamAssetController", () => {
       const neverResolves = new Promise<never>(
         Function.prototype as () => void,
       );
-      mockedAxiosGet.mockReturnValue(neverResolves);
+      mockedFetchAvailableMatches.mockReturnValue(neverResolves);
 
       render(
         <TeamAssetController
