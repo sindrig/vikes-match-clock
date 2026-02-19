@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { RingLoader } from "react-spinners";
 
-import { Player } from "../../../types";
 import {
   useController,
   useMatch,
