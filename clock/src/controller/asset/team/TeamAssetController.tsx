@@ -50,9 +50,7 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
   const [selectMOTM, setSelectMOTM] = useState(false);
   const [effect, setEffect] = useState("blink");
 
-  const getAvailableMatchesV3 = (
-    teamId: number,
-  ): Promise<AvailableMatches> => {
+  const getAvailableMatchesV3 = (teamId: number): Promise<AvailableMatches> => {
     return fetchAvailableMatches(teamId).then((data) => {
       setAvailableMatches(data);
       return data;
@@ -363,9 +361,7 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
     );
   };
 
-  const renderTeam = (
-    teamName: "homeTeam" | "awayTeam",
-  ): React.JSX.Element => {
+  const renderTeam = (teamName: "homeTeam" | "awayTeam"): React.JSX.Element => {
     let selectPlayerAction:
       | ((player: Player, teamName: string) => void)
       | null = null;

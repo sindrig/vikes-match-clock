@@ -118,9 +118,7 @@ const MatchesOnPitch = (): React.JSX.Element => {
     const matchId = Number(match.match_id);
 
     try {
-      const v3Match = v3Matches.find(
-        (m) => String(m.id) === match.match_id,
-      );
+      const v3Match = v3Matches.find((m) => String(m.id) === match.match_id);
       const lineups = await fetchLineups(teamId, matchId);
       if (v3Match) {
         const players = transformLineups(lineups, v3Match);
