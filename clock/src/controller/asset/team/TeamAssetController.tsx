@@ -1,9 +1,6 @@
 import React, { useState } from "react";
-import axios from "axios";
 
 import { RingLoader } from "react-spinners";
-import clubIds from "../../../club-ids";
-import apiConfig from "../../../apiConfig";
 
 import Team from "./Team";
 import SubView from "./SubView";
@@ -14,8 +11,10 @@ import { Asset, Player, AvailableMatches } from "../../../types";
 import {
   useController,
   useMatch,
+  useListeners,
 } from "../../../contexts/FirebaseStateContext";
 import { useRemoteSettings } from "../../../contexts/LocalStateContext";
+import { fetchAvailableMatches, getTeamId } from "../../../lib/v3-api";
 
 interface SubPlayer extends Player {
   teamName: string;
@@ -37,6 +36,7 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
     clearMatchPlayers,
     setAvailableMatches,
   } = useController();
+  const { screens } = useListeners();
   const { listenPrefix } = useRemoteSettings();
 
   const [loading, setLoading] = useState(false);
@@ -50,28 +50,21 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
   const [selectMOTM, setSelectMOTM] = useState(false);
   const [effect, setEffect] = useState("blink");
 
-  const getAvailableMatches = (homeTeam: string, awayTeam: string) => {
-    const options = {
-      params: {
-        homeTeam: clubIds[homeTeam as keyof typeof clubIds],
-        awayTeam: clubIds[awayTeam as keyof typeof clubIds],
-      },
-    };
-    return axios
-      .get<AvailableMatches>(`${apiConfig.gateWayUrl}match-report`, options)
-      .then((response) => {
-        setAvailableMatches(response.data);
-      });
+  const getAvailableMatchesV3 = (
+    teamId: number,
+  ): Promise<AvailableMatches> => {
+    return fetchAvailableMatches(teamId).then((data) => {
+      setAvailableMatches(data);
+      return data;
+    });
   };
 
   const getTeamPlayers = (): { homeTeam: Player[]; awayTeam: Player[] } => {
-    const { homeTeam, awayTeam } = match;
     const selectedMatchObj = selectedMatch
       ? availableMatches[selectedMatch]
       : undefined;
-    const clubIdsMap = clubIds as Record<string, string>;
-    const homeTeamId = clubIdsMap[homeTeam];
-    const awayTeamId = clubIdsMap[awayTeam];
+    const homeTeamId = String(match.homeTeamId);
+    const awayTeamId = String(match.awayTeamId);
     return {
       homeTeam:
         selectedMatchObj?.players && homeTeamId
@@ -228,7 +221,8 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
       return;
     }
     setLoading(true);
-    void getAvailableMatches(homeTeam, awayTeam)
+    const teamId = getTeamId(screens, listenPrefix);
+    void getAvailableMatchesV3(teamId)
       .then(() => setError(""))
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
@@ -369,7 +363,9 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
     );
   };
 
-  const renderTeam = (teamName: "homeTeam" | "awayTeam"): React.JSX.Element => {
+  const renderTeam = (
+    teamName: "homeTeam" | "awayTeam",
+  ): React.JSX.Element => {
     let selectPlayerAction:
       | ((player: Player, teamName: string) => void)
       | null = null;

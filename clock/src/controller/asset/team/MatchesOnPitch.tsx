@@ -1,8 +1,6 @@
 import React, { useState } from "react";
-import axios from "axios";
 import { RingLoader } from "react-spinners";
 
-import apiConfig from "../../../apiConfig";
 import { Player } from "../../../types";
 import {
   useController,
@@ -10,6 +8,13 @@ import {
   useListeners,
 } from "../../../contexts/FirebaseStateContext";
 import { useRemoteSettings } from "../../../contexts/LocalStateContext";
+import {
+  fetchMatchesByTeam,
+  fetchLineups,
+  transformLineups,
+  getTeamId,
+  V3Match,
+} from "../../../lib/v3-api";
 
 interface MatchData {
   match_id: string;
@@ -24,16 +29,6 @@ interface MatchData {
   };
 }
 
-interface MatchReportResponse {
-  players: Record<string, Player[]>;
-  group?: string;
-  sex?: string;
-}
-
-interface MatchesResponse {
-  matches: MatchData[];
-}
-
 const MatchesOnPitch = (): React.JSX.Element => {
   const { setAvailableMatches } = useController();
   const { updateMatch } = useMatch();
@@ -43,33 +38,31 @@ const MatchesOnPitch = (): React.JSX.Element => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [matches, setMatches] = useState<MatchData[]>([]);
+  const [v3Matches, setV3Matches] = useState<V3Match[]>([]);
 
   const fetchMatchesOnPitch = async (): Promise<void> => {
-    const matching = screens.filter(({ key }) => {
-      return key === listenPrefix;
-    });
-    if (!matching.length) {
-      setError("No screen found");
-      return;
-    }
+    const teamId = getTeamId(screens, listenPrefix);
     setLoading(true);
 
-    const firstMatch = matching[0];
-    const options = {
-      params: {
-        location: firstMatch?.pitchIds?.[0],
-        action: "get-matches",
-      },
-    };
     try {
-      const {
-        data: { matches: fetchedMatches },
-      } = await axios.get<MatchesResponse>(
-        `${apiConfig.gateWayUrl}match-report/v2`,
-        options,
-      );
+      const fetched = await fetchMatchesByTeam(teamId);
+      const mapped: MatchData[] = fetched.map((match) => {
+        const dt = new Date(match.dateTimeUTC);
+        return {
+          match_id: String(match.id),
+          date: dt.toLocaleDateString("is-IS"),
+          time: dt.toLocaleTimeString("is-IS", {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+          competition: match.competition.name,
+          home: { name: match.homeTeam.name },
+          away: { name: match.awayTeam.name },
+        };
+      });
       setError("");
-      setMatches(fetchedMatches);
+      setMatches(mapped);
+      setV3Matches(fetched);
       setLoading(false);
     } catch (e) {
       const err = e as Error;
@@ -82,24 +75,26 @@ const MatchesOnPitch = (): React.JSX.Element => {
     const matchId = prompt("ID á leikskýrslu");
     if (!matchId) return;
 
+    const teamId = getTeamId(screens, listenPrefix);
     setLoading(true);
 
-    const options = {
-      params: {
-        matchId,
-        action: "get-report",
-      },
-    };
     try {
-      const { data } = await axios.get<MatchReportResponse>(
-        `${apiConfig.gateWayUrl}match-report/v2`,
-        options,
-      );
+      const lineups = await fetchLineups(teamId, Number(matchId));
+      let v3Match = v3Matches.find((m) => String(m.id) === matchId);
+      if (!v3Match) {
+        const freshMatches = await fetchMatchesByTeam(teamId);
+        v3Match = freshMatches.find((m) => String(m.id) === matchId);
+      }
+      if (!v3Match) {
+        setError("Match not found");
+        setLoading(false);
+        return;
+      }
+      const players = transformLineups(lineups, v3Match);
       setAvailableMatches({
         [matchId]: {
-          players: data.players,
-          group: data.group,
-          sex: data.sex,
+          players,
+          group: v3Match.competition.name,
         },
       });
       setError("");
@@ -114,32 +109,29 @@ const MatchesOnPitch = (): React.JSX.Element => {
 
   const selectMatchHandler = async (match: MatchData): Promise<void> => {
     setLoading(true);
-    const home = match.home;
-    const away = match.away;
     updateMatch({
-      homeTeam: home.name,
-      awayTeam: away.name,
+      homeTeam: match.home.name,
+      awayTeam: match.away.name,
       matchStartTime: match.time,
     });
 
-    const options = {
-      params: {
-        matchId: match.match_id,
-        action: "get-report",
-      },
-    };
+    const teamId = getTeamId(screens, listenPrefix);
+    const matchId = Number(match.match_id);
+
     try {
-      const { data } = await axios.get<MatchReportResponse>(
-        `${apiConfig.gateWayUrl}match-report/v2`,
-        options,
+      const v3Match = v3Matches.find(
+        (m) => String(m.id) === match.match_id,
       );
-      setAvailableMatches({
-        [match.match_id]: {
-          players: data.players,
-          group: data.group,
-          sex: data.sex,
-        },
-      });
+      const lineups = await fetchLineups(teamId, matchId);
+      if (v3Match) {
+        const players = transformLineups(lineups, v3Match);
+        setAvailableMatches({
+          [match.match_id]: {
+            players,
+            group: v3Match.competition.name,
+          },
+        });
+      }
       setError("");
       setLoading(false);
       setMatches([]);

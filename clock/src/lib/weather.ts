@@ -1,20 +1,18 @@
-import axios from "axios";
-import apiConfig from "../apiConfig";
+import { fetchWeather } from "./v3-api";
 
-interface WeatherResponse {
-  temp?: number;
-}
-
-export const getTemp = () =>
-  axios
-    .get<WeatherResponse>(`${apiConfig.gateWayUrl}currentWeather`)
-    .then(({ data }) => {
-      const temperature = Math.ceil(data?.temp ?? NaN);
-      if (!Number.isNaN(temperature)) {
-        return temperature;
-      }
-      console.log("Received strange temperature:", data);
-      return null;
-    });
+export const getTemp = async () => {
+  try {
+    const { temp } = await fetchWeather();
+    const temperature = Math.ceil(temp ?? NaN);
+    if (!Number.isNaN(temperature)) {
+      return temperature;
+    }
+    console.log("Received strange temperature:", temp);
+    return null;
+  } catch (error) {
+    console.error("Failed to fetch weather:", error);
+    return null;
+  }
+};
 
 export default getTemp;

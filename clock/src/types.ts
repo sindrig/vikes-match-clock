@@ -151,6 +151,7 @@ export interface ListenersState {
     label: string;
     key: string;
     pitchIds?: string[];
+    teamId?: number;
   }>;
 }
 
