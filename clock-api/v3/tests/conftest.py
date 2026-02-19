@@ -52,6 +52,6 @@ def mock_weather_api_key():
 
 @pytest_asyncio.fixture
 async def ksi_client():
-    client = KsiClient()
+    client = KsiClient(api_key="test-key")
     yield client
     await client.close()

@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 from fastapi.testclient import TestClient
@@ -23,10 +23,9 @@ def mock_ksi_client():
 
 @pytest.fixture
 def test_client(mock_ksi_client):
-    app.dependency_overrides[get_ksi_client] = lambda: mock_ksi_client
+    app.dependency_overrides[get_ksi_client] = lambda team_id: mock_ksi_client
 
-    with patch("app.routers.matches.get_ksi_api_key", return_value="test-key"):
-        yield TestClient(app)
+    yield TestClient(app)
 
     app.dependency_overrides.clear()
 
@@ -77,7 +76,7 @@ class TestGetEvents:
 
         test_client.get("/42/matches/99999/events")
 
-        mock_ksi_client.get_events.assert_called_once_with(99999, "test-key")
+        mock_ksi_client.get_events.assert_called_once_with(99999)
 
 
 class TestGetMatchInfo:
@@ -120,6 +119,4 @@ class TestGetMatchInfo:
 
         test_client.get("/42/matches/12345/info")
 
-        mock_ksi_client.get_match_info.assert_called_once_with(
-            12345, "test-key"
-        )
+        mock_ksi_client.get_match_info.assert_called_once_with(12345)

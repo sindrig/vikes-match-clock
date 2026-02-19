@@ -16,7 +16,8 @@ def get_ksi_api_key(team_id: int) -> str:
         return response["Parameter"]["Value"]
     except KeyError:
         raise HTTPException(
-            status_code=500, detail="KSI API key not found for team_id: {team_id}"
+            status_code=500,
+            detail="KSI API key not found for team_id: {team_id}",
         )
 
 
@@ -26,5 +27,6 @@ def get_weather_api_key() -> str:
     return response["Parameter"]["Value"]
 
 
-def get_ksi_client() -> KsiClient:
-    return KsiClient()
+def get_ksi_client(team_id: int) -> KsiClient:
+    api_key = get_ksi_api_key(team_id)
+    return KsiClient(api_key=api_key)

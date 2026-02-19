@@ -5,6 +5,7 @@ from httpx import Response
 
 from app.main import app
 from app.models.matches import LineupsResponse, Match
+from app.services.ksi import KsiClient
 
 BASE_URL = "https://api-ksi.analyticom.de"
 
@@ -31,7 +32,7 @@ async def test_get_matches_success(ksi_client):
         )
     )
 
-    matches = await ksi_client.get_matches("20250615", 0, 1, "test-key")
+    matches = await ksi_client.get_matches("20250615", 0, 1)
 
     assert len(matches) == 1
     assert matches[0].id == 12345
@@ -48,7 +49,7 @@ async def test_get_matches_empty(ksi_client):
         return_value=Response(200, json=[])
     )
 
-    matches = await ksi_client.get_matches("20250615", 0, 1, "test-key")
+    matches = await ksi_client.get_matches("20250615", 0, 1)
 
     assert matches == []
 
@@ -80,7 +81,7 @@ async def test_get_lineups_success(ksi_client):
         )
     )
 
-    lineups = await ksi_client.get_lineups(12345, "test-key")
+    lineups = await ksi_client.get_lineups(12345)
 
     assert isinstance(lineups, LineupsResponse)
     assert len(lineups.home.players) == 1
@@ -113,7 +114,7 @@ async def test_get_events_success(ksi_client):
         )
     )
 
-    events = await ksi_client.get_events(12345, "test-key")
+    events = await ksi_client.get_events(12345)
 
     assert len(events) == 2
     assert events[0].eventId == 1
@@ -149,7 +150,7 @@ async def test_get_match_info_success(ksi_client):
         )
     )
 
-    match = await ksi_client.get_match_info(12345, "test-key")
+    match = await ksi_client.get_match_info(12345)
 
     assert isinstance(match, Match)
     assert match.id == 12345
@@ -167,7 +168,7 @@ async def test_get_matches_http_error(ksi_client):
     )
 
     with pytest.raises(httpx.HTTPStatusError) as exc_info:
-        await ksi_client.get_matches("20250615", 0, 1, "test-key")
+        await ksi_client.get_matches("20250615", 0, 1)
 
     assert exc_info.value.response.status_code == 500
 
@@ -180,19 +181,21 @@ async def test_get_match_info_not_found(ksi_client):
     )
 
     with pytest.raises(httpx.HTTPStatusError) as exc_info:
-        await ksi_client.get_match_info(99999, "test-key")
+        await ksi_client.get_match_info(99999)
 
     assert exc_info.value.response.status_code == 404
 
 
 @pytest.mark.asyncio
 @respx.mock
-async def test_get_matches_sends_api_key_header(ksi_client):
+async def test_get_matches_sends_api_key_header():
+    client = KsiClient(api_key="my-secret-key")
     route = respx.get(f"{BASE_URL}/api/live/matchList/20250615/0").mock(
         return_value=Response(200, json=[])
     )
 
-    await ksi_client.get_matches("20250615", 0, 1, "my-secret-key")
+    await client.get_matches("20250615", 0, 1)
+    await client.close()
 
     assert route.called
     request = route.calls[0].request
@@ -212,7 +215,7 @@ MOCK_MATCH_DATA = [
 
 
 def test_endpoint_get_matches_date_success(client):
-    from unittest.mock import AsyncMock, patch
+    from unittest.mock import AsyncMock
 
     from app.dependencies import get_ksi_client
     from app.models.matches import Match
@@ -222,10 +225,9 @@ def test_endpoint_get_matches_date_success(client):
     mock_client = AsyncMock()
     mock_client.get_matches.return_value = mock_matches
 
-    app.dependency_overrides[get_ksi_client] = lambda: mock_client
+    app.dependency_overrides[get_ksi_client] = lambda team_id: mock_client
 
-    with patch("app.routers.matches.get_ksi_api_key", return_value="test-key"):
-        response = client.get("/1/matches/2025-06-15")
+    response = client.get("/1/matches/2025-06-15")
 
     assert response.status_code == 200
     data = response.json()
@@ -235,48 +237,42 @@ def test_endpoint_get_matches_date_success(client):
     assert data[0]["awayTeam"]["name"] == "KR"
     assert data[0]["liveStatus"] == "SCHEDULED"
 
-    mock_client.get_matches.assert_called_once_with(
-        "20250615", 0, 1, "test-key"
-    )
+    mock_client.get_matches.assert_called_once_with("20250615", 0, 1)
 
     app.dependency_overrides.clear()
 
 
 def test_endpoint_get_matches_date_with_utc_offset(client):
-    from unittest.mock import AsyncMock, patch
+    from unittest.mock import AsyncMock
 
     from app.dependencies import get_ksi_client
 
     mock_client = AsyncMock()
     mock_client.get_matches.return_value = []
 
-    app.dependency_overrides[get_ksi_client] = lambda: mock_client
+    app.dependency_overrides[get_ksi_client] = lambda team_id: mock_client
 
-    with patch("app.routers.matches.get_ksi_api_key", return_value="test-key"):
-        response = client.get("/1/matches/2025-06-15?utc_offset=-3")
+    response = client.get("/1/matches/2025-06-15?utc_offset=-3")
 
     assert response.status_code == 200
     assert response.json() == []
 
-    mock_client.get_matches.assert_called_once_with(
-        "20250615", -3, 1, "test-key"
-    )
+    mock_client.get_matches.assert_called_once_with("20250615", -3, 1)
 
     app.dependency_overrides.clear()
 
 
 def test_endpoint_get_matches_date_empty(client):
-    from unittest.mock import AsyncMock, patch
+    from unittest.mock import AsyncMock
 
     from app.dependencies import get_ksi_client
 
     mock_client = AsyncMock()
     mock_client.get_matches.return_value = []
 
-    app.dependency_overrides[get_ksi_client] = lambda: mock_client
+    app.dependency_overrides[get_ksi_client] = lambda team_id: mock_client
 
-    with patch("app.routers.matches.get_ksi_api_key", return_value="test-key"):
-        response = client.get("/99/matches/2025-01-01")
+    response = client.get("/99/matches/2025-01-01")
 
     assert response.status_code == 200
     assert response.json() == []
@@ -285,7 +281,7 @@ def test_endpoint_get_matches_date_empty(client):
 
 
 def test_endpoint_get_lineups_success(client):
-    from unittest.mock import AsyncMock, patch
+    from unittest.mock import AsyncMock
 
     from app.dependencies import get_ksi_client
     from app.models.matches import (
@@ -338,10 +334,9 @@ def test_endpoint_get_lineups_success(client):
     mock_client = AsyncMock()
     mock_client.get_lineups.return_value = mock_lineups
 
-    app.dependency_overrides[get_ksi_client] = lambda: mock_client
+    app.dependency_overrides[get_ksi_client] = lambda team_id: mock_client
 
-    with patch("app.routers.matches.get_ksi_api_key", return_value="test-key"):
-        response = client.get("/1/matches/12345/lineups")
+    response = client.get("/1/matches/12345/lineups")
 
     assert response.status_code == 200
     data = response.json()
@@ -361,13 +356,13 @@ def test_endpoint_get_lineups_success(client):
     assert data["away"]["players"][0]["captain"] is True
     assert data["away"]["officials"] == []
 
-    mock_client.get_lineups.assert_called_once_with(12345, "test-key")
+    mock_client.get_lineups.assert_called_once_with(12345)
 
     app.dependency_overrides.clear()
 
 
 def test_endpoint_get_lineups_empty_lineups(client):
-    from unittest.mock import AsyncMock, patch
+    from unittest.mock import AsyncMock
 
     from app.dependencies import get_ksi_client
     from app.models.matches import LineupsResponse, TeamLineup
@@ -380,10 +375,9 @@ def test_endpoint_get_lineups_empty_lineups(client):
     mock_client = AsyncMock()
     mock_client.get_lineups.return_value = mock_lineups
 
-    app.dependency_overrides[get_ksi_client] = lambda: mock_client
+    app.dependency_overrides[get_ksi_client] = lambda team_id: mock_client
 
-    with patch("app.routers.matches.get_ksi_api_key", return_value="test-key"):
-        response = client.get("/1/matches/99999/lineups")
+    response = client.get("/1/matches/99999/lineups")
 
     assert response.status_code == 200
     data = response.json()
