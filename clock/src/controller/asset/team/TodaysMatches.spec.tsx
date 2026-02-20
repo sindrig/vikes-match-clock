@@ -2,7 +2,7 @@ import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import MatchesOnPitch from "./MatchesOnPitch";
+import TodaysMatches from "./TodaysMatches";
 
 vi.mock("../../../lib/v3-api", () => ({
   fetchMatchesByTeam: vi.fn(),
@@ -50,7 +50,7 @@ const mockedFetchLineups = vi.mocked(fetchLineups);
 const mockedTransformLineups = vi.mocked(transformLineups);
 const mockedGetTeamId = vi.mocked(getTeamId);
 
-describe("MatchesOnPitch", () => {
+describe("TodaysMatches", () => {
   const mockSetAvailableMatches = vi.fn();
   const mockUpdateMatch = vi.fn();
 
@@ -90,10 +90,10 @@ describe("MatchesOnPitch", () => {
 
   describe("Initial render", () => {
     it("renders initial state with two action buttons", () => {
-      render(<MatchesOnPitch />);
+      render(<TodaysMatches />);
 
       expect(
-        screen.getByRole("button", { name: /Sækja leiki á velli/i }),
+        screen.getByRole("button", { name: /Sækja leiki í dag/i }),
       ).toBeInTheDocument();
       expect(
         screen.getByRole("button", { name: /Slá inn ID leikskýrslu/i }),
@@ -102,7 +102,7 @@ describe("MatchesOnPitch", () => {
     });
 
     it("does not show error message initially", () => {
-      render(<MatchesOnPitch />);
+      render(<TodaysMatches />);
 
       const errorSpan = screen.getByText("", { selector: "span.error" });
       expect(errorSpan).toBeInTheDocument();
@@ -110,7 +110,7 @@ describe("MatchesOnPitch", () => {
     });
   });
 
-  describe("fetchMatchesOnPitch", () => {
+  describe("fetchTodaysMatches", () => {
     it("fetches and displays matches on button click", async () => {
       const v3Match1 = {
         id: 100,
@@ -132,10 +132,10 @@ describe("MatchesOnPitch", () => {
       mockedFetchMatchesByTeam.mockResolvedValueOnce([v3Match1, v3Match2]);
 
       const user = userEvent.setup();
-      render(<MatchesOnPitch />);
+      render(<TodaysMatches />);
 
       const fetchButton = screen.getByRole("button", {
-        name: /Sækja leiki á velli/i,
+        name: /Sækja leiki í dag/i,
       });
       await user.click(fetchButton);
 
@@ -182,10 +182,10 @@ describe("MatchesOnPitch", () => {
       );
 
       const user = userEvent.setup();
-      render(<MatchesOnPitch />);
+      render(<TodaysMatches />);
 
       const fetchButton = screen.getByRole("button", {
-        name: /Sækja leiki á velli/i,
+        name: /Sækja leiki í dag/i,
       });
       await user.click(fetchButton);
 
@@ -202,10 +202,10 @@ describe("MatchesOnPitch", () => {
       );
 
       const user = userEvent.setup();
-      render(<MatchesOnPitch />);
+      render(<TodaysMatches />);
 
       const fetchButton = screen.getByRole("button", {
-        name: /Sækja leiki á velli/i,
+        name: /Sækja leiki í dag/i,
       });
       await user.click(fetchButton);
 
@@ -251,7 +251,7 @@ describe("MatchesOnPitch", () => {
       mockedTransformLineups.mockReturnValue(mockPlayers);
 
       const user = userEvent.setup();
-      render(<MatchesOnPitch />);
+      render(<TodaysMatches />);
 
       const reportButton = screen.getByRole("button", {
         name: /Slá inn ID leikskýrslu/i,
@@ -278,7 +278,7 @@ describe("MatchesOnPitch", () => {
       promptSpy.mockReturnValue(null);
 
       const user = userEvent.setup();
-      render(<MatchesOnPitch />);
+      render(<TodaysMatches />);
 
       const reportButton = screen.getByRole("button", {
         name: /Slá inn ID leikskýrslu/i,
@@ -293,7 +293,7 @@ describe("MatchesOnPitch", () => {
       promptSpy.mockReturnValue("");
 
       const user = userEvent.setup();
-      render(<MatchesOnPitch />);
+      render(<TodaysMatches />);
 
       const reportButton = screen.getByRole("button", {
         name: /Slá inn ID leikskýrslu/i,
@@ -309,7 +309,7 @@ describe("MatchesOnPitch", () => {
       mockedFetchLineups.mockRejectedValueOnce(new Error("API error"));
 
       const user = userEvent.setup();
-      render(<MatchesOnPitch />);
+      render(<TodaysMatches />);
 
       const reportButton = screen.getByRole("button", {
         name: /Slá inn ID leikskýrslu/i,

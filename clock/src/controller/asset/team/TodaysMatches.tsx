@@ -28,7 +28,7 @@ interface MatchData {
   };
 }
 
-const MatchesOnPitch = (): React.JSX.Element => {
+const TodaysMatches = (): React.JSX.Element => {
   const { setAvailableMatches } = useController();
   const { updateMatch } = useMatch();
   const { screens } = useListeners();
@@ -39,7 +39,7 @@ const MatchesOnPitch = (): React.JSX.Element => {
   const [matches, setMatches] = useState<MatchData[]>([]);
   const [v3Matches, setV3Matches] = useState<V3Match[]>([]);
 
-  const fetchMatchesOnPitch = async (): Promise<void> => {
+  const fetchTodaysMatches = async (): Promise<void> => {
     const teamId = getTeamId(screens, listenPrefix);
     setLoading(true);
 
@@ -147,10 +147,10 @@ const MatchesOnPitch = (): React.JSX.Element => {
           <button
             type="button"
             onClick={() => {
-              void fetchMatchesOnPitch();
+              void fetchTodaysMatches();
             }}
           >
-            Sækja leiki á velli
+            Sækja leiki í dag
           </button>
           <button
             type="button"
@@ -186,4 +186,4 @@ const MatchesOnPitch = (): React.JSX.Element => {
   );
 };
 
-export default MatchesOnPitch;
+export default TodaysMatches;
