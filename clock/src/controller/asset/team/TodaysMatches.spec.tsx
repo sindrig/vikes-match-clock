@@ -51,7 +51,7 @@ const mockedTransformLineups = vi.mocked(transformLineups);
 const mockedGetTeamId = vi.mocked(getTeamId);
 
 describe("TodaysMatches", () => {
-  const mockSetAvailableMatches = vi.fn();
+  const mockSetRoster = vi.fn();
   const mockUpdateMatch = vi.fn();
 
   beforeEach(() => {
@@ -59,7 +59,7 @@ describe("TodaysMatches", () => {
 
     // Default mock implementations
     mockedUseController.mockReturnValue({
-      setAvailableMatches: mockSetAvailableMatches,
+      setRoster: mockSetRoster,
     } as unknown as ReturnType<typeof useController>);
 
     mockedUseMatch.mockReturnValue({
@@ -234,8 +234,8 @@ describe("TodaysMatches", () => {
         away: { players: [], officials: [] },
       };
       const mockPlayers = {
-        "10": [{ name: "Player 1", number: 10, show: true }],
-        "20": [{ name: "Player 3", number: 9, show: true }],
+        home: [{ name: "Player 1", number: 10, show: true }],
+        away: [{ name: "Player 3", number: 9, show: true }],
       };
       const v3Match = {
         id: 123,
@@ -265,15 +265,14 @@ describe("TodaysMatches", () => {
       });
 
       await waitFor(() => {
-        expect(mockSetAvailableMatches).toHaveBeenCalledWith({
-          "123": {
-            players: mockPlayers,
-            group: "U19",
-          },
-        });
+        expect(mockSetRoster).toHaveBeenCalledWith(
+          expect.objectContaining({
+            home: expect.any(Array),
+            away: expect.any(Array),
+          }),
+        );
       });
     });
-
     it("does nothing when prompt is cancelled", async () => {
       promptSpy.mockReturnValue(null);
 

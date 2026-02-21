@@ -48,8 +48,7 @@ const defaultController: ControllerState = {
   playing: false,
   assetView: "grid",
   view: "scoreboard",
-  availableMatches: {},
-  selectedMatch: null,
+  roster: { home: [], away: [] },
   currentAsset: null,
   refreshToken: "",
 };
@@ -810,49 +809,26 @@ describe("firebaseParsers", () => {
       expect(result!.refreshToken).toBe(defaultController.refreshToken);
     });
 
-    it("parses availableMatches object", () => {
-      const matches = {
-        match1: {
-          group: "A",
-          sex: "M",
-          players: {},
-        },
+    it("parses roster object", () => {
+      const roster = {
+        home: [{ name: "Player A", number: "10", show: true, role: "FW" }],
+        away: [{ name: "Player B", number: "1", show: true, role: "GK" }],
       };
       const data = {
-        availableMatches: matches,
+        roster,
       };
 
       const result = parseController(data, defaultController);
-      expect(result!.availableMatches).toEqual(matches);
+      expect(result!.roster).toEqual(roster);
     });
 
-    it("uses default availableMatches when not object", () => {
+    it("uses default roster when not object", () => {
       const data = {
-        availableMatches: "not an object",
+        roster: "not an object",
       };
 
       const result = parseController(data, defaultController);
-      expect(result!.availableMatches).toEqual(
-        defaultController.availableMatches,
-      );
-    });
-
-    it("parses selectedMatch string", () => {
-      const data = {
-        selectedMatch: "match123",
-      };
-
-      const result = parseController(data, defaultController);
-      expect(result!.selectedMatch).toBe("match123");
-    });
-
-    it("uses null for non-string selectedMatch", () => {
-      const data = {
-        selectedMatch: 123,
-      };
-
-      const result = parseController(data, defaultController);
-      expect(result!.selectedMatch).toBeNull();
+      expect(result!.roster).toEqual(defaultController.roster);
     });
 
     it("parses currentAsset object", () => {
@@ -892,7 +868,7 @@ describe("firebaseParsers", () => {
       // Default fields
       expect(result!.autoPlay).toBe(defaultController.autoPlay);
       expect(result!.selectedAssets).toEqual([]);
-      expect(result!.selectedMatch).toBeNull();
+      expect(result!.roster).toEqual({ home: [], away: [] });
     });
   });
 

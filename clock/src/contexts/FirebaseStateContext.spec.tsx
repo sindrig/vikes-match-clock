@@ -7,7 +7,7 @@ import {
   useController,
   useView,
 } from "./FirebaseStateContext";
-import { Asset, AvailableMatches, ViewPort } from "../types";
+import { Asset, Roster, ViewPort } from "../types";
 import { Sports, DEFAULT_HALFSTOPS } from "../constants";
 
 import { firebaseDatabase } from "../firebaseDatabase";
@@ -805,7 +805,7 @@ describe("FirebaseStateContext", () => {
       );
     });
 
-    it("clearMatchPlayers clears availableMatches and selectedMatch", () => {
+    it("clearRoster resets roster to empty home and away arrays", () => {
       let controllerApi: ReturnType<typeof useController> | null = null;
       render(
         <FirebaseStateProvider
@@ -820,12 +820,12 @@ describe("FirebaseStateContext", () => {
         </FirebaseStateProvider>,
       );
       act(() => {
-        controllerApi!.clearMatchPlayers();
+        controllerApi!.clearRoster();
       });
       expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "controller",
-        expect.objectContaining({ availableMatches: {} }),
+        expect.objectContaining({ roster: { home: [], away: [] } }),
       );
     });
   });
@@ -900,6 +900,30 @@ describe("FirebaseStateContext", () => {
         "test-location",
         "match",
         { awayTeam: "Unknown FC", awayTeamId: 0 },
+      );
+    });
+
+    it("normalizes team name with trailing dot to club-ids canonical name", () => {
+      let matchApi: ReturnType<typeof useMatch> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestMatchConsumer
+            onMount={(api) => {
+              matchApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        matchApi!.updateMatch({ homeTeam: "Víkingur R." });
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "match",
+        { homeTeam: "Víkingur R", homeTeamId: 2492 },
       );
     });
 
@@ -1677,19 +1701,14 @@ describe("FirebaseStateContext", () => {
   });
 
   describe("player CRUD", () => {
-    const setupWithMatch = () => {
+    const setupWithRoster = () => {
       let controllerApi: ReturnType<typeof useController> | null = null;
-      const availableMatches: AvailableMatches = {
-        "123": {
-          group: "Premier",
-          players: {
-            home: [
-              { name: "Player A", number: "10", show: true, role: "FW" },
-              { name: "Player B", number: "7", show: true, role: "MF" },
-            ],
-            away: [{ name: "Player C", number: "1", show: true, role: "GK" }],
-          },
-        },
+      const roster: Roster = {
+        home: [
+          { name: "Player A", number: "10", show: true, role: "FW" },
+          { name: "Player B", number: "7", show: true, role: "MF" },
+        ],
+        away: [{ name: "Player C", number: "1", show: true, role: "GK" }],
       };
       render(
         <FirebaseStateProvider
@@ -1704,14 +1723,14 @@ describe("FirebaseStateContext", () => {
         </FirebaseStateProvider>,
       );
       act(() => {
-        controllerApi!.setAvailableMatches(availableMatches);
+        controllerApi!.setRoster(roster);
       });
       vi.clearAllMocks();
       return controllerApi!;
     };
 
     it("editPlayer updates a player field at index", () => {
-      const api = setupWithMatch();
+      const api = setupWithRoster();
       act(() => {
         api.editPlayer("home", 0, { name: "Updated Player" });
       });
@@ -1719,20 +1738,16 @@ describe("FirebaseStateContext", () => {
         "test-location",
         "controller",
         expect.objectContaining({
-          availableMatches: expect.objectContaining({
-            "123": expect.objectContaining({
-              players: expect.objectContaining({
-                home: expect.arrayContaining([
-                  expect.objectContaining({ name: "Updated Player" }),
-                ]) as unknown,
-              }) as unknown,
-            }) as unknown,
+          roster: expect.objectContaining({
+            home: expect.arrayContaining([
+              expect.objectContaining({ name: "Updated Player" }),
+            ]) as unknown,
           }) as unknown,
         }),
       );
     });
 
-    it("editPlayer does nothing when selectedMatch is null", () => {
+    it("editPlayer does nothing for empty roster", () => {
       let controllerApi: ReturnType<typeof useController> | null = null;
       render(
         <FirebaseStateProvider
@@ -1753,7 +1768,7 @@ describe("FirebaseStateContext", () => {
     });
 
     it("editPlayer does nothing for invalid player index", () => {
-      const api = setupWithMatch();
+      const api = setupWithRoster();
       act(() => {
         api.editPlayer("home", 99, { name: "Ghost" });
       });
@@ -1761,7 +1776,7 @@ describe("FirebaseStateContext", () => {
     });
 
     it("deletePlayer removes player at index", () => {
-      const api = setupWithMatch();
+      const api = setupWithRoster();
       act(() => {
         api.deletePlayer("home", 0);
       });
@@ -1769,29 +1784,15 @@ describe("FirebaseStateContext", () => {
         "test-location",
         "controller",
         expect.objectContaining({
-          availableMatches: expect.objectContaining({
-            "123": expect.objectContaining({
-              players: expect.objectContaining({
-                home: [
-                  expect.objectContaining({ name: "Player B", number: "7" }),
-                ],
-              }) as unknown,
-            }) as unknown,
+          roster: expect.objectContaining({
+            home: [expect.objectContaining({ name: "Player B", number: "7" })],
           }) as unknown,
         }),
       );
     });
 
-    it("deletePlayer does nothing for non-existent teamId", () => {
-      const api = setupWithMatch();
-      act(() => {
-        api.deletePlayer("nonexistent", 0);
-      });
-      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
-    });
-
-    it("addPlayer adds empty player to existing team", () => {
-      const api = setupWithMatch();
+    it("addPlayer adds empty player to existing side", () => {
+      const api = setupWithRoster();
       act(() => {
         api.addPlayer("home");
       });
@@ -1799,39 +1800,15 @@ describe("FirebaseStateContext", () => {
         "test-location",
         "controller",
         expect.objectContaining({
-          availableMatches: expect.objectContaining({
-            "123": expect.objectContaining({
-              players: expect.objectContaining({
-                home: expect.arrayContaining([
-                  expect.objectContaining({
-                    name: "",
-                    number: "",
-                    show: false,
-                    role: "",
-                  }),
-                ]) as unknown,
-              }) as unknown,
-            }) as unknown,
-          }) as unknown,
-        }),
-      );
-    });
-
-    it("addPlayer creates team array if it does not exist", () => {
-      const api = setupWithMatch();
-      act(() => {
-        api.addPlayer("newteam");
-      });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
-        "test-location",
-        "controller",
-        expect.objectContaining({
-          availableMatches: expect.objectContaining({
-            "123": expect.objectContaining({
-              players: expect.objectContaining({
-                newteam: [{ name: "", number: "", show: false, role: "" }],
-              }) as unknown,
-            }) as unknown,
+          roster: expect.objectContaining({
+            home: expect.arrayContaining([
+              expect.objectContaining({
+                name: "",
+                number: "",
+                show: false,
+                role: "",
+              }),
+            ]) as unknown,
           }) as unknown,
         }),
       );
@@ -2102,7 +2079,7 @@ describe("FirebaseStateContext", () => {
   });
 
   describe("additional controller actions", () => {
-    it("selectMatch stores matchId for valid numeric string", () => {
+    it("setRoster sets roster data", () => {
       let controllerApi: ReturnType<typeof useController> | null = null;
       render(
         <FirebaseStateProvider
@@ -2116,63 +2093,18 @@ describe("FirebaseStateContext", () => {
           />
         </FirebaseStateProvider>,
       );
-      act(() => {
-        controllerApi!.selectMatch("456");
-      });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
-        "test-location",
-        "controller",
-        expect.objectContaining({ selectedMatch: "456" }),
-      );
-    });
-
-    it("selectMatch ignores non-numeric matchId", () => {
-      let controllerApi: ReturnType<typeof useController> | null = null;
-      render(
-        <FirebaseStateProvider
-          listenPrefix="test-location"
-          isAuthenticated={true}
-        >
-          <TestControllerConsumer
-            onMount={(api) => {
-              controllerApi = api;
-            }}
-          />
-        </FirebaseStateProvider>,
-      );
-      act(() => {
-        controllerApi!.selectMatch("not-a-number");
-      });
-      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
-    });
-
-    it("setAvailableMatches sets matches and selects first key", () => {
-      let controllerApi: ReturnType<typeof useController> | null = null;
-      render(
-        <FirebaseStateProvider
-          listenPrefix="test-location"
-          isAuthenticated={true}
-        >
-          <TestControllerConsumer
-            onMount={(api) => {
-              controllerApi = api;
-            }}
-          />
-        </FirebaseStateProvider>,
-      );
-      const matches: AvailableMatches = {
-        "100": { players: {} },
-        "200": { players: {} },
+      const roster: Roster = {
+        home: [{ name: "Player A", number: "10", show: true, role: "FW" }],
+        away: [{ name: "Player B", number: "1", show: true, role: "GK" }],
       };
       act(() => {
-        controllerApi!.setAvailableMatches(matches);
+        controllerApi!.setRoster(roster);
       });
       expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({
-          availableMatches: matches,
-          selectedMatch: "100",
+          roster,
         }),
       );
     });
