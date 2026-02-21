@@ -18,7 +18,7 @@ interface OwnProps {
 
 const Team = ({ teamName, selectPlayer }: OwnProps): React.JSX.Element => {
   const {
-    controller: { availableMatches, selectedMatch },
+    controller: { roster },
     editPlayer,
     deletePlayer,
     addPlayer,
@@ -28,23 +28,18 @@ const Team = ({ teamName, selectPlayer }: OwnProps): React.JSX.Element => {
   const [inputValue, setInputValue] = useState("");
   const [error, setError] = useState("");
 
-  const selectedMatchObj = selectedMatch
-    ? availableMatches[selectedMatch]
-    : undefined;
-  const teamId = teamName === "homeTeam" ? match.homeTeamId : match.awayTeamId;
-  const team = selectedMatchObj?.players
-    ? selectedMatchObj.players[String(teamId)] || []
-    : [];
+  const side = teamName === "homeTeam" ? "home" : "away";
+  const team = roster[side] || [];
 
   const displayTeamName =
     teamName === "homeTeam" ? match.homeTeam : match.awayTeam;
 
   const addEmptyLine = (): void => {
-    addPlayer(String(teamId));
+    addPlayer(side);
   };
 
   const removePlayer = (idx: number): void => {
-    deletePlayer(String(teamId), idx);
+    deletePlayer(side, idx);
   };
 
   const updatePlayer = (
@@ -52,7 +47,7 @@ const Team = ({ teamName, selectPlayer }: OwnProps): React.JSX.Element => {
   ): ((updatedPlayer: Partial<Player>) => void) => {
     return (updatedPlayer: Partial<Player>) => {
       console.log("updatedPlayer", updatedPlayer);
-      editPlayer(String(teamId), idx, updatedPlayer);
+      editPlayer(side, idx, updatedPlayer);
     };
   };
 
@@ -113,7 +108,7 @@ const Team = ({ teamName, selectPlayer }: OwnProps): React.JSX.Element => {
             </div>
           ))
         : null}
-      {displayTeamName && selectedMatch ? (
+      {displayTeamName ? (
         <div>
           <button type="button" onClick={addEmptyLine}>
             Ný lína...

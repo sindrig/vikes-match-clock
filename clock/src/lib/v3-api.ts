@@ -1,6 +1,6 @@
 import axios from "axios";
 import apiConfig from "../apiConfig";
-import { AvailableMatches, ListenersState, Player } from "../types";
+import { ListenersState, Player, Roster } from "../types";
 
 interface Person {
   id: number;
@@ -139,10 +139,7 @@ function mapRole(tp: TeamPlayer): string {
   return "Varama\u00F0ur";
 }
 
-export function transformLineups(
-  lineups: LineupsResponse,
-  match: V3Match,
-): Record<string, Player[]> {
+export function transformLineups(lineups: LineupsResponse): Roster {
   const mapPlayers = (lineup: TeamLineup): Player[] => {
     const players: Player[] = lineup.players.map((tp) => ({
       name: tp.person.name,
@@ -164,25 +161,7 @@ export function transformLineups(
   };
 
   return {
-    [String(match.homeTeam.id)]: mapPlayers(lineups.home),
-    [String(match.awayTeam.id)]: mapPlayers(lineups.away),
+    home: mapPlayers(lineups.home),
+    away: mapPlayers(lineups.away),
   };
-}
-
-export async function fetchAvailableMatches(
-  teamId: number,
-): Promise<AvailableMatches> {
-  const matches = await fetchMatchesByTeam(teamId);
-  const result: AvailableMatches = {};
-
-  for (const match of matches) {
-    const lineups = await fetchLineups(teamId, match.id);
-    const players = transformLineups(lineups, match);
-    result[String(match.id)] = {
-      players,
-      group: match.competition.name,
-    };
-  }
-
-  return result;
 }

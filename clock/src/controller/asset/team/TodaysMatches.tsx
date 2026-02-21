@@ -29,7 +29,7 @@ interface MatchData {
 }
 
 const TodaysMatches = (): React.JSX.Element => {
-  const { setAvailableMatches } = useController();
+  const { setRoster } = useController();
   const { updateMatch } = useMatch();
   const { screens } = useListeners();
   const { listenPrefix } = useRemoteSettings();
@@ -89,13 +89,8 @@ const TodaysMatches = (): React.JSX.Element => {
         setLoading(false);
         return;
       }
-      const players = transformLineups(lineups, v3Match);
-      setAvailableMatches({
-        [matchId]: {
-          players,
-          group: v3Match.competition.name,
-        },
-      });
+      const roster = transformLineups(lineups);
+      setRoster(roster);
       setError("");
       setLoading(false);
       setMatches([]);
@@ -121,13 +116,8 @@ const TodaysMatches = (): React.JSX.Element => {
       const v3Match = v3Matches.find((m) => String(m.id) === match.match_id);
       const lineups = await fetchLineups(teamId, matchId);
       if (v3Match) {
-        const players = transformLineups(lineups, v3Match);
-        setAvailableMatches({
-          [match.match_id]: {
-            players,
-            group: v3Match.competition.name,
-          },
-        });
+        const roster = transformLineups(lineups);
+        setRoster(roster);
       }
       setError("");
       setLoading(false);

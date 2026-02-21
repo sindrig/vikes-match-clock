@@ -76,18 +76,10 @@ const MatchActions = () => {
   const { controller, renderAsset } = useController();
   const { listenPrefix } = useRemoteSettings();
 
-  const { view, availableMatches, selectedMatch } = controller;
+  const { view, roster } = controller;
 
-  const selectedMatchObj = selectedMatch
-    ? availableMatches[selectedMatch]
-    : undefined;
-
-  const homeTeam = selectedMatchObj?.players
-    ? selectedMatchObj.players[match.homeTeamId] || []
-    : [];
-  const awayTeam = selectedMatchObj?.players
-    ? selectedMatchObj.players[match.awayTeamId] || []
-    : [];
+  const homeTeam = roster.home;
+  const awayTeam = roster.away;
 
   const [showScorerSelector, setShowScorerSelector] = useState<string | null>(
     null,

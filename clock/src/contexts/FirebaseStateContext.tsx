@@ -20,7 +20,7 @@ import {
   ViewPort,
   Asset,
   Player,
-  AvailableMatches,
+  Roster,
   TwoMinPenalty,
 } from "../types";
 import { Sports, DEFAULT_HALFSTOPS } from "../constants";
@@ -63,8 +63,7 @@ const defaultController: ControllerState = {
   playing: false,
   assetView: "assets",
   view: "idle",
-  availableMatches: {},
-  selectedMatch: null,
+  roster: { home: [], away: [] },
   currentAsset: null,
   refreshToken: "",
 };
@@ -120,16 +119,15 @@ interface FirebaseStateContextType {
   showNextAsset: () => void;
   removeAssetAfterTimeout: () => void;
   remoteRefresh: () => void;
-  setAvailableMatches: (matches: AvailableMatches) => void;
-  selectMatch: (matchId: string) => void;
+  setRoster: (roster: Roster) => void;
   editPlayer: (
-    teamId: string,
+    side: "home" | "away",
     idx: number,
     updatedPlayer: Partial<Player>,
   ) => void;
-  deletePlayer: (teamId: string, idx: number) => void;
-  addPlayer: (teamId: string) => void;
-  clearMatchPlayers: () => void;
+  deletePlayer: (side: "home" | "away", idx: number) => void;
+  addPlayer: (side: "home" | "away") => void;
+  clearRoster: () => void;
   selectTab: (tab: string) => void;
 
   updateView: (updates: Partial<ViewState>) => void;
@@ -399,11 +397,25 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       const prev = matchRef.current;
       const newState: Match = { ...prev, ...updates };
       const clubIdsMap = clubIds as Record<string, string>;
+      const normalizeTeamName = (name: string): string => {
+        if (clubIdsMap[name]) return name;
+        const stripped = name.replace(/\.+$/, "");
+        if (clubIdsMap[stripped]) return stripped;
+        return name;
+      };
+      const lookupClubId = (name: string): string =>
+        clubIdsMap[name] ?? clubIdsMap[name.replace(/\.+$/, "")] ?? "0";
+      if (newState.homeTeam) {
+        newState.homeTeam = normalizeTeamName(newState.homeTeam);
+      }
+      if (newState.awayTeam) {
+        newState.awayTeam = normalizeTeamName(newState.awayTeam);
+      }
       newState.homeTeamId = newState.homeTeam
-        ? parseInt(clubIdsMap[newState.homeTeam] || "0", 10)
+        ? parseInt(lookupClubId(newState.homeTeam), 10)
         : 0;
       newState.awayTeamId = newState.awayTeam
-        ? parseInt(clubIdsMap[newState.awayTeam] || "0", 10)
+        ? parseInt(lookupClubId(newState.awayTeam), 10)
         : 0;
 
       if (Number.isNaN(newState.injuryTime)) {
@@ -785,109 +797,65 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     }));
   }, [applyControllerUpdate]);
 
-  const setAvailableMatches = useCallback(
-    (matches: AvailableMatches) => {
+  const setRoster = useCallback(
+    (roster: Roster) => {
       applyControllerUpdate((prev) => ({
         ...prev,
-        availableMatches: matches || {},
-        selectedMatch: Object.keys(matches || {})[0] || null,
+        roster,
       }));
     },
     [applyControllerUpdate],
   );
 
-  const selectMatch = useCallback(
-    (matchId: string) => {
-      applyControllerUpdate((prev) => {
-        const selectedMatch = parseInt(matchId, 10);
-        if (!isNaN(selectedMatch)) {
-          return { ...prev, selectedMatch: matchId };
-        }
-        return prev;
-      });
-    },
-    [applyControllerUpdate],
-  );
-
   const editPlayer = useCallback(
-    (teamId: string, idx: number, updatedPlayer: Partial<Player>) => {
+    (side: "home" | "away", idx: number, updatedPlayer: Partial<Player>) => {
       applyControllerUpdate((prev) => {
-        const { availableMatches, selectedMatch } = prev;
-        if (!selectedMatch || !availableMatches[selectedMatch]) return prev;
-        const match = structuredClone(availableMatches[selectedMatch]);
-        const players = match.players[teamId];
-        if (!players || !players[idx]) return prev;
-        players[idx] = {
-          ...players[idx],
+        const roster = structuredClone(prev.roster);
+        if (!roster[side] || !roster[side][idx]) return prev;
+        roster[side][idx] = {
+          ...roster[side][idx],
           ...updatedPlayer,
         };
-        return {
-          ...prev,
-          availableMatches: {
-            ...availableMatches,
-            [selectedMatch]: match,
-          },
-        };
+        return { ...prev, roster };
       });
     },
     [applyControllerUpdate],
   );
 
   const deletePlayer = useCallback(
-    (teamId: string, idx: number) => {
+    (side: "home" | "away", idx: number) => {
       applyControllerUpdate((prev) => {
-        const { availableMatches, selectedMatch } = prev;
-        if (!selectedMatch || !availableMatches[selectedMatch]) return prev;
-        const match = structuredClone(availableMatches[selectedMatch]);
-        const players = match.players[teamId];
-        if (!players) return prev;
-        match.players[teamId] = players.filter(
-          (_: Player, i: number) => i !== idx,
-        );
-        return {
-          ...prev,
-          availableMatches: {
-            ...availableMatches,
-            [selectedMatch]: match,
-          },
-        };
+        const roster = structuredClone(prev.roster);
+        if (!roster[side]) return prev;
+        roster[side] = roster[side].filter((_: Player, i: number) => i !== idx);
+        return { ...prev, roster };
       });
     },
     [applyControllerUpdate],
   );
 
   const addPlayer = useCallback(
-    (teamId: string) => {
+    (side: "home" | "away") => {
       applyControllerUpdate((prev) => {
-        const { availableMatches, selectedMatch } = prev;
-        if (!selectedMatch || !availableMatches[selectedMatch]) return prev;
-        const match = structuredClone(availableMatches[selectedMatch]);
-        if (!match.players[teamId]) {
-          match.players[teamId] = [];
-        }
-        match.players[teamId].push({
+        const roster = structuredClone(prev.roster);
+        const players = roster[side] ?? [];
+        players.push({
           name: "",
           number: "",
           show: false,
           role: "",
         });
-        return {
-          ...prev,
-          availableMatches: {
-            ...availableMatches,
-            [selectedMatch]: match,
-          },
-        };
+        roster[side] = players;
+        return { ...prev, roster };
       });
     },
     [applyControllerUpdate],
   );
 
-  const clearMatchPlayers = useCallback(() => {
+  const clearRoster = useCallback(() => {
     applyControllerUpdate((prev) => ({
       ...prev,
-      availableMatches: {},
-      selectedMatch: null,
+      roster: { home: [], away: [] },
     }));
   }, [applyControllerUpdate]);
 
@@ -962,12 +930,11 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       showNextAsset,
       removeAssetAfterTimeout,
       remoteRefresh,
-      setAvailableMatches,
-      selectMatch,
+      setRoster,
       editPlayer,
       deletePlayer,
       addPlayer,
-      clearMatchPlayers,
+      clearRoster,
       selectTab,
       updateView,
       setViewPort,
@@ -1009,12 +976,11 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       showNextAsset,
       removeAssetAfterTimeout,
       remoteRefresh,
-      setAvailableMatches,
-      selectMatch,
+      setRoster,
       editPlayer,
       deletePlayer,
       addPlayer,
-      clearMatchPlayers,
+      clearRoster,
       selectTab,
       updateView,
       setViewPort,
@@ -1096,12 +1062,11 @@ export const useController = () => {
     showNextAsset,
     removeAssetAfterTimeout,
     remoteRefresh,
-    setAvailableMatches,
-    selectMatch,
+    setRoster,
     editPlayer,
     deletePlayer,
     addPlayer,
-    clearMatchPlayers,
+    clearRoster,
     selectTab,
   } = useFirebaseState();
   return {
@@ -1120,12 +1085,11 @@ export const useController = () => {
     showNextAsset,
     removeAssetAfterTimeout,
     remoteRefresh,
-    setAvailableMatches,
-    selectMatch,
+    setRoster,
     editPlayer,
     deletePlayer,
     addPlayer,
-    clearMatchPlayers,
+    clearRoster,
     selectTab,
   };
 };

@@ -202,12 +202,17 @@ export function parseController(
         ? raw.assetView
         : defaultController.assetView,
     view: typeof raw.view === "string" ? raw.view : defaultController.view,
-    availableMatches:
-      raw.availableMatches && typeof raw.availableMatches === "object"
-        ? (raw.availableMatches as ControllerState["availableMatches"])
-        : defaultController.availableMatches,
-    selectedMatch:
-      typeof raw.selectedMatch === "string" ? raw.selectedMatch : null,
+    roster:
+      raw.roster && typeof raw.roster === "object"
+        ? {
+            home: Array.isArray((raw.roster as { home?: unknown }).home)
+              ? (raw.roster as { home: ControllerState["roster"]["home"] }).home
+              : defaultController.roster.home,
+            away: Array.isArray((raw.roster as { away?: unknown }).away)
+              ? (raw.roster as { away: ControllerState["roster"]["away"] }).away
+              : defaultController.roster.away,
+          }
+        : defaultController.roster,
     currentAsset:
       raw.currentAsset && typeof raw.currentAsset === "object"
         ? (raw.currentAsset as ControllerState["currentAsset"])

@@ -5,16 +5,21 @@ import { RingLoader } from "react-spinners";
 import Team from "./Team";
 import SubView from "./SubView";
 import assetTypes from "../AssetTypes";
-import MatchSelector from "./MatchSelector";
 import { getMOTMAsset, getPlayerAssetObject } from "./assetHelpers";
-import { Asset, Player, AvailableMatches } from "../../../types";
+import { Asset, Player } from "../../../types";
 import {
   useController,
   useMatch,
   useListeners,
 } from "../../../contexts/FirebaseStateContext";
 import { useRemoteSettings } from "../../../contexts/LocalStateContext";
-import { fetchAvailableMatches, getTeamId } from "../../../lib/v3-api";
+import {
+  fetchMatchesByTeam,
+  fetchLineups,
+  transformLineups,
+  getTeamId,
+  V3Match,
+} from "../../../lib/v3-api";
 
 interface SubPlayer extends Player {
   teamName: string;
@@ -32,9 +37,9 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
   const { addAssets, previousView } = props;
   const { match } = useMatch();
   const {
-    controller: { availableMatches, selectedMatch },
-    clearMatchPlayers,
-    setAvailableMatches,
+    controller: { roster },
+    setRoster,
+    clearRoster,
   } = useController();
   const { screens } = useListeners();
   const { listenPrefix } = useRemoteSettings();
@@ -50,28 +55,43 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
   const [selectMOTM, setSelectMOTM] = useState(false);
   const [effect, setEffect] = useState("blink");
 
-  const getAvailableMatchesV3 = (teamId: number): Promise<AvailableMatches> => {
-    return fetchAvailableMatches(teamId).then((data) => {
-      setAvailableMatches(data);
-      return data;
-    });
+  const fetchAndSetRoster = async (teamId: number): Promise<void> => {
+    const matches = await fetchMatchesByTeam(teamId);
+    if (!matches.length) {
+      throw new Error("Engir leikir fundust");
+    }
+
+    let selected: V3Match | undefined;
+    if (matches.length === 1) {
+      selected = matches[0];
+    } else {
+      const options = matches
+        .map(
+          (m, i) =>
+            `${i + 1}: ${m.homeTeam.name} - ${m.awayTeam.name} (${m.competition.name})`,
+        )
+        .join("\n");
+      const choice = window.prompt(`Veldu leik:\n${options}`, "1");
+      if (!choice) return;
+      const idx = Number(choice) - 1;
+      if (idx < 0 || idx >= matches.length) {
+        throw new Error("Ógilt val");
+      }
+      selected = matches[idx];
+    }
+    if (!selected) {
+      throw new Error("Enginn leikur valinn");
+    }
+
+    const lineups = await fetchLineups(teamId, selected.id);
+    const rosterData = transformLineups(lineups);
+    setRoster(rosterData);
   };
 
   const getTeamPlayers = (): { homeTeam: Player[]; awayTeam: Player[] } => {
-    const selectedMatchObj = selectedMatch
-      ? availableMatches[selectedMatch]
-      : undefined;
-    const homeTeamId = String(match.homeTeamId);
-    const awayTeamId = String(match.awayTeamId);
     return {
-      homeTeam:
-        selectedMatchObj?.players && homeTeamId
-          ? selectedMatchObj.players[homeTeamId] || []
-          : [],
-      awayTeam:
-        selectedMatchObj?.players && awayTeamId
-          ? selectedMatchObj.players[awayTeamId] || []
-          : [],
+      homeTeam: roster.home,
+      awayTeam: roster.away,
     };
   };
 
@@ -220,7 +240,7 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
     }
     setLoading(true);
     const teamId = getTeamId(screens, listenPrefix);
-    void getAvailableMatchesV3(teamId)
+    void fetchAndSetRoster(teamId)
       .then(() => setError(""))
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
@@ -332,14 +352,12 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
             </button>
           </div>
         ) : null}
-        {homeTeam.length ||
-        awayTeam.length ||
-        Object.keys(availableMatches).length ? (
+        {homeTeam.length || awayTeam.length ? (
           <div className="control-item stdbuttons">
             <button
               type="button"
               onClick={() =>
-                window.confirm("Ertu alveg viss?") && clearMatchPlayers()
+                window.confirm("Ertu alveg viss?") && clearRoster()
               }
             >
               Hreinsa lið
@@ -352,9 +370,6 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
               Setja lið í biðröð
             </button>
           </div>
-        ) : null}
-        {availableMatches && Object.keys(availableMatches || {}).length > 1 ? (
-          <MatchSelector />
         ) : null}
         {homeTeam.length || awayTeam.length ? renderActionControllers() : null}
       </div>

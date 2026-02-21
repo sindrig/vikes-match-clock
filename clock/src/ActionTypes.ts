@@ -20,11 +20,8 @@ export enum MatchActionType {
 export enum ControllerActionType {
   SELECT_VIEW = "selectView",
   SELECT_ASSET_VIEW = "selectAssetView",
-  GET_AVAILABLE_MATCHES = "getAvailableMatches",
-  SET_AVAILABLE_MATCHES = "setAvailableMatches",
-  GET_RUV_URL = "getRuvUrl",
-  CLEAR_MATCH_PLAYERS = "clearMatchPlayers",
-  SELECT_MATCH = "selectMatch",
+  SET_ROSTER = "setRoster",
+  CLEAR_ROSTER = "clearRoster",
   EDIT_PLAYER = "editPlayer",
   DELETE_PLAYER = "deletePlayer",
   ADD_PLAYER = "addPlayer",
