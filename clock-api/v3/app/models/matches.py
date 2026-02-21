@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
 
 
 class Person(BaseModel):
@@ -79,10 +79,40 @@ class TeamPlayer(BaseModel):
     startingLineup: bool = False
     person: Person
 
+    @model_validator(mode="before")
+    @classmethod
+    def flatten_to_nested(cls, data: object) -> object:
+        if not isinstance(data, dict):
+            return data
+        if "person" in data:
+            return data
+        result = dict(data)
+        result["person"] = {
+            "id": result.pop("personId", 0),
+            "name": result.get("name", ""),
+        }
+        result["startingLineup"] = result.pop("starting", False)
+        result["goalkeeper"] = result.pop("position", "") == "G"
+        return result
+
 
 class MatchAndTeamOfficial(BaseModel):
     person: Person
     role: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def flatten_to_nested(cls, data: object) -> object:
+        if not isinstance(data, dict):
+            return data
+        if "person" in data:
+            return data
+        result = dict(data)
+        result["person"] = {
+            "id": result.pop("personId", 0),
+            "name": result.get("name", ""),
+        }
+        return result
 
 
 class TeamLineup(BaseModel):
