@@ -44,6 +44,35 @@ async def test_get_matches_success(ksi_client):
 
 @pytest.mark.asyncio
 @respx.mock
+async def test_get_matches_empty_current_match_phase(ksi_client):
+    respx.get(f"{BASE_URL}/api/live/matchList/20250615/0").mock(
+        return_value=Response(
+            200,
+            json=[
+                {
+                    "id": 12345,
+                    "homeTeam": {"id": 1, "name": "Víkingur"},
+                    "awayTeam": {"id": 2, "name": "KR"},
+                    "dateTimeUTC": "2025-06-15T14:00:00Z",
+                    "liveStatus": "PLAYED",
+                    "currentMatchPhase": {},
+                    "competition": {
+                        "id": 1,
+                        "name": "Pepsi Max deildin",
+                    },
+                }
+            ],
+        )
+    )
+
+    matches = await ksi_client.get_matches("20250615", 0, 1)
+
+    assert len(matches) == 1
+    assert matches[0].currentMatchPhase is None
+
+
+@pytest.mark.asyncio
+@respx.mock
 async def test_get_matches_empty(ksi_client):
     respx.get(f"{BASE_URL}/api/live/matchList/20250615/0").mock(
         return_value=Response(200, json=[])

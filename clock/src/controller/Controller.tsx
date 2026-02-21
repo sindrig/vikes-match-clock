@@ -66,8 +66,7 @@ const Controller = () => {
     };
 
     return (
-      <div className="controller">
-        <div className="dummyDiv" style={vp.style}></div>
+      <div className="controller login-controller">
         <div className="control-item">
           <div>
             Skjár:

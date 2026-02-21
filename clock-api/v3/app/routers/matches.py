@@ -9,13 +9,12 @@ router = APIRouter(tags=["matches"])
 
 @router.get("/{team_id}/matches/{date}", response_model=list[Match])
 async def get_matches(
-    team_id: int,
     date: str,
     utc_offset: int = 0,
     ksi_client: KsiClient = Depends(get_ksi_client),
 ):
     date_formatted = date.replace("-", "")
-    return await ksi_client.get_matches(date_formatted, utc_offset, team_id)
+    return await ksi_client.get_matches(date_formatted, utc_offset)
 
 
 @router.get(

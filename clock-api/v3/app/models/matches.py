@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 class Person(BaseModel):
@@ -57,6 +57,14 @@ class Match(BaseModel):
     status: str | None = None
     statusDescription: str | None = None
     currentMatchPhase: MatchPhase | None = None
+
+    @field_validator("currentMatchPhase", mode="before")
+    @classmethod
+    def empty_dict_to_none(cls, v: object) -> object:
+        if isinstance(v, dict) and not v:
+            return None
+        return v
+
     competition: Competition
     facility: Facility | None = None
     attendance: int | None = None
