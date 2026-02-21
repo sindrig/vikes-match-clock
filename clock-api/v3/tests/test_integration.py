@@ -52,7 +52,7 @@ class TestGetEvents:
             ),
         ]
 
-        response = test_client.get("/1/matches/12345/events")
+        response = test_client.get("/v3/1/matches/12345/events")
 
         assert response.status_code == 200
         data = response.json()
@@ -64,7 +64,7 @@ class TestGetEvents:
     def test_get_events_empty(self, test_client, mock_ksi_client):
         mock_ksi_client.get_events.return_value = []
 
-        response = test_client.get("/1/matches/12345/events")
+        response = test_client.get("/v3/1/matches/12345/events")
 
         assert response.status_code == 200
         assert response.json() == []
@@ -74,7 +74,7 @@ class TestGetEvents:
     ):
         mock_ksi_client.get_events.return_value = []
 
-        test_client.get("/42/matches/99999/events")
+        test_client.get("/v3/42/matches/99999/events")
 
         mock_ksi_client.get_events.assert_called_once_with(99999)
 
@@ -93,7 +93,7 @@ class TestGetMatchInfo:
             awayTeamResult=Result(regular=1),
         )
 
-        response = test_client.get("/1/matches/12345/info")
+        response = test_client.get("/v3/1/matches/12345/info")
 
         assert response.status_code == 200
         data = response.json()
@@ -117,6 +117,6 @@ class TestGetMatchInfo:
             competition=Competition(id=1, name="Test"),
         )
 
-        test_client.get("/42/matches/12345/info")
+        test_client.get("/v3/42/matches/12345/info")
 
         mock_ksi_client.get_match_info.assert_called_once_with(12345)

@@ -227,7 +227,7 @@ def test_endpoint_get_matches_date_success(client):
 
     app.dependency_overrides[get_ksi_client] = lambda team_id: mock_client
 
-    response = client.get("/1/matches/2025-06-15")
+    response = client.get("/v3/1/matches/2025-06-15")
 
     assert response.status_code == 200
     data = response.json()
@@ -252,7 +252,7 @@ def test_endpoint_get_matches_date_with_utc_offset(client):
 
     app.dependency_overrides[get_ksi_client] = lambda team_id: mock_client
 
-    response = client.get("/1/matches/2025-06-15?utc_offset=-3")
+    response = client.get("/v3/1/matches/2025-06-15?utc_offset=-3")
 
     assert response.status_code == 200
     assert response.json() == []
@@ -272,7 +272,7 @@ def test_endpoint_get_matches_date_empty(client):
 
     app.dependency_overrides[get_ksi_client] = lambda team_id: mock_client
 
-    response = client.get("/99/matches/2025-01-01")
+    response = client.get("/v3/99/matches/2025-01-01")
 
     assert response.status_code == 200
     assert response.json() == []
@@ -336,7 +336,7 @@ def test_endpoint_get_lineups_success(client):
 
     app.dependency_overrides[get_ksi_client] = lambda team_id: mock_client
 
-    response = client.get("/1/matches/12345/lineups")
+    response = client.get("/v3/1/matches/12345/lineups")
 
     assert response.status_code == 200
     data = response.json()
@@ -377,7 +377,7 @@ def test_endpoint_get_lineups_empty_lineups(client):
 
     app.dependency_overrides[get_ksi_client] = lambda team_id: mock_client
 
-    response = client.get("/1/matches/99999/lineups")
+    response = client.get("/v3/1/matches/99999/lineups")
 
     assert response.status_code == 200
     data = response.json()
@@ -395,7 +395,7 @@ def test_endpoint_get_lineups_in_openapi():
     schema = app.openapi()
     paths = schema["paths"]
 
-    lineups_path = "/{team_id}/matches/{match_id}/lineups"
+    lineups_path = "/v3/{team_id}/matches/{match_id}/lineups"
     assert lineups_path in paths
     assert "get" in paths[lineups_path]
 

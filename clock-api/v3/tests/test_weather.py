@@ -5,9 +5,7 @@ from httpx import Response
 from app.models.weather import WeatherResponse
 from app.services.weather import get_weather
 
-VEDUR_URL = (
-    "https://xmlweather.vedur.is/?op_w=xml&type=obs&lang=is&view=xml&ids=1472"
-)
+VEDUR_URL = "https://xmlweather.vedur.is/?op_w=xml&type=obs&lang=is&view=xml&ids=1472"
 OWM_URL = "https://api.openweathermap.org/data/2.5/weather"
 
 VEDUR_XML = """<?xml version="1.0" encoding="utf-8"?>
@@ -114,7 +112,7 @@ def test_weather_endpoint_owm_success(client):
             "app.routers.weather.get_weather_api_key",
             lambda: "test-key",
         )
-        response = client.get("/weather/", params={"lat": LAT, "lon": LON})
+        response = client.get("/v3/weather/", params={"lat": LAT, "lon": LON})
 
     assert response.status_code == 200
     data = response.json()
@@ -133,7 +131,7 @@ def test_weather_endpoint_both_fail_returns_500(client):
             "app.routers.weather.get_weather_api_key",
             lambda: "test-key",
         )
-        response = client.get("/weather/", params={"lat": LAT, "lon": LON})
+        response = client.get("/v3/weather/", params={"lat": LAT, "lon": LON})
 
     assert response.status_code == 500
 
@@ -144,6 +142,6 @@ def test_weather_endpoint_requires_params(client):
             "app.routers.weather.get_weather_api_key",
             lambda: "test-key",
         )
-        response = client.get("/weather/")
+        response = client.get("/v3/weather/")
 
     assert response.status_code == 422
