@@ -250,3 +250,41 @@ For testing Firebase sync between controller and display (e.g., "Hreinsa virkt o
 ## Related Systems
 
 - **`clock-api/`**: Python lambdas for match reports and weather data
+
+## Team ID System & Match Data Pipeline
+
+### How Team IDs Work
+
+`club-ids.ts` is the canonical mapping of team display names to KSI Analyticom API IDs. These IDs were sourced from https://www.ksi.is/felagslid/adildarfelog/ (each team link has `felag?id=XXXX`).
+
+**The full data flow when a user selects a match:**
+
+1. User picks a team name in `TeamSelector.tsx` (dropdown from `club-ids.ts` keys)
+2. `updateMatch()` in `FirebaseStateContext.tsx` resolves the team name → numeric ID via `lookupClubId()` and writes `homeTeamId`/`awayTeamId` to Firebase
+3. "Sækja leiki í dag" fetches matches from the v3 API using the team's numeric ID
+4. `fetchLineups()` returns players keyed by the API's team IDs: `{ [String(match.homeTeam.id)]: Player[] }`
+5. `TeamAssetController.tsx` looks up players via `String(match.homeTeamId)` — the ID stored in Firebase **must match** the API's team ID, or lineup lookup silently returns nothing
+
+### Name Normalization
+
+The KSI API sometimes returns team names with trailing dots (e.g., "Víkingur R.") while `club-ids.ts` stores names without dots ("Víkingur R"). The `lookupClubId()` helper in `FirebaseStateContext.tsx` handles this by stripping trailing dots as a fallback:
+
+```typescript
+const lookupClubId = (name: string): string =>
+  clubIdsMap[name] ?? clubIdsMap[name.replace(/\.+$/, "")] ?? "0";
+```
+
+### Special ID Values
+
+- **`"-1"`**: Teams not found in KSI (combined teams, foreign clubs, national teams). Still selectable in the UI but won't match API data.
+- **`"0"`**: Unknown/unrecognized team name (fallback when lookup fails).
+
+### Key Files in the Pipeline
+
+| File | Role |
+|------|------|
+| `club-ids.ts` | Team name → KSI Analyticom ID mapping |
+| `FirebaseStateContext.tsx` | Resolves IDs on team selection, writes to Firebase |
+| `controller/TeamSelector.tsx` | Team dropdown UI, case-insensitive matching |
+| `lib/v3-api.ts` | Fetches matches/lineups from API, `transformLineups()` keys players by API team ID |
+| `controller/asset/team/TeamAssetController.tsx` | Looks up players by `String(match.homeTeamId)` from the transformed lineups |

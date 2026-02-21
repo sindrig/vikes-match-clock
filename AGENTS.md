@@ -75,6 +75,21 @@ Common fixable patterns:
 - **No hydration guards**: 100% Firebase means no local state to hydrate
 - **Type-safe parsing**: All Firebase snapshots validated through `firebaseParsers.ts`
 
+### Team ID System (club-ids.ts ↔ KSI Analyticom API)
+
+The match data pipeline depends on team IDs matching between the frontend and the KSI Analyticom API:
+
+1. **`club-ids.ts`** maps team display names → KSI Analyticom IDs (e.g., `"Víkingur R": "2492"`)
+2. **`updateMatch()`** in `FirebaseStateContext.tsx` resolves `homeTeamId`/`awayTeamId` from `club-ids.ts` when a team name is set
+3. **`v3-api.ts`** fetches lineups from the API, which returns players keyed by API team IDs: `{ [String(match.homeTeam.id)]: Player[], ... }`
+4. **`TeamAssetController.tsx`** looks up players via `String(match.homeTeamId)` — if `club-ids.ts` has wrong IDs, this lookup silently returns nothing
+
+**Name normalization**: The API sometimes returns team names with trailing dots (e.g., "Víkingur R.") while `club-ids.ts` stores them without. The `lookupClubId()` helper in `FirebaseStateContext.tsx` strips trailing dots as a fallback.
+
+**Teams not in KSI** (combined teams, foreign clubs, national teams) have ID `"-1"` in `club-ids.ts`. They remain selectable but won't match API data.
+
+**Authoritative source for IDs**: https://www.ksi.is/felagslid/adildarfelog/ — each team link contains `felag?id=XXXX`.
+
 ### Multi-Controller Support
 - Multiple controllers can connect to the same `listenPrefix`
 - Uses **last-write-wins** semantics (no conflict resolution)
