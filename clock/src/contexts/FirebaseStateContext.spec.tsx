@@ -851,7 +851,7 @@ describe("FirebaseStateContext", () => {
       expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "match",
-        { homeTeam: "Valur", homeTeamId: 101 },
+        { homeTeam: "Valur", homeTeamId: 2058 },
       );
     });
 
@@ -875,7 +875,7 @@ describe("FirebaseStateContext", () => {
       expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "match",
-        { awayTeam: "KR", awayTeamId: 107 },
+        { awayTeam: "KR", awayTeamId: 2145 },
       );
     });
 

@@ -135,8 +135,8 @@ const mockAvailableMatches: AvailableMatches = {
     group: "Úrvalsdeild",
     sex: "M",
     players: {
-      "103": mockPlayers,
-      "107": mockAwayPlayers,
+      "2492": mockPlayers,
+      "2145": mockAwayPlayers,
     },
   },
 };
@@ -146,16 +146,16 @@ const multipleAvailableMatches: AvailableMatches = {
     group: "Úrvalsdeild",
     sex: "M",
     players: {
-      "103": mockPlayers,
-      "107": mockAwayPlayers,
+      "2492": mockPlayers,
+      "2145": mockAwayPlayers,
     },
   },
   "2": {
     group: "Bikarkeppni",
     sex: "M",
     players: {
-      "103": mockPlayers,
-      "107": mockAwayPlayers,
+      "2492": mockPlayers,
+      "2145": mockAwayPlayers,
     },
   },
 };
@@ -168,8 +168,8 @@ const defaultMatch = {
   started: 0,
   timeElapsed: 0,
   halfStops: [45, 90],
-  homeTeamId: 103,
-  awayTeamId: 107,
+  homeTeamId: 2492,
+  awayTeamId: 2145,
   injuryTime: 0,
   matchType: "football" as const,
   home2min: [],
@@ -505,8 +505,8 @@ describe("TeamAssetController", () => {
           group: "Úrvalsdeild",
           sex: "M",
           players: {
-            "103": playersWithMissingData,
-            "107": mockAwayPlayers,
+            "2492": playersWithMissingData,
+            "2145": mockAwayPlayers,
           },
         },
       };
