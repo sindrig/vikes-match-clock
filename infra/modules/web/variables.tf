@@ -30,18 +30,4 @@ variable "parent_zone_name" {
   default     = "irdn.is"
 }
 
-variable "vpc_security_group_ids" {
-  description = "VPC security group IDs for Lambda functions"
-  type        = list(string)
-  default     = ["sg-03ecf18a377c6c35f"]
-}
 
-variable "vpc_subnet_ids" {
-  description = "VPC subnet IDs for Lambda functions"
-  type        = list(string)
-  default = [
-    "subnet-0c45ac69865df1ecf",
-    "subnet-09299f279812c8762",
-    "subnet-0191832d9edda018a",
-  ]
-}

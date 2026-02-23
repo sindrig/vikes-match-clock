@@ -48,17 +48,4 @@ moved {
   to   = module.web.aws_cloudwatch_log_group.logs
 }
 
-moved {
-  from = module.match-report
-  to   = module.web.module.match-report
-}
 
-moved {
-  from = module.match-report-v2
-  to   = module.web.module.match-report-v2
-}
-
-moved {
-  from = module.weather
-  to   = module.web.module.weather
-}
