@@ -150,6 +150,8 @@ describe("App", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    // Clean up any root fontSize set by the useEffect
+    document.documentElement.style.fontSize = "";
   });
 
   describe("State 1: unauthenticated, no listenPrefix", () => {
@@ -277,6 +279,71 @@ describe("App", () => {
       render(<App />);
 
       expect(screen.queryByTestId("controller")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("fontSize propagation", () => {
+    it("sets root font-size from vp.fontSize", () => {
+      mockedUseLocalState.mockReturnValue({
+        auth: { isLoaded: true, isEmpty: true },
+        listenPrefix: "vikinni",
+        setListenPrefix: vi.fn(),
+        screenViewport: null,
+        setScreenViewport: vi.fn(),
+        available: [],
+        email: "",
+        setEmail: vi.fn(),
+        password: "",
+        setPassword: vi.fn(),
+      });
+      mockedUseFirebaseState.mockReturnValue({
+        controller: { view: VIEWS.idle, currentAsset: null },
+        view: {
+          vp: { ...defaultViewport, fontSize: "200%" },
+          background: "Default",
+        },
+        ready: true,
+      } as unknown as ReturnType<typeof useFirebaseState>);
+
+      render(<App />);
+
+      expect(document.documentElement.style.fontSize).toBe("200%");
+    });
+
+    it("does not set root font-size when vp.fontSize is undefined", () => {
+      setupState2();
+      render(<App />);
+
+      expect(document.documentElement.style.fontSize).toBe("");
+    });
+
+    it("resets root font-size on unmount", () => {
+      mockedUseLocalState.mockReturnValue({
+        auth: { isLoaded: true, isEmpty: true },
+        listenPrefix: "vikinni",
+        setListenPrefix: vi.fn(),
+        screenViewport: null,
+        setScreenViewport: vi.fn(),
+        available: [],
+        email: "",
+        setEmail: vi.fn(),
+        password: "",
+        setPassword: vi.fn(),
+      });
+      mockedUseFirebaseState.mockReturnValue({
+        controller: { view: VIEWS.idle, currentAsset: null },
+        view: {
+          vp: { ...defaultViewport, fontSize: "200%" },
+          background: "Default",
+        },
+        ready: true,
+      } as unknown as ReturnType<typeof useFirebaseState>);
+
+      const { unmount } = render(<App />);
+      expect(document.documentElement.style.fontSize).toBe("200%");
+
+      unmount();
+      expect(document.documentElement.style.fontSize).toBe("");
     });
   });
 

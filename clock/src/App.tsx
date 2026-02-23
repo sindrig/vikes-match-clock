@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Button } from "rsuite";
 import { RingLoader } from "react-spinners";
 import { useFirebaseState } from "./contexts/FirebaseStateContext";
@@ -28,6 +29,17 @@ function App() {
   const asset = controller.currentAsset || null;
 
   const isAuthenticated = auth.isLoaded && !auth.isEmpty;
+
+  // Apply viewport fontSize to the root <html> element so all rem-based
+  // content (clocks, scores, etc.) scales to the physical screen config.
+  useEffect(() => {
+    if (vp.fontSize) {
+      document.documentElement.style.fontSize = vp.fontSize;
+    }
+    return () => {
+      document.documentElement.style.fontSize = "";
+    };
+  }, [vp.fontSize]);
 
   // State 1: no listenPrefix, not authenticated — Controller handles screen selector + login
   if (!listenPrefix && !isAuthenticated) {
