@@ -36,6 +36,7 @@ const Controller = () => {
     setPassword,
     listenPrefix,
     setListenPrefix,
+    setScreenViewport,
   } = useLocalState();
   const auth = useAuth();
 
@@ -89,6 +90,7 @@ const Controller = () => {
               onClick={() => {
                 const screen = screens[parseInt(selectedScreen, 10)];
                 if (screen) {
+                  setScreenViewport(screen.screen);
                   setListenPrefix(screen.key);
                 }
               }}

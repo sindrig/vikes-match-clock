@@ -73,6 +73,8 @@ function setupState1() {
     setListenPrefix: vi.fn(),
     auth: { isLoaded: true, isEmpty: true },
     available: [],
+    screenViewport: null,
+    setScreenViewport: vi.fn(),
   });
   mockedUseController.mockReturnValue({
     controller: { view: VIEWS.idle, currentAsset: null },
@@ -99,6 +101,8 @@ function setupState2() {
     setListenPrefix: vi.fn(),
     auth: { isLoaded: true, isEmpty: true },
     available: [],
+    screenViewport: null,
+    setScreenViewport: vi.fn(),
   });
   mockedUseController.mockReturnValue({
     controller: { view: VIEWS.idle, currentAsset: null },
@@ -129,6 +133,8 @@ function setupState3() {
     setListenPrefix: vi.fn(),
     auth: { isLoaded: true, isEmpty: false, email: "test@test.com" },
     available: ["vikinni"],
+    screenViewport: null,
+    setScreenViewport: vi.fn(),
   });
   mockedUseController.mockReturnValue({
     controller: { view: VIEWS.idle, currentAsset: null },

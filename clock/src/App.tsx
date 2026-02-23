@@ -2,6 +2,7 @@ import { Button } from "rsuite";
 import { RingLoader } from "react-spinners";
 import { useFirebaseState } from "./contexts/FirebaseStateContext";
 import { useLocalState } from "./contexts/LocalStateContext";
+import { firebaseAuth } from "./firebaseAuth";
 import Controller from "./controller/Controller";
 import RefreshHandler from "./controller/RefreshHandler";
 import AssetComponent from "./controller/asset/Asset";
@@ -19,7 +20,8 @@ import "./App.css";
 function App() {
   useGlobalShortcuts();
   const { controller, view: viewState, ready } = useFirebaseState();
-  const { auth, listenPrefix, setListenPrefix } = useLocalState();
+  const { auth, listenPrefix, setListenPrefix, setScreenViewport } =
+    useLocalState();
 
   const { view } = controller;
   const { vp, background } = viewState;
@@ -86,10 +88,14 @@ function App() {
         ) : null}
         <RefreshHandler />
         <Button
-          appearance="subtle"
-          size="xs"
-          onClick={() => setListenPrefix("")}
-          style={{ position: "fixed", bottom: 8, right: 8, zIndex: 9999 }}
+          color="red"
+          appearance="primary"
+          size="lg"
+          onClick={() => {
+            setScreenViewport(null);
+            setListenPrefix("");
+          }}
+          style={{ position: "fixed", bottom: 16, right: 16, zIndex: 9999 }}
         >
           Aftengja skjá
         </Button>
@@ -98,7 +104,13 @@ function App() {
     );
   }
 
-  // State 3: authenticated — full UI unchanged
+  // State 3: authenticated — full UI with disconnect/logout button
+  const disconnect = () => {
+    setScreenViewport(null);
+    setListenPrefix("");
+    firebaseAuth.logout().catch(console.error);
+  };
+
   return (
     <div>
       {view === VIEWS.control ? <MatchController /> : null}
@@ -111,6 +123,15 @@ function App() {
           <AssetComponent asset={asset.asset} time={asset.time} />
         </div>
       ) : null}
+      <Button
+        color="red"
+        appearance="primary"
+        size="lg"
+        onClick={disconnect}
+        style={{ position: "fixed", bottom: 16, right: 16, zIndex: 9999 }}
+      >
+        Aftengja skjá
+      </Button>
       <StateListener />
     </div>
   );
