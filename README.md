@@ -10,12 +10,8 @@ It also includes the control interface for managing the match clock.
 
 ## clock-api
 
-This contains various lambdas that help with the match clock.
+This contains the match clock API.
 
-### match-report
+### v3
 
-Fetches matches based on the two teams that are selected.
-
-### weather
-
-Fetches weather forecast (currently only for Víkin)
+FastAPI application wrapping the Analyticom KSI REST API for match data and weather. Deployed as a single Lambda behind API Gateway.

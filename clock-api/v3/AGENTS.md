@@ -116,5 +116,4 @@ pnpm run generate-api-types
 ## Related
 
 - Frontend: `clock/` consumes these endpoints via generated TypeScript types
-- Old APIs: `clock-api/match-report/` and `clock-api/match-report-v2/` (legacy, being replaced)
 - Infrastructure: `infra/modules/web/api.tf` defines the Lambda and API Gateway route

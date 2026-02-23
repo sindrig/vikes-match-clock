@@ -249,7 +249,7 @@ For testing Firebase sync between controller and display (e.g., "Hreinsa virkt o
 
 ## Related Systems
 
-- **`clock-api/`**: Python lambdas for match reports and weather data
+- **`clock-api/`**: Python Lambda API for match data and weather
 
 ## Team ID System & Match Data Pipeline
 
@@ -286,5 +286,5 @@ const lookupClubId = (name: string): string =>
 | `club-ids.ts` | Team name → KSI Analyticom ID mapping |
 | `FirebaseStateContext.tsx` | Resolves IDs on team selection, writes to Firebase |
 | `controller/TeamSelector.tsx` | Team dropdown UI, case-insensitive matching |
-| `lib/v3-api.ts` | Fetches matches/lineups from API, `transformLineups()` keys players by API team ID |
+| `lib/api.ts` | Fetches matches/lineups from API, `transformLineups()` keys players by API team ID |
 | `controller/asset/team/TeamAssetController.tsx` | Looks up players by `String(match.homeTeamId)` from the transformed lineups |
