@@ -12,21 +12,8 @@ import {
   fetchLineups,
   transformLineups,
   getTeamId,
-  V3Match,
-} from "../../../lib/v3-api";
-
-interface MatchData {
-  match_id: string;
-  date: string;
-  time: string;
-  competition: string;
-  home: {
-    name: string;
-  };
-  away: {
-    name: string;
-  };
-}
+  ApiMatch,
+} from "../../../lib/api";
 
 const TodaysMatches = (): React.JSX.Element => {
   const { setRoster } = useController();
@@ -36,8 +23,7 @@ const TodaysMatches = (): React.JSX.Element => {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [matches, setMatches] = useState<MatchData[]>([]);
-  const [v3Matches, setV3Matches] = useState<V3Match[]>([]);
+  const [matches, setMatches] = useState<ApiMatch[]>([]);
 
   const fetchTodaysMatches = async (): Promise<void> => {
     const teamId = getTeamId(screens, listenPrefix);
@@ -45,23 +31,8 @@ const TodaysMatches = (): React.JSX.Element => {
 
     try {
       const fetched = await fetchMatchesByTeam(teamId);
-      const mapped: MatchData[] = fetched.map((match) => {
-        const dt = new Date(match.dateTimeUTC);
-        return {
-          match_id: String(match.id),
-          date: dt.toLocaleDateString("is-IS"),
-          time: dt.toLocaleTimeString("is-IS", {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-          competition: match.competition.name,
-          home: { name: match.homeTeam.name },
-          away: { name: match.awayTeam.name },
-        };
-      });
       setError("");
-      setMatches(mapped);
-      setV3Matches(fetched);
+      setMatches(fetched);
       setLoading(false);
     } catch (e) {
       const err = e as Error;
@@ -79,12 +50,12 @@ const TodaysMatches = (): React.JSX.Element => {
 
     try {
       const lineups = await fetchLineups(teamId, Number(matchId));
-      let v3Match = v3Matches.find((m) => String(m.id) === matchId);
-      if (!v3Match) {
+      let foundMatch = matches.find((m) => String(m.id) === matchId);
+      if (!foundMatch) {
         const freshMatches = await fetchMatchesByTeam(teamId);
-        v3Match = freshMatches.find((m) => String(m.id) === matchId);
+        foundMatch = freshMatches.find((m) => String(m.id) === matchId);
       }
-      if (!v3Match) {
+      if (!foundMatch) {
         setError("Match not found");
         setLoading(false);
         return;
@@ -101,24 +72,20 @@ const TodaysMatches = (): React.JSX.Element => {
     }
   };
 
-  const selectMatchHandler = async (match: MatchData): Promise<void> => {
+  const selectMatchHandler = async (match: ApiMatch): Promise<void> => {
     setLoading(true);
     updateMatch({
-      homeTeam: match.home.name,
-      awayTeam: match.away.name,
-      matchStartTime: match.time,
+      homeTeam: match.homeTeam.name,
+      awayTeam: match.awayTeam.name,
+      matchStartTime: new Date(match.dateTimeUTC).toISOString(),
     });
 
     const teamId = getTeamId(screens, listenPrefix);
-    const matchId = Number(match.match_id);
 
     try {
-      const v3Match = v3Matches.find((m) => String(m.id) === match.match_id);
-      const lineups = await fetchLineups(teamId, matchId);
-      if (v3Match) {
-        const roster = transformLineups(lineups);
-        setRoster(roster);
-      }
+      const lineups = await fetchLineups(teamId, match.id);
+      const roster = transformLineups(lineups);
+      setRoster(roster);
       setError("");
       setLoading(false);
       setMatches([]);
@@ -162,13 +129,18 @@ const TodaysMatches = (): React.JSX.Element => {
         {matches.map((match) => (
           <button
             type="button"
-            key={match.match_id}
+            key={match.id}
             onClick={() => {
               void selectMatchHandler(match);
             }}
           >
-            {match.date} {match.time} {match.competition} [{match.home.name} -{" "}
-            {match.away.name}]{" "}
+            {new Date(match.dateTimeUTC).toLocaleDateString("is-IS")}{" "}
+            {new Date(match.dateTimeUTC).toLocaleTimeString("is-IS", {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}{" "}
+            {match.competition.name} [{match.homeTeam.name} -{" "}
+            {match.awayTeam.name}]{" "}
           </button>
         ))}
       </div>

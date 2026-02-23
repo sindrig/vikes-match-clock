@@ -14,7 +14,7 @@ import {
   fetchLineups,
   transformLineups,
   getTeamId,
-} from "../../../lib/v3-api";
+} from "../../../lib/api";
 
 vi.mock("../../../contexts/FirebaseStateContext", () => ({
   useMatch: vi.fn(),
@@ -26,7 +26,7 @@ vi.mock("../../../contexts/LocalStateContext", () => ({
   useRemoteSettings: vi.fn(),
 }));
 
-vi.mock("../../../lib/v3-api", () => ({
+vi.mock("../../../lib/api", () => ({
   fetchMatchesByTeam: vi.fn(),
   fetchLineups: vi.fn(),
   transformLineups: vi.fn(),

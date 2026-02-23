@@ -18,8 +18,8 @@ import {
   fetchLineups,
   transformLineups,
   getTeamId,
-  V3Match,
-} from "../../../lib/v3-api";
+  ApiMatch,
+} from "../../../lib/api";
 
 interface SubPlayer extends Player {
   teamName: string;
@@ -61,7 +61,7 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
       throw new Error("Engir leikir fundust");
     }
 
-    let selected: V3Match | undefined;
+    let selected: ApiMatch | undefined;
     if (matches.length === 1) {
       selected = matches[0];
     } else {

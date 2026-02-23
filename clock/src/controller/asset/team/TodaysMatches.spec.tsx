@@ -4,7 +4,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import TodaysMatches from "./TodaysMatches";
 
-vi.mock("../../../lib/v3-api", () => ({
+vi.mock("../../../lib/api", () => ({
   fetchMatchesByTeam: vi.fn(),
   fetchLineups: vi.fn(),
   transformLineups: vi.fn(),
@@ -39,7 +39,7 @@ import {
   fetchLineups,
   transformLineups,
   getTeamId,
-} from "../../../lib/v3-api";
+} from "../../../lib/api";
 
 const mockedUseController = vi.mocked(useController);
 const mockedUseMatch = vi.mocked(useMatch);
@@ -112,7 +112,7 @@ describe("TodaysMatches", () => {
 
   describe("fetchTodaysMatches", () => {
     it("fetches and displays matches on button click", async () => {
-      const v3Match1 = {
+      const apiMatch1 = {
         id: 100,
         dateTimeUTC: "2024-01-15T19:00:00Z",
         competition: { id: 1, name: "Úrvalsdeild" },
@@ -120,7 +120,7 @@ describe("TodaysMatches", () => {
         awayTeam: { id: 20, name: "KR" },
         liveStatus: "not_started",
       };
-      const v3Match2 = {
+      const apiMatch2 = {
         id: 200,
         dateTimeUTC: "2024-01-20T15:00:00Z",
         competition: { id: 2, name: "Bikarinn" },
@@ -129,7 +129,7 @@ describe("TodaysMatches", () => {
         liveStatus: "not_started",
       };
 
-      mockedFetchMatchesByTeam.mockResolvedValueOnce([v3Match1, v3Match2]);
+      mockedFetchMatchesByTeam.mockResolvedValueOnce([apiMatch1, apiMatch2]);
 
       const user = userEvent.setup();
       render(<TodaysMatches />);
@@ -143,22 +143,22 @@ describe("TodaysMatches", () => {
         expect(mockedFetchMatchesByTeam).toHaveBeenCalledWith(2492);
       });
 
-      const dt1 = new Date(v3Match1.dateTimeUTC);
-      const dt2 = new Date(v3Match2.dateTimeUTC);
+      const dt1 = new Date(apiMatch1.dateTimeUTC);
+      const dt2 = new Date(apiMatch2.dateTimeUTC);
       const label1 = `${dt1.toLocaleDateString("is-IS")} ${dt1.toLocaleTimeString(
         "is-IS",
         {
           hour: "2-digit",
           minute: "2-digit",
         },
-      )} ${v3Match1.competition.name} [${v3Match1.homeTeam.name} - ${v3Match1.awayTeam.name}]`;
+      )} ${apiMatch1.competition.name} [${apiMatch1.homeTeam.name} - ${apiMatch1.awayTeam.name}]`;
       const label2 = `${dt2.toLocaleDateString("is-IS")} ${dt2.toLocaleTimeString(
         "is-IS",
         {
           hour: "2-digit",
           minute: "2-digit",
         },
-      )} ${v3Match2.competition.name} [${v3Match2.homeTeam.name} - ${v3Match2.awayTeam.name}]`;
+      )} ${apiMatch2.competition.name} [${apiMatch2.homeTeam.name} - ${apiMatch2.awayTeam.name}]`;
 
       await waitFor(() => {
         expect(
@@ -233,11 +233,14 @@ describe("TodaysMatches", () => {
         home: { players: [], officials: [] },
         away: { players: [], officials: [] },
       };
-      const mockPlayers = {
+      const mockPlayers: {
+        home: Array<Record<string, unknown>>;
+        away: Array<Record<string, unknown>>;
+      } = {
         home: [{ name: "Player 1", number: 10, show: true }],
         away: [{ name: "Player 3", number: 9, show: true }],
       };
-      const v3Match = {
+      const apiMatch = {
         id: 123,
         dateTimeUTC: "2024-01-15T19:00:00Z",
         competition: { id: 1, name: "U19" },
@@ -247,7 +250,7 @@ describe("TodaysMatches", () => {
       };
 
       mockedFetchLineups.mockResolvedValueOnce(mockReportData);
-      mockedFetchMatchesByTeam.mockResolvedValueOnce([v3Match]);
+      mockedFetchMatchesByTeam.mockResolvedValueOnce([apiMatch]);
       mockedTransformLineups.mockReturnValue(mockPlayers);
 
       const user = userEvent.setup();
@@ -267,8 +270,8 @@ describe("TodaysMatches", () => {
       await waitFor(() => {
         expect(mockSetRoster).toHaveBeenCalledWith(
           expect.objectContaining({
-            home: expect.any(Array),
-            away: expect.any(Array),
+            home: expect.any(Array) as unknown,
+            away: expect.any(Array) as unknown,
           }),
         );
       });

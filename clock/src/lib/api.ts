@@ -40,7 +40,7 @@ interface Facility {
   city?: string | null;
 }
 
-export interface V3Match {
+export interface ApiMatch {
   id: number;
   homeTeam: V3Team;
   awayTeam: V3Team;
@@ -103,9 +103,9 @@ export function getTeamId(
 export async function fetchMatchesByTeam(
   teamId: number,
   date?: string,
-): Promise<V3Match[]> {
+): Promise<ApiMatch[]> {
   const d = date ?? new Date().toISOString().slice(0, 10);
-  const response = await axios.get<V3Match[]>(
+  const response = await axios.get<ApiMatch[]>(
     `${apiConfig.gateWayUrl}v3/${teamId}/matches/${d}`,
   );
   return response.data;

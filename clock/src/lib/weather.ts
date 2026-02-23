@@ -1,4 +1,4 @@
-import { fetchWeather } from "./v3-api";
+import { fetchWeather } from "./api";
 
 export const getTemp = async () => {
   try {
