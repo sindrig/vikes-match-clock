@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 from unittest.mock import patch
 
 from app.main import app
-from app.services.ksi import KsiClient
+from app.services.adapter import KsiAdapter
 
 
 @pytest.fixture
@@ -50,6 +50,6 @@ def mock_weather_api_key():
 
 @pytest_asyncio.fixture
 async def ksi_client():
-    client = KsiClient(api_key="test-key", team_id=1)
+    client = KsiAdapter(api_key="test-key", team_id=1)
     yield client
     await client.close()

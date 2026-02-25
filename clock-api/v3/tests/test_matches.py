@@ -5,7 +5,7 @@ from httpx import Response
 
 from app.main import app
 from app.models.matches import LineupsResponse, Match
-from app.services.ksi import KsiClient
+from app.services.adapter import KsiAdapter
 
 BASE_URL = "https://api-ksi.analyticom.de"
 
@@ -302,7 +302,7 @@ async def test_get_match_info_not_found(ksi_client):
 @pytest.mark.asyncio
 @respx.mock
 async def test_get_matches_sends_api_key_header():
-    client = KsiClient(api_key="my-secret-key", team_id=1)
+    client = KsiAdapter(api_key="my-secret-key", team_id=1)
     route = respx.get(f"{BASE_URL}/api/live/matchList/20250615/0").mock(
         return_value=Response(200, json=[])
     )
