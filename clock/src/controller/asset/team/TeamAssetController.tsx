@@ -108,9 +108,7 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
 
   const addPlayersToQ = (): void => {
     const { homeTeam } = getTeamPlayers();
-    const teams = [
-      { team: homeTeam, teamName: match.homeTeam },
-    ];
+    const teams = [{ team: homeTeam, teamName: match.homeTeam }];
     const playersToShow = teams.flatMap(({ team }) =>
       team.filter((p) => p.show),
     );
