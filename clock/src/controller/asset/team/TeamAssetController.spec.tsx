@@ -9,12 +9,7 @@ import {
   useListeners,
 } from "../../../contexts/FirebaseStateContext";
 import { useRemoteSettings } from "../../../contexts/LocalStateContext";
-import {
-  fetchMatchesByTeam,
-  fetchLineups,
-  transformLineups,
-  getTeamId,
-} from "../../../lib/api";
+import { fetchLineups, transformLineups, getTeamId } from "../../../lib/api";
 
 vi.mock("../../../contexts/FirebaseStateContext", () => ({
   useMatch: vi.fn(),
@@ -27,7 +22,6 @@ vi.mock("../../../contexts/LocalStateContext", () => ({
 }));
 
 vi.mock("../../../lib/api", () => ({
-  fetchMatchesByTeam: vi.fn(),
   fetchLineups: vi.fn(),
   transformLineups: vi.fn(),
   getTeamId: vi.fn(),
@@ -99,7 +93,6 @@ const mockedUseMatch = vi.mocked(useMatch);
 const mockedUseController = vi.mocked(useController);
 const mockedUseListeners = vi.mocked(useListeners);
 const mockedUseRemoteSettings = vi.mocked(useRemoteSettings);
-const mockedFetchMatchesByTeam = vi.mocked(fetchMatchesByTeam);
 const mockedFetchLineups = vi.mocked(fetchLineups);
 const mockedTransformLineups = vi.mocked(transformLineups);
 const mockedGetTeamId = vi.mocked(getTeamId);
@@ -159,6 +152,7 @@ const defaultMatch = {
   awayTimeouts: 0,
   buzzer: false as const,
   countdown: false,
+  ksiMatchId: 12345,
 };
 
 function setupMocks(overrides?: {
@@ -203,7 +197,6 @@ describe("TeamAssetController", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.spyOn(window, "prompt").mockReturnValue(null);
     mockAddAssets =
       vi.fn<
         (
@@ -259,7 +252,7 @@ describe("TeamAssetController", () => {
       expect(screen.getByTestId("team-awayTeam")).toBeInTheDocument();
     });
 
-    it('shows "Sækja lið" button when no players loaded', () => {
+    it('shows "Sækja lið" button when ksiMatchId is set', () => {
       setupMocks();
 
       render(
@@ -292,8 +285,8 @@ describe("TeamAssetController", () => {
       ).toBeInTheDocument();
     });
 
-    it('hides "Sækja lið" button when players are loaded', () => {
-      setupMocks({ roster: mockRoster });
+    it('hides "Sækja lið" button when ksiMatchId is undefined', () => {
+      setupMocks({ match: { ksiMatchId: undefined } });
 
       render(
         <TeamAssetController
@@ -308,23 +301,9 @@ describe("TeamAssetController", () => {
     });
   });
 
-  describe("autoFill / fetch available matches", () => {
-    it("fetches matches, prompts for selection, and sets roster", async () => {
+  describe("refetchRoster / fetch lineups by ksiMatchId", () => {
+    it("calls fetchLineups with teamId and ksiMatchId directly", async () => {
       const { mockSetRoster } = setupMocks();
-      const matches = [
-        {
-          id: 10,
-          homeTeam: { name: "Víkingur R" },
-          awayTeam: { name: "KR" },
-          competition: { name: "Úrvalsdeild" },
-        },
-        {
-          id: 11,
-          homeTeam: { name: "Víkingur R" },
-          awayTeam: { name: "Valur" },
-          competition: { name: "Bikar" },
-        },
-      ];
       const rosterData: Roster = {
         home: [{ name: "Jón", id: 1 }],
         away: [{ name: "Gunnar", id: 2 }],
@@ -334,14 +313,10 @@ describe("TeamAssetController", () => {
         away: { players: [], officials: [] },
       };
 
-      mockedFetchMatchesByTeam.mockResolvedValueOnce(
-        matches as Awaited<ReturnType<typeof fetchMatchesByTeam>>,
-      );
       mockedFetchLineups.mockResolvedValueOnce(
         lineups as Awaited<ReturnType<typeof fetchLineups>>,
       );
       mockedTransformLineups.mockReturnValueOnce(rosterData);
-      vi.spyOn(window, "prompt").mockReturnValue("2");
 
       render(
         <TeamAssetController
@@ -358,64 +333,15 @@ describe("TeamAssetController", () => {
         expect(screen.queryByTestId("ring-loader")).not.toBeInTheDocument();
       });
 
-      expect(mockedFetchMatchesByTeam).toHaveBeenCalledWith(2492);
-      expect(window.prompt).toHaveBeenCalledWith(
-        expect.stringContaining("Veldu leik"),
-        "1",
-      );
-      expect(mockedFetchLineups).toHaveBeenCalledWith(2492, 11);
+      expect(mockedFetchLineups).toHaveBeenCalledWith(2492, 12345);
       expect(mockedTransformLineups).toHaveBeenCalledWith(lineups);
-      expect(mockSetRoster).toHaveBeenCalledWith(rosterData);
-    });
-
-    it("selects the only match without prompting", async () => {
-      const { mockSetRoster } = setupMocks();
-      const matches = [
-        {
-          id: 10,
-          homeTeam: { name: "Víkingur R" },
-          awayTeam: { name: "KR" },
-          competition: { name: "Úrvalsdeild" },
-        },
-      ];
-      const rosterData: Roster = { home: [], away: [] };
-      const lineups = {
-        home: { players: [], officials: [] },
-        away: { players: [], officials: [] },
-      };
-
-      mockedFetchMatchesByTeam.mockResolvedValueOnce(
-        matches as Awaited<ReturnType<typeof fetchMatchesByTeam>>,
-      );
-      mockedFetchLineups.mockResolvedValueOnce(
-        lineups as Awaited<ReturnType<typeof fetchLineups>>,
-      );
-      mockedTransformLineups.mockReturnValueOnce(rosterData);
-
-      render(
-        <TeamAssetController
-          addAssets={mockAddAssets}
-          previousView={mockPreviousView}
-        />,
-      );
-
-      fireEvent.click(screen.getByRole("button", { name: "Sækja lið" }));
-
-      await waitFor(() => {
-        expect(screen.queryByTestId("ring-loader")).not.toBeInTheDocument();
-      });
-
-      expect(window.prompt).not.toHaveBeenCalled();
-      expect(mockedFetchLineups).toHaveBeenCalledWith(2492, 10);
       expect(mockSetRoster).toHaveBeenCalledWith(rosterData);
     });
 
     it("shows error on API failure", async () => {
       setupMocks();
 
-      mockedFetchMatchesByTeam.mockRejectedValueOnce(
-        new Error("Network error"),
-      );
+      mockedFetchLineups.mockRejectedValueOnce(new Error("Network error"));
 
       render(
         <TeamAssetController
@@ -431,8 +357,8 @@ describe("TeamAssetController", () => {
       });
     });
 
-    it("shows error when teams not in club-ids", () => {
-      setupMocks({ match: { homeTeam: "", awayTeam: "" } });
+    it("does not fetch when ksiMatchId is undefined", () => {
+      setupMocks({ match: { ksiMatchId: undefined } });
 
       render(
         <TeamAssetController
@@ -441,7 +367,10 @@ describe("TeamAssetController", () => {
         />,
       );
 
-      expect(screen.getByText("Veldu lið fyrst")).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Sækja lið" }),
+      ).not.toBeInTheDocument();
+      expect(mockedFetchLineups).not.toHaveBeenCalled();
     });
   });
 
@@ -1015,7 +944,7 @@ describe("TeamAssetController", () => {
       const neverResolves = new Promise<never>(
         Function.prototype as () => void,
       );
-      mockedFetchMatchesByTeam.mockReturnValue(neverResolves);
+      mockedFetchLineups.mockReturnValue(neverResolves);
 
       render(
         <TeamAssetController
@@ -1035,7 +964,7 @@ describe("TeamAssetController", () => {
       const neverResolves = new Promise<never>(
         Function.prototype as () => void,
       );
-      mockedFetchMatchesByTeam.mockReturnValue(neverResolves);
+      mockedFetchLineups.mockReturnValue(neverResolves);
 
       render(
         <TeamAssetController

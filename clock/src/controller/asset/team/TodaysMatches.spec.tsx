@@ -322,5 +322,107 @@ describe("TodaysMatches", () => {
         expect(screen.getByText("API error")).toBeInTheDocument();
       });
     });
+
+    it("calls updateMatch with ksiMatchId after successful fetch", async () => {
+      promptSpy.mockReturnValue("123");
+
+      const mockReportData = {
+        home: { players: [], officials: [] },
+        away: { players: [], officials: [] },
+      };
+      const mockPlayers: {
+        home: Array<Record<string, unknown>>;
+        away: Array<Record<string, unknown>>;
+      } = {
+        home: [{ name: "Player 1", number: 10, show: true }],
+        away: [{ name: "Player 3", number: 9, show: true }],
+      };
+      const apiMatch = {
+        id: 123,
+        dateTimeUTC: "2024-01-15T19:00:00Z",
+        competition: { id: 1, name: "U19" },
+        homeTeam: { id: 10, name: "Víkingur" },
+        awayTeam: { id: 20, name: "KR" },
+        liveStatus: "not_started",
+      };
+
+      mockedFetchLineups.mockResolvedValueOnce(mockReportData);
+      mockedFetchMatchesByTeam.mockResolvedValueOnce([apiMatch]);
+      mockedTransformLineups.mockReturnValue(mockPlayers);
+
+      const user = userEvent.setup();
+      render(<TodaysMatches />);
+
+      const reportButton = screen.getByRole("button", {
+        name: /Slá inn ID leikskýrslu/i,
+      });
+      await user.click(reportButton);
+
+      await waitFor(() => {
+        expect(mockUpdateMatch).toHaveBeenCalledWith(
+          expect.objectContaining({ ksiMatchId: 123 }),
+        );
+      });
+    });
+  });
+
+  describe("selectMatchHandler", () => {
+    it("calls updateMatch with ksiMatchId matching selected match", async () => {
+      const apiMatch = {
+        id: 456,
+        dateTimeUTC: "2024-01-15T19:00:00Z",
+        competition: { id: 1, name: "Úrvalsdeild" },
+        homeTeam: { id: 10, name: "Víkingur" },
+        awayTeam: { id: 20, name: "KR" },
+        liveStatus: "not_started",
+      };
+
+      const mockLineups = {
+        home: { players: [], officials: [] },
+        away: { players: [], officials: [] },
+      };
+      const mockPlayers: {
+        home: Array<Record<string, unknown>>;
+        away: Array<Record<string, unknown>>;
+      } = {
+        home: [{ name: "Player 1", number: 10, show: true }],
+        away: [{ name: "Player 3", number: 9, show: true }],
+      };
+
+      mockedFetchMatchesByTeam.mockResolvedValueOnce([apiMatch]);
+      mockedFetchLineups.mockResolvedValueOnce(mockLineups);
+      mockedTransformLineups.mockReturnValue(mockPlayers);
+
+      const user = userEvent.setup();
+      render(<TodaysMatches />);
+
+      const fetchButton = screen.getByRole("button", {
+        name: /Sækja leiki í dag/i,
+      });
+      await user.click(fetchButton);
+
+      await waitFor(() => {
+        expect(
+          screen.getByRole("button", {
+            name: new RegExp("Víkingur.*KR"),
+          }),
+        ).toBeInTheDocument();
+      });
+
+      const matchButton = screen.getByRole("button", {
+        name: new RegExp("Víkingur.*KR"),
+      });
+      await user.click(matchButton);
+
+      await waitFor(() => {
+        expect(mockUpdateMatch).toHaveBeenCalledWith(
+          expect.objectContaining({
+            homeTeam: "Víkingur",
+            awayTeam: "KR",
+            ksiMatchId: 456,
+          }),
+        );
+      });
+    });
   });
 });

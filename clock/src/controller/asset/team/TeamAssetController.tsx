@@ -13,13 +13,7 @@ import {
   useListeners,
 } from "../../../contexts/FirebaseStateContext";
 import { useRemoteSettings } from "../../../contexts/LocalStateContext";
-import {
-  fetchMatchesByTeam,
-  fetchLineups,
-  transformLineups,
-  getTeamId,
-  ApiMatch,
-} from "../../../lib/api";
+import { fetchLineups, transformLineups, getTeamId } from "../../../lib/api";
 
 interface SubPlayer extends Player {
   teamName: string;
@@ -55,37 +49,18 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
   const [selectMOTM, setSelectMOTM] = useState(false);
   const [effect, setEffect] = useState("blink");
 
-  const fetchAndSetRoster = async (teamId: number): Promise<void> => {
-    const matches = await fetchMatchesByTeam(teamId);
-    if (!matches.length) {
-      throw new Error("Engir leikir fundust");
-    }
-
-    let selected: ApiMatch | undefined;
-    if (matches.length === 1) {
-      selected = matches[0];
-    } else {
-      const options = matches
-        .map(
-          (m, i) =>
-            `${i + 1}: ${m.homeTeam.name} - ${m.awayTeam.name} (${m.competition.name})`,
-        )
-        .join("\n");
-      const choice = window.prompt(`Veldu leik:\n${options}`, "1");
-      if (!choice) return;
-      const idx = Number(choice) - 1;
-      if (idx < 0 || idx >= matches.length) {
-        throw new Error("Ógilt val");
-      }
-      selected = matches[idx];
-    }
-    if (!selected) {
-      throw new Error("Enginn leikur valinn");
-    }
-
-    const lineups = await fetchLineups(teamId, selected.id);
-    const rosterData = transformLineups(lineups);
-    setRoster(rosterData);
+  const refetchRoster = (): void => {
+    if (!match.ksiMatchId) return;
+    setLoading(true);
+    const teamId = getTeamId(screens, listenPrefix);
+    void fetchLineups(teamId, match.ksiMatchId)
+      .then((lineups) => {
+        const rosterData = transformLineups(lineups);
+        setRoster(rosterData);
+        setError("");
+      })
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setLoading(false));
   };
 
   const getTeamPlayers = (): { homeTeam: Player[]; awayTeam: Player[] } => {
@@ -229,20 +204,6 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
     clearState();
   };
 
-  const autoFill = (): void => {
-    const { homeTeam, awayTeam } = match;
-    if (!homeTeam || !awayTeam) {
-      setError("Choose teams first");
-      return;
-    }
-    setLoading(true);
-    const teamId = getTeamId(screens, listenPrefix);
-    void fetchAndSetRoster(teamId)
-      .then(() => setError(""))
-      .catch((e: Error) => setError(e.message))
-      .finally(() => setLoading(false));
-  };
-
   const renderActionButtons = (): React.JSX.Element => {
     if (selectSubs) {
       return (
@@ -342,9 +303,9 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
     const { homeTeam, awayTeam } = getTeamPlayers();
     return (
       <div>
-        {!(homeTeam.length || awayTeam.length) ? (
+        {match.ksiMatchId !== undefined ? (
           <div className="control-item stdbuttons">
-            <button type="button" onClick={autoFill}>
+            <button type="button" onClick={refetchRoster}>
               Sækja lið
             </button>
           </div>

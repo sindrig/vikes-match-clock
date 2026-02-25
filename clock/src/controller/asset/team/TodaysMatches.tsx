@@ -62,6 +62,7 @@ const TodaysMatches = (): React.JSX.Element => {
       }
       const roster = transformLineups(lineups);
       setRoster(roster);
+      updateMatch({ ksiMatchId: Number(matchId) });
       setError("");
       setLoading(false);
       setMatches([]);
@@ -81,6 +82,7 @@ const TodaysMatches = (): React.JSX.Element => {
         hour: "2-digit",
         minute: "2-digit",
       }),
+      ksiMatchId: match.id,
     });
 
     const teamId = getTeamId(screens, listenPrefix);
