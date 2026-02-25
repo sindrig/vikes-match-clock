@@ -1,0 +1,1022 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Clock API v3",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/v3/{team_id}/matches/{date}": {
+      "get": {
+        "tags": [
+          "matches",
+          "matches"
+        ],
+        "summary": "Get Matches",
+        "operationId": "get_matches_v3__team_id__matches__date__get",
+        "parameters": [
+          {
+            "name": "date",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Date"
+            }
+          },
+          {
+            "name": "team_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Team Id"
+            }
+          },
+          {
+            "name": "utc_offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "title": "Utc Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Match"
+                  },
+                  "title": "Response Get Matches V3  Team Id  Matches  Date  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v3/{team_id}/matches/{match_id}/lineups": {
+      "get": {
+        "tags": [
+          "matches",
+          "matches"
+        ],
+        "summary": "Get Lineups",
+        "operationId": "get_lineups_v3__team_id__matches__match_id__lineups_get",
+        "parameters": [
+          {
+            "name": "match_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Match Id"
+            }
+          },
+          {
+            "name": "team_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Team Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LineupsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v3/{team_id}/matches/{match_id}/events": {
+      "get": {
+        "tags": [
+          "matches",
+          "matches"
+        ],
+        "summary": "Get Events",
+        "operationId": "get_events_v3__team_id__matches__match_id__events_get",
+        "parameters": [
+          {
+            "name": "match_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Match Id"
+            }
+          },
+          {
+            "name": "team_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Team Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MatchEvent"
+                  },
+                  "title": "Response Get Events V3  Team Id  Matches  Match Id  Events Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v3/{team_id}/matches/{match_id}/info": {
+      "get": {
+        "tags": [
+          "matches",
+          "matches"
+        ],
+        "summary": "Get Match Info",
+        "operationId": "get_match_info_v3__team_id__matches__match_id__info_get",
+        "parameters": [
+          {
+            "name": "match_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Match Id"
+            }
+          },
+          {
+            "name": "team_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Team Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Match"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v3/weather/": {
+      "get": {
+        "tags": [
+          "weather"
+        ],
+        "summary": "Get Weather Endpoint",
+        "operationId": "get_weather_endpoint_v3_weather__get",
+        "parameters": [
+          {
+            "name": "lat",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "title": "Lat"
+            }
+          },
+          {
+            "name": "lon",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "title": "Lon"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WeatherResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v3/health": {
+      "get": {
+        "summary": "Health Check",
+        "operationId": "health_check_v3_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Competition": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "shortName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shortname"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "Competition"
+      },
+      "Facility": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "Facility"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "LineupsResponse": {
+        "properties": {
+          "home": {
+            "$ref": "#/components/schemas/TeamLineup"
+          },
+          "away": {
+            "$ref": "#/components/schemas/TeamLineup"
+          }
+        },
+        "type": "object",
+        "required": [
+          "home",
+          "away"
+        ],
+        "title": "LineupsResponse"
+      },
+      "Match": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "homeTeam": {
+            "$ref": "#/components/schemas/Team"
+          },
+          "awayTeam": {
+            "$ref": "#/components/schemas/Team"
+          },
+          "homeTeamResult": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Result"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "awayTeamResult": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Result"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "homeTeamRedCards": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hometeamredcards"
+          },
+          "awayTeamRedCards": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Awayteamredcards"
+          },
+          "liveStatus": {
+            "type": "string",
+            "title": "Livestatus"
+          },
+          "minute": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minute"
+          },
+          "currentMinute": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currentminute"
+          },
+          "dateTimeUTC": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Datetimeutc"
+          },
+          "round": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Round"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "statusDescription": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Statusdescription"
+          },
+          "currentMatchPhase": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MatchPhase"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "competition": {
+            "$ref": "#/components/schemas/Competition"
+          },
+          "facility": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Facility"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "attendance": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attendance"
+          },
+          "showEvents": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Showevents"
+          },
+          "allowDetail": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowdetail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "homeTeam",
+          "awayTeam",
+          "liveStatus",
+          "dateTimeUTC",
+          "competition"
+        ],
+        "title": "Match"
+      },
+      "MatchAndTeamOfficial": {
+        "properties": {
+          "person": {
+            "$ref": "#/components/schemas/Person"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          }
+        },
+        "type": "object",
+        "required": [
+          "person"
+        ],
+        "title": "MatchAndTeamOfficial"
+      },
+      "MatchEvent": {
+        "properties": {
+          "eventId": {
+            "type": "integer",
+            "title": "Eventid"
+          },
+          "eventType": {
+            "$ref": "#/components/schemas/MatchEventType"
+          },
+          "matchPhase": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MatchPhase"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "minute": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minute"
+          },
+          "minuteFull": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minutefull"
+          },
+          "stoppageTime": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stoppagetime"
+          },
+          "displayMinute": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Displayminute"
+          },
+          "player": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TeamPlayer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "player2": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TeamPlayer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "club": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Team"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "homeTeam": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hometeam"
+          },
+          "orderNumber": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ordernumber"
+          },
+          "commentary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commentary"
+          }
+        },
+        "type": "object",
+        "required": [
+          "eventId",
+          "eventType"
+        ],
+        "title": "MatchEvent"
+      },
+      "MatchEventType": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "MatchEventType"
+      },
+      "MatchPhase": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "MatchPhase"
+      },
+      "Person": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "firstName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Firstname"
+          },
+          "lastName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastname"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "Person"
+      },
+      "Result": {
+        "properties": {
+          "regular": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Regular"
+          },
+          "overtime": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Overtime"
+          },
+          "penalty": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Penalty"
+          }
+        },
+        "type": "object",
+        "title": "Result"
+      },
+      "Team": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "shortName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shortname"
+          },
+          "logo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Logo"
+          },
+          "imageUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Imageurl"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "Team"
+      },
+      "TeamLineup": {
+        "properties": {
+          "players": {
+            "items": {
+              "$ref": "#/components/schemas/TeamPlayer"
+            },
+            "type": "array",
+            "title": "Players",
+            "default": []
+          },
+          "officials": {
+            "items": {
+              "$ref": "#/components/schemas/MatchAndTeamOfficial"
+            },
+            "type": "array",
+            "title": "Officials",
+            "default": []
+          }
+        },
+        "type": "object",
+        "title": "TeamLineup"
+      },
+      "TeamPlayer": {
+        "properties": {
+          "shirtNumber": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shirtnumber"
+          },
+          "captain": {
+            "type": "boolean",
+            "title": "Captain",
+            "default": false
+          },
+          "goalkeeper": {
+            "type": "boolean",
+            "title": "Goalkeeper",
+            "default": false
+          },
+          "startingLineup": {
+            "type": "boolean",
+            "title": "Startinglineup",
+            "default": false
+          },
+          "person": {
+            "$ref": "#/components/schemas/Person"
+          }
+        },
+        "type": "object",
+        "required": [
+          "person"
+        ],
+        "title": "TeamPlayer"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "WeatherResponse": {
+        "properties": {
+          "temp": {
+            "type": "number",
+            "title": "Temp"
+          },
+          "service": {
+            "type": "string",
+            "title": "Service"
+          },
+          "main": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Main"
+          }
+        },
+        "type": "object",
+        "required": [
+          "temp",
+          "service",
+          "main"
+        ],
+        "title": "WeatherResponse"
+      }
+    }
+  }
+}

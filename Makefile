@@ -10,7 +10,7 @@ generate-ksi-client:
 
 # Stub target for future API spec generation (e.g., from Python source)
 generate-api-spec:
-	@echo "Placeholder: API spec generation from Python source (TBD)"
+	cd clock-api/v3 && python export-openapi.py
 
 # Stub target for future TypeScript client generation (e.g., from OpenAPI spec)
 generate-ts-client:
