@@ -1,5 +1,10 @@
 import { ListenersState, Player, Roster } from "../types";
-import { LineupsResponse, TeamLineup, TeamPlayer, MatchAndTeamOfficial } from "./api";
+import {
+  LineupsResponse,
+  TeamLineup,
+  TeamPlayer,
+  MatchAndTeamOfficial,
+} from "../api/client";
 
 export const getTeamId = (
   screens: ListenersState["screens"],
@@ -32,12 +37,14 @@ export function transformLineups(lineups: LineupsResponse): Roster {
       return player;
     });
 
-    const officials: Player[] = lineup.officials.map((official: MatchAndTeamOfficial) => ({
-      name: official.person.name,
-      id: official.person.id,
-      role: "Þjálfari",
-      show: false,
-    }));
+    const officials: Player[] = lineup.officials.map(
+      (official: MatchAndTeamOfficial) => ({
+        name: official.person.name,
+        id: official.person.id,
+        role: "Þjálfari",
+        show: false,
+      }),
+    );
 
     return [...players, ...officials];
   };
