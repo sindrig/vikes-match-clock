@@ -77,7 +77,10 @@ const TodaysMatches = (): React.JSX.Element => {
     updateMatch({
       homeTeam: match.homeTeam.name,
       awayTeam: match.awayTeam.name,
-      matchStartTime: new Date(match.dateTimeUTC).toISOString(),
+      matchStartTime: new Date(match.dateTimeUTC).toLocaleTimeString("is-IS", {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
     });
 
     const teamId = getTeamId(screens, listenPrefix);
