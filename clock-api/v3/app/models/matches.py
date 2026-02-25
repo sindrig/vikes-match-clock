@@ -53,7 +53,7 @@ class Match(BaseModel):
     minute: int | None = None
     currentMinute: str | None = None
     dateTimeUTC: datetime
-    round: int | None = None
+    round: int | str | None = None
     status: str | None = None
     statusDescription: str | None = None
     currentMatchPhase: MatchPhase | None = None
