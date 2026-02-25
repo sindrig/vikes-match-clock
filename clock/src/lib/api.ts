@@ -141,18 +141,22 @@ function mapRole(tp: TeamPlayer): string {
 
 export function transformLineups(lineups: LineupsResponse): Roster {
   const mapPlayers = (lineup: TeamLineup): Player[] => {
-    const players: Player[] = lineup.players.map((tp) => ({
-      name: tp.person.name,
-      id: tp.person.id,
-      number: tp.shirtNumber ?? undefined,
-      role: mapRole(tp),
-      show: tp.startingLineup,
-    }));
+    const players: Player[] = lineup.players.map((tp) => {
+      const player: Player = {
+        name: tp.person.name,
+        id: tp.person.id,
+        role: mapRole(tp),
+        show: tp.startingLineup,
+      };
+      if (tp.shirtNumber != null) {
+        player.number = tp.shirtNumber;
+      }
+      return player;
+    });
 
     const officials: Player[] = lineup.officials.map((official) => ({
       name: official.person.name,
       id: official.person.id,
-      number: undefined,
       role: "\u00DEj\u00E1lfari",
       show: false,
     }));
