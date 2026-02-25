@@ -12,6 +12,6 @@ generate-ksi-client:
 generate-api-spec:
 	cd clock-api/v3 && python export-openapi.py
 
-# Stub target for future TypeScript client generation (e.g., from OpenAPI spec)
+# Generate TypeScript API client from OpenAPI spec
 generate-ts-client:
-	@echo "Placeholder: TypeScript client generation (TBD)"
+	cd clock && pnpm exec openapi-ts
