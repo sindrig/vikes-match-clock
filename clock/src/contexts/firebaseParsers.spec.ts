@@ -546,6 +546,24 @@ describe("firebaseParsers", () => {
       expect(result!.matchStartTime).toBeUndefined();
     });
 
+    it("parses optional ksiMatchId", () => {
+      const data = {
+        ksiMatchId: 12345,
+      };
+
+      const result = parseMatch(data, defaultMatch);
+      expect(result!.ksiMatchId).toBe(12345);
+    });
+
+    it("omits ksiMatchId when not number", () => {
+      const data = {
+        ksiMatchId: "12345",
+      };
+
+      const result = parseMatch(data, defaultMatch);
+      expect(result!.ksiMatchId).toBeUndefined();
+    });
+
     it("parses red card fields", () => {
       const data = {
         homeRedCards: 2,

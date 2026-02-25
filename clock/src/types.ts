@@ -18,6 +18,7 @@ export interface Match {
   awayTeam: string;
   homeTeamId: number;
   awayTeamId: number;
+  ksiMatchId?: number;
   injuryTime: number;
   matchType: Sports;
   matchStartTime?: string;

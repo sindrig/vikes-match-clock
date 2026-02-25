@@ -136,6 +136,8 @@ export function parseMatch(data: unknown, defaultMatch: Match): Match | null {
         : defaultMatch.matchType,
     matchStartTime:
       typeof raw.matchStartTime === "string" ? raw.matchStartTime : undefined,
+    ksiMatchId:
+      typeof raw.ksiMatchId === "number" ? raw.ksiMatchId : undefined,
     home2min: parseTwoMinArray(raw.home2min),
     away2min: parseTwoMinArray(raw.away2min),
     timeout:

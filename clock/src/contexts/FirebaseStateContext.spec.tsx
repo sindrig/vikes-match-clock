@@ -851,7 +851,7 @@ describe("FirebaseStateContext", () => {
       expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "match",
-        { homeTeam: "Valur", homeTeamId: 2058 },
+        { homeTeam: "Valur", homeTeamId: 2058, ksiMatchId: null },
       );
     });
 
@@ -875,7 +875,7 @@ describe("FirebaseStateContext", () => {
       expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "match",
-        { awayTeam: "KR", awayTeamId: 2145 },
+        { awayTeam: "KR", awayTeamId: 2145, ksiMatchId: null },
       );
     });
 
@@ -899,7 +899,7 @@ describe("FirebaseStateContext", () => {
       expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "match",
-        { awayTeam: "Unknown FC", awayTeamId: 0 },
+        { awayTeam: "Unknown FC", awayTeamId: 0, ksiMatchId: null },
       );
     });
 
@@ -923,7 +923,7 @@ describe("FirebaseStateContext", () => {
       expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "match",
-        { homeTeam: "Víkingur R", homeTeamId: 2492 },
+        { homeTeam: "Víkingur R", homeTeamId: 2492, ksiMatchId: null },
       );
     });
 
@@ -947,7 +947,7 @@ describe("FirebaseStateContext", () => {
       expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "match",
-        { awayTeam: "", awayTeamId: 0 },
+        { awayTeam: "", awayTeamId: 0, ksiMatchId: null },
       );
     });
 
@@ -1080,7 +1080,7 @@ describe("FirebaseStateContext", () => {
       expect(Object.keys(call[2])).toEqual(
         expect.arrayContaining(["homeTeam", "homeTeamId"]),
       );
-      expect(Object.keys(call[2])).toHaveLength(2);
+      expect(Object.keys(call[2])).toHaveLength(3);
     });
 
     it("syncs only awayTeam and awayTeamId when only awayTeam is updated", () => {
@@ -1104,7 +1104,7 @@ describe("FirebaseStateContext", () => {
       expect(Object.keys(call[2])).toEqual(
         expect.arrayContaining(["awayTeam", "awayTeamId"]),
       );
-      expect(Object.keys(call[2])).toHaveLength(2);
+      expect(Object.keys(call[2])).toHaveLength(3);
     });
 
     it("syncs matchType and halfStops when matchType changes", () => {
@@ -1150,6 +1150,120 @@ describe("FirebaseStateContext", () => {
       });
       const call = vi.mocked(firebaseDatabase.syncState).mock.calls[0];
       expect(call[2]).toEqual({ injuryTime: 0 });
+    });
+
+    it("clears ksiMatchId when homeTeam changes without ksiMatchId in same update", () => {
+      let matchApi: ReturnType<typeof useMatch> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestMatchConsumer
+            onMount={(api) => {
+              matchApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        matchApi!.updateMatch({ homeTeam: "Valur" });
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "match",
+        expect.objectContaining({ ksiMatchId: null }),
+      );
+    });
+
+    it("clears ksiMatchId when awayTeam changes without ksiMatchId in same update", () => {
+      let matchApi: ReturnType<typeof useMatch> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestMatchConsumer
+            onMount={(api) => {
+              matchApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        matchApi!.updateMatch({ awayTeam: "KR" });
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "match",
+        expect.objectContaining({ ksiMatchId: null }),
+      );
+    });
+
+    it("does NOT clear ksiMatchId when homeTeam and ksiMatchId are set together", () => {
+      let matchApi: ReturnType<typeof useMatch> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestMatchConsumer
+            onMount={(api) => {
+              matchApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        matchApi!.updateMatch({ homeTeam: "Valur", ksiMatchId: 12345 });
+      });
+      const call = vi.mocked(firebaseDatabase.syncState).mock.calls[0];
+      expect(call[2].ksiMatchId).toBe(12345);
+    });
+
+    it("does NOT clear ksiMatchId when unrelated fields change", () => {
+      let matchApi: ReturnType<typeof useMatch> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestMatchConsumer
+            onMount={(api) => {
+              matchApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        matchApi!.updateMatch({ homeScore: 5 });
+      });
+      const call = vi.mocked(firebaseDatabase.syncState).mock.calls[0];
+      expect(call[2].ksiMatchId).toBeUndefined();
+    });
+
+    it("syncs ksiMatchId to Firebase when explicitly set", () => {
+      let matchApi: ReturnType<typeof useMatch> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestMatchConsumer
+            onMount={(api) => {
+              matchApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        matchApi!.updateMatch({ ksiMatchId: 99999 });
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "match",
+        expect.objectContaining({ ksiMatchId: 99999 }),
+      );
     });
   });
 

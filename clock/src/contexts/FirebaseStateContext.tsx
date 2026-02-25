@@ -445,6 +445,15 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       if ("awayTeam" in updates) {
         partialData.awayTeamId = newState.awayTeamId;
       }
+      if (
+        ("homeTeam" in updates || "awayTeam" in updates) &&
+        !("ksiMatchId" in updates)
+      ) {
+        partialData.ksiMatchId = null;
+      }
+      if ("ksiMatchId" in updates) {
+        partialData.ksiMatchId = newState.ksiMatchId ?? null;
+      }
       if ("matchType" in updates && newState.matchType !== prev.matchType) {
         partialData.halfStops = newState.halfStops;
       }
