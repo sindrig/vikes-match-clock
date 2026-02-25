@@ -28,6 +28,16 @@ class MatchPhase(BaseModel):
     id: int
     name: str
 
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_phase_type_id(cls, data: object) -> object:
+        if not isinstance(data, dict):
+            return data
+        if "id" not in data and "phaseTypeId" in data:
+            result = dict(data)
+            result["id"] = result.pop("phaseTypeId")
+            return result
+        return data
 
 class Competition(BaseModel):
     id: int

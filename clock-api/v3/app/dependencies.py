@@ -1,7 +1,7 @@
 import boto3
 from functools import cache
 
-from app.services.ksi import KsiClient
+from app.services.adapter import KsiAdapter
 from fastapi.exceptions import HTTPException
 
 ssm_client = boto3.client("ssm", region_name="eu-west-1")
@@ -27,6 +27,6 @@ def get_weather_api_key() -> str:
     return response["Parameter"]["Value"]
 
 
-def get_ksi_client(team_id: int) -> KsiClient:
+def get_ksi_client(team_id: int) -> KsiAdapter:
     api_key = get_ksi_api_key(team_id)
-    return KsiClient(api_key=api_key, team_id=team_id)
+    return KsiAdapter(api_key=api_key, team_id=team_id)
