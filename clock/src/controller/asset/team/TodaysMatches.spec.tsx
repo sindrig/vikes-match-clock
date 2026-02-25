@@ -7,6 +7,9 @@ import TodaysMatches from "./TodaysMatches";
 vi.mock("../../../lib/api", () => ({
   fetchMatchesByTeam: vi.fn(),
   fetchLineups: vi.fn(),
+}));
+
+vi.mock("../../../lib/matchUtils", () => ({
   transformLineups: vi.fn(),
   getTeamId: vi.fn(),
 }));
@@ -37,9 +40,8 @@ import { useRemoteSettings } from "../../../contexts/LocalStateContext";
 import {
   fetchMatchesByTeam,
   fetchLineups,
-  transformLineups,
-  getTeamId,
 } from "../../../lib/api";
+import { transformLineups, getTeamId } from "../../../lib/matchUtils";
 
 const mockedUseController = vi.mocked(useController);
 const mockedUseMatch = vi.mocked(useMatch);

@@ -1,6 +1,5 @@
 import axios from "axios";
 import apiConfig from "../apiConfig";
-import { ListenersState, Player, Roster } from "../types";
 
 interface Person {
   id: number;
@@ -63,7 +62,7 @@ export interface ApiMatch {
   allowDetail?: boolean | null;
 }
 
-interface TeamPlayer {
+export interface TeamPlayer {
   shirtNumber?: number | null;
   captain: boolean;
   goalkeeper: boolean;
@@ -71,17 +70,17 @@ interface TeamPlayer {
   person: Person;
 }
 
-interface MatchAndTeamOfficial {
+export interface MatchAndTeamOfficial {
   person: Person;
   role?: string | null;
 }
 
-interface TeamLineup {
+export interface TeamLineup {
   players: TeamPlayer[];
   officials: MatchAndTeamOfficial[];
 }
 
-interface LineupsResponse {
+export interface LineupsResponse {
   home: TeamLineup;
   away: TeamLineup;
 }
@@ -92,13 +91,6 @@ interface WeatherResponse {
   main: Record<string, unknown>;
 }
 
-export function getTeamId(
-  screens: ListenersState["screens"],
-  listenPrefix: string,
-): number {
-  const screen = screens.find((s: { key?: string }) => s.key === listenPrefix);
-  return screen?.teamId ?? 2492;
-}
 
 export async function fetchMatchesByTeam(
   teamId: number,
@@ -131,41 +123,3 @@ export async function fetchWeather(
   return { temp: response.data.temp };
 }
 
-function mapRole(tp: TeamPlayer): string {
-  if (tp.goalkeeper && tp.startingLineup) return "Markma\u00F0ur";
-  if (tp.goalkeeper && !tp.startingLineup) return "Varamarkma\u00F0ur";
-  if (tp.captain) return "Fyrirli\u00F0i";
-  if (tp.startingLineup && !tp.goalkeeper) return "Leikma\u00F0ur";
-  return "Varama\u00F0ur";
-}
-
-export function transformLineups(lineups: LineupsResponse): Roster {
-  const mapPlayers = (lineup: TeamLineup): Player[] => {
-    const players: Player[] = lineup.players.map((tp) => {
-      const player: Player = {
-        name: tp.person.name,
-        id: tp.person.id,
-        role: mapRole(tp),
-        show: tp.startingLineup,
-      };
-      if (tp.shirtNumber != null) {
-        player.number = tp.shirtNumber;
-      }
-      return player;
-    });
-
-    const officials: Player[] = lineup.officials.map((official) => ({
-      name: official.person.name,
-      id: official.person.id,
-      role: "\u00DEj\u00E1lfari",
-      show: false,
-    }));
-
-    return [...players, ...officials];
-  };
-
-  return {
-    home: mapPlayers(lineups.home),
-    away: mapPlayers(lineups.away),
-  };
-}

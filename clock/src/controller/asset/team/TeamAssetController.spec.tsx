@@ -9,7 +9,8 @@ import {
   useListeners,
 } from "../../../contexts/FirebaseStateContext";
 import { useRemoteSettings } from "../../../contexts/LocalStateContext";
-import { fetchLineups, transformLineups, getTeamId } from "../../../lib/api";
+import { fetchLineups } from "../../../lib/api";
+import { transformLineups, getTeamId } from "../../../lib/matchUtils";
 
 vi.mock("../../../contexts/FirebaseStateContext", () => ({
   useMatch: vi.fn(),
@@ -23,6 +24,9 @@ vi.mock("../../../contexts/LocalStateContext", () => ({
 
 vi.mock("../../../lib/api", () => ({
   fetchLineups: vi.fn(),
+}));
+
+vi.mock("../../../lib/matchUtils", () => ({
   transformLineups: vi.fn(),
   getTeamId: vi.fn(),
 }));

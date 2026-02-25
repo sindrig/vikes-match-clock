@@ -10,10 +10,9 @@ import { useRemoteSettings } from "../../../contexts/LocalStateContext";
 import {
   fetchMatchesByTeam,
   fetchLineups,
-  transformLineups,
-  getTeamId,
   ApiMatch,
 } from "../../../lib/api";
+import { transformLineups, getTeamId } from "../../../lib/matchUtils";
 
 const TodaysMatches = (): React.JSX.Element => {
   const { setRoster } = useController();

@@ -13,7 +13,8 @@ import {
   useListeners,
 } from "../../../contexts/FirebaseStateContext";
 import { useRemoteSettings } from "../../../contexts/LocalStateContext";
-import { fetchLineups, transformLineups, getTeamId } from "../../../lib/api";
+import { fetchLineups } from "../../../lib/api";
+import { transformLineups, getTeamId } from "../../../lib/matchUtils";
 
 interface SubPlayer extends Player {
   teamName: string;
