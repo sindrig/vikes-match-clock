@@ -59,8 +59,6 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r clock-api/v3/requirements.txt -r clock-api/v3/requirements-dev.txt
 
-      - name: Generate KSI client
-        run: make generate-ksi-client
 
       - name: Check API spec freshness
         run: make generate-api-spec && git diff --exit-code clock-api/v3/openapi.json

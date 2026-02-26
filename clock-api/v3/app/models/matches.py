@@ -39,6 +39,7 @@ class MatchPhase(BaseModel):
             return result
         return data
 
+
 class Competition(BaseModel):
     id: int
     name: str

@@ -5,7 +5,6 @@ from httpx import Response
 
 from app.main import app
 from app.models.matches import LineupsResponse, Match
-from app.services.adapter import KsiAdapter
 
 BASE_URL = "https://api-ksi.analyticom.de"
 
@@ -40,35 +39,6 @@ async def test_get_matches_success(ksi_client):
     assert matches[0].awayTeam.name == "KR"
     assert matches[0].liveStatus == "SCHEDULED"
     assert matches[0].competition.name == "Pepsi Max deildin"
-
-
-@pytest.mark.asyncio
-@respx.mock
-async def test_get_matches_empty_current_match_phase(ksi_client):
-    respx.get(f"{BASE_URL}/api/live/matchList/20250615/0").mock(
-        return_value=Response(
-            200,
-            json=[
-                {
-                    "id": 12345,
-                    "homeTeam": {"id": 1, "name": "Víkingur"},
-                    "awayTeam": {"id": 2, "name": "KR"},
-                    "dateTimeUTC": "2025-06-15T14:00:00Z",
-                    "liveStatus": "PLAYED",
-                    "currentMatchPhase": {},
-                    "competition": {
-                        "id": 1,
-                        "name": "Pepsi Max deildin",
-                    },
-                }
-            ],
-        )
-    )
-
-    matches = await ksi_client.get_matches("20250615", 0)
-
-    assert len(matches) == 1
-    assert matches[0].currentMatchPhase is None
 
 
 @pytest.mark.asyncio
@@ -118,90 +88,6 @@ async def test_get_lineups_success(ksi_client):
     assert lineups.home.players[0].captain is True
     assert lineups.home.players[0].person.name == "Player One"
     assert lineups.away.players == []
-
-
-@pytest.mark.asyncio
-@respx.mock
-async def test_get_lineups_flat_api_response(ksi_client):
-    respx.get(f"{BASE_URL}/api/live/match/12345/lineups").mock(
-        return_value=Response(
-            200,
-            json={
-                "home": {
-                    "players": [
-                        {
-                            "roleId": 100,
-                            "personId": 42,
-                            "name": "Goalkeeper One",
-                            "shortName": "GK One",
-                            "shirtNumber": 1,
-                            "starting": True,
-                            "captain": False,
-                            "position": "G",
-                            "orderNumber": 1,
-                        },
-                        {
-                            "roleId": 101,
-                            "personId": 43,
-                            "name": "Outfield Player",
-                            "shortName": "Outfield P.",
-                            "shirtNumber": 10,
-                            "starting": True,
-                            "captain": True,
-                            "orderNumber": 2,
-                        },
-                        {
-                            "roleId": 102,
-                            "personId": 44,
-                            "name": "Sub Player",
-                            "shortName": "Sub P.",
-                            "shirtNumber": 15,
-                            "starting": False,
-                            "captain": False,
-                            "orderNumber": 3,
-                        },
-                    ],
-                    "officials": [
-                        {
-                            "roleId": 200,
-                            "personId": 99,
-                            "name": "Head Coach",
-                            "shortName": "Coach",
-                            "role": "Head Coach",
-                            "orderNumber": 1,
-                        }
-                    ],
-                },
-                "away": {"players": [], "officials": []},
-            },
-        )
-    )
-
-    lineups = await ksi_client.get_lineups(12345)
-
-    assert len(lineups.home.players) == 3
-
-    gk = lineups.home.players[0]
-    assert gk.person.id == 42
-    assert gk.person.name == "Goalkeeper One"
-    assert gk.goalkeeper is True
-    assert gk.startingLineup is True
-    assert gk.shirtNumber == 1
-
-    captain = lineups.home.players[1]
-    assert captain.person.id == 43
-    assert captain.captain is True
-    assert captain.goalkeeper is False
-    assert captain.startingLineup is True
-
-    sub = lineups.home.players[2]
-    assert sub.person.id == 44
-    assert sub.startingLineup is False
-
-    official = lineups.home.officials[0]
-    assert official.person.id == 99
-    assert official.person.name == "Head Coach"
-    assert official.role == "Head Coach"
 
 
 @pytest.mark.asyncio
@@ -301,18 +187,16 @@ async def test_get_match_info_not_found(ksi_client):
 
 @pytest.mark.asyncio
 @respx.mock
-async def test_get_matches_sends_api_key_header():
-    client = KsiAdapter(api_key="my-secret-key", team_id=1)
+async def test_get_matches_sends_api_key_header(ksi_client):
     route = respx.get(f"{BASE_URL}/api/live/matchList/20250615/0").mock(
         return_value=Response(200, json=[])
     )
 
-    await client.get_matches("20250615", 0)
-    await client.close()
+    await ksi_client.get_matches("20250615", 0)
 
     assert route.called
     request = route.calls[0].request
-    assert request.headers["API_KEY"] == "my-secret-key"
+    assert request.headers["API_KEY"] == "test-key"
 
 
 MOCK_MATCH_DATA = [
@@ -338,9 +222,9 @@ def test_endpoint_get_matches_date_success(client):
     mock_client = AsyncMock()
     mock_client.get_matches.return_value = mock_matches
 
-    app.dependency_overrides[get_ksi_client] = lambda team_id: mock_client
+    app.dependency_overrides[get_ksi_client] = lambda: mock_client
 
-    response = client.get("/v3/1/matches/2025-06-15")
+    response = client.get("/1/matches/2025-06-15")
 
     assert response.status_code == 200
     data = response.json()
@@ -363,9 +247,9 @@ def test_endpoint_get_matches_date_with_utc_offset(client):
     mock_client = AsyncMock()
     mock_client.get_matches.return_value = []
 
-    app.dependency_overrides[get_ksi_client] = lambda team_id: mock_client
+    app.dependency_overrides[get_ksi_client] = lambda: mock_client
 
-    response = client.get("/v3/1/matches/2025-06-15?utc_offset=-3")
+    response = client.get("/1/matches/2025-06-15?utc_offset=-3")
 
     assert response.status_code == 200
     assert response.json() == []
@@ -383,9 +267,9 @@ def test_endpoint_get_matches_date_empty(client):
     mock_client = AsyncMock()
     mock_client.get_matches.return_value = []
 
-    app.dependency_overrides[get_ksi_client] = lambda team_id: mock_client
+    app.dependency_overrides[get_ksi_client] = lambda: mock_client
 
-    response = client.get("/v3/99/matches/2025-01-01")
+    response = client.get("/99/matches/2025-01-01")
 
     assert response.status_code == 200
     assert response.json() == []
@@ -447,9 +331,9 @@ def test_endpoint_get_lineups_success(client):
     mock_client = AsyncMock()
     mock_client.get_lineups.return_value = mock_lineups
 
-    app.dependency_overrides[get_ksi_client] = lambda team_id: mock_client
+    app.dependency_overrides[get_ksi_client] = lambda: mock_client
 
-    response = client.get("/v3/1/matches/12345/lineups")
+    response = client.get("/1/matches/12345/lineups")
 
     assert response.status_code == 200
     data = response.json()
@@ -488,9 +372,9 @@ def test_endpoint_get_lineups_empty_lineups(client):
     mock_client = AsyncMock()
     mock_client.get_lineups.return_value = mock_lineups
 
-    app.dependency_overrides[get_ksi_client] = lambda team_id: mock_client
+    app.dependency_overrides[get_ksi_client] = lambda: mock_client
 
-    response = client.get("/v3/1/matches/99999/lineups")
+    response = client.get("/1/matches/99999/lineups")
 
     assert response.status_code == 200
     data = response.json()

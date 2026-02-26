@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 from unittest.mock import patch
 
 from app.main import app
-from app.services.adapter import KsiAdapter
+from app.services.ksi import KsiClient
 
 
 @pytest.fixture
@@ -15,7 +15,9 @@ def client():
 @pytest.fixture
 def mock_ssm():
     with patch("app.dependencies.ssm_client") as mock:
-        mock.get_parameter.return_value = {"Parameter": {"Value": "test-api-key"}}
+        mock.get_parameter.return_value = {
+            "Parameter": {"Value": "test-api-key"}
+        }
         yield mock
 
 
@@ -50,6 +52,6 @@ def mock_weather_api_key():
 
 @pytest_asyncio.fixture
 async def ksi_client():
-    client = KsiAdapter(api_key="test-key", team_id=1)
+    client = KsiClient(api_key="test-key", team_id=1)
     yield client
     await client.close()
