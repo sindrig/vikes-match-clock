@@ -13,7 +13,8 @@ import {
   useListeners,
 } from "../../../contexts/FirebaseStateContext";
 import { useRemoteSettings } from "../../../contexts/LocalStateContext";
-import { fetchLineups } from "../../../lib/api";
+import "../../../api/clientConfig";
+import { getLineupsV3TeamIdMatchesMatchIdLineupsGet } from "../../../api/client";
 import { transformLineups, getTeamId } from "../../../lib/matchUtils";
 
 interface SubPlayer extends Player {
@@ -54,8 +55,14 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
     if (!match.ksiMatchId) return;
     setLoading(true);
     const teamId = getTeamId(screens, listenPrefix);
-    void fetchLineups(teamId, match.ksiMatchId)
-      .then((lineups) => {
+    void getLineupsV3TeamIdMatchesMatchIdLineupsGet({
+      path: { team_id: teamId, match_id: match.ksiMatchId },
+    })
+      .then((result) => {
+        const lineups = result.data ?? {
+          home: { players: [], officials: [] },
+          away: { players: [], officials: [] },
+        };
         const rosterData = transformLineups(lineups);
         setRoster(rosterData);
         setError("");

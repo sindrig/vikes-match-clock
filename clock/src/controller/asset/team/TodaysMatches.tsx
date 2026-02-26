@@ -7,11 +7,12 @@ import {
   useListeners,
 } from "../../../contexts/FirebaseStateContext";
 import { useRemoteSettings } from "../../../contexts/LocalStateContext";
+import "../../../api/clientConfig";
 import {
-  fetchMatchesByTeam,
-  fetchLineups,
-  ApiMatch,
-} from "../../../lib/api";
+  getMatchesV3TeamIdMatchesDateGet,
+  getLineupsV3TeamIdMatchesMatchIdLineupsGet,
+  type Match,
+} from "../../../api/client";
 import { transformLineups, getTeamId } from "../../../lib/matchUtils";
 
 const TodaysMatches = (): React.JSX.Element => {
@@ -22,14 +23,18 @@ const TodaysMatches = (): React.JSX.Element => {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [matches, setMatches] = useState<ApiMatch[]>([]);
+  const [matches, setMatches] = useState<Match[]>([]);
 
   const fetchTodaysMatches = async (): Promise<void> => {
     const teamId = getTeamId(screens, listenPrefix);
     setLoading(true);
 
     try {
-      const fetched = await fetchMatchesByTeam(teamId);
+      const result = await getMatchesV3TeamIdMatchesDateGet({
+        path: { team_id: teamId, date: new Date().toISOString().slice(0, 10) },
+        query: { utc_offset: 0 },
+      });
+      const fetched = result.data ?? [];
       setError("");
       setMatches(fetched);
       setLoading(false);
@@ -48,10 +53,23 @@ const TodaysMatches = (): React.JSX.Element => {
     setLoading(true);
 
     try {
-      const lineups = await fetchLineups(teamId, Number(matchId));
+      const result = await getLineupsV3TeamIdMatchesMatchIdLineupsGet({
+        path: { team_id: teamId, match_id: Number(matchId) },
+      });
+      const lineups = result.data ?? {
+        home: { players: [], officials: [] },
+        away: { players: [], officials: [] },
+      };
       let foundMatch = matches.find((m) => String(m.id) === matchId);
       if (!foundMatch) {
-        const freshMatches = await fetchMatchesByTeam(teamId);
+        const result = await getMatchesV3TeamIdMatchesDateGet({
+          path: {
+            team_id: teamId,
+            date: new Date().toISOString().slice(0, 10),
+          },
+          query: { utc_offset: 0 },
+        });
+        const freshMatches = result.data ?? [];
         foundMatch = freshMatches.find((m) => String(m.id) === matchId);
       }
       if (!foundMatch) {
@@ -72,7 +90,7 @@ const TodaysMatches = (): React.JSX.Element => {
     }
   };
 
-  const selectMatchHandler = async (match: ApiMatch): Promise<void> => {
+  const selectMatchHandler = async (match: Match): Promise<void> => {
     setLoading(true);
     updateMatch({
       homeTeam: match.homeTeam.name,
@@ -87,7 +105,13 @@ const TodaysMatches = (): React.JSX.Element => {
     const teamId = getTeamId(screens, listenPrefix);
 
     try {
-      const lineups = await fetchLineups(teamId, match.id);
+      const result = await getLineupsV3TeamIdMatchesMatchIdLineupsGet({
+        path: { team_id: teamId, match_id: match.id },
+      });
+      const lineups = result.data ?? {
+        home: { players: [], officials: [] },
+        away: { players: [], officials: [] },
+      };
       const roster = transformLineups(lineups);
       setRoster(roster);
       setError("");
