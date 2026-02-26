@@ -51,6 +51,26 @@ jobs:
         working-directory: ./clock
         run: pnpm exec playwright install --with-deps chromium
 
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python dependencies
+        run: pip install -r clock-api/v3/requirements.txt -r clock-api/v3/requirements-dev.txt
+
+      - name: Generate KSI client
+        run: make generate-ksi-client
+
+      - name: Check API spec freshness
+        run: make generate-api-spec && git diff --exit-code clock-api/v3/openapi.json
+
+      - name: Generate TypeScript client
+        run: make generate-ts-client
+
+      - name: Run Python tests
+        run: cd clock-api/v3 && python -m pytest tests/ -v
+
       - name: Lint
         working-directory: ./clock
         run: pnpm lint
