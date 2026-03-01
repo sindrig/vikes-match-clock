@@ -1,24 +1,26 @@
 data "aws_iam_policy_document" "deploy" {
+  # Lambda: manage the clock-api-v3 function and its versions/aliases
   statement {
     actions = ["lambda:*"]
     resources = [
-      module.clock-api-v3.lambda_function_arn
+      module.clock-api-v3.lambda_function_arn,
+      "${module.clock-api-v3.lambda_function_arn}:*"
     ]
   }
 
+  # API Gateway: manage HTTP API and its resources
   statement {
-    actions = ["apigateway:*"]
+    actions   = ["apigateway:*"]
     resources = ["*"]
   }
 
+  # CloudWatch Logs: API Gateway access logs + Lambda log group
   statement {
-    actions = ["logs:*"]
-    resources = [
-      aws_cloudwatch_log_group.logs.arn,
-      "${aws_cloudwatch_log_group.logs.arn}:*"
-    ]
+    actions   = ["logs:*"]
+    resources = ["*"]
   }
 
+  # IAM: manage Lambda execution roles and policies
   statement {
     actions = [
       "iam:GetRole",
@@ -49,6 +51,21 @@ data "aws_iam_policy_document" "deploy" {
     ]
   }
 
+  # IAM: manage the deploy policy itself (self-referential)
+  statement {
+    actions = [
+      "iam:GetPolicy",
+      "iam:GetPolicyVersion",
+      "iam:CreatePolicyVersion",
+      "iam:DeletePolicyVersion",
+      "iam:ListPolicyVersions"
+    ]
+    resources = [
+      "arn:aws:iam::*:policy/vikes-match-clock-deploy-*"
+    ]
+  }
+
+  # Route53: manage DNS records for API and frontend
   statement {
     actions = [
       "route53:GetHostedZone",
@@ -61,6 +78,7 @@ data "aws_iam_policy_document" "deploy" {
     resources = ["*"]
   }
 
+  # ACM: manage certificates for API and frontend domains
   statement {
     actions = [
       "acm:DescribeCertificate",
@@ -73,21 +91,21 @@ data "aws_iam_policy_document" "deploy" {
     resources = ["*"]
   }
 
+  # CloudFront: manage distribution + Origin Access Identity
   statement {
-    actions = ["cloudfront:*"]
-    resources = [module.webpage.cf_arn]
+    actions   = ["cloudfront:*"]
+    resources = ["*"]
   }
 
+  # S3: manage frontend bucket, logs bucket, and account-level operations
   statement {
-    actions = ["s3:*"]
-    resources = [
-      module.webpage.s3_bucket_arn,
-      "${module.webpage.s3_bucket_arn}/*"
-    ]
+    actions   = ["s3:*"]
+    resources = ["*"]
   }
 
+  # SSM: read API keys for Lambda
   statement {
-    actions = ["ssm:GetParameter"]
+    actions   = ["ssm:GetParameter"]
     resources = ["arn:aws:ssm:*:*:parameter/vikes-match-clock/*"]
   }
 }
