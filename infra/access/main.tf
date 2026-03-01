@@ -68,7 +68,7 @@ resource "aws_iam_role" "github_master_deploy" {
   }
 }
 
-resource "aws_iam_role_policy" "master_tf_state_read" {
+resource "aws_iam_role_policy" "master_tf_state_access" {
   name = "terraform-state-read"
   role = aws_iam_role.github_master_deploy.id
 
@@ -79,7 +79,9 @@ resource "aws_iam_role_policy" "master_tf_state_read" {
         Effect = "Allow"
         Action = [
           "s3:GetObject",
-          "s3:ListBucket"
+          "s3:ListBucket",
+          "s3:PutObject",
+          "s3:DeleteObject"
         ]
         Resource = [
           "arn:aws:s3:::vikes-misc-tf-state",
@@ -125,7 +127,7 @@ resource "aws_iam_role" "github_staging_deploy" {
   }
 }
 
-resource "aws_iam_role_policy" "staging_tf_state_read" {
+resource "aws_iam_role_policy" "staging_tf_state_access" {
   name = "terraform-state-read"
   role = aws_iam_role.github_staging_deploy.id
 
@@ -136,7 +138,9 @@ resource "aws_iam_role_policy" "staging_tf_state_read" {
         Effect = "Allow"
         Action = [
           "s3:GetObject",
-          "s3:ListBucket"
+          "s3:ListBucket",
+          "s3:PutObject",
+          "s3:DeleteObject"
         ]
         Resource = [
           "arn:aws:s3:::vikes-misc-tf-state",
