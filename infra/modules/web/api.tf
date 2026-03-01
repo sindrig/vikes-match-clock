@@ -85,6 +85,7 @@ module "clock-api-v3" {
   build_in_docker = true
   trigger_on_package_timestamp = false
   source_path     = "${path.module}/../../../clock-api/v3"
+  ignore_source_code_hash = true
 
   layers = [
     "arn:aws:lambda:eu-west-1:753240598075:layer:LambdaAdapterLayerX86:20"
