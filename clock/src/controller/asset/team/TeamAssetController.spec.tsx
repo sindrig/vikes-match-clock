@@ -343,7 +343,7 @@ describe("TeamAssetController", () => {
           path: expect.objectContaining({
             teamId: 2492,
             matchId: 12345,
-          }),
+          }) as unknown,
         }),
       );
       expect(mockedTransformLineups).toHaveBeenCalledWith(lineups);

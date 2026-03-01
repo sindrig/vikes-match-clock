@@ -144,7 +144,7 @@ describe("TodaysMatches", () => {
       await waitFor(() => {
         expect(mockedGetMatches).toHaveBeenCalledWith(
           expect.objectContaining({
-            path: expect.objectContaining({ teamId: 2492 }),
+            path: expect.objectContaining({ teamId: 2492 }) as unknown,
           }),
         );
       });
@@ -281,7 +281,7 @@ describe("TodaysMatches", () => {
             path: expect.objectContaining({
               teamId: 2492,
               matchId: 123,
-            }),
+            }) as unknown,
           }),
         );
       });
