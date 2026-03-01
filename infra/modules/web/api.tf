@@ -83,6 +83,7 @@ module "clock-api-v3" {
   timeout = 20
 
   build_in_docker = true
+  trigger_on_package_timestamp = false
   source_path     = "${path.module}/../../../clock-api/v3"
 
   layers = [
