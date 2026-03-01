@@ -4,9 +4,12 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import TodaysMatches from "./TodaysMatches";
 
-vi.mock("../../../lib/api", () => ({
-  fetchMatchesByTeam: vi.fn(),
-  fetchLineups: vi.fn(),
+vi.mock("../../../api/client", () => ({
+  getMatches: vi.fn(),
+  getLineups: vi.fn(),
+}));
+
+vi.mock("../../../lib/matchUtils", () => ({
   transformLineups: vi.fn(),
   getTeamId: vi.fn(),
 }));
@@ -34,19 +37,15 @@ import {
   useListeners,
 } from "../../../contexts/FirebaseStateContext";
 import { useRemoteSettings } from "../../../contexts/LocalStateContext";
-import {
-  fetchMatchesByTeam,
-  fetchLineups,
-  transformLineups,
-  getTeamId,
-} from "../../../lib/api";
+import { getMatches, getLineups } from "../../../api/client";
+import { transformLineups, getTeamId } from "../../../lib/matchUtils";
 
 const mockedUseController = vi.mocked(useController);
 const mockedUseMatch = vi.mocked(useMatch);
 const mockedUseListeners = vi.mocked(useListeners);
 const mockedUseRemoteSettings = vi.mocked(useRemoteSettings);
-const mockedFetchMatchesByTeam = vi.mocked(fetchMatchesByTeam);
-const mockedFetchLineups = vi.mocked(fetchLineups);
+const mockedGetMatches = vi.mocked(getMatches);
+const mockedGetLineups = vi.mocked(getLineups);
 const mockedTransformLineups = vi.mocked(transformLineups);
 const mockedGetTeamId = vi.mocked(getTeamId);
 
@@ -129,7 +128,10 @@ describe("TodaysMatches", () => {
         liveStatus: "not_started",
       };
 
-      mockedFetchMatchesByTeam.mockResolvedValueOnce([apiMatch1, apiMatch2]);
+      mockedGetMatches.mockResolvedValueOnce({
+        data: [apiMatch1, apiMatch2],
+        error: null,
+      });
 
       const user = userEvent.setup();
       render(<TodaysMatches />);
@@ -140,7 +142,11 @@ describe("TodaysMatches", () => {
       await user.click(fetchButton);
 
       await waitFor(() => {
-        expect(mockedFetchMatchesByTeam).toHaveBeenCalledWith(2492);
+        expect(mockedGetMatches).toHaveBeenCalledWith(
+          expect.objectContaining({
+            path: expect.objectContaining({ teamId: 2492 }) as unknown,
+          }),
+        );
       });
 
       const dt1 = new Date(apiMatch1.dateTimeUTC);
@@ -176,8 +182,10 @@ describe("TodaysMatches", () => {
 
     it("shows loading spinner during fetch", async () => {
       const mockImplementationFn = () =>
-        new Promise((resolve) => setTimeout(() => resolve([]), 100));
-      mockedFetchMatchesByTeam.mockImplementation(
+        new Promise((resolve) =>
+          setTimeout(() => resolve({ data: [], error: null }), 100),
+        );
+      mockedGetMatches.mockImplementation(
         mockImplementationFn as ReturnType<typeof vi.fn>,
       );
 
@@ -197,9 +205,7 @@ describe("TodaysMatches", () => {
     });
 
     it("displays error when fetch fails", async () => {
-      mockedFetchMatchesByTeam.mockRejectedValueOnce(
-        new Error("Network error"),
-      );
+      mockedGetMatches.mockRejectedValueOnce(new Error("Network error"));
 
       const user = userEvent.setup();
       render(<TodaysMatches />);
@@ -249,8 +255,14 @@ describe("TodaysMatches", () => {
         liveStatus: "not_started",
       };
 
-      mockedFetchLineups.mockResolvedValueOnce(mockReportData);
-      mockedFetchMatchesByTeam.mockResolvedValueOnce([apiMatch]);
+      mockedGetLineups.mockResolvedValueOnce({
+        data: mockReportData,
+        error: null,
+      });
+      mockedGetMatches.mockResolvedValueOnce({
+        data: [apiMatch],
+        error: null,
+      });
       mockedTransformLineups.mockReturnValue(mockPlayers);
 
       const user = userEvent.setup();
@@ -264,7 +276,14 @@ describe("TodaysMatches", () => {
       expect(promptSpy).toHaveBeenCalledWith("ID á leikskýrslu");
 
       await waitFor(() => {
-        expect(mockedFetchLineups).toHaveBeenCalledWith(2492, 123);
+        expect(mockedGetLineups).toHaveBeenCalledWith(
+          expect.objectContaining({
+            path: expect.objectContaining({
+              teamId: 2492,
+              matchId: 123,
+            }) as unknown,
+          }),
+        );
       });
 
       await waitFor(() => {
@@ -288,7 +307,7 @@ describe("TodaysMatches", () => {
       await user.click(reportButton);
 
       expect(promptSpy).toHaveBeenCalledWith("ID á leikskýrslu");
-      expect(mockedFetchLineups).not.toHaveBeenCalled();
+      expect(mockedGetLineups).not.toHaveBeenCalled();
     });
 
     it("does nothing when prompt returns empty string", async () => {
@@ -303,12 +322,12 @@ describe("TodaysMatches", () => {
       await user.click(reportButton);
 
       expect(promptSpy).toHaveBeenCalledWith("ID á leikskýrslu");
-      expect(mockedFetchLineups).not.toHaveBeenCalled();
+      expect(mockedGetLineups).not.toHaveBeenCalled();
     });
 
     it("displays error when fetch fails", async () => {
       promptSpy.mockReturnValue("match-123");
-      mockedFetchLineups.mockRejectedValueOnce(new Error("API error"));
+      mockedGetLineups.mockRejectedValueOnce(new Error("API error"));
 
       const user = userEvent.setup();
       render(<TodaysMatches />);
@@ -346,8 +365,14 @@ describe("TodaysMatches", () => {
         liveStatus: "not_started",
       };
 
-      mockedFetchLineups.mockResolvedValueOnce(mockReportData);
-      mockedFetchMatchesByTeam.mockResolvedValueOnce([apiMatch]);
+      mockedGetLineups.mockResolvedValueOnce({
+        data: mockReportData,
+        error: null,
+      });
+      mockedGetMatches.mockResolvedValueOnce({
+        data: [apiMatch],
+        error: null,
+      });
       mockedTransformLineups.mockReturnValue(mockPlayers);
 
       const user = userEvent.setup();
@@ -389,8 +414,14 @@ describe("TodaysMatches", () => {
         away: [{ name: "Player 3", number: 9, show: true }],
       };
 
-      mockedFetchMatchesByTeam.mockResolvedValueOnce([apiMatch]);
-      mockedFetchLineups.mockResolvedValueOnce(mockLineups);
+      mockedGetMatches.mockResolvedValueOnce({
+        data: [apiMatch],
+        error: null,
+      });
+      mockedGetLineups.mockResolvedValueOnce({
+        data: mockLineups,
+        error: null,
+      });
       mockedTransformLineups.mockReturnValue(mockPlayers);
 
       const user = userEvent.setup();

@@ -9,7 +9,8 @@ import {
   useListeners,
 } from "../../../contexts/FirebaseStateContext";
 import { useRemoteSettings } from "../../../contexts/LocalStateContext";
-import { fetchLineups, transformLineups, getTeamId } from "../../../lib/api";
+import { transformLineups, getTeamId } from "../../../lib/matchUtils";
+import { getLineups } from "../../../api/client";
 
 vi.mock("../../../contexts/FirebaseStateContext", () => ({
   useMatch: vi.fn(),
@@ -21,8 +22,11 @@ vi.mock("../../../contexts/LocalStateContext", () => ({
   useRemoteSettings: vi.fn(),
 }));
 
-vi.mock("../../../lib/api", () => ({
-  fetchLineups: vi.fn(),
+vi.mock("../../../api/client", () => ({
+  getLineups: vi.fn(),
+}));
+
+vi.mock("../../../lib/matchUtils", () => ({
   transformLineups: vi.fn(),
   getTeamId: vi.fn(),
 }));
@@ -93,7 +97,7 @@ const mockedUseMatch = vi.mocked(useMatch);
 const mockedUseController = vi.mocked(useController);
 const mockedUseListeners = vi.mocked(useListeners);
 const mockedUseRemoteSettings = vi.mocked(useRemoteSettings);
-const mockedFetchLineups = vi.mocked(fetchLineups);
+const mockedGetLineups = vi.mocked(getLineups);
 const mockedTransformLineups = vi.mocked(transformLineups);
 const mockedGetTeamId = vi.mocked(getTeamId);
 const mockedGetPlayerAssetObject = vi.mocked(getPlayerAssetObject);
@@ -313,9 +317,10 @@ describe("TeamAssetController", () => {
         away: { players: [], officials: [] },
       };
 
-      mockedFetchLineups.mockResolvedValueOnce(
-        lineups as Awaited<ReturnType<typeof fetchLineups>>,
-      );
+      mockedGetLineups.mockResolvedValueOnce({
+        data: lineups as Awaited<ReturnType<typeof getLineups>>,
+        error: null,
+      });
       mockedTransformLineups.mockReturnValueOnce(rosterData);
 
       render(
@@ -333,7 +338,14 @@ describe("TeamAssetController", () => {
         expect(screen.queryByTestId("ring-loader")).not.toBeInTheDocument();
       });
 
-      expect(mockedFetchLineups).toHaveBeenCalledWith(2492, 12345);
+      expect(mockedGetLineups).toHaveBeenCalledWith(
+        expect.objectContaining({
+          path: expect.objectContaining({
+            teamId: 2492,
+            matchId: 12345,
+          }) as unknown,
+        }),
+      );
       expect(mockedTransformLineups).toHaveBeenCalledWith(lineups);
       expect(mockSetRoster).toHaveBeenCalledWith(rosterData);
     });
@@ -341,7 +353,7 @@ describe("TeamAssetController", () => {
     it("shows error on API failure", async () => {
       setupMocks();
 
-      mockedFetchLineups.mockRejectedValueOnce(new Error("Network error"));
+      mockedGetLineups.mockRejectedValueOnce(new Error("Network error"));
 
       render(
         <TeamAssetController
@@ -370,7 +382,7 @@ describe("TeamAssetController", () => {
       expect(
         screen.queryByRole("button", { name: "Sækja lið" }),
       ).not.toBeInTheDocument();
-      expect(mockedFetchLineups).not.toHaveBeenCalled();
+      expect(mockedGetLineups).not.toHaveBeenCalled();
     });
   });
 
@@ -944,7 +956,7 @@ describe("TeamAssetController", () => {
       const neverResolves = new Promise<never>(
         Function.prototype as () => void,
       );
-      mockedFetchLineups.mockReturnValue(neverResolves);
+      mockedGetLineups.mockReturnValue(neverResolves);
 
       render(
         <TeamAssetController
@@ -964,7 +976,7 @@ describe("TeamAssetController", () => {
       const neverResolves = new Promise<never>(
         Function.prototype as () => void,
       );
-      mockedFetchLineups.mockReturnValue(neverResolves);
+      mockedGetLineups.mockReturnValue(neverResolves);
 
       render(
         <TeamAssetController

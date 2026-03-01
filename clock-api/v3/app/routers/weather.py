@@ -7,7 +7,7 @@ from app.services.weather import get_weather
 router = APIRouter(prefix="/weather", tags=["weather"])
 
 
-@router.get("/", response_model=WeatherResponse)
+@router.get("/", response_model=WeatherResponse, operation_id="get_weather")
 async def get_weather_endpoint(lat: float, lon: float):
     api_key = get_weather_api_key()
     try:

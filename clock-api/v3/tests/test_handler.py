@@ -30,6 +30,8 @@ class TestAppConfig:
         assert response.headers.get("access-control-allow-origin") == "*"
 
     def test_run_script_exists(self):
-        run_sh = os.path.join(os.path.dirname(os.path.dirname(__file__)), "run.sh")
+        run_sh = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)), "run.sh"
+        )
         assert os.path.isfile(run_sh)
         assert os.access(run_sh, os.X_OK)

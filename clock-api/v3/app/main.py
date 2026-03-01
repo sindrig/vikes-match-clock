@@ -17,7 +17,7 @@ v3.include_router(matches.router, tags=["matches"])
 v3.include_router(weather.router)
 
 
-@v3.get("/health")
+@v3.get("/health", operation_id="health_check")
 def health_check():
     return {"status": "ok"}
 
