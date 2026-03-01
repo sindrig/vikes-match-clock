@@ -51,17 +51,21 @@ data "aws_iam_policy_document" "deploy" {
     ]
   }
 
-  # IAM: manage the deploy policy itself (self-referential)
+  # IAM: manage the deploy policy and role attachment (self-referential)
   statement {
     actions = [
       "iam:GetPolicy",
       "iam:GetPolicyVersion",
       "iam:CreatePolicyVersion",
       "iam:DeletePolicyVersion",
-      "iam:ListPolicyVersions"
+      "iam:ListPolicyVersions",
+      "iam:ListAttachedRolePolicies",
+      "iam:AttachRolePolicy",
+      "iam:DetachRolePolicy"
     ]
     resources = [
-      "arn:aws:iam::*:policy/vikes-match-clock-deploy-*"
+      "arn:aws:iam::*:policy/vikes-match-clock-deploy-*",
+      "arn:aws:iam::*:role/${var.deploy_role_name}"
     ]
   }
 
@@ -82,6 +86,7 @@ data "aws_iam_policy_document" "deploy" {
   statement {
     actions = [
       "acm:DescribeCertificate",
+      "acm:GetCertificate",
       "acm:ListCertificates",
       "acm:ListTagsForCertificate",
       "acm:RequestCertificate",
