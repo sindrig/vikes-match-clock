@@ -5,8 +5,8 @@ import userEvent from "@testing-library/user-event";
 import TodaysMatches from "./TodaysMatches";
 
 vi.mock("../../../api/client", () => ({
-  getMatchesV3TeamIdMatchesDateGet: vi.fn(),
-  getLineupsV3TeamIdMatchesMatchIdLineupsGet: vi.fn(),
+  getMatches: vi.fn(),
+  getLineups: vi.fn(),
 }));
 
 vi.mock("../../../lib/matchUtils", () => ({
@@ -37,22 +37,15 @@ import {
   useListeners,
 } from "../../../contexts/FirebaseStateContext";
 import { useRemoteSettings } from "../../../contexts/LocalStateContext";
-import {
-  getMatchesV3TeamIdMatchesDateGet,
-  getLineupsV3TeamIdMatchesMatchIdLineupsGet,
-} from "../../../api/client";
+import { getMatches, getLineups } from "../../../api/client";
 import { transformLineups, getTeamId } from "../../../lib/matchUtils";
 
 const mockedUseController = vi.mocked(useController);
 const mockedUseMatch = vi.mocked(useMatch);
 const mockedUseListeners = vi.mocked(useListeners);
 const mockedUseRemoteSettings = vi.mocked(useRemoteSettings);
-const mockedGetMatchesV3TeamIdMatchesDateGet = vi.mocked(
-  getMatchesV3TeamIdMatchesDateGet,
-);
-const mockedGetLineupsV3TeamIdMatchesMatchIdLineupsGet = vi.mocked(
-  getLineupsV3TeamIdMatchesMatchIdLineupsGet,
-);
+const mockedGetMatches = vi.mocked(getMatches);
+const mockedGetLineups = vi.mocked(getLineups);
 const mockedTransformLineups = vi.mocked(transformLineups);
 const mockedGetTeamId = vi.mocked(getTeamId);
 
@@ -135,7 +128,7 @@ describe("TodaysMatches", () => {
         liveStatus: "not_started",
       };
 
-      mockedGetMatchesV3TeamIdMatchesDateGet.mockResolvedValueOnce({
+      mockedGetMatches.mockResolvedValueOnce({
         data: [apiMatch1, apiMatch2],
         error: null,
       });
@@ -149,7 +142,7 @@ describe("TodaysMatches", () => {
       await user.click(fetchButton);
 
       await waitFor(() => {
-        expect(mockedGetMatchesV3TeamIdMatchesDateGet).toHaveBeenCalledWith(
+        expect(mockedGetMatches).toHaveBeenCalledWith(
           expect.objectContaining({
             path: expect.objectContaining({ team_id: 2492 }),
           }),
@@ -192,7 +185,7 @@ describe("TodaysMatches", () => {
         new Promise((resolve) =>
           setTimeout(() => resolve({ data: [], error: null }), 100),
         );
-      mockedGetMatchesV3TeamIdMatchesDateGet.mockImplementation(
+      mockedGetMatches.mockImplementation(
         mockImplementationFn as ReturnType<typeof vi.fn>,
       );
 
@@ -212,9 +205,7 @@ describe("TodaysMatches", () => {
     });
 
     it("displays error when fetch fails", async () => {
-      mockedGetMatchesV3TeamIdMatchesDateGet.mockRejectedValueOnce(
-        new Error("Network error"),
-      );
+      mockedGetMatches.mockRejectedValueOnce(new Error("Network error"));
 
       const user = userEvent.setup();
       render(<TodaysMatches />);
@@ -264,11 +255,11 @@ describe("TodaysMatches", () => {
         liveStatus: "not_started",
       };
 
-      mockedGetLineupsV3TeamIdMatchesMatchIdLineupsGet.mockResolvedValueOnce({
+      mockedGetLineups.mockResolvedValueOnce({
         data: mockReportData,
         error: null,
       });
-      mockedGetMatchesV3TeamIdMatchesDateGet.mockResolvedValueOnce({
+      mockedGetMatches.mockResolvedValueOnce({
         data: [apiMatch],
         error: null,
       });
@@ -285,9 +276,7 @@ describe("TodaysMatches", () => {
       expect(promptSpy).toHaveBeenCalledWith("ID á leikskýrslu");
 
       await waitFor(() => {
-        expect(
-          mockedGetLineupsV3TeamIdMatchesMatchIdLineupsGet,
-        ).toHaveBeenCalledWith(
+        expect(mockedGetLineups).toHaveBeenCalledWith(
           expect.objectContaining({
             path: expect.objectContaining({
               team_id: 2492,
@@ -318,9 +307,7 @@ describe("TodaysMatches", () => {
       await user.click(reportButton);
 
       expect(promptSpy).toHaveBeenCalledWith("ID á leikskýrslu");
-      expect(
-        mockedGetLineupsV3TeamIdMatchesMatchIdLineupsGet,
-      ).not.toHaveBeenCalled();
+      expect(mockedGetLineups).not.toHaveBeenCalled();
     });
 
     it("does nothing when prompt returns empty string", async () => {
@@ -335,16 +322,12 @@ describe("TodaysMatches", () => {
       await user.click(reportButton);
 
       expect(promptSpy).toHaveBeenCalledWith("ID á leikskýrslu");
-      expect(
-        mockedGetLineupsV3TeamIdMatchesMatchIdLineupsGet,
-      ).not.toHaveBeenCalled();
+      expect(mockedGetLineups).not.toHaveBeenCalled();
     });
 
     it("displays error when fetch fails", async () => {
       promptSpy.mockReturnValue("match-123");
-      mockedGetLineupsV3TeamIdMatchesMatchIdLineupsGet.mockRejectedValueOnce(
-        new Error("API error"),
-      );
+      mockedGetLineups.mockRejectedValueOnce(new Error("API error"));
 
       const user = userEvent.setup();
       render(<TodaysMatches />);
@@ -382,11 +365,11 @@ describe("TodaysMatches", () => {
         liveStatus: "not_started",
       };
 
-      mockedGetLineupsV3TeamIdMatchesMatchIdLineupsGet.mockResolvedValueOnce({
+      mockedGetLineups.mockResolvedValueOnce({
         data: mockReportData,
         error: null,
       });
-      mockedGetMatchesV3TeamIdMatchesDateGet.mockResolvedValueOnce({
+      mockedGetMatches.mockResolvedValueOnce({
         data: [apiMatch],
         error: null,
       });
@@ -431,11 +414,11 @@ describe("TodaysMatches", () => {
         away: [{ name: "Player 3", number: 9, show: true }],
       };
 
-      mockedGetMatchesV3TeamIdMatchesDateGet.mockResolvedValueOnce({
+      mockedGetMatches.mockResolvedValueOnce({
         data: [apiMatch],
         error: null,
       });
-      mockedGetLineupsV3TeamIdMatchesMatchIdLineupsGet.mockResolvedValueOnce({
+      mockedGetLineups.mockResolvedValueOnce({
         data: mockLineups,
         error: null,
       });

@@ -12,7 +12,7 @@
           "matches"
         ],
         "summary": "Get Matches",
-        "operationId": "get_matches_v3__team_id__matches__date__get",
+        "operationId": "get_matches",
         "parameters": [
           {
             "name": "date",
@@ -53,7 +53,7 @@
                   "items": {
                     "$ref": "#/components/schemas/Match"
                   },
-                  "title": "Response Get Matches V3  Team Id  Matches  Date  Get"
+                  "title": "Response Get Matches"
                 }
               }
             }
@@ -78,7 +78,7 @@
           "matches"
         ],
         "summary": "Get Lineups",
-        "operationId": "get_lineups_v3__team_id__matches__match_id__lineups_get",
+        "operationId": "get_lineups",
         "parameters": [
           {
             "name": "match_id",
@@ -130,7 +130,7 @@
           "matches"
         ],
         "summary": "Get Events",
-        "operationId": "get_events_v3__team_id__matches__match_id__events_get",
+        "operationId": "get_events",
         "parameters": [
           {
             "name": "match_id",
@@ -161,7 +161,7 @@
                   "items": {
                     "$ref": "#/components/schemas/MatchEvent"
                   },
-                  "title": "Response Get Events V3  Team Id  Matches  Match Id  Events Get"
+                  "title": "Response Get Events"
                 }
               }
             }
@@ -186,7 +186,7 @@
           "matches"
         ],
         "summary": "Get Match Info",
-        "operationId": "get_match_info_v3__team_id__matches__match_id__info_get",
+        "operationId": "get_match_info",
         "parameters": [
           {
             "name": "match_id",
@@ -237,7 +237,7 @@
           "weather"
         ],
         "summary": "Get Weather Endpoint",
-        "operationId": "get_weather_endpoint_v3_weather__get",
+        "operationId": "get_weather",
         "parameters": [
           {
             "name": "lat",
@@ -285,7 +285,7 @@
     "/v3/health": {
       "get": {
         "summary": "Health Check",
-        "operationId": "health_check_v3_health_get",
+        "operationId": "health_check",
         "responses": {
           "200": {
             "description": "Successful Response",

@@ -24,7 +24,7 @@ function mapRole(tp: TeamPlayer): string {
 
 export function transformLineups(lineups: LineupsResponse): Roster {
   const mapPlayers = (lineup: TeamLineup): Player[] => {
-    const players: Player[] = lineup.players.map((tp) => {
+    const players: Player[] = (lineup.players ?? []).map((tp) => {
       const player: Player = {
         name: tp.person.name,
         id: tp.person.id,
@@ -37,7 +37,7 @@ export function transformLineups(lineups: LineupsResponse): Roster {
       return player;
     });
 
-    const officials: Player[] = lineup.officials.map(
+    const officials: Player[] = (lineup.officials ?? []).map(
       (official: MatchAndTeamOfficial) => ({
         name: official.person.name,
         id: official.person.id,

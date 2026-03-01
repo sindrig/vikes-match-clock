@@ -1,10 +1,10 @@
 import "../api/clientConfig";
-import { getWeatherEndpointV3WeatherGet } from "../api/client";
+import { getWeather } from "../api/client";
 
 export const getTemp = async () => {
   try {
-    const result = await getWeatherEndpointV3WeatherGet({
-      query: { lat: "64.1285", lon: "-21.8681" },
+    const result = await getWeather({
+      query: { lat: 64.1285, lon: -21.8681 },
     });
     const temp = result.data?.temp;
     const temperature = Math.ceil(temp ?? NaN);

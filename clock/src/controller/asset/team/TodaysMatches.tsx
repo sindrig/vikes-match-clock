@@ -8,11 +8,7 @@ import {
 } from "../../../contexts/FirebaseStateContext";
 import { useRemoteSettings } from "../../../contexts/LocalStateContext";
 import "../../../api/clientConfig";
-import {
-  getMatchesV3TeamIdMatchesDateGet,
-  getLineupsV3TeamIdMatchesMatchIdLineupsGet,
-  type Match,
-} from "../../../api/client";
+import { getMatches, getLineups, type Match } from "../../../api/client";
 import { transformLineups, getTeamId } from "../../../lib/matchUtils";
 
 const TodaysMatches = (): React.JSX.Element => {
@@ -30,7 +26,7 @@ const TodaysMatches = (): React.JSX.Element => {
     setLoading(true);
 
     try {
-      const result = await getMatchesV3TeamIdMatchesDateGet({
+      const result = await getMatches({
         path: { team_id: teamId, date: new Date().toISOString().slice(0, 10) },
         query: { utc_offset: 0 },
       });
@@ -53,7 +49,7 @@ const TodaysMatches = (): React.JSX.Element => {
     setLoading(true);
 
     try {
-      const result = await getLineupsV3TeamIdMatchesMatchIdLineupsGet({
+      const result = await getLineups({
         path: { team_id: teamId, match_id: Number(matchId) },
       });
       const lineups = result.data ?? {
@@ -62,7 +58,7 @@ const TodaysMatches = (): React.JSX.Element => {
       };
       let foundMatch = matches.find((m) => String(m.id) === matchId);
       if (!foundMatch) {
-        const result = await getMatchesV3TeamIdMatchesDateGet({
+        const result = await getMatches({
           path: {
             team_id: teamId,
             date: new Date().toISOString().slice(0, 10),
@@ -105,7 +101,7 @@ const TodaysMatches = (): React.JSX.Element => {
     const teamId = getTeamId(screens, listenPrefix);
 
     try {
-      const result = await getLineupsV3TeamIdMatchesMatchIdLineupsGet({
+      const result = await getLineups({
         path: { team_id: teamId, match_id: match.id },
       });
       const lineups = result.data ?? {
