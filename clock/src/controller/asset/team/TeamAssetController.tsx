@@ -56,7 +56,7 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
     setLoading(true);
     const teamId = getTeamId(screens, listenPrefix);
     void getLineups({
-      path: { team_id: teamId, match_id: match.ksiMatchId },
+      path: { teamId, matchId: match.ksiMatchId },
     })
       .then((result) => {
         const lineups = result.data ?? {

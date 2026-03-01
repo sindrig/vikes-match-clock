@@ -27,8 +27,8 @@ const TodaysMatches = (): React.JSX.Element => {
 
     try {
       const result = await getMatches({
-        path: { team_id: teamId, date: new Date().toISOString().slice(0, 10) },
-        query: { utc_offset: 0 },
+        path: { teamId, date: new Date().toISOString().slice(0, 10) },
+        query: { utcOffset: 0 },
       });
       const fetched = result.data ?? [];
       setError("");
@@ -50,7 +50,7 @@ const TodaysMatches = (): React.JSX.Element => {
 
     try {
       const result = await getLineups({
-        path: { team_id: teamId, match_id: Number(matchId) },
+        path: { teamId, matchId: Number(matchId) },
       });
       const lineups = result.data ?? {
         home: { players: [], officials: [] },
@@ -60,10 +60,10 @@ const TodaysMatches = (): React.JSX.Element => {
       if (!foundMatch) {
         const result = await getMatches({
           path: {
-            team_id: teamId,
+            teamId,
             date: new Date().toISOString().slice(0, 10),
           },
-          query: { utc_offset: 0 },
+          query: { utcOffset: 0 },
         });
         const freshMatches = result.data ?? [];
         foundMatch = freshMatches.find((m) => String(m.id) === matchId);
@@ -102,7 +102,7 @@ const TodaysMatches = (): React.JSX.Element => {
 
     try {
       const result = await getLineups({
-        path: { team_id: teamId, match_id: match.id },
+        path: { teamId, matchId: match.id },
       });
       const lineups = result.data ?? {
         home: { players: [], officials: [] },

@@ -23,7 +23,7 @@ def mock_ksi_client():
 
 @pytest.fixture
 def test_client(mock_ksi_client):
-    app.dependency_overrides[get_ksi_client] = lambda team_id: mock_ksi_client
+    app.dependency_overrides[get_ksi_client] = lambda: mock_ksi_client
 
     yield TestClient(app)
 

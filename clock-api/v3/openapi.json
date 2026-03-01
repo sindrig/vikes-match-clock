@@ -5,7 +5,7 @@
     "version": "0.1.0"
   },
   "paths": {
-    "/v3/{team_id}/matches/{date}": {
+    "/v3/{teamId}/matches/{date}": {
       "get": {
         "tags": [
           "matches",
@@ -24,22 +24,22 @@
             }
           },
           {
-            "name": "team_id",
+            "name": "teamId",
             "in": "path",
             "required": true,
             "schema": {
               "type": "integer",
-              "title": "Team Id"
+              "title": "Teamid"
             }
           },
           {
-            "name": "utc_offset",
+            "name": "utcOffset",
             "in": "query",
             "required": false,
             "schema": {
               "type": "integer",
               "default": 0,
-              "title": "Utc Offset"
+              "title": "Utcoffset"
             }
           }
         ],
@@ -71,7 +71,7 @@
         }
       }
     },
-    "/v3/{team_id}/matches/{match_id}/lineups": {
+    "/v3/{teamId}/matches/{matchId}/lineups": {
       "get": {
         "tags": [
           "matches",
@@ -81,21 +81,21 @@
         "operationId": "get_lineups",
         "parameters": [
           {
-            "name": "match_id",
+            "name": "matchId",
             "in": "path",
             "required": true,
             "schema": {
               "type": "integer",
-              "title": "Match Id"
+              "title": "Matchid"
             }
           },
           {
-            "name": "team_id",
+            "name": "teamId",
             "in": "path",
             "required": true,
             "schema": {
               "type": "integer",
-              "title": "Team Id"
+              "title": "Teamid"
             }
           }
         ],
@@ -123,7 +123,7 @@
         }
       }
     },
-    "/v3/{team_id}/matches/{match_id}/events": {
+    "/v3/{teamId}/matches/{matchId}/events": {
       "get": {
         "tags": [
           "matches",
@@ -133,21 +133,21 @@
         "operationId": "get_events",
         "parameters": [
           {
-            "name": "match_id",
+            "name": "matchId",
             "in": "path",
             "required": true,
             "schema": {
               "type": "integer",
-              "title": "Match Id"
+              "title": "Matchid"
             }
           },
           {
-            "name": "team_id",
+            "name": "teamId",
             "in": "path",
             "required": true,
             "schema": {
               "type": "integer",
-              "title": "Team Id"
+              "title": "Teamid"
             }
           }
         ],
@@ -179,7 +179,7 @@
         }
       }
     },
-    "/v3/{team_id}/matches/{match_id}/info": {
+    "/v3/{teamId}/matches/{matchId}/info": {
       "get": {
         "tags": [
           "matches",
@@ -189,21 +189,21 @@
         "operationId": "get_match_info",
         "parameters": [
           {
-            "name": "match_id",
+            "name": "matchId",
             "in": "path",
             "required": true,
             "schema": {
               "type": "integer",
-              "title": "Match Id"
+              "title": "Matchid"
             }
           },
           {
-            "name": "team_id",
+            "name": "teamId",
             "in": "path",
             "required": true,
             "schema": {
               "type": "integer",
-              "title": "Team Id"
+              "title": "Teamid"
             }
           }
         ],

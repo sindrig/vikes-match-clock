@@ -341,8 +341,8 @@ describe("TeamAssetController", () => {
       expect(mockedGetLineups).toHaveBeenCalledWith(
         expect.objectContaining({
           path: expect.objectContaining({
-            team_id: 2492,
-            match_id: 12345,
+            teamId: 2492,
+            matchId: 12345,
           }),
         }),
       );
