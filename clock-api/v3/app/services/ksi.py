@@ -1,4 +1,5 @@
 import httpx
+from fastapi import HTTPException
 
 from app.models.matches import LineupsResponse, Match, MatchEvent
 
@@ -10,13 +11,21 @@ class KsiClient:
         self.team_id = team_id
         self.client = httpx.AsyncClient(base_url=self.base_url, timeout=10.0)
 
+    def _check_response(self, response: httpx.Response) -> None:
+        if response.is_success:
+            return
+        raise HTTPException(
+            status_code=502,
+            detail=f"Upstream API responded with {response.status_code}",
+        )
+
     async def get_matches(self, date: str, utc_offset: int) -> list[Match]:
         response = await self.client.get(
             f"/api/live/matchList/{date}/{utc_offset}",
             headers={"API_KEY": self.api_key},
             params={"teamIdFilter": self.team_id},
         )
-        response.raise_for_status()
+        self._check_response(response)
         return [Match.model_validate(m) for m in response.json()]
 
     async def get_lineups(self, match_id: int) -> LineupsResponse:
@@ -25,7 +34,7 @@ class KsiClient:
             headers={"API_KEY": self.api_key},
             params={"teamIdFilter": self.team_id},
         )
-        response.raise_for_status()
+        self._check_response(response)
         return LineupsResponse.model_validate(response.json())
 
     async def get_events(self, match_id: int) -> list[MatchEvent]:
@@ -34,7 +43,7 @@ class KsiClient:
             headers={"API_KEY": self.api_key},
             params={"teamIdFilter": self.team_id},
         )
-        response.raise_for_status()
+        self._check_response(response)
         return [MatchEvent.model_validate(e) for e in response.json()]
 
     async def get_match_info(self, match_id: int) -> Match:
@@ -43,7 +52,7 @@ class KsiClient:
             headers={"API_KEY": self.api_key},
             params={"teamIdFilter": self.team_id},
         )
-        response.raise_for_status()
+        self._check_response(response)
         return Match.model_validate(response.json())
 
     async def close(self):

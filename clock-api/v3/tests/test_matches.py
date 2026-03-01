@@ -1,6 +1,6 @@
-import httpx
 import pytest
 import respx
+from fastapi import HTTPException
 from httpx import Response
 
 from app.main import app
@@ -166,10 +166,11 @@ async def test_get_matches_http_error(ksi_client):
         return_value=Response(500, text="Internal Server Error")
     )
 
-    with pytest.raises(httpx.HTTPStatusError) as exc_info:
+    with pytest.raises(HTTPException) as exc_info:
         await ksi_client.get_matches("20250615", 0)
 
-    assert exc_info.value.response.status_code == 500
+    assert exc_info.value.status_code == 502
+    assert "500" in exc_info.value.detail
 
 
 @pytest.mark.asyncio
@@ -179,10 +180,11 @@ async def test_get_match_info_not_found(ksi_client):
         return_value=Response(404, text="Not Found")
     )
 
-    with pytest.raises(httpx.HTTPStatusError) as exc_info:
+    with pytest.raises(HTTPException) as exc_info:
         await ksi_client.get_match_info(99999)
 
-    assert exc_info.value.response.status_code == 404
+    assert exc_info.value.status_code == 502
+    assert "404" in exc_info.value.detail
 
 
 @pytest.mark.asyncio
