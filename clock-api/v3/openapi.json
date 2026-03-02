@@ -891,6 +891,16 @@
               }
             ],
             "title": "Imageurl"
+          },
+          "parent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Team"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",

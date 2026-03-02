@@ -16,6 +16,7 @@ class Team(BaseModel):
     shortName: str | None = None
     logo: str | None = None
     imageUrl: str | None = None
+    parent: "Team | None" = None
 
 
 class Result(BaseModel):

@@ -8,8 +8,15 @@ import {
 } from "../../../contexts/FirebaseStateContext";
 import { useRemoteSettings } from "../../../contexts/LocalStateContext";
 import "../../../api/clientConfig";
-import { getMatches, getLineups, type Match } from "../../../api/client";
+import {
+  getMatches,
+  getLineups,
+  type Match,
+  type Team,
+} from "../../../api/client";
 import { transformLineups, getTeamId } from "../../../lib/matchUtils";
+
+const getClubName = (team: Team): string => team.parent?.name ?? team.name;
 
 const TodaysMatches = (): React.JSX.Element => {
   const { setRoster } = useController();
@@ -89,8 +96,8 @@ const TodaysMatches = (): React.JSX.Element => {
   const selectMatchHandler = async (match: Match): Promise<void> => {
     setLoading(true);
     updateMatch({
-      homeTeam: match.homeTeam.name,
-      awayTeam: match.awayTeam.name,
+      homeTeam: getClubName(match.homeTeam),
+      awayTeam: getClubName(match.awayTeam),
       matchStartTime: new Date(match.dateTimeUTC).toLocaleTimeString("is-IS", {
         hour: "2-digit",
         minute: "2-digit",
