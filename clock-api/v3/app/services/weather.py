@@ -38,7 +38,7 @@ async def get_weather(lat: float, lon: float, api_key: str) -> WeatherResponse:
         r.raise_for_status()
         dom = minidom.parseString(r.text)
         temp_elem = dom.getElementsByTagName("T")[0]
-        temp = float(temp_elem.firstChild.data)  # type: ignore[union-attr]
+        temp = float(temp_elem.firstChild.data.replace(",", "."))  # type: ignore[union-attr]
         return WeatherResponse(
             temp=temp,
             service="vedur.is",

@@ -24,7 +24,9 @@ def get_ksi_api_key(team_id: int) -> str:
 
 @cache
 def get_weather_api_key() -> str:
-    response = ssm_client.get_parameter(Name="/vikes-match-clock/weather-api")
+    response = ssm_client.get_parameter(
+        Name="/vikes-match-clock/weather-api", WithDecryption=True
+    )
     return response["Parameter"]["Value"]
 
 

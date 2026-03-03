@@ -5,9 +5,7 @@ from httpx import Response
 from app.models.weather import WeatherResponse
 from app.services.weather import get_weather
 
-VEDUR_URL = (
-    "https://xmlweather.vedur.is/?op_w=xml&type=obs&lang=is&view=xml&ids=1472"
-)
+VEDUR_URL = "https://xmlweather.vedur.is/?op_w=xml&type=obs&lang=is&view=xml&ids=1472"
 OWM_URL = "https://api.openweathermap.org/data/2.5/weather"
 
 VEDUR_XML = """<?xml version="1.0" encoding="utf-8"?>
@@ -53,6 +51,25 @@ async def test_get_weather_owm_fails_vedur_fallback():
     assert result.temp == 12.5
     assert result.service == "vedur.is"
     assert result.main == {"temp_max": "12.5"}
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_get_weather_vedur_fallback_comma_decimal():
+    vedur_xml_comma = """<?xml version="1.0" encoding="utf-8"?>
+<observations>
+  <station>
+    <T>7,1</T>
+  </station>
+</observations>"""
+    respx.get(OWM_URL).mock(return_value=Response(500, text="Server Error"))
+    respx.get(VEDUR_URL).mock(return_value=Response(200, text=vedur_xml_comma))
+
+    result = await get_weather(LAT, LON, "test-key")
+
+    assert result.temp == 7.1
+    assert result.service == "vedur.is"
+    assert result.main == {"temp_max": "7.1"}
 
 
 @pytest.mark.asyncio
