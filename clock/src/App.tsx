@@ -123,13 +123,41 @@ function App() {
     firebaseAuth.logout().catch(console.error);
   };
 
+  const showController = view === VIEWS.match || view === VIEWS.idle;
+  const previewWidth = 350;
+  const previewHeight = Math.round((previewWidth / 16) * 9);
+  const previewScale = Math.min(1, previewWidth / (vp.style.width || 960));
+
   return (
     <div>
       {view === VIEWS.control ? <MatchController /> : null}
-      <div className="App" style={style}>
-        {renderAppContents()}
-      </div>
-      {(view === VIEWS.match || view === VIEWS.idle) && <Controller />}
+      {showController && (
+        <div className="controller-layout">
+          <div className="controller-controls">
+            <Controller />
+          </div>
+          <div
+            className="scoreboard-preview"
+            style={{ width: previewWidth, height: previewHeight }}
+          >
+            <div
+              className="App"
+              style={{
+                ...style,
+                transform: `scale(${previewScale})`,
+                transformOrigin: "top left",
+              }}
+            >
+              {renderAppContents()}
+            </div>
+          </div>
+        </div>
+      )}
+      {!showController && (
+        <div className="App" style={style}>
+          {renderAppContents()}
+        </div>
+      )}
       {asset ? (
         <div className="overlay-container" style={vp.style}>
           <AssetComponent asset={asset.asset} time={asset.time} />

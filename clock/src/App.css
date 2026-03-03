@@ -11,8 +11,32 @@ html {
   position: relative;
   cursor: none;
   top: 0px;
-  float: left;
   z-index: 999;
+}
+
+.controller-layout {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  gap: 16px;
+  padding: 8px;
+}
+
+.controller-layout .controller-controls {
+  flex: 1;
+  min-width: 0;
+}
+
+.controller-layout .scoreboard-preview {
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+}
+
+.controller-layout .scoreboard-preview .App {
+  pointer-events: none;
+  cursor: default;
 }
 
 button {
