@@ -212,11 +212,15 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
     clearState();
   };
 
-  const renderActionButtons = (): React.JSX.Element => {
+  const isPlayerActionActive =
+    selectSubs || selectPlayerAsset || selectGoalScorer || selectMOTM;
+
+  const renderCancelButton = (): React.JSX.Element | null => {
     if (selectSubs) {
       return (
         <button
           type="button"
+          className="cancel-btn"
           onClick={() => {
             setSelectSubs(false);
             setSubIn(null);
@@ -232,6 +236,7 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
       return (
         <button
           type="button"
+          className="cancel-btn"
           onClick={() => {
             setSelectPlayerAsset(false);
             setSelectGoalScorer(false);
@@ -242,102 +247,92 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
         </button>
       );
     }
-    return (
-      <div>
-        <div className="control-item stdbuttons">
-          <button type="button" onClick={() => setSelectSubs(true)}>
-            Skipting
-          </button>
-        </div>
-        <div className="control-item stdbuttons">
-          <button type="button" onClick={() => setSelectPlayerAsset(true)}>
-            Birta leikmann
-          </button>
-        </div>
-        <div className="control-item stdbuttons">
-          <button type="button" onClick={() => setSelectGoalScorer(true)}>
-            Birta markaskorara
-          </button>
-        </div>
-        <div className="control-item stdbuttons">
-          <button type="button" onClick={() => setSelectMOTM(true)}>
-            Birta mann leiksins
-          </button>
-        </div>
-        <div className="control-item stdbuttons">
-          <select
-            onChange={({ target: { value } }) => setEffect(value)}
-            value={effect}
-          >
-            <option value="blink" key="Blink">
-              Blink
-            </option>
-            <option value="shaker" key="Shaker">
-              Shaker
-            </option>
-            <option value="scaleit" key="Scale Up">
-              Scale Up
-            </option>
-          </select>
-        </div>
-      </div>
-    );
+    return null;
   };
 
-  const renderActionControllers = (): React.JSX.Element => {
+  const renderPlayerActions = (): React.JSX.Element => {
     return (
-      <div className="sub-controller control-item stdbuttons">
-        {renderActionButtons()}
-        {selectSubs ? (
-          <div className="control-item">
-            <SubView
-              subIn={subIn}
-              subOut={subOut}
-              subTeam={
-                subTeam
-                  ? subTeam === "homeTeam"
-                    ? match.homeTeam
-                    : match.awayTeam
-                  : null
-              }
-            />
-          </div>
-        ) : null}
+      <div className="button-group">
+        <div className="button-group-label">Leikmannaval</div>
+        {isPlayerActionActive ? (
+          <>
+            {renderCancelButton()}
+            {selectSubs ? (
+              <SubView
+                subIn={subIn}
+                subOut={subOut}
+                subTeam={
+                  subTeam
+                    ? subTeam === "homeTeam"
+                      ? match.homeTeam
+                      : match.awayTeam
+                    : null
+                }
+              />
+            ) : null}
+          </>
+        ) : (
+          <>
+            <div className="button-row">
+              <button type="button" onClick={() => setSelectSubs(true)}>
+                Skipting
+              </button>
+              <button type="button" onClick={() => setSelectPlayerAsset(true)}>
+                Birta leikmann
+              </button>
+              <button type="button" onClick={() => setSelectGoalScorer(true)}>
+                Birta markaskorara
+              </button>
+              <button type="button" onClick={() => setSelectMOTM(true)}>
+                Birta mann leiksins
+              </button>
+            </div>
+            <select
+              className="effect-select"
+              onChange={({ target: { value } }) => setEffect(value)}
+              value={effect}
+            >
+              <option value="blink">Blink</option>
+              <option value="shaker">Shaker</option>
+              <option value="scaleit">Scale Up</option>
+            </select>
+          </>
+        )}
       </div>
     );
   };
 
   const renderControls = (): React.JSX.Element => {
     const { homeTeam, awayTeam } = getTeamPlayers();
+    const hasPlayers = homeTeam.length > 0 || awayTeam.length > 0;
     return (
-      <div>
-        {match.ksiMatchId !== undefined ? (
-          <div className="control-item stdbuttons">
-            <button type="button" onClick={refetchRoster}>
-              Sækja lið
-            </button>
+      <div className="team-controls">
+        <div className="button-group">
+          <div className="button-group-label">Lið</div>
+          <div className="button-row">
+            {match.ksiMatchId !== undefined ? (
+              <button type="button" onClick={refetchRoster}>
+                Sækja lið
+              </button>
+            ) : null}
+            {hasPlayers ? (
+              <button
+                type="button"
+                onClick={() =>
+                  window.confirm("Ertu alveg viss?") && clearRoster()
+                }
+              >
+                Hreinsa lið
+              </button>
+            ) : null}
+            {hasPlayers ? (
+              <button type="button" onClick={addPlayersToQ}>
+                Setja lið í biðröð
+              </button>
+            ) : null}
           </div>
-        ) : null}
-        {homeTeam.length || awayTeam.length ? (
-          <div className="control-item stdbuttons">
-            <button
-              type="button"
-              onClick={() =>
-                window.confirm("Ertu alveg viss?") && clearRoster()
-              }
-            >
-              Hreinsa lið
-            </button>
-          </div>
-        ) : null}
-        {homeTeam.length || awayTeam.length ? (
-          <div className="control-item stdbuttons">
-            <button type="button" onClick={addPlayersToQ}>
-              Setja lið í biðröð
-            </button>
-          </div>
-        ) : null}
-        {homeTeam.length || awayTeam.length ? renderActionControllers() : null}
+        </div>
+        {hasPlayers ? renderPlayerActions() : null}
       </div>
     );
   };

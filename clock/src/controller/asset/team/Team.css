@@ -62,3 +62,60 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.team-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.button-group {
+  border: 1px solid #3c3f43;
+  border-radius: 6px;
+  padding: 8px;
+}
+
+.button-group-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  opacity: 0.6;
+  margin-bottom: 6px;
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.button-group button {
+  border: 1px solid #747474;
+  background-color: lightgray;
+  border-radius: 3px;
+  padding: 3px 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.button-group button:hover {
+  border-color: #494949;
+  background-color: rgb(187, 187, 187);
+}
+
+.button-group .cancel-btn {
+  background-color: #d9534f;
+  border-color: #d43f3a;
+  color: white;
+}
+
+.button-group .cancel-btn:hover {
+  background-color: #c9302c;
+  border-color: #ac2925;
+}
+
+.effect-select {
+  margin-top: 6px;
+  font-size: 12px;
+}
