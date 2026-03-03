@@ -368,7 +368,7 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
       <RingLoader loading={loading} />
       {!loading && renderControls()}
       <span className="error">{error}</span>
-      <div className="team-asset-controller">
+      <div className="team-columns">
         {renderTeam("homeTeam")}
         {renderTeam("awayTeam")}
       </div>
