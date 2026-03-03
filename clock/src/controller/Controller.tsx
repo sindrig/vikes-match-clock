@@ -1,6 +1,7 @@
 import type React from "react";
 import { useState } from "react";
 import { Nav, Tooltip, Whisper, Button } from "rsuite";
+import { RingLoader } from "react-spinners";
 import GearIcon from "@rsuite/icons/Gear";
 import MediaIcon from "@rsuite/icons/Media";
 import TimeIcon from "@rsuite/icons/Time";
@@ -11,7 +12,6 @@ import { firebaseAuth } from "../firebaseAuth";
 import MatchActions from "./MatchActions";
 import MatchActionSettings from "./MatchActionSettings";
 import MediaManager from "./media/MediaManager";
-import LoginPage from "./LoginPage";
 import RefreshHandler from "./RefreshHandler";
 import AssetController from "./asset/AssetController";
 import "rsuite/dist/rsuite.min.css";
@@ -55,7 +55,6 @@ const Controller = () => {
       e.preventDefault();
       firebaseAuth
         .login(email, password)
-        .then(() => {})
         .catch((err: Error) => alert(err.message));
     };
 
@@ -129,7 +128,9 @@ const Controller = () => {
     return (
       <div className="screen-selector">
         <h2>Veldu skjá til að stjórna</h2>
-        {available.length === 0 ? (
+        {available === null ? (
+          <RingLoader color="#1675e0" size={60} />
+        ) : available.length === 0 ? (
           <p>Engir skjáir tiltækir</p>
         ) : (
           <div className="screen-selector-buttons">
@@ -139,7 +140,9 @@ const Controller = () => {
               );
               if (locationScreens.length === 0) return null;
 
-              const label = locationScreens[0].label;
+              const first = locationScreens[0];
+              if (!first) return null;
+              const label = first.label;
               const screenNames = locationScreens
                 .map((s) => s.screen.name)
                 .join(" / ");
@@ -160,7 +163,7 @@ const Controller = () => {
         <button
           type="button"
           className="screen-selector-logout"
-          onClick={() => firebaseAuth.logout()}
+          onClick={() => void firebaseAuth.logout()}
         >
           Útskrá
         </button>
@@ -251,7 +254,6 @@ const Controller = () => {
             Hard refresh
           </Button>
           <RefreshHandler />
-          <LoginPage />
         </div>
       )}
       <AssetController />

@@ -23,6 +23,12 @@ vi.mock("../firebaseAuth", () => ({
   },
 }));
 
+vi.mock("react-spinners", () => ({
+  RingLoader: ({ color, size }: { color: string; size: number }) => (
+    <div data-testid="ring-loader">{`RingLoader color=${color} size=${size}`}</div>
+  ),
+}));
+
 vi.mock("./MatchActions", () => ({
   default: () => <div data-testid="match-actions">MatchActions</div>,
 }));
@@ -71,7 +77,7 @@ function setupState1() {
     listenPrefix: "",
     setListenPrefix: vi.fn(),
     auth: { isLoaded: true, isEmpty: true },
-    available: [],
+    available: null,
     screenViewport: null,
     setScreenViewport: vi.fn(),
   });
@@ -99,7 +105,7 @@ function setupState2() {
     listenPrefix: "vikinni",
     setListenPrefix: vi.fn(),
     auth: { isLoaded: true, isEmpty: true },
-    available: [],
+    available: null,
     screenViewport: null,
     setScreenViewport: vi.fn(),
   });
@@ -151,12 +157,15 @@ function setupState3() {
 
 function setupScreenSelector(
   overrides: {
-    available?: string[];
+    available?: string[] | null;
     setListenPrefix?: ReturnType<typeof vi.fn>;
   } = {},
 ) {
   const mockSetListenPrefix = overrides.setListenPrefix ?? vi.fn();
-  const mockAvailable = overrides.available ?? ["vikinni", "hasteinsvollur"];
+  const mockAvailable =
+    overrides.available !== undefined
+      ? overrides.available
+      : ["vikinni", "hasteinsvollur"];
   mockedUseAuth.mockReturnValue({
     isLoaded: true,
     isEmpty: false,
@@ -269,6 +278,27 @@ describe("Controller", () => {
       const button = screen.getByText("Birta skjá");
       expect(button).toBeDisabled();
     });
+
+    it("email/password login does NOT call setListenPrefix", () => {
+      const mockSetListenPrefix = vi.fn();
+      setupState1();
+      mockedUseLocalState.mockReturnValue({
+        ...mockedUseLocalState(),
+        email: "test@vikingur.is",
+        password: "testpass",
+        setListenPrefix: mockSetListenPrefix,
+      });
+      render(<Controller />);
+
+      const form = screen.getByText("Login");
+      fireEvent.click(form);
+
+      expect(firebaseAuth.login).toHaveBeenCalledWith(
+        "test@vikingur.is",
+        "testpass",
+      );
+      expect(mockSetListenPrefix).not.toHaveBeenCalled();
+    });
   });
 
   describe("State: authenticated, no listenPrefix (screen selector)", () => {
@@ -331,6 +361,16 @@ describe("Controller", () => {
       render(<Controller />);
 
       expect(screen.getByText("Engir skjáir tiltækir")).toBeInTheDocument();
+    });
+
+    it("shows loading spinner when available is null (still loading)", () => {
+      setupScreenSelector({ available: null });
+      render(<Controller />);
+
+      expect(screen.getByTestId("ring-loader")).toBeInTheDocument();
+      expect(
+        screen.queryByText("Engir skjáir tiltækir"),
+      ).not.toBeInTheDocument();
     });
   });
 

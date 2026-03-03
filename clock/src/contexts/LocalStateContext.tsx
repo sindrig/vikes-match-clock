@@ -25,7 +25,7 @@ interface LocalStateContextType {
   // Remote settings
   listenPrefix: string;
   setListenPrefix: (prefix: string) => void;
-  available: string[];
+  available: string[] | null;
 
   // Screen viewport override (from "Birta skjá" selection)
   screenViewport: ViewPort | null;
@@ -57,7 +57,7 @@ export function LocalStateProvider({ children }: { children: ReactNode }) {
     return localStorage.getItem(LISTEN_PREFIX_KEY) || "";
   });
 
-  const [available, setAvailable] = useState<string[]>([]);
+  const [available, setAvailable] = useState<string[] | null>(null);
 
   // Screen viewport override (set when selecting a screen via "Birta skjá")
   const [screenViewport, setScreenViewportState] = useState<ViewPort | null>(
@@ -123,7 +123,7 @@ export function LocalStateProvider({ children }: { children: ReactNode }) {
 
     return () => {
       unsubscribe();
-      setAvailable([]);
+      setAvailable(null);
     };
   }, [auth.uid]);
 
