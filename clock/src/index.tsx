@@ -12,13 +12,14 @@ import { FirebaseStateProvider } from "./contexts/FirebaseStateContext";
 
 // Create a wrapper component that bridges LocalState to FirebaseState
 function AppWithProviders() {
-  const { listenPrefix, auth } = useLocalState();
+  const { listenPrefix, auth, screenViewport } = useLocalState();
   const isAuthenticated = auth.isLoaded && !auth.isEmpty;
 
   return (
     <FirebaseStateProvider
       listenPrefix={listenPrefix}
       isAuthenticated={isAuthenticated}
+      screenViewport={screenViewport}
     >
       <App />
     </FirebaseStateProvider>

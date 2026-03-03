@@ -9,6 +9,7 @@ import { User } from "firebase/auth";
 import { ref, onValue } from "firebase/database";
 import { firebaseAuth } from "../firebaseAuth";
 import { database } from "../firebase";
+import type { ViewPort } from "../types";
 
 export interface FirebaseAuthState {
   isLoaded: boolean;
@@ -26,6 +27,10 @@ interface LocalStateContextType {
   setListenPrefix: (prefix: string) => void;
   available: string[];
 
+  // Screen viewport override (from "Birta skjá" selection)
+  screenViewport: ViewPort | null;
+  setScreenViewport: (vp: ViewPort | null) => void;
+
   // Login form state
   email: string;
   setEmail: (email: string) => void;
@@ -38,6 +43,7 @@ const LocalStateContext = createContext<LocalStateContextType | undefined>(
 );
 
 const LISTEN_PREFIX_KEY = "clock_listenPrefix";
+const SCREEN_VIEWPORT_KEY = "clock_screenViewport";
 
 export function LocalStateProvider({ children }: { children: ReactNode }) {
   // Auth State
@@ -53,6 +59,21 @@ export function LocalStateProvider({ children }: { children: ReactNode }) {
 
   const [available, setAvailable] = useState<string[]>([]);
 
+  // Screen viewport override (set when selecting a screen via "Birta skjá")
+  const [screenViewport, setScreenViewportState] = useState<ViewPort | null>(
+    () => {
+      const stored = localStorage.getItem(SCREEN_VIEWPORT_KEY);
+      if (stored) {
+        try {
+          return JSON.parse(stored) as ViewPort;
+        } catch {
+          return null;
+        }
+      }
+      return null;
+    },
+  );
+
   // Login Form State
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -61,6 +82,15 @@ export function LocalStateProvider({ children }: { children: ReactNode }) {
   const setListenPrefix = (newPrefix: string) => {
     setListenPrefixState(newPrefix);
     localStorage.setItem(LISTEN_PREFIX_KEY, newPrefix);
+  };
+
+  const setScreenViewport = (vp: ViewPort | null) => {
+    setScreenViewportState(vp);
+    if (vp) {
+      localStorage.setItem(SCREEN_VIEWPORT_KEY, JSON.stringify(vp));
+    } else {
+      localStorage.removeItem(SCREEN_VIEWPORT_KEY);
+    }
   };
 
   // Auth Listener
@@ -107,6 +137,8 @@ export function LocalStateProvider({ children }: { children: ReactNode }) {
     listenPrefix,
     setListenPrefix,
     available,
+    screenViewport,
+    setScreenViewport,
     email,
     setEmail,
     password,

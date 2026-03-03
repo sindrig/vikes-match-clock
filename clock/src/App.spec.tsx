@@ -2,6 +2,7 @@ import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import App from "./App";
+import { firebaseAuth } from "./firebaseAuth";
 import { VIEWS } from "./constants";
 
 vi.mock("./contexts/FirebaseStateContext", () => ({
@@ -46,6 +47,11 @@ vi.mock("react-spinners", () => ({
     <div data-testid="ring-loader" data-color={color} data-size={size} />
   ),
 }));
+vi.mock("./firebaseAuth", () => ({
+  firebaseAuth: {
+    logout: vi.fn().mockResolvedValue(undefined),
+  },
+}));
 
 import { useFirebaseState } from "./contexts/FirebaseStateContext";
 import { useLocalState } from "./contexts/LocalStateContext";
@@ -64,6 +70,8 @@ function setupState1() {
     auth: { isLoaded: true, isEmpty: true },
     listenPrefix: "",
     setListenPrefix: vi.fn(),
+    screenViewport: null,
+    setScreenViewport: vi.fn(),
     available: [],
     email: "",
     setEmail: vi.fn(),
@@ -79,13 +87,19 @@ function setupState1() {
 
 function setupState2(
   view = VIEWS.idle,
-  overrides?: { setListenPrefix?: ReturnType<typeof vi.fn> },
+  overrides?: {
+    setListenPrefix?: ReturnType<typeof vi.fn>;
+    setScreenViewport?: ReturnType<typeof vi.fn>;
+  },
 ) {
   const setListenPrefix = overrides?.setListenPrefix ?? vi.fn();
+  const setScreenViewport = overrides?.setScreenViewport ?? vi.fn();
   mockedUseLocalState.mockReturnValue({
     auth: { isLoaded: true, isEmpty: true },
     listenPrefix: "vikinni",
     setListenPrefix,
+    screenViewport: null,
+    setScreenViewport,
     available: [],
     email: "",
     setEmail: vi.fn(),
@@ -97,14 +111,24 @@ function setupState2(
     view: { vp: defaultViewport, background: "Default" },
     ready: true,
   } as unknown as ReturnType<typeof useFirebaseState>);
-  return { setListenPrefix };
+  return { setListenPrefix, setScreenViewport };
 }
 
-function setupState3(view = VIEWS.idle) {
+function setupState3(
+  view = VIEWS.idle,
+  overrides?: {
+    setListenPrefix?: ReturnType<typeof vi.fn>;
+    setScreenViewport?: ReturnType<typeof vi.fn>;
+  },
+) {
+  const setListenPrefix = overrides?.setListenPrefix ?? vi.fn();
+  const setScreenViewport = overrides?.setScreenViewport ?? vi.fn();
   mockedUseLocalState.mockReturnValue({
     auth: { isLoaded: true, isEmpty: false, email: "test@test.com" },
     listenPrefix: "vikinni",
-    setListenPrefix: vi.fn(),
+    setListenPrefix,
+    screenViewport: null,
+    setScreenViewport,
     available: ["vikinni"],
     email: "test@test.com",
     setEmail: vi.fn(),
@@ -116,6 +140,7 @@ function setupState3(view = VIEWS.idle) {
     view: { vp: defaultViewport, background: "Default" },
     ready: true,
   } as unknown as ReturnType<typeof useFirebaseState>);
+  return { setListenPrefix, setScreenViewport };
 }
 
 describe("App", () => {
@@ -125,6 +150,8 @@ describe("App", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    // Clean up any root fontSize set by the useEffect
+    document.documentElement.style.fontSize = "";
   });
 
   describe("State 1: unauthenticated, no listenPrefix", () => {
@@ -224,11 +251,27 @@ describe("App", () => {
       expect(screen.getByTestId("scoreboard")).toBeInTheDocument();
     });
 
-    it("does not render disconnect button", () => {
+    it("renders disconnect button", () => {
       setupState3();
       render(<App />);
 
-      expect(screen.queryByText("Aftengja skjá")).not.toBeInTheDocument();
+      expect(screen.getByText("Aftengja skjá")).toBeInTheDocument();
+    });
+
+    it("calls logout and disconnects when disconnect button is clicked", () => {
+      const mockSetListenPrefix = vi.fn();
+      const mockSetScreenViewport = vi.fn();
+      setupState3(VIEWS.idle, {
+        setListenPrefix: mockSetListenPrefix,
+        setScreenViewport: mockSetScreenViewport,
+      });
+      render(<App />);
+
+      fireEvent.click(screen.getByText("Aftengja skjá"));
+
+      expect(mockSetScreenViewport).toHaveBeenCalledWith(null);
+      expect(mockSetListenPrefix).toHaveBeenCalledWith("");
+      expect(firebaseAuth.logout).toHaveBeenCalled();
     });
 
     it("does not render Controller for control view", () => {
@@ -239,12 +282,79 @@ describe("App", () => {
     });
   });
 
+  describe("fontSize propagation", () => {
+    it("sets root font-size from vp.fontSize", () => {
+      mockedUseLocalState.mockReturnValue({
+        auth: { isLoaded: true, isEmpty: true },
+        listenPrefix: "vikinni",
+        setListenPrefix: vi.fn(),
+        screenViewport: null,
+        setScreenViewport: vi.fn(),
+        available: [],
+        email: "",
+        setEmail: vi.fn(),
+        password: "",
+        setPassword: vi.fn(),
+      });
+      mockedUseFirebaseState.mockReturnValue({
+        controller: { view: VIEWS.idle, currentAsset: null },
+        view: {
+          vp: { ...defaultViewport, fontSize: "200%" },
+          background: "Default",
+        },
+        ready: true,
+      } as unknown as ReturnType<typeof useFirebaseState>);
+
+      render(<App />);
+
+      expect(document.documentElement.style.fontSize).toBe("200%");
+    });
+
+    it("does not set root font-size when vp.fontSize is undefined", () => {
+      setupState2();
+      render(<App />);
+
+      expect(document.documentElement.style.fontSize).toBe("");
+    });
+
+    it("resets root font-size on unmount", () => {
+      mockedUseLocalState.mockReturnValue({
+        auth: { isLoaded: true, isEmpty: true },
+        listenPrefix: "vikinni",
+        setListenPrefix: vi.fn(),
+        screenViewport: null,
+        setScreenViewport: vi.fn(),
+        available: [],
+        email: "",
+        setEmail: vi.fn(),
+        password: "",
+        setPassword: vi.fn(),
+      });
+      mockedUseFirebaseState.mockReturnValue({
+        controller: { view: VIEWS.idle, currentAsset: null },
+        view: {
+          vp: { ...defaultViewport, fontSize: "200%" },
+          background: "Default",
+        },
+        ready: true,
+      } as unknown as ReturnType<typeof useFirebaseState>);
+
+      const { unmount } = render(<App />);
+      expect(document.documentElement.style.fontSize).toBe("200%");
+
+      unmount();
+      expect(document.documentElement.style.fontSize).toBe("");
+    });
+  });
+
   describe("Loading spinner", () => {
     it("shows spinner when listenPrefix is set but firebase is not ready", () => {
       mockedUseLocalState.mockReturnValue({
         auth: { isLoaded: true, isEmpty: true },
         listenPrefix: "vikinni",
         setListenPrefix: vi.fn(),
+        screenViewport: null,
+        setScreenViewport: vi.fn(),
         available: [],
         email: "",
         setEmail: vi.fn(),
@@ -268,6 +378,8 @@ describe("App", () => {
         auth: { isLoaded: false, isEmpty: true },
         listenPrefix: "vikinni",
         setListenPrefix: vi.fn(),
+        screenViewport: null,
+        setScreenViewport: vi.fn(),
         available: [],
         email: "",
         setEmail: vi.fn(),

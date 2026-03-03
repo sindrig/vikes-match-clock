@@ -174,12 +174,14 @@ interface FirebaseStateProviderProps {
   children: ReactNode;
   listenPrefix: string;
   isAuthenticated: boolean;
+  screenViewport: ViewPort | null;
 }
 
 export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   children,
   listenPrefix,
   isAuthenticated,
+  screenViewport,
 }) => {
   const [match, setMatch] = useState<Match>(defaultMatch);
   const [controller, setController] =
@@ -903,11 +905,19 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     [applyViewUpdate],
   );
 
+  // Apply screen viewport override from "Birta skjá" selection.
+  // The screenViewport from locations.X.screens[Y] takes precedence over
+  // the Firebase view.vp, which may not match the physical screen config.
+  const effectiveView = useMemo<ViewState>(() => {
+    if (!screenViewport) return view;
+    return { ...view, vp: screenViewport };
+  }, [view, screenViewport]);
+
   const value = useMemo(
     () => ({
       match,
       controller,
-      view,
+      view: effectiveView,
       listeners,
       ready,
       updateMatch,
@@ -953,7 +963,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     [
       match,
       controller,
-      view,
+      effectiveView,
       listeners,
       ready,
       updateMatch,
