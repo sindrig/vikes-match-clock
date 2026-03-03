@@ -10,6 +10,7 @@ import { useRemoteSettings } from "../../../contexts/LocalStateContext";
 import "../../../api/clientConfig";
 import {
   getMatches,
+  getMatchInfo,
   getLineups,
   type Match,
   type Team,
@@ -56,33 +57,38 @@ const TodaysMatches = (): React.JSX.Element => {
     setLoading(true);
 
     try {
-      const result = await getLineups({
+      const infoResult = await getMatchInfo({
         path: { teamId, matchId: Number(matchId) },
       });
-      const lineups = result.data ?? {
-        home: { players: [], officials: [] },
-        away: { players: [], officials: [] },
-      };
-      let foundMatch = matches.find((m) => String(m.id) === matchId);
-      if (!foundMatch) {
-        const result = await getMatches({
-          path: {
-            teamId,
-            date: new Date().toISOString().slice(0, 10),
-          },
-          query: { utcOffset: 0 },
-        });
-        const freshMatches = result.data ?? [];
-        foundMatch = freshMatches.find((m) => String(m.id) === matchId);
-      }
-      if (!foundMatch) {
+      const match = infoResult.data;
+      if (!match) {
         setError("Match not found");
         setLoading(false);
         return;
       }
+
+      updateMatch({
+        homeTeam: getClubName(match.homeTeam),
+        awayTeam: getClubName(match.awayTeam),
+        matchStartTime: new Date(match.dateTimeUTC).toLocaleTimeString(
+          "is-IS",
+          {
+            hour: "2-digit",
+            minute: "2-digit",
+          },
+        ),
+        ksiMatchId: match.id,
+      });
+
+      const lineupsResult = await getLineups({
+        path: { teamId, matchId: match.id },
+      });
+      const lineups = lineupsResult.data ?? {
+        home: { players: [], officials: [] },
+        away: { players: [], officials: [] },
+      };
       const roster = transformLineups(lineups);
       setRoster(roster);
-      updateMatch({ ksiMatchId: Number(matchId) });
       setError("");
       setLoading(false);
       setMatches([]);

@@ -6,6 +6,7 @@ import TodaysMatches from "./TodaysMatches";
 
 vi.mock("../../../api/client", () => ({
   getMatches: vi.fn(),
+  getMatchInfo: vi.fn(),
   getLineups: vi.fn(),
 }));
 
@@ -37,7 +38,7 @@ import {
   useListeners,
 } from "../../../contexts/FirebaseStateContext";
 import { useRemoteSettings } from "../../../contexts/LocalStateContext";
-import { getMatches, getLineups } from "../../../api/client";
+import { getMatches, getMatchInfo, getLineups } from "../../../api/client";
 import { transformLineups, getTeamId } from "../../../lib/matchUtils";
 
 const mockedUseController = vi.mocked(useController);
@@ -45,6 +46,7 @@ const mockedUseMatch = vi.mocked(useMatch);
 const mockedUseListeners = vi.mocked(useListeners);
 const mockedUseRemoteSettings = vi.mocked(useRemoteSettings);
 const mockedGetMatches = vi.mocked(getMatches);
+const mockedGetMatchInfo = vi.mocked(getMatchInfo);
 const mockedGetLineups = vi.mocked(getLineups);
 const mockedTransformLineups = vi.mocked(transformLineups);
 const mockedGetTeamId = vi.mocked(getTeamId);
@@ -235,6 +237,14 @@ describe("TodaysMatches", () => {
     it("prompts for match ID and fetches report", async () => {
       promptSpy.mockReturnValue("123");
 
+      const apiMatch = {
+        id: 123,
+        dateTimeUTC: "2024-01-15T19:00:00Z",
+        competition: { id: 1, name: "U19" },
+        homeTeam: { id: 10, name: "Víkingur" },
+        awayTeam: { id: 20, name: "KR" },
+        liveStatus: "not_started",
+      };
       const mockReportData = {
         home: { players: [], officials: [] },
         away: { players: [], officials: [] },
@@ -246,21 +256,13 @@ describe("TodaysMatches", () => {
         home: [{ name: "Player 1", number: 10, show: true }],
         away: [{ name: "Player 3", number: 9, show: true }],
       };
-      const apiMatch = {
-        id: 123,
-        dateTimeUTC: "2024-01-15T19:00:00Z",
-        competition: { id: 1, name: "U19" },
-        homeTeam: { id: 10, name: "Víkingur" },
-        awayTeam: { id: 20, name: "KR" },
-        liveStatus: "not_started",
-      };
 
-      mockedGetLineups.mockResolvedValueOnce({
-        data: mockReportData,
+      mockedGetMatchInfo.mockResolvedValueOnce({
+        data: apiMatch,
         error: null,
       });
-      mockedGetMatches.mockResolvedValueOnce({
-        data: [apiMatch],
+      mockedGetLineups.mockResolvedValueOnce({
+        data: mockReportData,
         error: null,
       });
       mockedTransformLineups.mockReturnValue(mockPlayers);
@@ -274,6 +276,17 @@ describe("TodaysMatches", () => {
       await user.click(reportButton);
 
       expect(promptSpy).toHaveBeenCalledWith("ID á leikskýrslu");
+
+      await waitFor(() => {
+        expect(mockedGetMatchInfo).toHaveBeenCalledWith(
+          expect.objectContaining({
+            path: expect.objectContaining({
+              teamId: 2492,
+              matchId: 123,
+            }) as unknown,
+          }),
+        );
+      });
 
       await waitFor(() => {
         expect(mockedGetLineups).toHaveBeenCalledWith(
@@ -327,7 +340,7 @@ describe("TodaysMatches", () => {
 
     it("displays error when fetch fails", async () => {
       promptSpy.mockReturnValue("match-123");
-      mockedGetLineups.mockRejectedValueOnce(new Error("API error"));
+      mockedGetMatchInfo.mockRejectedValueOnce(new Error("API error"));
 
       const user = userEvent.setup();
       render(<TodaysMatches />);
@@ -365,12 +378,12 @@ describe("TodaysMatches", () => {
         liveStatus: "not_started",
       };
 
-      mockedGetLineups.mockResolvedValueOnce({
-        data: mockReportData,
+      mockedGetMatchInfo.mockResolvedValueOnce({
+        data: apiMatch,
         error: null,
       });
-      mockedGetMatches.mockResolvedValueOnce({
-        data: [apiMatch],
+      mockedGetLineups.mockResolvedValueOnce({
+        data: mockReportData,
         error: null,
       });
       mockedTransformLineups.mockReturnValue(mockPlayers);
@@ -385,7 +398,11 @@ describe("TodaysMatches", () => {
 
       await waitFor(() => {
         expect(mockUpdateMatch).toHaveBeenCalledWith(
-          expect.objectContaining({ ksiMatchId: 123 }),
+          expect.objectContaining({
+            homeTeam: "Víkingur",
+            awayTeam: "KR",
+            ksiMatchId: 123,
+          }),
         );
       });
     });
