@@ -36,6 +36,7 @@ const Controller = () => {
     setPassword,
     listenPrefix,
     setListenPrefix,
+    available,
     setScreenViewport,
   } = useLocalState();
   const auth = useAuth();
@@ -54,11 +55,7 @@ const Controller = () => {
       e.preventDefault();
       firebaseAuth
         .login(email, password)
-        .then(() => {
-          if (email) {
-            setListenPrefix(email.split("@")[0] || "");
-          }
-        })
+        .then(() => {})
         .catch((err: Error) => alert(err.message));
     };
 
@@ -124,6 +121,49 @@ const Controller = () => {
             Login (google)
           </button>
         </div>
+      </div>
+    );
+  }
+
+  if (isAuthenticated && !listenPrefix) {
+    return (
+      <div className="screen-selector">
+        <h2>Veldu skjá til að stjórna</h2>
+        {available.length === 0 ? (
+          <p>Engir skjáir tiltækir</p>
+        ) : (
+          <div className="screen-selector-buttons">
+            {available.map((locationKey) => {
+              const locationScreens = screens.filter(
+                (s) => s.key === locationKey,
+              );
+              if (locationScreens.length === 0) return null;
+
+              const label = locationScreens[0].label;
+              const screenNames = locationScreens
+                .map((s) => s.screen.name)
+                .join(" / ");
+              const buttonLabel = `${label} ${screenNames}`;
+
+              return (
+                <button
+                  key={locationKey}
+                  className="screen-selector-button"
+                  onClick={() => setListenPrefix(locationKey)}
+                >
+                  {buttonLabel}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        <button
+          type="button"
+          className="screen-selector-logout"
+          onClick={() => firebaseAuth.logout()}
+        >
+          Útskrá
+        </button>
       </div>
     );
   }

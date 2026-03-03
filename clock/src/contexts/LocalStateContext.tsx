@@ -116,11 +116,6 @@ export function LocalStateProvider({ children }: { children: ReactNode }) {
           .filter(([, value]) => value === true)
           .map(([key]) => key);
         setAvailable(locations);
-
-        // If current listenPrefix is not in available, set to first available
-        if (locations.length > 0 && !locations.includes(listenPrefix)) {
-          setListenPrefix(locations[0]!);
-        }
       } else {
         setAvailable([]);
       }
@@ -130,7 +125,7 @@ export function LocalStateProvider({ children }: { children: ReactNode }) {
       unsubscribe();
       setAvailable([]);
     };
-  }, [auth.uid, listenPrefix]);
+  }, [auth.uid]);
 
   const value = {
     auth,
