@@ -11,7 +11,7 @@ import { Asset } from "../../types";
 import { parseYoutubePlaylistId, isYoutubeUrl } from "../../utils/urlUtils";
 
 import "./AssetController.css";
-import MatchesOnPitch from "./team/MatchesOnPitch";
+import TodaysMatches from "./team/TodaysMatches";
 import { useController } from "../../contexts/FirebaseStateContext";
 
 const AssetController = () => {
@@ -146,7 +146,7 @@ const AssetController = () => {
         </button>
       </div>
       <div className="view-selector">
-        {assetView === ASSET_VIEWS.teams && <MatchesOnPitch />}
+        {assetView === ASSET_VIEWS.teams && <TodaysMatches />}
       </div>
       {assetView === ASSET_VIEWS.assets && renderAssetController()}
       {assetView === ASSET_VIEWS.teams && (

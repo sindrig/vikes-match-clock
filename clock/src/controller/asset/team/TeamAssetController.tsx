@@ -1,21 +1,21 @@
 import React, { useState } from "react";
-import axios from "axios";
 
 import { RingLoader } from "react-spinners";
-import clubIds from "../../../club-ids";
-import apiConfig from "../../../apiConfig";
 
 import Team from "./Team";
 import SubView from "./SubView";
 import assetTypes from "../AssetTypes";
-import MatchSelector from "./MatchSelector";
 import { getMOTMAsset, getPlayerAssetObject } from "./assetHelpers";
-import { Asset, Player, AvailableMatches } from "../../../types";
+import { Asset, Player } from "../../../types";
 import {
   useController,
   useMatch,
+  useListeners,
 } from "../../../contexts/FirebaseStateContext";
 import { useRemoteSettings } from "../../../contexts/LocalStateContext";
+import "../../../api/clientConfig";
+import { getLineups } from "../../../api/client";
+import { transformLineups, getTeamId } from "../../../lib/matchUtils";
 
 interface SubPlayer extends Player {
   teamName: string;
@@ -33,10 +33,11 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
   const { addAssets, previousView } = props;
   const { match } = useMatch();
   const {
-    controller: { availableMatches, selectedMatch },
-    clearMatchPlayers,
-    setAvailableMatches,
+    controller: { roster },
+    setRoster,
+    clearRoster,
   } = useController();
+  const { screens } = useListeners();
   const { listenPrefix } = useRemoteSettings();
 
   const [loading, setLoading] = useState(false);
@@ -50,37 +51,30 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
   const [selectMOTM, setSelectMOTM] = useState(false);
   const [effect, setEffect] = useState("blink");
 
-  const getAvailableMatches = (homeTeam: string, awayTeam: string) => {
-    const options = {
-      params: {
-        homeTeam: clubIds[homeTeam as keyof typeof clubIds],
-        awayTeam: clubIds[awayTeam as keyof typeof clubIds],
-      },
-    };
-    return axios
-      .get<AvailableMatches>(`${apiConfig.gateWayUrl}match-report`, options)
-      .then((response) => {
-        setAvailableMatches(response.data);
-      });
+  const refetchRoster = (): void => {
+    if (!match.ksiMatchId) return;
+    setLoading(true);
+    const teamId = getTeamId(screens, listenPrefix);
+    void getLineups({
+      path: { teamId, matchId: match.ksiMatchId },
+    })
+      .then((result) => {
+        const lineups = result.data ?? {
+          home: { players: [], officials: [] },
+          away: { players: [], officials: [] },
+        };
+        const rosterData = transformLineups(lineups);
+        setRoster(rosterData);
+        setError("");
+      })
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setLoading(false));
   };
 
   const getTeamPlayers = (): { homeTeam: Player[]; awayTeam: Player[] } => {
-    const { homeTeam, awayTeam } = match;
-    const selectedMatchObj = selectedMatch
-      ? availableMatches[selectedMatch]
-      : undefined;
-    const clubIdsMap = clubIds as Record<string, string>;
-    const homeTeamId = clubIdsMap[homeTeam];
-    const awayTeamId = clubIdsMap[awayTeam];
     return {
-      homeTeam:
-        selectedMatchObj?.players && homeTeamId
-          ? selectedMatchObj.players[homeTeamId] || []
-          : [],
-      awayTeam:
-        selectedMatchObj?.players && awayTeamId
-          ? selectedMatchObj.players[awayTeamId] || []
-          : [],
+      homeTeam: roster.home,
+      awayTeam: roster.away,
     };
   };
 
@@ -96,11 +90,8 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
   };
 
   const addPlayersToQ = (): void => {
-    const { homeTeam, awayTeam } = getTeamPlayers();
-    const teams = [
-      { team: awayTeam, teamName: match.awayTeam },
-      { team: homeTeam, teamName: match.homeTeam },
-    ];
+    const { homeTeam } = getTeamPlayers();
+    const teams = [{ team: homeTeam, teamName: match.homeTeam }];
     const playersToShow = teams.flatMap(({ team }) =>
       team.filter((p) => p.show),
     );
@@ -221,19 +212,6 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
     clearState();
   };
 
-  const autoFill = (): void => {
-    const { homeTeam, awayTeam } = match;
-    if (!homeTeam || !awayTeam) {
-      setError("Choose teams first");
-      return;
-    }
-    setLoading(true);
-    void getAvailableMatches(homeTeam, awayTeam)
-      .then(() => setError(""))
-      .catch((e: Error) => setError(e.message))
-      .finally(() => setLoading(false));
-  };
-
   const renderActionButtons = (): React.JSX.Element => {
     if (selectSubs) {
       return (
@@ -333,21 +311,19 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
     const { homeTeam, awayTeam } = getTeamPlayers();
     return (
       <div>
-        {!(homeTeam.length || awayTeam.length) ? (
+        {match.ksiMatchId !== undefined ? (
           <div className="control-item stdbuttons">
-            <button type="button" onClick={autoFill}>
+            <button type="button" onClick={refetchRoster}>
               Sækja lið
             </button>
           </div>
         ) : null}
-        {homeTeam.length ||
-        awayTeam.length ||
-        Object.keys(availableMatches).length ? (
+        {homeTeam.length || awayTeam.length ? (
           <div className="control-item stdbuttons">
             <button
               type="button"
               onClick={() =>
-                window.confirm("Ertu alveg viss?") && clearMatchPlayers()
+                window.confirm("Ertu alveg viss?") && clearRoster()
               }
             >
               Hreinsa lið
@@ -360,9 +336,6 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
               Setja lið í biðröð
             </button>
           </div>
-        ) : null}
-        {availableMatches && Object.keys(availableMatches || {}).length > 1 ? (
-          <MatchSelector />
         ) : null}
         {homeTeam.length || awayTeam.length ? renderActionControllers() : null}
       </div>

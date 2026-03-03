@@ -41,7 +41,7 @@ Both roles have:
 Reusable module that creates:
 - CloudFront + S3 CDN for frontend
 - API Gateway (HTTP) with custom domain
-- Lambda functions: match-report, match-report-v2, weather
+- Lambda functions: clock-api-v3
 - ACM certificates
 - Route53 records
 - IAM deploy policy (attached to OIDC role)
@@ -86,15 +86,12 @@ The `prod/moves.tf` file contains `moved {}` blocks from the original flat struc
 
 Lambda functions are built from `clock-api/` directory. The module uses relative paths:
 ```hcl
-source_path = "${path.module}/../../../clock-api/match-report"
+source_path = "${path.module}/../../../clock-api/v3"
 ```
 
 Lambdas are built in Docker (`build_in_docker = true`) for consistent Python dependencies.
 
 ## VPC Configuration
 
-`match-report` and `match-report-v2` Lambdas run in VPC for database access:
-- Security Group: `sg-03ecf18a377c6c35f`
-- Subnets: 3 subnets in eu-west-1
+The `clock-api-v3` Lambda does NOT run in VPC (only calls external APIs: Analyticom, vedur.is, OpenWeatherMap). This is important to note as it simplifies networking and avoids VPC interface endpoint costs.
 
-The `weather` Lambda does NOT run in VPC (only needs internet access).

@@ -1,26 +1,35 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import axios from "axios";
-
 import TeamAssetController from "./TeamAssetController";
-import { Asset, Player, AvailableMatches } from "../../../types";
+import { Asset, Player, Roster } from "../../../types";
 import {
   useController,
   useMatch,
+  useListeners,
 } from "../../../contexts/FirebaseStateContext";
 import { useRemoteSettings } from "../../../contexts/LocalStateContext";
+import { transformLineups, getTeamId } from "../../../lib/matchUtils";
+import { getLineups } from "../../../api/client";
 
 vi.mock("../../../contexts/FirebaseStateContext", () => ({
   useMatch: vi.fn(),
   useController: vi.fn(),
+  useListeners: vi.fn(),
 }));
 
 vi.mock("../../../contexts/LocalStateContext", () => ({
   useRemoteSettings: vi.fn(),
 }));
 
-vi.mock("axios");
+vi.mock("../../../api/client", () => ({
+  getLineups: vi.fn(),
+}));
+
+vi.mock("../../../lib/matchUtils", () => ({
+  transformLineups: vi.fn(),
+  getTeamId: vi.fn(),
+}));
 
 vi.mock("./Team", () => ({
   default: ({
@@ -72,10 +81,6 @@ vi.mock("./SubView", () => ({
   ),
 }));
 
-vi.mock("./MatchSelector", () => ({
-  default: () => <div data-testid="match-selector">MatchSelector</div>,
-}));
-
 vi.mock("./assetHelpers", () => ({
   getPlayerAssetObject: vi.fn(),
   getMOTMAsset: vi.fn(),
@@ -90,9 +95,11 @@ import { getPlayerAssetObject, getMOTMAsset } from "./assetHelpers";
 
 const mockedUseMatch = vi.mocked(useMatch);
 const mockedUseController = vi.mocked(useController);
+const mockedUseListeners = vi.mocked(useListeners);
 const mockedUseRemoteSettings = vi.mocked(useRemoteSettings);
-const mockedAxiosGet = vi.fn<typeof axios.get>();
-axios.get = mockedAxiosGet;
+const mockedGetLineups = vi.mocked(getLineups);
+const mockedTransformLineups = vi.mocked(transformLineups);
+const mockedGetTeamId = vi.mocked(getTeamId);
 const mockedGetPlayerAssetObject = vi.mocked(getPlayerAssetObject);
 const mockedGetMOTMAsset = vi.mocked(getMOTMAsset);
 
@@ -125,34 +132,9 @@ const mockAwayPlayers: Player[] = [
   },
 ];
 
-const mockAvailableMatches: AvailableMatches = {
-  "1": {
-    group: "Úrvalsdeild",
-    sex: "M",
-    players: {
-      "103": mockPlayers,
-      "107": mockAwayPlayers,
-    },
-  },
-};
-
-const multipleAvailableMatches: AvailableMatches = {
-  "1": {
-    group: "Úrvalsdeild",
-    sex: "M",
-    players: {
-      "103": mockPlayers,
-      "107": mockAwayPlayers,
-    },
-  },
-  "2": {
-    group: "Bikarkeppni",
-    sex: "M",
-    players: {
-      "103": mockPlayers,
-      "107": mockAwayPlayers,
-    },
-  },
+const mockRoster: Roster = {
+  home: mockPlayers,
+  away: mockAwayPlayers,
 };
 
 const defaultMatch = {
@@ -163,8 +145,8 @@ const defaultMatch = {
   started: 0,
   timeElapsed: 0,
   halfStops: [45, 90],
-  homeTeamId: 103,
-  awayTeamId: 107,
+  homeTeamId: 2492,
+  awayTeamId: 2145,
   injuryTime: 0,
   matchType: "football" as const,
   home2min: [],
@@ -174,15 +156,15 @@ const defaultMatch = {
   awayTimeouts: 0,
   buzzer: false as const,
   countdown: false,
+  ksiMatchId: 12345,
 };
 
 function setupMocks(overrides?: {
   match?: Partial<typeof defaultMatch>;
-  availableMatches?: AvailableMatches;
-  selectedMatch?: string | null;
+  roster?: Roster;
 }) {
-  const mockClearMatchPlayers = vi.fn();
-  const mockSetAvailableMatches = vi.fn();
+  const mockClearRoster = vi.fn();
+  const mockSetRoster = vi.fn();
 
   mockedUseMatch.mockReturnValue({
     match: { ...defaultMatch, ...overrides?.match },
@@ -190,18 +172,23 @@ function setupMocks(overrides?: {
 
   mockedUseController.mockReturnValue({
     controller: {
-      availableMatches: overrides?.availableMatches ?? {},
-      selectedMatch: overrides?.selectedMatch ?? null,
+      roster: overrides?.roster ?? { home: [], away: [] },
     },
-    clearMatchPlayers: mockClearMatchPlayers,
-    setAvailableMatches: mockSetAvailableMatches,
+    clearRoster: mockClearRoster,
+    setRoster: mockSetRoster,
   } as unknown as ReturnType<typeof useController>);
 
   mockedUseRemoteSettings.mockReturnValue({
     listenPrefix: "vikinni",
   } as unknown as ReturnType<typeof useRemoteSettings>);
 
-  return { mockClearMatchPlayers, mockSetAvailableMatches };
+  mockedUseListeners.mockReturnValue({
+    screens: [{ key: "vikinni", teamId: 2492 }],
+  } as unknown as ReturnType<typeof useListeners>);
+
+  mockedGetTeamId.mockReturnValue(2492);
+
+  return { mockClearRoster, mockSetRoster };
 }
 
 describe("TeamAssetController", () => {
@@ -256,10 +243,7 @@ describe("TeamAssetController", () => {
     });
 
     it("renders team components when teams are selected", () => {
-      setupMocks({
-        availableMatches: mockAvailableMatches,
-        selectedMatch: "1",
-      });
+      setupMocks({ roster: mockRoster });
 
       render(
         <TeamAssetController
@@ -272,7 +256,7 @@ describe("TeamAssetController", () => {
       expect(screen.getByTestId("team-awayTeam")).toBeInTheDocument();
     });
 
-    it('shows "Sækja lið" button when no players loaded', () => {
+    it('shows "Sækja lið" button when ksiMatchId is set', () => {
       setupMocks();
 
       render(
@@ -288,10 +272,7 @@ describe("TeamAssetController", () => {
     });
 
     it('shows "Hreinsa lið" and "Setja lið í biðröð" when players are loaded', () => {
-      setupMocks({
-        availableMatches: mockAvailableMatches,
-        selectedMatch: "1",
-      });
+      setupMocks({ roster: mockRoster });
 
       render(
         <TeamAssetController
@@ -308,11 +289,8 @@ describe("TeamAssetController", () => {
       ).toBeInTheDocument();
     });
 
-    it('hides "Sækja lið" button when players are loaded', () => {
-      setupMocks({
-        availableMatches: mockAvailableMatches,
-        selectedMatch: "1",
-      });
+    it('hides "Sækja lið" button when ksiMatchId is undefined', () => {
+      setupMocks({ match: { ksiMatchId: undefined } });
 
       render(
         <TeamAssetController
@@ -327,11 +305,23 @@ describe("TeamAssetController", () => {
     });
   });
 
-  describe("autoFill / fetch available matches", () => {
-    it("calls axios and sets available matches on success", async () => {
-      const { mockSetAvailableMatches } = setupMocks();
+  describe("refetchRoster / fetch lineups by ksiMatchId", () => {
+    it("calls fetchLineups with teamId and ksiMatchId directly", async () => {
+      const { mockSetRoster } = setupMocks();
+      const rosterData: Roster = {
+        home: [{ name: "Jón", id: 1 }],
+        away: [{ name: "Gunnar", id: 2 }],
+      };
+      const lineups = {
+        home: { players: [], officials: [] },
+        away: { players: [], officials: [] },
+      };
 
-      mockedAxiosGet.mockResolvedValueOnce({ data: mockAvailableMatches });
+      mockedGetLineups.mockResolvedValueOnce({
+        data: lineups as Awaited<ReturnType<typeof getLineups>>,
+        error: null,
+      });
+      mockedTransformLineups.mockReturnValueOnce(rosterData);
 
       render(
         <TeamAssetController
@@ -348,20 +338,22 @@ describe("TeamAssetController", () => {
         expect(screen.queryByTestId("ring-loader")).not.toBeInTheDocument();
       });
 
-      expect(mockedAxiosGet).toHaveBeenCalledWith(
-        "https://clock-api.irdn.is/match-report",
-        { params: { homeTeam: "103", awayTeam: "107" } },
+      expect(mockedGetLineups).toHaveBeenCalledWith(
+        expect.objectContaining({
+          path: expect.objectContaining({
+            teamId: 2492,
+            matchId: 12345,
+          }) as unknown,
+        }),
       );
-
-      expect(mockSetAvailableMatches).toHaveBeenCalledWith(
-        mockAvailableMatches,
-      );
+      expect(mockedTransformLineups).toHaveBeenCalledWith(lineups);
+      expect(mockSetRoster).toHaveBeenCalledWith(rosterData);
     });
 
     it("shows error on API failure", async () => {
       setupMocks();
 
-      mockedAxiosGet.mockRejectedValueOnce(new Error("Network error"));
+      mockedGetLineups.mockRejectedValueOnce(new Error("Network error"));
 
       render(
         <TeamAssetController
@@ -377,8 +369,8 @@ describe("TeamAssetController", () => {
       });
     });
 
-    it("shows error when teams not in club-ids", () => {
-      setupMocks({ match: { homeTeam: "", awayTeam: "" } });
+    it("does not fetch when ksiMatchId is undefined", () => {
+      setupMocks({ match: { ksiMatchId: undefined } });
 
       render(
         <TeamAssetController
@@ -387,16 +379,16 @@ describe("TeamAssetController", () => {
         />,
       );
 
-      expect(screen.getByText("Veldu lið fyrst")).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Sækja lið" }),
+      ).not.toBeInTheDocument();
+      expect(mockedGetLineups).not.toHaveBeenCalled();
     });
   });
 
   describe("clear match players", () => {
-    it("calls clearMatchPlayers when confirmed", () => {
-      const { mockClearMatchPlayers } = setupMocks({
-        availableMatches: mockAvailableMatches,
-        selectedMatch: "1",
-      });
+    it("calls clearRoster when confirmed", () => {
+      const { mockClearRoster } = setupMocks({ roster: mockRoster });
 
       vi.spyOn(window, "confirm").mockReturnValue(true);
 
@@ -410,14 +402,11 @@ describe("TeamAssetController", () => {
       fireEvent.click(screen.getByRole("button", { name: "Hreinsa lið" }));
 
       expect(window.confirm).toHaveBeenCalledWith("Ertu alveg viss?");
-      expect(mockClearMatchPlayers).toHaveBeenCalledTimes(1);
+      expect(mockClearRoster).toHaveBeenCalledTimes(1);
     });
 
-    it("does not call clearMatchPlayers when cancelled", () => {
-      const { mockClearMatchPlayers } = setupMocks({
-        availableMatches: mockAvailableMatches,
-        selectedMatch: "1",
-      });
+    it("does not call clearRoster when cancelled", () => {
+      const { mockClearRoster } = setupMocks({ roster: mockRoster });
 
       vi.spyOn(window, "confirm").mockReturnValue(false);
 
@@ -431,34 +420,13 @@ describe("TeamAssetController", () => {
       fireEvent.click(screen.getByRole("button", { name: "Hreinsa lið" }));
 
       expect(window.confirm).toHaveBeenCalledWith("Ertu alveg viss?");
-      expect(mockClearMatchPlayers).not.toHaveBeenCalled();
-    });
-
-    it('shows "Hreinsa lið" when availableMatches has entries but no players', () => {
-      setupMocks({
-        availableMatches: { "1": { players: {} } },
-        selectedMatch: null,
-      });
-
-      render(
-        <TeamAssetController
-          addAssets={mockAddAssets}
-          previousView={mockPreviousView}
-        />,
-      );
-
-      expect(
-        screen.getByRole("button", { name: "Hreinsa lið" }),
-      ).toBeInTheDocument();
+      expect(mockClearRoster).not.toHaveBeenCalled();
     });
   });
 
   describe("add players to queue", () => {
     it("adds visible players to queue and calls previousView", () => {
-      setupMocks({
-        availableMatches: mockAvailableMatches,
-        selectedMatch: "1",
-      });
+      setupMocks({ roster: mockRoster });
 
       const mockAsset = {
         type: "PLAYER",
@@ -490,21 +458,12 @@ describe("TeamAssetController", () => {
         ...mockPlayers,
         { name: "", id: 999, number: 99, role: "midfielder", show: true },
       ];
-      const matchesWithBadPlayers: AvailableMatches = {
-        "1": {
-          group: "Úrvalsdeild",
-          sex: "M",
-          players: {
-            "103": playersWithMissingData,
-            "107": mockAwayPlayers,
-          },
-        },
+      const rosterWithBadPlayers: Roster = {
+        home: playersWithMissingData,
+        away: mockAwayPlayers,
       };
 
-      setupMocks({
-        availableMatches: matchesWithBadPlayers,
-        selectedMatch: "1",
-      });
+      setupMocks({ roster: rosterWithBadPlayers });
 
       render(
         <TeamAssetController
@@ -527,10 +486,7 @@ describe("TeamAssetController", () => {
 
   describe("action buttons", () => {
     it("renders action buttons when players are loaded", () => {
-      setupMocks({
-        availableMatches: mockAvailableMatches,
-        selectedMatch: "1",
-      });
+      setupMocks({ roster: mockRoster });
 
       render(
         <TeamAssetController
@@ -554,10 +510,7 @@ describe("TeamAssetController", () => {
     });
 
     it("shows effect selector with default blink value", () => {
-      setupMocks({
-        availableMatches: mockAvailableMatches,
-        selectedMatch: "1",
-      });
+      setupMocks({ roster: mockRoster });
 
       render(
         <TeamAssetController
@@ -571,10 +524,7 @@ describe("TeamAssetController", () => {
     });
 
     it("allows changing the effect", () => {
-      setupMocks({
-        availableMatches: mockAvailableMatches,
-        selectedMatch: "1",
-      });
+      setupMocks({ roster: mockRoster });
 
       render(
         <TeamAssetController
@@ -592,10 +542,7 @@ describe("TeamAssetController", () => {
 
   describe("substitution flow", () => {
     it("enters sub mode and shows cancel button", () => {
-      setupMocks({
-        availableMatches: mockAvailableMatches,
-        selectedMatch: "1",
-      });
+      setupMocks({ roster: mockRoster });
 
       render(
         <TeamAssetController
@@ -613,10 +560,7 @@ describe("TeamAssetController", () => {
     });
 
     it("cancels sub mode when cancel button clicked", () => {
-      setupMocks({
-        availableMatches: mockAvailableMatches,
-        selectedMatch: "1",
-      });
+      setupMocks({ roster: mockRoster });
 
       render(
         <TeamAssetController
@@ -636,10 +580,7 @@ describe("TeamAssetController", () => {
     });
 
     it("enables player selection on Team components during sub mode", () => {
-      setupMocks({
-        availableMatches: mockAvailableMatches,
-        selectedMatch: "1",
-      });
+      setupMocks({ roster: mockRoster });
 
       render(
         <TeamAssetController
@@ -655,10 +596,7 @@ describe("TeamAssetController", () => {
     });
 
     it("selects first sub player (subIn) and shows SubView", () => {
-      setupMocks({
-        availableMatches: mockAvailableMatches,
-        selectedMatch: "1",
-      });
+      setupMocks({ roster: mockRoster });
 
       render(
         <TeamAssetController
@@ -675,10 +613,7 @@ describe("TeamAssetController", () => {
     });
 
     it("completes substitution flow when both players selected", async () => {
-      setupMocks({
-        availableMatches: mockAvailableMatches,
-        selectedMatch: "1",
-      });
+      setupMocks({ roster: mockRoster });
 
       const subInAsset = {
         type: "PLAYER",
@@ -732,10 +667,7 @@ describe("TeamAssetController", () => {
     });
 
     it("does not call addAssets if getPlayerAssetObject returns null for subIn", async () => {
-      setupMocks({
-        availableMatches: mockAvailableMatches,
-        selectedMatch: "1",
-      });
+      setupMocks({ roster: mockRoster });
 
       mockedGetPlayerAssetObject.mockResolvedValue(null);
 
@@ -760,10 +692,7 @@ describe("TeamAssetController", () => {
 
   describe("select player asset", () => {
     it("enters player asset mode and shows cancel button", () => {
-      setupMocks({
-        availableMatches: mockAvailableMatches,
-        selectedMatch: "1",
-      });
+      setupMocks({ roster: mockRoster });
 
       render(
         <TeamAssetController
@@ -780,10 +709,7 @@ describe("TeamAssetController", () => {
     });
 
     it("cancels player asset mode", () => {
-      setupMocks({
-        availableMatches: mockAvailableMatches,
-        selectedMatch: "1",
-      });
+      setupMocks({ roster: mockRoster });
 
       render(
         <TeamAssetController
@@ -803,10 +729,7 @@ describe("TeamAssetController", () => {
     });
 
     it("selects a player and adds asset with showNow", () => {
-      setupMocks({
-        availableMatches: mockAvailableMatches,
-        selectedMatch: "1",
-      });
+      setupMocks({ roster: mockRoster });
 
       const playerAsset = {
         type: "PLAYER",
@@ -834,10 +757,7 @@ describe("TeamAssetController", () => {
     });
 
     it("uses actual team name (not homeTeam/awayTeam key) for player asset", () => {
-      setupMocks({
-        availableMatches: mockAvailableMatches,
-        selectedMatch: "1",
-      });
+      setupMocks({ roster: mockRoster });
 
       mockedGetPlayerAssetObject.mockReturnValue(
         {} as unknown as ReturnType<typeof getPlayerAssetObject>,
@@ -862,10 +782,7 @@ describe("TeamAssetController", () => {
     });
 
     it("uses away team name for away player asset", () => {
-      setupMocks({
-        availableMatches: mockAvailableMatches,
-        selectedMatch: "1",
-      });
+      setupMocks({ roster: mockRoster });
 
       mockedGetPlayerAssetObject.mockReturnValue(
         {} as unknown as ReturnType<typeof getPlayerAssetObject>,
@@ -892,10 +809,7 @@ describe("TeamAssetController", () => {
 
   describe("select goal scorer", () => {
     it("enters goal scorer mode and shows cancel button", () => {
-      setupMocks({
-        availableMatches: mockAvailableMatches,
-        selectedMatch: "1",
-      });
+      setupMocks({ roster: mockRoster });
 
       render(
         <TeamAssetController
@@ -914,10 +828,7 @@ describe("TeamAssetController", () => {
     });
 
     it("selects goal scorer with overlay effect", () => {
-      setupMocks({
-        availableMatches: mockAvailableMatches,
-        selectedMatch: "1",
-      });
+      setupMocks({ roster: mockRoster });
 
       const playerAsset = {
         type: "PLAYER",
@@ -952,10 +863,7 @@ describe("TeamAssetController", () => {
     });
 
     it("uses selected effect for goal scorer overlay", () => {
-      setupMocks({
-        availableMatches: mockAvailableMatches,
-        selectedMatch: "1",
-      });
+      setupMocks({ roster: mockRoster });
 
       mockedGetPlayerAssetObject.mockReturnValue(
         {} as unknown as ReturnType<typeof getPlayerAssetObject>,
@@ -986,10 +894,7 @@ describe("TeamAssetController", () => {
 
   describe("select MOTM", () => {
     it("enters MOTM mode and shows cancel button", () => {
-      setupMocks({
-        availableMatches: mockAvailableMatches,
-        selectedMatch: "1",
-      });
+      setupMocks({ roster: mockRoster });
 
       render(
         <TeamAssetController
@@ -1008,10 +913,7 @@ describe("TeamAssetController", () => {
     });
 
     it("selects MOTM and calls getMOTMAsset", () => {
-      setupMocks({
-        availableMatches: mockAvailableMatches,
-        selectedMatch: "1",
-      });
+      setupMocks({ roster: mockRoster });
 
       const motmAsset = {
         type: "MOTM",
@@ -1047,40 +949,6 @@ describe("TeamAssetController", () => {
     });
   });
 
-  describe("MatchSelector visibility", () => {
-    it("shows MatchSelector when multiple available matches exist", () => {
-      setupMocks({
-        availableMatches: multipleAvailableMatches,
-        selectedMatch: "1",
-      });
-
-      render(
-        <TeamAssetController
-          addAssets={mockAddAssets}
-          previousView={mockPreviousView}
-        />,
-      );
-
-      expect(screen.getByTestId("match-selector")).toBeInTheDocument();
-    });
-
-    it("hides MatchSelector when only one available match exists", () => {
-      setupMocks({
-        availableMatches: mockAvailableMatches,
-        selectedMatch: "1",
-      });
-
-      render(
-        <TeamAssetController
-          addAssets={mockAddAssets}
-          previousView={mockPreviousView}
-        />,
-      );
-
-      expect(screen.queryByTestId("match-selector")).not.toBeInTheDocument();
-    });
-  });
-
   describe("loading state", () => {
     it("shows spinner during data loading", () => {
       setupMocks();
@@ -1088,7 +956,7 @@ describe("TeamAssetController", () => {
       const neverResolves = new Promise<never>(
         Function.prototype as () => void,
       );
-      mockedAxiosGet.mockReturnValue(neverResolves);
+      mockedGetLineups.mockReturnValue(neverResolves);
 
       render(
         <TeamAssetController
@@ -1108,7 +976,7 @@ describe("TeamAssetController", () => {
       const neverResolves = new Promise<never>(
         Function.prototype as () => void,
       );
-      mockedAxiosGet.mockReturnValue(neverResolves);
+      mockedGetLineups.mockReturnValue(neverResolves);
 
       render(
         <TeamAssetController
@@ -1127,10 +995,7 @@ describe("TeamAssetController", () => {
 
   describe("renderTeam selectPlayer behavior", () => {
     it("does not pass selectPlayer to Team when no action is selected", () => {
-      setupMocks({
-        availableMatches: mockAvailableMatches,
-        selectedMatch: "1",
-      });
+      setupMocks({ roster: mockRoster });
 
       render(
         <TeamAssetController
@@ -1148,10 +1013,7 @@ describe("TeamAssetController", () => {
     });
 
     it("passes selectPlayer to both teams in player asset mode", () => {
-      setupMocks({
-        availableMatches: mockAvailableMatches,
-        selectedMatch: "1",
-      });
+      setupMocks({ roster: mockRoster });
 
       render(
         <TeamAssetController
@@ -1167,10 +1029,7 @@ describe("TeamAssetController", () => {
     });
 
     it("passes selectPlayer to both teams in goal scorer mode", () => {
-      setupMocks({
-        availableMatches: mockAvailableMatches,
-        selectedMatch: "1",
-      });
+      setupMocks({ roster: mockRoster });
 
       render(
         <TeamAssetController
@@ -1188,10 +1047,7 @@ describe("TeamAssetController", () => {
     });
 
     it("passes selectPlayer to both teams in MOTM mode", () => {
-      setupMocks({
-        availableMatches: mockAvailableMatches,
-        selectedMatch: "1",
-      });
+      setupMocks({ roster: mockRoster });
 
       render(
         <TeamAssetController
@@ -1211,10 +1067,7 @@ describe("TeamAssetController", () => {
 
   describe("cancel display mode", () => {
     it("cancels goal scorer mode from cancel button", () => {
-      setupMocks({
-        availableMatches: mockAvailableMatches,
-        selectedMatch: "1",
-      });
+      setupMocks({ roster: mockRoster });
 
       render(
         <TeamAssetController
@@ -1240,10 +1093,7 @@ describe("TeamAssetController", () => {
     });
 
     it("cancels MOTM mode from cancel button", () => {
-      setupMocks({
-        availableMatches: mockAvailableMatches,
-        selectedMatch: "1",
-      });
+      setupMocks({ roster: mockRoster });
 
       render(
         <TeamAssetController
@@ -1267,10 +1117,7 @@ describe("TeamAssetController", () => {
 
   describe("SubView during substitution", () => {
     it("shows correct team name in SubView for home team sub", () => {
-      setupMocks({
-        availableMatches: mockAvailableMatches,
-        selectedMatch: "1",
-      });
+      setupMocks({ roster: mockRoster });
 
       render(
         <TeamAssetController
@@ -1289,10 +1136,7 @@ describe("TeamAssetController", () => {
     });
 
     it("shows correct team name in SubView for away team sub", () => {
-      setupMocks({
-        availableMatches: mockAvailableMatches,
-        selectedMatch: "1",
-      });
+      setupMocks({ roster: mockRoster });
 
       render(
         <TeamAssetController
@@ -1309,11 +1153,8 @@ describe("TeamAssetController", () => {
   });
 
   describe("getTeamPlayers with no selected match", () => {
-    it("renders with empty players when selectedMatch is null", () => {
-      setupMocks({
-        availableMatches: mockAvailableMatches,
-        selectedMatch: null,
-      });
+    it("renders with empty players when roster is empty", () => {
+      setupMocks();
 
       render(
         <TeamAssetController
@@ -1330,10 +1171,7 @@ describe("TeamAssetController", () => {
 
   describe("clearState after actions", () => {
     it("returns to default action buttons after selecting a player asset", () => {
-      setupMocks({
-        availableMatches: mockAvailableMatches,
-        selectedMatch: "1",
-      });
+      setupMocks({ roster: mockRoster });
 
       mockedGetPlayerAssetObject.mockReturnValue(
         {} as unknown as ReturnType<typeof getPlayerAssetObject>,
@@ -1359,10 +1197,7 @@ describe("TeamAssetController", () => {
     });
 
     it("returns to default action buttons after selecting a goal scorer", () => {
-      setupMocks({
-        availableMatches: mockAvailableMatches,
-        selectedMatch: "1",
-      });
+      setupMocks({ roster: mockRoster });
 
       mockedGetPlayerAssetObject.mockReturnValue(
         {} as unknown as ReturnType<typeof getPlayerAssetObject>,
@@ -1386,10 +1221,7 @@ describe("TeamAssetController", () => {
     });
 
     it("returns to default action buttons after selecting MOTM", () => {
-      setupMocks({
-        availableMatches: mockAvailableMatches,
-        selectedMatch: "1",
-      });
+      setupMocks({ roster: mockRoster });
 
       mockedGetMOTMAsset.mockReturnValue(
         {} as unknown as ReturnType<typeof getMOTMAsset>,

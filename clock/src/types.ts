@@ -18,6 +18,7 @@ export interface Match {
   awayTeam: string;
   homeTeamId: number;
   awayTeamId: number;
+  ksiMatchId?: number;
   injuryTime: number;
   matchType: Sports;
   matchStartTime?: string;
@@ -71,21 +72,8 @@ export interface CurrentAsset {
   time: number | null;
 }
 
-// Team players type
-export interface TeamPlayers {
-  homeTeam: Player[];
-  awayTeam: Player[];
-}
-
-// Available match type
-export interface AvailableMatch {
-  group?: string;
-  sex?: string;
-  players: Record<string, Player[]>;
-}
-
-// Available matches type
-export type AvailableMatches = Record<string, AvailableMatch>;
+// Roster type
+export type Roster = { home: Player[]; away: Player[] };
 
 // Viewport type
 export interface ViewPort {
@@ -113,8 +101,7 @@ export interface ControllerState {
   playing: boolean;
   assetView: string;
   view: string;
-  availableMatches: AvailableMatches;
-  selectedMatch: string | null;
+  roster: Roster;
   currentAsset: CurrentAsset | null;
   refreshToken: string;
   tab?: string;
@@ -151,6 +138,7 @@ export interface ListenersState {
     label: string;
     key: string;
     pitchIds?: string[];
+    teamId?: number;
   }>;
 }
 

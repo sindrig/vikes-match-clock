@@ -45,26 +45,10 @@ module "api_gateway" {
   }
 
   integrations = {
-    "ANY /match-report" = {
-      lambda_arn             = module.match-report.lambda_function_arn
+    "ANY /v3/{proxy+}" = {
+      lambda_arn             = module.clock-api-v3.lambda_function_arn
       payload_format_version = "2.0"
       timeout_milliseconds   = 12000
-    }
-
-    "ANY /match-report/v2" = {
-      lambda_arn             = module.match-report-v2.lambda_function_arn
-      payload_format_version = "2.0"
-      timeout_milliseconds   = 12000
-    }
-
-    "ANY /currentWeather" = {
-      lambda_arn             = module.weather.lambda_function_arn
-      payload_format_version = "2.0"
-      timeout_milliseconds   = 12000
-    }
-
-    "$default" = {
-      lambda_arn = module.match-report.lambda_function_arn
     }
   }
 
@@ -86,78 +70,41 @@ resource "aws_route53_record" "api" {
   }
 }
 
-module "match-report" {
+module "clock-api-v3" {
   source  = "terraform-aws-modules/lambda/aws"
   version = "8.5.0"
 
-  function_name = "${random_pet.this.id}${var.name_suffix}-match-report"
-  description   = "Match report (${var.stage})"
-  handler       = "app.lambda_handler"
+  function_name = "${random_pet.this.id}${var.name_suffix}-clock-api-v3"
+  description   = "Clock API v3 - FastAPI (${var.stage})"
+  handler       = "run.sh"
   runtime       = "python3.12"
 
   publish = true
   timeout = 20
 
   build_in_docker = true
-  source_path     = "${path.module}/../../../clock-api/match-report"
+  trigger_on_package_timestamp = false
+  source_path     = "${path.module}/../../../clock-api/v3"
+  ignore_source_code_hash = true
 
-  vpc_security_group_ids             = var.vpc_security_group_ids
-  vpc_subnet_ids                     = var.vpc_subnet_ids
-  attach_network_policy              = true
-  replace_security_groups_on_destroy = true
-  replacement_security_group_ids     = var.vpc_security_group_ids
+  layers = [
+    "arn:aws:lambda:eu-west-1:753240598075:layer:LambdaAdapterLayerX86:20"
+  ]
 
-  allowed_triggers = {
-    AllowExecutionFromAPIGateway = {
-      service    = "apigateway"
-      source_arn = "${module.api_gateway.apigatewayv2_api_execution_arn}/*/*"
-    }
+  environment_variables = {
+    AWS_LAMBDA_EXEC_WRAPPER = "/opt/bootstrap"
+    PORT                    = "8000"
   }
-}
 
-module "weather" {
-  source  = "terraform-aws-modules/lambda/aws"
-  version = "8.5.0"
-
-  function_name = "${random_pet.this.id}${var.name_suffix}-weather"
-  description   = "Weather (${var.stage})"
-  handler       = "app.lambda_handler"
-  runtime       = "python3.12"
-
-  publish = true
-  timeout = 10
-
-  build_in_docker = true
-  source_path     = "${path.module}/../../../clock-api/weather"
-
-  allowed_triggers = {
-    AllowExecutionFromAPIGateway = {
-      service    = "apigateway"
-      source_arn = "${module.api_gateway.apigatewayv2_api_execution_arn}/*/*"
-    }
-  }
-}
-
-module "match-report-v2" {
-  source  = "terraform-aws-modules/lambda/aws"
-  version = "8.5.0"
-
-  function_name = "${random_pet.this.id}${var.name_suffix}-match-report-v2"
-  description   = "Match report v2 (${var.stage})"
-  handler       = "app.lambda_handler"
-  runtime       = "python3.12"
-
-  publish = true
-  timeout = 20
-
-  build_in_docker = true
-  source_path     = "${path.module}/../../../clock-api/match-report-v2"
-
-  vpc_security_group_ids             = var.vpc_security_group_ids
-  vpc_subnet_ids                     = var.vpc_subnet_ids
-  attach_network_policy              = true
-  replace_security_groups_on_destroy = true
-  replacement_security_group_ids     = var.vpc_security_group_ids
+  attach_policy_json = true
+  policy_json = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["ssm:GetParameter"]
+      Resource = "arn:aws:ssm:*:*:parameter/vikes-match-clock/*"
+    }]
+  })
 
   allowed_triggers = {
     AllowExecutionFromAPIGateway = {

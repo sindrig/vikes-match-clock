@@ -16,6 +16,7 @@ export default tseslint.config(
       "src/lib/idb-keyval.js",
       "*.config.js",
       "*.config.ts",
+      "src/api/client/**/*.gen.ts",
     ],
   },
 

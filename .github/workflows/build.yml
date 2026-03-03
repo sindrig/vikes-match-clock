@@ -51,6 +51,24 @@ jobs:
         working-directory: ./clock
         run: pnpm exec playwright install --with-deps chromium
 
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python dependencies
+        run: pip install -r clock-api/v3/requirements.txt -r clock-api/v3/requirements-dev.txt
+
+
+      - name: Check API spec freshness
+        run: make generate-api-spec && git diff --exit-code clock-api/v3/openapi.json
+
+      - name: Generate TypeScript client
+        run: make generate-ts-client
+
+      - name: Run Python tests
+        run: cd clock-api/v3 && python -m pytest tests/ -v
+
       - name: Lint
         working-directory: ./clock
         run: pnpm lint
@@ -160,6 +178,9 @@ jobs:
   deploy-prod:
     runs-on: ubuntu-latest
     needs: [build-clock]
+    concurrency:
+      group: deploy-prod
+      cancel-in-progress: false
     if: github.ref == 'refs/heads/master'
     env:
       AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
@@ -183,11 +204,17 @@ jobs:
         with:
           terraform_wrapper: false
 
+      - name: Terraform Apply
+        working-directory: ./infra/prod
+        timeout-minutes: 15
+        run: |
+          terraform init -backend=true
+          terraform apply -auto-approve
+
       - name: Get Terraform outputs
         id: tf-outputs
         working-directory: ./infra/prod
         run: |
-          terraform init -backend=true
           echo "frontend_bucket=$(terraform output -raw frontend_bucket)" >> $GITHUB_OUTPUT
           echo "cloudfront_distribution_id=$(terraform output -raw cloudfront_distribution_id)" >> $GITHUB_OUTPUT
 
@@ -216,6 +243,9 @@ jobs:
   deploy-staging:
     runs-on: ubuntu-latest
     needs: [build-clock]
+    concurrency:
+      group: deploy-staging
+      cancel-in-progress: false
     if: |
       github.event_name == 'pull_request' &&
       contains(github.event.pull_request.labels.*.name, 'sandbox-deploy')
@@ -243,11 +273,17 @@ jobs:
         with:
           terraform_wrapper: false
 
+      - name: Terraform Apply
+        working-directory: ./infra/staging
+        timeout-minutes: 15
+        run: |
+          terraform init -backend=true
+          terraform apply -auto-approve
+
       - name: Get Terraform outputs
         id: tf-outputs
         working-directory: ./infra/staging
         run: |
-          terraform init -backend=true
           echo "frontend_bucket=$(terraform output -raw frontend_bucket)" >> $GITHUB_OUTPUT
           echo "cloudfront_distribution_id=$(terraform output -raw cloudfront_distribution_id)" >> $GITHUB_OUTPUT
 

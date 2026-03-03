@@ -1,3 +1,18 @@
+.controller.login-controller {
+  padding: 10px;
+}
+
+.controller.login-controller .control-item {
+  float: none;
+}
+
+.controller.login-controller .control-item > button,
+.controller.login-controller .control-item > select,
+.controller.login-controller .control-item > div {
+  float: none;
+  clear: none;
+}
+
 .controller button {
   /*background-color: #c0c0c0;
   border: 1px solid black;

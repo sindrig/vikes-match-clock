@@ -5,15 +5,13 @@ A match clock application for Víkingur football club stadiums. Displays match i
 ## Project Structure
 
 - **clock/**: React app - match clock display and control interface (see `clock/AGENTS.md` for details)
-- **clock-api/**: Python lambdas for match reports and weather
+- **clock-api/**: Python Lambda API for match data and weather
 - **admin/**: Nuxt.js admin interface for match control (newer alternative to clock's controller)
 - **infra/**: Terraform infrastructure configuration
 ```
 ├── clock/              # React frontend application
 ├── clock-api/          # Python Lambda functions
-│   ├── match-report/   # Fetches match data
-│   ├── match-report-v2/# Updated match report API
-│   └── weather/        # Weather forecast API
+│   └── v3/             # FastAPI API — match data + weather (see clock-api/v3/AGENTS.md)
 ├── infra/              # Terraform infrastructure (see infra/AGENTS.md)
 └── .github/workflows/  # CI/CD pipelines
 ```
@@ -28,7 +26,7 @@ A match clock application for Víkingur football club stadiums. Displays match i
 ## Key Technologies
 
 - **Frontend**: React (in `clock/` directory)
-- **Backend**: Python 3.12 Lambda functions
+- **Backend**: Python 3.12 Lambda functions (FastAPI + Lambda Web Adapter)
 - **Infrastructure**: Terraform with S3 backend
 - **CI/CD**: GitHub Actions with OIDC authentication (no static AWS keys)
 - **Real-time**: Firebase Realtime Database for screen state management
@@ -73,6 +71,21 @@ Common fixable patterns:
 - **No optimistic updates**: All state changes flow through Firebase subscriptions (write → Firebase → onValue → state)
 - **No hydration guards**: 100% Firebase means no local state to hydrate
 - **Type-safe parsing**: All Firebase snapshots validated through `firebaseParsers.ts`
+
+### Team ID System (club-ids.ts ↔ KSI Analyticom API)
+
+The match data pipeline depends on team IDs matching between the frontend and the KSI Analyticom API:
+
+1. **`club-ids.ts`** maps team display names → KSI Analyticom IDs (e.g., `"Víkingur R": "2492"`)
+2. **`updateMatch()`** in `FirebaseStateContext.tsx` resolves `homeTeamId`/`awayTeamId` from `club-ids.ts` when a team name is set
+3. **`api.ts`** fetches lineups from the API, which returns players keyed by API team IDs: `{ [String(match.homeTeam.id)]: Player[], ... }`
+4. **`TeamAssetController.tsx`** looks up players via `String(match.homeTeamId)` — if `club-ids.ts` has wrong IDs, this lookup silently returns nothing
+
+**Name normalization**: The API sometimes returns team names with trailing dots (e.g., "Víkingur R.") while `club-ids.ts` stores them without. The `lookupClubId()` helper in `FirebaseStateContext.tsx` strips trailing dots as a fallback.
+
+**Teams not in KSI** (combined teams, foreign clubs, national teams) have ID `"-1"` in `club-ids.ts`. They remain selectable but won't match API data.
+
+**Authoritative source for IDs**: https://www.ksi.is/felagslid/adildarfelog/ — each team link contains `felag?id=XXXX`.
 
 ### Multi-Controller Support
 - Multiple controllers can connect to the same `listenPrefix`

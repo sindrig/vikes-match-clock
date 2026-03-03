@@ -1,11 +1,8 @@
 import React, { useState } from "react";
-import axios from "axios";
 import CloseIcon from "@rsuite/icons/Close";
-import ReloadIcon from "@rsuite/icons/Reload";
 import { Button, IconButton } from "rsuite";
 
 import TeamPlayer from "./TeamPlayer";
-import apiConfig from "../../../apiConfig";
 import { Player } from "../../../types";
 
 import "./Team.css";
@@ -19,16 +16,9 @@ interface OwnProps {
   selectPlayer?: ((player: Player, teamName: string) => void) | null;
 }
 
-interface PlayerResponse {
-  id?: number;
-  name?: string;
-  number?: number | string;
-  role?: string;
-}
-
 const Team = ({ teamName, selectPlayer }: OwnProps): React.JSX.Element => {
   const {
-    controller: { availableMatches, selectedMatch },
+    controller: { roster },
     editPlayer,
     deletePlayer,
     addPlayer,
@@ -37,27 +27,19 @@ const Team = ({ teamName, selectPlayer }: OwnProps): React.JSX.Element => {
 
   const [inputValue, setInputValue] = useState("");
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
 
-  const selectedMatchObj = selectedMatch
-    ? availableMatches[selectedMatch]
-    : undefined;
-  const teamId = teamName === "homeTeam" ? match.homeTeamId : match.awayTeamId;
-  const team = selectedMatchObj?.players
-    ? selectedMatchObj.players[String(teamId)] || []
-    : [];
-  const group = selectedMatchObj?.group;
-  const sex = selectedMatchObj?.sex;
+  const side = teamName === "homeTeam" ? "home" : "away";
+  const team = roster[side] || [];
 
   const displayTeamName =
     teamName === "homeTeam" ? match.homeTeam : match.awayTeam;
 
   const addEmptyLine = (): void => {
-    addPlayer(String(teamId));
+    addPlayer(side);
   };
 
   const removePlayer = (idx: number): void => {
-    deletePlayer(String(teamId), idx);
+    deletePlayer(side, idx);
   };
 
   const updatePlayer = (
@@ -65,54 +47,8 @@ const Team = ({ teamName, selectPlayer }: OwnProps): React.JSX.Element => {
   ): ((updatedPlayer: Partial<Player>) => void) => {
     return (updatedPlayer: Partial<Player>) => {
       console.log("updatedPlayer", updatedPlayer);
-      editPlayer(String(teamId), idx, updatedPlayer);
+      editPlayer(side, idx, updatedPlayer);
     };
-  };
-
-  const fetchPlayerId = (idx: number): void => {
-    const player = team[idx];
-
-    if (!player || !player.name) {
-      setError("Player not found or has no name");
-      return;
-    }
-
-    const options = {
-      params: {
-        playerName: player.name,
-        teamId,
-        group,
-        sex,
-      },
-    };
-    setLoading(true);
-    axios
-      .get<PlayerResponse>(
-        `${apiConfig.gateWayUrl}match-report/v2?action=search-for-player`,
-        options,
-      )
-      .then((response) => {
-        if (response && response.data && response.data.id) {
-          const updatedPlayer: Player = {
-            id: response.data.id,
-            name: response.data.name || player.name,
-            number: response.data.number || player.number,
-            role: response.data.role || player.role,
-            show: player.show,
-          };
-          updatePlayer(idx)(updatedPlayer);
-        } else {
-          setError(
-            `No ID found for player ${String(player.name ?? "unknown")}`,
-          );
-        }
-      })
-      .catch((e: Error) => {
-        setError(e.message);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
   };
 
   const submitForm = (event: React.FormEvent<HTMLFormElement>): void => {
@@ -144,10 +80,7 @@ const Team = ({ teamName, selectPlayer }: OwnProps): React.JSX.Element => {
   };
 
   return (
-    <div
-      className="team-asset-container"
-      style={loading ? { backgroundColor: "grey" } : {}}
-    >
+    <div className="team-asset-container">
       <span>{error}</span>
       {selectPlayer ? renderForm() : null}
       <div className="team-name">{displayTeamName}</div>
@@ -162,16 +95,6 @@ const Team = ({ teamName, selectPlayer }: OwnProps): React.JSX.Element => {
               ) : (
                 <TeamPlayer player={p} onChange={updatePlayer(i)} />
               )}
-              {!selectPlayer && !p.id && (
-                <IconButton
-                  icon={<ReloadIcon />}
-                  size="xs"
-                  color="blue"
-                  appearance="primary"
-                  circle
-                  onClick={() => fetchPlayerId(i)}
-                />
-              )}
               {!selectPlayer && (
                 <IconButton
                   icon={<CloseIcon />}
@@ -185,7 +108,7 @@ const Team = ({ teamName, selectPlayer }: OwnProps): React.JSX.Element => {
             </div>
           ))
         : null}
-      {displayTeamName && selectedMatch ? (
+      {displayTeamName ? (
         <div>
           <button type="button" onClick={addEmptyLine}>
             Ný lína...

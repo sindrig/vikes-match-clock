@@ -80,3 +80,5 @@ clock/coverage
 clock/playwright-report
 clock/test-results
 .sisyphus
+clock/src/api/client/
+**/.sisyphus/

@@ -1,12 +1,8 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import axios from "axios";
 import Team from "./Team";
 import { Player } from "../../../types";
-
-// Mock axios
-vi.mock("axios");
 
 // Mock Firebase context
 vi.mock("../../../contexts/FirebaseStateContext", () => ({
@@ -53,10 +49,6 @@ vi.mock("@rsuite/icons/Close", () => ({
   default: () => <span data-testid="close-icon">X</span>,
 }));
 
-vi.mock("@rsuite/icons/Reload", () => ({
-  default: () => <span data-testid="reload-icon">R</span>,
-}));
-
 // Mock TeamPlayer component
 vi.mock("./TeamPlayer", () => ({
   default: ({
@@ -85,9 +77,6 @@ import {
 
 const mockedUseController = vi.mocked(useController);
 const mockedUseMatch = vi.mocked(useMatch);
-const mockedAxios = axios as unknown as {
-  get: ReturnType<typeof vi.fn>;
-};
 
 describe("Team", () => {
   const mockEditPlayer = vi.fn();
@@ -104,22 +93,16 @@ describe("Team", () => {
     vi.clearAllMocks();
 
     // Default controller mock
+    // Default controller mock with roster-based data model
     mockedUseController.mockReturnValue({
       controller: {
-        availableMatches: {
-          match1: {
-            players: {
-              "10": mockPlayers,
-              "20": [
-                { name: "Away One", number: 11, id: 201 },
-                { name: "Away Two", number: 12, id: 202 },
-              ],
-            },
-            group: "A",
-            sex: "male",
-          },
+        roster: {
+          home: mockPlayers,
+          away: [
+            { name: "Away One", number: 11, id: 201, show: true },
+            { name: "Away Two", number: 12, id: 202, show: true },
+          ],
         },
-        selectedMatch: "match1",
       },
       editPlayer: mockEditPlayer,
       deletePlayer: mockDeletePlayer,
@@ -172,11 +155,13 @@ describe("Team", () => {
       ).not.toBeInTheDocument();
     });
 
-    it("should not render add player button when selectedMatch is null", () => {
+    it("should render add player button even when roster is empty", () => {
       mockedUseController.mockReturnValue({
         controller: {
-          availableMatches: {},
-          selectedMatch: null,
+          roster: {
+            home: [],
+            away: [],
+          },
         },
         editPlayer: mockEditPlayer,
         deletePlayer: mockDeletePlayer,
@@ -184,7 +169,7 @@ describe("Team", () => {
       } as unknown as ReturnType<typeof useController>);
 
       render(<Team teamName="homeTeam" />);
-      expect(screen.queryByText("Ný lína...")).not.toBeInTheDocument();
+      expect(screen.getByText("Ný lína...")).toBeInTheDocument();
     });
   });
 
@@ -195,7 +180,7 @@ describe("Team", () => {
       const addButton = screen.getByText("Ný lína...");
       fireEvent.click(addButton);
 
-      expect(mockAddPlayer).toHaveBeenCalledWith("10");
+      expect(mockAddPlayer).toHaveBeenCalledWith("home");
     });
 
     it("should call addPlayer with away team ID for away team", () => {
@@ -204,7 +189,7 @@ describe("Team", () => {
       const addButton = screen.getByText("Ný lína...");
       fireEvent.click(addButton);
 
-      expect(mockAddPlayer).toHaveBeenCalledWith("20");
+      expect(mockAddPlayer).toHaveBeenCalledWith("away");
     });
   });
 
@@ -215,7 +200,7 @@ describe("Team", () => {
       const playerLines = container.querySelectorAll(".player-whole-line");
       expect(playerLines.length).toBe(3);
 
-      const firstPlayerLine = playerLines[0];
+      const firstPlayerLine = playerLines[0] as HTMLElement;
       const buttons = firstPlayerLine.querySelectorAll("button");
       const deleteButton = Array.from(buttons).find((btn) =>
         btn.className.includes("red"),
@@ -224,7 +209,7 @@ describe("Team", () => {
       expect(deleteButton).toBeDefined();
       fireEvent.click(deleteButton!);
 
-      expect(mockDeletePlayer).toHaveBeenCalledWith("10", 0);
+      expect(mockDeletePlayer).toHaveBeenCalledWith("home", 0);
     });
 
     it("should not render delete button when selectPlayer is provided", () => {
@@ -234,7 +219,7 @@ describe("Team", () => {
       );
 
       const playerLines = container.querySelectorAll(".player-whole-line");
-      const firstPlayerLine = playerLines[0];
+      const firstPlayerLine = playerLines[0] as HTMLElement;
       const buttons = firstPlayerLine.querySelectorAll("button");
       const deleteButton = Array.from(buttons).find((btn) =>
         btn.className.includes("red"),
@@ -249,287 +234,11 @@ describe("Team", () => {
       render(<Team teamName="homeTeam" />);
 
       const updateButtons = screen.getAllByText("Update");
-      fireEvent.click(updateButtons[0]);
+      fireEvent.click(updateButtons[0] as HTMLElement);
 
-      expect(mockEditPlayer).toHaveBeenCalledWith("10", 0, {
+      expect(mockEditPlayer).toHaveBeenCalledWith("home", 0, {
         name: "Updated Player",
       });
-    });
-  });
-
-  describe("Fetch player ID functionality", () => {
-    beforeEach(() => {
-      mockedAxios.get.mockResolvedValue({
-        data: {
-          id: 999,
-          name: "Updated Name",
-          number: 99,
-          role: "Forward",
-        },
-      });
-    });
-
-    it("should render reload icon for players without ID", () => {
-      mockedUseController.mockReturnValue({
-        controller: {
-          availableMatches: {
-            match1: {
-              players: {
-                "10": [{ name: "No ID Player", number: 5, show: true }],
-              },
-              group: "A",
-              sex: "male",
-            },
-          },
-          selectedMatch: "match1",
-        },
-        editPlayer: mockEditPlayer,
-        deletePlayer: mockDeletePlayer,
-        addPlayer: mockAddPlayer,
-      } as unknown as ReturnType<typeof useController>);
-
-      const { container } = render(<Team teamName="homeTeam" />);
-
-      const playerLines = container.querySelectorAll(".player-whole-line");
-      const firstPlayerLine = playerLines[0];
-      const buttons = firstPlayerLine.querySelectorAll("button");
-      const reloadButton = Array.from(buttons).find((btn) =>
-        btn.className.includes("blue"),
-      );
-
-      expect(reloadButton).toBeDefined();
-    });
-
-    it("should not render reload icon for players with ID", () => {
-      const { container } = render(<Team teamName="homeTeam" />);
-
-      const playerLines = container.querySelectorAll(".player-whole-line");
-      const firstPlayerLine = playerLines[0];
-      const buttons = firstPlayerLine.querySelectorAll("button");
-      const reloadButton = Array.from(buttons).find((btn) =>
-        btn.className.includes("blue"),
-      );
-
-      expect(reloadButton).toBeUndefined();
-    });
-
-    it("should fetch player ID and update player on success", async () => {
-      mockedUseController.mockReturnValue({
-        controller: {
-          availableMatches: {
-            match1: {
-              players: {
-                "10": [{ name: "Fetch Me", number: 7, show: true }],
-              },
-              group: "A",
-              sex: "male",
-            },
-          },
-          selectedMatch: "match1",
-        },
-        editPlayer: mockEditPlayer,
-        deletePlayer: mockDeletePlayer,
-        addPlayer: mockAddPlayer,
-      } as unknown as ReturnType<typeof useController>);
-
-      const { container } = render(<Team teamName="homeTeam" />);
-
-      const playerLines = container.querySelectorAll(".player-whole-line");
-      const firstPlayerLine = playerLines[0];
-      const buttons = firstPlayerLine.querySelectorAll("button");
-      const reloadButton = Array.from(buttons).find((btn) =>
-        btn.className.includes("blue"),
-      );
-
-      fireEvent.click(reloadButton!);
-
-      await vi.waitFor(() => {
-        expect(mockedAxios.get).toHaveBeenCalledWith(
-          expect.stringContaining("match-report/v2?action=search-for-player"),
-          {
-            params: {
-              playerName: "Fetch Me",
-              teamId: 10,
-              group: "A",
-              sex: "male",
-            },
-          },
-        );
-      });
-
-      await vi.waitFor(() => {
-        expect(mockEditPlayer).toHaveBeenCalledWith("10", 0, {
-          id: 999,
-          name: "Updated Name",
-          number: 99,
-          role: "Forward",
-          show: true,
-        });
-      });
-    });
-
-    it("should show error when player has no name", () => {
-      mockedUseController.mockReturnValue({
-        controller: {
-          availableMatches: {
-            match1: {
-              players: {
-                "10": [{ name: "", number: 7, show: true }],
-              },
-              group: "A",
-              sex: "male",
-            },
-          },
-          selectedMatch: "match1",
-        },
-        editPlayer: mockEditPlayer,
-        deletePlayer: mockDeletePlayer,
-        addPlayer: mockAddPlayer,
-      } as unknown as ReturnType<typeof useController>);
-
-      const { container } = render(<Team teamName="homeTeam" />);
-
-      const playerLines = container.querySelectorAll(".player-whole-line");
-      const firstPlayerLine = playerLines[0];
-      const buttons = firstPlayerLine.querySelectorAll("button");
-      const reloadButton = Array.from(buttons).find((btn) =>
-        btn.className.includes("blue"),
-      );
-
-      fireEvent.click(reloadButton!);
-
-      expect(
-        screen.getByText("Player not found or has no name"),
-      ).toBeInTheDocument();
-      expect(mockedAxios.get).not.toHaveBeenCalled();
-    });
-
-    it("should show error when response has no ID", async () => {
-      mockedAxios.get.mockResolvedValue({
-        data: {
-          name: "No ID",
-        },
-      });
-
-      mockedUseController.mockReturnValue({
-        controller: {
-          availableMatches: {
-            match1: {
-              players: {
-                "10": [{ name: "No ID Player", number: 8, show: true }],
-              },
-              group: "A",
-              sex: "male",
-            },
-          },
-          selectedMatch: "match1",
-        },
-        editPlayer: mockEditPlayer,
-        deletePlayer: mockDeletePlayer,
-        addPlayer: mockAddPlayer,
-      } as unknown as ReturnType<typeof useController>);
-
-      const { container } = render(<Team teamName="homeTeam" />);
-
-      const playerLines = container.querySelectorAll(".player-whole-line");
-      const firstPlayerLine = playerLines[0];
-      const buttons = firstPlayerLine.querySelectorAll("button");
-      const reloadButton = Array.from(buttons).find((btn) =>
-        btn.className.includes("blue"),
-      );
-
-      fireEvent.click(reloadButton!);
-
-      await vi.waitFor(() => {
-        expect(
-          screen.getByText("No ID found for player No ID Player"),
-        ).toBeInTheDocument();
-      });
-    });
-
-    it("should show error on axios failure", async () => {
-      mockedAxios.get.mockRejectedValue(new Error("Network error"));
-
-      mockedUseController.mockReturnValue({
-        controller: {
-          availableMatches: {
-            match1: {
-              players: {
-                "10": [{ name: "Error Player", number: 9, show: true }],
-              },
-              group: "A",
-              sex: "male",
-            },
-          },
-          selectedMatch: "match1",
-        },
-        editPlayer: mockEditPlayer,
-        deletePlayer: mockDeletePlayer,
-        addPlayer: mockAddPlayer,
-      } as unknown as ReturnType<typeof useController>);
-
-      const { container } = render(<Team teamName="homeTeam" />);
-
-      const playerLines = container.querySelectorAll(".player-whole-line");
-      const firstPlayerLine = playerLines[0];
-      const buttons = firstPlayerLine.querySelectorAll("button");
-      const reloadButton = Array.from(buttons).find((btn) =>
-        btn.className.includes("blue"),
-      );
-
-      fireEvent.click(reloadButton!);
-
-      await vi.waitFor(() => {
-        expect(screen.getByText("Network error")).toBeInTheDocument();
-      });
-    });
-
-    it("should set loading state during fetch", async () => {
-      let resolvePromise: ((value: unknown) => void) | undefined;
-      const promise = new Promise((resolve) => {
-        resolvePromise = resolve;
-      });
-      mockedAxios.get.mockReturnValue(promise as never);
-
-      mockedUseController.mockReturnValue({
-        controller: {
-          availableMatches: {
-            match1: {
-              players: {
-                "10": [{ name: "Loading Player", number: 10, show: true }],
-              },
-              group: "A",
-              sex: "male",
-            },
-          },
-          selectedMatch: "match1",
-        },
-        editPlayer: mockEditPlayer,
-        deletePlayer: mockDeletePlayer,
-        addPlayer: mockAddPlayer,
-      } as unknown as ReturnType<typeof useController>);
-
-      const { container } = render(<Team teamName="homeTeam" />);
-
-      const playerLines = container.querySelectorAll(".player-whole-line");
-      const firstPlayerLine = playerLines[0];
-      const buttons = firstPlayerLine.querySelectorAll("button");
-      const reloadButton = Array.from(buttons).find((btn) =>
-        btn.className.includes("blue"),
-      );
-
-      fireEvent.click(reloadButton!);
-
-      await vi.waitFor(() => {
-        const teamContainer = container.querySelector(".team-asset-container");
-        expect(teamContainer?.getAttribute("style")).toContain(
-          "background-color: grey",
-        );
-      });
-
-      if (resolvePromise) {
-        resolvePromise({ data: { id: 999, name: "Loaded" } });
-      }
     });
   });
 
@@ -607,16 +316,10 @@ describe("Team", () => {
     it("should display role initial when player has role but no number", () => {
       mockedUseController.mockReturnValue({
         controller: {
-          availableMatches: {
-            match1: {
-              players: {
-                "10": [{ name: "Coach", role: "Manager", show: true }],
-              },
-              group: "A",
-              sex: "male",
-            },
+          roster: {
+            home: [{ name: "Coach", role: "Manager", show: true }],
+            away: [],
           },
-          selectedMatch: "match1",
         },
         editPlayer: mockEditPlayer,
         deletePlayer: mockDeletePlayer,
@@ -631,16 +334,10 @@ describe("Team", () => {
     it("should display empty when player has neither number nor role", () => {
       mockedUseController.mockReturnValue({
         controller: {
-          availableMatches: {
-            match1: {
-              players: {
-                "10": [{ name: "Unknown", show: true }],
-              },
-              group: "A",
-              sex: "male",
-            },
+          roster: {
+            home: [{ name: "Unknown", show: true }],
+            away: [],
           },
-          selectedMatch: "match1",
         },
         editPlayer: mockEditPlayer,
         deletePlayer: mockDeletePlayer,
@@ -657,16 +354,10 @@ describe("Team", () => {
     it("should handle empty team players array", () => {
       mockedUseController.mockReturnValue({
         controller: {
-          availableMatches: {
-            match1: {
-              players: {
-                "10": [],
-              },
-              group: "A",
-              sex: "male",
-            },
+          roster: {
+            home: [],
+            away: [],
           },
-          selectedMatch: "match1",
         },
         editPlayer: mockEditPlayer,
         deletePlayer: mockDeletePlayer,
@@ -682,14 +373,10 @@ describe("Team", () => {
     it("should handle missing players object for team", () => {
       mockedUseController.mockReturnValue({
         controller: {
-          availableMatches: {
-            match1: {
-              players: {},
-              group: "A",
-              sex: "male",
-            },
+          roster: {
+            home: [],
+            away: [],
           },
-          selectedMatch: "match1",
         },
         editPlayer: mockEditPlayer,
         deletePlayer: mockDeletePlayer,
@@ -705,8 +392,10 @@ describe("Team", () => {
     it("should handle undefined selectedMatchObj", () => {
       mockedUseController.mockReturnValue({
         controller: {
-          availableMatches: {},
-          selectedMatch: "nonexistent",
+          roster: {
+            home: [],
+            away: [],
+          },
         },
         editPlayer: mockEditPlayer,
         deletePlayer: mockDeletePlayer,
