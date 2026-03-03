@@ -242,13 +242,15 @@ describe("Controller", () => {
   });
 
   describe("State 3: authenticated", () => {
-    it("renders tabs (Heim, Myndefni, Stillingar)", () => {
+    it("renders tabs (Heim, Myndefni) and settings gear button", () => {
       setupState3();
       render(<Controller />);
 
       expect(screen.getByText("Heim")).toBeInTheDocument();
       expect(screen.getByText("Myndefni")).toBeInTheDocument();
-      expect(screen.getByText("Stillingar")).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Stillingar" }),
+      ).toBeInTheDocument();
     });
 
     it("shows MatchActions on home tab by default", () => {
@@ -262,14 +264,14 @@ describe("Controller", () => {
       expect(screen.queryByTestId("media-manager")).not.toBeInTheDocument();
     });
 
-    it("switches to Stillingar tab locally", () => {
+    it("opens settings modal when gear button is clicked", () => {
       setupState3();
       render(<Controller />);
 
-      fireEvent.click(screen.getByText("Stillingar"));
+      fireEvent.click(screen.getByRole("button", { name: "Stillingar" }));
 
       expect(screen.getByTestId("match-action-settings")).toBeInTheDocument();
-      expect(screen.queryByTestId("match-actions")).not.toBeInTheDocument();
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
     });
 
     it("switches to Myndefni tab locally", () => {

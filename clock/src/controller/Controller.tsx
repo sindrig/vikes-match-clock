@@ -1,6 +1,6 @@
 import type React from "react";
 import { useState } from "react";
-import { Nav, Tooltip, Whisper, Button } from "rsuite";
+import { Nav, Tooltip, Whisper, Button, Modal, IconButton } from "rsuite";
 import GearIcon from "@rsuite/icons/Gear";
 import MediaIcon from "@rsuite/icons/Media";
 import TimeIcon from "@rsuite/icons/Time";
@@ -37,6 +37,7 @@ const Controller = () => {
 
   const [tab, setTab] = useState<string>(TABS.home);
   const [selectedScreen, setSelectedScreen] = useState("");
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const { view, currentAsset } = controller;
 
@@ -134,24 +135,30 @@ const Controller = () => {
   };
 
   const showHome = tab === "home";
-  const showSettings = tab === "settings";
   const showMedia = tab === "media";
   const tooltipClear = <Tooltip>Birtir aftur stöðu leiksins á skjá.</Tooltip>;
   return (
     <div className="controller">
-      <Nav appearance="tabs" onSelect={setTab} activeKey={tab}>
-        <Nav.Item eventKey="home" icon={<TimeIcon />}>
-          Heim
-        </Nav.Item>
-        <Nav.Item eventKey="media" icon={<MediaIcon />}>
-          Myndefni
-        </Nav.Item>
-        <Nav.Item eventKey="settings" icon={<GearIcon />}>
+      <div className="nav-bar">
+        <Nav appearance="tabs" onSelect={setTab} activeKey={tab}>
+          <Nav.Item eventKey="home" icon={<TimeIcon />}>
+            Heim
+          </Nav.Item>
+          <Nav.Item eventKey="media" icon={<MediaIcon />}>
+            Myndefni
+          </Nav.Item>
+        </Nav>
+        <IconButton
+          icon={<GearIcon />}
+          appearance="subtle"
+          size="sm"
+          onClick={() => setSettingsOpen(true)}
+          aria-label="Stillingar"
+        >
           Stillingar
-        </Nav.Item>
-      </Nav>
+        </IconButton>
+      </div>
       {showHome && <MatchActions />}
-      {showSettings && <MatchActionSettings />}
       {showMedia && <MediaManager />}
       {currentAsset && (
         <div className="control-item">
@@ -172,41 +179,47 @@ const Controller = () => {
           </Whisper>
         </div>
       )}
-      {showSettings && (
-        <div className="page-actions control-item withborder">
-          <div className="view-selector">
-            {Object.keys(VIEWS).map((VIEW) => (
-              <label htmlFor={`view-selector-${VIEW}`} key={VIEW}>
-                <input
-                  type="radio"
-                  value={VIEW}
-                  checked={VIEW === view}
-                  onChange={(e) => selectView(e.target.value)}
-                  className="view-selector-input"
-                  id={`view-selector-${VIEW}`}
-                  name="view-selector"
-                />
-                {VIEW}
-              </label>
-            ))}
+      <Modal open={settingsOpen} onClose={() => setSettingsOpen(false)}>
+        <Modal.Header>
+          <Modal.Title>Stillingar</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <MatchActionSettings />
+          <div className="page-actions control-item withborder">
+            <div className="view-selector">
+              {Object.keys(VIEWS).map((VIEW) => (
+                <label htmlFor={`view-selector-${VIEW}`} key={VIEW}>
+                  <input
+                    type="radio"
+                    value={VIEW}
+                    checked={VIEW === view}
+                    onChange={(e) => selectView(e.target.value)}
+                    className="view-selector-input"
+                    id={`view-selector-${VIEW}`}
+                    name="view-selector"
+                  />
+                  {VIEW}
+                </label>
+              ))}
+            </div>
+            <Button
+              color="red"
+              appearance="primary"
+              size="sm"
+              onClick={() => {
+                if (confirmRefresh()) {
+                  clearState();
+                  window.location.reload();
+                }
+              }}
+            >
+              Hard refresh
+            </Button>
+            <RefreshHandler />
+            <LoginPage />
           </div>
-          <Button
-            color="red"
-            appearance="primary"
-            size="sm"
-            onClick={() => {
-              if (confirmRefresh()) {
-                clearState();
-                window.location.reload();
-              }
-            }}
-          >
-            Hard refresh
-          </Button>
-          <RefreshHandler />
-          <LoginPage />
-        </div>
-      )}
+        </Modal.Body>
+      </Modal>
       <AssetController />
     </div>
   );

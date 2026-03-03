@@ -14,7 +14,15 @@
 }
 
 .controller .rs-nav {
+  flex: 1;
+  min-width: 0;
+}
+
+.controller .nav-bar {
+  display: flex;
+  align-items: center;
   width: 100%;
+  gap: 8px;
 }
 
 .controller .control-item {
@@ -59,6 +67,14 @@ div.stdbuttons > button:hover {
 .controller div.control-item > select,
 .controller div.control-item > div {
   margin: 2px;
+}
+
+.controller .rs-modal-body > * + * {
+  margin-top: 12px;
+}
+
+.controller .rs-modal-body .page-actions > * + * {
+  margin-top: 8px;
 }
 
 .controller .page-actions {
