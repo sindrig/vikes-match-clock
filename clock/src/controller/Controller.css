@@ -2,50 +2,40 @@
   padding: 10px;
 }
 
-.controller.login-controller .control-item {
-  float: none;
-}
-
-.controller.login-controller .control-item > button,
-.controller.login-controller .control-item > select,
-.controller.login-controller .control-item > div {
-  float: none;
-  clear: none;
-}
-
 .controller button {
-  /*background-color: #c0c0c0;
-  border: 1px solid black;
-  font-size: 15px;*/
 }
 
 .controller {
-  position: absolute;
-  top: 0px;
   font-size: 14px;
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.controller .rs-nav {
   width: 100%;
 }
 
 .controller .control-item {
   margin: 1px;
-  float: left;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
 }
 
 .controller .playerControls {
   width: 550px;
 }
 
-.controller .home-scorer-selector .rs-btn {
-  display: block;
+.controller .playerControls > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
 }
 
-.controller .dummyDiv {
-  position: relative;
-  top: 0px;
-  width: 242px;
-  height: 176px;
-  float: left;
-  z-index: -100;
+.controller .home-scorer-selector .rs-btn {
+  display: block;
 }
 
 .controller div.withborder {
@@ -69,18 +59,15 @@ div.stdbuttons > button:hover {
 .controller div.control-item > select,
 .controller div.control-item > div {
   margin: 2px;
-  float: left;
-  clear: both;
 }
 
 .controller .page-actions {
   position: relative;
-  float: left;
-  clear: both;
+  width: 100%;
 }
 
 .controller .asset-controller {
-  clear: both;
+  width: 100%;
 }
 
 input[type="number"] {

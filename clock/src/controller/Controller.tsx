@@ -16,18 +16,13 @@ import RefreshHandler from "./RefreshHandler";
 import AssetController from "./asset/AssetController";
 import "rsuite/dist/rsuite.min.css";
 import "./Controller.css";
-import {
-  useController,
-  useListeners,
-  useView,
-} from "../contexts/FirebaseStateContext";
+import { useController, useListeners } from "../contexts/FirebaseStateContext";
 import { useAuth, useLocalState } from "../contexts/LocalStateContext";
 
 const confirmRefresh = () => confirm("Are you absolutely sure?");
 
 const Controller = () => {
   const { controller, selectView, renderAsset } = useController();
-  const { view: viewState } = useView();
   const { screens } = useListeners();
   const {
     email,
@@ -44,7 +39,6 @@ const Controller = () => {
   const [selectedScreen, setSelectedScreen] = useState("");
 
   const { view, currentAsset } = controller;
-  const { vp } = viewState;
 
   const isAuthenticated = auth.isLoaded && !auth.isEmpty;
 
@@ -145,7 +139,6 @@ const Controller = () => {
   const tooltipClear = <Tooltip>Birtir aftur stöðu leiksins á skjá.</Tooltip>;
   return (
     <div className="controller">
-      <div className="dummyDiv" style={vp.style}></div>
       <Nav appearance="tabs" onSelect={setTab} activeKey={tab}>
         <Nav.Item eventKey="home" icon={<TimeIcon />}>
           Heim
