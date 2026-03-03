@@ -161,7 +161,9 @@ const Controller = () => {
         <button
           type="button"
           className="screen-selector-logout"
-          onClick={() => firebaseAuth.logout()}
+          onClick={() => {
+            firebaseAuth.logout().catch(console.error);
+          }}
         >
           Útskrá
         </button>
