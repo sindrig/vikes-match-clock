@@ -4,6 +4,7 @@ import {
   ensureEmulatorUser,
   clearEmulatorData,
   loginWithEmulatorUser,
+  closeSettings,
 } from "./fixtures/test-helpers";
 
 test.describe("Asset Overlay System", () => {
@@ -196,23 +197,18 @@ test.describe("Asset Overlay System - Team Views", () => {
     await expect(page.locator("#team-selector-awayTeam")).toHaveValue("Fram", {
       timeout: 10000,
     });
-    await page.keyboard.press("Escape");
+    await closeSettings(page);
 
-    const assetController = page.locator(".asset-controller");
-    await expect(
-      assetController.getByRole("button", { name: "Biðröð" }),
-    ).toBeVisible();
-    await expect(
-      assetController.getByRole("button", { name: "Lið" }),
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Biðröð" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Lið" })).toBeVisible();
 
-    await assetController.getByRole("button", { name: "Lið" }).click();
+    await page.getByRole("button", { name: "Lið" }).click();
 
     await expect(page.locator(".team-asset-controller").first()).toBeVisible({
       timeout: 10000,
     });
 
-    await assetController.getByRole("button", { name: "Biðröð" }).click();
+    await page.getByRole("button", { name: "Biðröð" }).click();
 
     await expect(page.locator(".controls")).toBeVisible();
   });

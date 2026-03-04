@@ -201,20 +201,6 @@ export async function loginWithEmulatorUser(page: Page): Promise<void> {
   await page
     .getByRole("button", { name: "Biðröð" })
     .waitFor({ state: "visible", timeout: 10000 });
-
-  // Navigate to Settings tab to complete the login flow
-  await page.waitForTimeout(1000);
-  await page.getByRole("button", { name: "Stillingar" }).click({
-    force: true,
-  });
-
-  // Wait for Settings content to load (match start time selector is a good indicator)
-  await page
-    .locator(".match-start-time-selector")
-    .waitFor({ state: "visible", timeout: 10000 });
-
-  // Close the settings modal so tests start from a clean state
-  await page.keyboard.press("Escape");
 }
 
 export const test = base.extend<{
@@ -244,6 +230,10 @@ export async function goToSettingsTab(page: Page) {
 
 export async function closeSettings(page: Page) {
   await page.keyboard.press("Escape");
+  await page
+    .locator(".rs-modal-backdrop")
+    .waitFor({ state: "hidden", timeout: 5000 })
+    .catch(() => {});
 }
 
 export async function selectViewMode(

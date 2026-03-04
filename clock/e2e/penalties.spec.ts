@@ -9,6 +9,7 @@ import {
   loginWithEmulatorUser,
   startSimpleClockAndWait,
   stopSimpleClockAndWait,
+  closeSettings,
 } from "./fixtures/test-helpers";
 
 test.describe("Penalty System - 2-Minute Suspensions", () => {
@@ -33,7 +34,7 @@ test.describe("Penalty System - 2-Minute Suspensions", () => {
     const fakeClock = new FakeClock(new Date(2025, 3, 10, 14, 0, 0));
     await page.getByRole("button", { name: "Stillingar" }).click();
     await page.locator(".match-type-selector").selectOption("handball");
-    await page.keyboard.press("Escape");
+    await closeSettings(page);
     await page
       .locator(".view-mode-buttons")
       .getByText("Control", { exact: true })
@@ -73,7 +74,7 @@ test.describe("Penalty System - 2-Minute Suspensions", () => {
     const fakeClock = new FakeClock(new Date(2025, 3, 10, 14, 0, 0));
     await page.getByRole("button", { name: "Stillingar" }).click();
     await page.locator(".match-type-selector").selectOption("handball");
-    await page.keyboard.press("Escape");
+    await closeSettings(page);
     await page
       .locator(".view-mode-buttons")
       .getByText("Control", { exact: true })
@@ -114,7 +115,7 @@ test.describe("Penalty System - 2-Minute Suspensions", () => {
     const fakeClock = new FakeClock(new Date(2025, 3, 10, 14, 0, 0));
     await page.getByRole("button", { name: "Stillingar" }).click();
     await page.locator(".match-type-selector").selectOption("handball");
-    await page.keyboard.press("Escape");
+    await closeSettings(page);
     await page
       .locator(".view-mode-buttons")
       .getByText("Control", { exact: true })
@@ -154,7 +155,7 @@ test.describe("Penalty System - 2-Minute Suspensions", () => {
     const fakeClock = new FakeClock(new Date(2025, 3, 10, 14, 0, 0));
     await page.getByRole("button", { name: "Stillingar" }).click();
     await page.locator(".match-type-selector").selectOption("handball");
-    await page.keyboard.press("Escape");
+    await closeSettings(page);
     await page
       .locator(".view-mode-buttons")
       .getByText("Control", { exact: true })
@@ -182,7 +183,7 @@ test.describe("Penalty System - 2-Minute Suspensions", () => {
     const fakeClock = new FakeClock(new Date(2025, 3, 10, 14, 0, 0));
     await page.getByRole("button", { name: "Stillingar" }).click();
     await page.locator(".match-type-selector").selectOption("handball");
-    await page.keyboard.press("Escape");
+    await closeSettings(page);
     await page
       .locator(".view-mode-buttons")
       .getByText("Control", { exact: true })

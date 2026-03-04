@@ -7,6 +7,7 @@ import {
   clearEmulatorData,
   loginWithEmulatorUser,
   startClock,
+  closeSettings,
 } from "./fixtures/test-helpers";
 
 test.describe("Match Flow - Complete Match Simulation", () => {
@@ -29,8 +30,6 @@ test.describe("Match Flow - Complete Match Simulation", () => {
     page,
   }) => {
     const fakeClock = new FakeClock(new Date(2025, 3, 10, 14, 0, 0));
-    await page.getByRole("button", { name: "Stillingar" }).click();
-    await page.keyboard.press("Escape");
     await page
       .locator(".view-mode-buttons")
       .getByText("Match", { exact: true })
@@ -66,7 +65,7 @@ test.describe("Match Flow - Complete Match Simulation", () => {
 
     await page.getByRole("button", { name: "Stillingar" }).click();
     await expect(page.locator(".halfstops-input")).toHaveCount(3);
-    await page.keyboard.press("Escape");
+    await closeSettings(page);
     await startClock(page);
 
     await fakeClock.advance(page, ONE_MINUTE * 15);
@@ -95,8 +94,6 @@ test.describe("Match Flow - Complete Match Simulation", () => {
 
   test("handles goal corrections with H -1 button", async ({ page }) => {
     const fakeClock = new FakeClock(new Date(2025, 3, 10, 14, 0, 0));
-    await page.getByRole("button", { name: "Stillingar" }).click();
-    await page.keyboard.press("Escape");
     await page
       .locator(".view-mode-buttons")
       .getByText("Match", { exact: true })
@@ -118,7 +115,7 @@ test.describe("Match Flow - Complete Match Simulation", () => {
     const fakeClock = new FakeClock(new Date(2025, 3, 10, 14, 0, 0));
     await page.getByRole("button", { name: "Stillingar" }).click();
     await page.locator(".match-type-selector").selectOption("handball");
-    await page.keyboard.press("Escape");
+    await closeSettings(page);
     await page
       .locator(".view-mode-buttons")
       .getByText("Match", { exact: true })
@@ -158,8 +155,6 @@ test.describe("Match Flow - Complete Match Simulation", () => {
     page,
   }) => {
     const fakeClock = new FakeClock(new Date(2025, 3, 10, 14, 0, 0));
-    await page.getByRole("button", { name: "Stillingar" }).click();
-    await page.keyboard.press("Escape");
     await page
       .locator(".view-mode-buttons")
       .getByText("Match", { exact: true })
@@ -185,7 +180,7 @@ test.describe("Match Flow - Complete Match Simulation", () => {
   test("sets team logos and displays them on scoreboard", async ({ page }) => {
     await page.getByRole("button", { name: "Stillingar" }).click();
     await page.locator("#team-selector-awayTeam").fill("fram");
-    await page.keyboard.press("Escape");
+    await closeSettings(page);
     await page
       .locator(".view-mode-buttons")
       .getByText("Match", { exact: true })
@@ -196,7 +191,8 @@ test.describe("Match Flow - Complete Match Simulation", () => {
 
   test("uses Leiðrétta to switch to advanced controls", async ({ page }) => {
     await page.getByRole("button", { name: "Stillingar" }).click();
-    await page.keyboard.press("Escape");
+    await page.locator(".match-type-selector").selectOption("handball");
+    await closeSettings(page);
     await page
       .locator(".view-mode-buttons")
       .getByText("Control", { exact: true })
@@ -207,10 +203,8 @@ test.describe("Match Flow - Complete Match Simulation", () => {
 
     await page.getByText("Leiðrétta").click();
 
-    await page.getByRole("button", { name: "Stillingar" }).click();
     await expect(
       page.locator(".view-mode-buttons").getByText("Match"),
     ).toHaveClass(/rs-btn-primary/);
-    await page.keyboard.press("Escape");
   });
 });
