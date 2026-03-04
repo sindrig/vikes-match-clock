@@ -126,8 +126,8 @@ export async function loginWithEmulatorUser(page: Page): Promise<void> {
     .getByPlaceholder("E-mail")
     .waitFor({ state: "visible", timeout: 15000 });
   await page.getByPlaceholder("E-mail").fill(TEST_EMAIL);
-  await page.getByPlaceholder("Password").fill(TEST_PASSWORD);
-  await page.getByRole("button", { name: "Login", exact: true }).click();
+  await page.getByPlaceholder("Lykilorð").fill(TEST_PASSWORD);
+  await page.getByRole("button", { name: "Innskrá", exact: true }).click();
 
   await page.waitForFunction(() => (window as any).__firebaseAuthUID, null, {
     timeout: 15000,
