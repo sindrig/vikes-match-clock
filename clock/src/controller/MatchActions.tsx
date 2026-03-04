@@ -110,6 +110,12 @@ const TimeControlDialog = ({
             />
           </div>
         ) : null}
+        {match.matchType === Sports.Handball ? (
+          <div className="time-control-section-penalties">
+            <PenaltiesManipulationBox team="home" />
+            <PenaltiesManipulationBox team="away" />
+          </div>
+        ) : null}
       </Modal.Body>
     </Modal>
   );
@@ -216,8 +222,6 @@ const MatchActions = () => {
 
       {match.matchType === Sports.Handball ? (
         <div className="match-actions-handball">
-          <PenaltiesManipulationBox team="home" />
-          <PenaltiesManipulationBox team="away" />
           <div className="match-actions-timeouts">
             {match.timeout ? (
               <Button size="sm" onClick={removeTimeout}>

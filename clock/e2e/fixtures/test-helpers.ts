@@ -278,6 +278,11 @@ export async function addHomeGoal(page: Page) {
     .getByRole("button")
     .first()
     .click({ force: true });
+  const celebrationDialog = page.locator(".rs-modal");
+  if (await celebrationDialog.isVisible().catch(() => false)) {
+    await page.keyboard.press("Escape");
+    await celebrationDialog.waitFor({ state: "hidden", timeout: 5000 });
+  }
 }
 
 export async function subtractHomeGoal(page: Page) {
@@ -299,7 +304,9 @@ export async function addAwayGoal(page: Page) {
 }
 
 export async function openTimeControl(page: Page) {
-  await page.getByRole("button", { name: "Tímastjórnun" }).click();
+  await page
+    .getByRole("button", { name: "Tímastjórnun" })
+    .click({ force: true });
   await page
     .locator(".time-adjust-btn")
     .first()
@@ -313,7 +320,9 @@ export async function closeTimeControl(page: Page) {
 
 export async function adjustTime(page: Page, amount: string) {
   await openTimeControl(page);
-  await page.locator(".time-adjust-btn", { hasText: amount }).click();
+  await page
+    .locator(".time-adjust-btn", { hasText: amount })
+    .click({ force: true });
   await closeTimeControl(page);
 }
 
