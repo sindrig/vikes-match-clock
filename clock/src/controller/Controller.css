@@ -32,6 +32,10 @@
   align-items: flex-start;
 }
 
+.controller .home-scorer-selector .rs-btn {
+  display: block;
+}
+
 .controller .playerControls {
   width: 550px;
 }
@@ -40,10 +44,6 @@
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
-}
-
-.controller .home-scorer-selector .rs-btn {
-  display: block;
 }
 
 .controller div.withborder {
@@ -89,6 +89,100 @@ div.stdbuttons > button:hover {
 .controller .clear-overlay {
   width: 100%;
   margin-bottom: 4px;
+}
+
+/* Match Actions in sidebar */
+.match-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #c7c7c7;
+  border-radius: 5px;
+}
+
+.match-actions-clock {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.match-actions-clock-primary {
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
+}
+
+.match-actions-clock-primary .rs-btn {
+  flex: 1;
+}
+
+.match-actions-clock-secondary {
+  display: flex;
+  gap: 6px;
+}
+
+.match-actions-clock-secondary .rs-btn {
+  flex: 1;
+}
+
+.match-actions-handball {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.match-actions-timeouts {
+  display: flex;
+  gap: 4px;
+}
+
+.match-actions .home-scorer-selector .rs-btn {
+  display: block;
+}
+
+/* Time control dialog */
+.time-control-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.time-control-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.time-control-label {
+  min-width: 40px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.time-control-section {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+button.time-adjust-btn {
+  border: 1px solid #747474;
+  background-color: lightgray;
+  border-radius: 2px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+button.time-adjust-btn:hover {
+  border: 1px solid #494949;
+  background-color: rgb(187, 187, 187);
+}
+
+button.time-adjust-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 input[type="number"] {

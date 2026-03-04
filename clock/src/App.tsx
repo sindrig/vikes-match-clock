@@ -6,7 +6,7 @@ import {
   useController,
   useMatch,
 } from "./contexts/FirebaseStateContext";
-import { useLocalState } from "./contexts/LocalStateContext";
+import { useLocalState, useRemoteSettings } from "./contexts/LocalStateContext";
 import { firebaseAuth } from "./firebaseAuth";
 import Controller from "./controller/Controller";
 import MatchActions from "./controller/MatchActions";
@@ -20,8 +20,50 @@ import { VIEWS, Sports, getBackground } from "./constants";
 import StateListener from "./StateListener";
 import MatchController from "./match-controller/MatchController";
 import useGlobalShortcuts from "./hooks/useGlobalShortcuts";
+import { shouldShowGoalCelebration } from "./utils/matchUtils";
+import baddi from "./images/baddi.gif";
+import assetTypes from "./controller/asset/AssetTypes";
 
 import "./App.css";
+
+const ScoreButtons = ({ side }: { side: "home" | "away" }) => {
+  const { match, updateMatch, addGoal } = useMatch();
+  const { renderAsset } = useController();
+  const { listenPrefix } = useRemoteSettings();
+  const scoreKeys = { home: "homeScore", away: "awayScore" } as const;
+  const score = match[scoreKeys[side]];
+
+  const handleGoal = () => {
+    addGoal(side);
+    const teamName = side === "home" ? match.homeTeam : match.awayTeam;
+    if (shouldShowGoalCelebration(match.matchType, teamName, listenPrefix)) {
+      renderAsset({ key: baddi, type: assetTypes.IMAGE });
+    }
+  };
+
+  return (
+    <div className="preview-score-buttons">
+      <Button
+        size="sm"
+        appearance="primary"
+        color="green"
+        onClick={handleGoal}
+        block
+      >
+        +
+      </Button>
+      <Button
+        size="sm"
+        appearance="subtle"
+        onClick={() => updateMatch({ [scoreKeys[side]]: score - 1 })}
+        disabled={score <= 0}
+        block
+      >
+        −
+      </Button>
+    </div>
+  );
+};
 
 const ViewModeButtons = () => {
   const { controller, selectView } = useController();
@@ -131,12 +173,12 @@ function App() {
       <div>
         <div className="App" style={style}>
           {renderAppContents()}
+          {asset ? (
+            <div className="overlay-container" style={vp.style}>
+              <AssetComponent asset={asset.asset} time={asset.time} />
+            </div>
+          ) : null}
         </div>
-        {asset ? (
-          <div className="overlay-container" style={vp.style}>
-            <AssetComponent asset={asset.asset} time={asset.time} />
-          </div>
-        ) : null}
         <RefreshHandler />
         <Button
           color="red"
@@ -163,51 +205,64 @@ function App() {
   };
 
   const showController = view === VIEWS.match || view === VIEWS.idle;
-  const previewWidth = 350;
-  const previewHeight = Math.round((previewWidth / 16) * 9);
-  const previewScale = Math.min(1, previewWidth / (vp.style.width || 960));
+  const scoreButtonWidth = 44;
+  const sidebarWidth = 350;
+  const previewWidth = sidebarWidth - scoreButtonWidth * 2;
+  const vpWidth = vp.style.width || 960;
+  const vpHeight = vp.style.height || 540;
+  const previewScale = previewWidth / vpWidth;
+  const previewHeight = Math.ceil(vpHeight * previewScale);
 
   return (
     <div>
       {view === VIEWS.control ? <MatchController /> : null}
       {showController && (
         <div className="controller-layout">
-          <div className="controller-controls">
-            <Controller />
-          </div>
           <div className="controller-sidebar">
             <div className="preview-and-controls">
-              <div
-                className="scoreboard-preview"
-                style={{ width: previewWidth, height: previewHeight }}
-              >
+              <div className="preview-with-scores">
+                <ScoreButtons side="home" />
                 <div
-                  className="App"
-                  style={{
-                    ...style,
-                    transform: `scale(${previewScale})`,
-                    transformOrigin: "top left",
-                  }}
+                  className="scoreboard-preview"
+                  style={{ height: previewHeight }}
                 >
-                  {renderAppContents()}
+                  <div
+                    className="App"
+                    style={{
+                      ...style,
+                      transform: `scale(${previewScale})`,
+                      transformOrigin: "top left",
+                    }}
+                  >
+                    {renderAppContents()}
+                    {asset ? (
+                      <div className="overlay-container" style={vp.style}>
+                        <AssetComponent asset={asset.asset} time={asset.time} />
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
+                <ScoreButtons side="away" />
               </div>
               <ViewModeButtons />
             </div>
             <MatchActions />
+          </div>
+          <div className="controller-controls">
+            <Controller />
           </div>
         </div>
       )}
       {!showController && (
         <div className="App" style={style}>
           {renderAppContents()}
+          {asset ? (
+            <div className="overlay-container" style={vp.style}>
+              <AssetComponent asset={asset.asset} time={asset.time} />
+            </div>
+          ) : null}
         </div>
       )}
-      {asset ? (
-        <div className="overlay-container" style={vp.style}>
-          <AssetComponent asset={asset.asset} time={asset.time} />
-        </div>
-      ) : null}
       <Button
         color="red"
         appearance="primary"

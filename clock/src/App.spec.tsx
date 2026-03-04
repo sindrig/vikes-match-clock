@@ -61,12 +61,13 @@ import {
   useController,
   useMatch,
 } from "./contexts/FirebaseStateContext";
-import { useLocalState } from "./contexts/LocalStateContext";
+import { useLocalState, useRemoteSettings } from "./contexts/LocalStateContext";
 
 const mockedUseFirebaseState = vi.mocked(useFirebaseState);
 const mockedUseLocalState = vi.mocked(useLocalState);
 const mockedUseController = vi.mocked(useController);
 const mockedUseMatch = vi.mocked(useMatch);
+const mockedUseRemoteSettings = vi.mocked(useRemoteSettings);
 
 const defaultViewport = {
   style: { height: 100, width: 200 },
@@ -152,10 +153,16 @@ function setupState3(
   mockedUseController.mockReturnValue({
     controller: { view, currentAsset: null },
     selectView: vi.fn(),
+    renderAsset: vi.fn(),
   } as unknown as ReturnType<typeof useController>);
   mockedUseMatch.mockReturnValue({
-    match: { matchType: "football" },
+    match: { matchType: "football", homeScore: 0, awayScore: 0 },
+    addGoal: vi.fn(),
+    updateMatch: vi.fn(),
   } as unknown as ReturnType<typeof useMatch>);
+  mockedUseRemoteSettings.mockReturnValue({
+    listenPrefix: "vikinni",
+  } as unknown as ReturnType<typeof useRemoteSettings>);
   return { setListenPrefix, setScreenViewport };
 }
 
