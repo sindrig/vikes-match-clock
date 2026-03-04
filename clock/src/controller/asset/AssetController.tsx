@@ -1,12 +1,12 @@
-import AssetQueue from "./AssetQueue";
+import { useState } from "react";
 import { addVideosFromPlaylist } from "./YoutubePlaylist";
+import { QueueBoard } from "./queue";
+import QueuePicker from "./queue/QueuePicker";
 import { ASSET_VIEWS } from "../../constants";
 import TeamAssetController from "./team/TeamAssetController";
 import UrlController from "./UrlController";
 import assetTypes from "./AssetTypes";
-import Button from "rsuite/Button";
-import InputNumber from "rsuite/InputNumber";
-import Checkbox from "rsuite/Checkbox";
+import { Button, InputNumber, Modal, Toggle } from "rsuite";
 import { Asset } from "../../types";
 import { parseYoutubePlaylistId, isYoutubeUrl } from "../../utils/urlUtils";
 
@@ -16,45 +16,43 @@ import { useController } from "../../contexts/FirebaseStateContext";
 
 const AssetController = () => {
   const {
-    controller: {
-      assetView,
-      selectedAssets,
-      autoPlay,
-      cycle,
-      imageSeconds,
-      playing,
-    },
+    controller,
     selectAssetView,
-    toggleCycle,
-    setImageSeconds,
-    toggleAutoPlay,
-    setPlaying,
-    setSelectedAssets,
-    addAssets,
-    showNextAsset,
-    renderAsset,
+    createQueue,
+    deleteQueue,
+    renameQueue,
+    reorderQueues,
+    addItemsToQueue,
+    removeItemFromQueue,
+    reorderItemsInQueue,
+    updateQueueSettings,
+    playQueue,
+    stopPlaying,
+    showItemNow,
   } = useController();
 
-  const addMultipleAssets = (
-    assetList: Promise<Asset | null>[],
-    options: { showNow?: boolean } = { showNow: false },
-  ) => {
-    void Promise.all(assetList).then((resolvedAssets: unknown[]) => {
-      const validAssets = resolvedAssets.filter(
-        (a): a is Asset => a !== null && typeof a === "object",
-      );
-      if (options.showNow && validAssets.length === 1 && validAssets[0]) {
-        renderAsset(validAssets[0]);
-      } else {
-        addAssets(validAssets);
-      }
-    });
-  };
+  const { assetView, queues, activeQueueId, playing } = controller;
+  const [pendingAssets, setPendingAssets] = useState<Asset[]>([]);
+  const [settingsQueueId, setSettingsQueueId] = useState<string | null>(null);
 
-  const onImageSecondsChange = (value: string | number | null) => {
-    if (value !== null) {
-      setImageSeconds(Math.max(parseInt(String(value), 10), 1));
-    }
+  const addMultipleAssets = (
+    promises: (Asset | Promise<Asset | null>)[],
+    { showNow }: { showNow?: boolean } = {},
+  ): void => {
+    void (async () => {
+      const results = await Promise.all(
+        promises.map((p) => Promise.resolve(p)),
+      );
+      const validAssets = results.filter((a): a is Asset => a !== null);
+
+      const [firstAsset] = validAssets;
+
+      if (showNow && firstAsset) {
+        showItemNow(firstAsset);
+      } else if (validAssets.length > 0) {
+        setPendingAssets(validAssets);
+      }
+    })();
   };
 
   const addAssetKey = (asset: Asset) => {
@@ -64,68 +62,131 @@ const AssetController = () => {
         return addVideosFromPlaylist(listId, addAssetKey);
       }
     }
-    return addMultipleAssets([Promise.resolve(asset)]);
+    return addMultipleAssets([asset]);
   };
 
+  const handleAddToQueue = (queueId: string, assets: Asset[]) => {
+    addItemsToQueue(queueId, assets);
+    setPendingAssets([]);
+  };
+
+  const handleCreateAndAdd = (queueName: string, assets: Asset[]) => {
+    const newQueueId = createQueue(queueName);
+    addItemsToQueue(newQueueId, assets);
+    setPendingAssets([]);
+  };
+
+  const handleSettingsClose = () => {
+    setSettingsQueueId(null);
+  };
+
+  const settingsQueue = settingsQueueId ? queues[settingsQueueId] : null;
+
   const renderAssetController = () => {
-    const selectedAssetsList = selectedAssets || [];
     return (
       <div className="withborder">
         <div className="controls control-item">
-          <span>{selectedAssetsList.length} í biðröð</span>
-          {selectedAssetsList.length ? (
-            <Button
-              color="red"
-              size="xs"
-              appearance="primary"
-              onClick={() =>
-                window.confirm("Ertu alveg viss?") && setSelectedAssets([])
-              }
-            >
-              Hreinsa biðröð
-            </Button>
-          ) : null}
-          {playing ? (
-            <Button
-              color="yellow"
-              appearance="primary"
-              onClick={() => setPlaying(false)}
-            >
-              Pause
-            </Button>
-          ) : null}
-          {!playing && selectedAssetsList.length ? (
-            <Button color="green" appearance="primary" onClick={showNextAsset}>
-              Birta
-            </Button>
-          ) : null}
-          <div>
-            <Checkbox onChange={toggleAutoPlay} checked={autoPlay}>
-              Autoplay
-            </Checkbox>
-          </div>
-          {autoPlay && (
-            <div>
-              <InputNumber
-                defaultValue={3}
-                max={600}
-                min={1}
-                onChange={onImageSecondsChange}
-                value={imageSeconds}
-                postfix="sek"
-              />
-            </div>
-          )}
-          <div>
-            <Checkbox onChange={toggleCycle} checked={cycle}>
-              Loop
-            </Checkbox>
-          </div>
           <UrlController addAsset={addAssetKey} />
         </div>
-        <div className="upcoming-assets">
-          <AssetQueue includeRemove />
-        </div>
+        <QueueBoard
+          queues={queues}
+          activeQueueId={activeQueueId}
+          playing={playing}
+          onRenameQueue={renameQueue}
+          onPlayQueue={playQueue}
+          onStopPlaying={stopPlaying}
+          onOpenSettings={setSettingsQueueId}
+          onShowItemNow={showItemNow}
+          onDeleteAsset={(queueId, assetKey) =>
+            removeItemFromQueue(queueId, assetKey)
+          }
+          onReorderQueues={reorderQueues}
+          onReorderItems={(queueId, newItems) =>
+            reorderItemsInQueue(queueId, newItems)
+          }
+        />
+        {pendingAssets.length > 0 && (
+          <QueuePicker
+            queues={queues}
+            assets={pendingAssets}
+            onAddToQueue={handleAddToQueue}
+            onCreateAndAdd={handleCreateAndAdd}
+          />
+        )}
+        <Modal open={Boolean(settingsQueue)} onClose={handleSettingsClose}>
+          {settingsQueue ? (
+            <>
+              <Modal.Header>
+                <Modal.Title>Stillingar biðraðar</Modal.Title>
+              </Modal.Header>
+              <Modal.Body>
+                <div className="queue-settings-row">
+                  <label>Autoplay</label>
+                  <Toggle
+                    checked={settingsQueue.autoPlay}
+                    onChange={(checked) =>
+                      updateQueueSettings(settingsQueue.id, {
+                        autoPlay: checked,
+                      })
+                    }
+                  />
+                </div>
+                {settingsQueue.autoPlay && (
+                  <div className="queue-settings-row">
+                    <label>Tími</label>
+                    <InputNumber
+                      min={1}
+                      max={600}
+                      defaultValue={3}
+                      value={settingsQueue.imageSeconds}
+                      onChange={(value) => {
+                        if (value !== null) {
+                          const seconds =
+                            typeof value === "string"
+                              ? parseInt(value, 10)
+                              : value;
+                          updateQueueSettings(settingsQueue.id, {
+                            imageSeconds: Math.max(1, seconds),
+                          });
+                        }
+                      }}
+                      postfix="sek"
+                      style={{ width: 110 }}
+                    />
+                  </div>
+                )}
+                <div className="queue-settings-row">
+                  <label>Loop</label>
+                  <Toggle
+                    checked={settingsQueue.cycle}
+                    onChange={(checked) =>
+                      updateQueueSettings(settingsQueue.id, {
+                        cycle: checked,
+                      })
+                    }
+                  />
+                </div>
+              </Modal.Body>
+              <Modal.Footer>
+                <Button
+                  color="red"
+                  appearance="primary"
+                  onClick={() => {
+                    if (window.confirm("Ertu alveg viss?")) {
+                      deleteQueue(settingsQueue.id);
+                      handleSettingsClose();
+                    }
+                  }}
+                >
+                  Eyða biðröð
+                </Button>
+                <Button appearance="subtle" onClick={handleSettingsClose}>
+                  Loka
+                </Button>
+              </Modal.Footer>
+            </>
+          ) : null}
+        </Modal>
       </div>
     );
   };
@@ -139,7 +200,6 @@ const AssetController = () => {
       {assetView === ASSET_VIEWS.assets && renderAssetController()}
       {assetView === ASSET_VIEWS.teams && (
         <TeamAssetController
-          addAssets={addMultipleAssets}
           previousView={() =>
             setTimeout(() => selectAssetView(ASSET_VIEWS.assets), 500)
           }
