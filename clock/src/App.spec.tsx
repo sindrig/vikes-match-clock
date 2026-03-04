@@ -151,7 +151,7 @@ function setupState3(
     ready: true,
   } as unknown as ReturnType<typeof useFirebaseState>);
   mockedUseController.mockReturnValue({
-    controller: { view, currentAsset: null },
+    controller: { view, currentAsset: null, roster: { home: [], away: [] } },
     selectView: vi.fn(),
     renderAsset: vi.fn(),
   } as unknown as ReturnType<typeof useController>);

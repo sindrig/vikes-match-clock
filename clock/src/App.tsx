@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Button, ButtonGroup } from "rsuite";
 import { RingLoader } from "react-spinners";
 import {
@@ -12,6 +12,7 @@ import Controller from "./controller/Controller";
 import MatchActions from "./controller/MatchActions";
 import RefreshHandler from "./controller/RefreshHandler";
 import AssetComponent from "./controller/asset/Asset";
+import GoalScorerDialog from "./controller/GoalScorerDialog";
 
 import ScoreBoard from "./screens/ScoreBoard";
 import Idle from "./screens/Idle";
@@ -28,16 +29,25 @@ import "./App.css";
 
 const ScoreButtons = ({ side }: { side: "home" | "away" }) => {
   const { match, updateMatch, addGoal } = useMatch();
-  const { renderAsset } = useController();
+  const {
+    renderAsset,
+    controller: { roster },
+  } = useController();
   const { listenPrefix } = useRemoteSettings();
   const scoreKeys = { home: "homeScore", away: "awayScore" } as const;
   const score = match[scoreKeys[side]];
+  const [scorerDialogOpen, setScorerDialogOpen] = useState(false);
+
+  const teamName = side === "home" ? match.homeTeam : match.awayTeam;
+  const players = roster[side] || [];
 
   const handleGoal = () => {
     addGoal(side);
-    const teamName = side === "home" ? match.homeTeam : match.awayTeam;
     if (shouldShowGoalCelebration(match.matchType, teamName, listenPrefix)) {
       renderAsset({ key: baddi, type: assetTypes.IMAGE });
+      if (players.length > 0) {
+        setScorerDialogOpen(true);
+      }
     }
   };
 
@@ -61,6 +71,12 @@ const ScoreButtons = ({ side }: { side: "home" | "away" }) => {
       >
         −
       </Button>
+      <GoalScorerDialog
+        open={scorerDialogOpen}
+        players={players}
+        teamName={teamName}
+        onClose={() => setScorerDialogOpen(false)}
+      />
     </div>
   );
 };
