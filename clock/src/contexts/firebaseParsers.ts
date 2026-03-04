@@ -245,13 +245,11 @@ export function parseView(
     blackoutStart:
       typeof raw.blackoutStart === "string" ? raw.blackoutStart : undefined,
     blackoutEnd:
-       typeof raw.blackoutEnd === "string" ? raw.blackoutEnd : undefined,
+      typeof raw.blackoutEnd === "string" ? raw.blackoutEnd : undefined,
   };
 }
 
-export function parseQueueMap(
-  data: unknown,
-): Record<string, QueueState> {
+export function parseQueueMap(data: unknown): Record<string, QueueState> {
   if (!data || typeof data !== "object") return {};
 
   const raw = data as Record<string, unknown>;
@@ -266,8 +264,7 @@ export function parseQueueMap(
       id: typeof entry.id === "string" ? entry.id : key,
       name: typeof entry.name === "string" ? entry.name : key,
       items: parseAssetArray(entry.items),
-      autoPlay:
-        typeof entry.autoPlay === "boolean" ? entry.autoPlay : false,
+      autoPlay: typeof entry.autoPlay === "boolean" ? entry.autoPlay : false,
       imageSeconds:
         typeof entry.imageSeconds === "number" ? entry.imageSeconds : 3,
       cycle: typeof entry.cycle === "boolean" ? entry.cycle : false,

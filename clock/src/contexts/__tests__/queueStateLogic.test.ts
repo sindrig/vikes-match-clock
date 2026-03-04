@@ -59,9 +59,8 @@ let getStateShowingNextAsset:
 
 try {
   const mod = await import("../FirebaseStateContext");
-  getStateShowingNextAsset = (
-    mod as unknown as Record<string, unknown>
-  ).getStateShowingNextAsset as typeof getStateShowingNextAsset;
+  getStateShowingNextAsset = (mod as unknown as Record<string, unknown>)
+    .getStateShowingNextAsset as typeof getStateShowingNextAsset;
 } catch {
   getStateShowingNextAsset = undefined;
 }

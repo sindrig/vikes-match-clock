@@ -719,8 +719,6 @@ describe("firebaseParsers", () => {
       expect(result).toEqual(defaultController);
     });
 
-
-
     it("uses default selectedAssets when not array", () => {
       const data = {
         selectedAssets: "not an array",
@@ -729,8 +727,6 @@ describe("firebaseParsers", () => {
       const result = parseController(data, defaultController);
       expect(result!.selectedAssets).toEqual([]);
     });
-
-
 
     it("uses default imageSeconds for non-numeric", () => {
       const data = {

@@ -247,8 +247,6 @@ describe("FirebaseStateContext", () => {
       expect(matchApi!.match.started).toBe(0);
       expect(matchApi!.match.homeTeam).toBe("Víkingur R");
     });
-
-
   });
 
   describe("match actions", () => {
@@ -569,12 +567,6 @@ describe("FirebaseStateContext", () => {
       );
     });
 
-
-
-
-
-
-
     it("setPlaying updates playing state", () => {
       let controllerApi: ReturnType<typeof useController> | null = null;
       render(
@@ -647,8 +639,6 @@ describe("FirebaseStateContext", () => {
       });
       expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
     });
-
-
 
     it("selectTab updates tab", () => {
       let controllerApi: ReturnType<typeof useController> | null = null;
@@ -1303,12 +1293,6 @@ describe("FirebaseStateContext", () => {
     });
   });
 
-
-
-
-
-
-
   describe("removeAssetAfterTimeout", () => {
     it("clears currentAsset when autoPlay is off", () => {
       let controllerApi: ReturnType<typeof useController> | null = null;
@@ -1768,10 +1752,6 @@ describe("FirebaseStateContext", () => {
         }),
       );
     });
-
-
-
-
   });
 
   describe("server time offset", () => {

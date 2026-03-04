@@ -191,9 +191,7 @@ export const getStateShowingNextAsset = (
     return newState;
   }
 
-  const updatedItems = activeQueue.cycle
-    ? [...items, nextAsset]
-    : [...items];
+  const updatedItems = activeQueue.cycle ? [...items, nextAsset] : [...items];
   const updatedQueue: QueueState = {
     ...activeQueue,
     items: updatedItems,
@@ -839,7 +837,9 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         const updatedItems = [...queue.items];
         assets.forEach((asset) => {
           if (Object.keys(assetTypes).indexOf(asset.type) !== -1 && asset.key) {
-            if (updatedItems.map((item) => item.key).indexOf(asset.key) === -1) {
+            if (
+              updatedItems.map((item) => item.key).indexOf(asset.key) === -1
+            ) {
               updatedItems.push(asset);
             }
           }
