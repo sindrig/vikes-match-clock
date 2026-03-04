@@ -92,12 +92,21 @@ export interface Background {
   backgroundColor?: string;
 }
 
+// Queue state type
+export interface QueueState {
+  id: string;
+  name: string;
+  items: Asset[];
+  autoPlay: boolean;
+  imageSeconds: number;
+  cycle: boolean;
+  order: number;
+}
+
 // Controller state type
 export interface ControllerState {
-  selectedAssets: Asset[];
-  cycle: boolean;
-  imageSeconds: number;
-  autoPlay: boolean;
+  queues: Record<string, QueueState>;
+  activeQueueId: string | null;
   playing: boolean;
   assetView: string;
   view: string;

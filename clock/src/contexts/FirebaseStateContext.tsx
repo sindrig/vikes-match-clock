@@ -56,10 +56,8 @@ const defaultMatch: Match = {
 };
 
 const defaultController: ControllerState = {
-  selectedAssets: [],
-  cycle: false,
-  imageSeconds: 3,
-  autoPlay: false,
+  queues: {},
+  activeQueueId: null,
   playing: false,
   assetView: "assets",
   view: "idle",

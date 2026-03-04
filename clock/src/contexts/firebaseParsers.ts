@@ -5,6 +5,7 @@ import type {
   TwoMinPenalty,
   Asset,
   ViewPort,
+  QueueState,
 } from "../types";
 import { Sports } from "../constants";
 
@@ -184,16 +185,13 @@ export function parseController(
 
   return {
     ...defaultController,
-    selectedAssets: parseAssetArray(raw.selectedAssets),
-    cycle: typeof raw.cycle === "boolean" ? raw.cycle : defaultController.cycle,
-    imageSeconds:
-      typeof raw.imageSeconds === "number"
-        ? raw.imageSeconds
-        : defaultController.imageSeconds,
-    autoPlay:
-      typeof raw.autoPlay === "boolean"
-        ? raw.autoPlay
-        : defaultController.autoPlay,
+    queues: parseQueueMap(raw.queues),
+    activeQueueId:
+      typeof raw.activeQueueId === "string"
+        ? raw.activeQueueId
+        : raw.activeQueueId === null
+          ? null
+          : defaultController.activeQueueId,
     playing:
       typeof raw.playing === "boolean"
         ? raw.playing
@@ -247,6 +245,35 @@ export function parseView(
     blackoutStart:
       typeof raw.blackoutStart === "string" ? raw.blackoutStart : undefined,
     blackoutEnd:
-      typeof raw.blackoutEnd === "string" ? raw.blackoutEnd : undefined,
+       typeof raw.blackoutEnd === "string" ? raw.blackoutEnd : undefined,
   };
+}
+
+export function parseQueueMap(
+  data: unknown,
+): Record<string, QueueState> {
+  if (!data || typeof data !== "object") return {};
+
+  const raw = data as Record<string, unknown>;
+  const result: Record<string, QueueState> = {};
+
+  for (const [key, value] of Object.entries(raw)) {
+    if (!value || typeof value !== "object") continue;
+
+    const entry = value as Record<string, unknown>;
+
+    result[key] = {
+      id: typeof entry.id === "string" ? entry.id : key,
+      name: typeof entry.name === "string" ? entry.name : key,
+      items: parseAssetArray(entry.items),
+      autoPlay:
+        typeof entry.autoPlay === "boolean" ? entry.autoPlay : false,
+      imageSeconds:
+        typeof entry.imageSeconds === "number" ? entry.imageSeconds : 3,
+      cycle: typeof entry.cycle === "boolean" ? entry.cycle : false,
+      order: typeof entry.order === "number" ? entry.order : 0,
+    };
+  }
+
+  return result;
 }
