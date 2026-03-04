@@ -54,11 +54,10 @@ jobs:
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: "3.12"
 
       - name: Install Python dependencies
         run: pip install -r clock-api/v3/requirements.txt -r clock-api/v3/requirements-dev.txt
-
 
       - name: Check API spec freshness
         run: make generate-api-spec && git diff --exit-code clock-api/v3/openapi.json
@@ -128,21 +127,6 @@ jobs:
           echo "Waiting for Vite dev server on port 3000..."
           timeout 120 bash -c 'until curl -sf http://localhost:3000 > /dev/null 2>&1; do sleep 1; done'
           echo "Vite dev server is ready"
-
-      - name: Verify Vite is using emulator config
-        run: |
-          echo "Checking if Vite app is using emulator..."
-          curl -s http://localhost:3000 | head -100
-          echo ""
-          echo "Checking if VITE_USE_EMULATOR is in bundle..."
-          curl -s http://localhost:3000/src/firebase.ts 2>/dev/null | head -20 || echo "Direct source not accessible (expected in bundled mode)"
-
-      - name: Test browser connectivity
-        working-directory: ./clock
-        run: |
-          npx playwright test --list 2>&1 || echo "Listed tests"
-          echo "Running single test to verify connectivity..."
-          timeout 60 npx playwright test basic-navigation.spec.ts -g "starts a countdown" --reporter=line 2>&1 || echo "Test timed out or failed"
 
       - name: Run e2e tests
         working-directory: ./clock
