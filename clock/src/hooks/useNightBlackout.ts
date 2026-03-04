@@ -23,30 +23,21 @@ export default function useNightBlackout(
       setIsBlackedOut(inWindow && isIdle);
     };
 
-    // Check immediately when dependencies change (auto-resume on view switch)
-    updateBlackoutState();
-
-    const timer = setInterval(updateBlackoutState, 60000);
-
-    return () => clearInterval(timer);
-  }, [blackoutStart, blackoutEnd, view]);
-
-  useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
-        const inWindow = isInBlackoutWindow(
-          new Date(),
-          blackoutStart,
-          blackoutEnd,
-        );
-        const isIdle = view === "idle";
-        setIsBlackedOut(inWindow && isIdle);
+        updateBlackoutState();
       }
     };
 
+    updateBlackoutState();
+
+    const timer = setInterval(updateBlackoutState, 60000);
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () =>
+
+    return () => {
+      clearInterval(timer);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [blackoutStart, blackoutEnd, view]);
 
   return isBlackedOut;
