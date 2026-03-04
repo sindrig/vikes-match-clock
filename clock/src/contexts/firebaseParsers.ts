@@ -244,5 +244,9 @@ export function parseView(
         ? raw.background
         : defaultView.background,
     idleImage: typeof raw.idleImage === "string" ? raw.idleImage : undefined,
+    blackoutStart:
+      typeof raw.blackoutStart === "string" ? raw.blackoutStart : undefined,
+    blackoutEnd:
+      typeof raw.blackoutEnd === "string" ? raw.blackoutEnd : undefined,
   };
 }

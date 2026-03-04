@@ -134,6 +134,8 @@ interface FirebaseStateContextType {
   setViewPort: (vp: ViewPort) => void;
   setBackground: (background: string) => void;
   setIdleImage: (idleImage: string) => void;
+  setBlackoutStart: (blackoutStart: string | undefined) => void;
+  setBlackoutEnd: (blackoutEnd: string | undefined) => void;
 }
 
 const FirebaseStateContext = createContext<FirebaseStateContextType | null>(
@@ -905,6 +907,20 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     [applyViewUpdate],
   );
 
+  const setBlackoutStart = useCallback(
+    (blackoutStart: string | undefined) => {
+      applyViewUpdate((prev) => ({ ...prev, blackoutStart }));
+    },
+    [applyViewUpdate],
+  );
+
+  const setBlackoutEnd = useCallback(
+    (blackoutEnd: string | undefined) => {
+      applyViewUpdate((prev) => ({ ...prev, blackoutEnd }));
+    },
+    [applyViewUpdate],
+  );
+
   // Apply screen viewport override from "Birta skjá" selection.
   // The screenViewport from locations.X.screens[Y] takes precedence over
   // the Firebase view.vp, which may not match the physical screen config.
@@ -959,6 +975,8 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       setViewPort,
       setBackground,
       setIdleImage,
+      setBlackoutStart,
+      setBlackoutEnd,
     }),
     [
       match,
@@ -1005,6 +1023,8 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       setViewPort,
       setBackground,
       setIdleImage,
+      setBlackoutStart,
+      setBlackoutEnd,
     ],
   );
 
@@ -1114,9 +1134,24 @@ export const useController = () => {
 };
 
 export const useView = () => {
-  const { view, updateView, setViewPort, setBackground, setIdleImage } =
-    useFirebaseState();
-  return { view, updateView, setViewPort, setBackground, setIdleImage };
+  const {
+    view,
+    updateView,
+    setViewPort,
+    setBackground,
+    setIdleImage,
+    setBlackoutStart,
+    setBlackoutEnd,
+  } = useFirebaseState();
+  return {
+    view,
+    updateView,
+    setViewPort,
+    setBackground,
+    setIdleImage,
+    setBlackoutStart,
+    setBlackoutEnd,
+  };
 };
 
 export const useListeners = () => {

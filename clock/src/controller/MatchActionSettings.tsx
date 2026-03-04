@@ -11,7 +11,13 @@ import {
 const MatchActionSettings = () => {
   const { match, updateMatch } = useMatch();
   const { controller } = useController();
-  const { view: viewState, setBackground, setIdleImage } = useView();
+  const {
+    view: viewState,
+    setBackground,
+    setIdleImage,
+    setBlackoutStart,
+    setBlackoutEnd,
+  } = useView();
 
   const { view } = controller;
   const { background, idleImage } = viewState;
@@ -84,6 +90,38 @@ const MatchActionSettings = () => {
                 </option>
               ))}
             </select>
+          </div>
+          <div
+            style={{
+              marginTop: "1rem",
+              paddingTop: "1rem",
+              borderTop: "1px solid #ccc",
+            }}
+          >
+            <label style={{ display: "block", marginBottom: "0.5rem" }}>
+              Næturstilling:
+            </label>
+            <div
+              style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}
+            >
+              <input
+                type="time"
+                className="blackout-time-selector"
+                value={viewState.blackoutStart ?? ""}
+                onChange={({ target: { value } }) =>
+                  setBlackoutStart(value || undefined)
+                }
+              />
+              <span>–</span>
+              <input
+                type="time"
+                className="blackout-time-selector"
+                value={viewState.blackoutEnd ?? ""}
+                onChange={({ target: { value } }) =>
+                  setBlackoutEnd(value || undefined)
+                }
+              />
+            </div>
           </div>
         </div>
       </div>

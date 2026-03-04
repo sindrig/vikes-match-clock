@@ -22,6 +22,7 @@ import { VIEWS, Sports, getBackground } from "./constants";
 import StateListener from "./StateListener";
 import MatchController from "./match-controller/MatchController";
 import useGlobalShortcuts from "./hooks/useGlobalShortcuts";
+import useNightBlackout from "./hooks/useNightBlackout";
 import { shouldShowGoalCelebration } from "./utils/matchUtils";
 import baddi from "./images/baddi.gif";
 import assetTypes from "./controller/asset/AssetTypes";
@@ -148,8 +149,10 @@ function App() {
     useLocalState();
 
   const { view } = controller;
-  const { vp, background } = viewState;
+  const { vp, background, blackoutStart, blackoutEnd } = viewState;
   const asset = controller.currentAsset || null;
+
+  const isBlackedOut = useNightBlackout(blackoutStart, blackoutEnd, view);
 
   const isAuthenticated = auth.isLoaded && !auth.isEmpty;
 
@@ -197,6 +200,7 @@ function App() {
         return <ScoreBoard />;
       case VIEWS.idle:
       default:
+        if (isBlackedOut) return null;
         if (background !== "Blackout") {
           return <Idle />;
         }

@@ -112,6 +112,8 @@ export interface ViewState {
   vp: ViewPort;
   background: string;
   idleImage?: string;
+  blackoutStart?: string;
+  blackoutEnd?: string;
 }
 
 // Remote state type
