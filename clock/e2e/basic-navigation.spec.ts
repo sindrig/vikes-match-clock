@@ -12,6 +12,8 @@ import {
   stopSimpleClockAndWait,
   startCountdownAndWait,
   closeSettings,
+  adjustTime,
+  setInjuryTime,
 } from "./fixtures/test-helpers";
 
 test.describe("Basic navigation", () => {
@@ -68,10 +70,10 @@ test.describe("Basic navigation", () => {
     await closeSettings(page);
     await startClock(page);
     await fakeClock.advance(page, ONE_MINUTE);
-    await page.getByText("+5m").click();
+    await adjustTime(page, "+5m");
     await fakeClock.advance(page, ONE_MINUTE);
     await expect(page.locator(".matchclock")).toHaveText("52:00");
-    await page.locator(".longerInput").fill("5");
+    await setInjuryTime(page, "5");
     await expect(page.locator(".injury-time")).toHaveText("+5");
   });
 
