@@ -9,7 +9,7 @@ interface ClockProps {
 
 const Clock: React.FC<ClockProps> = ({ className }) => {
   const { match, pauseMatch, buzz, getServerTime } = useMatch();
-  const { started, halfStops, timeElapsed, showInjuryTime, countdown } = match;
+  const { started, halfStops, timeElapsed, halfOffset, showInjuryTime, countdown } = match;
 
   const halfStop = halfStops[0];
 
@@ -17,7 +17,7 @@ const Clock: React.FC<ClockProps> = ({ className }) => {
   const hasFiredCountdownEnd = useRef(false);
 
   const updateTime = useCallback((): string => {
-    let milliSecondsElapsed = timeElapsed;
+    let milliSecondsElapsed = halfOffset + timeElapsed;
     if (started) {
       milliSecondsElapsed += getServerTime() - started;
     }
@@ -57,6 +57,7 @@ const Clock: React.FC<ClockProps> = ({ className }) => {
     started,
     halfStop,
     timeElapsed,
+    halfOffset,
     pauseMatch,
     buzz,
     showInjuryTime,
@@ -77,7 +78,7 @@ const Clock: React.FC<ClockProps> = ({ className }) => {
   return (
     <ClockBase
       updateTime={updateTime}
-      isTimeNull={!started && !timeElapsed}
+      isTimeNull={!started && !timeElapsed && !halfOffset}
       className={className}
     />
   );
