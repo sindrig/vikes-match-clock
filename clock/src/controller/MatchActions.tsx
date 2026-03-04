@@ -5,7 +5,6 @@ import PlayIcon from "@rsuite/icons/PlayOutline";
 import PauseIcon from "@rsuite/icons/PauseRound";
 import HistoryIcon from "@rsuite/icons/History";
 import PenaltiesManipulationBox from "./PenaltiesManipulationBox";
-import { VIEWS } from "../constants";
 import { Sports, DEFAULT_HALFSTOPS } from "../constants";
 import assetTypes from "./asset/AssetTypes";
 import baddi from "../images/baddi.gif";
@@ -76,8 +75,7 @@ const MatchActions = () => {
   const { controller, renderAsset } = useController();
   const { listenPrefix } = useRemoteSettings();
 
-  const { view, roster } = controller;
-
+  const { roster } = controller;
   const homeTeam = roster.home;
   const awayTeam = roster.away;
 
@@ -154,122 +152,120 @@ const MatchActions = () => {
   }
   return (
     <div className={WRAPPER_CLASSNAME}>
-      {view === VIEWS.match && (
-        <div>
-          <div className="control-item stdbuttons">
-            <button type="button" onClick={() => goal("home")}>
-              H +1
-            </button>
-            <button
-              type="button"
-              onClick={() => updateMatch({ homeScore: match.homeScore - 1 })}
-              disabled={match.homeScore <= 0}
+      <div>
+        <div className="control-item stdbuttons">
+          <button type="button" onClick={() => goal("home")}>
+            H +1
+          </button>
+          <button
+            type="button"
+            onClick={() => updateMatch({ homeScore: match.homeScore - 1 })}
+            disabled={match.homeScore <= 0}
+          >
+            H -1
+          </button>
+        </div>
+        <div className="control-item stdbuttons">
+          <button type="button" onClick={() => goal("away")}>
+            Ú +1
+          </button>
+          <button
+            type="button"
+            onClick={() => updateMatch({ awayScore: match.awayScore - 1 })}
+            disabled={match.awayScore <= 0}
+          >
+            Ú -1
+          </button>
+        </div>
+        <div className="control-item">
+          {match.started ? (
+            <Button
+              color="yellow"
+              appearance="primary"
+              onClick={() => pauseMatch()}
+              disabled={!!match.timeout}
             >
-              H -1
-            </button>
-          </div>
-          <div className="control-item stdbuttons">
-            <button type="button" onClick={() => goal("away")}>
-              Ú +1
-            </button>
-            <button
-              type="button"
-              onClick={() => updateMatch({ awayScore: match.awayScore - 1 })}
-              disabled={match.awayScore <= 0}
-            >
-              Ú -1
-            </button>
-          </div>
-          <div className="control-item">
-            {match.started ? (
+              <PauseIcon /> Pása
+            </Button>
+          ) : (
+            <React.Fragment>
               <Button
-                color="yellow"
+                color="green"
                 appearance="primary"
-                onClick={() => pauseMatch()}
+                onClick={startMatch}
                 disabled={!!match.timeout}
               >
-                <PauseIcon /> Pása
+                <PlayIcon /> Byrja
               </Button>
-            ) : (
-              <React.Fragment>
+              {match.showInjuryTime ? (
                 <Button
-                  color="green"
+                  color="blue"
                   appearance="primary"
-                  onClick={startMatch}
+                  onClick={() => pauseMatch(true)}
                   disabled={!!match.timeout}
                 >
-                  <PlayIcon /> Byrja
+                  <PlayIcon /> Næsti hálfleikur
                 </Button>
-                {match.showInjuryTime ? (
-                  <Button
-                    color="blue"
-                    appearance="primary"
-                    onClick={() => pauseMatch(true)}
-                    disabled={!!match.timeout}
-                  >
-                    <PlayIcon /> Næsti hálfleikur
-                  </Button>
-                ) : null}
-              </React.Fragment>
-            )}
-            <IconButton
-              size="xs"
-              icon={<HistoryIcon />}
-              onClick={() =>
-                window.confirm("Ertu alveg viss?") &&
-                updateMatch({
-                  started: 0,
-                  timeElapsed: 0,
-                  home2min: [],
-                  away2min: [],
-                  timeout: 0,
-                  homeTimeouts: 0,
-                  awayTimeouts: 0,
-                  buzzer: false,
-                  halfStops: DEFAULT_HALFSTOPS[match.matchType],
-                })
-              }
-              disabled={isMatchResetDisabled(match)}
-              color="red"
-              appearance="primary"
-            >
-              Reset
-            </IconButton>
-          </div>
-          {clockManipulationBox(1, match, updateMatch)}
-          {clockManipulationBox(5, match, updateMatch)}
-          {clockManipulationBox(60, match, updateMatch)}
-          {clockManipulationBox(60 * 5, match, updateMatch)}
-          <RedCardManipulation />
-          <div className="control-item stdbuttons">
-            {match.matchType === Sports.Football ? (
-              <div style={{ whiteSpace: "nowrap", width: "400px" }}>
-                {" "}
-                <input
-                  type="number"
-                  className="longerInput"
-                  placeholder="Uppbótartími"
-                  value={match.injuryTime || ""}
-                  onChange={({ target: { value } }) =>
-                    updateMatch({ injuryTime: parseInt(value, 10) })
-                  }
-                />
-              </div>
-            ) : null}
-
-            {match.matchType === Sports.Football &&
-            !match.started &&
-            match.matchStartTime &&
-            !match.timeElapsed ? (
-              <div style={{ whiteSpace: "nowrap", width: "400px" }}>
-                <Button color="green" appearance="primary" onClick={countdown}>
-                  Hefja niðurtalningu
-                </Button>
-              </div>
-            ) : null}
-          </div>
+              ) : null}
+            </React.Fragment>
+          )}
+          <IconButton
+            size="xs"
+            icon={<HistoryIcon />}
+            onClick={() =>
+              window.confirm("Ertu alveg viss?") &&
+              updateMatch({
+                started: 0,
+                timeElapsed: 0,
+                home2min: [],
+                away2min: [],
+                timeout: 0,
+                homeTimeouts: 0,
+                awayTimeouts: 0,
+                buzzer: false,
+                halfStops: DEFAULT_HALFSTOPS[match.matchType],
+              })
+            }
+            disabled={isMatchResetDisabled(match)}
+            color="red"
+            appearance="primary"
+          >
+            Reset
+          </IconButton>
         </div>
-      )}
+        {clockManipulationBox(1, match, updateMatch)}
+        {clockManipulationBox(5, match, updateMatch)}
+        {clockManipulationBox(60, match, updateMatch)}
+        {clockManipulationBox(60 * 5, match, updateMatch)}
+        <RedCardManipulation />
+        <div className="control-item stdbuttons">
+          {match.matchType === Sports.Football ? (
+            <div style={{ whiteSpace: "nowrap", width: "400px" }}>
+              {" "}
+              <input
+                type="number"
+                className="longerInput"
+                placeholder="Uppbótartími"
+                value={match.injuryTime || ""}
+                onChange={({ target: { value } }) =>
+                  updateMatch({ injuryTime: parseInt(value, 10) })
+                }
+              />
+            </div>
+          ) : null}
+
+          {match.matchType === Sports.Football &&
+          !match.started &&
+          match.matchStartTime &&
+          !match.timeElapsed ? (
+            <div style={{ whiteSpace: "nowrap", width: "400px" }}>
+              <Button color="green" appearance="primary" onClick={countdown}>
+                Hefja niðurtalningu
+              </Button>
+            </div>
+          ) : null}
+        </div>
+      </div>
       <div>
         <div className="control-item">
           {match.matchType === Sports.Handball ? (

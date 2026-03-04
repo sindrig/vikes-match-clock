@@ -7,23 +7,14 @@
 }
 
 .asset-controller {
-  height: calc(100vh - 110px);
   width: 100%;
-  overflow: scroll;
+  overflow: auto;
   margin: 0px 5px 5px 5px;
 }
 
 .asset-controller .view-selector {
   display: flex;
   gap: 4px;
-}
-
-.asset-controller .assettabs {
-  width: 90%;
-  margin: 10px;
-}
-
-.asset-controller .view-selector button {
 }
 
 .asset-controller .controls .rs-btn-default {

@@ -21,6 +21,9 @@ vi.mock("./contexts/LocalStateContext", () => ({
 vi.mock("./controller/Controller", () => ({
   default: () => <div data-testid="controller">Controller</div>,
 }));
+vi.mock("./controller/MatchActions", () => ({
+  default: () => <div data-testid="match-actions">MatchActions</div>,
+}));
 vi.mock("./controller/RefreshHandler", () => ({
   default: () => <div data-testid="refresh-handler">RefreshHandler</div>,
 }));
@@ -53,11 +56,17 @@ vi.mock("./firebaseAuth", () => ({
   },
 }));
 
-import { useFirebaseState } from "./contexts/FirebaseStateContext";
+import {
+  useFirebaseState,
+  useController,
+  useMatch,
+} from "./contexts/FirebaseStateContext";
 import { useLocalState } from "./contexts/LocalStateContext";
 
 const mockedUseFirebaseState = vi.mocked(useFirebaseState);
 const mockedUseLocalState = vi.mocked(useLocalState);
+const mockedUseController = vi.mocked(useController);
+const mockedUseMatch = vi.mocked(useMatch);
 
 const defaultViewport = {
   style: { height: 100, width: 200 },
@@ -140,6 +149,13 @@ function setupState3(
     view: { vp: defaultViewport, background: "Default" },
     ready: true,
   } as unknown as ReturnType<typeof useFirebaseState>);
+  mockedUseController.mockReturnValue({
+    controller: { view, currentAsset: null },
+    selectView: vi.fn(),
+  } as unknown as ReturnType<typeof useController>);
+  mockedUseMatch.mockReturnValue({
+    match: { matchType: "football" },
+  } as unknown as ReturnType<typeof useMatch>);
   return { setListenPrefix, setScreenViewport };
 }
 

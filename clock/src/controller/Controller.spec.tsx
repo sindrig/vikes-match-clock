@@ -140,6 +140,7 @@ function setupState3() {
     controller: { view: VIEWS.idle, currentAsset: null },
     selectView: vi.fn(),
     renderAsset: vi.fn(),
+    selectAssetView: vi.fn(),
   } as unknown as ReturnType<typeof useController>);
   mockedUseView.mockReturnValue({
     view: { vp: defaultViewport, background: "Default" },
@@ -177,7 +178,7 @@ describe("Controller", () => {
       setupState1();
       render(<Controller />);
 
-      expect(screen.queryByText("Heim")).not.toBeInTheDocument();
+      expect(screen.queryByText("Biðröð")).not.toBeInTheDocument();
       expect(screen.queryByText("Myndefni")).not.toBeInTheDocument();
       expect(screen.queryByText("Stillingar")).not.toBeInTheDocument();
     });
@@ -236,31 +237,29 @@ describe("Controller", () => {
       setupState2();
       render(<Controller />);
 
-      expect(screen.queryByText("Heim")).not.toBeInTheDocument();
+      expect(screen.queryByText("Biðröð")).not.toBeInTheDocument();
       expect(screen.queryByText("Stillingar")).not.toBeInTheDocument();
     });
   });
 
   describe("State 3: authenticated", () => {
-    it("renders tabs (Heim, Myndefni) and settings gear button", () => {
+    it("renders tabs (Biðröð, Lið, Myndefni) and settings gear button", () => {
       setupState3();
       render(<Controller />);
 
-      expect(screen.getByText("Heim")).toBeInTheDocument();
+      expect(screen.getByText("Biðröð")).toBeInTheDocument();
+      expect(screen.getByText("Lið")).toBeInTheDocument();
       expect(screen.getByText("Myndefni")).toBeInTheDocument();
       expect(
         screen.getByRole("button", { name: "Stillingar" }),
       ).toBeInTheDocument();
     });
 
-    it("shows MatchActions on home tab by default", () => {
+    it("shows AssetController on queue tab by default", () => {
       setupState3();
       render(<Controller />);
 
-      expect(screen.getByTestId("match-actions")).toBeInTheDocument();
-      expect(
-        screen.queryByTestId("match-action-settings"),
-      ).not.toBeInTheDocument();
+      expect(screen.getByTestId("asset-controller")).toBeInTheDocument();
       expect(screen.queryByTestId("media-manager")).not.toBeInTheDocument();
     });
 
@@ -281,7 +280,7 @@ describe("Controller", () => {
       fireEvent.click(screen.getByText("Myndefni"));
 
       expect(screen.getByTestId("media-manager")).toBeInTheDocument();
-      expect(screen.queryByTestId("match-actions")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("asset-controller")).not.toBeInTheDocument();
     });
 
     it("does not render login form or screen selector", () => {
@@ -294,11 +293,25 @@ describe("Controller", () => {
       ).not.toBeInTheDocument();
     });
 
-    it("renders AssetController", () => {
+    it("renders AssetController on queue tab", () => {
       setupState3();
       render(<Controller />);
 
       expect(screen.getByTestId("asset-controller")).toBeInTheDocument();
+    });
+
+    it("syncs assetView to teams when Lið tab is clicked", () => {
+      const mockSelectAssetView = vi.fn();
+      setupState3();
+      mockedUseController.mockReturnValue({
+        ...mockedUseController(),
+        selectAssetView: mockSelectAssetView,
+      } as unknown as ReturnType<typeof useController>);
+      render(<Controller />);
+
+      fireEvent.click(screen.getByText("Lið"));
+
+      expect(mockSelectAssetView).toHaveBeenCalledWith("teams");
     });
   });
 });

@@ -25,6 +25,29 @@ html {
 .controller-layout .controller-controls {
   flex: 1;
   min-width: 0;
+  overflow-y: auto;
+  max-height: calc(100vh - 16px);
+}
+
+.controller-layout .controller-sidebar {
+  flex-shrink: 0;
+  width: 350px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+}
+
+.controller-layout .preview-and-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.controller-layout .view-mode-buttons {
+  display: flex;
+  justify-content: center;
 }
 
 .controller-layout .scoreboard-preview {
