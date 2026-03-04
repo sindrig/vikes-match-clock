@@ -56,7 +56,7 @@ async function clearEmulatorData(): Promise<void> {
             awayScore: 0,
             started: 0,
             timeElapsed: 0,
-            halfStops: [2700, 5400],
+            halfStops: [45, 90, 105, 120],
             homeTeam: "Víkingur R",
             awayTeam: "",
             homeTeamId: 103,

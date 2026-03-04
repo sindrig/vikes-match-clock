@@ -98,6 +98,11 @@ export function LocalStateProvider({ children }: { children: ReactNode }) {
     const unsubscribe = firebaseAuth.onAuthStateChanged((user: User | null) => {
       const authState = firebaseAuth.userToAuthState(user);
       setAuth(authState);
+
+      // Expose UID on window for E2E tests
+      if (typeof window !== "undefined") {
+        (window as any).__firebaseAuthUID = authState.uid || null;
+      }
     });
     return () => unsubscribe();
   }, []);
