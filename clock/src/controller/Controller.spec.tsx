@@ -233,9 +233,9 @@ describe("Controller", () => {
         screen.getByRole("option", { name: "Veldu skjá" }),
       ).toBeInTheDocument();
       expect(screen.getByPlaceholderText("E-mail")).toBeInTheDocument();
-      expect(screen.getByPlaceholderText("Password")).toBeInTheDocument();
-      expect(screen.getByText("Login")).toBeInTheDocument();
-      expect(screen.getByText("Login (google)")).toBeInTheDocument();
+      expect(screen.getByPlaceholderText("Lykilorð")).toBeInTheDocument();
+      expect(screen.getByText("Innskrá")).toBeInTheDocument();
+      expect(screen.getByText("Innskrá með Google")).toBeInTheDocument();
     });
 
     it("does not render tabs", () => {
@@ -291,7 +291,7 @@ describe("Controller", () => {
       });
       render(<Controller />);
 
-      const form = screen.getByText("Login");
+      const form = screen.getByText("Innskrá");
       fireEvent.click(form);
 
       expect(firebaseAuth.login).toHaveBeenCalledWith(
@@ -353,8 +353,8 @@ describe("Controller", () => {
       render(<Controller />);
 
       expect(screen.queryByPlaceholderText("E-mail")).not.toBeInTheDocument();
-      expect(screen.queryByPlaceholderText("Password")).not.toBeInTheDocument();
-      expect(screen.queryByText("Login")).not.toBeInTheDocument();
+      expect(screen.queryByPlaceholderText("Lykilorð")).not.toBeInTheDocument();
+      expect(screen.queryByText("Innskrá")).not.toBeInTheDocument();
     });
 
     it("shows empty message when available array is empty", () => {
@@ -388,7 +388,7 @@ describe("Controller", () => {
       render(<Controller />);
 
       expect(screen.queryByPlaceholderText("E-mail")).not.toBeInTheDocument();
-      expect(screen.queryByText("Login")).not.toBeInTheDocument();
+      expect(screen.queryByText("Innskrá")).not.toBeInTheDocument();
     });
 
     it("does not render tabs", () => {

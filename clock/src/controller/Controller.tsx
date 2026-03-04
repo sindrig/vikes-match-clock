@@ -62,62 +62,83 @@ const Controller = () => {
     };
 
     return (
-      <div className="controller login-controller">
-        <div className="control-item">
-          <div>
-            Skjár:
-            <select
-              onChange={({ target: { value } }) => setSelectedScreen(value)}
-              value={selectedScreen}
-            >
-              <option value="" disabled>
-                Veldu skjá
-              </option>
-              {screens.map(({ label, screen }, i) => (
-                <option value={String(i)} key={i}>
-                  {label} {screen.name}
+      <div className="initial-screen">
+        <div className="initial-screen-card">
+          <h3 className="initial-screen-card-title">Skjár</h3>
+          <p className="initial-screen-card-desc">
+            Veldu skjá til að birta stigatöflu
+          </p>
+          {screens.length === 0 ? (
+            <p className="initial-screen-empty">Engir skjáir tiltækir</p>
+          ) : (
+            <div className="initial-screen-select-group">
+              <select
+                className="initial-screen-select"
+                onChange={({ target: { value } }) => setSelectedScreen(value)}
+                value={selectedScreen}
+              >
+                <option value="" disabled>
+                  Veldu skjá
                 </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              onClick={() => {
-                const screen = screens[parseInt(selectedScreen, 10)];
-                if (screen) {
-                  setScreenViewport(screen.screen);
-                  setListenPrefix(screen.key);
-                }
-              }}
-              disabled={selectedScreen === ""}
-            >
-              Birta skjá
-            </button>
-          </div>
-          <form onSubmit={login}>
-            <div>
-              <input
-                name="email"
-                autoComplete="email"
-                placeholder="E-mail"
-                value={email}
-                onChange={({ target: { value } }) => setEmail(value)}
-              />
-              <input
-                name="password"
-                placeholder="Password"
-                autoComplete="current-password"
-                type="password"
-                value={password}
-                onChange={({ target: { value } }) => setPassword(value)}
-              />
+                {screens.map(({ label, screen }, i) => (
+                  <option value={String(i)} key={i}>
+                    {label} {screen.name}
+                  </option>
+                ))}
+              </select>
+              <Button
+                appearance="primary"
+                size="md"
+                onClick={() => {
+                  const screen = screens[parseInt(selectedScreen, 10)];
+                  if (screen) {
+                    setScreenViewport(screen.screen);
+                    setListenPrefix(screen.key);
+                  }
+                }}
+                disabled={selectedScreen === ""}
+                block
+              >
+                Birta skjá
+              </Button>
             </div>
-            <div>
-              <button type="submit">Login</button>
-            </div>
+          )}
+        </div>
+
+        <div className="initial-screen-divider">
+          <span>eða</span>
+        </div>
+
+        <div className="initial-screen-card">
+          <h3 className="initial-screen-card-title">Stjórnborð</h3>
+          <p className="initial-screen-card-desc">
+            Skráðu þig inn til að stjórna leik
+          </p>
+          <form className="initial-screen-form" onSubmit={login}>
+            <input
+              className="initial-screen-input"
+              name="email"
+              autoComplete="email"
+              placeholder="E-mail"
+              value={email}
+              onChange={({ target: { value } }) => setEmail(value)}
+            />
+            <input
+              className="initial-screen-input"
+              name="password"
+              placeholder="Lykilorð"
+              autoComplete="current-password"
+              type="password"
+              value={password}
+              onChange={({ target: { value } }) => setPassword(value)}
+            />
+            <Button appearance="primary" size="md" type="submit" block>
+              Innskrá
+            </Button>
           </form>
-          <button type="button" onClick={loginWithGoogle}>
-            Login (google)
-          </button>
+          <Button appearance="ghost" size="sm" onClick={loginWithGoogle} block>
+            Innskrá með Google
+          </Button>
         </div>
       </div>
     );
