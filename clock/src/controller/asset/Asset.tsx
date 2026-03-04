@@ -83,7 +83,7 @@ const AssetComponent = (props: AssetProps) => {
           overlay={playerAsset.overlay || { text: "" }}
           includeBackground={includeBackground}
         >
-          {playerAsset.background ? (
+          {includeBackground !== false && playerAsset.background ? (
             <img src={playerAsset.background} alt={playerAsset.background} />
           ) : null}
           <img src={playerAsset.key} alt={playerAsset.key} />
@@ -102,7 +102,7 @@ const AssetComponent = (props: AssetProps) => {
           overlay={playerAsset.overlay || { text: "" }}
           includeBackground={includeBackground}
         >
-          {playerAsset.background ? (
+          {includeBackground !== false && playerAsset.background ? (
             <img src={playerAsset.background} alt={playerAsset.background} />
           ) : null}
           {teamName && teamName in clubLogos ? (

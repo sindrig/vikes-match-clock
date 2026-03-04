@@ -45,17 +45,10 @@ const GoalScorerDialog = ({
     [teamName, listenPrefix, renderAsset, onClose],
   );
 
-  useEffect(() => {
-    if (open) {
-      setNumberInput("");
-      const MODAL_ANIMATION_MS = 100;
-      const timer = setTimeout(
-        () => inputRef.current?.focus(),
-        MODAL_ANIMATION_MS,
-      );
-      return () => clearTimeout(timer);
-    }
-  }, [open]);
+  const handleEntered = useCallback(() => {
+    setNumberInput("");
+    inputRef.current?.focus();
+  }, []);
 
   useEffect(() => {
     if (filtered.length === 1 && numberInput.length > 0) {
@@ -76,7 +69,7 @@ const GoalScorerDialog = ({
   };
 
   return (
-    <Modal open={open} onClose={onClose} size="xs">
+    <Modal open={open} onClose={onClose} onEntered={handleEntered} size="xs">
       <Modal.Header>
         <Modal.Title>Markaskorari &mdash; {teamName}</Modal.Title>
       </Modal.Header>
