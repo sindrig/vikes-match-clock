@@ -184,8 +184,7 @@ export async function loginWithEmulatorUser(page: Page): Promise<void> {
   // 1. Set listenPrefix
   // 2. Load Firebase data for that location
   // 3. Render the display + Controller UI
-  // Wait for the Controller Nav tabs to appear, specifically the "Heim" button
-  // which is part of the authenticated full UI
+  // Wait for the Controller Nav tabs to appear (Biðröð is the default tab)
 
   // First, give the page a moment to process the click and start loading
   await page.waitForTimeout(500);
@@ -199,19 +198,23 @@ export async function loginWithEmulatorUser(page: Page): Promise<void> {
   });
   console.log("[DEBUG] After screen button click:", debugState);
 
-  // Wait for Controller UI to appear - specifically the "Heim" button
   await page
-    .getByRole("button", { name: "Heim", exact: true })
+    .getByRole("button", { name: "Biðröð" })
     .waitFor({ state: "visible", timeout: 10000 });
 
   // Navigate to Settings tab to complete the login flow
   await page.waitForTimeout(1000);
-  await page.getByText("Stillingar").click({ force: true });
+  await page.getByRole("button", { name: "Stillingar" }).click({
+    force: true,
+  });
 
   // Wait for Settings content to load (match start time selector is a good indicator)
   await page
     .locator(".match-start-time-selector")
     .waitFor({ state: "visible", timeout: 10000 });
+
+  // Close the settings modal so tests start from a clean state
+  await page.keyboard.press("Escape");
 }
 
 export const test = base.extend<{
@@ -232,11 +235,25 @@ export const test = base.extend<{
 export { ensureEmulatorUser, clearEmulatorData };
 
 export async function goToHomeTab(page: Page) {
-  await page.getByRole("button", { name: "Heim", exact: true }).click();
+  await page.getByRole("button", { name: "Biðröð" }).click();
 }
 
 export async function goToSettingsTab(page: Page) {
-  await page.getByText("Stillingar").click();
+  await page.getByRole("button", { name: "Stillingar" }).click();
+}
+
+export async function closeSettings(page: Page) {
+  await page.keyboard.press("Escape");
+}
+
+export async function selectViewMode(
+  page: Page,
+  mode: "Idle" | "Match" | "Control",
+) {
+  await page
+    .locator(".view-mode-buttons")
+    .getByText(mode, { exact: true })
+    .click();
 }
 
 export async function selectMatchType(
@@ -251,7 +268,15 @@ export async function selectView(
   page: Page,
   view: "match" | "control" | "idle",
 ) {
-  await page.locator(`#view-selector-${view}`).click();
+  const viewModeLabel = {
+    match: "Match",
+    control: "Control",
+    idle: "Idle",
+  } as const;
+  await page
+    .locator(".view-mode-buttons")
+    .getByText(viewModeLabel[view], { exact: true })
+    .click();
 }
 
 export async function startClock(page: Page) {
