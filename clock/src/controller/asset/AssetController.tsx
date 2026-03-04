@@ -131,23 +131,11 @@ const AssetController = () => {
   };
   return (
     <div className="asset-controller">
-      <div className="view-selector assettabs stdbuttons">
-        <button
-          type="button"
-          onClick={() => selectAssetView(ASSET_VIEWS.assets)}
-        >
-          Biðröð
-        </button>
-        <button
-          type="button"
-          onClick={() => selectAssetView(ASSET_VIEWS.teams)}
-        >
-          Lið
-        </button>
-      </div>
-      <div className="view-selector">
-        {assetView === ASSET_VIEWS.teams && <TodaysMatches />}
-      </div>
+      {assetView === ASSET_VIEWS.teams && (
+        <div className="view-selector">
+          <TodaysMatches />
+        </div>
+      )}
       {assetView === ASSET_VIEWS.assets && renderAssetController()}
       {assetView === ASSET_VIEWS.teams && (
         <TeamAssetController

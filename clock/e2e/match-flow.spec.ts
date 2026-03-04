@@ -7,6 +7,12 @@ import {
   clearEmulatorData,
   loginWithEmulatorUser,
   startClock,
+  closeSettings,
+  addHomeGoal,
+  addAwayGoal,
+  subtractHomeGoal,
+  adjustTime,
+  setInjuryTime,
 } from "./fixtures/test-helpers";
 
 test.describe("Match Flow - Complete Match Simulation", () => {
@@ -29,29 +35,30 @@ test.describe("Match Flow - Complete Match Simulation", () => {
     page,
   }) => {
     const fakeClock = new FakeClock(new Date(2025, 3, 10, 14, 0, 0));
-    await page.getByText("Stillingar").click();
-    await page.locator("#view-selector-match").click();
-    await page.getByRole("button", { name: "Heim", exact: true }).click();
+    await page
+      .locator(".view-mode-buttons")
+      .getByText("Match", { exact: true })
+      .click();
 
     await startClock(page);
     await fakeClock.advance(page, ONE_MINUTE * 10);
     await expect(page.locator(".matchclock")).toContainText(/10:0\d/);
 
-    await page.getByText("H +1").click();
+    await addHomeGoal(page);
     await expect(page.locator(".team.home .score")).toHaveText("1");
     await expect(page.locator(".team.away .score")).toHaveText("0");
 
     await fakeClock.advance(page, ONE_MINUTE * 15);
     await expect(page.locator(".matchclock")).toContainText(/25:0\d/);
 
-    await page.getByText("Ú +1").click();
+    await addAwayGoal(page);
     await expect(page.locator(".team.home .score")).toHaveText("1");
     await expect(page.locator(".team.away .score")).toHaveText("1");
 
     await fakeClock.advance(page, ONE_MINUTE * 15);
     await expect(page.locator(".matchclock")).toContainText(/40:0\d/);
 
-    await page.getByText("H +1").click();
+    await addHomeGoal(page);
     await expect(page.locator(".team.home .score")).toHaveText("2");
     await expect(page.locator(".team.away .score")).toHaveText("1");
 
@@ -61,26 +68,25 @@ test.describe("Match Flow - Complete Match Simulation", () => {
     await page.getByText("Pása").click();
     await page.getByText("Næsti hálfleikur").click();
 
-    await page.getByText("Stillingar").click();
+    await page.getByRole("button", { name: "Stillingar" }).click();
     await expect(page.locator(".halfstops-input")).toHaveCount(3);
-
-    await page.getByRole("button", { name: "Heim", exact: true }).click();
+    await closeSettings(page);
     await startClock(page);
 
     await fakeClock.advance(page, ONE_MINUTE * 15);
     await expect(page.locator(".matchclock")).toContainText(/60:0\d/);
 
-    await page.getByText("Ú +1").click();
+    await addAwayGoal(page);
     await expect(page.locator(".team.home .score")).toHaveText("2");
     await expect(page.locator(".team.away .score")).toHaveText("2");
 
     await fakeClock.advance(page, ONE_MINUTE * 25);
     await expect(page.locator(".matchclock")).toContainText(/85:0\d/);
 
-    await page.locator(".longerInput").fill("3");
+    await setInjuryTime(page, "3");
     await expect(page.locator(".injury-time")).toHaveText("+3");
 
-    await page.getByText("H +1").click();
+    await addHomeGoal(page);
     await expect(page.locator(".team.home .score")).toHaveText("3");
     await expect(page.locator(".team.away .score")).toHaveText("2");
 
@@ -93,17 +99,17 @@ test.describe("Match Flow - Complete Match Simulation", () => {
 
   test("handles goal corrections with H -1 button", async ({ page }) => {
     const fakeClock = new FakeClock(new Date(2025, 3, 10, 14, 0, 0));
-    await page.getByText("Stillingar").click();
-    await page.locator("#view-selector-match").click();
-    await page.getByRole("button", { name: "Heim", exact: true }).click();
-
+    await page
+      .locator(".view-mode-buttons")
+      .getByText("Match", { exact: true })
+      .click();
     await startClock(page);
     await fakeClock.advance(page, ONE_MINUTE * 5);
 
-    await page.getByText("H +1").click();
+    await addHomeGoal(page);
     await expect(page.locator(".team.home .score")).toHaveText("1");
 
-    await page.getByText("H -1").click();
+    await subtractHomeGoal(page);
     await expect(page.locator(".team.home .score")).toHaveText("0");
   });
 
@@ -111,19 +117,22 @@ test.describe("Match Flow - Complete Match Simulation", () => {
     page,
   }) => {
     const fakeClock = new FakeClock(new Date(2025, 3, 10, 14, 0, 0));
-    await page.getByText("Stillingar").click();
+    await page.getByRole("button", { name: "Stillingar" }).click();
     await page.locator(".match-type-selector").selectOption("handball");
-    await page.locator("#view-selector-match").click();
-    await page.getByRole("button", { name: "Heim", exact: true }).click();
+    await closeSettings(page);
+    await page
+      .locator(".view-mode-buttons")
+      .getByText("Match", { exact: true })
+      .click();
 
     await startClock(page);
 
     await fakeClock.advance(page, ONE_MINUTE * 15);
     await expect(page.locator(".matchclock")).toContainText(/15:0\d/);
 
-    await page.getByText("H +1").click();
-    await page.getByText("H +1").click();
-    await page.getByText("Ú +1").click();
+    await addHomeGoal(page);
+    await addHomeGoal(page);
+    await addAwayGoal(page);
     await expect(page.locator(".team.home .score")).toHaveText("2");
     await expect(page.locator(".team.away .score")).toHaveText("1");
 
@@ -137,8 +146,8 @@ test.describe("Match Flow - Complete Match Simulation", () => {
     await fakeClock.advance(page, ONE_MINUTE * 10);
     await expect(page.locator(".matchclock")).toContainText(/40:0\d/);
 
-    await page.getByText("Ú +1").click();
-    await page.getByText("Ú +1").click();
+    await addAwayGoal(page);
+    await addAwayGoal(page);
     await expect(page.locator(".team.home .score")).toHaveText("2");
     await expect(page.locator(".team.away .score")).toHaveText("3");
 
@@ -150,45 +159,56 @@ test.describe("Match Flow - Complete Match Simulation", () => {
     page,
   }) => {
     const fakeClock = new FakeClock(new Date(2025, 3, 10, 14, 0, 0));
-    await page.getByText("Stillingar").click();
-    await page.locator("#view-selector-match").click();
-    await page.getByRole("button", { name: "Heim", exact: true }).click();
+    await page
+      .locator(".view-mode-buttons")
+      .getByText("Match", { exact: true })
+      .click();
 
     await startClock(page);
     await fakeClock.advance(page, ONE_MINUTE * 10);
     await expect(page.locator(".matchclock")).toContainText(/10:0\d/);
 
-    await page.getByText("+5m").click();
+    await adjustTime(page, "+5m");
     await fakeClock.advance(page, 100);
     await expect(page.locator(".matchclock")).toContainText(/15:0\d/);
 
-    await page.getByText("+5m").click();
+    await adjustTime(page, "+5m");
     await fakeClock.advance(page, 100);
     await expect(page.locator(".matchclock")).toContainText(/20:0\d/);
 
-    await page.getByText("-5m").click();
+    await adjustTime(page, "-5m");
     await fakeClock.advance(page, 100);
     await expect(page.locator(".matchclock")).toContainText(/15:0\d/);
   });
 
   test("sets team logos and displays them on scoreboard", async ({ page }) => {
-    await page.getByText("Stillingar").click();
+    await page.getByRole("button", { name: "Stillingar" }).click();
     await page.locator("#team-selector-awayTeam").fill("fram");
-    await page.locator("#view-selector-match").click();
+    await closeSettings(page);
+    await page
+      .locator(".view-mode-buttons")
+      .getByText("Match", { exact: true })
+      .click();
 
     await expect(page.locator(".team.away img")).toHaveAttribute("src", /Fram/);
   });
 
   test("uses Leiðrétta to switch to advanced controls", async ({ page }) => {
-    await page.getByText("Stillingar").click();
-    await page.locator("#view-selector-control").click();
+    await page.getByRole("button", { name: "Stillingar" }).click();
+    await page.locator(".match-type-selector").selectOption("handball");
+    await closeSettings(page);
+    await page
+      .locator(".view-mode-buttons")
+      .getByText("Control", { exact: true })
+      .click();
     await expect(
       page.locator(".match-controller-box-home").getByText("Mark"),
     ).toBeVisible();
 
     await page.getByText("Leiðrétta").click();
 
-    await page.getByText("Stillingar").click();
-    await expect(page.locator("#view-selector-match")).toBeChecked();
+    await expect(
+      page.locator(".view-mode-buttons").getByText("Match"),
+    ).toHaveAttribute("data-appearance", "primary");
   });
 });

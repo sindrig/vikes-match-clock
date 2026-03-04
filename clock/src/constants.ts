@@ -30,8 +30,9 @@ export const VIEWS = keymirror({
 });
 
 export const TABS = keymirror({
-  home: null,
-  settings: null,
+  queue: null,
+  teams: null,
+  media: null,
 });
 
 // View/Background constants

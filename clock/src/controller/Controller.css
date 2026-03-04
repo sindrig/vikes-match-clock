@@ -2,50 +2,48 @@
   padding: 10px;
 }
 
-.controller.login-controller .control-item {
-  float: none;
-}
-
-.controller.login-controller .control-item > button,
-.controller.login-controller .control-item > select,
-.controller.login-controller .control-item > div {
-  float: none;
-  clear: none;
-}
-
 .controller button {
-  /*background-color: #c0c0c0;
-  border: 1px solid black;
-  font-size: 15px;*/
 }
 
 .controller {
-  position: absolute;
-  top: 0px;
   font-size: 14px;
   width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.controller .rs-nav {
+  flex: 1;
+  min-width: 0;
+}
+
+.controller .nav-bar {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 8px;
 }
 
 .controller .control-item {
   margin: 1px;
-  float: left;
-}
-
-.controller .playerControls {
-  width: 550px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
 }
 
 .controller .home-scorer-selector .rs-btn {
   display: block;
 }
 
-.controller .dummyDiv {
-  position: relative;
-  top: 0px;
-  width: 242px;
-  height: 176px;
-  float: left;
-  z-index: -100;
+.controller .playerControls {
+  width: 550px;
+}
+
+.controller .playerControls > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
 }
 
 .controller div.withborder {
@@ -69,18 +67,129 @@ div.stdbuttons > button:hover {
 .controller div.control-item > select,
 .controller div.control-item > div {
   margin: 2px;
-  float: left;
-  clear: both;
+}
+
+.controller .rs-modal-body > * + * {
+  margin-top: 12px;
+}
+
+.controller .rs-modal-body .page-actions > * + * {
+  margin-top: 8px;
 }
 
 .controller .page-actions {
   position: relative;
-  float: left;
-  clear: both;
+  width: 100%;
 }
 
 .controller .asset-controller {
-  clear: both;
+  width: 100%;
+}
+
+.controller .clear-overlay {
+  width: 100%;
+  margin-bottom: 4px;
+}
+
+/* Match Actions in sidebar */
+.match-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #c7c7c7;
+  border-radius: 5px;
+}
+
+.match-actions-clock {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.match-actions-clock-primary {
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
+}
+
+.match-actions-clock-primary .rs-btn {
+  flex: 1;
+}
+
+.match-actions-clock-secondary {
+  display: flex;
+  gap: 6px;
+}
+
+.match-actions-clock-secondary .rs-btn {
+  flex: 1;
+}
+
+.match-actions-handball {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.match-actions-timeouts {
+  display: flex;
+  gap: 4px;
+}
+
+.match-actions .home-scorer-selector .rs-btn {
+  display: block;
+}
+
+/* Time control dialog */
+.time-control-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.time-control-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.time-control-label {
+  min-width: 40px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.time-control-section {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.time-control-section-penalties {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+button.time-adjust-btn {
+  border: 1px solid #747474;
+  background-color: lightgray;
+  border-radius: 2px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+button.time-adjust-btn:hover {
+  border: 1px solid #494949;
+  background-color: rgb(187, 187, 187);
+}
+
+button.time-adjust-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 input[type="number"] {
@@ -141,4 +250,115 @@ input.longerInput {
 
 .screen-selector-logout:hover {
   background-color: #f5f5f5;
+}
+
+/* Initial screen (unauthenticated landing page) */
+
+.initial-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  min-height: 100vh;
+  gap: 0;
+}
+
+.initial-screen-card {
+  width: 100%;
+  max-width: 400px;
+  padding: 30px;
+  background: #fff;
+  border: 1px solid #e5e5ea;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.initial-screen-card-title {
+  margin: 0 0 6px;
+  font-size: 20px;
+  font-weight: 600;
+  color: #333;
+}
+
+.initial-screen-card-desc {
+  margin: 0 0 20px;
+  font-size: 14px;
+  color: #888;
+}
+
+.initial-screen-empty {
+  font-size: 14px;
+  color: #999;
+}
+
+.initial-screen-select-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.initial-screen-select {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 15px;
+  border: 1px solid #d4d4d8;
+  border-radius: 6px;
+  background: #fafafa;
+  color: #333;
+  appearance: auto;
+}
+
+.initial-screen-select:focus {
+  outline: none;
+  border-color: #3498ff;
+  box-shadow: 0 0 0 2px rgba(52, 152, 255, 0.2);
+}
+
+.initial-screen-divider {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  max-width: 400px;
+  margin: 20px 0;
+}
+
+.initial-screen-divider::before,
+.initial-screen-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: #e0e0e0;
+}
+
+.initial-screen-divider span {
+  padding: 0 16px;
+  font-size: 13px;
+  color: #aaa;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.initial-screen-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.initial-screen-input {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 15px;
+  border: 1px solid #d4d4d8;
+  border-radius: 6px;
+  background: #fafafa;
+  color: #333;
+  box-sizing: border-box;
+}
+
+.initial-screen-input:focus {
+  outline: none;
+  border-color: #3498ff;
+  box-shadow: 0 0 0 2px rgba(52, 152, 255, 0.2);
 }

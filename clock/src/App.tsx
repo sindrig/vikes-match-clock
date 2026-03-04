@@ -1,22 +1,145 @@
-import { useEffect } from "react";
-import { Button } from "rsuite";
+import { useEffect, useState } from "react";
+import { Button, ButtonGroup, Tooltip, Whisper } from "rsuite";
+import CloseIcon from "@rsuite/icons/CloseOutline";
 import { RingLoader } from "react-spinners";
-import { useFirebaseState } from "./contexts/FirebaseStateContext";
-import { useLocalState } from "./contexts/LocalStateContext";
+import {
+  useFirebaseState,
+  useController,
+  useMatch,
+} from "./contexts/FirebaseStateContext";
+import { useLocalState, useRemoteSettings } from "./contexts/LocalStateContext";
 import { firebaseAuth } from "./firebaseAuth";
 import Controller from "./controller/Controller";
+import MatchActions from "./controller/MatchActions";
 import RefreshHandler from "./controller/RefreshHandler";
 import AssetComponent from "./controller/asset/Asset";
+import GoalScorerDialog from "./controller/GoalScorerDialog";
 
 import ScoreBoard from "./screens/ScoreBoard";
 import Idle from "./screens/Idle";
 
-import { VIEWS, getBackground } from "./constants";
+import { VIEWS, Sports, getBackground } from "./constants";
 import StateListener from "./StateListener";
 import MatchController from "./match-controller/MatchController";
 import useGlobalShortcuts from "./hooks/useGlobalShortcuts";
+import { shouldShowGoalCelebration } from "./utils/matchUtils";
+import baddi from "./images/baddi.gif";
+import assetTypes from "./controller/asset/AssetTypes";
 
 import "./App.css";
+
+const ScoreButtons = ({ side }: { side: "home" | "away" }) => {
+  const { match, updateMatch, addGoal } = useMatch();
+  const {
+    renderAsset,
+    controller: { roster },
+  } = useController();
+  const { listenPrefix } = useRemoteSettings();
+  const scoreKeys = { home: "homeScore", away: "awayScore" } as const;
+  const score = match[scoreKeys[side]];
+  const [scorerDialogOpen, setScorerDialogOpen] = useState(false);
+
+  const teamName = side === "home" ? match.homeTeam : match.awayTeam;
+  const players = roster[side] || [];
+
+  const handleGoal = () => {
+    addGoal(side);
+    if (shouldShowGoalCelebration(match.matchType, teamName, listenPrefix)) {
+      renderAsset({ key: baddi, type: assetTypes.IMAGE });
+      if (players.length > 0) {
+        setScorerDialogOpen(true);
+      }
+    }
+  };
+
+  return (
+    <div className="preview-score-buttons">
+      <Button
+        size="sm"
+        appearance="primary"
+        color="green"
+        onClick={handleGoal}
+        block
+      >
+        +
+      </Button>
+      <Button
+        size="sm"
+        appearance="subtle"
+        onClick={() => updateMatch({ [scoreKeys[side]]: score - 1 })}
+        disabled={score <= 0}
+        block
+      >
+        −
+      </Button>
+      <GoalScorerDialog
+        open={scorerDialogOpen}
+        players={players}
+        teamName={teamName}
+        onClose={() => setScorerDialogOpen(false)}
+      />
+    </div>
+  );
+};
+
+const ViewModeButtons = () => {
+  const { controller, selectView } = useController();
+  const { match } = useMatch();
+  const { view } = controller;
+  const isHandball = match.matchType === Sports.Handball;
+
+  return (
+    <div className="view-mode-buttons">
+      <ButtonGroup size="xs">
+        <Button
+          appearance={view === VIEWS.idle ? "primary" : "default"}
+          onClick={() => selectView(VIEWS.idle)}
+        >
+          Idle
+        </Button>
+        <Button
+          appearance={view === VIEWS.match ? "primary" : "default"}
+          onClick={() => selectView(VIEWS.match)}
+        >
+          Match
+        </Button>
+        {isHandball && (
+          <Button
+            appearance={view === VIEWS.control ? "primary" : "default"}
+            onClick={() => selectView(VIEWS.control)}
+          >
+            Control
+          </Button>
+        )}
+      </ButtonGroup>
+    </div>
+  );
+};
+
+const tooltipClear = <Tooltip>Birtir aftur stöðu leiksins á skjá.</Tooltip>;
+
+const ClearOverlayButton = () => {
+  const { renderAsset } = useController();
+
+  return (
+    <Whisper
+      placement="bottom"
+      controlId="clearoverlay-id-hover"
+      trigger="hover"
+      speaker={tooltipClear}
+    >
+      <Button
+        color="cyan"
+        appearance="primary"
+        size="sm"
+        onClick={() => renderAsset(null)}
+        block
+      >
+        <CloseIcon /> Hreinsa virkt overlay
+      </Button>
+    </Whisper>
+  );
+};
 
 function App() {
   useGlobalShortcuts();
@@ -92,12 +215,12 @@ function App() {
       <div>
         <div className="App" style={style}>
           {renderAppContents()}
+          {asset ? (
+            <div className="overlay-container" style={vp.style}>
+              <AssetComponent asset={asset.asset} time={asset.time} />
+            </div>
+          ) : null}
         </div>
-        {asset ? (
-          <div className="overlay-container" style={vp.style}>
-            <AssetComponent asset={asset.asset} time={asset.time} />
-          </div>
-        ) : null}
         <RefreshHandler />
         <Button
           color="red"
@@ -133,18 +256,66 @@ function App() {
     firebaseAuth.logout().catch(console.error);
   };
 
+  const showController = view === VIEWS.match || view === VIEWS.idle;
+  const scoreButtonWidth = 44;
+  const sidebarWidth = 350;
+  const previewWidth = sidebarWidth - scoreButtonWidth * 2;
+  const vpWidth = vp.style.width || 960;
+  const vpHeight = vp.style.height || 540;
+  const previewScale = previewWidth / vpWidth;
+  const previewHeight = Math.ceil(vpHeight * previewScale);
+
   return (
     <div>
       {view === VIEWS.control ? <MatchController /> : null}
-      <div className="App" style={style}>
-        {renderAppContents()}
-      </div>
-      {(view === VIEWS.match || view === VIEWS.idle) && <Controller />}
-      {asset ? (
-        <div className="overlay-container" style={vp.style}>
-          <AssetComponent asset={asset.asset} time={asset.time} />
+      {showController && (
+        <div className="controller-layout">
+          <div className="controller-sidebar">
+            <div className="preview-and-controls">
+              <div className="preview-with-scores">
+                <ScoreButtons side="home" />
+                <div
+                  className="scoreboard-preview"
+                  style={{ height: previewHeight }}
+                >
+                  <div
+                    className="App"
+                    style={{
+                      ...style,
+                      transform: `scale(${previewScale})`,
+                      transformOrigin: "top left",
+                    }}
+                  >
+                    {renderAppContents()}
+                    {asset ? (
+                      <div className="overlay-container" style={vp.style}>
+                        <AssetComponent asset={asset.asset} time={asset.time} />
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+                <ScoreButtons side="away" />
+              </div>
+              <ViewModeButtons />
+            </div>
+            {asset && <ClearOverlayButton />}
+            <MatchActions />
+          </div>
+          <div className="controller-controls">
+            <Controller />
+          </div>
         </div>
-      ) : null}
+      )}
+      {!showController && (
+        <div className="App" style={style}>
+          {renderAppContents()}
+          {asset ? (
+            <div className="overlay-container" style={vp.style}>
+              <AssetComponent asset={asset.asset} time={asset.time} />
+            </div>
+          ) : null}
+        </div>
+      )}
       <Button
         color="red"
         appearance="primary"

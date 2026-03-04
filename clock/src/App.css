@@ -11,8 +11,103 @@ html {
   position: relative;
   cursor: none;
   top: 0px;
-  float: left;
   z-index: 999;
+}
+
+.controller-layout {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  gap: 16px;
+  padding: 8px;
+}
+
+.controller-layout .controller-controls {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  max-height: calc(100vh - 16px);
+}
+
+.controller-layout .controller-sidebar {
+  flex-shrink: 0;
+  width: 350px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+}
+
+.controller-layout .preview-and-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.controller-layout .preview-with-scores {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+}
+
+.controller-layout .scoreboard-preview {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.controller-layout .preview-score-buttons {
+  display: flex;
+  flex-direction: column;
+  width: 44px;
+  flex-shrink: 0;
+}
+
+.controller-layout .preview-score-buttons .rs-btn {
+  flex: 1;
+  border-radius: 0;
+  font-size: 18px;
+  font-weight: 700;
+  padding: 0;
+}
+
+.controller-layout
+  .preview-with-scores
+  > .preview-score-buttons:first-child
+  .rs-btn:first-child {
+  border-top-left-radius: 6px;
+}
+
+.controller-layout
+  .preview-with-scores
+  > .preview-score-buttons:first-child
+  .rs-btn:last-child {
+  border-bottom-left-radius: 6px;
+}
+
+.controller-layout
+  .preview-with-scores
+  > .preview-score-buttons:last-child
+  .rs-btn:first-child {
+  border-top-right-radius: 6px;
+}
+
+.controller-layout
+  .preview-with-scores
+  > .preview-score-buttons:last-child
+  .rs-btn:last-child {
+  border-bottom-right-radius: 6px;
+}
+
+.controller-layout .view-mode-buttons {
+  display: flex;
+  justify-content: center;
+}
+
+.controller-layout .scoreboard-preview .App {
+  pointer-events: none;
+  cursor: default;
 }
 
 button {

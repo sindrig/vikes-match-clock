@@ -4,6 +4,7 @@ import {
   ensureEmulatorUser,
   clearEmulatorData,
   loginWithEmulatorUser,
+  closeSettings,
 } from "./fixtures/test-helpers";
 
 test.describe("Asset Overlay System", () => {
@@ -25,8 +26,6 @@ test.describe("Asset Overlay System", () => {
   test("adds a URL asset to the queue and displays queue count", async ({
     page,
   }) => {
-    await page.getByRole("button", { name: "Heim", exact: true }).click();
-
     const assetController = page.locator(".asset-controller");
     await expect(assetController.getByText("0 í biðröð")).toBeVisible();
 
@@ -39,8 +38,6 @@ test.describe("Asset Overlay System", () => {
   });
 
   test("adds multiple assets to the queue", async ({ page }) => {
-    await page.getByRole("button", { name: "Heim", exact: true }).click();
-
     const assetController = page.locator(".asset-controller");
 
     await assetController
@@ -64,8 +61,6 @@ test.describe("Asset Overlay System", () => {
   test("clears the asset queue", async ({ page }) => {
     page.on("dialog", (dialog) => dialog.accept());
 
-    await page.getByRole("button", { name: "Heim", exact: true }).click();
-
     const assetController = page.locator(".asset-controller");
 
     await assetController
@@ -85,8 +80,6 @@ test.describe("Asset Overlay System", () => {
   });
 
   test("shows Birta button when queue has items", async ({ page }) => {
-    await page.getByRole("button", { name: "Heim", exact: true }).click();
-
     const assetController = page.locator(".asset-controller");
     await expect(assetController.getByText("Birta")).not.toBeVisible();
 
@@ -99,8 +92,6 @@ test.describe("Asset Overlay System", () => {
   });
 
   test("toggles autoplay and loop options", async ({ page }) => {
-    await page.getByRole("button", { name: "Heim", exact: true }).click();
-
     const assetController = page.locator(".asset-controller");
 
     await expect(
@@ -139,8 +130,6 @@ test.describe("Asset Overlay System", () => {
   test("shows clear overlay button when asset is displayed", async ({
     page,
   }) => {
-    await page.getByRole("button", { name: "Heim", exact: true }).click();
-
     await expect(page.getByText("Hreinsa virkt overlay")).not.toBeVisible();
 
     const assetController = page.locator(".asset-controller");
@@ -156,8 +145,6 @@ test.describe("Asset Overlay System", () => {
   test("clears active overlay when clear button is clicked", async ({
     page,
   }) => {
-    await page.getByRole("button", { name: "Heim", exact: true }).click();
-
     const assetController = page.locator(".asset-controller");
     await assetController
       .locator('input[type="text"]')
@@ -175,8 +162,6 @@ test.describe("Asset Overlay System", () => {
   });
 
   test("validates URL format before adding", async ({ page }) => {
-    await page.getByRole("button", { name: "Heim", exact: true }).click();
-
     const assetController = page.locator(".asset-controller");
     await assetController.locator('input[type="text"]').fill("not-a-valid-url");
     await assetController.getByText("Bæta við").click();
@@ -202,7 +187,7 @@ test.describe("Asset Overlay System - Team Views", () => {
   });
 
   test("switches between Biðröð and Lið views", async ({ page }) => {
-    await page.getByText("Stillingar").click();
+    await page.getByRole("button", { name: "Stillingar" }).click();
     await page.locator("#team-selector-homeTeam").fill("Víkingur R");
     await page.locator("#team-selector-awayTeam").fill("Fram");
     await expect(page.locator("#team-selector-homeTeam")).toHaveValue(
@@ -212,24 +197,18 @@ test.describe("Asset Overlay System - Team Views", () => {
     await expect(page.locator("#team-selector-awayTeam")).toHaveValue("Fram", {
       timeout: 10000,
     });
+    await closeSettings(page);
 
-    await page.getByRole("button", { name: "Heim", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Biðröð" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Lið" })).toBeVisible();
 
-    const assetController = page.locator(".asset-controller");
-    await expect(
-      assetController.getByRole("button", { name: "Biðröð" }),
-    ).toBeVisible();
-    await expect(
-      assetController.getByRole("button", { name: "Lið" }),
-    ).toBeVisible();
-
-    await assetController.getByRole("button", { name: "Lið" }).click();
+    await page.getByRole("button", { name: "Lið" }).click();
 
     await expect(page.locator(".team-asset-controller").first()).toBeVisible({
       timeout: 10000,
     });
 
-    await assetController.getByRole("button", { name: "Biðröð" }).click();
+    await page.getByRole("button", { name: "Biðröð" }).click();
 
     await expect(page.locator(".controls")).toBeVisible();
   });

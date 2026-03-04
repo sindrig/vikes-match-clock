@@ -9,6 +9,7 @@ import {
   loginWithEmulatorUser,
   startSimpleClockAndWait,
   stopSimpleClockAndWait,
+  closeSettings,
 } from "./fixtures/test-helpers";
 
 test.describe("Penalty System - 2-Minute Suspensions", () => {
@@ -31,9 +32,13 @@ test.describe("Penalty System - 2-Minute Suspensions", () => {
     page,
   }) => {
     const fakeClock = new FakeClock(new Date(2025, 3, 10, 14, 0, 0));
-    await page.getByText("Stillingar").click();
+    await page.getByRole("button", { name: "Stillingar" }).click();
     await page.locator(".match-type-selector").selectOption("handball");
-    await page.locator("#view-selector-control").click();
+    await closeSettings(page);
+    await page
+      .locator(".view-mode-buttons")
+      .getByText("Control", { exact: true })
+      .click();
 
     await startSimpleClockAndWait(page);
     await fakeClock.advance(page, ONE_MINUTE * 5);
@@ -67,9 +72,13 @@ test.describe("Penalty System - 2-Minute Suspensions", () => {
     page,
   }) => {
     const fakeClock = new FakeClock(new Date(2025, 3, 10, 14, 0, 0));
-    await page.getByText("Stillingar").click();
+    await page.getByRole("button", { name: "Stillingar" }).click();
     await page.locator(".match-type-selector").selectOption("handball");
-    await page.locator("#view-selector-control").click();
+    await closeSettings(page);
+    await page
+      .locator(".view-mode-buttons")
+      .getByText("Control", { exact: true })
+      .click();
 
     await startSimpleClockAndWait(page);
     await fakeClock.advance(page, ONE_MINUTE * 5);
@@ -104,9 +113,13 @@ test.describe("Penalty System - 2-Minute Suspensions", () => {
 
   test("handles penalties on both teams simultaneously", async ({ page }) => {
     const fakeClock = new FakeClock(new Date(2025, 3, 10, 14, 0, 0));
-    await page.getByText("Stillingar").click();
+    await page.getByRole("button", { name: "Stillingar" }).click();
     await page.locator(".match-type-selector").selectOption("handball");
-    await page.locator("#view-selector-control").click();
+    await closeSettings(page);
+    await page
+      .locator(".view-mode-buttons")
+      .getByText("Control", { exact: true })
+      .click();
 
     await startSimpleClockAndWait(page);
     await fakeClock.advance(page, ONE_MINUTE * 5);
@@ -140,9 +153,13 @@ test.describe("Penalty System - 2-Minute Suspensions", () => {
     page,
   }) => {
     const fakeClock = new FakeClock(new Date(2025, 3, 10, 14, 0, 0));
-    await page.getByText("Stillingar").click();
+    await page.getByRole("button", { name: "Stillingar" }).click();
     await page.locator(".match-type-selector").selectOption("handball");
-    await page.locator("#view-selector-control").click();
+    await closeSettings(page);
+    await page
+      .locator(".view-mode-buttons")
+      .getByText("Control", { exact: true })
+      .click();
 
     await expect(
       page.locator(".match-controller-box-home").getByText("Brottvísun"),
@@ -164,9 +181,13 @@ test.describe("Penalty System - 2-Minute Suspensions", () => {
 
   test("penalty countdown pauses when match is paused", async ({ page }) => {
     const fakeClock = new FakeClock(new Date(2025, 3, 10, 14, 0, 0));
-    await page.getByText("Stillingar").click();
+    await page.getByRole("button", { name: "Stillingar" }).click();
     await page.locator(".match-type-selector").selectOption("handball");
-    await page.locator("#view-selector-control").click();
+    await closeSettings(page);
+    await page
+      .locator(".view-mode-buttons")
+      .getByText("Control", { exact: true })
+      .click();
 
     await startSimpleClockAndWait(page);
     await fakeClock.advance(page, ONE_MINUTE * 5);

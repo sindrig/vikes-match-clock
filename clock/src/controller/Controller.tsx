@@ -1,33 +1,32 @@
 import type React from "react";
 import { useState } from "react";
-import { Nav, Tooltip, Whisper, Button } from "rsuite";
+import { Nav, Button, Modal, IconButton } from "rsuite";
 import { RingLoader } from "react-spinners";
 import GearIcon from "@rsuite/icons/Gear";
 import MediaIcon from "@rsuite/icons/Media";
-import TimeIcon from "@rsuite/icons/Time";
-import CloseIcon from "@rsuite/icons/CloseOutline";
+import ListIcon from "@rsuite/icons/List";
+import PeoplesIcon from "@rsuite/icons/Peoples";
 
-import { TABS, VIEWS } from "../constants";
+import { TABS, ASSET_VIEWS } from "../constants";
+
+const assetViewToTab: Record<string, string> = {
+  [ASSET_VIEWS.teams]: TABS.teams,
+  [ASSET_VIEWS.assets]: TABS.queue,
+};
 import { firebaseAuth } from "../firebaseAuth";
-import MatchActions from "./MatchActions";
 import MatchActionSettings from "./MatchActionSettings";
 import MediaManager from "./media/MediaManager";
 import RefreshHandler from "./RefreshHandler";
 import AssetController from "./asset/AssetController";
 import "rsuite/dist/rsuite.min.css";
 import "./Controller.css";
-import {
-  useController,
-  useListeners,
-  useView,
-} from "../contexts/FirebaseStateContext";
+import { useController, useListeners } from "../contexts/FirebaseStateContext";
 import { useAuth, useLocalState } from "../contexts/LocalStateContext";
 
 const confirmRefresh = () => confirm("Are you absolutely sure?");
 
 const Controller = () => {
-  const { controller, selectView, renderAsset } = useController();
-  const { view: viewState } = useView();
+  const { controller, selectAssetView } = useController();
   const { screens } = useListeners();
   const {
     email,
@@ -41,11 +40,11 @@ const Controller = () => {
   } = useLocalState();
   const auth = useAuth();
 
-  const [tab, setTab] = useState<string>(TABS.home);
+  const [tab, setTab] = useState<string>(
+    assetViewToTab[controller.assetView] ?? TABS.queue,
+  );
   const [selectedScreen, setSelectedScreen] = useState("");
-
-  const { view, currentAsset } = controller;
-  const { vp } = viewState;
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const isAuthenticated = auth.isLoaded && !auth.isEmpty;
 
@@ -63,62 +62,83 @@ const Controller = () => {
     };
 
     return (
-      <div className="controller login-controller">
-        <div className="control-item">
-          <div>
-            Skjár:
-            <select
-              onChange={({ target: { value } }) => setSelectedScreen(value)}
-              value={selectedScreen}
-            >
-              <option value="" disabled>
-                Veldu skjá
-              </option>
-              {screens.map(({ label, screen }, i) => (
-                <option value={String(i)} key={i}>
-                  {label} {screen.name}
+      <div className="initial-screen">
+        <div className="initial-screen-card">
+          <h3 className="initial-screen-card-title">Skjár</h3>
+          <p className="initial-screen-card-desc">
+            Veldu skjá til að birta stigatöflu
+          </p>
+          {screens.length === 0 ? (
+            <p className="initial-screen-empty">Engir skjáir tiltækir</p>
+          ) : (
+            <div className="initial-screen-select-group">
+              <select
+                className="initial-screen-select"
+                onChange={({ target: { value } }) => setSelectedScreen(value)}
+                value={selectedScreen}
+              >
+                <option value="" disabled>
+                  Veldu skjá
                 </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              onClick={() => {
-                const screen = screens[parseInt(selectedScreen, 10)];
-                if (screen) {
-                  setScreenViewport(screen.screen);
-                  setListenPrefix(screen.key);
-                }
-              }}
-              disabled={selectedScreen === ""}
-            >
-              Birta skjá
-            </button>
-          </div>
-          <form onSubmit={login}>
-            <div>
-              <input
-                name="email"
-                autoComplete="email"
-                placeholder="E-mail"
-                value={email}
-                onChange={({ target: { value } }) => setEmail(value)}
-              />
-              <input
-                name="password"
-                placeholder="Password"
-                autoComplete="current-password"
-                type="password"
-                value={password}
-                onChange={({ target: { value } }) => setPassword(value)}
-              />
+                {screens.map(({ label, screen }, i) => (
+                  <option value={String(i)} key={i}>
+                    {label} {screen.name}
+                  </option>
+                ))}
+              </select>
+              <Button
+                appearance="primary"
+                size="md"
+                onClick={() => {
+                  const screen = screens[parseInt(selectedScreen, 10)];
+                  if (screen) {
+                    setScreenViewport(screen.screen);
+                    setListenPrefix(screen.key);
+                  }
+                }}
+                disabled={selectedScreen === ""}
+                block
+              >
+                Birta skjá
+              </Button>
             </div>
-            <div>
-              <button type="submit">Login</button>
-            </div>
+          )}
+        </div>
+
+        <div className="initial-screen-divider">
+          <span>eða</span>
+        </div>
+
+        <div className="initial-screen-card">
+          <h3 className="initial-screen-card-title">Stjórnborð</h3>
+          <p className="initial-screen-card-desc">
+            Skráðu þig inn til að stjórna leik
+          </p>
+          <form className="initial-screen-form" onSubmit={login}>
+            <input
+              className="initial-screen-input"
+              name="email"
+              autoComplete="email"
+              placeholder="E-mail"
+              value={email}
+              onChange={({ target: { value } }) => setEmail(value)}
+            />
+            <input
+              className="initial-screen-input"
+              name="password"
+              placeholder="Lykilorð"
+              autoComplete="current-password"
+              type="password"
+              value={password}
+              onChange={({ target: { value } }) => setPassword(value)}
+            />
+            <Button appearance="primary" size="md" type="submit" block>
+              Innskrá
+            </Button>
           </form>
-          <button type="button" onClick={loginWithGoogle}>
-            Login (google)
-          </button>
+          <Button appearance="ghost" size="sm" onClick={loginWithGoogle} block>
+            Innskrá með Google
+          </Button>
         </div>
       </div>
     );
@@ -182,81 +202,65 @@ const Controller = () => {
     localStorage.clear();
   };
 
-  const showHome = tab === "home";
-  const showSettings = tab === "settings";
-  const showMedia = tab === "media";
-  const tooltipClear = <Tooltip>Birtir aftur stöðu leiksins á skjá.</Tooltip>;
+  const handleTabSelect = (key: string) => {
+    setTab(key);
+    if (key === TABS.queue) {
+      selectAssetView(ASSET_VIEWS.assets);
+    } else if (key === TABS.teams) {
+      selectAssetView(ASSET_VIEWS.teams);
+    }
+  };
+
   return (
     <div className="controller">
-      <div className="dummyDiv" style={vp.style}></div>
-      <Nav appearance="tabs" onSelect={setTab} activeKey={tab}>
-        <Nav.Item eventKey="home" icon={<TimeIcon />}>
-          Heim
-        </Nav.Item>
-        <Nav.Item eventKey="media" icon={<MediaIcon />}>
-          Myndefni
-        </Nav.Item>
-        <Nav.Item eventKey="settings" icon={<GearIcon />}>
+      <div className="nav-bar">
+        <Nav appearance="tabs" onSelect={handleTabSelect} activeKey={tab}>
+          <Nav.Item eventKey={TABS.queue} icon={<ListIcon />}>
+            Biðröð
+          </Nav.Item>
+          <Nav.Item eventKey={TABS.teams} icon={<PeoplesIcon />}>
+            Lið
+          </Nav.Item>
+          <Nav.Item eventKey={TABS.media} icon={<MediaIcon />}>
+            Myndefni
+          </Nav.Item>
+        </Nav>
+        <IconButton
+          icon={<GearIcon />}
+          appearance="subtle"
+          size="sm"
+          onClick={() => setSettingsOpen(true)}
+          aria-label="Stillingar"
+        >
           Stillingar
-        </Nav.Item>
-      </Nav>
-      {showHome && <MatchActions />}
-      {showSettings && <MatchActionSettings />}
-      {showMedia && <MediaManager />}
-      {currentAsset && (
-        <div className="control-item">
-          <Whisper
-            placement="bottom"
-            controlId="clearoverlay-id-hover"
-            trigger="hover"
-            speaker={tooltipClear}
-          >
+        </IconButton>
+      </div>
+      {tab === TABS.media && <MediaManager />}
+      {(tab === TABS.queue || tab === TABS.teams) && <AssetController />}
+      <Modal open={settingsOpen} onClose={() => setSettingsOpen(false)}>
+        <Modal.Header>
+          <Modal.Title>Stillingar</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <MatchActionSettings />
+          <div className="page-actions control-item withborder">
             <Button
-              color="cyan"
+              color="red"
               appearance="primary"
               size="sm"
-              onClick={() => renderAsset(null)}
+              onClick={() => {
+                if (confirmRefresh()) {
+                  clearState();
+                  window.location.reload();
+                }
+              }}
             >
-              <CloseIcon /> Hreinsa virkt overlay
+              Hard refresh
             </Button>
-          </Whisper>
-        </div>
-      )}
-      {showSettings && (
-        <div className="page-actions control-item withborder">
-          <div className="view-selector">
-            {Object.keys(VIEWS).map((VIEW) => (
-              <label htmlFor={`view-selector-${VIEW}`} key={VIEW}>
-                <input
-                  type="radio"
-                  value={VIEW}
-                  checked={VIEW === view}
-                  onChange={(e) => selectView(e.target.value)}
-                  className="view-selector-input"
-                  id={`view-selector-${VIEW}`}
-                  name="view-selector"
-                />
-                {VIEW}
-              </label>
-            ))}
+            <RefreshHandler />
           </div>
-          <Button
-            color="red"
-            appearance="primary"
-            size="sm"
-            onClick={() => {
-              if (confirmRefresh()) {
-                clearState();
-                window.location.reload();
-              }
-            }}
-          >
-            Hard refresh
-          </Button>
-          <RefreshHandler />
-        </div>
-      )}
-      <AssetController />
+        </Modal.Body>
+      </Modal>
     </div>
   );
 };

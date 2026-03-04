@@ -25,49 +25,6 @@ vi.mock("rsuite", () => ({
       {children}
     </button>
   ),
-  IconButton: ({
-    icon,
-    onClick,
-    color,
-  }: {
-    icon: React.ReactNode;
-    onClick?: () => void;
-    color?: string;
-  }) => (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rs-btn rs-btn-${color || "default"}`}
-    >
-      {icon}
-    </button>
-  ),
-}));
-
-// Mock rsuite icons
-vi.mock("@rsuite/icons/Close", () => ({
-  default: () => <span data-testid="close-icon">X</span>,
-}));
-
-// Mock TeamPlayer component
-vi.mock("./TeamPlayer", () => ({
-  default: ({
-    player,
-    onChange,
-  }: {
-    player: Player;
-    onChange: (p: Partial<Player>) => void;
-  }) => (
-    <div data-testid="team-player">
-      <span>Player: {player.name || "empty"}</span>
-      <button
-        type="button"
-        onClick={() => onChange({ name: "Updated Player" })}
-      >
-        Update
-      </button>
-    </div>
-  ),
 }));
 
 import {
@@ -80,8 +37,6 @@ const mockedUseMatch = vi.mocked(useMatch);
 
 describe("Team", () => {
   const mockEditPlayer = vi.fn();
-  const mockDeletePlayer = vi.fn();
-  const mockAddPlayer = vi.fn();
 
   const mockPlayers: Player[] = [
     { name: "Player One", number: 1, id: 101, show: true },
@@ -92,8 +47,6 @@ describe("Team", () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    // Default controller mock
-    // Default controller mock with roster-based data model
     mockedUseController.mockReturnValue({
       controller: {
         roster: {
@@ -105,11 +58,8 @@ describe("Team", () => {
         },
       },
       editPlayer: mockEditPlayer,
-      deletePlayer: mockDeletePlayer,
-      addPlayer: mockAddPlayer,
     } as unknown as ReturnType<typeof useController>);
 
-    // Default match mock
     mockedUseMatch.mockReturnValue({
       match: {
         homeTeamId: 10,
@@ -125,17 +75,25 @@ describe("Team", () => {
       render(<Team teamName="homeTeam" />);
 
       expect(screen.getByText("Home FC")).toBeInTheDocument();
-      expect(screen.getByText("Player: Player One")).toBeInTheDocument();
-      expect(screen.getByText("Player: Player Two")).toBeInTheDocument();
-      expect(screen.getByText("Player: Player Three")).toBeInTheDocument();
+      expect(screen.getByText("Player One")).toBeInTheDocument();
+      expect(screen.getByText("Player Two")).toBeInTheDocument();
+      expect(screen.getByText("Player Three")).toBeInTheDocument();
     });
 
     it("should render away team name and players", () => {
       render(<Team teamName="awayTeam" />);
 
       expect(screen.getByText("Away United")).toBeInTheDocument();
-      expect(screen.getByText("Player: Away One")).toBeInTheDocument();
-      expect(screen.getByText("Player: Away Two")).toBeInTheDocument();
+      expect(screen.getByText("Away One")).toBeInTheDocument();
+      expect(screen.getByText("Away Two")).toBeInTheDocument();
+    });
+
+    it("should render player numbers", () => {
+      render(<Team teamName="homeTeam" />);
+
+      expect(screen.getByText("1")).toBeInTheDocument();
+      expect(screen.getByText("2")).toBeInTheDocument();
+      expect(screen.getByText("3")).toBeInTheDocument();
     });
 
     it("should render nothing when team name is not set", () => {
@@ -149,96 +107,57 @@ describe("Team", () => {
       } as unknown as ReturnType<typeof useMatch>);
 
       const { container } = render(<Team teamName="homeTeam" />);
-      expect(screen.queryByText("Player: Player One")).not.toBeInTheDocument();
+      expect(screen.queryByText("Player One")).not.toBeInTheDocument();
       expect(
         container.querySelector(".player-whole-line"),
       ).not.toBeInTheDocument();
     });
 
-    it("should render add player button even when roster is empty", () => {
-      mockedUseController.mockReturnValue({
-        controller: {
-          roster: {
-            home: [],
-            away: [],
-          },
-        },
-        editPlayer: mockEditPlayer,
-        deletePlayer: mockDeletePlayer,
-        addPlayer: mockAddPlayer,
-      } as unknown as ReturnType<typeof useController>);
-
+    it("should not render add player button", () => {
       render(<Team teamName="homeTeam" />);
-      expect(screen.getByText("Ný lína...")).toBeInTheDocument();
-    });
-  });
-
-  describe("Add player functionality", () => {
-    it("should call addPlayer with correct teamId when add button clicked", () => {
-      render(<Team teamName="homeTeam" />);
-
-      const addButton = screen.getByText("Ný lína...");
-      fireEvent.click(addButton);
-
-      expect(mockAddPlayer).toHaveBeenCalledWith("home");
+      expect(screen.queryByText("+ Ný lína")).not.toBeInTheDocument();
     });
 
-    it("should call addPlayer with away team ID for away team", () => {
-      render(<Team teamName="awayTeam" />);
-
-      const addButton = screen.getByText("Ný lína...");
-      fireEvent.click(addButton);
-
-      expect(mockAddPlayer).toHaveBeenCalledWith("away");
-    });
-  });
-
-  describe("Delete player functionality", () => {
-    it("should call deletePlayer when close icon clicked", () => {
+    it("should not render delete buttons", () => {
       const { container } = render(<Team teamName="homeTeam" />);
-
-      const playerLines = container.querySelectorAll(".player-whole-line");
-      expect(playerLines.length).toBe(3);
-
-      const firstPlayerLine = playerLines[0] as HTMLElement;
-      const buttons = firstPlayerLine.querySelectorAll("button");
-      const deleteButton = Array.from(buttons).find((btn) =>
-        btn.className.includes("red"),
-      );
-
-      expect(deleteButton).toBeDefined();
-      fireEvent.click(deleteButton!);
-
-      expect(mockDeletePlayer).toHaveBeenCalledWith("home", 0);
-    });
-
-    it("should not render delete button when selectPlayer is provided", () => {
-      const mockSelectPlayer = vi.fn();
-      const { container } = render(
-        <Team teamName="homeTeam" selectPlayer={mockSelectPlayer} />,
-      );
-
-      const playerLines = container.querySelectorAll(".player-whole-line");
-      const firstPlayerLine = playerLines[0] as HTMLElement;
-      const buttons = firstPlayerLine.querySelectorAll("button");
-      const deleteButton = Array.from(buttons).find((btn) =>
-        btn.className.includes("red"),
-      );
-
-      expect(deleteButton).toBeUndefined();
+      const redButtons = container.querySelectorAll(".rs-btn-red");
+      expect(redButtons.length).toBe(0);
     });
   });
 
-  describe("Edit player functionality", () => {
-    it("should call editPlayer when TeamPlayer onChange is triggered", () => {
-      render(<Team teamName="homeTeam" />);
+  describe("Show checkbox", () => {
+    it("should render checkboxes for each player", () => {
+      const { container } = render(<Team teamName="homeTeam" />);
+      const checkboxes = container.querySelectorAll('input[type="checkbox"]');
+      expect(checkboxes.length).toBe(3);
+    });
 
-      const updateButtons = screen.getAllByText("Update");
-      fireEvent.click(updateButtons[0] as HTMLElement);
+    it("should reflect player show state in checkboxes", () => {
+      const { container } = render(<Team teamName="homeTeam" />);
+      const checkboxes = container.querySelectorAll('input[type="checkbox"]');
 
-      expect(mockEditPlayer).toHaveBeenCalledWith("home", 0, {
-        name: "Updated Player",
-      });
+      expect(checkboxes[0]).toBeChecked(); // Player One show: true
+      expect(checkboxes[1]).toBeChecked(); // Player Two show: true
+      expect(checkboxes[2]).not.toBeChecked(); // Player Three show: false
+    });
+
+    it("should call editPlayer to toggle show when checkbox clicked", () => {
+      const { container } = render(<Team teamName="homeTeam" />);
+      const checkboxes = container.querySelectorAll('input[type="checkbox"]');
+
+      fireEvent.click(checkboxes[0] as HTMLElement);
+      expect(mockEditPlayer).toHaveBeenCalledWith("home", 0, { show: false });
+
+      fireEvent.click(checkboxes[2] as HTMLElement);
+      expect(mockEditPlayer).toHaveBeenCalledWith("home", 2, { show: true });
+    });
+
+    it("should call editPlayer with away side for away team", () => {
+      const { container } = render(<Team teamName="awayTeam" />);
+      const checkboxes = container.querySelectorAll('input[type="checkbox"]');
+
+      fireEvent.click(checkboxes[0] as HTMLElement);
+      expect(mockEditPlayer).toHaveBeenCalledWith("away", 0, { show: false });
     });
   });
 
@@ -259,10 +178,13 @@ describe("Team", () => {
       expect(input).not.toBeInTheDocument();
     });
 
-    it("should render buttons instead of TeamPlayer when selectPlayer provided", () => {
-      render(<Team teamName="homeTeam" selectPlayer={mockSelectPlayer} />);
+    it("should render buttons instead of checkboxes when selectPlayer provided", () => {
+      const { container } = render(
+        <Team teamName="homeTeam" selectPlayer={mockSelectPlayer} />,
+      );
 
-      expect(screen.queryByTestId("team-player")).not.toBeInTheDocument();
+      const checkboxes = container.querySelectorAll('input[type="checkbox"]');
+      expect(checkboxes.length).toBe(0);
       expect(screen.getByText("#1 - Player One")).toBeInTheDocument();
     });
 
@@ -322,8 +244,6 @@ describe("Team", () => {
           },
         },
         editPlayer: mockEditPlayer,
-        deletePlayer: mockDeletePlayer,
-        addPlayer: mockAddPlayer,
       } as unknown as ReturnType<typeof useController>);
 
       render(<Team teamName="homeTeam" selectPlayer={mockSelectPlayer} />);
@@ -340,8 +260,6 @@ describe("Team", () => {
           },
         },
         editPlayer: mockEditPlayer,
-        deletePlayer: mockDeletePlayer,
-        addPlayer: mockAddPlayer,
       } as unknown as ReturnType<typeof useController>);
 
       render(<Team teamName="homeTeam" selectPlayer={mockSelectPlayer} />);
@@ -360,14 +278,12 @@ describe("Team", () => {
           },
         },
         editPlayer: mockEditPlayer,
-        deletePlayer: mockDeletePlayer,
-        addPlayer: mockAddPlayer,
       } as unknown as ReturnType<typeof useController>);
 
       render(<Team teamName="homeTeam" />);
 
       expect(screen.getByText("Home FC")).toBeInTheDocument();
-      expect(screen.queryByTestId("team-player")).not.toBeInTheDocument();
+      expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
     });
 
     it("should handle missing players object for team", () => {
@@ -379,33 +295,27 @@ describe("Team", () => {
           },
         },
         editPlayer: mockEditPlayer,
-        deletePlayer: mockDeletePlayer,
-        addPlayer: mockAddPlayer,
       } as unknown as ReturnType<typeof useController>);
 
       render(<Team teamName="homeTeam" />);
 
       expect(screen.getByText("Home FC")).toBeInTheDocument();
-      expect(screen.queryByTestId("team-player")).not.toBeInTheDocument();
     });
 
-    it("should handle undefined selectedMatchObj", () => {
+    it("should handle player with no name", () => {
       mockedUseController.mockReturnValue({
         controller: {
           roster: {
-            home: [],
+            home: [{ number: 99, show: true } as Player],
             away: [],
           },
         },
         editPlayer: mockEditPlayer,
-        deletePlayer: mockDeletePlayer,
-        addPlayer: mockAddPlayer,
       } as unknown as ReturnType<typeof useController>);
 
       render(<Team teamName="homeTeam" />);
 
-      expect(screen.getByText("Home FC")).toBeInTheDocument();
-      expect(screen.queryByTestId("team-player")).not.toBeInTheDocument();
+      expect(screen.getByText("99")).toBeInTheDocument();
     });
   });
 });

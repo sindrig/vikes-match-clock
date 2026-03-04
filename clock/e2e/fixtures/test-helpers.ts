@@ -3,8 +3,12 @@ import { test as base, expect, Page, request } from "@playwright/test";
 export const ONE_MINUTE = 60000;
 export const SECOND = 1000;
 
-export const TEST_LISTEN_PREFIX = "test-e2e";
-const TEST_EMAIL = "e2e-test@test.com";
+const WORKER_ID =
+  process.env.PW_TEST_WORKER_INDEX ??
+  process.env.TEST_WORKER_INDEX ??
+  process.pid.toString();
+export const TEST_LISTEN_PREFIX = `test-location-${WORKER_ID}`;
+const TEST_EMAIL = `e2e-test-${WORKER_ID}@test.com`;
 const TEST_PASSWORD = "testpassword123";
 const EMAIL_PREFIX = TEST_EMAIL.split("@")[0];
 
@@ -31,24 +35,22 @@ async function clearEmulatorData(): Promise<void> {
 
     // Create initial locations data that persists across test runs
     await apiContext.put(
-      "http://127.0.0.1:9000/locations.json?ns=vikes-match-clock-test",
+      `http://127.0.0.1:9000/locations/${TEST_LISTEN_PREFIX}.json?ns=vikes-match-clock-test`,
       {
         data: {
-          "test-location": {
-            label: "Test Location",
-            screens: [
-              {
-                name: "Display 1",
-              },
-            ],
-          },
+          label: `Test Location ${WORKER_ID}`,
+          screens: [
+            {
+              name: "Display 1",
+            },
+          ],
         },
       },
     );
 
     // Create initial state data for test-location so Firebase listeners don't hang
     await apiContext.put(
-      "http://127.0.0.1:9000/states/test-location.json?ns=vikes-match-clock-test",
+      `http://127.0.0.1:9000/states/${TEST_LISTEN_PREFIX}.json?ns=vikes-match-clock-test`,
       {
         data: {
           match: {
@@ -124,30 +126,16 @@ export async function loginWithEmulatorUser(page: Page): Promise<void> {
     .getByPlaceholder("E-mail")
     .waitFor({ state: "visible", timeout: 15000 });
   await page.getByPlaceholder("E-mail").fill(TEST_EMAIL);
-  await page.getByPlaceholder("Password").fill(TEST_PASSWORD);
-  await page.getByRole("button", { name: "Login", exact: true }).click();
+  await page.getByPlaceholder("Lykilorð").fill(TEST_PASSWORD);
+  await page.getByRole("button", { name: "Innskrá", exact: true }).click();
 
-  // Wait for login form to disappear (indicates auth success)
-  await page
-    .getByPlaceholder("E-mail")
-    .waitFor({ state: "hidden", timeout: 15000 });
-
-  // Get the real UID from Firebase Auth after successful login
-  const userUID = await page.evaluate(() => {
-    // Access the Firebase auth instance that was initialized in the app
-    return (window as any).__firebaseAuthUID || null;
+  await page.waitForFunction(() => (window as any).__firebaseAuthUID, null, {
+    timeout: 15000,
   });
 
-  // If we can't get UID from window, try extracting from the auth listener callback
-  // by waiting for auth state to settle
-  let realUID = userUID;
-  if (!realUID) {
-    // Wait a bit for auth state to propagate
-    await page.waitForTimeout(500);
-    realUID = await page.evaluate(() => {
-      return (window as any).__firebaseAuthUID || null;
-    });
-  }
+  const realUID = await page.evaluate(() => {
+    return (window as any).__firebaseAuthUID || null;
+  });
 
   if (!realUID) {
     throw new Error(
@@ -160,57 +148,29 @@ export async function loginWithEmulatorUser(page: Page): Promise<void> {
   const apiContext = await request.newContext();
   try {
     await apiContext.put(
-      `http://127.0.0.1:9000/auth/${realUID}.json?ns=vikes-match-clock-test`,
+      `http://127.0.0.1:9000/auth/${realUID}/${TEST_LISTEN_PREFIX}.json?ns=vikes-match-clock-test`,
       {
-        data: {
-          "test-location": true,
-        },
+        data: true,
       },
     );
   } finally {
     await apiContext.dispose();
   }
 
-  // Wait for at least one screen button to be visible
-  await page
-    .locator(".screen-selector-button")
-    .first()
-    .waitFor({ state: "visible", timeout: 15000 });
-
-  // Click first screen button to set listenPrefix
-  await page.locator(".screen-selector-button").first().click();
+  const screenButton = page.getByRole("button", {
+    name: new RegExp(`Test Location ${WORKER_ID}`),
+  });
+  await screenButton.waitFor({ state: "visible", timeout: 15000 });
+  await screenButton.click({ force: true });
 
   // After clicking the screen button, the app will:
   // 1. Set listenPrefix
   // 2. Load Firebase data for that location
   // 3. Render the display + Controller UI
-  // Wait for the Controller Nav tabs to appear, specifically the "Heim" button
-  // which is part of the authenticated full UI
+  // Wait for the Controller Nav tabs to appear (Biðröð is the default tab)
 
-  // First, give the page a moment to process the click and start loading
-  await page.waitForTimeout(500);
-
-  // Log current state for debugging
-  const debugState = await page.evaluate(() => {
-    return {
-      listenPrefix: localStorage.getItem("clock_listenPrefix"),
-      firebaseAuthUID: (window as any).__firebaseAuthUID,
-    };
-  });
-  console.log("[DEBUG] After screen button click:", debugState);
-
-  // Wait for Controller UI to appear - specifically the "Heim" button
   await page
-    .getByRole("button", { name: "Heim", exact: true })
-    .waitFor({ state: "visible", timeout: 10000 });
-
-  // Navigate to Settings tab to complete the login flow
-  await page.waitForTimeout(1000);
-  await page.getByText("Stillingar").click({ force: true });
-
-  // Wait for Settings content to load (match start time selector is a good indicator)
-  await page
-    .locator(".match-start-time-selector")
+    .getByRole("button", { name: "Biðröð" })
     .waitFor({ state: "visible", timeout: 10000 });
 }
 
@@ -232,11 +192,29 @@ export const test = base.extend<{
 export { ensureEmulatorUser, clearEmulatorData };
 
 export async function goToHomeTab(page: Page) {
-  await page.getByRole("button", { name: "Heim", exact: true }).click();
+  await page.getByRole("button", { name: "Biðröð" }).click();
 }
 
 export async function goToSettingsTab(page: Page) {
-  await page.getByText("Stillingar").click();
+  await page.getByRole("button", { name: "Stillingar" }).click();
+}
+
+export async function closeSettings(page: Page) {
+  await page.keyboard.press("Escape");
+  await page
+    .locator(".rs-modal-backdrop")
+    .waitFor({ state: "hidden", timeout: 5000 })
+    .catch(() => {});
+}
+
+export async function selectViewMode(
+  page: Page,
+  mode: "Idle" | "Match" | "Control",
+) {
+  await page
+    .locator(".view-mode-buttons")
+    .getByText(mode, { exact: true })
+    .click();
 }
 
 export async function selectMatchType(
@@ -251,12 +229,20 @@ export async function selectView(
   page: Page,
   view: "match" | "control" | "idle",
 ) {
-  await page.locator(`#view-selector-${view}`).click();
+  const viewModeLabel = {
+    match: "Match",
+    control: "Control",
+    idle: "Idle",
+  } as const;
+  await page
+    .locator(".view-mode-buttons")
+    .getByText(viewModeLabel[view], { exact: true })
+    .click();
 }
 
 export async function startClock(page: Page) {
   await page.getByText("Byrja").click();
-  await expect(page.getByText("Pása")).toBeVisible({ timeout: 5000 });
+  await expect(page.getByText("Pása")).toBeVisible({ timeout: 15000 });
 }
 
 export async function pauseClock(page: Page) {
@@ -286,15 +272,64 @@ export async function nextHalf(page: Page) {
 }
 
 export async function addHomeGoal(page: Page) {
-  await page.getByText("H +1").click();
+  await page
+    .locator(".preview-score-buttons")
+    .first()
+    .getByRole("button")
+    .first()
+    .click({ force: true });
+  const celebrationDialog = page.locator(".rs-modal");
+  if (await celebrationDialog.isVisible().catch(() => false)) {
+    await page.keyboard.press("Escape");
+    await celebrationDialog.waitFor({ state: "hidden", timeout: 5000 });
+  }
 }
 
 export async function subtractHomeGoal(page: Page) {
-  await page.getByText("H -1").click();
+  await page
+    .locator(".preview-score-buttons")
+    .first()
+    .getByRole("button")
+    .nth(1)
+    .click({ force: true });
 }
 
 export async function addAwayGoal(page: Page) {
-  await page.getByText("Ú +1").click();
+  await page
+    .locator(".preview-score-buttons")
+    .last()
+    .getByRole("button")
+    .first()
+    .click({ force: true });
+}
+
+export async function openTimeControl(page: Page) {
+  await page
+    .getByRole("button", { name: "Tímastjórnun" })
+    .click({ force: true });
+  await page
+    .locator(".time-adjust-btn")
+    .first()
+    .waitFor({ state: "visible", timeout: 5000 });
+}
+
+export async function closeTimeControl(page: Page) {
+  await page.keyboard.press("Escape");
+  await page.locator(".rs-modal").waitFor({ state: "hidden", timeout: 5000 });
+}
+
+export async function adjustTime(page: Page, amount: string) {
+  await openTimeControl(page);
+  await page
+    .locator(".time-adjust-btn", { hasText: amount })
+    .click({ force: true });
+  await closeTimeControl(page);
+}
+
+export async function setInjuryTime(page: Page, minutes: string) {
+  await openTimeControl(page);
+  await page.locator(".longerInput").fill(minutes);
+  await closeTimeControl(page);
 }
 
 export async function expectClockTime(page: Page, time: string) {

@@ -145,6 +145,7 @@ function setupState3() {
     controller: { view: VIEWS.idle, currentAsset: null },
     selectView: vi.fn(),
     renderAsset: vi.fn(),
+    selectAssetView: vi.fn(),
   } as unknown as ReturnType<typeof useController>);
   mockedUseView.mockReturnValue({
     view: { vp: defaultViewport, background: "Default" },
@@ -232,16 +233,16 @@ describe("Controller", () => {
         screen.getByRole("option", { name: "Veldu skjá" }),
       ).toBeInTheDocument();
       expect(screen.getByPlaceholderText("E-mail")).toBeInTheDocument();
-      expect(screen.getByPlaceholderText("Password")).toBeInTheDocument();
-      expect(screen.getByText("Login")).toBeInTheDocument();
-      expect(screen.getByText("Login (google)")).toBeInTheDocument();
+      expect(screen.getByPlaceholderText("Lykilorð")).toBeInTheDocument();
+      expect(screen.getByText("Innskrá")).toBeInTheDocument();
+      expect(screen.getByText("Innskrá með Google")).toBeInTheDocument();
     });
 
     it("does not render tabs", () => {
       setupState1();
       render(<Controller />);
 
-      expect(screen.queryByText("Heim")).not.toBeInTheDocument();
+      expect(screen.queryByText("Biðröð")).not.toBeInTheDocument();
       expect(screen.queryByText("Myndefni")).not.toBeInTheDocument();
       expect(screen.queryByText("Stillingar")).not.toBeInTheDocument();
     });
@@ -290,7 +291,7 @@ describe("Controller", () => {
       });
       render(<Controller />);
 
-      const form = screen.getByText("Login");
+      const form = screen.getByText("Innskrá");
       fireEvent.click(form);
 
       expect(firebaseAuth.login).toHaveBeenCalledWith(
@@ -352,8 +353,8 @@ describe("Controller", () => {
       render(<Controller />);
 
       expect(screen.queryByPlaceholderText("E-mail")).not.toBeInTheDocument();
-      expect(screen.queryByPlaceholderText("Password")).not.toBeInTheDocument();
-      expect(screen.queryByText("Login")).not.toBeInTheDocument();
+      expect(screen.queryByPlaceholderText("Lykilorð")).not.toBeInTheDocument();
+      expect(screen.queryByText("Innskrá")).not.toBeInTheDocument();
     });
 
     it("shows empty message when available array is empty", () => {
@@ -387,47 +388,47 @@ describe("Controller", () => {
       render(<Controller />);
 
       expect(screen.queryByPlaceholderText("E-mail")).not.toBeInTheDocument();
-      expect(screen.queryByText("Login")).not.toBeInTheDocument();
+      expect(screen.queryByText("Innskrá")).not.toBeInTheDocument();
     });
 
     it("does not render tabs", () => {
       setupState2();
       render(<Controller />);
 
-      expect(screen.queryByText("Heim")).not.toBeInTheDocument();
+      expect(screen.queryByText("Biðröð")).not.toBeInTheDocument();
       expect(screen.queryByText("Stillingar")).not.toBeInTheDocument();
     });
   });
 
   describe("State 3: authenticated", () => {
-    it("renders tabs (Heim, Myndefni, Stillingar)", () => {
+    it("renders tabs (Biðröð, Lið, Myndefni) and settings gear button", () => {
       setupState3();
       render(<Controller />);
 
-      expect(screen.getByText("Heim")).toBeInTheDocument();
+      expect(screen.getByText("Biðröð")).toBeInTheDocument();
+      expect(screen.getByText("Lið")).toBeInTheDocument();
       expect(screen.getByText("Myndefni")).toBeInTheDocument();
-      expect(screen.getByText("Stillingar")).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Stillingar" }),
+      ).toBeInTheDocument();
     });
 
-    it("shows MatchActions on home tab by default", () => {
+    it("shows AssetController on queue tab by default", () => {
       setupState3();
       render(<Controller />);
 
-      expect(screen.getByTestId("match-actions")).toBeInTheDocument();
-      expect(
-        screen.queryByTestId("match-action-settings"),
-      ).not.toBeInTheDocument();
+      expect(screen.getByTestId("asset-controller")).toBeInTheDocument();
       expect(screen.queryByTestId("media-manager")).not.toBeInTheDocument();
     });
 
-    it("switches to Stillingar tab locally", () => {
+    it("opens settings modal when gear button is clicked", () => {
       setupState3();
       render(<Controller />);
 
-      fireEvent.click(screen.getByText("Stillingar"));
+      fireEvent.click(screen.getByRole("button", { name: "Stillingar" }));
 
       expect(screen.getByTestId("match-action-settings")).toBeInTheDocument();
-      expect(screen.queryByTestId("match-actions")).not.toBeInTheDocument();
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
     });
 
     it("switches to Myndefni tab locally", () => {
@@ -437,7 +438,7 @@ describe("Controller", () => {
       fireEvent.click(screen.getByText("Myndefni"));
 
       expect(screen.getByTestId("media-manager")).toBeInTheDocument();
-      expect(screen.queryByTestId("match-actions")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("asset-controller")).not.toBeInTheDocument();
     });
 
     it("does not render login form or screen selector", () => {
@@ -450,11 +451,25 @@ describe("Controller", () => {
       ).not.toBeInTheDocument();
     });
 
-    it("renders AssetController", () => {
+    it("renders AssetController on queue tab", () => {
       setupState3();
       render(<Controller />);
 
       expect(screen.getByTestId("asset-controller")).toBeInTheDocument();
+    });
+
+    it("syncs assetView to teams when Lið tab is clicked", () => {
+      const mockSelectAssetView = vi.fn();
+      setupState3();
+      mockedUseController.mockReturnValue({
+        ...mockedUseController(),
+        selectAssetView: mockSelectAssetView,
+      } as unknown as ReturnType<typeof useController>);
+      render(<Controller />);
+
+      fireEvent.click(screen.getByText("Lið"));
+
+      expect(mockSelectAssetView).toHaveBeenCalledWith("teams");
     });
   });
 });

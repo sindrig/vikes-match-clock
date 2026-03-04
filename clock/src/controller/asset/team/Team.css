@@ -1,40 +1,121 @@
-.team-player-number {
-  width: 25px;
-}
-.team-player-role {
-  width: 80px;
-}
-
-div.team-asset-player {
-  float: none;
+.team-columns {
+  display: flex;
+  gap: 12px;
 }
 
 .team-asset-container {
-  float: left;
-  margin-left: 40px;
+  flex: 1;
+  min-width: 0;
+  border: 1px solid #3c3f43;
+  border-radius: 6px;
+  padding: 8px 8px 12px;
 }
 
-.team-asset-controller {
-  clear: both;
-}
-
-.team-asset-controller .sub-controller {
-  clear: both;
-}
-
-.team-player {
-  float: left;
-}
-
-.team-asset-container button {
-  clear: none;
-  /*height: 22px;*/
-}
-
-.team-asset-container .player-input {
-  width: 250px;
+.team-asset-container .team-name {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #3c3f43;
 }
 
 .team-asset-container .player-whole-line {
-  height: 35px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+  padding: 1px 0;
+}
+
+.team-asset-container .player-input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.player-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+}
+
+.player-row input[type="checkbox"] {
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.player-number {
+  font-weight: 600;
+  min-width: 20px;
+  text-align: right;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.player-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.team-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.button-group {
+  border: 1px solid #3c3f43;
+  border-radius: 6px;
+  padding: 8px;
+}
+
+.button-group-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  opacity: 0.6;
+  margin-bottom: 6px;
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.button-group button {
+  border: 1px solid #747474;
+  background-color: lightgray;
+  border-radius: 3px;
+  padding: 3px 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.button-group button:hover {
+  border-color: #494949;
+  background-color: rgb(187, 187, 187);
+}
+
+.button-group .cancel-btn {
+  background-color: #d9534f;
+  border-color: #d43f3a;
+  color: white;
+}
+
+.button-group .cancel-btn:hover {
+  background-color: #c9302c;
+  border-color: #ac2925;
+}
+
+.effect-select {
+  margin-top: 6px;
+  font-size: 12px;
 }

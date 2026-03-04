@@ -1,6 +1,4 @@
 .asset-controller .controls div {
-  float: none;
-  clear: both;
 }
 
 .asset-controller > div {
@@ -9,27 +7,14 @@
 }
 
 .asset-controller {
-  height: calc(100vh - 110px);
   width: 100%;
-  overflow: scroll;
+  overflow: auto;
   margin: 0px 5px 5px 5px;
-  float: left;
 }
 
 .asset-controller .view-selector {
-  position: relative;
-  float: left;
-}
-
-.asset-controller .assettabs {
-  clear: both;
-  width: 90%;
-  float: left;
-  margin: 10px;
-}
-
-.asset-controller .view-selector button {
-  float: left;
+  display: flex;
+  gap: 4px;
 }
 
 .asset-controller .controls .rs-btn-default {
@@ -39,7 +24,8 @@
 
 .asset-controller .controls {
   width: 130px;
-  float: left;
+  display: inline-block;
+  vertical-align: top;
 }
 .asset-controller .controls select {
   width: 130px;
@@ -48,6 +34,7 @@
 .asset-controller .upcoming-assets {
   position: relative;
   width: 500px;
-  float: left;
+  display: inline-block;
+  vertical-align: top;
   margin-left: 10px;
 }

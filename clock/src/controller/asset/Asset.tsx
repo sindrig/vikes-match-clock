@@ -83,7 +83,7 @@ const AssetComponent = (props: AssetProps) => {
           overlay={playerAsset.overlay || { text: "" }}
           includeBackground={includeBackground}
         >
-          {playerAsset.background ? (
+          {includeBackground !== false && playerAsset.background ? (
             <img src={playerAsset.background} alt={playerAsset.background} />
           ) : null}
           <img src={playerAsset.key} alt={playerAsset.key} />
@@ -102,7 +102,7 @@ const AssetComponent = (props: AssetProps) => {
           overlay={playerAsset.overlay || { text: "" }}
           includeBackground={includeBackground}
         >
-          {playerAsset.background ? (
+          {includeBackground !== false && playerAsset.background ? (
             <img src={playerAsset.background} alt={playerAsset.background} />
           ) : null}
           {teamName && teamName in clubLogos ? (
@@ -221,8 +221,36 @@ const AssetComponent = (props: AssetProps) => {
       return renderUrl();
 
     case assetTypes.PLAYER:
-    case assetTypes.NO_IMAGE_PLAYER:
+    case assetTypes.NO_IMAGE_PLAYER: {
+      if (asset.background) {
+        const playerCard = getPlayerAsset({
+          asset,
+          widthMultiplier: 1,
+          includeBackground: false,
+        });
+        return (
+          <>
+            <img
+              src={asset.background}
+              alt="background"
+              style={{ height: "100%", width: "100%" }}
+            />
+            <div
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+              }}
+            >
+              {playerCard}
+            </div>
+          </>
+        );
+      }
       return getPlayerAsset({ asset, widthMultiplier: 1 });
+    }
     case assetTypes.MOTM:
       return (
         <MOTM>

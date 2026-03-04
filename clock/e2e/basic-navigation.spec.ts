@@ -11,6 +11,9 @@ import {
   startSimpleClockAndWait,
   stopSimpleClockAndWait,
   startCountdownAndWait,
+  closeSettings,
+  adjustTime,
+  setInjuryTime,
 } from "./fixtures/test-helpers";
 
 test.describe("Basic navigation", () => {
@@ -31,10 +34,13 @@ test.describe("Basic navigation", () => {
 
   test("starts the clock and does some things", async ({ page }) => {
     const fakeClock = new FakeClock(new Date(2025, 3, 10, 12, 0, 0));
-    await page.getByText("Stillingar").click();
+    await page.getByRole("button", { name: "Stillingar" }).click();
     await page.locator(".match-start-time-selector").fill("12:30");
-    await page.locator("#view-selector-match").click();
-    await page.getByRole("button", { name: "Heim", exact: true }).click();
+    await closeSettings(page);
+    await page
+      .locator(".view-mode-buttons")
+      .getByText("Match", { exact: true })
+      .click();
     await expect(page.getByText("Hefja niðurtalningu")).toHaveCount(1);
     await startClock(page);
     await expect(page.getByText("Hefja niðurtalningu")).toHaveCount(0);
@@ -42,30 +48,32 @@ test.describe("Basic navigation", () => {
     await expect(page.getByText("Pása")).toHaveCount(1);
     await fakeClock.advance(page, ONE_MINUTE);
     await expect(page.locator(".matchclock")).toHaveText("01:30");
-    await page.getByText("Stillingar").click();
+    await page.getByRole("button", { name: "Stillingar" }).click();
     await page.locator("#team-selector-awayTeam").fill("fram");
+    await closeSettings(page);
     await fakeClock.advance(page, ONE_MINUTE * 10);
     await expect(page.locator(".matchclock")).toContainText(/11:3\d/);
     await expect(page.locator(".away img")).toHaveCount(1);
     await expect(page.locator(".away img")).toHaveAttribute("src", /Fram/);
+    await page.getByRole("button", { name: "Stillingar" }).click();
     await expect(page.locator(".halfstops-input")).toHaveCount(4);
+    await closeSettings(page);
     await fakeClock.advance(page, ONE_MINUTE * 35);
     await expect(page.locator(".matchclock")).toContainText(/46:3\d/);
-    await page.getByRole("button", { name: "Heim", exact: true }).click();
     await page.getByText("Pása").click();
     await expect(page.getByText("Hefja niðurtalningu")).toHaveCount(0);
     await page.getByText("Næsti hálfleikur").click();
     await fakeClock.advance(page, ONE_MINUTE);
     await expect(page.locator(".matchclock")).toHaveText("45:00");
-    await page.getByText("Stillingar").click();
+    await page.getByRole("button", { name: "Stillingar" }).click();
     await expect(page.locator(".halfstops-input")).toHaveCount(3);
-    await page.getByRole("button", { name: "Heim", exact: true }).click();
+    await closeSettings(page);
     await startClock(page);
     await fakeClock.advance(page, ONE_MINUTE);
-    await page.getByText("+5m").click();
+    await adjustTime(page, "+5m");
     await fakeClock.advance(page, ONE_MINUTE);
     await expect(page.locator(".matchclock")).toHaveText("52:00");
-    await page.locator(".longerInput").fill("5");
+    await setInjuryTime(page, "5");
     await expect(page.locator(".injury-time")).toHaveText("+5");
   });
 
@@ -73,10 +81,13 @@ test.describe("Basic navigation", () => {
     page,
   }) => {
     const fakeClock = new FakeClock(new Date(2025, 3, 10, 12, 0, 0));
-    await page.getByText("Stillingar").click();
-    await page.locator("#view-selector-match").click();
+    await page.getByRole("button", { name: "Stillingar" }).click();
     await page.locator(".match-type-selector").selectOption("handball");
-    await page.locator("#view-selector-control").click();
+    await closeSettings(page);
+    await page
+      .locator(".view-mode-buttons")
+      .getByText("Control", { exact: true })
+      .click();
 
     await expect(page.getByText("Stop")).toHaveCount(0);
     await expect(
@@ -130,10 +141,13 @@ test.describe("Basic navigation", () => {
 
   test("starts a countdown", async ({ page }) => {
     const fakeClock = new FakeClock(new Date(2025, 3, 10, 12, 0, 0));
-    await page.getByText("Stillingar").click();
+    await page.getByRole("button", { name: "Stillingar" }).click();
     await page.locator(".match-start-time-selector").fill("13:30");
-    await page.locator("#view-selector-match").click();
-    await page.getByRole("button", { name: "Heim", exact: true }).click();
+    await closeSettings(page);
+    await page
+      .locator(".view-mode-buttons")
+      .getByText("Match", { exact: true })
+      .click();
     await startCountdownAndWait(page);
 
     await fakeClock.advance(page, SECOND);
