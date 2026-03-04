@@ -12,7 +12,7 @@ export default defineConfig({
     "process.env.PUBLIC_URL": JSON.stringify(""),
   },
   server: {
-    port: 3000,
+    port: process.env.PORT ? parseInt(process.env.PORT, 10) : 3000,
     open: false,
   },
   build: {

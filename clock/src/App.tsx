@@ -239,7 +239,17 @@ function App() {
     );
   }
 
-  // State 3: authenticated — full UI with disconnect/logout button
+  // State 3: authenticated, no listenPrefix — show ONLY screen selector
+  if (!listenPrefix) {
+    return (
+      <div>
+        <Controller />
+        <StateListener />
+      </div>
+    );
+  }
+
+  // State 4: authenticated + listenPrefix set — full UI with disconnect/logout button
   const disconnect = () => {
     setScreenViewport(null);
     setListenPrefix("");

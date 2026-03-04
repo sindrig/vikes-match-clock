@@ -1,6 +1,7 @@
 import type React from "react";
 import { useState } from "react";
 import { Nav, Button, Modal, IconButton } from "rsuite";
+import { RingLoader } from "react-spinners";
 import GearIcon from "@rsuite/icons/Gear";
 import MediaIcon from "@rsuite/icons/Media";
 import ListIcon from "@rsuite/icons/List";
@@ -15,7 +16,6 @@ const assetViewToTab: Record<string, string> = {
 import { firebaseAuth } from "../firebaseAuth";
 import MatchActionSettings from "./MatchActionSettings";
 import MediaManager from "./media/MediaManager";
-import LoginPage from "./LoginPage";
 import RefreshHandler from "./RefreshHandler";
 import AssetController from "./asset/AssetController";
 import "rsuite/dist/rsuite.min.css";
@@ -35,6 +35,7 @@ const Controller = () => {
     setPassword,
     listenPrefix,
     setListenPrefix,
+    available,
     setScreenViewport,
   } = useLocalState();
   const auth = useAuth();
@@ -53,11 +54,6 @@ const Controller = () => {
       e.preventDefault();
       firebaseAuth
         .login(email, password)
-        .then(() => {
-          if (email) {
-            setListenPrefix(email.split("@")[0] || "");
-          }
-        })
         .catch((err: Error) => alert(err.message));
     };
 
@@ -123,6 +119,53 @@ const Controller = () => {
             Login (google)
           </button>
         </div>
+      </div>
+    );
+  }
+
+  if (isAuthenticated && !listenPrefix) {
+    return (
+      <div className="screen-selector">
+        <h2>Veldu skjá til að stjórna</h2>
+        {available === null ? (
+          <RingLoader color="#1675e0" size={60} />
+        ) : available.length === 0 ? (
+          <p>Engir skjáir tiltækir</p>
+        ) : (
+          <div className="screen-selector-buttons">
+            {available.map((locationKey) => {
+              const locationScreens = screens.filter(
+                (s) => s.key === locationKey,
+              );
+              if (locationScreens.length === 0) return null;
+
+              const first = locationScreens[0];
+              if (!first) return null;
+              const label = first.label;
+              const screenNames = locationScreens
+                .map((s) => s.screen.name)
+                .join(" / ");
+              const buttonLabel = `${label} ${screenNames}`;
+
+              return (
+                <button
+                  key={locationKey}
+                  className="screen-selector-button"
+                  onClick={() => setListenPrefix(locationKey)}
+                >
+                  {buttonLabel}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        <button
+          type="button"
+          className="screen-selector-logout"
+          onClick={() => void firebaseAuth.logout()}
+        >
+          Útskrá
+        </button>
       </div>
     );
   }
@@ -194,7 +237,6 @@ const Controller = () => {
               Hard refresh
             </Button>
             <RefreshHandler />
-            <LoginPage />
           </div>
         </Modal.Body>
       </Modal>

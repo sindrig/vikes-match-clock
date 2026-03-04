@@ -19,7 +19,14 @@ vi.mock("../firebaseAuth", () => ({
   firebaseAuth: {
     login: vi.fn().mockResolvedValue(undefined),
     loginWithGoogle: vi.fn().mockResolvedValue(undefined),
+    logout: vi.fn().mockResolvedValue(undefined),
   },
+}));
+
+vi.mock("react-spinners", () => ({
+  RingLoader: ({ color, size }: { color: string; size: number }) => (
+    <div data-testid="ring-loader">{`RingLoader color=${color} size=${size}`}</div>
+  ),
 }));
 
 vi.mock("./MatchActions", () => ({
@@ -32,9 +39,6 @@ vi.mock("./MatchActionSettings", () => ({
 }));
 vi.mock("./media/MediaManager", () => ({
   default: () => <div data-testid="media-manager">MediaManager</div>,
-}));
-vi.mock("./LoginPage", () => ({
-  default: () => <div data-testid="login-page">LoginPage</div>,
 }));
 vi.mock("./RefreshHandler", () => ({
   default: () => <div data-testid="refresh-handler">RefreshHandler</div>,
@@ -49,6 +53,7 @@ import {
   useListeners,
 } from "../contexts/FirebaseStateContext";
 import { useAuth, useLocalState } from "../contexts/LocalStateContext";
+import { firebaseAuth } from "../firebaseAuth";
 
 const mockedUseController = vi.mocked(useController);
 const mockedUseView = vi.mocked(useView);
@@ -72,7 +77,7 @@ function setupState1() {
     listenPrefix: "",
     setListenPrefix: vi.fn(),
     auth: { isLoaded: true, isEmpty: true },
-    available: [],
+    available: null,
     screenViewport: null,
     setScreenViewport: vi.fn(),
   });
@@ -100,7 +105,7 @@ function setupState2() {
     listenPrefix: "vikinni",
     setListenPrefix: vi.fn(),
     auth: { isLoaded: true, isEmpty: true },
-    available: [],
+    available: null,
     screenViewport: null,
     setScreenViewport: vi.fn(),
   });
@@ -149,6 +154,65 @@ function setupState3() {
     screens: [],
     available: [],
   } as unknown as ReturnType<typeof useListeners>);
+}
+
+function setupScreenSelector(
+  overrides: {
+    available?: string[] | null;
+    setListenPrefix?: ReturnType<typeof vi.fn>;
+  } = {},
+) {
+  const mockSetListenPrefix = overrides.setListenPrefix ?? vi.fn();
+  const mockAvailable =
+    overrides.available !== undefined
+      ? overrides.available
+      : ["vikinni", "hasteinsvollur"];
+  mockedUseAuth.mockReturnValue({
+    isLoaded: true,
+    isEmpty: false,
+    email: "test@test.com",
+  });
+  mockedUseLocalState.mockReturnValue({
+    email: "test@test.com",
+    setEmail: vi.fn(),
+    password: "",
+    setPassword: vi.fn(),
+    listenPrefix: "",
+    setListenPrefix: mockSetListenPrefix,
+    auth: { isLoaded: true, isEmpty: false, email: "test@test.com" },
+    available: mockAvailable,
+    screenViewport: null,
+    setScreenViewport: vi.fn(),
+  });
+  mockedUseController.mockReturnValue({
+    controller: { view: VIEWS.idle, currentAsset: null },
+    selectView: vi.fn(),
+    renderAsset: vi.fn(),
+  } as unknown as ReturnType<typeof useController>);
+  mockedUseView.mockReturnValue({
+    view: { vp: defaultViewport, background: "Default" },
+  } as unknown as ReturnType<typeof useView>);
+  mockedUseListeners.mockReturnValue({
+    screens: [
+      {
+        label: "Víkingur Reykjavík",
+        screen: { name: "Norðurskjár", style: {}, key: "vikinni" },
+        key: "vikinni",
+      },
+      {
+        label: "Víkingur Reykjavík",
+        screen: { name: "Suðurskjár", style: {}, key: "vikinni" },
+        key: "vikinni",
+      },
+      {
+        label: "Hásteinsvöllur",
+        screen: { name: "Skjár 1", style: {}, key: "hasteinsvollur" },
+        key: "hasteinsvollur",
+      },
+    ],
+    available: mockAvailable,
+  } as unknown as ReturnType<typeof useListeners>);
+  return { setListenPrefix: mockSetListenPrefix };
 }
 
 describe("Controller", () => {
@@ -214,6 +278,100 @@ describe("Controller", () => {
 
       const button = screen.getByText("Birta skjá");
       expect(button).toBeDisabled();
+    });
+
+    it("email/password login does NOT call setListenPrefix", () => {
+      const mockSetListenPrefix = vi.fn();
+      setupState1();
+      mockedUseLocalState.mockReturnValue({
+        ...mockedUseLocalState(),
+        email: "test@vikingur.is",
+        password: "testpass",
+        setListenPrefix: mockSetListenPrefix,
+      });
+      render(<Controller />);
+
+      const form = screen.getByText("Login");
+      fireEvent.click(form);
+
+      expect(firebaseAuth.login).toHaveBeenCalledWith(
+        "test@vikingur.is",
+        "testpass",
+      );
+      expect(mockSetListenPrefix).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("State: authenticated, no listenPrefix (screen selector)", () => {
+    it("renders screen selector heading", () => {
+      setupScreenSelector();
+      render(<Controller />);
+
+      expect(screen.getByText("Veldu skjá til að stjórna")).toBeInTheDocument();
+    });
+
+    it("renders button for each available location with correct labels", () => {
+      setupScreenSelector();
+      render(<Controller />);
+
+      expect(
+        screen.getByText("Víkingur Reykjavík Norðurskjár / Suðurskjár"),
+      ).toBeInTheDocument();
+      expect(screen.getByText("Hásteinsvöllur Skjár 1")).toBeInTheDocument();
+    });
+
+    it("clicking location button calls setListenPrefix with location key", () => {
+      const { setListenPrefix } = setupScreenSelector();
+      render(<Controller />);
+
+      fireEvent.click(screen.getByText("Hásteinsvöllur Skjár 1"));
+
+      expect(setListenPrefix).toHaveBeenCalledWith("hasteinsvollur");
+    });
+
+    it("renders logout button that calls firebaseAuth.logout", () => {
+      setupScreenSelector();
+      render(<Controller />);
+
+      const logoutButton = screen.getByText("Útskrá");
+      fireEvent.click(logoutButton);
+
+      expect(firebaseAuth.logout).toHaveBeenCalled();
+    });
+
+    it("does NOT render tabs when showing screen selector", () => {
+      setupScreenSelector();
+      render(<Controller />);
+
+      expect(screen.queryByText("Heim")).not.toBeInTheDocument();
+      expect(screen.queryByText("Myndefni")).not.toBeInTheDocument();
+      expect(screen.queryByText("Stillingar")).not.toBeInTheDocument();
+    });
+
+    it("does NOT render login form when showing screen selector", () => {
+      setupScreenSelector();
+      render(<Controller />);
+
+      expect(screen.queryByPlaceholderText("E-mail")).not.toBeInTheDocument();
+      expect(screen.queryByPlaceholderText("Password")).not.toBeInTheDocument();
+      expect(screen.queryByText("Login")).not.toBeInTheDocument();
+    });
+
+    it("shows empty message when available array is empty", () => {
+      setupScreenSelector({ available: [] });
+      render(<Controller />);
+
+      expect(screen.getByText("Engir skjáir tiltækir")).toBeInTheDocument();
+    });
+
+    it("shows loading spinner when available is null (still loading)", () => {
+      setupScreenSelector({ available: null });
+      render(<Controller />);
+
+      expect(screen.getByTestId("ring-loader")).toBeInTheDocument();
+      expect(
+        screen.queryByText("Engir skjáir tiltækir"),
+      ).not.toBeInTheDocument();
     });
   });
 
