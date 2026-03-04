@@ -1,0 +1,22 @@
+.queue-item {
+  border-radius: 4px;
+  padding: 4px;
+  margin: 4px 0;
+  transition: all 0.2s ease;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+}
+
+.queue-item:hover {
+  background: #f5f5f5;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.queue-item:active {
+  cursor: grabbing;
+}
+
+.queue-item[style*="opacity: 0.5"] {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  background: #fafafa;
+}
