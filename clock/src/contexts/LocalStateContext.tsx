@@ -101,7 +101,7 @@ export function LocalStateProvider({ children }: { children: ReactNode }) {
 
       // Expose UID on window for E2E tests
       if (typeof window !== "undefined") {
-        (window as any).__firebaseAuthUID = authState.uid || null;
+        window.__firebaseAuthUID = authState.uid || null;
       }
     });
     return () => unsubscribe();
