@@ -51,6 +51,9 @@ const defaultController: ControllerState = {
   roster: { home: [], away: [] },
   currentAsset: null,
   refreshToken: "",
+  queues: {},
+  activeQueueId: null,
+  tab: undefined,
 };
 
 const defaultView: ViewState = {
@@ -716,35 +719,7 @@ describe("firebaseParsers", () => {
       expect(result).toEqual(defaultController);
     });
 
-    it("parses selectedAssets array", () => {
-      const assets: Asset[] = [
-        { key: "a1", type: "image" },
-        { key: "a2", type: "video" },
-      ];
-      const data = {
-        selectedAssets: assets,
-      };
 
-      const result = parseController(data, defaultController);
-      expect(result!.selectedAssets).toEqual(assets);
-    });
-
-    it("filters invalid items from selectedAssets", () => {
-      const data = {
-        selectedAssets: [
-          { key: "a1", type: "image" },
-          null,
-          { key: "a2" }, // Missing required 'type' field
-          { type: "video" }, // Missing required 'key' field
-          { key: "a3", type: "text" },
-        ],
-      };
-
-      const result = parseController(data, defaultController);
-      expect(result!.selectedAssets).toHaveLength(2);
-      expect(result!.selectedAssets[0].key).toBe("a1");
-      expect(result!.selectedAssets[1].key).toBe("a3");
-    });
 
     it("uses default selectedAssets when not array", () => {
       const data = {
@@ -755,40 +730,7 @@ describe("firebaseParsers", () => {
       expect(result!.selectedAssets).toEqual([]);
     });
 
-    it("parses boolean fields", () => {
-      const data = {
-        cycle: true,
-        autoPlay: true,
-        playing: false,
-      };
 
-      const result = parseController(data, defaultController);
-      expect(result!.cycle).toBe(true);
-      expect(result!.autoPlay).toBe(true);
-      expect(result!.playing).toBe(false);
-    });
-
-    it("uses default for non-boolean boolean fields", () => {
-      const data = {
-        cycle: "true",
-        autoPlay: 1,
-        playing: null,
-      };
-
-      const result = parseController(data, defaultController);
-      expect(result!.cycle).toBe(defaultController.cycle);
-      expect(result!.autoPlay).toBe(defaultController.autoPlay);
-      expect(result!.playing).toBe(defaultController.playing);
-    });
-
-    it("parses numeric imageSeconds", () => {
-      const data = {
-        imageSeconds: 10,
-      };
-
-      const result = parseController(data, defaultController);
-      expect(result!.imageSeconds).toBe(10);
-    });
 
     it("uses default imageSeconds for non-numeric", () => {
       const data = {
@@ -873,18 +815,14 @@ describe("firebaseParsers", () => {
 
     it("merges all fields with defaults properly", () => {
       const data = {
-        cycle: true,
-        imageSeconds: 8,
         view: "assets",
       };
 
       const result = parseController(data, defaultController);
       // Provided fields
-      expect(result!.cycle).toBe(true);
-      expect(result!.imageSeconds).toBe(8);
       expect(result!.view).toBe("assets");
       // Default fields
-      expect(result!.autoPlay).toBe(defaultController.autoPlay);
+      expect(result!.playing).toBe(defaultController.playing);
       expect(result!.selectedAssets).toEqual([]);
       expect(result!.roster).toEqual({ home: [], away: [] });
     });

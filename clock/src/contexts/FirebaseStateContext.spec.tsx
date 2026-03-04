@@ -248,23 +248,7 @@ describe("FirebaseStateContext", () => {
       expect(matchApi!.match.homeTeam).toBe("Víkingur R");
     });
 
-    it("initializes with default controller state", () => {
-      let controllerApi: ReturnType<typeof useController> | null = null;
 
-      render(
-        <FirebaseStateProvider listenPrefix="test" isAuthenticated={false}>
-          <TestControllerConsumer
-            onMount={(api) => {
-              controllerApi = api;
-            }}
-          />
-        </FirebaseStateProvider>,
-      );
-
-      expect(controllerApi!.controller.view).toBe("idle");
-      expect(controllerApi!.controller.selectedAssets).toEqual([]);
-      expect(controllerApi!.controller.cycle).toBe(false);
-    });
   });
 
   describe("match actions", () => {
@@ -585,77 +569,11 @@ describe("FirebaseStateContext", () => {
       );
     });
 
-    it("toggleCycle toggles cycle boolean", () => {
-      let controllerApi: ReturnType<typeof useController> | null = null;
-      render(
-        <FirebaseStateProvider
-          listenPrefix="test-location"
-          isAuthenticated={true}
-        >
-          <TestControllerConsumer
-            onMount={(api) => {
-              controllerApi = api;
-            }}
-          />
-        </FirebaseStateProvider>,
-      );
-      act(() => {
-        controllerApi!.toggleCycle();
-      });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
-        "test-location",
-        "controller",
-        expect.objectContaining({ cycle: true }),
-      );
-    });
 
-    it("setImageSeconds updates imageSeconds", () => {
-      let controllerApi: ReturnType<typeof useController> | null = null;
-      render(
-        <FirebaseStateProvider
-          listenPrefix="test-location"
-          isAuthenticated={true}
-        >
-          <TestControllerConsumer
-            onMount={(api) => {
-              controllerApi = api;
-            }}
-          />
-        </FirebaseStateProvider>,
-      );
-      act(() => {
-        controllerApi!.setImageSeconds(10);
-      });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
-        "test-location",
-        "controller",
-        expect.objectContaining({ imageSeconds: 10 }),
-      );
-    });
 
-    it("toggleAutoPlay toggles autoPlay", () => {
-      let controllerApi: ReturnType<typeof useController> | null = null;
-      render(
-        <FirebaseStateProvider
-          listenPrefix="test-location"
-          isAuthenticated={true}
-        >
-          <TestControllerConsumer
-            onMount={(api) => {
-              controllerApi = api;
-            }}
-          />
-        </FirebaseStateProvider>,
-      );
-      act(() => {
-        controllerApi!.toggleAutoPlay();
-      });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
-        "test-location",
-        "controller",
-        expect.objectContaining({ autoPlay: true }),
-      );
-    });
+
+
+
 
     it("setPlaying updates playing state", () => {
       let controllerApi: ReturnType<typeof useController> | null = null;
@@ -730,30 +648,7 @@ describe("FirebaseStateContext", () => {
       expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
     });
 
-    it("setSelectedAssets sets assets array", () => {
-      let controllerApi: ReturnType<typeof useController> | null = null;
-      render(
-        <FirebaseStateProvider
-          listenPrefix="test-location"
-          isAuthenticated={true}
-        >
-          <TestControllerConsumer
-            onMount={(api) => {
-              controllerApi = api;
-            }}
-          />
-        </FirebaseStateProvider>,
-      );
-      const assets = [{ type: "image", key: "a1" }];
-      act(() => {
-        controllerApi!.setSelectedAssets(assets as unknown as Asset[]);
-      });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
-        "test-location",
-        "controller",
-        expect.objectContaining({ selectedAssets: assets }),
-      );
-    });
+
 
     it("selectTab updates tab", () => {
       let controllerApi: ReturnType<typeof useController> | null = null;
@@ -1408,319 +1303,11 @@ describe("FirebaseStateContext", () => {
     });
   });
 
-  describe("addAssets", () => {
-    it("adds valid assets to selectedAssets", () => {
-      let controllerApi: ReturnType<typeof useController> | null = null;
-      render(
-        <FirebaseStateProvider
-          listenPrefix="test-location"
-          isAuthenticated={true}
-        >
-          <TestControllerConsumer
-            onMount={(api) => {
-              controllerApi = api;
-            }}
-          />
-        </FirebaseStateProvider>,
-      );
-      const assets: Asset[] = [
-        { type: "IMAGE", key: "img-1" },
-        { type: "VIDEO", key: "vid-1" },
-      ];
-      act(() => {
-        controllerApi!.addAssets(assets);
-      });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
-        "test-location",
-        "controller",
-        expect.objectContaining({
-          selectedAssets: [
-            { type: "IMAGE", key: "img-1" },
-            { type: "VIDEO", key: "vid-1" },
-          ],
-        }),
-      );
-    });
 
-    it("deduplicates assets with same key", () => {
-      let controllerApi: ReturnType<typeof useController> | null = null;
-      render(
-        <FirebaseStateProvider
-          listenPrefix="test-location"
-          isAuthenticated={true}
-        >
-          <TestControllerConsumer
-            onMount={(api) => {
-              controllerApi = api;
-            }}
-          />
-        </FirebaseStateProvider>,
-      );
-      act(() => {
-        controllerApi!.addAssets([{ type: "IMAGE", key: "img-1" }]);
-      });
-      vi.clearAllMocks();
-      act(() => {
-        controllerApi!.addAssets([{ type: "IMAGE", key: "img-1" }]);
-      });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
-        "test-location",
-        "controller",
-        expect.objectContaining({
-          selectedAssets: [{ type: "IMAGE", key: "img-1" }],
-        }),
-      );
-    });
 
-    it("filters out assets with invalid type", () => {
-      let controllerApi: ReturnType<typeof useController> | null = null;
-      render(
-        <FirebaseStateProvider
-          listenPrefix="test-location"
-          isAuthenticated={true}
-        >
-          <TestControllerConsumer
-            onMount={(api) => {
-              controllerApi = api;
-            }}
-          />
-        </FirebaseStateProvider>,
-      );
-      act(() => {
-        controllerApi!.addAssets([
-          { type: "INVALID_TYPE", key: "bad-1" },
-          { type: "IMAGE", key: "good-1" },
-        ]);
-      });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
-        "test-location",
-        "controller",
-        expect.objectContaining({
-          selectedAssets: [{ type: "IMAGE", key: "good-1" }],
-        }),
-      );
-    });
 
-    it("filters out assets with empty key", () => {
-      let controllerApi: ReturnType<typeof useController> | null = null;
-      render(
-        <FirebaseStateProvider
-          listenPrefix="test-location"
-          isAuthenticated={true}
-        >
-          <TestControllerConsumer
-            onMount={(api) => {
-              controllerApi = api;
-            }}
-          />
-        </FirebaseStateProvider>,
-      );
-      act(() => {
-        controllerApi!.addAssets([{ type: "IMAGE", key: "" }]);
-      });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
-        "test-location",
-        "controller",
-        expect.objectContaining({ selectedAssets: [] }),
-      );
-    });
-  });
 
-  describe("removeAsset", () => {
-    it("removes asset by key", () => {
-      let controllerApi: ReturnType<typeof useController> | null = null;
-      render(
-        <FirebaseStateProvider
-          listenPrefix="test-location"
-          isAuthenticated={true}
-        >
-          <TestControllerConsumer
-            onMount={(api) => {
-              controllerApi = api;
-            }}
-          />
-        </FirebaseStateProvider>,
-      );
-      act(() => {
-        controllerApi!.addAssets([
-          { type: "IMAGE", key: "img-1" },
-          { type: "IMAGE", key: "img-2" },
-        ]);
-      });
-      vi.clearAllMocks();
-      act(() => {
-        controllerApi!.removeAsset({ type: "IMAGE", key: "img-1" });
-      });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
-        "test-location",
-        "controller",
-        expect.objectContaining({
-          selectedAssets: [{ type: "IMAGE", key: "img-2" }],
-        }),
-      );
-    });
 
-    it("returns unchanged state when removing non-existent asset", () => {
-      let controllerApi: ReturnType<typeof useController> | null = null;
-      render(
-        <FirebaseStateProvider
-          listenPrefix="test-location"
-          isAuthenticated={true}
-        >
-          <TestControllerConsumer
-            onMount={(api) => {
-              controllerApi = api;
-            }}
-          />
-        </FirebaseStateProvider>,
-      );
-      act(() => {
-        controllerApi!.removeAsset({ type: "IMAGE", key: "nonexistent" });
-      });
-      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("showNextAsset", () => {
-    it("shifts next asset from queue to currentAsset", () => {
-      let controllerApi: ReturnType<typeof useController> | null = null;
-      render(
-        <FirebaseStateProvider
-          listenPrefix="test-location"
-          isAuthenticated={true}
-        >
-          <TestControllerConsumer
-            onMount={(api) => {
-              controllerApi = api;
-            }}
-          />
-        </FirebaseStateProvider>,
-      );
-      act(() => {
-        controllerApi!.setSelectedAssets([
-          { type: "IMAGE", key: "img-1" },
-          { type: "IMAGE", key: "img-2" },
-        ]);
-      });
-      vi.clearAllMocks();
-      act(() => {
-        controllerApi!.showNextAsset();
-      });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
-        "test-location",
-        "controller",
-        expect.objectContaining({
-          currentAsset: expect.objectContaining({
-            asset: { type: "IMAGE", key: "img-1" },
-            time: null,
-          }) as unknown,
-          selectedAssets: [{ type: "IMAGE", key: "img-2" }],
-        }),
-      );
-    });
-
-    it("clears currentAsset and stops playing when queue is empty", () => {
-      let controllerApi: ReturnType<typeof useController> | null = null;
-      render(
-        <FirebaseStateProvider
-          listenPrefix="test-location"
-          isAuthenticated={true}
-        >
-          <TestControllerConsumer
-            onMount={(api) => {
-              controllerApi = api;
-            }}
-          />
-        </FirebaseStateProvider>,
-      );
-      act(() => {
-        controllerApi!.showNextAsset();
-      });
-      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
-    });
-
-    it("cycles asset to end of queue when cycle is enabled", () => {
-      let controllerApi: ReturnType<typeof useController> | null = null;
-      render(
-        <FirebaseStateProvider
-          listenPrefix="test-location"
-          isAuthenticated={true}
-        >
-          <TestControllerConsumer
-            onMount={(api) => {
-              controllerApi = api;
-            }}
-          />
-        </FirebaseStateProvider>,
-      );
-      act(() => {
-        controllerApi!.toggleCycle();
-      });
-      act(() => {
-        controllerApi!.setSelectedAssets([
-          { type: "IMAGE", key: "img-1" },
-          { type: "IMAGE", key: "img-2" },
-        ]);
-      });
-      vi.clearAllMocks();
-      act(() => {
-        controllerApi!.showNextAsset();
-      });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
-        "test-location",
-        "controller",
-        expect.objectContaining({
-          currentAsset: expect.objectContaining({
-            asset: { type: "IMAGE", key: "img-1" },
-          }) as unknown,
-          selectedAssets: [
-            { type: "IMAGE", key: "img-2" },
-            { type: "IMAGE", key: "img-1" },
-          ],
-        }),
-      );
-    });
-
-    it("sets time from imageSeconds when autoPlay is enabled", () => {
-      let controllerApi: ReturnType<typeof useController> | null = null;
-      render(
-        <FirebaseStateProvider
-          listenPrefix="test-location"
-          isAuthenticated={true}
-        >
-          <TestControllerConsumer
-            onMount={(api) => {
-              controllerApi = api;
-            }}
-          />
-        </FirebaseStateProvider>,
-      );
-      act(() => {
-        controllerApi!.toggleAutoPlay();
-      });
-      act(() => {
-        controllerApi!.setImageSeconds(5);
-      });
-      act(() => {
-        controllerApi!.setSelectedAssets([{ type: "IMAGE", key: "img-1" }]);
-      });
-      vi.clearAllMocks();
-      act(() => {
-        controllerApi!.showNextAsset();
-      });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
-        "test-location",
-        "controller",
-        expect.objectContaining({
-          currentAsset: expect.objectContaining({
-            asset: { type: "IMAGE", key: "img-1" },
-            time: 5,
-          }) as unknown,
-          playing: true,
-        }),
-      );
-    });
-  });
 
   describe("removeAssetAfterTimeout", () => {
     it("clears currentAsset when autoPlay is off", () => {
@@ -1751,44 +1338,6 @@ describe("FirebaseStateContext", () => {
       );
     });
 
-    it("shows next asset when autoPlay is on and playing", () => {
-      let controllerApi: ReturnType<typeof useController> | null = null;
-      render(
-        <FirebaseStateProvider
-          listenPrefix="test-location"
-          isAuthenticated={true}
-        >
-          <TestControllerConsumer
-            onMount={(api) => {
-              controllerApi = api;
-            }}
-          />
-        </FirebaseStateProvider>,
-      );
-      act(() => {
-        controllerApi!.toggleAutoPlay();
-      });
-      act(() => {
-        controllerApi!.setPlaying(true);
-      });
-      act(() => {
-        controllerApi!.setSelectedAssets([{ type: "IMAGE", key: "img-2" }]);
-      });
-      vi.clearAllMocks();
-      act(() => {
-        controllerApi!.removeAssetAfterTimeout();
-      });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
-        "test-location",
-        "controller",
-        expect.objectContaining({
-          currentAsset: expect.objectContaining({
-            asset: { type: "IMAGE", key: "img-2" },
-          }) as unknown,
-        }),
-      );
-    });
-
     it("does nothing when autoPlay is on but not playing", () => {
       let controllerApi: ReturnType<typeof useController> | null = null;
       render(
@@ -1803,9 +1352,6 @@ describe("FirebaseStateContext", () => {
           />
         </FirebaseStateProvider>,
       );
-      act(() => {
-        controllerApi!.toggleAutoPlay();
-      });
       vi.clearAllMocks();
       act(() => {
         controllerApi!.removeAssetAfterTimeout();
@@ -2223,60 +1769,9 @@ describe("FirebaseStateContext", () => {
       );
     });
 
-    it("updateController merges updates and defaults selectedAssets to empty", () => {
-      let controllerApi: ReturnType<typeof useController> | null = null;
-      render(
-        <FirebaseStateProvider
-          listenPrefix="test-location"
-          isAuthenticated={true}
-        >
-          <TestControllerConsumer
-            onMount={(api) => {
-              controllerApi = api;
-            }}
-          />
-        </FirebaseStateProvider>,
-      );
-      act(() => {
-        controllerApi!.updateController({ view: "match" });
-      });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
-        "test-location",
-        "controller",
-        expect.objectContaining({ view: "match", selectedAssets: [] }),
-      );
-    });
 
-    it("toggleAutoPlay turns off playing when disabling autoPlay", () => {
-      let controllerApi: ReturnType<typeof useController> | null = null;
-      render(
-        <FirebaseStateProvider
-          listenPrefix="test-location"
-          isAuthenticated={true}
-        >
-          <TestControllerConsumer
-            onMount={(api) => {
-              controllerApi = api;
-            }}
-          />
-        </FirebaseStateProvider>,
-      );
-      act(() => {
-        controllerApi!.toggleAutoPlay();
-      });
-      act(() => {
-        controllerApi!.setPlaying(true);
-      });
-      vi.clearAllMocks();
-      act(() => {
-        controllerApi!.toggleAutoPlay();
-      });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
-        "test-location",
-        "controller",
-        expect.objectContaining({ autoPlay: false, playing: false }),
-      );
-    });
+
+
   });
 
   describe("server time offset", () => {
