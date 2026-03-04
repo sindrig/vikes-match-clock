@@ -7,6 +7,11 @@ import ListIcon from "@rsuite/icons/List";
 import PeoplesIcon from "@rsuite/icons/Peoples";
 
 import { TABS, ASSET_VIEWS } from "../constants";
+
+const assetViewToTab: Record<string, string> = {
+  [ASSET_VIEWS.teams]: TABS.teams,
+  [ASSET_VIEWS.assets]: TABS.queue,
+};
 import { firebaseAuth } from "../firebaseAuth";
 import MatchActionSettings from "./MatchActionSettings";
 import MediaManager from "./media/MediaManager";
@@ -34,7 +39,9 @@ const Controller = () => {
   } = useLocalState();
   const auth = useAuth();
 
-  const [tab, setTab] = useState<string>(TABS.queue);
+  const [tab, setTab] = useState<string>(
+    assetViewToTab[controller.assetView] ?? TABS.queue,
+  );
   const [selectedScreen, setSelectedScreen] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
 
