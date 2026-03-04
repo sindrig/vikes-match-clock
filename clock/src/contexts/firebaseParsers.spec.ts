@@ -1023,5 +1023,45 @@ describe("firebaseParsers", () => {
       expect(result!.background).toBe("#333333");
       expect(result!.idleImage).toBe("bg.jpg");
     });
+
+    it("parses both blackoutStart and blackoutEnd when present", () => {
+      const data = {
+        blackoutStart: "20:00",
+        blackoutEnd: "08:00",
+      };
+
+      const result = parseView(data, defaultView);
+      expect(result!.blackoutStart).toBe("20:00");
+      expect(result!.blackoutEnd).toBe("08:00");
+    });
+
+    it("rejects non-string blackoutStart and blackoutEnd values", () => {
+      const data = {
+        blackoutStart: 123,
+        blackoutEnd: true,
+      };
+
+      const result = parseView(data, defaultView);
+      expect(result!.blackoutStart).toBeUndefined();
+      expect(result!.blackoutEnd).toBeUndefined();
+    });
+
+    it("omits blackoutStart and blackoutEnd when not provided (backward compatibility)", () => {
+      const data = {};
+
+      const result = parseView(data, defaultView);
+      expect(result!.blackoutStart).toBeUndefined();
+      expect(result!.blackoutEnd).toBeUndefined();
+    });
+
+    it("parses partial blackout fields independently", () => {
+      const data = {
+        blackoutStart: "20:00",
+      };
+
+      const result = parseView(data, defaultView);
+      expect(result!.blackoutStart).toBe("20:00");
+      expect(result!.blackoutEnd).toBeUndefined();
+    });
   });
 });
