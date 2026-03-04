@@ -22,21 +22,22 @@ interface SubPlayer extends Player {
 }
 
 interface OwnProps {
-  addAssets: (
-    assets: Promise<Asset | null>[],
-    options?: { showNow?: boolean },
-  ) => void;
   previousView: () => void;
 }
 
 const TeamAssetController = (props: OwnProps): React.JSX.Element => {
-  const { addAssets, previousView } = props;
+  const { previousView } = props;
   const { match } = useMatch();
   const {
-    controller: { roster },
+    controller,
     setRoster,
     clearRoster,
+    createQueue,
+    deleteQueue,
+    addItemsToQueue,
+    showItemNow,
   } = useController();
+  const { roster } = controller;
   const { screens } = useListeners();
   const { listenPrefix } = useRemoteSettings();
 
@@ -89,7 +90,7 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
     setSelectMOTM(false);
   };
 
-  const addPlayersToQ = (): void => {
+  const addPlayersToQ = async (): Promise<void> => {
     const { homeTeam } = getTeamPlayers();
     const teams = [{ team: homeTeam, teamName: match.homeTeam }];
     const playersToShow = teams.flatMap(({ team }) =>
@@ -107,7 +108,19 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
         ),
     );
     const flattened = ([] as Promise<Asset | null>[]).concat(...teamAssets);
-    addAssets(flattened);
+
+    const existingQueue = Object.values(controller.queues).find(
+      (q) => q.name === "Byrjunarlið",
+    );
+    if (existingQueue) {
+      deleteQueue(existingQueue.id);
+    }
+    const newQueueId = createQueue("Byrjunarlið");
+
+    const resolved = await Promise.all(flattened);
+    const validAssets = resolved.filter((a): a is Asset => a !== null);
+    addItemsToQueue(newQueueId, validAssets);
+
     previousView();
   };
 
@@ -138,19 +151,12 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
           listenPrefix,
         });
         if (!subInObj || !subOutObj) return;
-        addAssets(
-          [
-            Promise.resolve({
-              type: assetTypes.SUB,
-              subIn: subInObj,
-              subOut: subOutObj,
-              key: `sub-${subInObj.key}-${subOutObj.key}`,
-            }),
-          ],
-          {
-            showNow: true,
-          },
-        );
+        showItemNow({
+          type: assetTypes.SUB,
+          subIn: subInObj,
+          subOut: subOutObj,
+          key: `sub-${subInObj.key}-${subOutObj.key}`,
+        });
         clearState();
       })();
     } else {
@@ -162,54 +168,51 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
   const selectPlayerAssetAction = (player: Player, teamName: string): void => {
     const actualTeamName =
       teamName === "homeTeam" ? match.homeTeam : match.awayTeam;
-    addAssets(
-      [
-        getPlayerAssetObject({
-          player,
-          teamName: actualTeamName,
-          listenPrefix,
-        }),
-      ],
-      {
-        showNow: true,
-      },
-    );
-    clearState();
+    void (async () => {
+      const playerAsset = await getPlayerAssetObject({
+        player,
+        teamName: actualTeamName,
+        listenPrefix,
+      });
+      if (!playerAsset) return;
+      showItemNow(playerAsset);
+      clearState();
+    })();
   };
 
   const selectGoalScorerAction = (player: Player, teamName: string): void => {
     const actualTeamName =
       teamName === "homeTeam" ? match.homeTeam : match.awayTeam;
-    addAssets(
-      [
-        getPlayerAssetObject({
-          player,
-          teamName: actualTeamName,
-          overlay: {
-            text: "",
-            blink: true,
-            effect: effect,
-          },
-          listenPrefix,
-        }),
-      ],
-      {
-        showNow: true,
-      },
-    );
-    clearState();
+    void (async () => {
+      const goalAsset = await getPlayerAssetObject({
+        player,
+        teamName: actualTeamName,
+        overlay: {
+          text: "",
+          blink: true,
+          effect: effect,
+        },
+        listenPrefix,
+      });
+      if (!goalAsset) return;
+      showItemNow(goalAsset);
+      clearState();
+    })();
   };
 
   const selectMOTMAction = (player: Player, teamName: string): void => {
     const actualTeamName =
       teamName === "homeTeam" ? match.homeTeam : match.awayTeam;
-    addAssets(
-      [getMOTMAsset({ player, teamName: actualTeamName, listenPrefix })],
-      {
-        showNow: true,
-      },
-    );
-    clearState();
+    void (async () => {
+      const motmAsset = await getMOTMAsset({
+        player,
+        teamName: actualTeamName,
+        listenPrefix,
+      });
+      if (!motmAsset) return;
+      showItemNow(motmAsset);
+      clearState();
+    })();
   };
 
   const isPlayerActionActive =
@@ -326,7 +329,7 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
               </button>
             ) : null}
             {hasPlayers ? (
-              <button type="button" onClick={addPlayersToQ}>
+              <button type="button" onClick={() => void addPlayersToQ()}>
                 Setja lið í biðröð
               </button>
             ) : null}
