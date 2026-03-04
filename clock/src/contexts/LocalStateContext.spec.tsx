@@ -118,7 +118,7 @@ describe("LocalStateContext", () => {
       expect(api!.listenPrefix).toBe("");
     });
 
-    it("initializes available as empty array", () => {
+    it("initializes available as null (not yet loaded)", () => {
       let api: ReturnType<typeof useLocalState> | null = null;
 
       render(
@@ -132,7 +132,7 @@ describe("LocalStateContext", () => {
       );
 
       expect(api).not.toBeNull();
-      expect(api!.available).toEqual([]);
+      expect(api!.available).toBeNull();
     });
 
     it("initializes email and password as empty strings", () => {
@@ -363,7 +363,7 @@ describe("LocalStateContext", () => {
 
       expect(settings).not.toBeNull();
       expect(settings!.listenPrefix).toBe("");
-      expect(settings!.available).toEqual([]);
+      expect(settings!.available).toBeNull();
       expect(typeof settings!.setListenPrefix).toBe("function");
     });
 
@@ -442,7 +442,7 @@ describe("LocalStateContext", () => {
       expect(api!.auth).toBeDefined();
       expect(api!.listenPrefix).toBe("");
       expect(api!.setListenPrefix).toBeDefined();
-      expect(api!.available).toEqual([]);
+      expect(api!.available).toBeNull();
       expect(api!.email).toBe("");
       expect(api!.setEmail).toBeDefined();
       expect(api!.password).toBe("");

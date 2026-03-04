@@ -25,7 +25,7 @@ interface LocalStateContextType {
   // Remote settings
   listenPrefix: string;
   setListenPrefix: (prefix: string) => void;
-  available: string[];
+  available: string[] | null;
 
   // Screen viewport override (from "Birta skjá" selection)
   screenViewport: ViewPort | null;
@@ -57,7 +57,7 @@ export function LocalStateProvider({ children }: { children: ReactNode }) {
     return localStorage.getItem(LISTEN_PREFIX_KEY) || "";
   });
 
-  const [available, setAvailable] = useState<string[]>([]);
+  const [available, setAvailable] = useState<string[] | null>(null);
 
   // Screen viewport override (set when selecting a screen via "Birta skjá")
   const [screenViewport, setScreenViewportState] = useState<ViewPort | null>(
@@ -98,6 +98,11 @@ export function LocalStateProvider({ children }: { children: ReactNode }) {
     const unsubscribe = firebaseAuth.onAuthStateChanged((user: User | null) => {
       const authState = firebaseAuth.userToAuthState(user);
       setAuth(authState);
+
+      // Expose UID on window for E2E tests
+      if (typeof window !== "undefined") {
+        window.__firebaseAuthUID = authState.uid || null;
+      }
     });
     return () => unsubscribe();
   }, []);
@@ -116,11 +121,6 @@ export function LocalStateProvider({ children }: { children: ReactNode }) {
           .filter(([, value]) => value === true)
           .map(([key]) => key);
         setAvailable(locations);
-
-        // If current listenPrefix is not in available, set to first available
-        if (locations.length > 0 && !locations.includes(listenPrefix)) {
-          setListenPrefix(locations[0]!);
-        }
       } else {
         setAvailable([]);
       }
@@ -128,9 +128,9 @@ export function LocalStateProvider({ children }: { children: ReactNode }) {
 
     return () => {
       unsubscribe();
-      setAvailable([]);
+      setAvailable(null);
     };
-  }, [auth.uid, listenPrefix]);
+  }, [auth.uid]);
 
   const value = {
     auth,

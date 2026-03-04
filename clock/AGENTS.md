@@ -171,6 +171,25 @@ mockedHook.mockReturnValue({ ... } as unknown as ReturnType<typeof useHook>);
 
 ## Testing & Development
 
+### Port Configuration
+
+Both Vite and Playwright support a `PORT` environment variable for custom port assignment:
+
+```bash
+# Run dev server on custom port (defaults to 3000)
+PORT=4500 pnpm start
+
+# Run e2e tests on custom port (defaults to 3000)
+PORT=4500 VITE_USE_EMULATOR=true pnpm e2e
+```
+
+**Why this matters**: If port 3000 is already in use (e.g., multiple developers, parallel projects), tests will fail with connection errors. Use a custom port to avoid conflicts.
+
+**Implementation**: 
+- `vite.config.ts` reads `process.env.PORT` for server configuration
+- `playwright.config.ts` calculates `baseURL` from `process.env.PORT` and passes it to the webServer config
+- CI always uses default port 3000 (no env var set)
+
 ### Firebase Emulator
 
 For isolated local development and CI, use Firebase Emulator:
@@ -187,6 +206,9 @@ VITE_USE_EMULATOR=true pnpm start
 
 # Run e2e tests with emulator
 VITE_USE_EMULATOR=true pnpm e2e
+
+# Run e2e tests with emulator on custom port
+PORT=4500 VITE_USE_EMULATOR=true pnpm e2e
 ```
 
 Emulator ports:
@@ -212,12 +234,34 @@ If `TEST_CREDENTIALS` is not set, tests fall back to default staging credentials
 
 To log in manually (use playwright):
 
-1. Navigate to `localhost:3000`
+1. Navigate to `localhost:3000` (or custom port if using `PORT` env var)
 2. Click **Stillingar** (Settings) tab
 3. Enter credentials in the E-mail and Password fields
 4. Click **Login**
 
 Once logged in, you'll see your email displayed and have access to authenticated features like the "Myndefni" (Media) image uploads and remote control functionality.
+
+### E2E Test Architecture
+
+**Authentication Flow**: E2E tests rely on `window.__firebaseAuthUID` to verify successful login. This global is set by `LocalStateContext.tsx` when Firebase auth state changes:
+
+```typescript
+// In LocalStateContext.tsx onAuthStateChanged callback
+if (typeof window !== "undefined") {
+  (window as any).__firebaseAuthUID = authState.uid || null;
+}
+```
+
+**Why this exists**: Playwright tests need to verify auth completed before proceeding with authenticated actions. The window global provides a reliable synchronization point between Firebase auth and test assertions.
+
+**Test Data Initialization**: The `clearEmulatorData()` helper in `e2e/fixtures/test-helpers.ts` initializes Firebase with baseline state before each test. Key points:
+
+- **halfStops format**: Stored in **minutes** (e.g., `[45, 90, 105, 120]`), not seconds or milliseconds
+- **Default football config**: Use 4 values for overtime support: `[45, 90, 105, 120]`
+- **matchType**: Must be `"football"` or `"handball"` to match `Sports` enum
+- **homeTeamId/awayTeamId**: Numeric IDs matching KSI API (see Team ID System section)
+
+If tests fail with unexpected halfStops counts or values, check that test initialization data matches the format expected by `firebaseParsers.ts` and the default constants in `constants.ts`.
 
 ### Playwright MCP Limitations for Multi-Session Testing
 
@@ -288,3 +332,32 @@ const lookupClubId = (name: string): string =>
 | `controller/TeamSelector.tsx` | Team dropdown UI, case-insensitive matching |
 | `lib/api.ts` | Fetches matches/lineups from API, `transformLineups()` keys players by API team ID |
 | `controller/asset/team/TeamAssetController.tsx` | Looks up players by `String(match.homeTeamId)` from the transformed lineups |
+
+## Data Formats & Storage
+
+### halfStops Storage Format
+
+The `halfStops` array stores period end times in **minutes** (not seconds or milliseconds):
+
+```typescript
+// CORRECT - stored in minutes
+halfStops: [45, 90, 105, 120]  // Regular time + 2 extra time periods
+
+// WRONG - do not use seconds or milliseconds
+halfStops: [2700, 5400, 6300, 7200]  // ❌ seconds
+halfStops: [2700000, 5400000, ...]   // ❌ milliseconds
+```
+
+**Why**: The app converts to milliseconds internally (`halfStops[0] * 60 * 1000`), so Firebase stores the human-readable minute values.
+
+**Default configurations**:
+- Football: `[45, 90, 105, 120]` (45 min halves + 2x15 min extra time)
+- Handball: `[30, 60, 65, 70]` (30 min halves + 2x5 min extra time)
+
+**Source of truth**: `constants.ts` defines `DEFAULT_HALFSTOPS` and `HALFSTOPS` lookup tables.
+
+**Related files**:
+- `contexts/firebaseParsers.ts` - Parses halfStops from Firebase (no transformation)
+- `contexts/FirebaseStateContext.tsx` - Converts minutes → milliseconds for `timeElapsed`
+- `controller/HalfStops.tsx` - Renders input fields based on `halfStops.length`
+- `e2e/fixtures/test-helpers.ts` - Must initialize test data with minute values
