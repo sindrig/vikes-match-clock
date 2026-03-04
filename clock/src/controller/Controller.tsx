@@ -1,11 +1,10 @@
 import type React from "react";
 import { useState } from "react";
-import { Nav, Tooltip, Whisper, Button, Modal, IconButton } from "rsuite";
+import { Nav, Button, Modal, IconButton } from "rsuite";
 import GearIcon from "@rsuite/icons/Gear";
 import MediaIcon from "@rsuite/icons/Media";
 import ListIcon from "@rsuite/icons/List";
 import PeoplesIcon from "@rsuite/icons/Peoples";
-import CloseIcon from "@rsuite/icons/CloseOutline";
 
 import { TABS, ASSET_VIEWS } from "../constants";
 import { firebaseAuth } from "../firebaseAuth";
@@ -22,7 +21,7 @@ import { useAuth, useLocalState } from "../contexts/LocalStateContext";
 const confirmRefresh = () => confirm("Are you absolutely sure?");
 
 const Controller = () => {
-  const { controller, renderAsset, selectAssetView } = useController();
+  const { controller, selectAssetView } = useController();
   const { screens } = useListeners();
   const {
     email,
@@ -38,8 +37,6 @@ const Controller = () => {
   const [tab, setTab] = useState<string>(TABS.queue);
   const [selectedScreen, setSelectedScreen] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
-
-  const { currentAsset } = controller;
 
   const isAuthenticated = auth.isLoaded && !auth.isEmpty;
 
@@ -143,28 +140,8 @@ const Controller = () => {
     }
   };
 
-  const tooltipClear = <Tooltip>Birtir aftur stöðu leiksins á skjá.</Tooltip>;
   return (
     <div className="controller">
-      {currentAsset && (
-        <div className="control-item clear-overlay">
-          <Whisper
-            placement="bottom"
-            controlId="clearoverlay-id-hover"
-            trigger="hover"
-            speaker={tooltipClear}
-          >
-            <Button
-              color="cyan"
-              appearance="primary"
-              size="sm"
-              onClick={() => renderAsset(null)}
-            >
-              <CloseIcon /> Hreinsa virkt overlay
-            </Button>
-          </Whisper>
-        </div>
-      )}
       <div className="nav-bar">
         <Nav appearance="tabs" onSelect={handleTabSelect} activeKey={tab}>
           <Nav.Item eventKey={TABS.queue} icon={<ListIcon />}>

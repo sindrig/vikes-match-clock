@@ -4,6 +4,7 @@ import { Player } from "../types";
 import { getPlayerAssetObject } from "./asset/team/assetHelpers";
 import { useController } from "../contexts/FirebaseStateContext";
 import { useRemoteSettings } from "../contexts/LocalStateContext";
+import baddi from "../images/baddi.gif";
 
 interface GoalScorerDialogProps {
   open: boolean;
@@ -32,11 +33,11 @@ const GoalScorerDialog = ({
       void getPlayerAssetObject({
         player,
         teamName,
-        overlay: { text: "", blink: true, effect: "blink" },
+        preferExt: "fagn",
         listenPrefix,
       }).then((asset) => {
         if (asset) {
-          renderAsset(asset);
+          renderAsset({ ...asset, background: baddi });
         }
       });
       onClose();

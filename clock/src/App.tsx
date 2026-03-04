@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Button, ButtonGroup } from "rsuite";
+import { Button, ButtonGroup, Tooltip, Whisper } from "rsuite";
+import CloseIcon from "@rsuite/icons/CloseOutline";
 import { RingLoader } from "react-spinners";
 import {
   useFirebaseState,
@@ -112,6 +113,31 @@ const ViewModeButtons = () => {
         )}
       </ButtonGroup>
     </div>
+  );
+};
+
+const tooltipClear = <Tooltip>Birtir aftur stöðu leiksins á skjá.</Tooltip>;
+
+const ClearOverlayButton = () => {
+  const { renderAsset } = useController();
+
+  return (
+    <Whisper
+      placement="bottom"
+      controlId="clearoverlay-id-hover"
+      trigger="hover"
+      speaker={tooltipClear}
+    >
+      <Button
+        color="cyan"
+        appearance="primary"
+        size="sm"
+        onClick={() => renderAsset(null)}
+        block
+      >
+        <CloseIcon /> Hreinsa virkt overlay
+      </Button>
+    </Whisper>
   );
 };
 
@@ -262,6 +288,7 @@ function App() {
               </div>
               <ViewModeButtons />
             </div>
+            {asset && <ClearOverlayButton />}
             <MatchActions />
           </div>
           <div className="controller-controls">
