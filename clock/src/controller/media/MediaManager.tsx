@@ -4,9 +4,12 @@ import UploadManager from "./UploadManager";
 import ImageList from "./ImageList";
 import { IMAGE_TYPES } from ".";
 import { useLocalState } from "../../contexts/LocalStateContext";
+import { useController } from "../../contexts/FirebaseStateContext";
+import { Asset } from "../../types";
 
 const MediaManager: React.FC = () => {
   const { auth, listenPrefix } = useLocalState();
+  const { showItemNow } = useController();
   const [tab, setTab] = useState<string>(IMAGE_TYPES.images);
   const finalTab = `${String(listenPrefix) === "safamyri" ? "fotbolti" : String(listenPrefix)}/${String(tab)}`;
   const [prefix, setPrefix] = useState<string>("");
@@ -26,6 +29,9 @@ const MediaManager: React.FC = () => {
   const refresh = (): void => {
     // How stupid is this? sorry
     [2, 3, 5, 6].forEach((i) => setTimeout(() => setTs(Date.now()), 500 * i));
+  };
+  const handleAddAssets = (assets: Asset[]): void => {
+    assets.forEach((asset) => showItemNow(asset));
   };
   return (
     <div className="control-item withborder">
@@ -66,6 +72,7 @@ const MediaManager: React.FC = () => {
         displayNow={displayNow}
         allowEdit={!auth.isEmpty}
         ts={ts}
+        onAddAssets={handleAddAssets}
       />
     </div>
   );
