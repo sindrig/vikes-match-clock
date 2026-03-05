@@ -113,11 +113,11 @@ const ImageList: React.FC<ImageListProps> = ({
                     url: imageUrl,
                     type,
                   };
-                   if (displayNow) {
-                     renderAsset(asset);
-                   } else {
-                     onAddAssets([asset]);
-                   }
+                  if (displayNow) {
+                    renderAsset(asset);
+                  } else {
+                    onAddAssets([asset]);
+                  }
                 }}
               >
                 <img src={imageUrl} alt={name} />

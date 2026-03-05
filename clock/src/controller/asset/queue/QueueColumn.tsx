@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   SortableContext,
   verticalListSortingStrategy,
@@ -48,11 +48,6 @@ const QueueColumn: React.FC<QueueColumnProps> = ({
   style,
 }) => {
   const [nameInput, setNameInput] = useState(queue.name);
-
-  // Sync local state with prop changes (e.g. from Firebase)
-  useEffect(() => {
-    setNameInput(queue.name);
-  }, [queue.name]);
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setNameInput(e.target.value);

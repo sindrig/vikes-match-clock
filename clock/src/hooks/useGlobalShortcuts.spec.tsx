@@ -206,7 +206,17 @@ describe("useGlobalShortcuts", () => {
           controller: {
             view: VIEWS.match,
             assetView: ASSET_VIEWS.assets,
-            queues: { q1: { id: "q1", name: "Test", items: [{ key: "asset-1", type: "image" }], autoPlay: false, imageSeconds: 10, cycle: false, order: 0 } },
+            queues: {
+              q1: {
+                id: "q1",
+                name: "Test",
+                items: [{ key: "asset-1", type: "image" }],
+                autoPlay: false,
+                imageSeconds: 10,
+                cycle: false,
+                order: 0,
+              },
+            },
             activeQueueId: "q1",
             currentAsset: null,
           },
@@ -227,7 +237,17 @@ describe("useGlobalShortcuts", () => {
           controller: {
             view: VIEWS.idle,
             assetView: ASSET_VIEWS.assets,
-            queues: { q1: { id: "q1", name: "Test", items: [{ key: "asset-2", type: "image" }], autoPlay: false, imageSeconds: 10, cycle: false, order: 0 } },
+            queues: {
+              q1: {
+                id: "q1",
+                name: "Test",
+                items: [{ key: "asset-2", type: "image" }],
+                autoPlay: false,
+                imageSeconds: 10,
+                cycle: false,
+                order: 0,
+              },
+            },
             activeQueueId: "q1",
             currentAsset: null,
           },
@@ -314,7 +334,17 @@ describe("useGlobalShortcuts", () => {
           controller: {
             view: VIEWS.match,
             assetView: ASSET_VIEWS.assets,
-            queues: { q1: { id: "q1", name: "Test", items: [{ key: "asset-1", type: "image" }], autoPlay: false, imageSeconds: 10, cycle: false, order: 0 } },
+            queues: {
+              q1: {
+                id: "q1",
+                name: "Test",
+                items: [{ key: "asset-1", type: "image" }],
+                autoPlay: false,
+                imageSeconds: 10,
+                cycle: false,
+                order: 0,
+              },
+            },
             activeQueueId: "q1",
             currentAsset: { key: "asset-2", type: "image" },
           },
@@ -358,7 +388,17 @@ describe("useGlobalShortcuts", () => {
           controller: {
             view: VIEWS.match,
             assetView: "teams",
-            queues: { q1: { id: "q1", name: "Test", items: [{ key: "asset-1", type: "image" }], autoPlay: false, imageSeconds: 10, cycle: false, order: 0 } },
+            queues: {
+              q1: {
+                id: "q1",
+                name: "Test",
+                items: [{ key: "asset-1", type: "image" }],
+                autoPlay: false,
+                imageSeconds: 10,
+                cycle: false,
+                order: 0,
+              },
+            },
             activeQueueId: "q1",
             currentAsset: null,
           },
@@ -484,7 +524,17 @@ describe("useGlobalShortcuts", () => {
           controller: {
             view: VIEWS.match,
             assetView: ASSET_VIEWS.assets,
-            queues: { q1: { id: "q1", name: "Test", items: [{ key: "asset-1", type: "image" }], autoPlay: false, imageSeconds: 10, cycle: false, order: 0 } },
+            queues: {
+              q1: {
+                id: "q1",
+                name: "Test",
+                items: [{ key: "asset-1", type: "image" }],
+                autoPlay: false,
+                imageSeconds: 10,
+                cycle: false,
+                order: 0,
+              },
+            },
             activeQueueId: "q1",
             currentAsset: null,
           },

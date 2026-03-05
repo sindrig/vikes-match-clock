@@ -161,7 +161,8 @@ function setupScreenSelector(
     setListenPrefix?: (prefix: string) => void;
   } = {},
 ) {
-  const mockSetListenPrefix = overrides.setListenPrefix ?? vi.fn<(prefix: string) => void>();
+  const mockSetListenPrefix =
+    overrides.setListenPrefix ?? vi.fn<(prefix: string) => void>();
   const mockAvailable =
     overrides.available !== undefined
       ? overrides.available

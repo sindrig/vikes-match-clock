@@ -101,8 +101,10 @@ function setupState2(
     setScreenViewport?: (vp: unknown) => void;
   },
 ) {
-  const setListenPrefix = overrides?.setListenPrefix ?? vi.fn<(prefix: string) => void>();
-  const setScreenViewport = overrides?.setScreenViewport ?? vi.fn<(vp: unknown) => void>();
+  const setListenPrefix =
+    overrides?.setListenPrefix ?? vi.fn<(prefix: string) => void>();
+  const setScreenViewport =
+    overrides?.setScreenViewport ?? vi.fn<(vp: unknown) => void>();
   mockedUseLocalState.mockReturnValue({
     auth: { isLoaded: true, isEmpty: true },
     listenPrefix: "vikinni",
@@ -130,8 +132,10 @@ function setupState3(
     setScreenViewport?: (vp: unknown) => void;
   },
 ) {
-  const setListenPrefix = overrides?.setListenPrefix ?? vi.fn<(prefix: string) => void>();
-  const setScreenViewport = overrides?.setScreenViewport ?? vi.fn<(vp: unknown) => void>();
+  const setListenPrefix =
+    overrides?.setListenPrefix ?? vi.fn<(prefix: string) => void>();
+  const setScreenViewport =
+    overrides?.setScreenViewport ?? vi.fn<(vp: unknown) => void>();
   mockedUseLocalState.mockReturnValue({
     auth: { isLoaded: true, isEmpty: false, email: "test@test.com" },
     listenPrefix: "vikinni",

@@ -273,12 +273,24 @@ const QueueBoard: React.FC<QueueBoardProps> = ({
                   playing &&
                   activeQueueId === activeDragId.toString().replace("col-", "")
                 }
-                onRenameQueue={() => {}}
-                onPlayQueue={() => {}}
-                onStopPlaying={() => {}}
-                onOpenSettings={() => {}}
-                onShowItemNow={() => {}}
-                onDeleteAsset={() => {}}
+                onRenameQueue={() => {
+                  // noop - drag overlay
+                }}
+                onPlayQueue={() => {
+                  // noop - drag overlay
+                }}
+                onStopPlaying={() => {
+                  // noop - drag overlay
+                }}
+                onOpenSettings={() => {
+                  // noop - drag overlay
+                }}
+                onShowItemNow={() => {
+                  // noop - drag overlay
+                }}
+                onDeleteAsset={() => {
+                  // noop - drag overlay
+                }}
               />
             </div>
           ) : draggedItem ? (
@@ -286,8 +298,12 @@ const QueueBoard: React.FC<QueueBoardProps> = ({
               <QueueItem
                 asset={draggedItem}
                 queueId=""
-                onShowNow={() => {}}
-                onDelete={() => {}}
+                onShowNow={() => {
+                  // noop - drag overlay
+                }}
+                onDelete={() => {
+                  // noop - drag overlay
+                }}
               />
             </div>
           ) : null

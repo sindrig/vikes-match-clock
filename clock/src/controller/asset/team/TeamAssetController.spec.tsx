@@ -1,4 +1,12 @@
-import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from "vitest";
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import TeamAssetController from "./TeamAssetController";
 import { Player, Roster } from "../../../types";
@@ -165,7 +173,9 @@ function setupMocks(overrides?: {
   const mockClearRoster = vi.fn();
   const mockSetRoster = vi.fn();
   const mockShowItemNow = vi.fn();
-  const mockCreateQueue = vi.fn<(name: string) => string>().mockReturnValue("new-queue-id");
+  const mockCreateQueue = vi
+    .fn<(name: string) => string>()
+    .mockReturnValue("new-queue-id");
   const mockDeleteQueue = vi.fn();
   const mockAddItemsToQueue = vi.fn();
 
@@ -222,11 +232,7 @@ describe("TeamAssetController", () => {
     it("shows team selection message when no teams selected", () => {
       setupMocks({ match: { homeTeam: "", awayTeam: "" } });
 
-      render(
-        <TeamAssetController
-          previousView={mockPreviousView}
-        />,
-      );
+      render(<TeamAssetController previousView={mockPreviousView} />);
 
       expect(screen.getByText("Veldu lið fyrst")).toBeInTheDocument();
     });
@@ -234,11 +240,7 @@ describe("TeamAssetController", () => {
     it("shows team selection message when homeTeam is empty", () => {
       setupMocks({ match: { homeTeam: "" } });
 
-      render(
-        <TeamAssetController
-          previousView={mockPreviousView}
-        />,
-      );
+      render(<TeamAssetController previousView={mockPreviousView} />);
 
       expect(screen.getByText("Veldu lið fyrst")).toBeInTheDocument();
     });
@@ -246,11 +248,7 @@ describe("TeamAssetController", () => {
     it("renders team components when teams are selected", () => {
       setupMocks({ roster: mockRoster });
 
-      render(
-        <TeamAssetController
-          previousView={mockPreviousView}
-        />,
-      );
+      render(<TeamAssetController previousView={mockPreviousView} />);
 
       expect(screen.getByTestId("team-homeTeam")).toBeInTheDocument();
       expect(screen.getByTestId("team-awayTeam")).toBeInTheDocument();
@@ -259,11 +257,7 @@ describe("TeamAssetController", () => {
     it('shows "Sækja lið" button when ksiMatchId is set', () => {
       setupMocks();
 
-      render(
-        <TeamAssetController
-          previousView={mockPreviousView}
-        />,
-      );
+      render(<TeamAssetController previousView={mockPreviousView} />);
 
       expect(
         screen.getByRole("button", { name: "Sækja lið" }),
@@ -273,11 +267,7 @@ describe("TeamAssetController", () => {
     it('shows "Hreinsa lið" and "Setja lið í biðröð" when players are loaded', () => {
       setupMocks({ roster: mockRoster });
 
-      render(
-        <TeamAssetController
-          previousView={mockPreviousView}
-        />,
-      );
+      render(<TeamAssetController previousView={mockPreviousView} />);
 
       expect(
         screen.getByRole("button", { name: "Hreinsa lið" }),
@@ -290,11 +280,7 @@ describe("TeamAssetController", () => {
     it('hides "Sækja lið" button when ksiMatchId is undefined', () => {
       setupMocks({ match: { ksiMatchId: undefined } });
 
-      render(
-        <TeamAssetController
-          previousView={mockPreviousView}
-        />,
-      );
+      render(<TeamAssetController previousView={mockPreviousView} />);
 
       expect(
         screen.queryByRole("button", { name: "Sækja lið" }),
@@ -320,11 +306,7 @@ describe("TeamAssetController", () => {
       } as unknown as Awaited<ReturnType<typeof getLineups>>);
       mockedTransformLineups.mockReturnValueOnce(rosterData);
 
-      render(
-        <TeamAssetController
-          previousView={mockPreviousView}
-        />,
-      );
+      render(<TeamAssetController previousView={mockPreviousView} />);
 
       fireEvent.click(screen.getByRole("button", { name: "Sækja lið" }));
 
@@ -351,11 +333,7 @@ describe("TeamAssetController", () => {
 
       mockedGetLineups.mockRejectedValueOnce(new Error("Network error"));
 
-      render(
-        <TeamAssetController
-          previousView={mockPreviousView}
-        />,
-      );
+      render(<TeamAssetController previousView={mockPreviousView} />);
 
       fireEvent.click(screen.getByRole("button", { name: "Sækja lið" }));
 
@@ -367,11 +345,7 @@ describe("TeamAssetController", () => {
     it("does not fetch when ksiMatchId is undefined", () => {
       setupMocks({ match: { ksiMatchId: undefined } });
 
-      render(
-        <TeamAssetController
-          previousView={mockPreviousView}
-        />,
-      );
+      render(<TeamAssetController previousView={mockPreviousView} />);
 
       expect(
         screen.queryByRole("button", { name: "Sækja lið" }),
@@ -386,11 +360,7 @@ describe("TeamAssetController", () => {
 
       vi.spyOn(window, "confirm").mockReturnValue(true);
 
-      render(
-        <TeamAssetController
-          previousView={mockPreviousView}
-        />,
-      );
+      render(<TeamAssetController previousView={mockPreviousView} />);
 
       fireEvent.click(screen.getByRole("button", { name: "Hreinsa lið" }));
 
@@ -403,11 +373,7 @@ describe("TeamAssetController", () => {
 
       vi.spyOn(window, "confirm").mockReturnValue(false);
 
-      render(
-        <TeamAssetController
-          previousView={mockPreviousView}
-        />,
-      );
+      render(<TeamAssetController previousView={mockPreviousView} />);
 
       fireEvent.click(screen.getByRole("button", { name: "Hreinsa lið" }));
 
@@ -432,11 +398,7 @@ describe("TeamAssetController", () => {
         mockAsset as unknown as ReturnType<typeof getPlayerAssetObject>,
       );
 
-      render(
-        <TeamAssetController
-          previousView={mockPreviousView}
-        />,
-      );
+      render(<TeamAssetController previousView={mockPreviousView} />);
 
       fireEvent.click(
         screen.getByRole("button", { name: "Setja lið í biðröð" }),
@@ -463,11 +425,7 @@ describe("TeamAssetController", () => {
         roster: rosterWithBadPlayers,
       });
 
-      render(
-        <TeamAssetController
-          previousView={mockPreviousView}
-        />,
-      );
+      render(<TeamAssetController previousView={mockPreviousView} />);
 
       fireEvent.click(
         screen.getByRole("button", { name: "Setja lið í biðröð" }),
@@ -485,11 +443,7 @@ describe("TeamAssetController", () => {
     it("renders action buttons when players are loaded", () => {
       setupMocks({ roster: mockRoster });
 
-      render(
-        <TeamAssetController
-          previousView={mockPreviousView}
-        />,
-      );
+      render(<TeamAssetController previousView={mockPreviousView} />);
 
       expect(
         screen.getByRole("button", { name: "Skipting" }),
@@ -508,11 +462,7 @@ describe("TeamAssetController", () => {
     it("shows effect selector with default blink value", () => {
       setupMocks({ roster: mockRoster });
 
-      render(
-        <TeamAssetController
-          previousView={mockPreviousView}
-        />,
-      );
+      render(<TeamAssetController previousView={mockPreviousView} />);
 
       const select = screen.getByDisplayValue("Blink");
       expect(select).toBeInTheDocument();
@@ -521,11 +471,7 @@ describe("TeamAssetController", () => {
     it("allows changing the effect", () => {
       setupMocks({ roster: mockRoster });
 
-      render(
-        <TeamAssetController
-          previousView={mockPreviousView}
-        />,
-      );
+      render(<TeamAssetController previousView={mockPreviousView} />);
 
       const select = screen.getByDisplayValue("Blink");
       fireEvent.change(select, { target: { value: "shaker" } });
@@ -538,11 +484,7 @@ describe("TeamAssetController", () => {
     it("enters sub mode and shows cancel button", () => {
       setupMocks({ roster: mockRoster });
 
-      render(
-        <TeamAssetController
-          previousView={mockPreviousView}
-        />,
-      );
+      render(<TeamAssetController previousView={mockPreviousView} />);
 
       fireEvent.click(screen.getByRole("button", { name: "Skipting" }));
 
@@ -555,11 +497,7 @@ describe("TeamAssetController", () => {
     it("cancels sub mode when cancel button clicked", () => {
       setupMocks({ roster: mockRoster });
 
-      render(
-        <TeamAssetController
-          previousView={mockPreviousView}
-        />,
-      );
+      render(<TeamAssetController previousView={mockPreviousView} />);
 
       fireEvent.click(screen.getByRole("button", { name: "Skipting" }));
       fireEvent.click(
@@ -574,11 +512,7 @@ describe("TeamAssetController", () => {
     it("enables player selection on Team components during sub mode", () => {
       setupMocks({ roster: mockRoster });
 
-      render(
-        <TeamAssetController
-          previousView={mockPreviousView}
-        />,
-      );
+      render(<TeamAssetController previousView={mockPreviousView} />);
 
       fireEvent.click(screen.getByRole("button", { name: "Skipting" }));
 
@@ -589,11 +523,7 @@ describe("TeamAssetController", () => {
     it("selects first sub player (subIn) and shows SubView", () => {
       setupMocks({ roster: mockRoster });
 
-      render(
-        <TeamAssetController
-          previousView={mockPreviousView}
-        />,
-      );
+      render(<TeamAssetController previousView={mockPreviousView} />);
 
       fireEvent.click(screen.getByRole("button", { name: "Skipting" }));
       fireEvent.click(screen.getByTestId("select-player-homeTeam"));
@@ -629,11 +559,7 @@ describe("TeamAssetController", () => {
           >,
         );
 
-      render(
-        <TeamAssetController
-          previousView={mockPreviousView}
-        />,
-      );
+      render(<TeamAssetController previousView={mockPreviousView} />);
 
       fireEvent.click(screen.getByRole("button", { name: "Skipting" }));
       fireEvent.click(screen.getByTestId("select-player-homeTeam"));
@@ -658,11 +584,7 @@ describe("TeamAssetController", () => {
 
       mockedGetPlayerAssetObject.mockResolvedValue(null);
 
-      render(
-        <TeamAssetController
-          previousView={mockPreviousView}
-        />,
-      );
+      render(<TeamAssetController previousView={mockPreviousView} />);
 
       fireEvent.click(screen.getByRole("button", { name: "Skipting" }));
       fireEvent.click(screen.getByTestId("select-player-homeTeam"));
@@ -680,11 +602,7 @@ describe("TeamAssetController", () => {
     it("enters player asset mode and shows cancel button", () => {
       setupMocks({ roster: mockRoster });
 
-      render(
-        <TeamAssetController
-          previousView={mockPreviousView}
-        />,
-      );
+      render(<TeamAssetController previousView={mockPreviousView} />);
 
       fireEvent.click(screen.getByRole("button", { name: "Birta leikmann" }));
 
@@ -696,11 +614,7 @@ describe("TeamAssetController", () => {
     it("cancels player asset mode", () => {
       setupMocks({ roster: mockRoster });
 
-      render(
-        <TeamAssetController
-          previousView={mockPreviousView}
-        />,
-      );
+      render(<TeamAssetController previousView={mockPreviousView} />);
 
       fireEvent.click(screen.getByRole("button", { name: "Birta leikmann" }));
       fireEvent.click(
@@ -727,11 +641,7 @@ describe("TeamAssetController", () => {
         >,
       );
 
-      render(
-        <TeamAssetController
-          previousView={mockPreviousView}
-        />,
-      );
+      render(<TeamAssetController previousView={mockPreviousView} />);
 
       fireEvent.click(screen.getByRole("button", { name: "Birta leikmann" }));
       fireEvent.click(screen.getByTestId("select-player-homeTeam"));
@@ -748,11 +658,7 @@ describe("TeamAssetController", () => {
         {} as unknown as Awaited<ReturnType<typeof getPlayerAssetObject>>,
       );
 
-      render(
-        <TeamAssetController
-          previousView={mockPreviousView}
-        />,
-      );
+      render(<TeamAssetController previousView={mockPreviousView} />);
 
       fireEvent.click(screen.getByRole("button", { name: "Birta leikmann" }));
       fireEvent.click(screen.getByTestId("select-player-homeTeam"));
@@ -772,11 +678,7 @@ describe("TeamAssetController", () => {
         {} as unknown as Awaited<ReturnType<typeof getPlayerAssetObject>>,
       );
 
-      render(
-        <TeamAssetController
-          previousView={mockPreviousView}
-        />,
-      );
+      render(<TeamAssetController previousView={mockPreviousView} />);
 
       fireEvent.click(screen.getByRole("button", { name: "Birta leikmann" }));
       fireEvent.click(screen.getByTestId("select-player-awayTeam"));
@@ -794,11 +696,7 @@ describe("TeamAssetController", () => {
     it("enters goal scorer mode and shows cancel button", () => {
       setupMocks({ roster: mockRoster });
 
-      render(
-        <TeamAssetController
-          previousView={mockPreviousView}
-        />,
-      );
+      render(<TeamAssetController previousView={mockPreviousView} />);
 
       fireEvent.click(
         screen.getByRole("button", { name: "Birta markaskorara" }),
@@ -824,11 +722,7 @@ describe("TeamAssetController", () => {
         >,
       );
 
-      render(
-        <TeamAssetController
-          previousView={mockPreviousView}
-        />,
-      );
+      render(<TeamAssetController previousView={mockPreviousView} />);
 
       fireEvent.click(
         screen.getByRole("button", { name: "Birta markaskorara" }),
@@ -845,18 +739,14 @@ describe("TeamAssetController", () => {
       });
     });
 
-    it("uses selected effect for goal scorer overlay", async () => {
+    it("uses selected effect for goal scorer overlay", () => {
       setupMocks({ roster: mockRoster });
 
       mockedGetPlayerAssetObject.mockResolvedValue(
         {} as unknown as Awaited<ReturnType<typeof getPlayerAssetObject>>,
       );
 
-      render(
-        <TeamAssetController
-          previousView={mockPreviousView}
-        />,
-      );
+      render(<TeamAssetController previousView={mockPreviousView} />);
 
       const select = screen.getByDisplayValue("Blink");
       fireEvent.change(select, { target: { value: "shaker" } });
@@ -878,11 +768,7 @@ describe("TeamAssetController", () => {
     it("enters MOTM mode and shows cancel button", () => {
       setupMocks({ roster: mockRoster });
 
-      render(
-        <TeamAssetController
-          previousView={mockPreviousView}
-        />,
-      );
+      render(<TeamAssetController previousView={mockPreviousView} />);
 
       fireEvent.click(
         screen.getByRole("button", { name: "Birta mann leiksins" }),
@@ -906,11 +792,7 @@ describe("TeamAssetController", () => {
         motmAsset as unknown as Awaited<ReturnType<typeof getMOTMAsset>>,
       );
 
-      render(
-        <TeamAssetController
-          previousView={mockPreviousView}
-        />,
-      );
+      render(<TeamAssetController previousView={mockPreviousView} />);
 
       fireEvent.click(
         screen.getByRole("button", { name: "Birta mann leiksins" }),
@@ -938,11 +820,7 @@ describe("TeamAssetController", () => {
       );
       mockedGetLineups.mockReturnValue(neverResolves);
 
-      render(
-        <TeamAssetController
-          previousView={mockPreviousView}
-        />,
-      );
+      render(<TeamAssetController previousView={mockPreviousView} />);
 
       fireEvent.click(screen.getByRole("button", { name: "Sækja lið" }));
 
@@ -957,11 +835,7 @@ describe("TeamAssetController", () => {
       );
       mockedGetLineups.mockReturnValue(neverResolves);
 
-      render(
-        <TeamAssetController
-          previousView={mockPreviousView}
-        />,
-      );
+      render(<TeamAssetController previousView={mockPreviousView} />);
 
       fireEvent.click(screen.getByRole("button", { name: "Sækja lið" }));
 
@@ -975,11 +849,7 @@ describe("TeamAssetController", () => {
     it("does not pass selectPlayer to Team when no action is selected", () => {
       setupMocks({ roster: mockRoster });
 
-      render(
-        <TeamAssetController
-          previousView={mockPreviousView}
-        />,
-      );
+      render(<TeamAssetController previousView={mockPreviousView} />);
 
       expect(
         screen.queryByTestId("select-player-homeTeam"),
@@ -992,11 +862,7 @@ describe("TeamAssetController", () => {
     it("passes selectPlayer to both teams in player asset mode", () => {
       setupMocks({ roster: mockRoster });
 
-      render(
-        <TeamAssetController
-          previousView={mockPreviousView}
-        />,
-      );
+      render(<TeamAssetController previousView={mockPreviousView} />);
 
       fireEvent.click(screen.getByRole("button", { name: "Birta leikmann" }));
 
@@ -1007,11 +873,7 @@ describe("TeamAssetController", () => {
     it("passes selectPlayer to both teams in goal scorer mode", () => {
       setupMocks({ roster: mockRoster });
 
-      render(
-        <TeamAssetController
-          previousView={mockPreviousView}
-        />,
-      );
+      render(<TeamAssetController previousView={mockPreviousView} />);
 
       fireEvent.click(
         screen.getByRole("button", { name: "Birta markaskorara" }),
@@ -1024,11 +886,7 @@ describe("TeamAssetController", () => {
     it("passes selectPlayer to both teams in MOTM mode", () => {
       setupMocks({ roster: mockRoster });
 
-      render(
-        <TeamAssetController
-          previousView={mockPreviousView}
-        />,
-      );
+      render(<TeamAssetController previousView={mockPreviousView} />);
 
       fireEvent.click(
         screen.getByRole("button", { name: "Birta mann leiksins" }),
@@ -1043,11 +901,7 @@ describe("TeamAssetController", () => {
     it("cancels goal scorer mode from cancel button", () => {
       setupMocks({ roster: mockRoster });
 
-      render(
-        <TeamAssetController
-          previousView={mockPreviousView}
-        />,
-      );
+      render(<TeamAssetController previousView={mockPreviousView} />);
 
       fireEvent.click(
         screen.getByRole("button", { name: "Birta markaskorara" }),
@@ -1068,11 +922,7 @@ describe("TeamAssetController", () => {
     it("cancels MOTM mode from cancel button", () => {
       setupMocks({ roster: mockRoster });
 
-      render(
-        <TeamAssetController
-          previousView={mockPreviousView}
-        />,
-      );
+      render(<TeamAssetController previousView={mockPreviousView} />);
 
       fireEvent.click(
         screen.getByRole("button", { name: "Birta mann leiksins" }),
@@ -1091,11 +941,7 @@ describe("TeamAssetController", () => {
     it("shows correct team name in SubView for home team sub", () => {
       setupMocks({ roster: mockRoster });
 
-      render(
-        <TeamAssetController
-          previousView={mockPreviousView}
-        />,
-      );
+      render(<TeamAssetController previousView={mockPreviousView} />);
 
       fireEvent.click(screen.getByRole("button", { name: "Skipting" }));
 
@@ -1109,11 +955,7 @@ describe("TeamAssetController", () => {
     it("shows correct team name in SubView for away team sub", () => {
       setupMocks({ roster: mockRoster });
 
-      render(
-        <TeamAssetController
-          previousView={mockPreviousView}
-        />,
-      );
+      render(<TeamAssetController previousView={mockPreviousView} />);
 
       fireEvent.click(screen.getByRole("button", { name: "Skipting" }));
       fireEvent.click(screen.getByTestId("select-player-awayTeam"));
@@ -1126,11 +968,7 @@ describe("TeamAssetController", () => {
     it("renders with empty players when roster is empty", () => {
       setupMocks();
 
-      render(
-        <TeamAssetController
-          previousView={mockPreviousView}
-        />,
-      );
+      render(<TeamAssetController previousView={mockPreviousView} />);
 
       expect(
         screen.getByRole("button", { name: "Sækja lið" }),
@@ -1146,11 +984,7 @@ describe("TeamAssetController", () => {
         {} as unknown as Awaited<ReturnType<typeof getPlayerAssetObject>>,
       );
 
-      render(
-        <TeamAssetController
-          previousView={mockPreviousView}
-        />,
-      );
+      render(<TeamAssetController previousView={mockPreviousView} />);
 
       fireEvent.click(screen.getByRole("button", { name: "Birta leikmann" }));
       expect(
@@ -1173,11 +1007,7 @@ describe("TeamAssetController", () => {
         {} as unknown as Awaited<ReturnType<typeof getPlayerAssetObject>>,
       );
 
-      render(
-        <TeamAssetController
-          previousView={mockPreviousView}
-        />,
-      );
+      render(<TeamAssetController previousView={mockPreviousView} />);
 
       fireEvent.click(
         screen.getByRole("button", { name: "Birta markaskorara" }),
@@ -1198,11 +1028,7 @@ describe("TeamAssetController", () => {
         {} as unknown as Awaited<ReturnType<typeof getMOTMAsset>>,
       );
 
-      render(
-        <TeamAssetController
-          previousView={mockPreviousView}
-        />,
-      );
+      render(<TeamAssetController previousView={mockPreviousView} />);
 
       fireEvent.click(
         screen.getByRole("button", { name: "Birta mann leiksins" }),

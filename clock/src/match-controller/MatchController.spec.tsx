@@ -8,7 +8,11 @@ import MatchController from "./MatchController";
 const renderWithProviders = (ui: React.ReactElement) => {
   return render(
     <LocalStateProvider>
-      <FirebaseStateProvider listenPrefix="" isAuthenticated={false} screenViewport={null}>
+      <FirebaseStateProvider
+        listenPrefix=""
+        isAuthenticated={false}
+        screenViewport={null}
+      >
         {ui}
       </FirebaseStateProvider>
     </LocalStateProvider>,
