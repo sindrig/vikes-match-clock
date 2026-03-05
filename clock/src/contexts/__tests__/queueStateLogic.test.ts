@@ -71,13 +71,13 @@ describe("parseQueueMap", () => {
     const result = parseQueueMap(data);
 
     expect(result).toHaveProperty("q1");
-    expect(result.q1.id).toBe("q1");
-    expect(result.q1.name).toBe("Main Queue");
-    expect(result.q1.items).toHaveLength(2);
-    expect(result.q1.autoPlay).toBe(true);
-    expect(result.q1.imageSeconds).toBe(5);
-    expect(result.q1.cycle).toBe(true);
-    expect(result.q1.order).toBe(0);
+    expect(result.q1!.id).toBe("q1");
+    expect(result.q1!.name).toBe("Main Queue");
+    expect(result.q1!.items).toHaveLength(2);
+    expect(result.q1!.autoPlay).toBe(true);
+    expect(result.q1!.imageSeconds).toBe(5);
+    expect(result.q1!.cycle).toBe(true);
+    expect(result.q1!.order).toBe(0);
   });
 
   it("parses multiple queue entries", () => {
@@ -88,9 +88,9 @@ describe("parseQueueMap", () => {
     const result = parseQueueMap(data);
 
     expect(Object.keys(result)).toHaveLength(2);
-    expect(result.q1.name).toBe("Queue 1");
-    expect(result.q2.name).toBe("Queue 2");
-    expect(result.q2.order).toBe(1);
+    expect(result.q1!.name).toBe("Queue 1");
+    expect(result.q2!.name).toBe("Queue 2");
+    expect(result.q2!.order).toBe(1);
   });
 
   it("preserves asset details in queue items", () => {
@@ -101,9 +101,9 @@ describe("parseQueueMap", () => {
     const data = { q1: firebaseQueue({ items }) };
     const result = parseQueueMap(data);
 
-    expect(result.q1.items).toHaveLength(2);
-    expect(result.q1.items[0].key).toBe("a1");
-    expect(result.q1.items[1].name).toBe("Sponsor clip");
+    expect(result.q1!.items).toHaveLength(2);
+    expect(result.q1!.items[0]!.key).toBe("a1");
+    expect(result.q1!.items[1]!.name).toBe("Sponsor clip");
   });
 
   it("defaults autoPlay to false when missing", () => {
@@ -111,7 +111,7 @@ describe("parseQueueMap", () => {
     delete raw.autoPlay;
     const result = parseQueueMap({ q1: raw });
 
-    expect(result.q1.autoPlay).toBe(false);
+    expect(result.q1!.autoPlay).toBe(false);
   });
 
   it("defaults imageSeconds to 3 when missing", () => {
@@ -119,7 +119,7 @@ describe("parseQueueMap", () => {
     delete raw.imageSeconds;
     const result = parseQueueMap({ q1: raw });
 
-    expect(result.q1.imageSeconds).toBe(3);
+    expect(result.q1!.imageSeconds).toBe(3);
   });
 
   it("defaults cycle to false when missing", () => {
@@ -127,7 +127,7 @@ describe("parseQueueMap", () => {
     delete raw.cycle;
     const result = parseQueueMap({ q1: raw });
 
-    expect(result.q1.cycle).toBe(false);
+    expect(result.q1!.cycle).toBe(false);
   });
 
   it("defaults order to 0 when missing", () => {
@@ -135,7 +135,7 @@ describe("parseQueueMap", () => {
     delete raw.order;
     const result = parseQueueMap({ q1: raw });
 
-    expect(result.q1.order).toBe(0);
+    expect(result.q1!.order).toBe(0);
   });
 
   it("defaults items to empty array when missing", () => {
@@ -143,7 +143,7 @@ describe("parseQueueMap", () => {
     delete raw.items;
     const result = parseQueueMap({ q1: raw });
 
-    expect(result.q1.items).toEqual([]);
+    expect(result.q1!.items).toEqual([]);
   });
 
   it("applies all defaults simultaneously", () => {
@@ -199,9 +199,9 @@ describe("parseQueueMap", () => {
     };
     const result = parseQueueMap(data);
 
-    expect(result.q1.items).toHaveLength(2);
-    expect(result.q1.items[0].key).toBe("a1");
-    expect(result.q1.items[1].key).toBe("a3");
+    expect(result.q1!.items).toHaveLength(2);
+    expect(result.q1!.items[0]!.key).toBe("a1");
+    expect(result.q1!.items[1]!.key).toBe("a3");
   });
 
   it("handles items that is not an array", () => {
@@ -210,7 +210,7 @@ describe("parseQueueMap", () => {
     };
     const result = parseQueueMap(data);
 
-    expect(result.q1.items).toEqual([]);
+    expect(result.q1!.items).toEqual([]);
   });
 
   it("returns empty object for empty input", () => {
@@ -235,28 +235,28 @@ describe("parseQueueMap", () => {
     const data = { q1: firebaseQueue({ autoPlay: "yes" }) };
     const result = parseQueueMap(data);
 
-    expect(result.q1.autoPlay).toBe(false);
+    expect(result.q1!.autoPlay).toBe(false);
   });
 
   it("coerces non-number imageSeconds to default", () => {
     const data = { q1: firebaseQueue({ imageSeconds: "five" }) };
     const result = parseQueueMap(data);
 
-    expect(result.q1.imageSeconds).toBe(3);
+    expect(result.q1!.imageSeconds).toBe(3);
   });
 
   it("coerces non-boolean cycle to default", () => {
     const data = { q1: firebaseQueue({ cycle: 1 }) };
     const result = parseQueueMap(data);
 
-    expect(result.q1.cycle).toBe(false);
+    expect(result.q1!.cycle).toBe(false);
   });
 
   it("coerces non-number order to default", () => {
     const data = { q1: firebaseQueue({ order: "first" }) };
     const result = parseQueueMap(data);
 
-    expect(result.q1.order).toBe(0);
+    expect(result.q1!.order).toBe(0);
   });
 });
 
@@ -321,8 +321,8 @@ describe.skipIf(!getStateShowingNextAsset)(
       expect(result.currentAsset!.time).toBe(7);
       expect(result.playing).toBe(true);
 
-      const queue = result.queues.q1;
-      expect(queue.items[0].key).toBe("a2");
+      const queue = result.queues.q1!;
+      expect(queue.items[0]!.key).toBe("a2");
     });
 
     it("re-adds popped item to end of queue when cycle is on", () => {
@@ -344,10 +344,10 @@ describe.skipIf(!getStateShowingNextAsset)(
 
       expect(result.currentAsset!.asset.key).toBe("a1");
 
-      const queue = result.queues.q1;
+      const queue = result.queues.q1!;
       expect(queue.items).toHaveLength(2);
-      expect(queue.items[0].key).toBe("a2");
-      expect(queue.items[1].key).toBe("a1");
+      expect(queue.items[0]!.key).toBe("a2");
+      expect(queue.items[1]!.key).toBe("a1");
     });
 
     it("keeps single item cycling when cycle is on", () => {
@@ -368,8 +368,8 @@ describe.skipIf(!getStateShowingNextAsset)(
       const result = nextAsset(state);
 
       expect(result.currentAsset!.asset.key).toBe("a1");
-      expect(result.queues.q1.items).toHaveLength(1);
-      expect(result.queues.q1.items[0].key).toBe("a1");
+      expect(result.queues.q1!.items).toHaveLength(1);
+      expect(result.queues.q1!.items[0]!.key).toBe("a1");
     });
 
     it("removes item from queue without re-adding when cycle is off", () => {
@@ -390,8 +390,8 @@ describe.skipIf(!getStateShowingNextAsset)(
       const result = nextAsset(state);
 
       expect(result.currentAsset!.asset.key).toBe("a1");
-      expect(result.queues.q1.items).toHaveLength(1);
-      expect(result.queues.q1.items[0].key).toBe("a2");
+      expect(result.queues.q1!.items).toHaveLength(1);
+      expect(result.queues.q1!.items[0]!.key).toBe("a2");
     });
 
     it("empties queue when last item popped with cycle off", () => {
@@ -457,8 +457,8 @@ describe.skipIf(!getStateShowingNextAsset)(
       const result = nextAsset(original);
 
       expect(result).not.toBe(original);
-      expect(original.queues.q1.items).toHaveLength(2);
-      expect(original.queues.q1.items[0].key).toBe("a1");
+      expect(original.queues.q1!.items).toHaveLength(2);
+      expect(original.queues.q1!.items[0]!.key).toBe("a1");
     });
   },
 );

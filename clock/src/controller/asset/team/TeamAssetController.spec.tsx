@@ -1,8 +1,7 @@
-import React from "react";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import TeamAssetController from "./TeamAssetController";
-import { Asset, Player, Roster } from "../../../types";
+import { Player, Roster } from "../../../types";
 import {
   useController,
   useMatch,
@@ -165,6 +164,10 @@ function setupMocks(overrides?: {
 }) {
   const mockClearRoster = vi.fn();
   const mockSetRoster = vi.fn();
+  const mockShowItemNow = vi.fn();
+  const mockCreateQueue = vi.fn<(name: string) => string>().mockReturnValue("new-queue-id");
+  const mockDeleteQueue = vi.fn();
+  const mockAddItemsToQueue = vi.fn();
 
   mockedUseMatch.mockReturnValue({
     match: { ...defaultMatch, ...overrides?.match },
@@ -173,9 +176,14 @@ function setupMocks(overrides?: {
   mockedUseController.mockReturnValue({
     controller: {
       roster: overrides?.roster ?? { home: [], away: [] },
+      queues: {},
     },
     clearRoster: mockClearRoster,
     setRoster: mockSetRoster,
+    showItemNow: mockShowItemNow,
+    createQueue: mockCreateQueue,
+    deleteQueue: mockDeleteQueue,
+    addItemsToQueue: mockAddItemsToQueue,
   } as unknown as ReturnType<typeof useController>);
 
   mockedUseRemoteSettings.mockReturnValue({
@@ -188,27 +196,22 @@ function setupMocks(overrides?: {
 
   mockedGetTeamId.mockReturnValue(2492);
 
-  return { mockClearRoster, mockSetRoster };
+  return {
+    mockClearRoster,
+    mockSetRoster,
+    mockShowItemNow,
+    mockCreateQueue,
+    mockDeleteQueue,
+    mockAddItemsToQueue,
+  };
 }
 
 describe("TeamAssetController", () => {
-  let mockAddAssets: ReturnType<
-    typeof vi.fn<
-      (assets: Promise<Asset | null>[], options?: { showNow?: boolean }) => void
-    >
-  >;
-  let mockPreviousView: ReturnType<typeof vi.fn>;
+  let mockPreviousView: Mock<() => void>;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockAddAssets =
-      vi.fn<
-        (
-          assets: Promise<Asset | null>[],
-          options?: { showNow?: boolean },
-        ) => void
-      >();
-    mockPreviousView = vi.fn();
+    mockPreviousView = vi.fn<() => void>();
   });
 
   afterEach(() => {
@@ -221,7 +224,6 @@ describe("TeamAssetController", () => {
 
       render(
         <TeamAssetController
-          addAssets={mockAddAssets}
           previousView={mockPreviousView}
         />,
       );
@@ -234,7 +236,6 @@ describe("TeamAssetController", () => {
 
       render(
         <TeamAssetController
-          addAssets={mockAddAssets}
           previousView={mockPreviousView}
         />,
       );
@@ -247,7 +248,6 @@ describe("TeamAssetController", () => {
 
       render(
         <TeamAssetController
-          addAssets={mockAddAssets}
           previousView={mockPreviousView}
         />,
       );
@@ -261,7 +261,6 @@ describe("TeamAssetController", () => {
 
       render(
         <TeamAssetController
-          addAssets={mockAddAssets}
           previousView={mockPreviousView}
         />,
       );
@@ -276,7 +275,6 @@ describe("TeamAssetController", () => {
 
       render(
         <TeamAssetController
-          addAssets={mockAddAssets}
           previousView={mockPreviousView}
         />,
       );
@@ -294,7 +292,6 @@ describe("TeamAssetController", () => {
 
       render(
         <TeamAssetController
-          addAssets={mockAddAssets}
           previousView={mockPreviousView}
         />,
       );
@@ -318,14 +315,13 @@ describe("TeamAssetController", () => {
       };
 
       mockedGetLineups.mockResolvedValueOnce({
-        data: lineups as Awaited<ReturnType<typeof getLineups>>,
-        error: null,
-      });
+        data: lineups,
+        error: undefined,
+      } as unknown as Awaited<ReturnType<typeof getLineups>>);
       mockedTransformLineups.mockReturnValueOnce(rosterData);
 
       render(
         <TeamAssetController
-          addAssets={mockAddAssets}
           previousView={mockPreviousView}
         />,
       );
@@ -357,7 +353,6 @@ describe("TeamAssetController", () => {
 
       render(
         <TeamAssetController
-          addAssets={mockAddAssets}
           previousView={mockPreviousView}
         />,
       );
@@ -374,7 +369,6 @@ describe("TeamAssetController", () => {
 
       render(
         <TeamAssetController
-          addAssets={mockAddAssets}
           previousView={mockPreviousView}
         />,
       );
@@ -394,7 +388,6 @@ describe("TeamAssetController", () => {
 
       render(
         <TeamAssetController
-          addAssets={mockAddAssets}
           previousView={mockPreviousView}
         />,
       );
@@ -412,7 +405,6 @@ describe("TeamAssetController", () => {
 
       render(
         <TeamAssetController
-          addAssets={mockAddAssets}
           previousView={mockPreviousView}
         />,
       );
@@ -425,8 +417,10 @@ describe("TeamAssetController", () => {
   });
 
   describe("add players to queue", () => {
-    it("adds visible players to queue and calls previousView", () => {
-      setupMocks({ roster: mockRoster });
+    it("adds visible players to queue and calls previousView", async () => {
+      const { mockCreateQueue, mockAddItemsToQueue } = setupMocks({
+        roster: mockRoster,
+      });
 
       const mockAsset = {
         type: "PLAYER",
@@ -440,7 +434,6 @@ describe("TeamAssetController", () => {
 
       render(
         <TeamAssetController
-          addAssets={mockAddAssets}
           previousView={mockPreviousView}
         />,
       );
@@ -449,8 +442,11 @@ describe("TeamAssetController", () => {
         screen.getByRole("button", { name: "Setja lið í biðröð" }),
       );
 
-      expect(mockAddAssets).toHaveBeenCalled();
-      expect(mockPreviousView).toHaveBeenCalled();
+      await waitFor(() => {
+        expect(mockCreateQueue).toHaveBeenCalledWith("Byrjunarlið");
+        expect(mockAddItemsToQueue).toHaveBeenCalled();
+        expect(mockPreviousView).toHaveBeenCalled();
+      });
     });
 
     it("shows error when some players have missing name or id", () => {
@@ -463,11 +459,12 @@ describe("TeamAssetController", () => {
         away: mockAwayPlayers,
       };
 
-      setupMocks({ roster: rosterWithBadPlayers });
+      const { mockAddItemsToQueue } = setupMocks({
+        roster: rosterWithBadPlayers,
+      });
 
       render(
         <TeamAssetController
-          addAssets={mockAddAssets}
           previousView={mockPreviousView}
         />,
       );
@@ -479,7 +476,7 @@ describe("TeamAssetController", () => {
       expect(
         screen.getByText("Missing name/number for some players to show"),
       ).toBeInTheDocument();
-      expect(mockAddAssets).not.toHaveBeenCalled();
+      expect(mockAddItemsToQueue).not.toHaveBeenCalled();
       expect(mockPreviousView).not.toHaveBeenCalled();
     });
   });
@@ -490,7 +487,6 @@ describe("TeamAssetController", () => {
 
       render(
         <TeamAssetController
-          addAssets={mockAddAssets}
           previousView={mockPreviousView}
         />,
       );
@@ -514,7 +510,6 @@ describe("TeamAssetController", () => {
 
       render(
         <TeamAssetController
-          addAssets={mockAddAssets}
           previousView={mockPreviousView}
         />,
       );
@@ -528,7 +523,6 @@ describe("TeamAssetController", () => {
 
       render(
         <TeamAssetController
-          addAssets={mockAddAssets}
           previousView={mockPreviousView}
         />,
       );
@@ -546,7 +540,6 @@ describe("TeamAssetController", () => {
 
       render(
         <TeamAssetController
-          addAssets={mockAddAssets}
           previousView={mockPreviousView}
         />,
       );
@@ -564,7 +557,6 @@ describe("TeamAssetController", () => {
 
       render(
         <TeamAssetController
-          addAssets={mockAddAssets}
           previousView={mockPreviousView}
         />,
       );
@@ -584,7 +576,6 @@ describe("TeamAssetController", () => {
 
       render(
         <TeamAssetController
-          addAssets={mockAddAssets}
           previousView={mockPreviousView}
         />,
       );
@@ -600,7 +591,6 @@ describe("TeamAssetController", () => {
 
       render(
         <TeamAssetController
-          addAssets={mockAddAssets}
           previousView={mockPreviousView}
         />,
       );
@@ -613,7 +603,7 @@ describe("TeamAssetController", () => {
     });
 
     it("completes substitution flow when both players selected", async () => {
-      setupMocks({ roster: mockRoster });
+      const { mockShowItemNow } = setupMocks({ roster: mockRoster });
 
       const subInAsset = {
         type: "PLAYER",
@@ -641,7 +631,6 @@ describe("TeamAssetController", () => {
 
       render(
         <TeamAssetController
-          addAssets={mockAddAssets}
           previousView={mockPreviousView}
         />,
       );
@@ -651,13 +640,11 @@ describe("TeamAssetController", () => {
       fireEvent.click(screen.getByTestId("select-player-homeTeam"));
 
       await waitFor(() => {
-        expect(mockAddAssets).toHaveBeenCalled();
+        expect(mockShowItemNow).toHaveBeenCalled();
       });
 
-      const callArgs = mockAddAssets.mock.calls[0];
-      expect(callArgs[1]).toEqual({ showNow: true });
-      const resolved = await callArgs[0][0];
-      expect(resolved).toEqual(
+      const callArgs = mockShowItemNow.mock.calls[0]!;
+      expect(callArgs[0]).toEqual(
         expect.objectContaining({
           type: "SUB",
           subIn: subInAsset,
@@ -666,14 +653,13 @@ describe("TeamAssetController", () => {
       );
     });
 
-    it("does not call addAssets if getPlayerAssetObject returns null for subIn", async () => {
-      setupMocks({ roster: mockRoster });
+    it("does not call showItemNow if getPlayerAssetObject returns null for subIn", async () => {
+      const { mockShowItemNow } = setupMocks({ roster: mockRoster });
 
       mockedGetPlayerAssetObject.mockResolvedValue(null);
 
       render(
         <TeamAssetController
-          addAssets={mockAddAssets}
           previousView={mockPreviousView}
         />,
       );
@@ -686,7 +672,7 @@ describe("TeamAssetController", () => {
         expect(mockedGetPlayerAssetObject).toHaveBeenCalled();
       });
 
-      expect(mockAddAssets).not.toHaveBeenCalled();
+      expect(mockShowItemNow).not.toHaveBeenCalled();
     });
   });
 
@@ -696,7 +682,6 @@ describe("TeamAssetController", () => {
 
       render(
         <TeamAssetController
-          addAssets={mockAddAssets}
           previousView={mockPreviousView}
         />,
       );
@@ -713,7 +698,6 @@ describe("TeamAssetController", () => {
 
       render(
         <TeamAssetController
-          addAssets={mockAddAssets}
           previousView={mockPreviousView}
         />,
       );
@@ -728,8 +712,8 @@ describe("TeamAssetController", () => {
       ).toBeInTheDocument();
     });
 
-    it("selects a player and adds asset with showNow", () => {
-      setupMocks({ roster: mockRoster });
+    it("selects a player and calls showItemNow", async () => {
+      const { mockShowItemNow } = setupMocks({ roster: mockRoster });
 
       const playerAsset = {
         type: "PLAYER",
@@ -737,13 +721,14 @@ describe("TeamAssetController", () => {
         name: "Jón",
         number: 10,
       };
-      mockedGetPlayerAssetObject.mockReturnValue(
-        playerAsset as unknown as ReturnType<typeof getPlayerAssetObject>,
+      mockedGetPlayerAssetObject.mockResolvedValue(
+        playerAsset as unknown as Awaited<
+          ReturnType<typeof getPlayerAssetObject>
+        >,
       );
 
       render(
         <TeamAssetController
-          addAssets={mockAddAssets}
           previousView={mockPreviousView}
         />,
       );
@@ -751,21 +736,20 @@ describe("TeamAssetController", () => {
       fireEvent.click(screen.getByRole("button", { name: "Birta leikmann" }));
       fireEvent.click(screen.getByTestId("select-player-homeTeam"));
 
-      expect(mockAddAssets).toHaveBeenCalledWith([playerAsset], {
-        showNow: true,
+      await waitFor(() => {
+        expect(mockShowItemNow).toHaveBeenCalledWith(playerAsset);
       });
     });
 
     it("uses actual team name (not homeTeam/awayTeam key) for player asset", () => {
       setupMocks({ roster: mockRoster });
 
-      mockedGetPlayerAssetObject.mockReturnValue(
-        {} as unknown as ReturnType<typeof getPlayerAssetObject>,
+      mockedGetPlayerAssetObject.mockResolvedValue(
+        {} as unknown as Awaited<ReturnType<typeof getPlayerAssetObject>>,
       );
 
       render(
         <TeamAssetController
-          addAssets={mockAddAssets}
           previousView={mockPreviousView}
         />,
       );
@@ -784,13 +768,12 @@ describe("TeamAssetController", () => {
     it("uses away team name for away player asset", () => {
       setupMocks({ roster: mockRoster });
 
-      mockedGetPlayerAssetObject.mockReturnValue(
-        {} as unknown as ReturnType<typeof getPlayerAssetObject>,
+      mockedGetPlayerAssetObject.mockResolvedValue(
+        {} as unknown as Awaited<ReturnType<typeof getPlayerAssetObject>>,
       );
 
       render(
         <TeamAssetController
-          addAssets={mockAddAssets}
           previousView={mockPreviousView}
         />,
       );
@@ -813,7 +796,6 @@ describe("TeamAssetController", () => {
 
       render(
         <TeamAssetController
-          addAssets={mockAddAssets}
           previousView={mockPreviousView}
         />,
       );
@@ -827,8 +809,8 @@ describe("TeamAssetController", () => {
       ).toBeInTheDocument();
     });
 
-    it("selects goal scorer with overlay effect", () => {
-      setupMocks({ roster: mockRoster });
+    it("selects goal scorer with overlay effect", async () => {
+      const { mockShowItemNow } = setupMocks({ roster: mockRoster });
 
       const playerAsset = {
         type: "PLAYER",
@@ -836,13 +818,14 @@ describe("TeamAssetController", () => {
         name: "Jón",
         number: 10,
       };
-      mockedGetPlayerAssetObject.mockReturnValue(
-        playerAsset as unknown as ReturnType<typeof getPlayerAssetObject>,
+      mockedGetPlayerAssetObject.mockResolvedValue(
+        playerAsset as unknown as Awaited<
+          ReturnType<typeof getPlayerAssetObject>
+        >,
       );
 
       render(
         <TeamAssetController
-          addAssets={mockAddAssets}
           previousView={mockPreviousView}
         />,
       );
@@ -857,21 +840,20 @@ describe("TeamAssetController", () => {
           overlay: { text: "", blink: true, effect: "blink" },
         }),
       );
-      expect(mockAddAssets).toHaveBeenCalledWith([playerAsset], {
-        showNow: true,
+      await waitFor(() => {
+        expect(mockShowItemNow).toHaveBeenCalledWith(playerAsset);
       });
     });
 
-    it("uses selected effect for goal scorer overlay", () => {
+    it("uses selected effect for goal scorer overlay", async () => {
       setupMocks({ roster: mockRoster });
 
-      mockedGetPlayerAssetObject.mockReturnValue(
-        {} as unknown as ReturnType<typeof getPlayerAssetObject>,
+      mockedGetPlayerAssetObject.mockResolvedValue(
+        {} as unknown as Awaited<ReturnType<typeof getPlayerAssetObject>>,
       );
 
       render(
         <TeamAssetController
-          addAssets={mockAddAssets}
           previousView={mockPreviousView}
         />,
       );
@@ -898,7 +880,6 @@ describe("TeamAssetController", () => {
 
       render(
         <TeamAssetController
-          addAssets={mockAddAssets}
           previousView={mockPreviousView}
         />,
       );
@@ -912,8 +893,8 @@ describe("TeamAssetController", () => {
       ).toBeInTheDocument();
     });
 
-    it("selects MOTM and calls getMOTMAsset", () => {
-      setupMocks({ roster: mockRoster });
+    it("selects MOTM and calls getMOTMAsset", async () => {
+      const { mockShowItemNow } = setupMocks({ roster: mockRoster });
 
       const motmAsset = {
         type: "MOTM",
@@ -921,13 +902,12 @@ describe("TeamAssetController", () => {
         name: "Jón",
         number: 10,
       };
-      mockedGetMOTMAsset.mockReturnValue(
-        motmAsset as unknown as ReturnType<typeof getMOTMAsset>,
+      mockedGetMOTMAsset.mockResolvedValue(
+        motmAsset as unknown as Awaited<ReturnType<typeof getMOTMAsset>>,
       );
 
       render(
         <TeamAssetController
-          addAssets={mockAddAssets}
           previousView={mockPreviousView}
         />,
       );
@@ -943,8 +923,8 @@ describe("TeamAssetController", () => {
           listenPrefix: "vikinni",
         }),
       );
-      expect(mockAddAssets).toHaveBeenCalledWith([motmAsset], {
-        showNow: true,
+      await waitFor(() => {
+        expect(mockShowItemNow).toHaveBeenCalledWith(motmAsset);
       });
     });
   });
@@ -960,7 +940,6 @@ describe("TeamAssetController", () => {
 
       render(
         <TeamAssetController
-          addAssets={mockAddAssets}
           previousView={mockPreviousView}
         />,
       );
@@ -980,7 +959,6 @@ describe("TeamAssetController", () => {
 
       render(
         <TeamAssetController
-          addAssets={mockAddAssets}
           previousView={mockPreviousView}
         />,
       );
@@ -999,7 +977,6 @@ describe("TeamAssetController", () => {
 
       render(
         <TeamAssetController
-          addAssets={mockAddAssets}
           previousView={mockPreviousView}
         />,
       );
@@ -1017,7 +994,6 @@ describe("TeamAssetController", () => {
 
       render(
         <TeamAssetController
-          addAssets={mockAddAssets}
           previousView={mockPreviousView}
         />,
       );
@@ -1033,7 +1009,6 @@ describe("TeamAssetController", () => {
 
       render(
         <TeamAssetController
-          addAssets={mockAddAssets}
           previousView={mockPreviousView}
         />,
       );
@@ -1051,7 +1026,6 @@ describe("TeamAssetController", () => {
 
       render(
         <TeamAssetController
-          addAssets={mockAddAssets}
           previousView={mockPreviousView}
         />,
       );
@@ -1071,7 +1045,6 @@ describe("TeamAssetController", () => {
 
       render(
         <TeamAssetController
-          addAssets={mockAddAssets}
           previousView={mockPreviousView}
         />,
       );
@@ -1097,7 +1070,6 @@ describe("TeamAssetController", () => {
 
       render(
         <TeamAssetController
-          addAssets={mockAddAssets}
           previousView={mockPreviousView}
         />,
       );
@@ -1121,7 +1093,6 @@ describe("TeamAssetController", () => {
 
       render(
         <TeamAssetController
-          addAssets={mockAddAssets}
           previousView={mockPreviousView}
         />,
       );
@@ -1140,7 +1111,6 @@ describe("TeamAssetController", () => {
 
       render(
         <TeamAssetController
-          addAssets={mockAddAssets}
           previousView={mockPreviousView}
         />,
       );
@@ -1158,7 +1128,6 @@ describe("TeamAssetController", () => {
 
       render(
         <TeamAssetController
-          addAssets={mockAddAssets}
           previousView={mockPreviousView}
         />,
       );
@@ -1170,16 +1139,15 @@ describe("TeamAssetController", () => {
   });
 
   describe("clearState after actions", () => {
-    it("returns to default action buttons after selecting a player asset", () => {
+    it("returns to default action buttons after selecting a player asset", async () => {
       setupMocks({ roster: mockRoster });
 
-      mockedGetPlayerAssetObject.mockReturnValue(
-        {} as unknown as ReturnType<typeof getPlayerAssetObject>,
+      mockedGetPlayerAssetObject.mockResolvedValue(
+        {} as unknown as Awaited<ReturnType<typeof getPlayerAssetObject>>,
       );
 
       render(
         <TeamAssetController
-          addAssets={mockAddAssets}
           previousView={mockPreviousView}
         />,
       );
@@ -1191,21 +1159,22 @@ describe("TeamAssetController", () => {
 
       fireEvent.click(screen.getByTestId("select-player-homeTeam"));
 
-      expect(
-        screen.getByRole("button", { name: "Skipting" }),
-      ).toBeInTheDocument();
+      await waitFor(() => {
+        expect(
+          screen.getByRole("button", { name: "Skipting" }),
+        ).toBeInTheDocument();
+      });
     });
 
-    it("returns to default action buttons after selecting a goal scorer", () => {
+    it("returns to default action buttons after selecting a goal scorer", async () => {
       setupMocks({ roster: mockRoster });
 
-      mockedGetPlayerAssetObject.mockReturnValue(
-        {} as unknown as ReturnType<typeof getPlayerAssetObject>,
+      mockedGetPlayerAssetObject.mockResolvedValue(
+        {} as unknown as Awaited<ReturnType<typeof getPlayerAssetObject>>,
       );
 
       render(
         <TeamAssetController
-          addAssets={mockAddAssets}
           previousView={mockPreviousView}
         />,
       );
@@ -1215,21 +1184,22 @@ describe("TeamAssetController", () => {
       );
       fireEvent.click(screen.getByTestId("select-player-homeTeam"));
 
-      expect(
-        screen.getByRole("button", { name: "Skipting" }),
-      ).toBeInTheDocument();
+      await waitFor(() => {
+        expect(
+          screen.getByRole("button", { name: "Skipting" }),
+        ).toBeInTheDocument();
+      });
     });
 
-    it("returns to default action buttons after selecting MOTM", () => {
+    it("returns to default action buttons after selecting MOTM", async () => {
       setupMocks({ roster: mockRoster });
 
-      mockedGetMOTMAsset.mockReturnValue(
-        {} as unknown as ReturnType<typeof getMOTMAsset>,
+      mockedGetMOTMAsset.mockResolvedValue(
+        {} as unknown as Awaited<ReturnType<typeof getMOTMAsset>>,
       );
 
       render(
         <TeamAssetController
-          addAssets={mockAddAssets}
           previousView={mockPreviousView}
         />,
       );
@@ -1239,9 +1209,11 @@ describe("TeamAssetController", () => {
       );
       fireEvent.click(screen.getByTestId("select-player-homeTeam"));
 
-      expect(
-        screen.getByRole("button", { name: "Skipting" }),
-      ).toBeInTheDocument();
+      await waitFor(() => {
+        expect(
+          screen.getByRole("button", { name: "Skipting" }),
+        ).toBeInTheDocument();
+      });
     });
   });
 });

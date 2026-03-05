@@ -81,7 +81,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
 
       render(
-        <FirebaseStateProvider listenPrefix="" isAuthenticated={true}>
+        <FirebaseStateProvider listenPrefix="" isAuthenticated={true} screenViewport={null}>
           <TestMatchConsumer
             onMount={(api) => {
               matchApi = api;
@@ -104,7 +104,7 @@ describe("FirebaseStateContext", () => {
       let controllerApi: ReturnType<typeof useController> | null = null;
 
       render(
-        <FirebaseStateProvider listenPrefix="" isAuthenticated={true}>
+        <FirebaseStateProvider listenPrefix="" isAuthenticated={true} screenViewport={null}>
           <TestControllerConsumer
             onMount={(api) => {
               controllerApi = api;
@@ -132,6 +132,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -161,6 +162,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -207,6 +209,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestControllerConsumer
             onMount={(api) => {
@@ -233,7 +236,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
 
       render(
-        <FirebaseStateProvider listenPrefix="test" isAuthenticated={false}>
+        <FirebaseStateProvider listenPrefix="test" isAuthenticated={false} screenViewport={null}>
           <TestMatchConsumer
             onMount={(api) => {
               matchApi = api;
@@ -256,6 +259,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -282,6 +286,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -302,6 +307,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -326,6 +332,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -350,6 +357,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -374,6 +382,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -394,6 +403,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -418,6 +428,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -445,6 +456,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -465,6 +477,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -489,6 +502,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -517,6 +531,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -549,6 +564,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestControllerConsumer
             onMount={(api) => {
@@ -573,6 +589,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestControllerConsumer
             onMount={(api) => {
@@ -597,6 +614,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestControllerConsumer
             onMount={(api) => {
@@ -626,6 +644,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestControllerConsumer
             onMount={(api) => {
@@ -646,6 +665,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestControllerConsumer
             onMount={(api) => {
@@ -670,6 +690,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestControllerConsumer
             onMount={(api) => {
@@ -696,6 +717,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestControllerConsumer
             onMount={(api) => {
@@ -722,6 +744,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -746,6 +769,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -770,6 +794,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -794,6 +819,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -818,6 +844,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -842,6 +869,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -866,6 +894,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -892,6 +921,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -919,6 +949,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -950,6 +981,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -961,7 +993,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateMatch({ homeTeam: "Valur" });
       });
-      const call = vi.mocked(firebaseDatabase.syncState).mock.calls[0];
+      const call = vi.mocked(firebaseDatabase.syncState).mock.calls[0]!;
       expect(Object.keys(call[2])).toEqual(
         expect.arrayContaining(["homeTeam", "homeTeamId"]),
       );
@@ -974,6 +1006,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -985,7 +1018,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateMatch({ awayTeam: "KR" });
       });
-      const call = vi.mocked(firebaseDatabase.syncState).mock.calls[0];
+      const call = vi.mocked(firebaseDatabase.syncState).mock.calls[0]!;
       expect(Object.keys(call[2])).toEqual(
         expect.arrayContaining(["awayTeam", "awayTeamId"]),
       );
@@ -998,6 +1031,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -1009,7 +1043,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateMatch({ matchType: Sports.Handball });
       });
-      const call = vi.mocked(firebaseDatabase.syncState).mock.calls[0];
+      const call = vi.mocked(firebaseDatabase.syncState).mock.calls[0]!;
       expect(call[2]).toEqual({
         matchType: Sports.Handball,
         halfStops: DEFAULT_HALFSTOPS[Sports.Handball],
@@ -1022,6 +1056,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -1033,7 +1068,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateMatch({ injuryTime: NaN });
       });
-      const call = vi.mocked(firebaseDatabase.syncState).mock.calls[0];
+      const call = vi.mocked(firebaseDatabase.syncState).mock.calls[0]!;
       expect(call[2]).toEqual({ injuryTime: 0 });
     });
 
@@ -1043,6 +1078,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -1067,6 +1103,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -1091,6 +1128,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -1102,7 +1140,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateMatch({ homeTeam: "Valur", ksiMatchId: 12345 });
       });
-      const call = vi.mocked(firebaseDatabase.syncState).mock.calls[0];
+      const call = vi.mocked(firebaseDatabase.syncState).mock.calls[0]!;
       expect(call[2].ksiMatchId).toBe(12345);
     });
 
@@ -1112,6 +1150,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -1123,7 +1162,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateMatch({ homeScore: 5 });
       });
-      const call = vi.mocked(firebaseDatabase.syncState).mock.calls[0];
+      const call = vi.mocked(firebaseDatabase.syncState).mock.calls[0]!;
       expect(call[2].ksiMatchId).toBeUndefined();
     });
 
@@ -1133,6 +1172,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -1159,6 +1199,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -1191,6 +1232,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -1223,6 +1265,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -1243,6 +1286,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -1267,6 +1311,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -1300,6 +1345,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestControllerConsumer
             onMount={(api) => {
@@ -1328,6 +1374,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestControllerConsumer
             onMount={(api) => {
@@ -1358,6 +1405,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestControllerConsumer
             onMount={(api) => {
@@ -1397,6 +1445,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestControllerConsumer
             onMount={(api) => {
@@ -1466,6 +1515,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestViewConsumer
             onMount={(api) => {
@@ -1495,6 +1545,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestViewConsumer
             onMount={(api) => {
@@ -1519,6 +1570,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestViewConsumer
             onMount={(api) => {
@@ -1545,6 +1597,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestViewConsumer
             onMount={(api) => {
@@ -1571,6 +1624,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -1603,6 +1657,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -1627,6 +1682,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -1647,6 +1703,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -1671,6 +1728,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -1691,6 +1749,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -1729,6 +1788,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestControllerConsumer
             onMount={(api) => {
@@ -1761,6 +1821,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -1780,6 +1841,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -1800,6 +1862,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -1819,6 +1882,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -1831,7 +1895,7 @@ describe("FirebaseStateContext", () => {
         matchApi!.startMatch();
       });
       // Verify set was called with a timestamp close to Date.now()
-      const call = vi.mocked(firebaseDatabase.syncState).mock.calls[0];
+      const call = vi.mocked(firebaseDatabase.syncState).mock.calls[0]!;
       const writtenMatch = call[2];
       expect(writtenMatch.started).toBeGreaterThan(Date.now() - 100);
       expect(writtenMatch.started).toBeLessThan(Date.now() + 100);
@@ -1843,6 +1907,7 @@ describe("FirebaseStateContext", () => {
         <FirebaseStateProvider
           listenPrefix="test-location"
           isAuthenticated={true}
+        screenViewport={null}
         >
           <TestMatchConsumer
             onMount={(api) => {
@@ -1865,7 +1930,7 @@ describe("FirebaseStateContext", () => {
           started: 0,
         }),
       );
-      const pauseCall = vi.mocked(firebaseDatabase.syncState).mock.calls[0];
+      const pauseCall = vi.mocked(firebaseDatabase.syncState).mock.calls[0]!;
       const pauseData = pauseCall[2];
       // timeElapsed is computed via getServerTime() - started, ~0ms in tests.
       // The diff optimization may skip it if it stays at 0 (the default),

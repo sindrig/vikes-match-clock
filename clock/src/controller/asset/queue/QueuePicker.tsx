@@ -27,7 +27,7 @@ const QueuePicker: React.FC<QueuePickerProps> = ({
     if (queueCount === 0) {
       onCreateAndAdd("Biðröð 1", assets);
     } else if (queueCount === 1) {
-      onAddToQueue(queueIds[0], assets);
+      onAddToQueue(queueIds[0]!, assets);
     }
   }, [queueCount, queueIds, assets, onAddToQueue, onCreateAndAdd]);
 
@@ -65,7 +65,7 @@ const QueuePicker: React.FC<QueuePickerProps> = ({
       style={{ width: 224 }}
       searchable={false}
       cleanable={false}
-      renderMenuItem={(label, item) => {
+      renderMenuItem={(label: React.ReactNode, item: { value: string }) => {
         if (item.value === NEW_QUEUE_VALUE) {
           return <div className="new-queue-option">{label}</div>;
         }

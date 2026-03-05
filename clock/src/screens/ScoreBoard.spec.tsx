@@ -9,7 +9,7 @@ vi.mock("../sounds/buzzersound.mp3", () => ({ default: "" }));
 const renderWithProviders = () => {
   return render(
     <LocalStateProvider>
-      <FirebaseStateProvider listenPrefix="" isAuthenticated={false}>
+      <FirebaseStateProvider listenPrefix="" isAuthenticated={false} screenViewport={null}>
         <ScoreBoard />
       </FirebaseStateProvider>
     </LocalStateProvider>,
@@ -173,7 +173,7 @@ describe("ScoreBoard component", () => {
 
       rerender(
         <LocalStateProvider>
-          <FirebaseStateProvider listenPrefix="" isAuthenticated={false}>
+          <FirebaseStateProvider listenPrefix="" isAuthenticated={false} screenViewport={null}>
             <ScoreBoard />
           </FirebaseStateProvider>
         </LocalStateProvider>,

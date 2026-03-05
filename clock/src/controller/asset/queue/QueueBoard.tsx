@@ -221,7 +221,7 @@ const QueueBoard: React.FC<QueueBoardProps> = ({
         const newIndex = destItemIndex;
 
         if (oldIndex !== -1 && newIndex !== -1) {
-          const newItems = arrayMove(queue.items || [], oldIndex, newIndex);
+          const newItems = arrayMove(queue!.items || [], oldIndex, newIndex);
           onReorderItems(sourceQueueId, newItems);
         }
       }
@@ -268,7 +268,7 @@ const QueueBoard: React.FC<QueueBoardProps> = ({
           activeDragType === "column" ? (
             <div className="sortable-column-wrapper" style={{ opacity: 0.8 }}>
               <QueueColumn
-                queue={queues[activeDragId.toString().replace("col-", "")]}
+                queue={queues[activeDragId.toString().replace("col-", "")]!}
                 isPlaying={
                   playing &&
                   activeQueueId === activeDragId.toString().replace("col-", "")

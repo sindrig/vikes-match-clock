@@ -10,7 +10,6 @@ import type {
   Match,
   ControllerState,
   ViewState,
-  Asset,
   ViewPort,
   TwoMinPenalty,
 } from "../types";
@@ -41,10 +40,6 @@ const defaultMatch: Match = {
 };
 
 const defaultController: ControllerState = {
-  selectedAssets: [],
-  cycle: false,
-  imageSeconds: 5,
-  autoPlay: false,
   playing: false,
   assetView: "grid",
   view: "scoreboard",
@@ -134,7 +129,7 @@ describe("firebaseParsers", () => {
       };
 
       const result = parseLocations(data);
-      expect(result!.screens[0].label).toBe("hasteinsvollur");
+      expect(result!.screens[0]!.label).toBe("hasteinsvollur");
     });
 
     it("parses multiple screens within single location", () => {
@@ -158,8 +153,8 @@ describe("firebaseParsers", () => {
 
       const result = parseLocations(data);
       expect(result!.screens).toHaveLength(2);
-      expect(result!.screens[0].screen.name).toBe("Main");
-      expect(result!.screens[1].screen.name).toBe("Secondary");
+      expect(result!.screens[0]!.screen.name).toBe("Main");
+      expect(result!.screens[1]!.screen.name).toBe("Secondary");
     });
 
     it("parses multiple locations", () => {
@@ -208,7 +203,7 @@ describe("firebaseParsers", () => {
       };
 
       const result = parseLocations(data);
-      expect(result!.screens[0].pitchIds).toEqual(["pitch1", "pitch2"]);
+      expect(result!.screens[0]!.pitchIds).toEqual(["pitch1", "pitch2"]);
     });
 
     it("omits pitchIds when not present", () => {
@@ -226,7 +221,7 @@ describe("firebaseParsers", () => {
       };
 
       const result = parseLocations(data);
-      expect(result!.screens[0].pitchIds).toBeUndefined();
+      expect(result!.screens[0]!.pitchIds).toBeUndefined();
     });
 
     it("skips invalid location values", () => {
@@ -274,8 +269,8 @@ describe("firebaseParsers", () => {
 
       const result = parseLocations(data);
       expect(result!.screens).toHaveLength(2);
-      expect(result!.screens[0].screen.name).toBe("Valid");
-      expect(result!.screens[1].screen.name).toBe("Valid2");
+      expect(result!.screens[0]!.screen.name).toBe("Valid");
+      expect(result!.screens[1]!.screen.name).toBe("Valid2");
     });
 
     it("handles missing screens array", () => {
@@ -317,7 +312,7 @@ describe("firebaseParsers", () => {
       };
 
       const result = parseLocations(data);
-      expect(result!.screens[0].screen.fontSize).toBe("48px");
+      expect(result!.screens[0]!.screen.fontSize).toBe("48px");
     });
   });
 
@@ -664,8 +659,8 @@ describe("firebaseParsers", () => {
 
       const result = parseMatch(data, defaultMatch);
       expect(result!.home2min).toHaveLength(2);
-      expect(result!.home2min[0].key).toBe("p1");
-      expect(result!.home2min[1].key).toBe("p3");
+      expect(result!.home2min[0]!.key).toBe("p1");
+      expect(result!.home2min[1]!.key).toBe("p3");
     });
 
     it("uses default 2-minute arrays when not arrays", () => {
@@ -719,22 +714,22 @@ describe("firebaseParsers", () => {
       expect(result).toEqual(defaultController);
     });
 
-    it("uses default selectedAssets when not array", () => {
+    it("uses empty queues when not object", () => {
       const data = {
-        selectedAssets: "not an array",
+        queues: "not an object",
       };
 
       const result = parseController(data, defaultController);
-      expect(result!.selectedAssets).toEqual([]);
+      expect(result!.queues).toEqual({});
     });
 
-    it("uses default imageSeconds for non-numeric", () => {
+    it("uses default activeQueueId when not string", () => {
       const data = {
-        imageSeconds: "10",
+        activeQueueId: 123,
       };
 
       const result = parseController(data, defaultController);
-      expect(result!.imageSeconds).toBe(defaultController.imageSeconds);
+      expect(result!.activeQueueId).toBe(defaultController.activeQueueId);
     });
 
     it("parses string fields", () => {
@@ -819,7 +814,7 @@ describe("firebaseParsers", () => {
       expect(result!.view).toBe("assets");
       // Default fields
       expect(result!.playing).toBe(defaultController.playing);
-      expect(result!.selectedAssets).toEqual([]);
+      expect(result!.queues).toEqual({});
       expect(result!.roster).toEqual({ home: [], away: [] });
     });
   });

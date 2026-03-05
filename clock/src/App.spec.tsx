@@ -1,4 +1,3 @@
-import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import App from "./App";
@@ -96,14 +95,14 @@ function setupState1() {
 }
 
 function setupState2(
-  view = VIEWS.idle,
+  view: string = VIEWS.idle,
   overrides?: {
-    setListenPrefix?: ReturnType<typeof vi.fn>;
-    setScreenViewport?: ReturnType<typeof vi.fn>;
+    setListenPrefix?: (prefix: string) => void;
+    setScreenViewport?: (vp: unknown) => void;
   },
 ) {
-  const setListenPrefix = overrides?.setListenPrefix ?? vi.fn();
-  const setScreenViewport = overrides?.setScreenViewport ?? vi.fn();
+  const setListenPrefix = overrides?.setListenPrefix ?? vi.fn<(prefix: string) => void>();
+  const setScreenViewport = overrides?.setScreenViewport ?? vi.fn<(vp: unknown) => void>();
   mockedUseLocalState.mockReturnValue({
     auth: { isLoaded: true, isEmpty: true },
     listenPrefix: "vikinni",
@@ -125,14 +124,14 @@ function setupState2(
 }
 
 function setupState3(
-  view = VIEWS.idle,
+  view: string = VIEWS.idle,
   overrides?: {
-    setListenPrefix?: ReturnType<typeof vi.fn>;
-    setScreenViewport?: ReturnType<typeof vi.fn>;
+    setListenPrefix?: (prefix: string) => void;
+    setScreenViewport?: (vp: unknown) => void;
   },
 ) {
-  const setListenPrefix = overrides?.setListenPrefix ?? vi.fn();
-  const setScreenViewport = overrides?.setScreenViewport ?? vi.fn();
+  const setListenPrefix = overrides?.setListenPrefix ?? vi.fn<(prefix: string) => void>();
+  const setScreenViewport = overrides?.setScreenViewport ?? vi.fn<(vp: unknown) => void>();
   mockedUseLocalState.mockReturnValue({
     auth: { isLoaded: true, isEmpty: false, email: "test@test.com" },
     listenPrefix: "vikinni",

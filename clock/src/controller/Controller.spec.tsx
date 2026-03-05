@@ -1,4 +1,3 @@
-import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import Controller from "./Controller";
@@ -159,10 +158,10 @@ function setupState3() {
 function setupScreenSelector(
   overrides: {
     available?: string[] | null;
-    setListenPrefix?: ReturnType<typeof vi.fn>;
+    setListenPrefix?: (prefix: string) => void;
   } = {},
 ) {
-  const mockSetListenPrefix = overrides.setListenPrefix ?? vi.fn();
+  const mockSetListenPrefix = overrides.setListenPrefix ?? vi.fn<(prefix: string) => void>();
   const mockAvailable =
     overrides.available !== undefined
       ? overrides.available
