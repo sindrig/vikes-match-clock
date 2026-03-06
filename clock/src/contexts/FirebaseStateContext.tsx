@@ -77,6 +77,43 @@ const defaultListeners: ListenersState = {
   screens: [],
 };
 
+export function computeControllerDiff(
+  prev: ControllerState,
+  next: ControllerState,
+): Record<string, unknown> {
+  const diff: Record<string, unknown> = {};
+
+  for (const key of Object.keys(next) as Array<keyof ControllerState>) {
+    if (key === "queues") {
+      if (prev.queues !== next.queues) {
+        const prevQueues = prev.queues;
+        const nextQueues = next.queues;
+
+        for (const queueId of Object.keys(nextQueues)) {
+          if (prevQueues[queueId] !== nextQueues[queueId]) {
+            diff[`queues/${queueId}`] = nextQueues[queueId];
+          }
+        }
+
+        for (const queueId of Object.keys(prevQueues)) {
+          if (!Object.prototype.hasOwnProperty.call(nextQueues, queueId)) {
+            diff[`queues/${queueId}`] = null;
+          }
+        }
+      }
+      continue;
+    }
+
+    const oldVal = prev[key];
+    const newVal = next[key];
+    if (oldVal !== newVal) {
+      diff[key] = newVal;
+    }
+  }
+
+  return diff;
+}
+
 interface FirebaseStateContextType {
   match: Match;
   controller: ControllerState;
@@ -417,14 +454,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       if (isAuthenticated) {
         controllerRef.current = newState;
 
-        const diff: Record<string, unknown> = {};
-        for (const key of Object.keys(newState) as (keyof ControllerState)[]) {
-          const oldVal = prev[key];
-          const newVal = newState[key];
-          if (oldVal !== newVal) {
-            diff[key] = newVal;
-          }
-        }
+        const diff = computeControllerDiff(prev, newState);
 
         if (Object.keys(diff).length > 0) {
           firebaseDatabase

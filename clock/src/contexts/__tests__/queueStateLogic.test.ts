@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { parseQueueMap } from "../firebaseParsers";
+import { computeControllerDiff } from "../FirebaseStateContext";
 import type { ControllerState, QueueState, Asset } from "../../types";
 
 function firebaseQueue(
@@ -312,6 +313,87 @@ describe("parseQueueMap", () => {
 
     expect(uniqueOrders.size).toBe(3);
     expect(orders.sort()).toEqual([0, 1, 2]);
+  });
+});
+
+describe("computeControllerDiff", () => {
+  it("writes a nested queue path for a single queue update", () => {
+    const prev = makeControllerState({
+      queues: {
+        q1: makeQueue({ id: "q1", name: "Queue 1" }),
+        q2: makeQueue({ id: "q2", name: "Queue 2" }),
+      },
+    });
+    const next = {
+      ...prev,
+      queues: {
+        ...prev.queues,
+        q1: { ...prev.queues.q1!, name: "Updated" },
+      },
+    };
+
+    const diff = computeControllerDiff(prev, next);
+
+    expect(diff["queues/q1"]).toEqual(next.queues.q1);
+    expect(diff["queues/q2"]).toBeUndefined();
+    expect(diff.queues).toBeUndefined();
+  });
+
+  it("writes null for deleted queues", () => {
+    const prev = makeControllerState({
+      queues: {
+        q1: makeQueue({ id: "q1", name: "Queue 1" }),
+        q2: makeQueue({ id: "q2", name: "Queue 2" }),
+      },
+    });
+    const next = {
+      ...prev,
+      queues: {
+        q2: prev.queues.q2!,
+      },
+    };
+
+    const diff = computeControllerDiff(prev, next);
+
+    expect(diff["queues/q1"]).toBeNull();
+    expect(diff["queues/q2"]).toBeUndefined();
+  });
+
+  it("does not include queue paths when queues are unchanged", () => {
+    const prev = makeControllerState({
+      queues: {
+        q1: makeQueue({ id: "q1" }),
+        q2: makeQueue({ id: "q2" }),
+      },
+    });
+    const next = { ...prev };
+
+    const diff = computeControllerDiff(prev, next);
+
+    const queueKeys = Object.keys(diff).filter(
+      (key) => key === "queues" || key.startsWith("queues/"),
+    );
+    expect(queueKeys).toHaveLength(0);
+  });
+
+  it("writes a nested path for newly added queues", () => {
+    const prev = makeControllerState({
+      queues: {
+        q1: makeQueue({ id: "q1" }),
+      },
+    });
+    const next = {
+      ...prev,
+      queues: {
+        ...prev.queues,
+        q3: makeQueue({ id: "q3", name: "Queue 3" }),
+      },
+    };
+
+    const diff = computeControllerDiff(prev, next);
+
+    expect(diff["queues/q3"]).toEqual(next.queues.q3);
+    expect(diff["queues/q1"]).toBeUndefined();
   });
 });
 
