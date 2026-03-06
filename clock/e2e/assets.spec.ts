@@ -99,10 +99,11 @@ test.describe("Asset Overlay System", () => {
       .locator(".queue-column")
       .getByLabel("Play Queue");
     await expect(playButton).toBeVisible();
+
+    // Clicking play on a single-item queue shows the overlay
+    // (the item is consumed immediately, so we verify the overlay appeared)
     await playButton.click();
-    await expect(
-      assetController.locator(".queue-column").getByLabel("Stop Queue"),
-    ).toBeVisible();
+    await expect(page.getByText("Hreinsa virkt overlay")).toBeVisible();
   });
 
   test("toggles autoplay and loop options", async ({ page }) => {
@@ -126,15 +127,15 @@ test.describe("Asset Overlay System", () => {
       .locator("..")
       .locator(".rs-toggle");
 
-    await expect(autoplayToggle).not.toHaveClass(/rs-toggle-checked/);
+    await expect(autoplayToggle).not.toHaveAttribute("data-checked", "true");
     await autoplayToggle.click();
-    await expect(autoplayToggle).toHaveClass(/rs-toggle-checked/);
+    await expect(autoplayToggle).toHaveAttribute("data-checked", "true");
 
     await expect(settingsPopover.getByText("sek")).toBeVisible();
 
-    await expect(loopToggle).not.toHaveClass(/rs-toggle-checked/);
+    await expect(loopToggle).not.toHaveAttribute("data-checked", "true");
     await loopToggle.click();
-    await expect(loopToggle).toHaveClass(/rs-toggle-checked/);
+    await expect(loopToggle).toHaveAttribute("data-checked", "true");
   });
 
   test("shows clear overlay button when asset is displayed", async ({
