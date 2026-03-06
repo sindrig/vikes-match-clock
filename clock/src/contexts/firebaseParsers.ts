@@ -272,5 +272,20 @@ export function parseQueueMap(data: unknown): Record<string, QueueState> {
     };
   }
 
+  const orders = Object.values(result).map((q) => q.order);
+  const uniqueOrders = new Set(orders);
+
+  if (uniqueOrders.size !== orders.length) {
+    let nextOrder = 0;
+    for (const key of Object.keys(result)) {
+      const queue = result[key];
+      if (!queue) {
+        continue;
+      }
+      result[key] = { ...queue, order: nextOrder };
+      nextOrder += 1;
+    }
+  }
+
   return result;
 }

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   SortableContext,
   verticalListSortingStrategy,
@@ -15,6 +15,7 @@ import {
 } from "react-icons/md";
 import { QueueState, Asset } from "../../../types";
 import QueueItem from "./QueueItem";
+import { makeDragId } from "./dndUtils";
 import "./QueueColumn.css";
 
 // Extract listener type from useSortable return type for type safety
@@ -48,12 +49,21 @@ const QueueColumn: React.FC<QueueColumnProps> = ({
   style,
 }) => {
   const [nameInput, setNameInput] = useState(queue.name);
+  const [isEditing, setIsEditing] = useState(false);
+
+  useEffect(() => {
+    if (!isEditing) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setNameInput(queue.name);
+    }
+  }, [queue.name, isEditing]);
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setNameInput(e.target.value);
   };
 
   const handleNameBlur = () => {
+    setIsEditing(false);
     if (nameInput.trim() !== queue.name) {
       onRenameQueue(queue.id, nameInput.trim());
     }
@@ -80,7 +90,7 @@ const QueueColumn: React.FC<QueueColumnProps> = ({
   };
 
   const items = queue.items || [];
-  const itemIds = items.map((item) => item.key);
+  const itemIds = items.map((item) => makeDragId("item", queue.id, item.key));
 
   return (
     <div
@@ -91,15 +101,14 @@ const QueueColumn: React.FC<QueueColumnProps> = ({
       {...sortableAttributes}
     >
       <div className="queue-column-header">
-        <div
+        <button
+          type="button"
           className="queue-column-drag-handle"
           {...sortableListeners}
-          tabIndex={0}
-          role="button"
           aria-label="Drag column"
         >
           <MdDragIndicator size={20} />
-        </div>
+        </button>
 
         <div className="queue-column-title-container">
           <input
@@ -107,6 +116,7 @@ const QueueColumn: React.FC<QueueColumnProps> = ({
             value={nameInput}
             onChange={handleNameChange}
             onBlur={handleNameBlur}
+            onFocus={() => setIsEditing(true)}
             onKeyDown={handleKeyDown}
             aria-label={`Rename queue ${queue.name}`}
           />
