@@ -34,7 +34,11 @@ interface QueueBoardProps {
   onRenameQueue: (queueId: string, newName: string) => void;
   onPlayQueue: (queueId: string) => void;
   onStopPlaying: () => void;
-  onOpenSettings: (queueId: string) => void;
+  onUpdateSettings: (
+    queueId: string,
+    settings: Partial<Pick<QueueState, "autoPlay" | "imageSeconds" | "cycle">>,
+  ) => void;
+  onDeleteQueue: (queueId: string) => void;
   onShowItemNow: (asset: Asset) => void;
   onDeleteAsset: (queueId: string, assetKey: string) => void;
   onReorderQueues: (newQueueOrderIds: string[]) => void;
@@ -48,7 +52,11 @@ interface SortableColumnProps {
   onRenameQueue: (queueId: string, newName: string) => void;
   onPlayQueue: (queueId: string) => void;
   onStopPlaying: () => void;
-  onOpenSettings: (queueId: string) => void;
+  onUpdateSettings: (
+    queueId: string,
+    settings: Partial<Pick<QueueState, "autoPlay" | "imageSeconds" | "cycle">>,
+  ) => void;
+  onDeleteQueue: (queueId: string) => void;
   onShowItemNow: (asset: Asset) => void;
   onDeleteAsset: (queueId: string, assetKey: string) => void;
 }
@@ -83,7 +91,8 @@ const SortableColumn = ({ queue, ...props }: SortableColumnProps) => {
         onRenameQueue={props.onRenameQueue}
         onPlayQueue={props.onPlayQueue}
         onStopPlaying={props.onStopPlaying}
-        onOpenSettings={props.onOpenSettings}
+        onUpdateSettings={props.onUpdateSettings}
+        onDeleteQueue={props.onDeleteQueue}
         onShowItemNow={props.onShowItemNow}
         onDeleteAsset={props.onDeleteAsset}
       />
@@ -98,7 +107,8 @@ const QueueBoard: React.FC<QueueBoardProps> = ({
   onRenameQueue,
   onPlayQueue,
   onStopPlaying,
-  onOpenSettings,
+  onUpdateSettings,
+  onDeleteQueue,
   onShowItemNow,
   onDeleteAsset,
   onReorderQueues,
@@ -214,19 +224,19 @@ const QueueBoard: React.FC<QueueBoardProps> = ({
       if (overParsed.type === "column") {
         destQueueId = overParsed.queueId;
         const destQueue = queues[destQueueId];
-        if (!destQueue) return; // Guard: queue deleted mid-drag
+        if (!destQueue) return;
         destItemIndex = destQueue.items ? destQueue.items.length : 0;
       } else {
         destQueueId = overParsed.queueId;
         const destQueue = queues[destQueueId];
-        if (!destQueue) return; // Guard: queue deleted mid-drag
+        if (!destQueue) return;
         destItemIndex =
           destQueue.items.findIndex((i) => i.key === overParsed.assetKey) ?? -1;
       }
 
       if (sourceQueueId && destQueueId && sourceQueueId === destQueueId) {
         const queue = queues[sourceQueueId];
-        if (!queue) return; // Guard: queue deleted mid-drag
+        if (!queue) return;
         const oldIndex = sourceItemIndex;
         const newIndex = destItemIndex;
 
@@ -263,7 +273,8 @@ const QueueBoard: React.FC<QueueBoardProps> = ({
               onRenameQueue={onRenameQueue}
               onPlayQueue={onPlayQueue}
               onStopPlaying={onStopPlaying}
-              onOpenSettings={onOpenSettings}
+              onUpdateSettings={onUpdateSettings}
+              onDeleteQueue={onDeleteQueue}
               onShowItemNow={onShowItemNow}
               onDeleteAsset={onDeleteAsset}
             />
@@ -289,7 +300,10 @@ const QueueBoard: React.FC<QueueBoardProps> = ({
                 onStopPlaying={() => {
                   // noop - drag overlay
                 }}
-                onOpenSettings={() => {
+                onUpdateSettings={() => {
+                  // noop - drag overlay
+                }}
+                onDeleteQueue={() => {
                   // noop - drag overlay
                 }}
                 onShowItemNow={() => {

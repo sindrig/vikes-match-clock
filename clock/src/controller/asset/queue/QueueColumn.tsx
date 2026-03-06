@@ -9,16 +9,15 @@ import {
   MdDragIndicator,
   MdAutorenew,
   MdLoop,
-  MdSettings,
   MdPlayArrow,
   MdPause,
 } from "react-icons/md";
 import { QueueState, Asset } from "../../../types";
 import QueueItem from "./QueueItem";
+import QueueSettingsPopover from "./QueueSettingsPopover";
 import { makeDragId } from "./dndUtils";
 import "./QueueColumn.css";
 
-// Extract listener type from useSortable return type for type safety
 type SortableListeners = ReturnType<typeof useSortable>["listeners"];
 
 interface QueueColumnProps {
@@ -27,7 +26,11 @@ interface QueueColumnProps {
   onRenameQueue: (queueId: string, newName: string) => void;
   onPlayQueue: (queueId: string) => void;
   onStopPlaying: () => void;
-  onOpenSettings: (queueId: string) => void;
+  onUpdateSettings: (
+    queueId: string,
+    settings: Partial<Pick<QueueState, "autoPlay" | "imageSeconds" | "cycle">>,
+  ) => void;
+  onDeleteQueue: (queueId: string) => void;
   onShowItemNow: (asset: Asset) => void;
   onDeleteAsset: (queueId: string, assetKey: string) => void;
   sortableListeners?: SortableListeners;
@@ -41,7 +44,8 @@ const QueueColumn: React.FC<QueueColumnProps> = ({
   onRenameQueue,
   onPlayQueue,
   onStopPlaying,
-  onOpenSettings,
+  onUpdateSettings,
+  onDeleteQueue,
   onShowItemNow,
   onDeleteAsset,
   sortableListeners,
@@ -76,17 +80,12 @@ const QueueColumn: React.FC<QueueColumnProps> = ({
   };
 
   const handlePlayToggle = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent drag start if clicked on play button
+    e.stopPropagation();
     if (isPlaying) {
       onStopPlaying();
     } else {
       onPlayQueue(queue.id);
     }
-  };
-
-  const handleSettingsClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onOpenSettings(queue.id);
   };
 
   const items = queue.items || [];
@@ -96,8 +95,6 @@ const QueueColumn: React.FC<QueueColumnProps> = ({
     <div
       className={`queue-column ${isPlaying ? "queue-column--playing" : ""}`}
       style={style}
-      // Apply draggable attributes to the container so it can be identified
-      // but listeners are only on the handle
       {...sortableAttributes}
     >
       <div className="queue-column-header">
@@ -128,14 +125,11 @@ const QueueColumn: React.FC<QueueColumnProps> = ({
         </div>
 
         <div className="queue-column-actions">
-          <button
-            type="button"
-            className="queue-column-action-btn"
-            onClick={handleSettingsClick}
-            aria-label="Queue Settings"
-          >
-            <MdSettings />
-          </button>
+          <QueueSettingsPopover
+            queue={queue}
+            onUpdateSettings={onUpdateSettings}
+            onDeleteQueue={onDeleteQueue}
+          />
           <button
             type="button"
             className={`queue-column-action-btn ${isPlaying ? "stop-btn" : "play-btn"}`}

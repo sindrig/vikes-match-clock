@@ -6,7 +6,6 @@ import { ASSET_VIEWS } from "../../constants";
 import TeamAssetController from "./team/TeamAssetController";
 import UrlController from "./UrlController";
 import assetTypes from "./AssetTypes";
-import { Button, InputNumber, Modal, Toggle } from "rsuite";
 import { Asset } from "../../types";
 import { parseYoutubePlaylistId, isYoutubeUrl } from "../../utils/urlUtils";
 
@@ -33,7 +32,6 @@ const AssetController = () => {
 
   const { assetView, queues, activeQueueId, playing } = controller;
   const [pendingAssets, setPendingAssets] = useState<Asset[]>([]);
-  const [settingsQueueId, setSettingsQueueId] = useState<string | null>(null);
 
   const addMultipleAssets = (
     promises: (Asset | Promise<Asset | null>)[],
@@ -82,12 +80,6 @@ const AssetController = () => {
     [createQueue, addItemsToQueue],
   );
 
-  const handleSettingsClose = () => {
-    setSettingsQueueId(null);
-  };
-
-  const settingsQueue = settingsQueueId ? queues[settingsQueueId] : null;
-
   const renderAssetController = () => {
     return (
       <div className="withborder">
@@ -101,7 +93,8 @@ const AssetController = () => {
           onRenameQueue={renameQueue}
           onPlayQueue={playQueue}
           onStopPlaying={stopPlaying}
-          onOpenSettings={setSettingsQueueId}
+          onUpdateSettings={updateQueueSettings}
+          onDeleteQueue={deleteQueue}
           onShowItemNow={showItemNow}
           onDeleteAsset={(queueId, assetKey) =>
             removeItemFromQueue(queueId, assetKey)
@@ -119,80 +112,6 @@ const AssetController = () => {
             onCreateAndAdd={handleCreateAndAdd}
           />
         )}
-        <Modal open={Boolean(settingsQueue)} onClose={handleSettingsClose}>
-          {settingsQueue ? (
-            <>
-              <Modal.Header>
-                <Modal.Title>Stillingar biðraðar</Modal.Title>
-              </Modal.Header>
-              <Modal.Body>
-                <div className="queue-settings-row">
-                  <label>Autoplay</label>
-                  <Toggle
-                    checked={settingsQueue.autoPlay}
-                    onChange={(checked) =>
-                      updateQueueSettings(settingsQueue.id, {
-                        autoPlay: checked,
-                      })
-                    }
-                  />
-                </div>
-                {settingsQueue.autoPlay && (
-                  <div className="queue-settings-row">
-                    <label>Tími</label>
-                    <InputNumber
-                      min={1}
-                      max={600}
-                      defaultValue={3}
-                      value={settingsQueue.imageSeconds}
-                      onChange={(value) => {
-                        if (value !== null) {
-                          const seconds =
-                            typeof value === "string"
-                              ? parseInt(value, 10)
-                              : value;
-                          updateQueueSettings(settingsQueue.id, {
-                            imageSeconds: Math.max(1, seconds),
-                          });
-                        }
-                      }}
-                      postfix="sek"
-                      style={{ width: 110 }}
-                    />
-                  </div>
-                )}
-                <div className="queue-settings-row">
-                  <label>Loop</label>
-                  <Toggle
-                    checked={settingsQueue.cycle}
-                    onChange={(checked) =>
-                      updateQueueSettings(settingsQueue.id, {
-                        cycle: checked,
-                      })
-                    }
-                  />
-                </div>
-              </Modal.Body>
-              <Modal.Footer>
-                <Button
-                  color="red"
-                  appearance="primary"
-                  onClick={() => {
-                    if (window.confirm("Ertu alveg viss?")) {
-                      deleteQueue(settingsQueue.id);
-                      handleSettingsClose();
-                    }
-                  }}
-                >
-                  Eyða biðröð
-                </Button>
-                <Button appearance="subtle" onClick={handleSettingsClose}>
-                  Loka
-                </Button>
-              </Modal.Footer>
-            </>
-          ) : null}
-        </Modal>
       </div>
     );
   };
