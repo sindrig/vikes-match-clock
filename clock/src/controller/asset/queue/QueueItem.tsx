@@ -4,6 +4,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { Asset as AssetType } from "../../../types";
 import Asset from "../Asset";
 import ItemActionDialog from "./ItemActionDialog";
+import { makeDragId } from "./dndUtils";
 
 import "./QueueItem.css";
 
@@ -30,7 +31,8 @@ const QueueItem: React.FC<QueueItemProps> = ({
     transition,
     isDragging,
   } = useSortable({
-    id: asset.key,
+    id: makeDragId("item", queueId, asset.key),
+    data: { type: "item" },
   });
 
   const style: React.CSSProperties = {
@@ -50,7 +52,8 @@ const QueueItem: React.FC<QueueItemProps> = ({
 
   return (
     <>
-      <div
+      <button
+        type="button"
         ref={setNodeRef}
         style={style}
         className="queue-item"
@@ -60,7 +63,7 @@ const QueueItem: React.FC<QueueItemProps> = ({
         {...listeners}
       >
         <Asset asset={asset} thumbnail={true} />
-      </div>
+      </button>
       <ItemActionDialog
         open={dialogOpen}
         onClose={handleCloseDialog}

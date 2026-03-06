@@ -24,6 +24,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { QueueState, Asset } from "../../../types";
 import QueueColumn from "./QueueColumn";
 import QueueItem from "./QueueItem";
+import { makeDragId, parseDragId } from "./dndUtils";
 import "./QueueBoard.css";
 
 interface QueueBoardProps {
@@ -60,7 +61,10 @@ const SortableColumn = ({ queue, ...props }: SortableColumnProps) => {
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: `col-${queue.id}`, data: { type: "column", queue } });
+  } = useSortable({
+    id: makeDragId("column", queue.id),
+    data: { type: "column" },
+  });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -106,7 +110,6 @@ const QueueBoard: React.FC<QueueBoardProps> = ({
   const [activeDragType, setActiveDragType] = useState<
     "column" | "item" | null
   >(null);
-  const [draggedItem, setDraggedItem] = useState<Asset | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -130,28 +133,34 @@ const QueueBoard: React.FC<QueueBoardProps> = ({
   }, [queues]);
 
   const columnIds = useMemo(() => {
-    return sortedQueues.map((q) => `col-${q.id}`);
+    return sortedQueues.map((q) => makeDragId("column", q.id));
   }, [sortedQueues]);
+
+  const activeParsed = useMemo(() => {
+    return activeDragId ? parseDragId(activeDragId.toString()) : null;
+  }, [activeDragId]);
+
+  const activeQueue = activeParsed ? queues[activeParsed.queueId] : null;
+  const activeItem = activeParsed?.assetKey
+    ? (activeQueue?.items?.find((item) => item.key === activeParsed.assetKey) ??
+      null)
+    : null;
 
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
     const id = active.id.toString();
+    const parsed = parseDragId(id);
 
     setActiveDragId(active.id);
 
-    if (id.startsWith("col-")) {
+    if (!parsed) {
+      return;
+    }
+
+    if (parsed.type === "column") {
       setActiveDragType("column");
     } else {
       setActiveDragType("item");
-      let foundItem: Asset | null = null;
-      for (const queue of Object.values(queues)) {
-        const item = queue.items?.find((i) => i.key === id);
-        if (item) {
-          foundItem = item;
-          break;
-        }
-      }
-      setDraggedItem(foundItem);
     }
   };
 
@@ -159,20 +168,27 @@ const QueueBoard: React.FC<QueueBoardProps> = ({
     const { active, over } = event;
     setActiveDragId(null);
     setActiveDragType(null);
-    setDraggedItem(null);
 
     if (!over) return;
 
     const activeId = active.id.toString();
     const overId = over.id.toString();
+    const activeParsed = parseDragId(activeId);
+    const overParsed = parseDragId(overId);
+
+    if (!activeParsed || !overParsed) {
+      return;
+    }
 
     if (activeId === overId) return;
 
-    if (activeId.startsWith("col-") && overId.startsWith("col-")) {
+    if (activeParsed.type === "column" && overParsed.type === "column") {
       const oldIndex = sortedQueues.findIndex(
-        (q) => `col-${q.id}` === activeId,
+        (q) => q.id === activeParsed.queueId,
       );
-      const newIndex = sortedQueues.findIndex((q) => `col-${q.id}` === overId);
+      const newIndex = sortedQueues.findIndex(
+        (q) => q.id === overParsed.queueId,
+      );
 
       if (oldIndex !== -1 && newIndex !== -1) {
         const newOrder = arrayMove(sortedQueues, oldIndex, newIndex).map(
@@ -183,45 +199,39 @@ const QueueBoard: React.FC<QueueBoardProps> = ({
       return;
     }
 
-    if (!activeId.startsWith("col-")) {
+    if (activeParsed.type === "item") {
       let sourceQueueId: string | null = null;
       let destQueueId: string | null = null;
       let sourceItemIndex = -1;
       let destItemIndex = -1;
 
-      for (const queue of Object.values(queues)) {
-        const idx = queue.items?.findIndex((i) => i.key === activeId);
-        if (idx !== undefined && idx !== -1) {
-          sourceQueueId = queue.id;
-          sourceItemIndex = idx;
-          break;
-        }
-      }
+      sourceQueueId = activeParsed.queueId;
+      const sourceQueue = queues[sourceQueueId];
+      sourceItemIndex =
+        sourceQueue?.items?.findIndex((i) => i.key === activeParsed.assetKey) ??
+        -1;
 
-      if (overId.startsWith("col-")) {
-        destQueueId = overId.replace("col-", "");
+      if (overParsed.type === "column") {
+        destQueueId = overParsed.queueId;
         const destQueue = queues[destQueueId];
-        if (destQueue) {
-          destItemIndex = destQueue.items ? destQueue.items.length : 0;
-        }
+        if (!destQueue) return; // Guard: queue deleted mid-drag
+        destItemIndex = destQueue.items ? destQueue.items.length : 0;
       } else {
-        for (const queue of Object.values(queues)) {
-          const idx = queue.items?.findIndex((i) => i.key === overId);
-          if (idx !== undefined && idx !== -1) {
-            destQueueId = queue.id;
-            destItemIndex = idx;
-            break;
-          }
-        }
+        destQueueId = overParsed.queueId;
+        const destQueue = queues[destQueueId];
+        if (!destQueue) return; // Guard: queue deleted mid-drag
+        destItemIndex =
+          destQueue.items.findIndex((i) => i.key === overParsed.assetKey) ?? -1;
       }
 
       if (sourceQueueId && destQueueId && sourceQueueId === destQueueId) {
         const queue = queues[sourceQueueId];
+        if (!queue) return; // Guard: queue deleted mid-drag
         const oldIndex = sourceItemIndex;
         const newIndex = destItemIndex;
 
         if (oldIndex !== -1 && newIndex !== -1) {
-          const newItems = arrayMove(queue!.items || [], oldIndex, newIndex);
+          const newItems = arrayMove(queue.items || [], oldIndex, newIndex);
           onReorderItems(sourceQueueId, newItems);
         }
       }
@@ -264,15 +274,12 @@ const QueueBoard: React.FC<QueueBoardProps> = ({
       <DragOverlay
         dropAnimation={{ sideEffects: defaultDropAnimationSideEffects({}) }}
       >
-        {activeDragId ? (
-          activeDragType === "column" ? (
+        {activeDragId && activeParsed ? (
+          activeDragType === "column" && activeQueue ? (
             <div className="sortable-column-wrapper" style={{ opacity: 0.8 }}>
               <QueueColumn
-                queue={queues[activeDragId.toString().replace("col-", "")]!}
-                isPlaying={
-                  playing &&
-                  activeQueueId === activeDragId.toString().replace("col-", "")
-                }
+                queue={activeQueue}
+                isPlaying={playing && activeQueueId === activeQueue.id}
                 onRenameQueue={() => {
                   // noop - drag overlay
                 }}
@@ -293,11 +300,11 @@ const QueueBoard: React.FC<QueueBoardProps> = ({
                 }}
               />
             </div>
-          ) : draggedItem ? (
+          ) : activeItem ? (
             <div className="queue-item-drag-overlay">
               <QueueItem
-                asset={draggedItem}
-                queueId=""
+                asset={activeItem}
+                queueId={activeParsed.queueId}
                 onShowNow={() => {
                   // noop - drag overlay
                 }}
