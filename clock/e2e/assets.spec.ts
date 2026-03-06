@@ -27,14 +27,16 @@ test.describe("Asset Overlay System", () => {
     page,
   }) => {
     const assetController = page.locator(".asset-controller");
-    await expect(assetController.getByText("0 í biðröð")).toBeVisible();
+    await expect(page.getByText("Engin biðröð")).toBeVisible();
 
     await assetController
       .locator('input[type="text"]')
       .fill("https://www.youtube.com/watch?v=test1");
     await assetController.getByText("Bæta við").click();
 
-    await expect(assetController.getByText("1 í biðröð")).toBeVisible();
+    const queueColumn = assetController.locator(".queue-column");
+    await expect(queueColumn).toHaveCount(1);
+    await expect(queueColumn.locator(".queue-item")).toHaveCount(1);
   });
 
   test("adds multiple assets to the queue", async ({ page }) => {
@@ -55,7 +57,9 @@ test.describe("Asset Overlay System", () => {
       .fill("https://www.youtube.com/watch?v=test3");
     await assetController.getByText("Bæta við").click();
 
-    await expect(assetController.getByText("3 í biðröð")).toBeVisible();
+    const queueColumn = assetController.locator(".queue-column");
+    await expect(queueColumn).toHaveCount(1);
+    await expect(queueColumn.locator(".queue-item")).toHaveCount(3);
   });
 
   test("clears the asset queue", async ({ page }) => {
@@ -73,58 +77,64 @@ test.describe("Asset Overlay System", () => {
       .fill("https://www.youtube.com/watch?v=test2");
     await assetController.getByText("Bæta við").click();
 
-    await expect(assetController.getByText("2 í biðröð")).toBeVisible();
-    await assetController.getByText("Hreinsa biðröð").click();
+    const queueColumn = assetController.locator(".queue-column");
+    await expect(queueColumn.locator(".queue-item")).toHaveCount(2);
 
-    await expect(assetController.getByText("0 í biðröð")).toBeVisible();
+    await queueColumn.locator(".queue-column-actions .rs-btn").first().click();
+    await page.getByText("Eyða biðröð").click();
+
+    await expect(page.getByText("Engin biðröð")).toBeVisible();
   });
 
   test("shows Birta button when queue has items", async ({ page }) => {
     const assetController = page.locator(".asset-controller");
-    await expect(assetController.getByText("Birta")).not.toBeVisible();
+    await expect(assetController.getByLabel("Play Queue")).toHaveCount(0);
 
     await assetController
       .locator('input[type="text"]')
       .fill("https://www.youtube.com/watch?v=test1");
     await assetController.getByText("Bæta við").click();
 
-    await expect(assetController.getByText("Birta")).toBeVisible();
+    const playButton = assetController
+      .locator(".queue-column")
+      .getByLabel("Play Queue");
+    await expect(playButton).toBeVisible();
+    await playButton.click();
+    await expect(
+      assetController.locator(".queue-column").getByLabel("Stop Queue"),
+    ).toBeVisible();
   });
 
   test("toggles autoplay and loop options", async ({ page }) => {
     const assetController = page.locator(".asset-controller");
 
-    await expect(
-      assetController
-        .getByText("Autoplay")
-        .locator("..")
-        .locator('input[type="checkbox"]'),
-    ).not.toBeChecked();
+    await assetController
+      .locator('input[type="text"]')
+      .fill("https://www.youtube.com/watch?v=test1");
+    await assetController.getByText("Bæta við").click();
 
-    await assetController.getByText("Autoplay").click();
-    await expect(
-      assetController
-        .getByText("Autoplay")
-        .locator("..")
-        .locator('input[type="checkbox"]'),
-    ).toBeChecked();
+    const queueColumn = assetController.locator(".queue-column");
+    await queueColumn.locator(".queue-column-actions .rs-btn").first().click();
+    const settingsPopover = page.locator(".queue-settings-popover");
 
-    await expect(assetController.getByText("sek")).toBeVisible();
+    const autoplayToggle = settingsPopover
+      .getByText("Autoplay")
+      .locator("..")
+      .locator(".rs-toggle");
+    const loopToggle = settingsPopover
+      .getByText("Loop")
+      .locator("..")
+      .locator(".rs-toggle");
 
-    await expect(
-      assetController
-        .getByText("Loop")
-        .locator("..")
-        .locator('input[type="checkbox"]'),
-    ).not.toBeChecked();
+    await expect(autoplayToggle).not.toHaveClass(/rs-toggle-checked/);
+    await autoplayToggle.click();
+    await expect(autoplayToggle).toHaveClass(/rs-toggle-checked/);
 
-    await assetController.getByText("Loop").click();
-    await expect(
-      assetController
-        .getByText("Loop")
-        .locator("..")
-        .locator('input[type="checkbox"]'),
-    ).toBeChecked();
+    await expect(settingsPopover.getByText("sek")).toBeVisible();
+
+    await expect(loopToggle).not.toHaveClass(/rs-toggle-checked/);
+    await loopToggle.click();
+    await expect(loopToggle).toHaveClass(/rs-toggle-checked/);
   });
 
   test("shows clear overlay button when asset is displayed", async ({
@@ -137,7 +147,10 @@ test.describe("Asset Overlay System", () => {
       .locator('input[type="text"]')
       .fill("https://www.youtube.com/watch?v=test1");
     await assetController.getByText("Bæta við").click();
-    await assetController.getByText("Birta").click();
+    await assetController
+      .locator(".queue-column")
+      .getByLabel("Play Queue")
+      .click();
 
     await expect(page.getByText("Hreinsa virkt overlay")).toBeVisible();
   });
@@ -150,7 +163,10 @@ test.describe("Asset Overlay System", () => {
       .locator('input[type="text"]')
       .fill("https://www.youtube.com/watch?v=test1");
     await assetController.getByText("Bæta við").click();
-    await assetController.getByText("Birta").click();
+    await assetController
+      .locator(".queue-column")
+      .getByLabel("Play Queue")
+      .click();
 
     await expect(page.getByText("Hreinsa virkt overlay")).toBeVisible();
     await expect(page.locator(".overlay-container")).toBeVisible();
@@ -167,7 +183,7 @@ test.describe("Asset Overlay System", () => {
     await assetController.getByText("Bæta við").click();
 
     await expect(page.getByText("is not a valid url")).toBeVisible();
-    await expect(assetController.getByText("0 í biðröð")).toBeVisible();
+    await expect(page.getByText("Engin biðröð")).toBeVisible();
   });
 });
 
@@ -210,6 +226,8 @@ test.describe("Asset Overlay System - Team Views", () => {
 
     await page.getByRole("button", { name: "Biðröð" }).click();
 
-    await expect(page.locator(".controls")).toBeVisible();
+    await expect(
+      page.locator(".controls.control-item, .controls").first(),
+    ).toBeVisible();
   });
 });
