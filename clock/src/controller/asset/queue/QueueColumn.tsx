@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   SortableContext,
   verticalListSortingStrategy,
@@ -52,15 +52,17 @@ const QueueColumn: React.FC<QueueColumnProps> = ({
   sortableAttributes,
   style,
 }) => {
-  const [nameInput, setNameInput] = useState(queue.name);
+  const [nameInput, setNameInput] = useState("");
   const [isEditing, setIsEditing] = useState(false);
+  const editingStartValueRef = useRef("");
 
-  useEffect(() => {
-    if (!isEditing) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setNameInput(queue.name);
-    }
-  }, [queue.name, isEditing]);
+  const displayValue = isEditing ? nameInput : queue.name;
+
+  const handleNameFocus = () => {
+    editingStartValueRef.current = queue.name;
+    setNameInput(queue.name);
+    setIsEditing(true);
+  };
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setNameInput(e.target.value);
@@ -68,7 +70,7 @@ const QueueColumn: React.FC<QueueColumnProps> = ({
 
   const handleNameBlur = () => {
     setIsEditing(false);
-    if (nameInput.trim() !== queue.name) {
+    if (nameInput.trim() !== queue.name && nameInput.trim() !== "") {
       onRenameQueue(queue.id, nameInput.trim());
     }
   };
@@ -110,10 +112,10 @@ const QueueColumn: React.FC<QueueColumnProps> = ({
         <div className="queue-column-title-container">
           <input
             className="queue-column-name-input"
-            value={nameInput}
+            value={displayValue}
             onChange={handleNameChange}
             onBlur={handleNameBlur}
-            onFocus={() => setIsEditing(true)}
+            onFocus={handleNameFocus}
             onKeyDown={handleKeyDown}
             aria-label={`Rename queue ${queue.name}`}
           />

@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { parseQueueMap } from "../firebaseParsers";
-import { computeControllerDiff } from "../FirebaseStateContext";
+import {
+  computeControllerDiff,
+  maybeAutoDeleteQueue,
+} from "../FirebaseStateContext";
 import type { ControllerState, QueueState, Asset } from "../../types";
 
 function firebaseQueue(
@@ -655,3 +658,88 @@ describe.skipIf(!getStateShowingNextAsset)(
     });
   },
 );
+
+describe("maybeAutoDeleteQueue", () => {
+  it("returns state unchanged when queue does not exist", () => {
+    const state = makeControllerState({ queues: {}, activeQueueId: null });
+    const result = maybeAutoDeleteQueue(state, "nonexistent");
+    expect(result).toBe(state);
+  });
+
+  it("returns state unchanged when queue is cycling", () => {
+    const state = makeControllerState({
+      queues: {
+        q1: makeQueue({ id: "q1", items: [], cycle: true }),
+      },
+      activeQueueId: null,
+    });
+    const result = maybeAutoDeleteQueue(state, "q1");
+    expect(result).toBe(state);
+  });
+
+  it("returns state unchanged when queue has items", () => {
+    const state = makeControllerState({
+      queues: {
+        q1: makeQueue({
+          id: "q1",
+          items: [makeAsset("a1")],
+          cycle: false,
+        }),
+      },
+      activeQueueId: null,
+    });
+    const result = maybeAutoDeleteQueue(state, "q1");
+    expect(result).toBe(state);
+  });
+
+  it("deletes non-cycling empty queue that is NOT active", () => {
+    const state = makeControllerState({
+      queues: {
+        q1: makeQueue({ id: "q1", items: [], cycle: false }),
+        q2: makeQueue({ id: "q2", items: [makeAsset("a1")], cycle: false }),
+      },
+      activeQueueId: "q2",
+      playing: true,
+      currentAsset: { asset: makeAsset("a1"), time: 5 },
+    });
+    const result = maybeAutoDeleteQueue(state, "q1");
+    expect(result.queues).toEqual({ q2: state.queues.q2 });
+    expect(result.activeQueueId).toBe("q2");
+    expect(result.playing).toBe(true);
+    expect(result.currentAsset).toEqual({ asset: makeAsset("a1"), time: 5 });
+  });
+
+  it("deletes non-cycling empty queue that IS active and clears active state", () => {
+    const state = makeControllerState({
+      queues: {
+        q1: makeQueue({ id: "q1", items: [], cycle: false }),
+      },
+      activeQueueId: "q1",
+      playing: true,
+      currentAsset: { asset: makeAsset("a1"), time: 5 },
+    });
+    const result = maybeAutoDeleteQueue(state, "q1");
+    expect(result.queues).toEqual({});
+    expect(result.activeQueueId).toBeNull();
+    expect(result.playing).toBe(false);
+    expect(result.currentAsset).toBeNull();
+  });
+
+  it("handles deletion when multiple queues exist", () => {
+    const state = makeControllerState({
+      queues: {
+        q1: makeQueue({ id: "q1", items: [], cycle: false }),
+        q2: makeQueue({ id: "q2", items: [makeAsset("a1")], cycle: false }),
+        q3: makeQueue({ id: "q3", items: [], cycle: true }),
+      },
+      activeQueueId: "q1",
+      playing: false,
+      currentAsset: null,
+    });
+    const result = maybeAutoDeleteQueue(state, "q1");
+    expect(result.queues).toEqual({ q2: state.queues.q2, q3: state.queues.q3 });
+    expect(result.activeQueueId).toBeNull();
+    expect(result.playing).toBe(false);
+    expect(result.currentAsset).toBeNull();
+  });
+});

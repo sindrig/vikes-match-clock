@@ -233,19 +233,14 @@ export const getStateShowingNextAsset = (
   if (!activeQueue) {
     newState.playing = false;
     newState.currentAsset = null;
+    newState.activeQueueId = null;
     return newState;
   }
 
   if (activeQueue.items.length === 0) {
     newState.playing = false;
     newState.currentAsset = null;
-    if (!activeQueue.cycle) {
-      const queues = { ...state.queues };
-      delete queues[activeQueueId];
-      newState.queues = queues;
-      newState.activeQueueId = null;
-    }
-    return newState;
+    return maybeAutoDeleteQueue(newState, activeQueueId);
   }
 
   const items = [...activeQueue.items];
@@ -278,6 +273,31 @@ export const getStateShowingNextAsset = (
   newState.queues[activeQueueId] = updatedQueue;
   return newState;
 };
+
+export function maybeAutoDeleteQueue(
+  state: ControllerState,
+  queueId: string,
+): ControllerState {
+  const queue = state.queues[queueId];
+  if (!queue || queue.cycle || queue.items.length > 0) {
+    return state; // No deletion needed
+  }
+
+  // Delete non-cycling empty queue
+  const queues = { ...state.queues };
+  delete queues[queueId];
+
+  const newState: ControllerState = { ...state, queues };
+
+  // If deleted queue was active, clear active state
+  if (state.activeQueueId === queueId) {
+    newState.activeQueueId = null;
+    newState.playing = false;
+    newState.currentAsset = null;
+  }
+
+  return newState;
+}
 
 interface FirebaseStateProviderProps {
   children: ReactNode;
@@ -917,17 +937,15 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         if (idx === -1) return prev;
         const updatedItems = [...queue.items];
         updatedItems.splice(idx, 1);
-        if (!queue.cycle && updatedItems.length === 0) {
-          const queues = { ...prev.queues };
-          delete queues[queueId];
-          const isActive = prev.activeQueueId === queueId;
-          return {
+        if (updatedItems.length === 0) {
+          const nextState = {
             ...prev,
-            queues,
-            activeQueueId: isActive ? null : prev.activeQueueId,
-            playing: isActive ? false : prev.playing,
-            currentAsset: isActive ? null : prev.currentAsset,
+            queues: {
+              ...prev.queues,
+              [queueId]: { ...queue, items: updatedItems },
+            },
           };
+          return maybeAutoDeleteQueue(nextState, queueId);
         }
         return {
           ...prev,
@@ -959,17 +977,15 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
             seenKeys.add(asset.key);
           }
         });
-        if (!queue.cycle && dedupedItems.length === 0) {
-          const queues = { ...prev.queues };
-          delete queues[queueId];
-          const isActive = prev.activeQueueId === queueId;
-          return {
+        if (dedupedItems.length === 0) {
+          const nextState = {
             ...prev,
-            queues,
-            activeQueueId: isActive ? null : prev.activeQueueId,
-            playing: isActive ? false : prev.playing,
-            currentAsset: isActive ? null : prev.currentAsset,
+            queues: {
+              ...prev.queues,
+              [queueId]: { ...queue, items: dedupedItems },
+            },
           };
+          return maybeAutoDeleteQueue(nextState, queueId);
         }
         return {
           ...prev,
@@ -993,25 +1009,17 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       applyControllerUpdate((prev) => {
         const queue = prev.queues[queueId];
         if (!queue) return prev;
-        if (settings.cycle === false && queue.items.length === 0) {
-          const queues = { ...prev.queues };
-          delete queues[queueId];
-          const isActive = prev.activeQueueId === queueId;
-          return {
-            ...prev,
-            queues,
-            activeQueueId: isActive ? null : prev.activeQueueId,
-            playing: isActive ? false : prev.playing,
-            currentAsset: isActive ? null : prev.currentAsset,
-          };
-        }
-        return {
+        const nextState = {
           ...prev,
           queues: {
             ...prev.queues,
             [queueId]: { ...queue, ...settings },
           },
         };
+        if (settings.cycle === false) {
+          return maybeAutoDeleteQueue(nextState, queueId);
+        }
+        return nextState;
       });
     },
     [applyControllerUpdate],
