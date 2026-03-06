@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { addVideosFromPlaylist } from "./YoutubePlaylist";
 import { QueueBoard } from "./queue";
 import QueuePicker from "./queue/QueuePicker";
@@ -65,16 +65,22 @@ const AssetController = () => {
     return addMultipleAssets([asset]);
   };
 
-  const handleAddToQueue = (queueId: string, assets: Asset[]) => {
-    addItemsToQueue(queueId, assets);
-    setPendingAssets([]);
-  };
+  const handleAddToQueue = useCallback(
+    (queueId: string, assets: Asset[]) => {
+      addItemsToQueue(queueId, assets);
+      setPendingAssets([]);
+    },
+    [addItemsToQueue],
+  );
 
-  const handleCreateAndAdd = (queueName: string, assets: Asset[]) => {
-    const newQueueId = createQueue(queueName);
-    addItemsToQueue(newQueueId, assets);
-    setPendingAssets([]);
-  };
+  const handleCreateAndAdd = useCallback(
+    (queueName: string, assets: Asset[]) => {
+      const newQueueId = createQueue(queueName);
+      addItemsToQueue(newQueueId, assets);
+      setPendingAssets([]);
+    },
+    [createQueue, addItemsToQueue],
+  );
 
   const handleSettingsClose = () => {
     setSettingsQueueId(null);

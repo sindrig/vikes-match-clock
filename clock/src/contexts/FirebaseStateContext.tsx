@@ -149,6 +149,34 @@ const FirebaseStateContext = createContext<FirebaseStateContextType | null>(
   null,
 );
 
+export const getStateWithAddedItems = (
+  prev: ControllerState,
+  queueId: string,
+  assets: Asset[],
+): ControllerState => {
+  const queue = prev.queues[queueId];
+  if (!queue) return prev;
+
+  const existingKeys = new Set(queue.items.map((i) => i.key));
+  const validAssetKeys = Object.keys(assetTypes);
+  const newItems = assets.filter(
+    (asset) =>
+      validAssetKeys.indexOf(asset.type) !== -1 &&
+      asset.key &&
+      !existingKeys.has(asset.key),
+  );
+
+  if (newItems.length === 0) return prev;
+
+  return {
+    ...prev,
+    queues: {
+      ...prev.queues,
+      [queueId]: { ...queue, items: [...queue.items, ...newItems] },
+    },
+  };
+};
+
 export const getStateShowingNextAsset = (
   state: ControllerState,
 ): ControllerState => {
@@ -751,9 +779,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   const createQueue = useCallback(
     (name: string) => {
-      const queueId = `queue-${Date.now()}-${Math.random()
-        .toString(36)
-        .substring(2, 9)}`;
+      const queueId = `queue-${crypto.randomUUID()}`;
       applyControllerUpdate((prev) => {
         const existingOrders = Object.values(prev.queues).map((q) => q.order);
         const nextOrder = existingOrders.length
@@ -817,12 +843,26 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       applyControllerUpdate((prev) => {
         if (!orderedIds.length) return prev;
         const queues = { ...prev.queues };
+        const listedIds = new Set(orderedIds);
+
+        // Assign orders to listed queues
         orderedIds.forEach((queueId, index) => {
           const queue = queues[queueId];
           if (queue) {
             queues[queueId] = { ...queue, order: index };
           }
         });
+
+        // Find unlisted queues and sort them by current order
+        const unlistedQueues = Object.entries(queues)
+          .filter(([id]) => !listedIds.has(id))
+          .sort((a, b) => (a[1].order ?? 0) - (b[1].order ?? 0));
+
+        // Assign sequential orders to unlisted queues after listed ones
+        unlistedQueues.forEach(([queueId, queue], index) => {
+          queues[queueId] = { ...queue, order: orderedIds.length + index };
+        });
+
         return { ...prev, queues };
       });
     },
@@ -831,27 +871,9 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   const addItemsToQueue = useCallback(
     (queueId: string, assets: Asset[]) => {
-      applyControllerUpdate((prev) => {
-        const queue = prev.queues[queueId];
-        if (!queue) return prev;
-        const updatedItems = [...queue.items];
-        assets.forEach((asset) => {
-          if (Object.keys(assetTypes).indexOf(asset.type) !== -1 && asset.key) {
-            if (
-              updatedItems.map((item) => item.key).indexOf(asset.key) === -1
-            ) {
-              updatedItems.push(asset);
-            }
-          }
-        });
-        return {
-          ...prev,
-          queues: {
-            ...prev.queues,
-            [queueId]: { ...queue, items: updatedItems },
-          },
-        };
-      });
+      applyControllerUpdate((prev) =>
+        getStateWithAddedItems(prev, queueId, assets),
+      );
     },
     [applyControllerUpdate],
   );
@@ -900,9 +922,11 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
             Boolean(asset.key),
         );
         const dedupedItems: Asset[] = [];
+        const seenKeys = new Set<string>();
         filteredItems.forEach((asset) => {
-          if (dedupedItems.map((item) => item.key).indexOf(asset.key) === -1) {
+          if (!seenKeys.has(asset.key)) {
             dedupedItems.push(asset);
+            seenKeys.add(asset.key);
           }
         });
         if (!queue.cycle && dedupedItems.length === 0) {

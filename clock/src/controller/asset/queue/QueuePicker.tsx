@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { SelectPicker } from "rsuite";
 import { QueueState, Asset } from "../../../types";
 import "./QueuePicker.css";
@@ -20,9 +20,25 @@ const QueuePicker: React.FC<QueuePickerProps> = ({
 }) => {
   const queueIds = Object.keys(queues);
   const queueCount = queueIds.length;
+  const prevAssetsRef = useRef<Record<string, boolean>>({});
 
   useEffect(() => {
     if (assets.length === 0) return;
+
+    const assetSignature: Record<string, boolean> = {};
+    for (const asset of assets) {
+      assetSignature[asset.key] = true;
+    }
+
+    const prevKeys = Object.keys(prevAssetsRef.current);
+    const currKeys = Object.keys(assetSignature);
+    if (
+      prevKeys.length === currKeys.length &&
+      currKeys.every((k) => prevAssetsRef.current[k])
+    ) {
+      return;
+    }
+    prevAssetsRef.current = assetSignature;
 
     if (queueCount === 0) {
       onCreateAndAdd("Biðröð 1", assets);

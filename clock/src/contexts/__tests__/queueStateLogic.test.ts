@@ -258,6 +258,61 @@ describe("parseQueueMap", () => {
 
     expect(result.q1!.order).toBe(0);
   });
+
+  it("detects and re-sequences duplicate orders", () => {
+    const data = {
+      q1: firebaseQueue({ id: "q1", name: "Queue 1", order: 0 }),
+      q2: firebaseQueue({ id: "q2", name: "Queue 2", order: 0 }),
+      q3: firebaseQueue({ id: "q3", name: "Queue 3", order: 1 }),
+    };
+    const result = parseQueueMap(data);
+
+    const orders = [result.q1!.order, result.q2!.order, result.q3!.order];
+    const uniqueOrders = new Set(orders);
+
+    expect(uniqueOrders.size).toBe(3);
+    expect(orders).toEqual([0, 1, 2]);
+  });
+
+  it("re-sequences all orders when partial duplicates are found", () => {
+    const data = {
+      q1: firebaseQueue({ id: "q1", order: 5 }),
+      q2: firebaseQueue({ id: "q2", order: 5 }),
+      q3: firebaseQueue({ id: "q3", order: 10 }),
+    };
+    const result = parseQueueMap(data);
+
+    const orders = [result.q1!.order, result.q2!.order, result.q3!.order];
+    expect(orders.sort()).toEqual([0, 1, 2]);
+  });
+
+  it("leaves unique orders unchanged", () => {
+    const data = {
+      q1: firebaseQueue({ id: "q1", order: 0 }),
+      q2: firebaseQueue({ id: "q2", order: 1 }),
+      q3: firebaseQueue({ id: "q3", order: 2 }),
+    };
+    const result = parseQueueMap(data);
+
+    expect(result.q1!.order).toBe(0);
+    expect(result.q2!.order).toBe(1);
+    expect(result.q3!.order).toBe(2);
+  });
+
+  it("handles all queues having the same order", () => {
+    const data = {
+      q1: firebaseQueue({ id: "q1", order: 99 }),
+      q2: firebaseQueue({ id: "q2", order: 99 }),
+      q3: firebaseQueue({ id: "q3", order: 99 }),
+    };
+    const result = parseQueueMap(data);
+
+    const orders = [result.q1!.order, result.q2!.order, result.q3!.order];
+    const uniqueOrders = new Set(orders);
+
+    expect(uniqueOrders.size).toBe(3);
+    expect(orders.sort()).toEqual([0, 1, 2]);
+  });
 });
 
 describe.skipIf(!getStateShowingNextAsset)(
