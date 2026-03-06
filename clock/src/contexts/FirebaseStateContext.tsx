@@ -990,14 +990,10 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   const playQueue = useCallback(
     (queueId: string) => {
       applyControllerUpdate((prev) => {
-        const nextState = getStateShowingNextAsset({
+        return getStateShowingNextAsset({
           ...prev,
           activeQueueId: queueId,
         });
-        if (nextState.activeQueueId !== queueId) {
-          return { ...nextState, activeQueueId: queueId };
-        }
-        return nextState;
       });
     },
     [applyControllerUpdate],

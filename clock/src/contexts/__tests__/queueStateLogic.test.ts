@@ -515,5 +515,61 @@ describe.skipIf(!getStateShowingNextAsset)(
       expect(original.queues.q1!.items).toHaveLength(2);
       expect(original.queues.q1!.items[0]!.key).toBe("a1");
     });
+
+    it("deletes empty non-cycling queue and nulls activeQueueId", () => {
+      const state = makeControllerState({
+        activeQueueId: "q1",
+        queues: {
+          q1: makeQueue({ id: "q1", items: [], cycle: false }),
+        },
+      });
+
+      const result = nextAsset(state);
+
+      expect(result.activeQueueId).toBeNull();
+      expect(result.queues.q1).toBeUndefined();
+      expect(result.playing).toBe(false);
+      expect(result.currentAsset).toBeNull();
+    });
+
+    it("preserves empty cycling queue and keeps activeQueueId", () => {
+      const state = makeControllerState({
+        activeQueueId: "q1",
+        queues: {
+          q1: makeQueue({ id: "q1", items: [], cycle: true }),
+        },
+      });
+
+      const result = nextAsset(state);
+
+      expect(result.activeQueueId).toBe("q1");
+      expect(result.queues.q1).toBeDefined();
+      expect(result.queues.q1!.items).toHaveLength(0);
+      expect(result.playing).toBe(false);
+      expect(result.currentAsset).toBeNull();
+    });
+
+    it("plays last item from non-cycling queue then deletes queue and nulls activeQueueId", () => {
+      const state = makeControllerState({
+        activeQueueId: "q1",
+        queues: {
+          q1: makeQueue({
+            id: "q1",
+            items: [makeAsset("a1")],
+            autoPlay: true,
+            imageSeconds: 5,
+            cycle: false,
+          }),
+        },
+      });
+
+      const result = nextAsset(state);
+
+      expect(result.currentAsset).not.toBeNull();
+      expect(result.currentAsset!.asset.key).toBe("a1");
+      expect(result.queues.q1).toBeUndefined();
+      expect(result.activeQueueId).toBeNull();
+      expect(result.playing).toBe(false);
+    });
   },
 );
