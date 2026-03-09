@@ -54,7 +54,10 @@ const ScoreButtons = ({ side }: { side: "home" | "away" }) => {
   };
 
   return (
-    <div className="preview-score-buttons">
+    <div
+      className="preview-score-buttons"
+      data-testid={`score-buttons-${side}`}
+    >
       <Button
         size="sm"
         appearance="primary"
@@ -261,9 +264,12 @@ function App() {
   };
 
   const showController = view === VIEWS.match || view === VIEWS.idle;
+  const showMatchControls = view !== VIEWS.idle;
   const scoreButtonWidth = 44;
   const sidebarWidth = 350;
-  const previewWidth = sidebarWidth - scoreButtonWidth * 2;
+  const previewWidth = showMatchControls
+    ? sidebarWidth - scoreButtonWidth * 2
+    : sidebarWidth;
   const vpWidth = vp.style.width || 960;
   const vpHeight = vp.style.height || 540;
   const previewScale = previewWidth / vpWidth;
@@ -277,7 +283,7 @@ function App() {
           <div className="controller-sidebar">
             <div className="preview-and-controls">
               <div className="preview-with-scores">
-                <ScoreButtons side="home" />
+                {showMatchControls && <ScoreButtons side="home" />}
                 <div
                   className="scoreboard-preview"
                   style={{ height: previewHeight }}
@@ -298,12 +304,12 @@ function App() {
                     ) : null}
                   </div>
                 </div>
-                <ScoreButtons side="away" />
+                {showMatchControls && <ScoreButtons side="away" />}
               </div>
               <ViewModeButtons />
             </div>
             {asset && <ClearOverlayButton />}
-            <MatchActions />
+            {showMatchControls && <MatchActions />}
           </div>
           <div className="controller-controls">
             <Controller />
