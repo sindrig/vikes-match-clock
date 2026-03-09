@@ -1,7 +1,10 @@
-.removable-asset div.asset-player-icon {
+.removable-asset div.asset-player-icon,
+.queue-item div.asset-player-icon {
   margin: 0;
   height: 73px;
   width: 100%;
+  position: relative;
+  overflow: hidden;
 }
 
 .overlay-container div.asset-player-icon {
@@ -73,7 +76,8 @@ span.asset-player-name {
   line-height: normal;
 }
 
-.removable-asset span.asset-player-name {
+.removable-asset span.asset-player-name,
+.queue-item span.asset-player-name {
   top: 53px;
   font-size: 12px;
   left: 14px;
@@ -85,11 +89,52 @@ span.asset-player-number {
   left: 20px;
 }
 
-.removable-asset span.asset-player-number {
+.removable-asset span.asset-player-number,
+.queue-item span.asset-player-number {
   top: 5px;
   font-size: 33px;
   left: 14px;
   line-height: 50px;
+}
+
+.queue-item div.asset-player-icon {
+  display: flex;
+  align-items: center;
+}
+
+.queue-item div.asset-player-icon img {
+  height: 60px;
+  width: auto;
+  flex-shrink: 0;
+}
+
+.queue-item div.asset-player-icon.player-card-no-image img {
+  height: 50px;
+  max-height: 50px;
+  position: static;
+}
+
+.queue-item span.asset-player-number {
+  position: static;
+  font-size: 22px;
+  line-height: 73px;
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+
+.queue-item span.asset-player-name {
+  position: static;
+  font-size: 12px;
+  line-height: 73px;
+  margin-left: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.queue-item .player-card-overlay {
+  display: none;
 }
 
 .player-card-overlay {

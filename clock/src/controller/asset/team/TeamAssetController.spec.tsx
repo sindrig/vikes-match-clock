@@ -264,7 +264,7 @@ describe("TeamAssetController", () => {
       ).toBeInTheDocument();
     });
 
-    it('shows "Hreinsa lið" and "Setja lið í biðröð" when players are loaded', () => {
+    it('shows "Hreinsa lið" and per-team "Setja lið í biðröð" when players are loaded', () => {
       setupMocks({ roster: mockRoster });
 
       render(<TeamAssetController previousView={mockPreviousView} />);
@@ -273,8 +273,8 @@ describe("TeamAssetController", () => {
         screen.getByRole("button", { name: "Hreinsa lið" }),
       ).toBeInTheDocument();
       expect(
-        screen.getByRole("button", { name: "Setja lið í biðröð" }),
-      ).toBeInTheDocument();
+        screen.getAllByRole("button", { name: "Setja lið í biðröð" }),
+      ).toHaveLength(2);
     });
 
     it('hides "Sækja lið" button when ksiMatchId is undefined', () => {
@@ -383,7 +383,7 @@ describe("TeamAssetController", () => {
   });
 
   describe("add players to queue", () => {
-    it("adds visible players to queue and calls previousView", async () => {
+    it("adds visible home team players to queue named after team and calls previousView", async () => {
       const { mockCreateQueue, mockAddItemsToQueue } = setupMocks({
         roster: mockRoster,
       });
@@ -400,12 +400,13 @@ describe("TeamAssetController", () => {
 
       render(<TeamAssetController previousView={mockPreviousView} />);
 
-      fireEvent.click(
-        screen.getByRole("button", { name: "Setja lið í biðröð" }),
-      );
+      const queueButtons = screen.getAllByRole("button", {
+        name: "Setja lið í biðröð",
+      });
+      fireEvent.click(queueButtons[0]);
 
       await waitFor(() => {
-        expect(mockCreateQueue).toHaveBeenCalledWith("Byrjunarlið");
+        expect(mockCreateQueue).toHaveBeenCalledWith("Víkingur R");
         expect(mockAddItemsToQueue).toHaveBeenCalled();
         expect(mockPreviousView).toHaveBeenCalled();
       });
@@ -427,9 +428,10 @@ describe("TeamAssetController", () => {
 
       render(<TeamAssetController previousView={mockPreviousView} />);
 
-      fireEvent.click(
-        screen.getByRole("button", { name: "Setja lið í biðröð" }),
-      );
+      const queueButtons = screen.getAllByRole("button", {
+        name: "Setja lið í biðröð",
+      });
+      fireEvent.click(queueButtons[0]);
 
       expect(
         screen.getByText("Missing name/number for some players to show"),

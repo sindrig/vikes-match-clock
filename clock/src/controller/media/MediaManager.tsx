@@ -10,11 +10,7 @@ import QueuePicker from "../asset/queue/QueuePicker";
 
 const MediaManager: React.FC = () => {
   const { auth, listenPrefix } = useLocalState();
-  const {
-    controller,
-    createQueue,
-    addItemsToQueue,
-  } = useController();
+  const { controller, createQueue, addItemsToQueue } = useController();
   const { queues } = controller;
   const [tab, setTab] = useState<string>(IMAGE_TYPES.images);
   const finalTab = `${String(listenPrefix) === "safamyri" ? "fotbolti" : String(listenPrefix)}/${String(tab)}`;

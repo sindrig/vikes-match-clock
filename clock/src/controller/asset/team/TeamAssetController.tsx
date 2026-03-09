@@ -72,13 +72,6 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
       .finally(() => setLoading(false));
   };
 
-  const getTeamPlayers = (): { homeTeam: Player[]; awayTeam: Player[] } => {
-    return {
-      homeTeam: roster.home,
-      awayTeam: roster.away,
-    };
-  };
-
   const clearState = (): void => {
     setError("");
     setSelectSubs(false);
@@ -90,35 +83,30 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
     setSelectMOTM(false);
   };
 
-  const addPlayersToQ = async (): Promise<void> => {
-    const { homeTeam } = getTeamPlayers();
-    const teams = [{ team: homeTeam, teamName: match.homeTeam }];
-    const playersToShow = teams.flatMap(({ team }) =>
-      team.filter((p) => p.show),
-    );
+  const addTeamToQueue = async (side: "home" | "away"): Promise<void> => {
+    const players = roster[side];
+    const teamName = side === "home" ? match.homeTeam : match.awayTeam;
+
+    const playersToShow = players.filter((p) => p.show);
     if (playersToShow.some((p) => !p.name || p.id === undefined)) {
       setError("Missing name/number for some players to show");
       return;
     }
-    const teamAssets = teams.map(({ team, teamName }) =>
-      team
-        .filter((p) => p.show)
-        .map((player) =>
-          getPlayerAssetObject({ player, teamName, listenPrefix }),
-        ),
+
+    const assetPromises = playersToShow.map((player) =>
+      getPlayerAssetObject({ player, teamName, listenPrefix }),
     );
-    const flattened = ([] as Promise<Asset | null>[]).concat(...teamAssets);
 
     const existingQueue = Object.values(controller.queues).find(
-      (q) => q.name === "Byrjunarlið",
+      (q) => q.name === teamName,
     );
     if (existingQueue) {
       deleteQueue(existingQueue.id);
     }
-    const newQueueId = createQueue("Byrjunarlið");
+    const newQueueId = createQueue(teamName);
 
-    const resolved = await Promise.all(flattened);
-    const validAssets = resolved.filter((a): a is Asset => a !== null);
+    const resolved = await Promise.all(assetPromises);
+    const validAssets: Asset[] = resolved.filter((a) => a !== null);
     addItemsToQueue(newQueueId, validAssets);
 
     previousView();
@@ -306,8 +294,7 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
   };
 
   const renderControls = (): React.JSX.Element => {
-    const { homeTeam, awayTeam } = getTeamPlayers();
-    const hasPlayers = homeTeam.length > 0 || awayTeam.length > 0;
+    const hasPlayers = roster.home.length > 0 || roster.away.length > 0;
     return (
       <div className="team-controls">
         <div className="button-group">
@@ -328,11 +315,6 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
                 Hreinsa lið
               </button>
             ) : null}
-            {hasPlayers ? (
-              <button type="button" onClick={() => void addPlayersToQ()}>
-                Setja lið í biðröð
-              </button>
-            ) : null}
           </div>
         </div>
         {hasPlayers ? renderPlayerActions() : null}
@@ -341,6 +323,10 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
   };
 
   const renderTeam = (teamName: "homeTeam" | "awayTeam"): React.JSX.Element => {
+    const side = teamName === "homeTeam" ? "home" : "away";
+    const players = roster[side] || [];
+    const hasPlayers = players.length > 0;
+
     let selectPlayerAction:
       | ((player: Player, teamName: string) => void)
       | null = null;
@@ -355,7 +341,20 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
     } else if (selectMOTM) {
       selectPlayerAction = selectMOTMAction;
     }
-    return <Team teamName={teamName} selectPlayer={selectPlayerAction} />;
+    return (
+      <div className="team-column-wrapper">
+        {hasPlayers && !isPlayerActionActive ? (
+          <button
+            type="button"
+            className="queue-team-btn"
+            onClick={() => void addTeamToQueue(side)}
+          >
+            Setja lið í biðröð
+          </button>
+        ) : null}
+        <Team teamName={teamName} selectPlayer={selectPlayerAction} />
+      </div>
+    );
   };
 
   if (!match.homeTeam || !match.awayTeam) {
