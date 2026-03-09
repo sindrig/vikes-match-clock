@@ -212,7 +212,7 @@ function App() {
   };
 
   const style: React.CSSProperties = {
-    ...getBackground(background),
+    ...getBackground(isBlackedOut ? "Blackout" : background),
     ...vp.style,
   };
 
