@@ -7,7 +7,7 @@ import {
 import { DraggableAttributes } from "@dnd-kit/core";
 import {
   MdDragIndicator,
-  MdAutorenew,
+  MdFastForward,
   MdLoop,
   MdPlayArrow,
   MdPause,
@@ -122,7 +122,7 @@ const QueueColumn: React.FC<QueueColumnProps> = ({
         </div>
 
         <div className="queue-column-status">
-          {queue.autoPlay && <MdAutorenew title="Auto-play on" />}
+          {queue.autoPlay && <MdFastForward title="Auto-play on" />}
           {queue.cycle && <MdLoop title="Loop on" />}
         </div>
 

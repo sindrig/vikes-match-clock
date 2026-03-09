@@ -1,7 +1,5 @@
-.new-queue-option {
-  color: #1675e0;
-  font-weight: 600;
-  border-top: 1px solid #e5e5ea;
-  margin-top: 4px;
-  padding-top: 8px;
+.queue-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }

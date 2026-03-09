@@ -43,6 +43,7 @@ interface QueueBoardProps {
   onDeleteAsset: (queueId: string, assetKey: string) => void;
   onReorderQueues: (newQueueOrderIds: string[]) => void;
   onReorderItems: (queueId: string, newItems: Asset[]) => void;
+  onCreateQueue: () => void;
 }
 
 interface SortableColumnProps {
@@ -113,6 +114,7 @@ const QueueBoard: React.FC<QueueBoardProps> = ({
   onDeleteAsset,
   onReorderQueues,
   onReorderItems,
+  onCreateQueue,
 }) => {
   const [activeDragId, setActiveDragId] = useState<UniqueIdentifier | null>(
     null,
@@ -280,6 +282,14 @@ const QueueBoard: React.FC<QueueBoardProps> = ({
             />
           ))}
         </SortableContext>
+        <button
+          type="button"
+          className="queue-board-add-btn"
+          onClick={onCreateQueue}
+          title="Ný biðröð"
+        >
+          +
+        </button>
       </div>
 
       <DragOverlay

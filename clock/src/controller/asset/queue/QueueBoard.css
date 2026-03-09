@@ -20,3 +20,25 @@
   font-style: italic;
   font-size: 1.1rem;
 }
+
+.queue-board-add-btn {
+  min-width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  border: 2px dashed #c7c7cc;
+  background: transparent;
+  color: #8e8e93;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-start;
+  transition: all 0.2s;
+}
+
+.queue-board-add-btn:hover {
+  border-color: #3498db;
+  color: #3498db;
+  background-color: rgba(52, 152, 219, 0.05);
+}

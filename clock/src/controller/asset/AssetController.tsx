@@ -103,6 +103,10 @@ const AssetController = () => {
           onReorderItems={(queueId, newItems) =>
             reorderItemsInQueue(queueId, newItems)
           }
+          onCreateQueue={() => {
+            const name = `Biðröð ${Object.keys(queues).length + 1}`;
+            createQueue(name);
+          }}
         />
         {pendingAssets.length > 0 && (
           <QueuePicker
@@ -110,6 +114,7 @@ const AssetController = () => {
             assets={pendingAssets}
             onAddToQueue={handleAddToQueue}
             onCreateAndAdd={handleCreateAndAdd}
+            onClose={() => setPendingAssets([])}
           />
         )}
       </div>
