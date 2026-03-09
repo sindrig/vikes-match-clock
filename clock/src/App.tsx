@@ -54,7 +54,10 @@ const ScoreButtons = ({ side }: { side: "home" | "away" }) => {
   };
 
   return (
-    <div className="preview-score-buttons">
+    <div
+      className="preview-score-buttons"
+      data-testid={`score-buttons-${side}`}
+    >
       <Button
         size="sm"
         appearance="primary"
