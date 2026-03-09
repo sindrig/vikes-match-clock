@@ -83,9 +83,53 @@ The "Asset" system is a flexible overlay engine for non-match content.
 
 **Features**:
 
-- **Queue**: Assets can be queued, looped, or set to auto-play with specific durations
+- **Multi-Queue**: Multiple independent named queues, each with its own autoplay, loop, and timing settings
+- **Kanban Board**: Queues displayed as columns with drag-and-drop reordering (queues and items within them) via `@dnd-kit`
 - **Types**: Images, YouTube videos, "Free Text" (announcements), and "Team Assets" (lineups)
 - **Production Ready**: Designed for game-day operation where sponsors/announcements are prepared before kickoff
+
+#### Multi-Queue Architecture
+
+**Firebase schema** (`ControllerState`):
+```typescript
+{
+  queues: Record<string, QueueState>,  // keyed by queue ID
+  activeQueueId: string | null,        // currently playing queue
+  playing: boolean,
+  // ... other controller fields
+}
+
+interface QueueState {
+  id: string;
+  name: string;
+  items: Asset[];
+  autoPlay: boolean;     // auto-advance to next item
+  imageSeconds: number;  // duration per item (when autoPlay)
+  cycle: boolean;        // loop back to start when exhausted
+  order: number;         // display ordering
+}
+```
+
+**Key behaviors**:
+- Playing a queue shifts its first item to `currentAsset` and sets `playing = queue.autoPlay`
+- Empty non-cycling queues are auto-deleted via `maybeAutoDeleteQueue()`
+- `computeControllerDiff()` writes per-queue nested paths (`queues/{id}/items`) to prevent multi-controller data loss
+- `parseQueueMap()` in `firebaseParsers.ts` validates queue data and auto-repairs duplicate `order` values
+
+**Component hierarchy**:
+| Component | File | Purpose |
+|-----------|------|---------|
+| `AssetController` | `AssetController.tsx` | Root: tab switcher (URL/Free Text/Team/Media) + QueueBoard |
+| `QueueBoard` | `queue/QueueBoard.tsx` | Kanban layout with `@dnd-kit` DnD context |
+| `QueueColumn` | `queue/QueueColumn.tsx` | Per-queue column: play/stop, settings gear, rename, delete |
+| `QueueItem` | `queue/QueueItem.tsx` | Individual asset in a queue |
+| `QueuePicker` | `queue/QueuePicker.tsx` | Dropdown when adding assets: pick existing queue or create new |
+| `QueueSettingsPopover` | `queue/QueueSettingsPopover.tsx` | Per-queue Autoplay/Loop/Duration settings (rsuite Popover) |
+| `ItemActionDialog` | `queue/ItemActionDialog.tsx` | Context menu for "Show Now" / delete on individual items |
+| `dndUtils` | `queue/dndUtils.ts` | DnD ID namespacing (queue-level vs item-level drags) |
+
+**State operations** (in `FirebaseStateContext.tsx`):
+`createQueue`, `deleteQueue`, `renameQueue`, `reorderQueues`, `addItemsToQueue`, `removeItemFromQueue`, `reorderItemsInQueue`, `updateQueueSettings`, `playQueue`, `stopPlaying`, `showItemNow`
 
 ### 2. Match Control (`src/match-controller/`)
 
@@ -260,8 +304,20 @@ if (typeof window !== "undefined") {
 - **Default football config**: Use 4 values for overtime support: `[45, 90, 105, 120]`
 - **matchType**: Must be `"football"` or `"handball"` to match `Sports` enum
 - **homeTeamId/awayTeamId**: Numeric IDs matching KSI API (see Team ID System section)
+- **Controller state**: Uses multi-queue format (`queues: {}`, `activeQueueId: null`) — NOT the old `selectedAssets` array
 
 If tests fail with unexpected halfStops counts or values, check that test initialization data matches the format expected by `firebaseParsers.ts` and the default constants in `constants.ts`.
+
+#### E2E Asset Test Patterns
+
+The asset E2E tests (`e2e/assets.spec.ts`) use these selectors for the multi-queue UI:
+- `.queue-column` — a queue column in the Kanban board
+- `.queue-item` — an individual asset item within a queue
+- `.queue-board-empty` / `"Engin biðröð"` — empty state when no queues exist
+- `.queue-column-actions .rs-btn` — gear icon to open settings popover
+- `.queue-settings-popover` — the settings popover element
+- `getByLabel("Play Queue")` / `getByLabel("Stop Queue")` — play/stop buttons on queue columns
+- rsuite `Toggle` components use `data-checked="true"` attribute (NOT `rs-toggle-checked` class)
 
 ### Playwright MCP Limitations for Multi-Session Testing
 
