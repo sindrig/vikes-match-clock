@@ -3,6 +3,33 @@
   gap: 12px;
 }
 
+.team-column-wrapper {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.team-column-wrapper .team-asset-container {
+  flex: 1;
+}
+
+.queue-team-btn {
+  border: 1px solid #747474;
+  background-color: lightgray;
+  border-radius: 3px;
+  padding: 4px 8px;
+  font-size: 13px;
+  cursor: pointer;
+  width: 100%;
+}
+
+.queue-team-btn:hover {
+  border-color: #494949;
+  background-color: rgb(187, 187, 187);
+}
+
 .team-asset-container {
   flex: 1;
   min-width: 0;

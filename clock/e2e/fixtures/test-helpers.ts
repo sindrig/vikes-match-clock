@@ -75,10 +75,8 @@ async function clearEmulatorData(): Promise<void> {
             showInjuryTime: true,
           },
           controller: {
-            selectedAssets: [],
-            cycle: false,
-            imageSeconds: 3,
-            autoPlay: false,
+            queues: {},
+            activeQueueId: null,
             playing: false,
             assetView: "assets",
             view: "idle",

@@ -40,9 +40,19 @@ const Controller = () => {
   } = useLocalState();
   const auth = useAuth();
 
+  const [prevAssetView, setPrevAssetView] = useState(controller.assetView);
   const [tab, setTab] = useState<string>(
     assetViewToTab[controller.assetView] ?? TABS.queue,
   );
+
+  if (controller.assetView !== prevAssetView) {
+    setPrevAssetView(controller.assetView);
+    const mapped = assetViewToTab[controller.assetView];
+    if (mapped && tab !== TABS.media) {
+      setTab(mapped);
+    }
+  }
+
   const [selectedScreen, setSelectedScreen] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
 

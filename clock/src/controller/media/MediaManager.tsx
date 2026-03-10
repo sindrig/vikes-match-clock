@@ -1,17 +1,23 @@
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import { Nav } from "rsuite";
 import UploadManager from "./UploadManager";
 import ImageList from "./ImageList";
 import { IMAGE_TYPES } from ".";
 import { useLocalState } from "../../contexts/LocalStateContext";
+import { useController } from "../../contexts/FirebaseStateContext";
+import { Asset } from "../../types";
+import QueuePicker from "../asset/queue/QueuePicker";
 
 const MediaManager: React.FC = () => {
   const { auth, listenPrefix } = useLocalState();
+  const { controller, createQueue, addItemsToQueue, showItemNow } =
+    useController();
+  const { queues } = controller;
   const [tab, setTab] = useState<string>(IMAGE_TYPES.images);
   const finalTab = `${String(listenPrefix) === "safamyri" ? "fotbolti" : String(listenPrefix)}/${String(tab)}`;
   const [prefix, setPrefix] = useState<string>("");
   const [ts, setTs] = useState<number | null>(null);
-  const [displayNow, setDisplayNow] = useState(true);
+  const [pendingAssets, setPendingAssets] = useState<Asset[]>([]);
   const selectTab = (tab: string): void => {
     setPrefix("");
     setTab(tab);
@@ -27,6 +33,37 @@ const MediaManager: React.FC = () => {
     // How stupid is this? sorry
     [2, 3, 5, 6].forEach((i) => setTimeout(() => setTs(Date.now()), 500 * i));
   };
+  const handleAddAssets = (assets: Asset[]): void => {
+    setPendingAssets(assets);
+  };
+
+  const handleShowNow = useCallback(
+    (assets: Asset[]) => {
+      for (const asset of assets) {
+        showItemNow(asset);
+      }
+      setPendingAssets([]);
+    },
+    [showItemNow],
+  );
+
+  const handleAddToQueue = useCallback(
+    (queueId: string, assets: Asset[]) => {
+      addItemsToQueue(queueId, assets);
+      setPendingAssets([]);
+    },
+    [addItemsToQueue],
+  );
+
+  const handleCreateAndAdd = useCallback(
+    (queueName: string, assets: Asset[]) => {
+      const newQueueId = createQueue(queueName);
+      addItemsToQueue(newQueueId, assets);
+      setPendingAssets([]);
+    },
+    [createQueue, addItemsToQueue],
+  );
+
   return (
     <div className="control-item withborder">
       <Nav appearance="tabs" onSelect={selectTab} activeKey={tab}>
@@ -41,32 +78,23 @@ const MediaManager: React.FC = () => {
           refresh={refresh}
         />
       )}
-      <div>
-        <label>
-          Birta strax
-          <input
-            type="radio"
-            checked={displayNow}
-            onChange={() => setDisplayNow(true)}
-          />
-        </label>
-        <br />
-        <label>
-          Setja í biðröð
-          <input
-            type="radio"
-            checked={!displayNow}
-            onChange={() => setDisplayNow(false)}
-          />
-        </label>
-      </div>
       <ImageList
         prefix={`${String(finalTab)}${String(prefix)}`}
         appendPrefix={appendPrefix}
-        displayNow={displayNow}
         allowEdit={!auth.isEmpty}
         ts={ts}
+        onAddAssets={handleAddAssets}
       />
+      {pendingAssets.length > 0 && (
+        <QueuePicker
+          queues={queues}
+          assets={pendingAssets}
+          onShowNow={handleShowNow}
+          onAddToQueue={handleAddToQueue}
+          onCreateAndAdd={handleCreateAndAdd}
+          onClose={() => setPendingAssets([])}
+        />
+      )}
     </div>
   );
 };

@@ -22,21 +22,22 @@ interface SubPlayer extends Player {
 }
 
 interface OwnProps {
-  addAssets: (
-    assets: Promise<Asset | null>[],
-    options?: { showNow?: boolean },
-  ) => void;
   previousView: () => void;
 }
 
 const TeamAssetController = (props: OwnProps): React.JSX.Element => {
-  const { addAssets, previousView } = props;
+  const { previousView } = props;
   const { match } = useMatch();
   const {
-    controller: { roster },
+    controller,
     setRoster,
     clearRoster,
+    createQueue,
+    deleteQueue,
+    addItemsToQueue,
+    showItemNow,
   } = useController();
+  const { roster } = controller;
   const { screens } = useListeners();
   const { listenPrefix } = useRemoteSettings();
 
@@ -71,13 +72,6 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
       .finally(() => setLoading(false));
   };
 
-  const getTeamPlayers = (): { homeTeam: Player[]; awayTeam: Player[] } => {
-    return {
-      homeTeam: roster.home,
-      awayTeam: roster.away,
-    };
-  };
-
   const clearState = (): void => {
     setError("");
     setSelectSubs(false);
@@ -89,25 +83,32 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
     setSelectMOTM(false);
   };
 
-  const addPlayersToQ = (): void => {
-    const { homeTeam } = getTeamPlayers();
-    const teams = [{ team: homeTeam, teamName: match.homeTeam }];
-    const playersToShow = teams.flatMap(({ team }) =>
-      team.filter((p) => p.show),
-    );
+  const addTeamToQueue = async (side: "home" | "away"): Promise<void> => {
+    const players = roster[side];
+    const teamName = side === "home" ? match.homeTeam : match.awayTeam;
+
+    const playersToShow = players.filter((p) => p.show);
     if (playersToShow.some((p) => !p.name || p.id === undefined)) {
       setError("Missing name/number for some players to show");
       return;
     }
-    const teamAssets = teams.map(({ team, teamName }) =>
-      team
-        .filter((p) => p.show)
-        .map((player) =>
-          getPlayerAssetObject({ player, teamName, listenPrefix }),
-        ),
+
+    const assetPromises = playersToShow.map((player) =>
+      getPlayerAssetObject({ player, teamName, listenPrefix }),
     );
-    const flattened = ([] as Promise<Asset | null>[]).concat(...teamAssets);
-    addAssets(flattened);
+
+    const existingQueue = Object.values(controller.queues).find(
+      (q) => q.name === teamName,
+    );
+    if (existingQueue) {
+      deleteQueue(existingQueue.id);
+    }
+    const newQueueId = createQueue(teamName, { cycle: false });
+
+    const resolved = await Promise.all(assetPromises);
+    const validAssets: Asset[] = resolved.filter((a) => a !== null);
+    addItemsToQueue(newQueueId, validAssets);
+
     previousView();
   };
 
@@ -138,19 +139,12 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
           listenPrefix,
         });
         if (!subInObj || !subOutObj) return;
-        addAssets(
-          [
-            Promise.resolve({
-              type: assetTypes.SUB,
-              subIn: subInObj,
-              subOut: subOutObj,
-              key: `sub-${subInObj.key}-${subOutObj.key}`,
-            }),
-          ],
-          {
-            showNow: true,
-          },
-        );
+        showItemNow({
+          type: assetTypes.SUB,
+          subIn: subInObj,
+          subOut: subOutObj,
+          key: `sub-${subInObj.key}-${subOutObj.key}`,
+        });
         clearState();
       })();
     } else {
@@ -162,54 +156,51 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
   const selectPlayerAssetAction = (player: Player, teamName: string): void => {
     const actualTeamName =
       teamName === "homeTeam" ? match.homeTeam : match.awayTeam;
-    addAssets(
-      [
-        getPlayerAssetObject({
-          player,
-          teamName: actualTeamName,
-          listenPrefix,
-        }),
-      ],
-      {
-        showNow: true,
-      },
-    );
-    clearState();
+    void (async () => {
+      const playerAsset = await getPlayerAssetObject({
+        player,
+        teamName: actualTeamName,
+        listenPrefix,
+      });
+      if (!playerAsset) return;
+      showItemNow(playerAsset);
+      clearState();
+    })();
   };
 
   const selectGoalScorerAction = (player: Player, teamName: string): void => {
     const actualTeamName =
       teamName === "homeTeam" ? match.homeTeam : match.awayTeam;
-    addAssets(
-      [
-        getPlayerAssetObject({
-          player,
-          teamName: actualTeamName,
-          overlay: {
-            text: "",
-            blink: true,
-            effect: effect,
-          },
-          listenPrefix,
-        }),
-      ],
-      {
-        showNow: true,
-      },
-    );
-    clearState();
+    void (async () => {
+      const goalAsset = await getPlayerAssetObject({
+        player,
+        teamName: actualTeamName,
+        overlay: {
+          text: "",
+          blink: true,
+          effect: effect,
+        },
+        listenPrefix,
+      });
+      if (!goalAsset) return;
+      showItemNow(goalAsset);
+      clearState();
+    })();
   };
 
   const selectMOTMAction = (player: Player, teamName: string): void => {
     const actualTeamName =
       teamName === "homeTeam" ? match.homeTeam : match.awayTeam;
-    addAssets(
-      [getMOTMAsset({ player, teamName: actualTeamName, listenPrefix })],
-      {
-        showNow: true,
-      },
-    );
-    clearState();
+    void (async () => {
+      const motmAsset = await getMOTMAsset({
+        player,
+        teamName: actualTeamName,
+        listenPrefix,
+      });
+      if (!motmAsset) return;
+      showItemNow(motmAsset);
+      clearState();
+    })();
   };
 
   const isPlayerActionActive =
@@ -303,8 +294,7 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
   };
 
   const renderControls = (): React.JSX.Element => {
-    const { homeTeam, awayTeam } = getTeamPlayers();
-    const hasPlayers = homeTeam.length > 0 || awayTeam.length > 0;
+    const hasPlayers = roster.home.length > 0 || roster.away.length > 0;
     return (
       <div className="team-controls">
         <div className="button-group">
@@ -325,11 +315,6 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
                 Hreinsa lið
               </button>
             ) : null}
-            {hasPlayers ? (
-              <button type="button" onClick={addPlayersToQ}>
-                Setja lið í biðröð
-              </button>
-            ) : null}
           </div>
         </div>
         {hasPlayers ? renderPlayerActions() : null}
@@ -338,6 +323,10 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
   };
 
   const renderTeam = (teamName: "homeTeam" | "awayTeam"): React.JSX.Element => {
+    const side = teamName === "homeTeam" ? "home" : "away";
+    const players = roster[side] || [];
+    const hasPlayers = players.length > 0;
+
     let selectPlayerAction:
       | ((player: Player, teamName: string) => void)
       | null = null;
@@ -352,7 +341,20 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
     } else if (selectMOTM) {
       selectPlayerAction = selectMOTMAction;
     }
-    return <Team teamName={teamName} selectPlayer={selectPlayerAction} />;
+    return (
+      <div className="team-column-wrapper">
+        {hasPlayers && !isPlayerActionActive ? (
+          <button
+            type="button"
+            className="queue-team-btn"
+            onClick={() => void addTeamToQueue(side)}
+          >
+            Setja lið í biðröð
+          </button>
+        ) : null}
+        <Team teamName={teamName} selectPlayer={selectPlayerAction} />
+      </div>
+    );
   };
 
   if (!match.homeTeam || !match.awayTeam) {

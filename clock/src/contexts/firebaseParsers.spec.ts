@@ -10,7 +10,6 @@ import type {
   Match,
   ControllerState,
   ViewState,
-  Asset,
   ViewPort,
   TwoMinPenalty,
 } from "../types";
@@ -41,16 +40,15 @@ const defaultMatch: Match = {
 };
 
 const defaultController: ControllerState = {
-  selectedAssets: [],
-  cycle: false,
-  imageSeconds: 5,
-  autoPlay: false,
   playing: false,
   assetView: "grid",
   view: "scoreboard",
   roster: { home: [], away: [] },
   currentAsset: null,
   refreshToken: "",
+  queues: {},
+  activeQueueId: null,
+  tab: undefined,
 };
 
 const defaultView: ViewState = {
@@ -131,7 +129,7 @@ describe("firebaseParsers", () => {
       };
 
       const result = parseLocations(data);
-      expect(result!.screens[0].label).toBe("hasteinsvollur");
+      expect(result!.screens[0]!.label).toBe("hasteinsvollur");
     });
 
     it("parses multiple screens within single location", () => {
@@ -155,8 +153,8 @@ describe("firebaseParsers", () => {
 
       const result = parseLocations(data);
       expect(result!.screens).toHaveLength(2);
-      expect(result!.screens[0].screen.name).toBe("Main");
-      expect(result!.screens[1].screen.name).toBe("Secondary");
+      expect(result!.screens[0]!.screen.name).toBe("Main");
+      expect(result!.screens[1]!.screen.name).toBe("Secondary");
     });
 
     it("parses multiple locations", () => {
@@ -205,7 +203,7 @@ describe("firebaseParsers", () => {
       };
 
       const result = parseLocations(data);
-      expect(result!.screens[0].pitchIds).toEqual(["pitch1", "pitch2"]);
+      expect(result!.screens[0]!.pitchIds).toEqual(["pitch1", "pitch2"]);
     });
 
     it("omits pitchIds when not present", () => {
@@ -223,7 +221,7 @@ describe("firebaseParsers", () => {
       };
 
       const result = parseLocations(data);
-      expect(result!.screens[0].pitchIds).toBeUndefined();
+      expect(result!.screens[0]!.pitchIds).toBeUndefined();
     });
 
     it("skips invalid location values", () => {
@@ -271,8 +269,8 @@ describe("firebaseParsers", () => {
 
       const result = parseLocations(data);
       expect(result!.screens).toHaveLength(2);
-      expect(result!.screens[0].screen.name).toBe("Valid");
-      expect(result!.screens[1].screen.name).toBe("Valid2");
+      expect(result!.screens[0]!.screen.name).toBe("Valid");
+      expect(result!.screens[1]!.screen.name).toBe("Valid2");
     });
 
     it("handles missing screens array", () => {
@@ -314,7 +312,7 @@ describe("firebaseParsers", () => {
       };
 
       const result = parseLocations(data);
-      expect(result!.screens[0].screen.fontSize).toBe("48px");
+      expect(result!.screens[0]!.screen.fontSize).toBe("48px");
     });
   });
 
@@ -661,8 +659,8 @@ describe("firebaseParsers", () => {
 
       const result = parseMatch(data, defaultMatch);
       expect(result!.home2min).toHaveLength(2);
-      expect(result!.home2min[0].key).toBe("p1");
-      expect(result!.home2min[1].key).toBe("p3");
+      expect(result!.home2min[0]!.key).toBe("p1");
+      expect(result!.home2min[1]!.key).toBe("p3");
     });
 
     it("uses default 2-minute arrays when not arrays", () => {
@@ -716,87 +714,22 @@ describe("firebaseParsers", () => {
       expect(result).toEqual(defaultController);
     });
 
-    it("parses selectedAssets array", () => {
-      const assets: Asset[] = [
-        { key: "a1", type: "image" },
-        { key: "a2", type: "video" },
-      ];
+    it("uses empty queues when not object", () => {
       const data = {
-        selectedAssets: assets,
+        queues: "not an object",
       };
 
       const result = parseController(data, defaultController);
-      expect(result!.selectedAssets).toEqual(assets);
+      expect(result!.queues).toEqual({});
     });
 
-    it("filters invalid items from selectedAssets", () => {
+    it("uses default activeQueueId when not string", () => {
       const data = {
-        selectedAssets: [
-          { key: "a1", type: "image" },
-          null,
-          { key: "a2" }, // Missing required 'type' field
-          { type: "video" }, // Missing required 'key' field
-          { key: "a3", type: "text" },
-        ],
+        activeQueueId: 123,
       };
 
       const result = parseController(data, defaultController);
-      expect(result!.selectedAssets).toHaveLength(2);
-      expect(result!.selectedAssets[0].key).toBe("a1");
-      expect(result!.selectedAssets[1].key).toBe("a3");
-    });
-
-    it("uses default selectedAssets when not array", () => {
-      const data = {
-        selectedAssets: "not an array",
-      };
-
-      const result = parseController(data, defaultController);
-      expect(result!.selectedAssets).toEqual([]);
-    });
-
-    it("parses boolean fields", () => {
-      const data = {
-        cycle: true,
-        autoPlay: true,
-        playing: false,
-      };
-
-      const result = parseController(data, defaultController);
-      expect(result!.cycle).toBe(true);
-      expect(result!.autoPlay).toBe(true);
-      expect(result!.playing).toBe(false);
-    });
-
-    it("uses default for non-boolean boolean fields", () => {
-      const data = {
-        cycle: "true",
-        autoPlay: 1,
-        playing: null,
-      };
-
-      const result = parseController(data, defaultController);
-      expect(result!.cycle).toBe(defaultController.cycle);
-      expect(result!.autoPlay).toBe(defaultController.autoPlay);
-      expect(result!.playing).toBe(defaultController.playing);
-    });
-
-    it("parses numeric imageSeconds", () => {
-      const data = {
-        imageSeconds: 10,
-      };
-
-      const result = parseController(data, defaultController);
-      expect(result!.imageSeconds).toBe(10);
-    });
-
-    it("uses default imageSeconds for non-numeric", () => {
-      const data = {
-        imageSeconds: "10",
-      };
-
-      const result = parseController(data, defaultController);
-      expect(result!.imageSeconds).toBe(defaultController.imageSeconds);
+      expect(result!.activeQueueId).toBe(defaultController.activeQueueId);
     });
 
     it("parses string fields", () => {
@@ -873,19 +806,15 @@ describe("firebaseParsers", () => {
 
     it("merges all fields with defaults properly", () => {
       const data = {
-        cycle: true,
-        imageSeconds: 8,
         view: "assets",
       };
 
       const result = parseController(data, defaultController);
       // Provided fields
-      expect(result!.cycle).toBe(true);
-      expect(result!.imageSeconds).toBe(8);
       expect(result!.view).toBe("assets");
       // Default fields
-      expect(result!.autoPlay).toBe(defaultController.autoPlay);
-      expect(result!.selectedAssets).toEqual([]);
+      expect(result!.playing).toBe(defaultController.playing);
+      expect(result!.queues).toEqual({});
       expect(result!.roster).toEqual({ home: [], away: [] });
     });
   });

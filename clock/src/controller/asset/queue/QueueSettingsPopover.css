@@ -1,0 +1,19 @@
+.queue-settings-popover {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 220px;
+}
+
+.queue-settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.queue-settings-row label {
+  font-weight: 500;
+  color: #575757;
+}
