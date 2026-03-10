@@ -143,10 +143,9 @@ interface QueueState {
 `QueuePicker` is rendered as an rsuite `Modal` dialog. It uses smart auto-add behavior to minimize clicks during game-day operation:
 
 - **0 queues**: Auto-creates "Biðröð 1" and adds the item to it (no dialog shown)
-- **1 queue**: Auto-adds to the single existing queue (no dialog shown)
-- **2+ queues**: Shows the modal dialog listing all queues, plus a "Ný biðröð" (New queue) button
+- **1+ queues**: Shows the modal dialog listing all queues, plus a "Ný biðröð" (New queue) button
 
-This means the dialog only appears when there's an actual choice to make.
+This means the dialog appears whenever queues exist, so the operator always explicitly chooses where to add.
 
 #### Drag-and-Drop Collision Detection
 

@@ -42,12 +42,10 @@ const QueuePicker: React.FC<QueuePickerProps> = ({
 
     if (queueCount === 0) {
       onCreateAndAdd("Biðröð 1", assets);
-    } else if (queueCount === 1) {
-      onAddToQueue(queueIds[0]!, assets);
     }
-  }, [queueCount, queueIds, assets, onAddToQueue, onCreateAndAdd]);
+  }, [queueCount, assets, onCreateAndAdd]);
 
-  if (queueCount <= 1) {
+  if (queueCount === 0) {
     return null;
   }
 
