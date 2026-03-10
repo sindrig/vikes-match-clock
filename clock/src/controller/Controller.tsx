@@ -1,5 +1,5 @@
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Nav, Button, Modal, IconButton } from "rsuite";
 import { RingLoader } from "react-spinners";
 import GearIcon from "@rsuite/icons/Gear";
@@ -40,14 +40,18 @@ const Controller = () => {
   } = useLocalState();
   const auth = useAuth();
 
+  const [prevAssetView, setPrevAssetView] = useState(controller.assetView);
   const [tab, setTab] = useState<string>(
     assetViewToTab[controller.assetView] ?? TABS.queue,
   );
 
-  useEffect(() => {
+  if (controller.assetView !== prevAssetView) {
+    setPrevAssetView(controller.assetView);
     const mapped = assetViewToTab[controller.assetView];
-    if (mapped) setTab((prev) => (prev === TABS.media ? prev : mapped));
-  }, [controller.assetView]);
+    if (mapped && tab !== TABS.media) {
+      setTab(mapped);
+    }
+  }
 
   const [selectedScreen, setSelectedScreen] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
