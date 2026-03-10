@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import { storageHelpers, StorageReference, ListResult } from "../../firebase";
-import { useController } from "../../contexts/FirebaseStateContext";
 import { Asset } from "../../types";
 import assetTypes from "../asset/AssetTypes";
 import FolderFillIcon from "@rsuite/icons/FolderFill";
@@ -24,7 +23,6 @@ interface FolderData {
 
 interface ImageListProps {
   prefix: string;
-  displayNow: boolean;
   allowEdit: boolean;
   appendPrefix: (prefix: string) => void;
   ts: number | null;
@@ -33,13 +31,11 @@ interface ImageListProps {
 
 const ImageList: React.FC<ImageListProps> = ({
   prefix,
-  displayNow,
   allowEdit,
   appendPrefix,
   ts,
   onAddAssets,
 }) => {
-  const { renderAsset } = useController();
   const [images, setImages] = useState<ImageData[]>([]);
   const [folders, setFolders] = useState<FolderData[]>([]);
 
@@ -113,11 +109,7 @@ const ImageList: React.FC<ImageListProps> = ({
                     url: imageUrl,
                     type,
                   };
-                  if (displayNow) {
-                    renderAsset(asset);
-                  } else {
-                    onAddAssets([asset]);
-                  }
+                  onAddAssets([asset]);
                 }}
               >
                 <img src={imageUrl} alt={name} />

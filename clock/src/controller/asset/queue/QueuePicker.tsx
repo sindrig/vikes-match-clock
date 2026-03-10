@@ -1,11 +1,12 @@
 import React, { useEffect, useRef } from "react";
-import { Modal, Button } from "rsuite";
+import { Modal, Button, Divider } from "rsuite";
 import { QueueState, Asset } from "../../../types";
 import "./QueuePicker.css";
 
 interface QueuePickerProps {
   queues: Record<string, QueueState>;
   assets: Asset[];
+  onShowNow: (assets: Asset[]) => void;
   onAddToQueue: (queueId: string, assets: Asset[]) => void;
   onCreateAndAdd: (queueName: string, assets: Asset[]) => void;
   onClose: () => void;
@@ -14,6 +15,7 @@ interface QueuePickerProps {
 const QueuePicker: React.FC<QueuePickerProps> = ({
   queues,
   assets,
+  onShowNow,
   onAddToQueue,
   onCreateAndAdd,
   onClose,
@@ -54,10 +56,20 @@ const QueuePicker: React.FC<QueuePickerProps> = ({
   return (
     <Modal open={true} onClose={onClose} size="xs">
       <Modal.Header>
-        <Modal.Title>Veldu biðröð</Modal.Title>
+        <Modal.Title>Veldu aðgerð</Modal.Title>
       </Modal.Header>
       <Modal.Body>
         <div className="queue-picker-list">
+          <Button
+            appearance="primary"
+            color="green"
+            block
+            size="lg"
+            onClick={() => onShowNow(assets)}
+          >
+            Sýna
+          </Button>
+          <Divider className="queue-picker-divider">Biðraðir</Divider>
           {sortedQueues.map((q) => (
             <Button
               key={q.id}

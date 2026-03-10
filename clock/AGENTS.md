@@ -138,14 +138,17 @@ interface QueueState {
 **State operations** (in `FirebaseStateContext.tsx`):
 `createQueue`, `deleteQueue`, `renameQueue`, `reorderQueues`, `addItemsToQueue`, `removeItemFromQueue`, `reorderItemsInQueue`, `updateQueueSettings`, `playQueue`, `stopPlaying`, `showItemNow`
 
-#### QueuePicker Auto-Add Logic
+#### QueuePicker Behavior
 
-`QueuePicker` is rendered as an rsuite `Modal` dialog. It uses smart auto-add behavior to minimize clicks during game-day operation:
+`QueuePicker` is rendered as an rsuite `Modal` dialog. Every asset click (image, URL, etc.) opens QueuePicker, which offers two action types:
 
-- **0 queues**: Auto-creates "Biðröð 1" and adds the item to it (no dialog shown)
-- **1+ queues**: Shows the modal dialog listing all queues, plus a "Ný biðröð" (New queue) button
+1. **"Sýna"** (green, large button at top) — shows the asset immediately via `showItemNow`
+2. **Queue buttons** (ghost buttons below a divider) — adds the asset to a specific queue
+3. **"Ný biðröð"** (primary button at bottom) — creates a new queue and adds the asset
 
-This means the dialog appears whenever queues exist, so the operator always explicitly chooses where to add.
+Special case: **0 queues** → auto-creates "Biðröð 1" and adds the item (no dialog shown).
+
+The old "Birta strax" / "Setja í biðröð" radio buttons in MediaManager were removed. `ImageList` no longer has a `displayNow` prop — it always calls `onAddAssets`, which opens QueuePicker.
 
 #### Drag-and-Drop Collision Detection
 

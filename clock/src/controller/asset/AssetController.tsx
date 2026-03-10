@@ -63,6 +63,16 @@ const AssetController = () => {
     return addMultipleAssets([asset]);
   };
 
+  const handleShowNow = useCallback(
+    (assets: Asset[]) => {
+      for (const asset of assets) {
+        showItemNow(asset);
+      }
+      setPendingAssets([]);
+    },
+    [showItemNow],
+  );
+
   const handleAddToQueue = useCallback(
     (queueId: string, assets: Asset[]) => {
       addItemsToQueue(queueId, assets);
@@ -112,6 +122,7 @@ const AssetController = () => {
           <QueuePicker
             queues={queues}
             assets={pendingAssets}
+            onShowNow={handleShowNow}
             onAddToQueue={handleAddToQueue}
             onCreateAndAdd={handleCreateAndAdd}
             onClose={() => setPendingAssets([])}
