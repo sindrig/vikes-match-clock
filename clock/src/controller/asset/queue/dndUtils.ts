@@ -1,3 +1,9 @@
+import {
+  closestCenter,
+  CollisionDetection,
+  DroppableContainer,
+} from "@dnd-kit/core";
+
 export type DragType = "column" | "item";
 
 export interface ParsedDragId {
@@ -40,4 +46,21 @@ export const parseDragId = (id: string): ParsedDragId | null => {
   }
 
   return null;
+};
+
+// Restrict collision targets to the same drag type (col↔col, item↔item)
+// so nested SortableContexts don't interfere with each other.
+export const typedCollisionDetection: CollisionDetection = (args) => {
+  const activeId = args.active.id.toString();
+  const activePrefix = activeId.startsWith("col:") ? "col:" : "item:";
+
+  const filteredContainers = args.droppableContainers.filter(
+    (container: DroppableContainer) =>
+      container.id.toString().startsWith(activePrefix),
+  );
+
+  return closestCenter({
+    ...args,
+    droppableContainers: filteredContainers,
+  });
 };

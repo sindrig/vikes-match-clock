@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from "react";
 import {
   DndContext,
-  closestCenter,
   KeyboardSensor,
   PointerSensor,
   TouchSensor,
@@ -24,7 +23,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { QueueState, Asset } from "../../../types";
 import QueueColumn from "./QueueColumn";
 import QueueItem from "./QueueItem";
-import { makeDragId, parseDragId } from "./dndUtils";
+import { makeDragId, parseDragId, typedCollisionDetection } from "./dndUtils";
 import "./QueueBoard.css";
 
 interface QueueBoardProps {
@@ -257,7 +256,7 @@ const QueueBoard: React.FC<QueueBoardProps> = ({
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={closestCenter}
+      collisionDetection={typedCollisionDetection}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
