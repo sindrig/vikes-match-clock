@@ -144,7 +144,7 @@ interface FirebaseStateContextType {
   updateController: (updates: Partial<ControllerState>) => void;
   selectView: (view: string) => void;
   selectAssetView: (assetView: string) => void;
-  createQueue: (name: string) => string;
+  createQueue: (name: string, options?: { cycle?: boolean }) => string;
   deleteQueue: (queueId: string) => void;
   renameQueue: (queueId: string, name: string) => void;
   reorderQueues: (orderedIds: string[]) => void;
@@ -828,7 +828,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   );
 
   const createQueue = useCallback(
-    (name: string) => {
+    (name: string, options?: { cycle?: boolean }) => {
       const queueId = `queue-${crypto.randomUUID()}`;
       applyControllerUpdate((prev) => {
         const existingOrders = Object.values(prev.queues).map((q) => q.order);
@@ -841,7 +841,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
           items: [],
           autoPlay: false,
           imageSeconds: 3,
-          cycle: false,
+          cycle: options?.cycle ?? true,
           order: nextOrder,
         };
         return {

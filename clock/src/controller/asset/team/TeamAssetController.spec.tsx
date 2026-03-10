@@ -406,7 +406,9 @@ describe("TeamAssetController", () => {
       fireEvent.click(queueButtons[0]);
 
       await waitFor(() => {
-        expect(mockCreateQueue).toHaveBeenCalledWith("Víkingur R");
+        expect(mockCreateQueue).toHaveBeenCalledWith("Víkingur R", {
+          cycle: false,
+        });
         expect(mockAddItemsToQueue).toHaveBeenCalled();
         expect(mockPreviousView).toHaveBeenCalled();
       });

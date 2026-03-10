@@ -46,7 +46,7 @@ const Controller = () => {
 
   useEffect(() => {
     const mapped = assetViewToTab[controller.assetView];
-    if (mapped) setTab(mapped);
+    if (mapped) setTab((prev) => (prev === TABS.media ? prev : mapped));
   }, [controller.assetView]);
 
   const [selectedScreen, setSelectedScreen] = useState("");

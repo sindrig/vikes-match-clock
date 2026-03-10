@@ -103,7 +103,7 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
     if (existingQueue) {
       deleteQueue(existingQueue.id);
     }
-    const newQueueId = createQueue(teamName);
+    const newQueueId = createQueue(teamName, { cycle: false });
 
     const resolved = await Promise.all(assetPromises);
     const validAssets: Asset[] = resolved.filter((a) => a !== null);
