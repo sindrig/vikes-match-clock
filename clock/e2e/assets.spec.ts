@@ -42,20 +42,25 @@ test.describe("Asset Overlay System", () => {
   test("adds multiple assets to the queue", async ({ page }) => {
     const assetController = page.locator(".asset-controller");
 
+    // First asset: auto-creates "Biðröð 1" (0 queues → auto-add path)
     await assetController
       .locator('input[type="text"]')
       .fill("https://www.youtube.com/watch?v=test1");
     await assetController.getByText("Bæta við").click();
+    await expect(assetController.locator(".queue-column")).toHaveCount(1);
 
+    // Subsequent assets: QueuePicker modal opens — pick the existing queue
     await assetController
       .locator('input[type="text"]')
       .fill("https://www.youtube.com/watch?v=test2");
     await assetController.getByText("Bæta við").click();
+    await page.locator(".rs-modal").getByText("Biðröð 1").click();
 
     await assetController
       .locator('input[type="text"]')
       .fill("https://www.youtube.com/watch?v=test3");
     await assetController.getByText("Bæta við").click();
+    await page.locator(".rs-modal").getByText("Biðröð 1").click();
 
     const queueColumn = assetController.locator(".queue-column");
     await expect(queueColumn).toHaveCount(1);
@@ -71,11 +76,13 @@ test.describe("Asset Overlay System", () => {
       .locator('input[type="text"]')
       .fill("https://www.youtube.com/watch?v=test1");
     await assetController.getByText("Bæta við").click();
+    await expect(assetController.locator(".queue-column")).toHaveCount(1);
 
     await assetController
       .locator('input[type="text"]')
       .fill("https://www.youtube.com/watch?v=test2");
     await assetController.getByText("Bæta við").click();
+    await page.locator(".rs-modal").getByText("Biðröð 1").click();
 
     const queueColumn = assetController.locator(".queue-column");
     await expect(queueColumn.locator(".queue-item")).toHaveCount(2);
@@ -133,9 +140,9 @@ test.describe("Asset Overlay System", () => {
 
     await expect(settingsPopover.getByText("sek")).toBeVisible();
 
-    await expect(loopToggle).not.toHaveAttribute("data-checked", "true");
-    await loopToggle.click();
     await expect(loopToggle).toHaveAttribute("data-checked", "true");
+    await loopToggle.click();
+    await expect(loopToggle).not.toHaveAttribute("data-checked", "true");
   });
 
   test("shows clear overlay button when asset is displayed", async ({
