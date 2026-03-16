@@ -68,7 +68,7 @@ const Controller = () => {
     };
 
     const loginWithGoogle = () => {
-      void firebaseAuth.loginWithGoogle();
+      void firebaseAuth.loginWithGoogle().then(() => console.log("logged in"));
     };
 
     return (

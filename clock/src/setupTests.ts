@@ -36,7 +36,7 @@ vi.mock("firebase/app", () => ({
 vi.mock("firebase/auth", () => ({
   getAuth: vi.fn(() => ({})),
   signInWithEmailAndPassword: vi.fn(() => Promise.resolve({ user: null })),
-  signInWithRedirect: vi.fn(() => Promise.resolve()),
+  signInWithPopup: vi.fn(() => Promise.resolve({ user: null })),
   signOut: vi.fn(() => Promise.resolve()),
   onAuthStateChanged: vi.fn(
     (_auth: unknown, callback: (user: null) => void) => {

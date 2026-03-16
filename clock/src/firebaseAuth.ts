@@ -1,6 +1,6 @@
 import {
   signInWithEmailAndPassword,
-  signInWithRedirect,
+  signInWithPopup,
   signOut,
   onAuthStateChanged,
   GoogleAuthProvider,
@@ -22,8 +22,8 @@ export const firebaseAuth = {
   login: (email: string, password: string): Promise<UserCredential> =>
     signInWithEmailAndPassword(auth, email, password),
 
-  loginWithGoogle: (): Promise<never> =>
-    signInWithRedirect(auth, googleProvider),
+  loginWithGoogle: (): Promise<UserCredential> =>
+    signInWithPopup(auth, googleProvider),
 
   logout: (): Promise<void> => signOut(auth),
 
