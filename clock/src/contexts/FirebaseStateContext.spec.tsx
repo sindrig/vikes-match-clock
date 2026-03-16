@@ -1205,7 +1205,7 @@ describe("FirebaseStateContext", () => {
   });
 
   describe("pauseMatch with isHalfEnd", () => {
-    it("sets timeElapsed to first halfStop and slices halfStops", () => {
+    it("sets halfOffset to first halfStop, resets timeElapsed, and slices halfStops", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
@@ -1232,7 +1232,39 @@ describe("FirebaseStateContext", () => {
         "match",
         expect.objectContaining({
           started: 0,
-          timeElapsed: 45 * 60 * 1000,
+          halfOffset: 45 * 60 * 1000,
+          halfStops: [90, 105, 120],
+        }),
+      );
+    });
+
+    it("resets timeElapsed to 0 when it was non-zero", () => {
+      let matchApi: ReturnType<typeof useMatch> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+        >
+          <TestMatchConsumer
+            onMount={(api) => {
+              matchApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      act(() => {
+        matchApi!.updateMatch({ timeElapsed: 46 * 60 * 1000 });
+      });
+      vi.clearAllMocks();
+      act(() => {
+        matchApi!.pauseMatch(true);
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "match",
+        expect.objectContaining({
+          timeElapsed: 0,
+          halfOffset: 45 * 60 * 1000,
           halfStops: [90, 105, 120],
         }),
       );
