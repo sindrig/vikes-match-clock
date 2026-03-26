@@ -54,6 +54,7 @@ const defaultMatch: Match = {
   buzzer: false,
   countdown: false,
   showInjuryTime: true,
+  halfOffset: 0,
 };
 
 const defaultController: ControllerState = {
@@ -615,7 +616,8 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       applyMatchUpdate((prev) => {
         const newState: Match = { ...prev, started: 0 };
         if (isHalfEnd) {
-          newState.timeElapsed = (newState.halfStops[0] ?? 0) * 60 * 1000;
+          newState.halfOffset = (newState.halfStops[0] ?? 0) * 60 * 1000;
+          newState.timeElapsed = 0;
           if (newState.halfStops.length > 1) {
             newState.halfStops = newState.halfStops.slice(1);
           }
