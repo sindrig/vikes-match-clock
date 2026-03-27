@@ -102,8 +102,8 @@ img.ad {
 }
 
 .scoreboard .injury-time span {
-  top: 18%;
-  left: 45%;
+  top: var(--theme-injury-top, 18%);
+  left: var(--theme-injury-left, 45%);
   font-size: var(--theme-injury-font-size, 2rem);
   position: absolute;
   color: var(--theme-injury-color, white);

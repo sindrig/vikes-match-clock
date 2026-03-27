@@ -34,30 +34,60 @@ interface ColorFieldProps {
   onChange: (value: string) => void;
 }
 
+const isTransparent = (value: string): boolean =>
+  value.toLowerCase().trim() === "transparent";
+
 const ColorField = ({
   label,
   value,
   defaultValue,
   onChange,
-}: ColorFieldProps) => (
-  <div className="theme-field">
-    <label className="theme-field-label">{label}</label>
-    <div className="theme-field-input">
-      <input
-        type="color"
-        className="theme-color-picker"
-        value={toHex(value)}
-        onChange={(e) => onChange(e.target.value)}
-      />
-      <Input
-        size="xs"
-        value={value}
-        onChange={(val) => onChange(val)}
-        placeholder={defaultValue}
-      />
+}: ColorFieldProps) => {
+  const transparent = isTransparent(value);
+  return (
+    <div className="theme-field">
+      <label className="theme-field-label">{label}</label>
+      <div className="theme-field-input">
+        {transparent ? (
+          <span className="theme-transparent-indicator" title="Transparent" />
+        ) : (
+          <input
+            type="color"
+            className="theme-color-picker"
+            value={toHex(value)}
+            onChange={(e) => onChange(e.target.value)}
+          />
+        )}
+        <Input
+          size="xs"
+          value={value}
+          onChange={(val) => onChange(val)}
+          placeholder={defaultValue}
+        />
+        <div
+          className="theme-transparent-toggle"
+          title="Gegnsætt"
+          role="checkbox"
+          aria-checked={transparent}
+          tabIndex={0}
+          onClick={() => onChange(transparent ? defaultValue : "transparent")}
+          onKeyDown={(e) => {
+            if (e.key === " " || e.key === "Enter") {
+              e.preventDefault();
+              onChange(transparent ? defaultValue : "transparent");
+            }
+          }}
+        >
+          <span
+            className={`theme-transparent-toggle-label${transparent ? " checked" : ""}`}
+          >
+            ∅
+          </span>
+        </div>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 interface TextFieldProps {
   label: string;
@@ -116,9 +146,12 @@ const PercentField = ({
 
 const FONT_OPTIONS = [
   '"Anton", sans-serif',
+  '"Oswald", sans-serif',
+  '"Bebas Neue", sans-serif',
+  '"Orbitron", sans-serif',
+  '"Russo One", sans-serif',
   "sans-serif",
   '"Roboto", sans-serif',
-  '"Oswald", sans-serif',
   "monospace",
   '"Arial Black", sans-serif',
 ];
@@ -369,6 +402,19 @@ const ThemeEditorPanels = ({
         defaultValue={DEFAULT_THEME.injuryTimeFontSize}
         onChange={(v) => onFieldChange("injuryTimeFontSize", v)}
       />
+      <Divider className="theme-divider" />
+      <PercentField
+        label="Ofan"
+        value={effective.injuryTimeTop}
+        defaultValue={DEFAULT_THEME.injuryTimeTop}
+        onChange={(v) => onFieldChange("injuryTimeTop", v)}
+      />
+      <PercentField
+        label="Vinstri"
+        value={effective.injuryTimeLeft}
+        defaultValue={DEFAULT_THEME.injuryTimeLeft}
+        onChange={(v) => onFieldChange("injuryTimeLeft", v)}
+      />
     </Panel>
 
     <Panel header="Liðsheiti" collapsible bordered>
@@ -499,14 +545,21 @@ const ThemeEditorModal = ({ open, onClose }: ThemeEditorModalProps) => {
     [setTheme, setThemePreset],
   );
 
-  // When editing a field: if the active preset is built-in, auto-create a copy
-  const handleFieldChange = useCallback(
-    (field: keyof ThemeConfig, value: string) => {
+  // Apply one or more field changes atomically.
+  // Using Partial<ThemeConfig> ensures multiple drag fields (top + left)
+  // are batched into a single Firebase write, avoiding stale-closure issues
+  // when onFieldChange is called twice synchronously.
+  const handleFieldsChange = useCallback(
+    (changes: Partial<ThemeConfig>) => {
       if (BUILT_IN_PRESET_NAMES.has(activePresetId)) {
         // Check if a copy already exists
         const existingCopyId = findCopyOfBuiltIn(activePresetId, customPresets);
         const builtInTheme = THEME_PRESETS[activePresetId] ?? DEFAULT_THEME;
-        const newTheme = { ...builtInTheme, ...(theme ?? {}), [field]: value };
+        const newTheme = {
+          ...builtInTheme,
+          ...(theme ?? {}),
+          ...changes,
+        };
         const copyName = `${activePresetId} (breytt)`;
 
         if (existingCopyId) {
@@ -533,7 +586,7 @@ const ThemeEditorModal = ({ open, onClose }: ThemeEditorModalProps) => {
         // Editing a custom preset directly
         const customPreset = customPresets?.[activePresetId];
         if (customPreset) {
-          const newTheme = { ...customPreset.theme, [field]: value };
+          const newTheme = { ...customPreset.theme, ...changes };
           saveCustomPreset(activePresetId, {
             ...customPreset,
             theme: newTheme,
@@ -541,7 +594,7 @@ const ThemeEditorModal = ({ open, onClose }: ThemeEditorModalProps) => {
         } else {
           // Fallback: use theme overrides
           const currentTheme = theme ?? {};
-          setTheme({ ...DEFAULT_THEME, ...currentTheme, [field]: value });
+          setTheme({ ...DEFAULT_THEME, ...currentTheme, ...changes });
         }
       }
     },
@@ -553,6 +606,14 @@ const ThemeEditorModal = ({ open, onClose }: ThemeEditorModalProps) => {
       setThemePreset,
       saveCustomPreset,
     ],
+  );
+
+  // Single-field convenience wrapper
+  const handleFieldChange = useCallback(
+    (field: keyof ThemeConfig, value: string) => {
+      handleFieldsChange({ [field]: value });
+    },
+    [handleFieldsChange],
   );
 
   // Revert a modified copy back to its built-in original
@@ -756,6 +817,7 @@ const ThemeEditorModal = ({ open, onClose }: ThemeEditorModalProps) => {
           <VisualThemeEditor
             effective={effective}
             onFieldChange={handleFieldChange}
+            onFieldsChange={handleFieldsChange}
           />
         ) : (
           <ThemeEditorPanels

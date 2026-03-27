@@ -7,6 +7,7 @@ import "./VisualThemeEditor.css";
 interface VisualThemeEditorProps {
   effective: ThemeConfig;
   onFieldChange: (field: keyof ThemeConfig, value: string) => void;
+  onFieldsChange: (changes: Partial<ThemeConfig>) => void;
 }
 
 // ---- Element definitions ----
@@ -124,14 +125,14 @@ const ELEMENTS: ElementDef[] = [
   {
     id: "injury-time",
     label: "Uppbótatími",
-    left: "45%",
-    top: () => "18%",
+    left: (t) => t.injuryTimeLeft,
+    top: (t) => t.injuryTimeTop,
     width: () => "10%",
     height: () => "8%",
     bg: () => "transparent",
     color: (t) => t.injuryTimeColor,
     border: () => "1px dashed rgba(255,255,255,0.3)",
-    dragFields: { top: "scoreTop" },
+    dragFields: { top: "injuryTimeTop", left: "injuryTimeLeft" },
     colorFields: {
       bg: "injuryTimeColor",
       text: "injuryTimeColor",
@@ -149,6 +150,9 @@ interface ColorPopoverProps {
   onFieldChange: (field: keyof ThemeConfig, value: string) => void;
   onClose: () => void;
 }
+
+const isTransparent = (value: string): boolean =>
+  value.toLowerCase().trim() === "transparent";
 
 const ColorPopover = ({
   x,
@@ -171,17 +175,49 @@ const ColorPopover = ({
 
   return (
     <div ref={ref} className="visual-color-popover" style={{ left: x, top: y }}>
-      {fields.map(({ label, field, value }) => (
-        <div key={field} className="visual-color-popover-row">
-          <span className="visual-color-popover-label">{label}</span>
-          <input
-            type="color"
-            className="visual-color-swatch"
-            value={toHex(value)}
-            onChange={(e) => onFieldChange(field, e.target.value)}
-          />
-        </div>
-      ))}
+      {fields.map(({ label, field, value }) => {
+        const transparent = isTransparent(value);
+        return (
+          <div key={field} className="visual-color-popover-row">
+            <span className="visual-color-popover-label">{label}</span>
+            {transparent ? (
+              <span
+                className="visual-transparent-indicator"
+                title="Transparent"
+              />
+            ) : (
+              <input
+                type="color"
+                className="visual-color-swatch"
+                value={toHex(value)}
+                onChange={(e) => onFieldChange(field, e.target.value)}
+              />
+            )}
+            <div
+              className="visual-transparent-toggle"
+              title="Gegnsætt"
+              role="checkbox"
+              aria-checked={transparent}
+              tabIndex={0}
+              onClick={() =>
+                onFieldChange(field, transparent ? "#000000" : "transparent")
+              }
+              onKeyDown={(e) => {
+                if (e.key === " " || e.key === "Enter") {
+                  e.preventDefault();
+                  onFieldChange(field, transparent ? "#000000" : "transparent");
+                }
+              }}
+            >
+              <span
+                className={`visual-transparent-toggle-label${transparent ? " checked" : ""}`}
+              >
+                ∅
+              </span>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 };
@@ -191,7 +227,7 @@ const ColorPopover = ({
 interface DraggableElementProps {
   def: ElementDef;
   theme: ThemeConfig;
-  onFieldChange: (field: keyof ThemeConfig, value: string) => void;
+  onFieldsChange: (changes: Partial<ThemeConfig>) => void;
   onColorClick: (
     elementId: string,
     fields: ColorPopoverProps["fields"],
@@ -204,7 +240,7 @@ interface DraggableElementProps {
 const DraggableElement = ({
   def,
   theme,
-  onFieldChange,
+  onFieldsChange,
   onColorClick,
   canvasRef,
 }: DraggableElementProps) => {
@@ -323,15 +359,18 @@ const DraggableElement = ({
           );
         }
       } else if (dragOverride) {
-        // Actually dragged → commit final position to Firebase
-        onFieldChange(def.dragFields.top, dragOverride.top);
+        // Actually dragged → commit all position changes atomically
+        const changes: Partial<ThemeConfig> = {
+          [def.dragFields.top]: dragOverride.top,
+        };
         if (def.dragFields.left) {
-          onFieldChange(def.dragFields.left, dragOverride.left);
+          changes[def.dragFields.left] = dragOverride.left;
         }
+        onFieldsChange(changes);
         setDragOverride(null);
       }
     },
-    [def, theme, canvasRef, onColorClick, onFieldChange, dragOverride],
+    [def, theme, canvasRef, onColorClick, onFieldsChange, dragOverride],
   );
 
   // Use local drag position when dragging, otherwise use theme values
@@ -367,6 +406,7 @@ const DraggableElement = ({
 const VisualThemeEditor = ({
   effective,
   onFieldChange,
+  onFieldsChange,
 }: VisualThemeEditorProps) => {
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const [popover, setPopover] = useState<{
@@ -402,7 +442,7 @@ const VisualThemeEditor = ({
               key={def.id}
               def={def}
               theme={effective}
-              onFieldChange={onFieldChange}
+              onFieldsChange={onFieldsChange}
               onColorClick={handleColorClick}
               canvasRef={canvasRef}
             />

@@ -152,6 +152,8 @@ export interface ThemeConfig {
   // Injury time
   injuryTimeColor: string;
   injuryTimeFontSize: string;
+  injuryTimeTop: string;
+  injuryTimeLeft: string;
 
   // Team name
   teamNameColor: string;

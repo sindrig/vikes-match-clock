@@ -21,7 +21,11 @@ import RefreshHandler from "./RefreshHandler";
 import AssetController from "./asset/AssetController";
 import "rsuite/dist/rsuite.min.css";
 import "./Controller.css";
-import { useController, useListeners } from "../contexts/FirebaseStateContext";
+import {
+  useController,
+  useListeners,
+  useView,
+} from "../contexts/FirebaseStateContext";
 import { useAuth, useLocalState } from "../contexts/LocalStateContext";
 
 const confirmRefresh = () => confirm("Are you absolutely sure?");
@@ -29,6 +33,9 @@ const confirmRefresh = () => confirm("Are you absolutely sure?");
 const Controller = () => {
   const { controller, selectAssetView } = useController();
   const { screens } = useListeners();
+  const {
+    view: { themePreset, customPresets },
+  } = useView();
   const {
     email,
     setEmail,
@@ -256,16 +263,23 @@ const Controller = () => {
         <Modal.Body>
           <MatchActionSettings />
           <div className="theme-trigger-row">
-            <span className="theme-trigger-label">Klukku þema</span>
+            <div className="theme-trigger-info">
+              <span className="theme-trigger-label">Klukku þema</span>
+              <span className="theme-trigger-preset">
+                {customPresets?.[themePreset ?? "Default"]?.name ??
+                  themePreset ??
+                  "Default"}
+              </span>
+            </div>
             <Button
-              size="xs"
-              appearance="ghost"
+              size="sm"
+              appearance="primary"
               onClick={() => {
                 setSettingsOpen(false);
                 setThemeOpen(true);
               }}
             >
-              Breyta
+              Breyta þema
             </Button>
           </div>
           <div className="page-actions control-item withborder">

@@ -38,6 +38,8 @@ const themeToCssVars = (theme: ThemeConfig): Record<string, string> => ({
   // Injury time
   "--theme-injury-color": theme.injuryTimeColor,
   "--theme-injury-font-size": theme.injuryTimeFontSize,
+  "--theme-injury-top": theme.injuryTimeTop,
+  "--theme-injury-left": theme.injuryTimeLeft,
 
   // Team name
   "--theme-team-name-color": theme.teamNameColor,

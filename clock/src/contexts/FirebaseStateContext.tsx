@@ -506,7 +506,15 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
           const oldVal = prev[key];
           const newVal = newState[key];
           if (oldVal !== newVal) {
-            diff[key] = newVal;
+            // Firebase update() rejects undefined; use null to delete a key
+            diff[key] = newVal === undefined ? null : newVal;
+          }
+        }
+
+        // Also detect keys removed from newState (present in prev, absent in new)
+        for (const key of Object.keys(prev) as (keyof ViewState)[]) {
+          if (!(key in newState) && !(key in diff)) {
+            diff[key] = null;
           }
         }
 

@@ -367,10 +367,23 @@ input.longerInput {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 0;
+  padding: 12px;
+  border: 1px solid #c7c7c7;
+  border-radius: 5px;
+}
+
+.theme-trigger-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .theme-trigger-label {
   font-weight: 600;
   font-size: 14px;
+}
+
+.theme-trigger-preset {
+  font-size: 12px;
+  color: #888;
 }
