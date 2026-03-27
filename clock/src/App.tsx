@@ -23,6 +23,7 @@ import StateListener from "./StateListener";
 import MatchController from "./match-controller/MatchController";
 import useGlobalShortcuts from "./hooks/useGlobalShortcuts";
 import useNightBlackout from "./hooks/useNightBlackout";
+import { useThemeCssVars } from "./hooks/useThemeCssVars";
 import { shouldShowGoalCelebration } from "./utils/matchUtils";
 import baddi from "./images/baddi.gif";
 import assetTypes from "./controller/asset/AssetTypes";
@@ -152,10 +153,19 @@ function App() {
     useLocalState();
 
   const { view } = controller;
-  const { vp, background, blackoutStart, blackoutEnd } = viewState;
+  const {
+    vp,
+    background,
+    blackoutStart,
+    blackoutEnd,
+    theme,
+    themePreset,
+    customPresets,
+  } = viewState;
   const asset = controller.currentAsset || null;
 
   const isBlackedOut = useNightBlackout(blackoutStart, blackoutEnd, view);
+  const themeCssVars = useThemeCssVars(themePreset, theme, customPresets);
 
   const isAuthenticated = auth.isLoaded && !auth.isEmpty;
 
@@ -214,6 +224,7 @@ function App() {
   const style: React.CSSProperties = {
     ...getBackground(isBlackedOut ? "Blackout" : background),
     ...vp.style,
+    ...themeCssVars,
   };
 
   // State 2: listenPrefix set, not authenticated — display screen + disconnect button only

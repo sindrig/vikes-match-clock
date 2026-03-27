@@ -14,6 +14,7 @@ export default defineConfig({
   server: {
     port: process.env.PORT ? parseInt(process.env.PORT, 10) : 3000,
     open: false,
+    allowedHosts: true,
   },
   build: {
     outDir: "build",

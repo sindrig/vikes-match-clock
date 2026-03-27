@@ -15,6 +15,7 @@ const assetViewToTab: Record<string, string> = {
 };
 import { firebaseAuth } from "../firebaseAuth";
 import MatchActionSettings from "./MatchActionSettings";
+import ThemeEditorModal from "./theme/ThemeEditor";
 import MediaManager from "./media/MediaManager";
 import RefreshHandler from "./RefreshHandler";
 import AssetController from "./asset/AssetController";
@@ -55,6 +56,7 @@ const Controller = () => {
 
   const [selectedScreen, setSelectedScreen] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [themeOpen, setThemeOpen] = useState(false);
 
   const isAuthenticated = auth.isLoaded && !auth.isEmpty;
 
@@ -253,6 +255,19 @@ const Controller = () => {
         </Modal.Header>
         <Modal.Body>
           <MatchActionSettings />
+          <div className="theme-trigger-row">
+            <span className="theme-trigger-label">Klukku þema</span>
+            <Button
+              size="xs"
+              appearance="ghost"
+              onClick={() => {
+                setSettingsOpen(false);
+                setThemeOpen(true);
+              }}
+            >
+              Breyta
+            </Button>
+          </div>
           <div className="page-actions control-item withborder">
             <Button
               color="red"
@@ -271,6 +286,7 @@ const Controller = () => {
           </div>
         </Modal.Body>
       </Modal>
+      <ThemeEditorModal open={themeOpen} onClose={() => setThemeOpen(false)} />
     </div>
   );
 };

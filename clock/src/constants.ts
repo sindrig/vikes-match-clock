@@ -115,3 +115,132 @@ export const DEFAULT_HALFSTOPS: Record<Sports, number[]> = {
 
 export const PENALTY_LENGTH = 2 * 60 * 1000;
 export const TIMEOUT_LENGTH = 60000;
+
+// Theme system
+import type { ThemeConfig } from "./types";
+
+export const DEFAULT_THEME: ThemeConfig = {
+  // Score boxes
+  scoreBoxBg: "black",
+  scoreBoxColor: "white",
+  scoreBoxBorder: "1px solid white",
+  scoreBoxFontSize: "2.5rem",
+  scoreBoxFontFamily: '"Anton", sans-serif',
+
+  // Clock box
+  clockBg: "black",
+  clockColor: "white",
+  clockBorder: "1px solid white",
+  clockFontSizeMin: "1.7rem",
+  clockFontSizeMax: "1.85rem",
+  clockFontFamily: '"Anton", sans-serif',
+
+  // Clock position
+  clockTop: "45.5%",
+  clockLeft: "33.5%",
+  clockWidth: "33%",
+  clockHeight: "23%",
+
+  // Score position
+  scoreTop: "57%",
+  scoreHeight: "34%",
+  scoreWidth: "25%",
+
+  // Logo position
+  logoTop: "10%",
+  logoHeight: "43%",
+  logoWidth: "25%",
+
+  // Injury time
+  injuryTimeColor: "white",
+  injuryTimeFontSize: "2rem",
+
+  // Team name
+  teamNameColor: "white",
+  teamNameFontFamily: '"Anton", sans-serif',
+
+  // Red cards
+  redCardColor: "#e60000",
+
+  // Penalty boxes
+  penaltyBg: "black",
+  penaltyColor: "white",
+  penaltyBorder: "1px solid white",
+
+  // Timeout dots
+  timeoutColor: "red",
+
+  // Idle screen
+  idleTextColor: "#ffffff",
+  idleTextFontSize: "40px",
+  idleLogoTop: "5%",
+  idleLogoLeft: "15%",
+  idleLogoWidth: "30%",
+  idleTextTop: "65%",
+};
+
+export const BUILT_IN_PRESET_NAMES = new Set([
+  "Default",
+  "Vikes Dark",
+  "Vikes Light",
+  "Minimal",
+  "Blue Ice",
+]);
+
+export const THEME_PRESETS: Record<string, ThemeConfig> = {
+  Default: DEFAULT_THEME,
+  "Vikes Dark": {
+    ...DEFAULT_THEME,
+    scoreBoxBg: "#1a0000",
+    scoreBoxBorder: "2px solid #c7000f",
+    clockBg: "#1a0000",
+    clockBorder: "2px solid #c7000f",
+    penaltyBg: "#1a0000",
+    penaltyBorder: "2px solid #c7000f",
+    redCardColor: "#ff1a1a",
+    timeoutColor: "#c7000f",
+  },
+  "Vikes Light": {
+    ...DEFAULT_THEME,
+    scoreBoxBg: "rgba(255,255,255,0.85)",
+    scoreBoxColor: "#1a0000",
+    scoreBoxBorder: "2px solid #c7000f",
+    clockBg: "rgba(255,255,255,0.85)",
+    clockColor: "#1a0000",
+    clockBorder: "2px solid #c7000f",
+    injuryTimeColor: "#1a0000",
+    teamNameColor: "#1a0000",
+    penaltyBg: "rgba(255,255,255,0.85)",
+    penaltyColor: "#1a0000",
+    penaltyBorder: "2px solid #c7000f",
+    idleTextColor: "#1a0000",
+  },
+  Minimal: {
+    ...DEFAULT_THEME,
+    scoreBoxBg: "transparent",
+    scoreBoxColor: "white",
+    scoreBoxBorder: "none",
+    scoreBoxFontSize: "3rem",
+    clockBg: "transparent",
+    clockColor: "white",
+    clockBorder: "none",
+    penaltyBg: "transparent",
+    penaltyBorder: "none",
+  },
+  "Blue Ice": {
+    ...DEFAULT_THEME,
+    scoreBoxBg: "rgba(0,40,80,0.9)",
+    scoreBoxColor: "#e0f0ff",
+    scoreBoxBorder: "2px solid #4da6ff",
+    clockBg: "rgba(0,40,80,0.9)",
+    clockColor: "#e0f0ff",
+    clockBorder: "2px solid #4da6ff",
+    injuryTimeColor: "#4da6ff",
+    teamNameColor: "#e0f0ff",
+    penaltyBg: "rgba(0,40,80,0.9)",
+    penaltyColor: "#e0f0ff",
+    penaltyBorder: "2px solid #4da6ff",
+    timeoutColor: "#4da6ff",
+    idleTextColor: "#e0f0ff",
+  },
+};

@@ -362,3 +362,15 @@ input.longerInput {
   border-color: #3498ff;
   box-shadow: 0 0 0 2px rgba(52, 152, 255, 0.2);
 }
+
+.theme-trigger-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+}
+
+.theme-trigger-label {
+  font-weight: 600;
+  font-size: 14px;
+}

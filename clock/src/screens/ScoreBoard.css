@@ -29,29 +29,28 @@
 }
 
 .team-timeout {
-  color: red;
+  color: var(--theme-timeout-color, red);
   line-height: 0.8rem;
 }
 
 .team span.score {
   position: absolute;
-  background-color: black;
-  font-family: "Anton", sans-serif;
-  font-size: 2.5rem;
-  color: white;
-  top: 57%;
-  height: 34%;
-  width: 25%;
-  /*line-height:60px;*/
+  background-color: var(--theme-score-bg, black);
+  font-family: var(--theme-score-font-family, "Anton", sans-serif);
+  font-size: var(--theme-score-font-size, 2.5rem);
+  color: var(--theme-score-color, white);
+  top: var(--theme-score-top, 57%);
+  height: var(--theme-score-height, 34%);
+  width: var(--theme-score-width, 25%);
   text-align: center;
-  border: 1px solid white;
+  border: var(--theme-score-border, 1px solid white);
 }
 
 .team .img-wrapper {
-  width: 25%;
+  width: var(--theme-logo-width, 25%);
   position: absolute;
-  top: 10%;
-  height: 43%;
+  top: var(--theme-logo-top, 10%);
+  height: var(--theme-logo-height, 43%);
 }
 
 .team img {
@@ -66,19 +65,19 @@
 
 .clock {
   position: absolute;
-  background-color: black;
-  font-family: "Anton", sans-serif;
-  color: white;
+  background-color: var(--theme-clock-bg, black);
+  font-family: var(--theme-clock-font-family, "Anton", sans-serif);
+  color: var(--theme-clock-color, white);
   line-height: 140%;
   text-align: center;
-  border: 1px solid white;
+  border: var(--theme-clock-border, 1px solid white);
 }
 
 .matchclock {
-  top: 45.5%;
-  left: 33.5%;
-  height: 23%;
-  width: 33%;
+  top: var(--theme-clock-top, 45.5%);
+  left: var(--theme-clock-left, 33.5%);
+  height: var(--theme-clock-height, 23%);
+  width: var(--theme-clock-width, 33%);
 }
 
 .scoreboard-insidebig .timeoutclock {
@@ -105,10 +104,10 @@ img.ad {
 .scoreboard .injury-time span {
   top: 18%;
   left: 45%;
-  font-size: 2rem;
+  font-size: var(--theme-injury-font-size, 2rem);
   position: absolute;
-  color: white;
-  font-family: "Anton", sans-serif;
+  color: var(--theme-injury-color, white);
+  font-family: var(--theme-score-font-family, "Anton", sans-serif);
 }
 
 .scoreboard .penalty {
@@ -162,8 +161,8 @@ img.ad {
   width: 26%;
   font-size: 0.5rem;
   position: absolute;
-  color: white;
-  font-family: "Anton", sans-serif;
+  color: var(--theme-team-name-color, white);
+  font-family: var(--theme-team-name-font-family, "Anton", sans-serif);
   text-align: center;
   white-space: nowrap;
   overflow: hidden;
@@ -184,12 +183,12 @@ img.ad {
   font-size: 0.9rem;
 
   /*position:absolute;*/
-  background-color: black;
-  font-family: "Anton", sans-serif;
-  color: white;
+  background-color: var(--theme-penalty-bg, black);
+  font-family: var(--theme-score-font-family, "Anton", sans-serif);
+  color: var(--theme-penalty-color, white);
   line-height: 140%;
   text-align: center;
-  border: 1px solid white;
+  border: var(--theme-penalty-border, 1px solid white);
 }
 
 .scoreboard-insidebig .penalties {
