@@ -1,3 +1,35 @@
+/** Parsed representation of a `-webkit-text-stroke` CSS value */
+export interface StrokeParts {
+  width: number;
+  color: string;
+}
+
+/** Parse a CSS `-webkit-text-stroke` value (e.g. "2px red") into width + colour */
+export function parseStroke(value: string): StrokeParts {
+  const trimmed = value.trim().toLowerCase();
+  if (!trimmed || trimmed === "none") return { width: 0, color: "#000000" };
+
+  // Match "<number>px <color>" — the colour part is everything after the px token
+  const match = trimmed.match(/^([\d.]+)\s*px\s+(.+)$/);
+  if (match) {
+    const width = parseFloat(match[1] ?? "0");
+    const color = match[2] ?? "#000000";
+    return { width: Number.isNaN(width) ? 0 : width, color };
+  }
+
+  // Fallback: try to read just a number (bare width, default colour)
+  const num = parseFloat(trimmed);
+  if (!Number.isNaN(num)) return { width: num, color: "#000000" };
+
+  return { width: 0, color: "#000000" };
+}
+
+/** Compose width + colour back into a `-webkit-text-stroke` CSS value */
+export function composeStroke(width: number, color: string): string {
+  if (width <= 0) return "none";
+  return `${width}px ${color}`;
+}
+
 /** Best-effort conversion of CSS colour strings to hex for the colour picker */
 export function toHex(color: string): string {
   if (/^#[0-9a-f]{6}$/i.test(color)) return color;

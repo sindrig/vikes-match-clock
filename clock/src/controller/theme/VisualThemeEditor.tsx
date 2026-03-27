@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import type { ThemeConfig } from "../../types";
 import { storageHelpers } from "../../firebase";
-import { toHex } from "./themeUtils";
+import { toHex, parseStroke, composeStroke } from "./themeUtils";
 
 import "./VisualThemeEditor.css";
 
@@ -37,6 +37,8 @@ interface ElementDef {
     text: keyof ThemeConfig;
     border?: keyof ThemeConfig;
   };
+  /** Optional text-stroke field (e.g. scoreBoxStroke, clockStroke) */
+  strokeField?: keyof ThemeConfig;
   /** Display text inside the element */
   displayText: string;
 }
@@ -86,6 +88,7 @@ const ELEMENTS: ElementDef[] = [
       text: "clockColor",
       border: "clockBorder",
     },
+    strokeField: "clockStroke",
     displayText: "45:00",
   },
   {
@@ -104,6 +107,7 @@ const ELEMENTS: ElementDef[] = [
       text: "scoreBoxColor",
       border: "scoreBoxBorder",
     },
+    strokeField: "scoreBoxStroke",
     displayText: "2",
   },
   {
@@ -122,6 +126,7 @@ const ELEMENTS: ElementDef[] = [
       text: "scoreBoxColor",
       border: "scoreBoxBorder",
     },
+    strokeField: "scoreBoxStroke",
     displayText: "1",
   },
   {
@@ -139,6 +144,7 @@ const ELEMENTS: ElementDef[] = [
       bg: "injuryTimeColor",
       text: "injuryTimeColor",
     },
+    strokeField: "injuryTimeStroke",
     displayText: "+3",
   },
   {
@@ -163,6 +169,7 @@ interface ColorPopoverProps {
   x: number;
   y: number;
   fields: { label: string; field: keyof ThemeConfig; value: string }[];
+  stroke?: { field: keyof ThemeConfig; value: string };
   onFieldChange: (field: keyof ThemeConfig, value: string) => void;
   onClose: () => void;
 }
@@ -174,6 +181,7 @@ const ColorPopover = ({
   x,
   y,
   fields,
+  stroke,
   onFieldChange,
   onClose,
 }: ColorPopoverProps) => {
@@ -188,6 +196,8 @@ const ColorPopover = ({
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [onClose]);
+
+  const strokeParts = stroke ? parseStroke(stroke.value) : null;
 
   return (
     <div ref={ref} className="visual-color-popover" style={{ left: x, top: y }}>
@@ -234,6 +244,37 @@ const ColorPopover = ({
           </div>
         );
       })}
+      {stroke && strokeParts && (
+        <div className="visual-color-popover-row visual-stroke-row">
+          <span className="visual-color-popover-label">Útlína</span>
+          <input
+            type="range"
+            className="visual-stroke-slider"
+            min={0}
+            max={5}
+            step={0.5}
+            value={strokeParts.width}
+            onChange={(e) => {
+              const w = parseFloat(e.target.value);
+              onFieldChange(stroke.field, composeStroke(w, strokeParts.color));
+            }}
+          />
+          <span className="visual-stroke-value">{strokeParts.width}px</span>
+          {strokeParts.width > 0 && (
+            <input
+              type="color"
+              className="visual-color-swatch"
+              value={toHex(strokeParts.color)}
+              onChange={(e) =>
+                onFieldChange(
+                  stroke.field,
+                  composeStroke(strokeParts.width, e.target.value),
+                )
+              }
+            />
+          )}
+        </div>
+      )}
     </div>
   );
 };
@@ -249,6 +290,7 @@ interface DraggableElementProps {
     fields: ColorPopoverProps["fields"],
     clickX: number,
     clickY: number,
+    stroke?: ColorPopoverProps["stroke"],
   ) => void;
   canvasRef: React.RefObject<HTMLDivElement | null>;
 }
@@ -364,6 +406,10 @@ const DraggableElement = ({
           });
         }
 
+        const strokeInfo = def.strokeField
+          ? { field: def.strokeField, value: theme[def.strokeField] }
+          : undefined;
+
         const canvas = canvasRef.current;
         if (canvas) {
           const canvasRect = canvas.getBoundingClientRect();
@@ -372,6 +418,7 @@ const DraggableElement = ({
             popoverFields,
             e.clientX - canvasRect.left,
             e.clientY - canvasRect.top,
+            strokeInfo,
           );
         }
       } else if (dragOverride) {
@@ -431,6 +478,7 @@ const VisualThemeEditor = ({
   const [popover, setPopover] = useState<{
     elementId: string;
     fields: ColorPopoverProps["fields"];
+    stroke?: ColorPopoverProps["stroke"];
     x: number;
     y: number;
   } | null>(null);
@@ -441,8 +489,9 @@ const VisualThemeEditor = ({
       fields: ColorPopoverProps["fields"],
       x: number,
       y: number,
+      stroke?: ColorPopoverProps["stroke"],
     ) => {
-      setPopover({ elementId, fields, x, y });
+      setPopover({ elementId, fields, x, y, stroke });
     },
     [],
   );
@@ -552,6 +601,7 @@ const VisualThemeEditor = ({
               x={popover.x}
               y={popover.y}
               fields={popover.fields}
+              stroke={popover.stroke}
               onFieldChange={onFieldChange}
               onClose={closePopover}
             />

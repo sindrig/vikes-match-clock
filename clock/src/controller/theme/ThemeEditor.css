@@ -202,3 +202,27 @@
   border-color: #4096ff;
   color: #4096ff;
 }
+
+/* Stroke field (slider + color picker) */
+.theme-stroke-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+
+.theme-stroke-slider {
+  flex: 1;
+  min-width: 60px;
+  height: 4px;
+  cursor: pointer;
+  accent-color: #4096ff;
+}
+
+.theme-stroke-value {
+  font-size: 11px;
+  color: #555;
+  min-width: 30px;
+  text-align: center;
+  flex-shrink: 0;
+}

@@ -23,7 +23,7 @@ import {
 } from "../../constants";
 import { resolveTheme } from "../../hooks/useThemeCssVars";
 import type { ThemeConfig, CustomPreset } from "../../types";
-import { toHex } from "./themeUtils";
+import { toHex, parseStroke, composeStroke } from "./themeUtils";
 import VisualThemeEditor from "./VisualThemeEditor";
 
 import "./ThemeEditor.css";
@@ -183,6 +183,46 @@ const FontField = ({ label, value, onChange }: FontFieldProps) => (
   </div>
 );
 
+interface StrokeFieldProps {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}
+
+const StrokeField = ({ label, value, onChange }: StrokeFieldProps) => {
+  const parts = parseStroke(value);
+  return (
+    <div className="theme-field theme-stroke-field">
+      <label className="theme-field-label">{label}</label>
+      <div className="theme-stroke-controls">
+        <input
+          type="range"
+          className="theme-stroke-slider"
+          min={0}
+          max={5}
+          step={0.5}
+          value={parts.width}
+          onChange={(e) => {
+            const w = parseFloat(e.target.value);
+            onChange(composeStroke(w, parts.color));
+          }}
+        />
+        <span className="theme-stroke-value">{parts.width}px</span>
+        {parts.width > 0 && (
+          <input
+            type="color"
+            className="theme-color-picker"
+            value={toHex(parts.color)}
+            onChange={(e) =>
+              onChange(composeStroke(parts.width, e.target.value))
+            }
+          />
+        )}
+      </div>
+    </div>
+  );
+};
+
 // ---- Preset list item types ----
 
 interface PresetEntry {
@@ -285,10 +325,9 @@ const ThemeEditorPanels = ({
         value={effective.scoreBoxFontFamily}
         onChange={(v) => onFieldChange("scoreBoxFontFamily", v)}
       />
-      <TextField
+      <StrokeField
         label="Leturútlína"
         value={effective.scoreBoxStroke}
-        defaultValue={DEFAULT_THEME.scoreBoxStroke}
         onChange={(v) => onFieldChange("scoreBoxStroke", v)}
       />
       <Divider className="theme-divider" />
@@ -336,10 +375,9 @@ const ThemeEditorPanels = ({
         value={effective.clockFontFamily}
         onChange={(v) => onFieldChange("clockFontFamily", v)}
       />
-      <TextField
+      <StrokeField
         label="Leturútlína"
         value={effective.clockStroke}
-        defaultValue={DEFAULT_THEME.clockStroke}
         onChange={(v) => onFieldChange("clockStroke", v)}
       />
       <TextField
@@ -415,10 +453,9 @@ const ThemeEditorPanels = ({
         defaultValue={DEFAULT_THEME.injuryTimeFontSize}
         onChange={(v) => onFieldChange("injuryTimeFontSize", v)}
       />
-      <TextField
+      <StrokeField
         label="Leturútlína"
         value={effective.injuryTimeStroke}
-        defaultValue={DEFAULT_THEME.injuryTimeStroke}
         onChange={(v) => onFieldChange("injuryTimeStroke", v)}
       />
       <Divider className="theme-divider" />
