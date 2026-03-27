@@ -66,6 +66,17 @@ const themeToCssVars = (theme: ThemeConfig): Record<string, string> => ({
   "--theme-idle-logo-left": theme.idleLogoLeft,
   "--theme-idle-logo-width": theme.idleLogoWidth,
   "--theme-idle-text-top": theme.idleTextTop,
+
+  // Ad image
+  "--theme-ad-top": theme.adTop,
+  "--theme-ad-left": theme.adLeft,
+  "--theme-ad-width": theme.adWidth,
+  "--theme-ad-height": theme.adHeight,
+
+  // Background image
+  ...(theme.backgroundImage
+    ? { "--theme-background-image": `url(${theme.backgroundImage})` }
+    : {}),
 });
 
 /**

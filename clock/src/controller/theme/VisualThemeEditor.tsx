@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import type { ThemeConfig } from "../../types";
+import { storageHelpers } from "../../firebase";
 import { toHex } from "./themeUtils";
 
 import "./VisualThemeEditor.css";
@@ -8,6 +9,7 @@ interface VisualThemeEditorProps {
   effective: ThemeConfig;
   onFieldChange: (field: keyof ThemeConfig, value: string) => void;
   onFieldsChange: (changes: Partial<ThemeConfig>) => void;
+  listenPrefix: string;
 }
 
 // ---- Element definitions ----
@@ -138,6 +140,20 @@ const ELEMENTS: ElementDef[] = [
       text: "injuryTimeColor",
     },
     displayText: "+3",
+  },
+  {
+    id: "ad",
+    label: "Auglýsing",
+    left: (t) => t.adLeft,
+    top: (t) => t.adTop,
+    width: (t) => t.adWidth,
+    height: (t) => t.adHeight,
+    bg: () => "rgba(255,255,255,0.08)",
+    color: () => "#aaa",
+    border: () => "1px dashed rgba(255,255,255,0.3)",
+    dragFields: { top: "adTop", left: "adLeft" },
+    colorFields: { bg: "adTop", text: "adTop" },
+    displayText: "AD",
   },
 ];
 
@@ -407,8 +423,11 @@ const VisualThemeEditor = ({
   effective,
   onFieldChange,
   onFieldsChange,
+  listenPrefix,
 }: VisualThemeEditorProps) => {
   const canvasRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [popover, setPopover] = useState<{
     elementId: string;
     fields: ColorPopoverProps["fields"];
@@ -430,13 +449,94 @@ const VisualThemeEditor = ({
 
   const closePopover = useCallback(() => setPopover(null), []);
 
+  // Background click → open file picker
+  const handleCanvasClick = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      // Only trigger on direct canvas clicks (not on elements or popover)
+      if (e.target === e.currentTarget && listenPrefix) {
+        fileInputRef.current?.click();
+      }
+    },
+    [listenPrefix],
+  );
+
+  // Handle file selection → upload to Firebase Storage
+  const handleFileUpload = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file || !listenPrefix) return;
+
+      // Reset input so re-selecting the same file triggers onChange
+      e.target.value = "";
+
+      setUploading(true);
+      const ext = file.name.split(".").pop() ?? "png";
+      const filename = `bg-${Date.now()}.${ext}`;
+      const path = `${listenPrefix}/backgrounds/${filename}`;
+      storageHelpers
+        .uploadBytes(path, file, {
+          cacheControl: "public, max-age=604800",
+          contentType: file.type,
+        })
+        .then(() => storageHelpers.getDownloadURL(path))
+        .then((url) => {
+          onFieldChange("backgroundImage", url);
+        })
+        .catch((err) => {
+          console.error("Background upload failed:", err);
+        })
+        .finally(() => {
+          setUploading(false);
+        });
+    },
+    [listenPrefix, onFieldChange],
+  );
+
+  // Clear background image
+  const handleClearBackground = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      onFieldChange("backgroundImage", "");
+    },
+    [onFieldChange],
+  );
+
+  const hasBackground = Boolean(effective.backgroundImage);
+
   return (
     <div className="visual-theme-editor">
       <p className="visual-instructions">
-        Dragðu hluti til að færa. Smelltu á hlut til að breyta litum.
+        Dragðu hluti til að færa. Smelltu á hlut til að breyta litum. Smelltu á
+        bakgrunn til að hlaða upp mynd.
       </p>
       <div className="visual-canvas-wrapper">
-        <div ref={canvasRef} className="visual-canvas">
+        <div
+          ref={canvasRef}
+          className="visual-canvas"
+          onClick={handleCanvasClick}
+          style={
+            hasBackground
+              ? {
+                  backgroundImage: `url(${effective.backgroundImage})`,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                }
+              : undefined
+          }
+        >
+          {uploading && (
+            <div className="visual-upload-indicator">Hleð upp…</div>
+          )}
+          {hasBackground && (
+            <button
+              className="visual-clear-bg-btn"
+              onClick={handleClearBackground}
+              title="Fjarlægja bakgrunnsmynd"
+              type="button"
+            >
+              ✕
+            </button>
+          )}
           {ELEMENTS.map((def) => (
             <DraggableElement
               key={def.id}
@@ -458,6 +558,13 @@ const VisualThemeEditor = ({
           )}
         </div>
       </div>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: "none" }}
+        onChange={handleFileUpload}
+      />
     </div>
   );
 };

@@ -250,6 +250,8 @@ All properties are CSS value strings. Grouped by display area:
 | Red cards | `redCardColor` | `--theme-red-card-color` |
 | Penalties | `penaltyBg`, `penaltyColor`, `penaltyBorder` | `--theme-penalty-*` |
 | Timeouts | `timeoutColor` | `--theme-timeout-color` |
+| Ad image | `adTop`, `adLeft`, `adWidth`, `adHeight` | `--theme-ad-*` |
+| Background | `backgroundImage` | `--theme-background-image` (conditional) |
 | Idle screen | `idleTextColor`, `idleTextFontSize`, `idleLogoTop`, `idleLogoLeft`, `idleLogoWidth`, `idleTextTop` | `--theme-idle-*` |
 
 #### Preset Themes
@@ -289,6 +291,8 @@ All properties are CSS value strings. Grouped by display area:
 | `App.tsx` | Applies CSS vars to `.App` container (passes `customPresets` to `useThemeCssVars`) |
 | `controller/theme/ThemeEditor.tsx` | `ThemeEditorModal` — rsuite Modal for preset management and theme editing |
 | `controller/theme/ThemeEditor.css` | Theme editor modal styling |
+| `controller/theme/VisualThemeEditor.tsx` | Visual (drag-and-drop) theme editor with background upload |
+| `controller/theme/VisualThemeEditor.css` | Visual editor styles (upload indicator, clear button) |
 | `screens/ScoreBoard.css` | Uses `var(--theme-*)` for score/clock/penalty display |
 | `screens/Idle.css` | Uses `var(--theme-*)` for idle screen display |
 | `match/RedCard.css` | Uses `var(--theme-red-card-color)` |
@@ -301,6 +305,33 @@ All properties are CSS value strings. Grouped by display area:
 3. Add CSS variable mapping in `themeToCssVars()` in `useThemeCssVars.ts`
 4. Use `var(--theme-your-var, fallback)` in the relevant CSS file
 5. Optionally add it to preset themes and the `ThemeEditor` UI
+
+#### Background Image
+
+Each theme can have a custom `backgroundImage` URL that overrides the default background. This is a **per-theme** property stored in `ThemeConfig`, so different presets can have different backgrounds.
+
+**Upload flow** (Visual tab in ThemeEditor):
+1. User clicks the canvas background area in `VisualThemeEditor`
+2. A hidden `<input type="file">` opens for image selection
+3. Image uploads to Firebase Storage at `${listenPrefix}/backgrounds/bg-${Date.now()}.${ext}`
+4. On success, the download URL is saved as `theme.backgroundImage` via `onChange`
+5. A "✕" button appears to clear the background
+
+**Display** (`App.tsx`):
+- When `effectiveTheme.backgroundImage` is set and the display is not blacked out, it overrides `getBackground()` with `backgroundImage: url(...)`, `backgroundSize: cover`, `backgroundPosition: center`
+- The `--theme-background-image` CSS var is only emitted when the URL is non-empty
+
+**Advanced tab** (`ThemeEditor.tsx`):
+- "Bakgrunnsmynd" panel with a URL text input and "Fjarlægja mynd" clear button
+
+#### Ad Image Positioning
+
+The ad image (`img.ad` in `ScoreBoard.css`) uses theme CSS vars for all positioning:
+- `adTop` (default `"73%"`), `adLeft` (default `"33.5%"`), `adWidth` (default `"33%"`), `adHeight` (default `"25%"`)
+- In the Visual tab, the "AD" element is draggable like other elements (score boxes, clock, etc.)
+- The Advanced tab has an "Auglýsing" panel with position/size percentage inputs
+
+**Note**: The original CSS used `bottom: 2%` with `height: 25%`, which was converted to the equivalent `top: 73%` for consistency with the theme system's top-based positioning.
 
 #### Viewport Variants Note
 

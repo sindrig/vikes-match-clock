@@ -180,6 +180,15 @@ export interface ThemeConfig {
   idleLogoLeft: string;
   idleLogoWidth: string;
   idleTextTop: string;
+
+  // Ad image position (scoreboard)
+  adTop: string;
+  adLeft: string;
+  adWidth: string;
+  adHeight: string;
+
+  // Background image (URL from Firebase Storage, or empty for none)
+  backgroundImage: string;
 }
 
 // Custom theme preset (user-created or copy of built-in)

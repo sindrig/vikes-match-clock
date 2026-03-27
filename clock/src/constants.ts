@@ -182,6 +182,15 @@ export const DEFAULT_THEME: ThemeConfig = {
   idleLogoLeft: "15%",
   idleLogoWidth: "30%",
   idleTextTop: "65%",
+
+  // Ad image position (scoreboard)
+  adTop: "73%",
+  adLeft: "33.5%",
+  adWidth: "33%",
+  adHeight: "25%",
+
+  // Background image (URL from Firebase Storage, or empty for none)
+  backgroundImage: "",
 };
 
 export const BUILT_IN_PRESET_NAMES = new Set([

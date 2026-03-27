@@ -95,10 +95,10 @@ img.ad {
 }
 
 .scoreboard img.ad {
-  left: calc(33.5% + 1px);
-  height: 25%;
-  width: 33%;
-  bottom: 2%;
+  top: var(--theme-ad-top, 73%);
+  left: var(--theme-ad-left, 33.5%);
+  height: var(--theme-ad-height, 25%);
+  width: var(--theme-ad-width, 33%);
   position: absolute;
   display: block;
 }

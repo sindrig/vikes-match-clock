@@ -15,6 +15,7 @@ import TrashIcon from "@rsuite/icons/Trash";
 import ReloadIcon from "@rsuite/icons/Reload";
 import PlusIcon from "@rsuite/icons/Plus";
 import { useView } from "../../contexts/FirebaseStateContext";
+import { useRemoteSettings } from "../../contexts/LocalStateContext";
 import {
   DEFAULT_THEME,
   THEME_PRESETS,
@@ -520,6 +521,56 @@ const ThemeEditorPanels = ({
         onChange={(v) => onFieldChange("idleTextTop", v)}
       />
     </Panel>
+
+    <Panel header="Auglýsing" collapsible bordered>
+      <PercentField
+        label="Ofan"
+        value={effective.adTop}
+        defaultValue={DEFAULT_THEME.adTop}
+        onChange={(v) => onFieldChange("adTop", v)}
+      />
+      <PercentField
+        label="Vinstri"
+        value={effective.adLeft}
+        defaultValue={DEFAULT_THEME.adLeft}
+        onChange={(v) => onFieldChange("adLeft", v)}
+      />
+      <PercentField
+        label="Breidd"
+        value={effective.adWidth}
+        defaultValue={DEFAULT_THEME.adWidth}
+        onChange={(v) => onFieldChange("adWidth", v)}
+      />
+      <PercentField
+        label="Hæð"
+        value={effective.adHeight}
+        defaultValue={DEFAULT_THEME.adHeight}
+        onChange={(v) => onFieldChange("adHeight", v)}
+      />
+    </Panel>
+
+    <Panel header="Bakgrunnsmynd" collapsible bordered>
+      <div className="theme-field">
+        <label className="theme-field-label">Slóð</label>
+        <Input
+          size="xs"
+          value={effective.backgroundImage}
+          onChange={(val) => onFieldChange("backgroundImage", val)}
+          placeholder="Engin mynd"
+        />
+      </div>
+      {effective.backgroundImage && (
+        <Button
+          size="xs"
+          color="red"
+          appearance="ghost"
+          onClick={() => onFieldChange("backgroundImage", "")}
+          style={{ marginTop: 4 }}
+        >
+          Fjarlægja mynd
+        </Button>
+      )}
+    </Panel>
   </div>
 );
 
@@ -538,6 +589,7 @@ const ThemeEditorModal = ({ open, onClose }: ThemeEditorModalProps) => {
     saveCustomPreset,
     deleteCustomPreset,
   } = useView();
+  const { listenPrefix } = useRemoteSettings();
 
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
@@ -836,6 +888,7 @@ const ThemeEditorModal = ({ open, onClose }: ThemeEditorModalProps) => {
             effective={effective}
             onFieldChange={handleFieldChange}
             onFieldsChange={handleFieldsChange}
+            listenPrefix={listenPrefix}
           />
         ) : (
           <ThemeEditorPanels
