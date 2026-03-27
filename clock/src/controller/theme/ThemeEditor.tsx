@@ -9,6 +9,7 @@ import {
   Modal,
   IconButton,
   Badge,
+  Nav,
 } from "rsuite";
 import TrashIcon from "@rsuite/icons/Trash";
 import ReloadIcon from "@rsuite/icons/Reload";
@@ -21,6 +22,8 @@ import {
 } from "../../constants";
 import { resolveTheme } from "../../hooks/useThemeCssVars";
 import type { ThemeConfig, CustomPreset } from "../../types";
+import { toHex } from "./themeUtils";
+import VisualThemeEditor from "./VisualThemeEditor";
 
 import "./ThemeEditor.css";
 
@@ -110,41 +113,6 @@ const PercentField = ({
     </InputGroup>
   </div>
 );
-
-/** Best-effort conversion of CSS colour strings to hex for the colour picker */
-function toHex(color: string): string {
-  if (/^#[0-9a-f]{6}$/i.test(color)) return color;
-  if (/^#[0-9a-f]{3}$/i.test(color)) {
-    const r = color[1];
-    const g = color[2];
-    const b = color[3];
-    return `#${r}${r}${g}${g}${b}${b}`;
-  }
-  const namedMap: Record<string, string> = {
-    black: "#000000",
-    white: "#ffffff",
-    red: "#ff0000",
-    transparent: "#000000",
-  };
-  const lower = color.toLowerCase().trim();
-  const named = namedMap[lower];
-  if (named) return named;
-
-  const rgbMatch = lower.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
-  if (rgbMatch) {
-    const r = parseInt(rgbMatch[1] ?? "0", 10)
-      .toString(16)
-      .padStart(2, "0");
-    const g = parseInt(rgbMatch[2] ?? "0", 10)
-      .toString(16)
-      .padStart(2, "0");
-    const b = parseInt(rgbMatch[3] ?? "0", 10)
-      .toString(16)
-      .padStart(2, "0");
-    return `#${r}${g}${b}`;
-  }
-  return "#000000";
-}
 
 const FONT_OPTIONS = [
   '"Anton", sans-serif',
@@ -509,6 +477,7 @@ const ThemeEditorModal = ({ open, onClose }: ThemeEditorModalProps) => {
 
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  const [editorTab, setEditorTab] = useState<"visual" | "advanced">("visual");
 
   const activePresetId = themePreset ?? "Default";
   const presetList = useMemo(
@@ -773,10 +742,27 @@ const ThemeEditorModal = ({ open, onClose }: ThemeEditorModalProps) => {
 
         <Divider />
 
-        <ThemeEditorPanels
-          effective={effective}
-          onFieldChange={handleFieldChange}
-        />
+        <Nav
+          appearance="subtle"
+          activeKey={editorTab}
+          onSelect={(key) => setEditorTab(key as "visual" | "advanced")}
+          className="theme-editor-tabs"
+        >
+          <Nav.Item eventKey="visual">Sjónrænt</Nav.Item>
+          <Nav.Item eventKey="advanced">Ítarlegt</Nav.Item>
+        </Nav>
+
+        {editorTab === "visual" ? (
+          <VisualThemeEditor
+            effective={effective}
+            onFieldChange={handleFieldChange}
+          />
+        ) : (
+          <ThemeEditorPanels
+            effective={effective}
+            onFieldChange={handleFieldChange}
+          />
+        )}
       </Modal.Body>
       <Modal.Footer>
         <Button onClick={onClose} appearance="primary" size="sm">

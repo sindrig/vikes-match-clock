@@ -1,0 +1,121 @@
+.visual-theme-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.visual-instructions {
+  font-size: 12px;
+  color: #888;
+  margin: 0;
+}
+
+/* 16:9 canvas wrapper */
+.visual-canvas-wrapper {
+  position: relative;
+  width: 100%;
+  padding-bottom: 56.25%; /* 16:9 ratio */
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.visual-canvas {
+  position: absolute;
+  inset: 0;
+  background: #1a1a2e;
+  background-image: radial-gradient(
+    ellipse at 50% 80%,
+    rgba(34, 87, 34, 0.3) 0%,
+    transparent 70%
+  );
+  border: 1px solid #333;
+  border-radius: 6px;
+}
+
+/* Draggable elements */
+.visual-element {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  border-radius: 3px;
+  transition: box-shadow 0.15s;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.visual-element:hover {
+  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.6);
+  z-index: 10;
+}
+
+.visual-element:active {
+  cursor: grabbing;
+}
+
+.visual-element-text {
+  font-family: "Anton", sans-serif;
+  font-size: clamp(10px, 2.5vw, 22px);
+  line-height: 1;
+  pointer-events: none;
+}
+
+.visual-element-label {
+  font-size: 8px;
+  opacity: 0.6;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  pointer-events: none;
+  margin-top: 2px;
+}
+
+/* Color picker popover */
+.visual-color-popover {
+  position: absolute;
+  z-index: 100;
+  background: #fff;
+  border: 1px solid #d4d4d8;
+  border-radius: 6px;
+  padding: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 140px;
+}
+
+.visual-color-popover-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.visual-color-popover-label {
+  font-size: 11px;
+  color: #555;
+  min-width: 70px;
+}
+
+.visual-color-swatch {
+  width: 28px;
+  height: 28px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 1px;
+  cursor: pointer;
+  background: none;
+  flex-shrink: 0;
+}
+
+.visual-color-swatch::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.visual-color-swatch::-webkit-color-swatch {
+  border: none;
+  border-radius: 3px;
+}
