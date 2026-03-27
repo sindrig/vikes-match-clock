@@ -43,7 +43,6 @@
   touch-action: none;
   user-select: none;
   border-radius: 3px;
-  transition: box-shadow 0.15s;
   box-sizing: border-box;
   overflow: hidden;
 }
@@ -53,8 +52,10 @@
   z-index: 10;
 }
 
-.visual-element:active {
+.visual-element:active,
+.visual-element.dragging {
   cursor: grabbing;
+  z-index: 20;
 }
 
 .visual-element-text {

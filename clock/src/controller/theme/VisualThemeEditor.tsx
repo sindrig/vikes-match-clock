@@ -210,8 +210,14 @@ const DraggableElement = ({
 }: DraggableElementProps) => {
   const dragging = useRef(false);
   const startPos = useRef({ x: 0, y: 0, top: 0, left: 0 });
+  // Local drag overrides — kept in state so the element re-renders smoothly
+  // without waiting for a Firebase round-trip.
+  const [dragOverride, setDragOverride] = useState<{
+    top: string;
+    left: string;
+  } | null>(null);
 
-  const left = typeof def.left === "string" ? def.left : def.left(theme);
+  const themeLeft = typeof def.left === "string" ? def.left : def.left(theme);
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
@@ -222,17 +228,21 @@ const DraggableElement = ({
 
       dragging.current = true;
       const rect = canvas.getBoundingClientRect();
+      const currentTop = def.top(theme);
+      const currentLeft =
+        typeof def.left === "string" ? def.left : def.left(theme);
       startPos.current = {
         x: e.clientX,
         y: e.clientY,
-        top: (parseFloat(def.top(theme)) / 100) * rect.height,
-        left: (parseFloat(left) / 100) * rect.width,
+        top: (parseFloat(currentTop) / 100) * rect.height,
+        left: (parseFloat(currentLeft) / 100) * rect.width,
       };
+      setDragOverride({ top: currentTop, left: currentLeft });
 
       const target = e.currentTarget as HTMLElement;
       target.setPointerCapture(e.pointerId);
     },
-    [canvasRef, def, theme, left],
+    [canvasRef, def, theme],
   );
 
   const handlePointerMove = useCallback(
@@ -250,18 +260,22 @@ const DraggableElement = ({
         0,
         Math.min(100, (newTopPx / rect.height) * 100),
       );
-      onFieldChange(def.dragFields.top, `${newTopPct.toFixed(1)}%`);
+      const newTop = `${newTopPct.toFixed(1)}%`;
 
+      let newLeft = dragOverride?.left ?? themeLeft;
       if (def.dragFields.left) {
         const newLeftPx = startPos.current.left + dx;
         const newLeftPct = Math.max(
           0,
           Math.min(100, (newLeftPx / rect.width) * 100),
         );
-        onFieldChange(def.dragFields.left, `${newLeftPct.toFixed(1)}%`);
+        newLeft = `${newLeftPct.toFixed(1)}%`;
       }
+
+      // Only update local state — no Firebase write during drag
+      setDragOverride({ top: newTop, left: newLeft });
     },
-    [canvasRef, def.dragFields, onFieldChange],
+    [canvasRef, def.dragFields.left, dragOverride?.left, themeLeft],
   );
 
   const handlePointerUp = useCallback(
@@ -269,10 +283,13 @@ const DraggableElement = ({
       if (!dragging.current) return;
       dragging.current = false;
 
-      // If hardly moved, treat as a click → open color picker
       const dx = Math.abs(e.clientX - startPos.current.x);
       const dy = Math.abs(e.clientY - startPos.current.y);
+
       if (dx < 4 && dy < 4) {
+        // Hardly moved → treat as a click → open color picker
+        setDragOverride(null);
+
         const popoverFields: ColorPopoverProps["fields"] = [];
         const { colorFields } = def;
         popoverFields.push({
@@ -295,7 +312,6 @@ const DraggableElement = ({
           });
         }
 
-        // Position relative to the canvas parent (the modal body)
         const canvas = canvasRef.current;
         if (canvas) {
           const canvasRect = canvas.getBoundingClientRect();
@@ -306,18 +322,29 @@ const DraggableElement = ({
             e.clientY - canvasRect.top,
           );
         }
+      } else if (dragOverride) {
+        // Actually dragged → commit final position to Firebase
+        onFieldChange(def.dragFields.top, dragOverride.top);
+        if (def.dragFields.left) {
+          onFieldChange(def.dragFields.left, dragOverride.left);
+        }
+        setDragOverride(null);
       }
     },
-    [def, theme, canvasRef, onColorClick],
+    [def, theme, canvasRef, onColorClick, onFieldChange, dragOverride],
   );
+
+  // Use local drag position when dragging, otherwise use theme values
+  const displayTop = dragOverride?.top ?? def.top(theme);
+  const displayLeft = dragOverride?.left ?? themeLeft;
 
   return (
     <div
-      className="visual-element"
+      className={`visual-element${dragOverride ? " dragging" : ""}`}
       data-element-id={def.id}
       style={{
-        left,
-        top: def.top(theme),
+        left: displayLeft,
+        top: displayTop,
         width: def.width(theme),
         height: def.height(theme),
         backgroundColor: def.bg(theme),
