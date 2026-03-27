@@ -124,6 +124,7 @@ export interface ThemeConfig {
   scoreBoxBorder: string;
   scoreBoxFontSize: string;
   scoreBoxFontFamily: string;
+  scoreBoxStroke: string;
 
   // Clock box
   clockBg: string;
@@ -132,6 +133,7 @@ export interface ThemeConfig {
   clockFontSizeMin: string;
   clockFontSizeMax: string;
   clockFontFamily: string;
+  clockStroke: string;
 
   // Clock position (percentages)
   clockTop: string;
@@ -154,6 +156,7 @@ export interface ThemeConfig {
   injuryTimeFontSize: string;
   injuryTimeTop: string;
   injuryTimeLeft: string;
+  injuryTimeStroke: string;
 
   // Team name
   teamNameColor: string;

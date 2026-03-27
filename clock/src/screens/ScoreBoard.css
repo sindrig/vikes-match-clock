@@ -39,6 +39,7 @@
   font-family: var(--theme-score-font-family, "Anton", sans-serif);
   font-size: var(--theme-score-font-size, 2.5rem);
   color: var(--theme-score-color, white);
+  -webkit-text-stroke: var(--theme-score-stroke, none);
   top: var(--theme-score-top, 57%);
   height: var(--theme-score-height, 34%);
   width: var(--theme-score-width, 25%);
@@ -68,6 +69,7 @@
   background-color: var(--theme-clock-bg, black);
   font-family: var(--theme-clock-font-family, "Anton", sans-serif);
   color: var(--theme-clock-color, white);
+  -webkit-text-stroke: var(--theme-clock-stroke, none);
   line-height: 140%;
   text-align: center;
   border: var(--theme-clock-border, 1px solid white);
@@ -107,6 +109,7 @@ img.ad {
   font-size: var(--theme-injury-font-size, 2rem);
   position: absolute;
   color: var(--theme-injury-color, white);
+  -webkit-text-stroke: var(--theme-injury-stroke, none);
   font-family: var(--theme-score-font-family, "Anton", sans-serif);
 }
 

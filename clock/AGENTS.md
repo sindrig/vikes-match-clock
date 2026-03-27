@@ -242,10 +242,10 @@ All properties are CSS value strings. Grouped by display area:
 
 | Group | Properties | CSS Variables |
 |-------|-----------|---------------|
-| Score boxes | `scoreBoxBg`, `scoreBoxColor`, `scoreBoxBorder`, `scoreBoxFontSize`, `scoreBoxFontFamily`, `scoreTop`, `scoreHeight`, `scoreWidth` | `--theme-score-*` |
-| Clock | `clockBg`, `clockColor`, `clockBorder`, `clockFontSizeMin`, `clockFontSizeMax`, `clockFontFamily`, `clockTop`, `clockLeft`, `clockWidth`, `clockHeight` | `--theme-clock-*` |
+| Score boxes | `scoreBoxBg`, `scoreBoxColor`, `scoreBoxBorder`, `scoreBoxFontSize`, `scoreBoxFontFamily`, `scoreBoxStroke`, `scoreTop`, `scoreHeight`, `scoreWidth` | `--theme-score-*` |
+| Clock | `clockBg`, `clockColor`, `clockBorder`, `clockFontSizeMin`, `clockFontSizeMax`, `clockFontFamily`, `clockStroke`, `clockTop`, `clockLeft`, `clockWidth`, `clockHeight` | `--theme-clock-*` |
 | Logos | `logoTop`, `logoHeight`, `logoWidth` | `--theme-logo-*` |
-| Injury time | `injuryTimeColor`, `injuryTimeFontSize`, `injuryTimeTop`, `injuryTimeLeft` | `--theme-injury-*` |
+| Injury time | `injuryTimeColor`, `injuryTimeFontSize`, `injuryTimeStroke`, `injuryTimeTop`, `injuryTimeLeft` | `--theme-injury-*` |
 | Team names | `teamNameColor`, `teamNameFontFamily` | `--theme-team-name-*` |
 | Red cards | `redCardColor` | `--theme-red-card-color` |
 | Penalties | `penaltyBg`, `penaltyColor`, `penaltyBorder` | `--theme-penalty-*` |

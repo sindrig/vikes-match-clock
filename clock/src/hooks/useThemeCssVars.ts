@@ -14,6 +14,7 @@ const themeToCssVars = (theme: ThemeConfig): Record<string, string> => ({
   "--theme-score-border": theme.scoreBoxBorder,
   "--theme-score-font-size": theme.scoreBoxFontSize,
   "--theme-score-font-family": theme.scoreBoxFontFamily,
+  "--theme-score-stroke": theme.scoreBoxStroke,
   "--theme-score-top": theme.scoreTop,
   "--theme-score-height": theme.scoreHeight,
   "--theme-score-width": theme.scoreWidth,
@@ -25,6 +26,7 @@ const themeToCssVars = (theme: ThemeConfig): Record<string, string> => ({
   "--theme-clock-font-size-min": theme.clockFontSizeMin,
   "--theme-clock-font-size-max": theme.clockFontSizeMax,
   "--theme-clock-font-family": theme.clockFontFamily,
+  "--theme-clock-stroke": theme.clockStroke,
   "--theme-clock-top": theme.clockTop,
   "--theme-clock-left": theme.clockLeft,
   "--theme-clock-width": theme.clockWidth,
@@ -40,6 +42,7 @@ const themeToCssVars = (theme: ThemeConfig): Record<string, string> => ({
   "--theme-injury-font-size": theme.injuryTimeFontSize,
   "--theme-injury-top": theme.injuryTimeTop,
   "--theme-injury-left": theme.injuryTimeLeft,
+  "--theme-injury-stroke": theme.injuryTimeStroke,
 
   // Team name
   "--theme-team-name-color": theme.teamNameColor,

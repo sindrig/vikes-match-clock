@@ -126,6 +126,7 @@ export const DEFAULT_THEME: ThemeConfig = {
   scoreBoxBorder: "1px solid white",
   scoreBoxFontSize: "2.5rem",
   scoreBoxFontFamily: '"Anton", sans-serif',
+  scoreBoxStroke: "none",
 
   // Clock box
   clockBg: "black",
@@ -134,6 +135,7 @@ export const DEFAULT_THEME: ThemeConfig = {
   clockFontSizeMin: "1.7rem",
   clockFontSizeMax: "1.85rem",
   clockFontFamily: '"Anton", sans-serif',
+  clockStroke: "none",
 
   // Clock position
   clockTop: "45.5%",
@@ -156,6 +158,7 @@ export const DEFAULT_THEME: ThemeConfig = {
   injuryTimeFontSize: "2rem",
   injuryTimeTop: "18%",
   injuryTimeLeft: "45%",
+  injuryTimeStroke: "none",
 
   // Team name
   teamNameColor: "white",
@@ -277,6 +280,7 @@ export const THEME_PRESETS: Record<string, ThemeConfig> = {
     scoreBoxBorder: "none",
     scoreBoxFontSize: "4rem",
     scoreBoxFontFamily: '"Russo One", sans-serif',
+    scoreBoxStroke: "1px black",
     scoreTop: "50%",
     scoreHeight: "42%",
     scoreWidth: "20%",
@@ -286,6 +290,7 @@ export const THEME_PRESETS: Record<string, ThemeConfig> = {
     clockFontSizeMin: "1.2rem",
     clockFontSizeMax: "1.4rem",
     clockFontFamily: '"Russo One", sans-serif',
+    clockStroke: "1px black",
     clockTop: "42%",
     clockLeft: "37%",
     clockWidth: "26%",
@@ -295,6 +300,7 @@ export const THEME_PRESETS: Record<string, ThemeConfig> = {
     logoWidth: "22%",
     injuryTimeColor: "rgba(255,255,255,0.6)",
     injuryTimeFontSize: "1.6rem",
+    injuryTimeStroke: "1px black",
     teamNameColor: "rgba(255,255,255,0.8)",
     teamNameFontFamily: '"Russo One", sans-serif',
     penaltyBg: "transparent",

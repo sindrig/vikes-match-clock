@@ -284,6 +284,12 @@ const ThemeEditorPanels = ({
         value={effective.scoreBoxFontFamily}
         onChange={(v) => onFieldChange("scoreBoxFontFamily", v)}
       />
+      <TextField
+        label="Leturútlína"
+        value={effective.scoreBoxStroke}
+        defaultValue={DEFAULT_THEME.scoreBoxStroke}
+        onChange={(v) => onFieldChange("scoreBoxStroke", v)}
+      />
       <Divider className="theme-divider" />
       <PercentField
         label="Ofan"
@@ -328,6 +334,12 @@ const ThemeEditorPanels = ({
         label="Letur"
         value={effective.clockFontFamily}
         onChange={(v) => onFieldChange("clockFontFamily", v)}
+      />
+      <TextField
+        label="Leturútlína"
+        value={effective.clockStroke}
+        defaultValue={DEFAULT_THEME.clockStroke}
+        onChange={(v) => onFieldChange("clockStroke", v)}
       />
       <TextField
         label="Leturstærð (min)"
@@ -401,6 +413,12 @@ const ThemeEditorPanels = ({
         value={effective.injuryTimeFontSize}
         defaultValue={DEFAULT_THEME.injuryTimeFontSize}
         onChange={(v) => onFieldChange("injuryTimeFontSize", v)}
+      />
+      <TextField
+        label="Leturútlína"
+        value={effective.injuryTimeStroke}
+        defaultValue={DEFAULT_THEME.injuryTimeStroke}
+        onChange={(v) => onFieldChange("injuryTimeStroke", v)}
       />
       <Divider className="theme-divider" />
       <PercentField
