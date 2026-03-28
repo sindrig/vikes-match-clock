@@ -314,6 +314,9 @@ const DraggableElement = ({
     top: string;
     left: string;
   } | null>(null);
+  // Mirror drag left in a ref so handlePointerMove can read it without
+  // being recreated on every frame.
+  const dragLeftRef = useRef<string | null>(null);
 
   const themeLeft = typeof def.left === "string" ? def.left : def.left(theme);
 
@@ -335,6 +338,7 @@ const DraggableElement = ({
         top: (parseFloat(currentTop) / 100) * rect.height,
         left: (parseFloat(currentLeft) / 100) * rect.width,
       };
+      dragLeftRef.current = currentLeft;
       setDragOverride({ top: currentTop, left: currentLeft });
 
       const target = e.currentTarget as HTMLElement;
@@ -360,7 +364,7 @@ const DraggableElement = ({
       );
       const newTop = `${newTopPct.toFixed(1)}%`;
 
-      let newLeft = dragOverride?.left ?? themeLeft;
+      let newLeft = dragLeftRef.current ?? themeLeft;
       if (def.dragFields.left) {
         const newLeftPx = startPos.current.left + dx;
         const newLeftPct = Math.max(
@@ -371,9 +375,10 @@ const DraggableElement = ({
       }
 
       // Only update local state — no Firebase write during drag
+      dragLeftRef.current = newLeft;
       setDragOverride({ top: newTop, left: newLeft });
     },
-    [canvasRef, def.dragFields.left, dragOverride?.left, themeLeft],
+    [canvasRef, def.dragFields.left, themeLeft],
   );
 
   const handlePointerUp = useCallback(
@@ -386,6 +391,7 @@ const DraggableElement = ({
 
       if (dx < 4 && dy < 4) {
         // Hardly moved → treat as a click → open color picker
+        dragLeftRef.current = null;
         setDragOverride(null);
 
         const popoverFields: ColorPopoverProps["fields"] = [];
@@ -427,10 +433,11 @@ const DraggableElement = ({
           changes[def.dragFields.left] = dragOverride.left;
         }
         onFieldsChange(changes);
+        dragLeftRef.current = null;
         setDragOverride(null);
       }
     },
-    [def, theme, canvasRef, onColorClick, onFieldsChange, dragOverride],
+    [def, canvasRef, onColorClick, onFieldsChange, dragOverride],
   );
 
   // Use local drag position when dragging, otherwise use theme values
@@ -460,6 +467,10 @@ const DraggableElement = ({
     </div>
   );
 };
+
+/** Sanitize a URL for use inside CSS url() by escaping breakout characters */
+const sanitizeCssUrl = (url: string): string =>
+  url.replace(/[()'"\\]/g, (ch) => `\\${ch}`);
 
 // ---- Main visual editor ----
 
@@ -563,7 +574,7 @@ const VisualThemeEditor = ({
           style={
             hasBackground
               ? {
-                  backgroundImage: `url(${effective.backgroundImage})`,
+                  backgroundImage: `url(${sanitizeCssUrl(effective.backgroundImage)})`,
                   backgroundSize: "cover",
                   backgroundPosition: "center",
                 }

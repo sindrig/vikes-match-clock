@@ -96,7 +96,7 @@ img.ad {
 
 .scoreboard img.ad {
   top: var(--theme-ad-top, 73%);
-  left: var(--theme-ad-left, 33.5%);
+  left: var(--theme-ad-left, calc(33.5% + 1px));
   height: var(--theme-ad-height, 25%);
   width: var(--theme-ad-width, 33%);
   position: absolute;

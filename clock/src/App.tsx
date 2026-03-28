@@ -225,12 +225,16 @@ function App() {
     }
   };
 
+  /** Sanitize a URL for use inside CSS url() by encoding characters that could break out */
+  const sanitizeCssUrl = (url: string): string =>
+    url.replace(/[()'"\\]/g, (ch) => `\\${ch}`);
+
   const style: React.CSSProperties = {
     ...getBackground(isBlackedOut ? "Blackout" : background),
     // Theme background image overrides the background selector when set
     ...(effectiveTheme.backgroundImage && !isBlackedOut
       ? {
-          backgroundImage: `url(${effectiveTheme.backgroundImage})`,
+          backgroundImage: `url(${sanitizeCssUrl(effectiveTheme.backgroundImage)})`,
           backgroundSize: "cover",
           backgroundPosition: "center",
         }

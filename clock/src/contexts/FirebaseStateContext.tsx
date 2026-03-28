@@ -513,7 +513,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
         // Also detect keys removed from newState (present in prev, absent in new)
         for (const key of Object.keys(prev) as (keyof ViewState)[]) {
-          if (!(key in newState) && !(key in diff)) {
+          if (!(key in newState) && !(key in diff) && prev[key] !== undefined) {
             diff[key] = null;
           }
         }
@@ -1248,26 +1248,17 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   const deleteCustomPreset = useCallback(
     (id: string) => {
-      if (!listenPrefix || !isAuthenticated) return;
+      applyViewUpdate((prev) => {
+        if (!prev.customPresets?.[id]) return prev;
 
-      const prev = viewRef.current;
-      if (!prev.customPresets?.[id]) return;
-
-      const updated = { ...prev.customPresets };
-      delete updated[id];
-      const newCustomPresets =
-        Object.keys(updated).length > 0 ? updated : undefined;
-      const newState = { ...prev, customPresets: newCustomPresets };
-      viewRef.current = newState;
-
-      // Write null for the specific preset path so Firebase actually deletes it
-      firebaseDatabase
-        .syncState(listenPrefix, "view", {
-          [`customPresets/${id}`]: null,
-        })
-        .catch(console.error);
+        const updated = { ...prev.customPresets };
+        delete updated[id];
+        const newCustomPresets =
+          Object.keys(updated).length > 0 ? updated : undefined;
+        return { ...prev, customPresets: newCustomPresets };
+      });
     },
-    [isAuthenticated, listenPrefix],
+    [applyViewUpdate],
   );
 
   // Apply screen viewport override from "Birta skjá" selection.

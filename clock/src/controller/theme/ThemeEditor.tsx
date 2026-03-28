@@ -131,8 +131,11 @@ const PercentField = ({
     <label className="theme-field-label">{label}</label>
     <InputGroup size="xs" className="theme-percent-input">
       <Input
-        value={parseFloat(value).toString()}
+        value={
+          Number.isNaN(parseFloat(value)) ? "" : parseFloat(value).toString()
+        }
         onChange={(val) => {
+          if (val === "") return;
           const num = parseFloat(val);
           if (!Number.isNaN(num)) {
             onChange(`${num}%`);
