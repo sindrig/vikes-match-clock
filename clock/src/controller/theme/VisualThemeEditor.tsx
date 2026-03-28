@@ -1,4 +1,10 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import {
+  useState,
+  useCallback,
+  useRef,
+  useEffect,
+  useLayoutEffect,
+} from "react";
 import type { ThemeConfig } from "../../types";
 import { storageHelpers } from "../../firebase";
 import { toHex, parseStroke, composeStroke } from "./themeUtils";
@@ -199,6 +205,28 @@ const ColorPopover = ({
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [onClose]);
+
+  // Clamp popover position so it stays within the canvas.
+  // useLayoutEffect fires before paint, so the popover never visually appears
+  // outside bounds.  We mutate style directly to avoid a re-render loop.
+  useLayoutEffect(() => {
+    const el = ref.current;
+    const canvas = el?.parentElement;
+    if (!el || !canvas) return;
+    const canvasRect = canvas.getBoundingClientRect();
+    const popRect = el.getBoundingClientRect();
+    const margin = 4;
+    let left = x;
+    let top = y;
+    if (left + popRect.width > canvasRect.width - margin) {
+      left = Math.max(margin, canvasRect.width - popRect.width - margin);
+    }
+    if (top + popRect.height > canvasRect.height - margin) {
+      top = Math.max(margin, canvasRect.height - popRect.height - margin);
+    }
+    el.style.left = `${left}px`;
+    el.style.top = `${top}px`;
+  });
 
   const strokeParts = strokeField ? parseStroke(theme[strokeField]) : null;
 
