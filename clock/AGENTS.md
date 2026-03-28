@@ -272,12 +272,11 @@ All properties are CSS value strings. Grouped by display area:
 #### Custom Preset Behavior
 
 - **A preset is always active** — there is no "no preset" state
-- **Editing a built-in preset** auto-creates a copy named `"<preset> (breytt)"` with `basedOn` set to the original. The built-in preset remains untouched
+- **Editing a built-in preset** auto-creates an independent copy named `"<preset> (breytt)"`. The built-in preset remains untouched and the copy has no link back to it
 - **Editing a custom preset** updates it directly (no copy behavior)
-- **Reverting** a modified copy (one with `basedOn`) deletes the copy and switches back to the original built-in preset
 - **Creating a new preset** creates a blank custom preset with `DEFAULT_THEME` values
 - **Deleting** a custom preset removes it from Firebase; if it was active, falls back to Default
-- **Visual indicator**: Built-in presets with existing modified copies show a `*` badge in the preset selector
+- **Renaming** custom presets is supported via double-click on the preset name
 
 #### Key Files
 
@@ -349,9 +348,7 @@ The theme editor is a **full rsuite Modal** (`ThemeEditorModal`) launched from a
 **Preset management features**:
 
 - Select any built-in or custom preset to activate it
-- Built-in presets with modified copies show a `*` badge (rsuite `Badge`)
-- Editing a built-in preset auto-creates a copy named `"<preset> (breytt)"` — original stays untouched
-- "Afturkalla breytingar" button on modified copies reverts (deletes the copy, switches back to original)
+- Editing a built-in preset auto-creates an independent copy named `"<preset> (breytt)"` — original stays untouched
 - "Nýtt þema" button creates a blank custom preset from `DEFAULT_THEME`
 - Custom preset names are editable via double-click (inline `Input`)
 - Custom presets can be deleted via `IconButton` with `TrashIcon`

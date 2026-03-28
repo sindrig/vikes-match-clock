@@ -221,3 +221,35 @@
   text-align: center;
   flex-shrink: 0;
 }
+
+/* Font size controls inside popover */
+.visual-font-size-row {
+  border-top: 1px solid #eee;
+  padding-top: 6px;
+  margin-top: 2px;
+}
+
+.visual-font-size-slider {
+  width: 60px;
+  height: 4px;
+  cursor: pointer;
+  accent-color: #4096ff;
+  flex-shrink: 0;
+}
+
+.visual-font-size-input {
+  width: 48px;
+  height: 22px;
+  font-size: 11px;
+  text-align: center;
+  border: 1px solid #d4d4d8;
+  border-radius: 4px;
+  padding: 0 2px;
+  flex-shrink: 0;
+}
+
+.visual-font-size-unit {
+  font-size: 10px;
+  color: #555;
+  flex-shrink: 0;
+}

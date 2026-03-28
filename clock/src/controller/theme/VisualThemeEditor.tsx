@@ -7,7 +7,13 @@ import {
 } from "react";
 import type { ThemeConfig } from "../../types";
 import { storageHelpers } from "../../firebase";
-import { toHex, parseStroke, composeStroke } from "./themeUtils";
+import {
+  toHex,
+  parseStroke,
+  composeStroke,
+  parseFontSize,
+  composeFontSize,
+} from "./themeUtils";
 
 import "./VisualThemeEditor.css";
 
@@ -45,6 +51,8 @@ interface ElementDef {
   };
   /** Optional text-stroke field (e.g. scoreBoxStroke, clockStroke) */
   strokeField?: keyof ThemeConfig;
+  /** Optional font-size field (e.g. scoreBoxFontSize, injuryTimeFontSize) */
+  fontSizeField?: keyof ThemeConfig;
   /** Display text inside the element */
   displayText: string;
 }
@@ -95,6 +103,7 @@ const ELEMENTS: ElementDef[] = [
       border: "clockBorder",
     },
     strokeField: "clockStroke",
+    fontSizeField: "clockFontSizeMax",
     displayText: "45:00",
   },
   {
@@ -114,6 +123,7 @@ const ELEMENTS: ElementDef[] = [
       border: "scoreBoxBorder",
     },
     strokeField: "scoreBoxStroke",
+    fontSizeField: "scoreBoxFontSize",
     displayText: "2",
   },
   {
@@ -133,6 +143,7 @@ const ELEMENTS: ElementDef[] = [
       border: "scoreBoxBorder",
     },
     strokeField: "scoreBoxStroke",
+    fontSizeField: "scoreBoxFontSize",
     displayText: "1",
   },
   {
@@ -151,6 +162,7 @@ const ELEMENTS: ElementDef[] = [
       text: "injuryTimeColor",
     },
     strokeField: "injuryTimeStroke",
+    fontSizeField: "injuryTimeFontSize",
     displayText: "+3",
   },
   {
@@ -177,6 +189,7 @@ interface ColorPopoverProps {
   /** Field references — values are looked up from `theme` at render time */
   fields: { label: string; field: keyof ThemeConfig }[];
   strokeField?: keyof ThemeConfig;
+  fontSizeField?: keyof ThemeConfig;
   theme: ThemeConfig;
   onFieldChange: (field: keyof ThemeConfig, value: string) => void;
   onClose: () => void;
@@ -190,6 +203,7 @@ const ColorPopover = ({
   y,
   fields,
   strokeField,
+  fontSizeField,
   theme,
   onFieldChange,
   onClose,
@@ -229,6 +243,7 @@ const ColorPopover = ({
   });
 
   const strokeParts = strokeField ? parseStroke(theme[strokeField]) : null;
+  const fontParts = fontSizeField ? parseFontSize(theme[fontSizeField]) : null;
 
   return (
     <div ref={ref} className="visual-color-popover" style={{ left: x, top: y }}>
@@ -307,6 +322,41 @@ const ColorPopover = ({
           )}
         </div>
       )}
+      {fontSizeField && fontParts && (
+        <div className="visual-color-popover-row visual-font-size-row">
+          <span className="visual-color-popover-label">Stærð</span>
+          <input
+            type="range"
+            className="visual-font-size-slider"
+            min={0.5}
+            max={6}
+            step={0.1}
+            value={fontParts.size}
+            onChange={(e) => {
+              const s = parseFloat(e.target.value);
+              onFieldChange(fontSizeField, composeFontSize(s, fontParts.unit));
+            }}
+          />
+          <input
+            type="number"
+            className="visual-font-size-input"
+            min={0.1}
+            max={10}
+            step={0.1}
+            value={fontParts.size}
+            onChange={(e) => {
+              const s = parseFloat(e.target.value);
+              if (!Number.isNaN(s) && s > 0) {
+                onFieldChange(
+                  fontSizeField,
+                  composeFontSize(s, fontParts.unit),
+                );
+              }
+            }}
+          />
+          <span className="visual-font-size-unit">{fontParts.unit}</span>
+        </div>
+      )}
     </div>
   );
 };
@@ -323,6 +373,7 @@ interface DraggableElementProps {
     clickX: number,
     clickY: number,
     strokeField?: keyof ThemeConfig,
+    fontSizeField?: keyof ThemeConfig,
   ) => void;
   canvasRef: React.RefObject<HTMLDivElement | null>;
 }
@@ -450,6 +501,7 @@ const DraggableElement = ({
             e.clientX - canvasRect.left,
             e.clientY - canvasRect.top,
             def.strokeField,
+            def.fontSizeField,
           );
         }
       } else if (dragOverride) {
@@ -515,6 +567,7 @@ const VisualThemeEditor = ({
     elementId: string;
     fields: ColorPopoverProps["fields"];
     strokeField?: keyof ThemeConfig;
+    fontSizeField?: keyof ThemeConfig;
     x: number;
     y: number;
   } | null>(null);
@@ -526,8 +579,9 @@ const VisualThemeEditor = ({
       x: number,
       y: number,
       strokeField?: keyof ThemeConfig,
+      fontSizeField?: keyof ThemeConfig,
     ) => {
-      setPopover({ elementId, fields, x, y, strokeField });
+      setPopover({ elementId, fields, x, y, strokeField, fontSizeField });
     },
     [],
   );
@@ -638,6 +692,7 @@ const VisualThemeEditor = ({
               y={popover.y}
               fields={popover.fields}
               strokeField={popover.strokeField}
+              fontSizeField={popover.fontSizeField}
               theme={effective}
               onFieldChange={onFieldChange}
               onClose={closePopover}

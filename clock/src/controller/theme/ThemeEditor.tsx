@@ -8,11 +8,9 @@ import {
   Divider,
   Modal,
   IconButton,
-  Badge,
   Nav,
 } from "rsuite";
 import TrashIcon from "@rsuite/icons/Trash";
-import ReloadIcon from "@rsuite/icons/Reload";
 import PlusIcon from "@rsuite/icons/Plus";
 import { useView } from "../../contexts/FirebaseStateContext";
 import { useRemoteSettings } from "../../contexts/LocalStateContext";
@@ -237,14 +235,10 @@ interface PresetEntry {
   theme: ThemeConfig;
   /** Whether this is a built-in preset */
   isBuiltIn: boolean;
-  /** For custom presets that are copies of built-in ones */
-  basedOn?: string;
 }
 
 /**
  * Build a unified list of presets: built-in first, then custom.
- * If a custom preset is basedOn a built-in, the built-in still shows
- * but the custom copy is listed separately.
  */
 function buildPresetList(
   customPresets?: Record<string, CustomPreset>,
@@ -264,26 +258,11 @@ function buildPresetList(
         name: preset.name,
         theme: preset.theme,
         isBuiltIn: false,
-        basedOn: preset.basedOn,
       });
     }
   }
 
   return entries;
-}
-
-/**
- * Find the custom preset ID that is a modified copy of a given built-in preset.
- */
-function findCopyOfBuiltIn(
-  builtInName: string,
-  customPresets?: Record<string, CustomPreset>,
-): string | undefined {
-  if (!customPresets) return undefined;
-  for (const [id, preset] of Object.entries(customPresets)) {
-    if (preset.basedOn === builtInName) return id;
-  }
-  return undefined;
 }
 
 // ---- Theme property editor panels ----
@@ -662,8 +641,7 @@ const ThemeEditorModal = ({ open, onClose }: ThemeEditorModalProps) => {
   const handleFieldsChange = useCallback(
     (changes: Partial<ThemeConfig>) => {
       if (BUILT_IN_PRESET_NAMES.has(activePresetId)) {
-        // Check if a copy already exists
-        const existingCopyId = findCopyOfBuiltIn(activePresetId, customPresets);
+        // Create an independent copy — built-in presets are never modified
         const builtInTheme = THEME_PRESETS[activePresetId] ?? DEFAULT_THEME;
         const newTheme = {
           ...builtInTheme,
@@ -671,27 +649,13 @@ const ThemeEditorModal = ({ open, onClose }: ThemeEditorModalProps) => {
           ...changes,
         };
         const copyName = `${activePresetId} (breytt)`;
-
-        if (existingCopyId) {
-          // Update existing copy
-          saveCustomPreset(existingCopyId, {
-            name: copyName,
-            theme: newTheme,
-            basedOn: activePresetId,
-          });
-          setThemePreset(existingCopyId);
-          setTheme(undefined);
-        } else {
-          // Create new copy
-          const newId = `custom-${crypto.randomUUID()}`;
-          saveCustomPreset(newId, {
-            name: copyName,
-            theme: newTheme,
-            basedOn: activePresetId,
-          });
-          setThemePreset(newId);
-          setTheme(undefined);
-        }
+        const newId = `custom-${crypto.randomUUID()}`;
+        saveCustomPreset(newId, {
+          name: copyName,
+          theme: newTheme,
+        });
+        setThemePreset(newId);
+        setTheme(undefined);
       } else {
         // Editing a custom preset directly
         const customPreset = customPresets?.[activePresetId];
@@ -724,16 +688,6 @@ const ThemeEditorModal = ({ open, onClose }: ThemeEditorModalProps) => {
       handleFieldsChange({ [field]: value });
     },
     [handleFieldsChange],
-  );
-
-  // Revert a modified copy back to its built-in original
-  const revertToBuiltIn = useCallback(
-    (copyId: string, builtInName: string) => {
-      deleteCustomPreset(copyId);
-      setThemePreset(builtInName);
-      setTheme(undefined);
-    },
-    [deleteCustomPreset, setThemePreset, setTheme],
   );
 
   // Create a new blank custom preset
@@ -780,19 +734,6 @@ const ThemeEditorModal = ({ open, onClose }: ThemeEditorModalProps) => {
     setRenamingId(null);
   }, [renamingId, renameValue, customPresets, saveCustomPreset]);
 
-  // Map of built-in names to their custom copy IDs (for showing badge)
-  const builtInCopyMap = useMemo(() => {
-    const map: Record<string, string> = {};
-    if (customPresets) {
-      for (const [id, preset] of Object.entries(customPresets)) {
-        if (preset.basedOn && BUILT_IN_PRESET_NAMES.has(preset.basedOn)) {
-          map[preset.basedOn] = id;
-        }
-      }
-    }
-    return map;
-  }, [customPresets]);
-
   return (
     <Modal open={open} onClose={onClose} size="md" overflow>
       <Modal.Header>
@@ -820,7 +761,6 @@ const ThemeEditorModal = ({ open, onClose }: ThemeEditorModalProps) => {
                 {presetList
                   .filter((e) => e.isBuiltIn)
                   .map((entry) => {
-                    const hasCopy = Boolean(builtInCopyMap[entry.id]);
                     const isActive = activePresetId === entry.id;
                     return (
                       <Button
@@ -828,11 +768,7 @@ const ThemeEditorModal = ({ open, onClose }: ThemeEditorModalProps) => {
                         appearance={isActive ? "primary" : "default"}
                         onClick={() => selectPreset(entry)}
                       >
-                        {hasCopy ? (
-                          <Badge content="*">{entry.name}</Badge>
-                        ) : (
-                          entry.name
-                        )}
+                        {entry.name}
                       </Button>
                     );
                   })}
@@ -882,17 +818,6 @@ const ThemeEditorModal = ({ open, onClose }: ThemeEditorModalProps) => {
                             )}
                           </Button>
                           <div className="theme-custom-preset-actions">
-                            {entry.basedOn && (
-                              <IconButton
-                                icon={<ReloadIcon />}
-                                size="xs"
-                                appearance="subtle"
-                                title={`Endurstilla sem ${entry.basedOn}`}
-                                onClick={() =>
-                                  revertToBuiltIn(entry.id, entry.basedOn!)
-                                }
-                              />
-                            )}
                             <IconButton
                               icon={<TrashIcon />}
                               size="xs"
