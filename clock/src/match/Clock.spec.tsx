@@ -83,7 +83,9 @@ describe("Clock component", () => {
       );
 
       const clock = container.querySelector(".matchclock");
-      expect(clock).toHaveStyle({ fontSize: "1.85rem" });
+      expect(clock).toHaveStyle({
+        fontSize: "var(--theme-clock-font-size-max, 1.85rem)",
+      });
     });
   });
 });

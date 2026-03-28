@@ -35,22 +35,21 @@ img.idle-ad {
 
 .idle .idle-text-container {
   position: absolute;
-  top: 65%;
+  top: var(--theme-idle-text-top, 65%);
   width: 100%;
 }
 
 .idle .idle-text-box {
   float: left;
   width: 50%;
-  font-size: 40px;
+  font-size: var(--theme-idle-text-font-size, 40px);
   font-weight: bold;
-  color: #ffffff;
-  /*padding: 0 20px 0 20px;*/
+  color: var(--theme-idle-text-color, #ffffff);
 }
 
 .idle .idle-vikes {
   position: absolute;
-  left: 15%;
-  top: 5%;
-  width: 30%;
+  left: var(--theme-idle-logo-left, 15%);
+  top: var(--theme-idle-logo-top, 5%);
+  width: var(--theme-idle-logo-width, 30%);
 }

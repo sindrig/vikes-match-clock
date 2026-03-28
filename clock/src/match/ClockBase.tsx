@@ -69,7 +69,10 @@ export default class Clock extends Component<ClockBaseProps, ClockBaseState> {
     const displayedTime =
       (!isTimeNull && time) || formatMillisAsTime(zeroTime || 0);
     const style = {
-      fontSize: displayedTime.length > 5 ? fontSizeMin : fontSizeMax,
+      fontSize:
+        displayedTime.length > 5
+          ? `var(--theme-clock-font-size-min, ${fontSizeMin})`
+          : `var(--theme-clock-font-size-max, ${fontSizeMax})`,
     };
     return (
       <div className={className} style={style}>
