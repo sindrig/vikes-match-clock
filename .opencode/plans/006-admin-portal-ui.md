@@ -12,7 +12,7 @@ There is currently no admin UI. User-to-screen mappings are managed via Firebase
 The admin portal has two main sections displayed on a single page:
 
 ### Header bar
-- App title: "Vikes Klukka -- Stjornborð" (admin dashboard)
+- App title: "Vikes Klukka -- Stjórnborð" (admin dashboard)
 - Admin badge: small label showing the admin's email
 - "Til baka" (Back) link navigating to `/`
 - "Utskra" (Logout) button
@@ -160,7 +160,7 @@ When `isAuthenticated && !listenPrefix && isAdmin`, render above the screen sele
 
 ```tsx
 <Link to="/admin" className="admin-portal-button">
-  Stjornbord
+  Stjórnbord
 </Link>
 ```
 

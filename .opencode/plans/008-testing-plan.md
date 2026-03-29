@@ -102,7 +102,7 @@ Test cases:
 #### Test cases
 
 **Admin access**:
-- Admin user sees red "Stjornbord" button on screen selector
+- Admin user sees red "Stjórnbord" button on screen selector
 - Non-admin user does not see admin button
 - Navigate to `/admin` as admin -> admin portal loads
 - Navigate to `/admin` as non-admin -> access denied
