@@ -7,7 +7,7 @@ import { DEFAULT_THEME, THEME_PRESETS } from "../constants";
  * These variables are applied to the `.App` container so all
  * display CSS can reference them via `var(--theme-*)`.
  */
-const themeToCssVars = (theme: ThemeConfig): Record<string, string> => ({
+export const themeToCssVars = (theme: ThemeConfig): Record<string, string> => ({
   // Score boxes
   "--theme-score-bg": theme.scoreBoxBg,
   "--theme-score-color": theme.scoreBoxColor,
@@ -82,7 +82,7 @@ const themeToCssVars = (theme: ThemeConfig): Record<string, string> => ({
 /**
  * Looks up a preset by name, checking custom presets first, then built-in.
  */
-function lookupPreset(
+export function lookupPreset(
   presetName: string | undefined,
   customPresets?: Record<string, CustomPreset>,
 ): ThemeConfig {

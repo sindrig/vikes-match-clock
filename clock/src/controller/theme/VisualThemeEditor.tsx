@@ -549,7 +549,7 @@ const DraggableElement = ({
 };
 
 /** Sanitize a URL for use inside CSS url() by escaping breakout characters */
-const sanitizeCssUrl = (url: string): string =>
+export const sanitizeCssUrl = (url: string): string =>
   url.replace(/[()'"\\]/g, (ch) => `\\${ch}`);
 
 // ---- Main visual editor ----

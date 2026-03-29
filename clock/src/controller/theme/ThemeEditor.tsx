@@ -34,7 +34,7 @@ interface ColorFieldProps {
   onChange: (value: string) => void;
 }
 
-const isTransparent = (value: string): boolean =>
+export const isTransparent = (value: string): boolean =>
   value.toLowerCase().trim() === "transparent";
 
 const ColorField = ({
@@ -241,7 +241,7 @@ interface PresetEntry {
 /**
  * Build a unified list of presets: built-in first, then custom.
  */
-function buildPresetList(
+export function buildPresetList(
   customPresets?: Record<string, CustomPreset>,
 ): PresetEntry[] {
   const entries: PresetEntry[] = [];
