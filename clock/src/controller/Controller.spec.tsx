@@ -85,6 +85,7 @@ function setupState1() {
     available: null,
     screenViewport: null,
     setScreenViewport: vi.fn(),
+    isAdmin: false,
   });
   mockedUseRemoteSettings.mockReturnValue({
     listenPrefix: "",
@@ -118,6 +119,7 @@ function setupState2() {
     available: null,
     screenViewport: null,
     setScreenViewport: vi.fn(),
+    isAdmin: false,
   });
   mockedUseRemoteSettings.mockReturnValue({
     listenPrefix: "vikinni",
@@ -155,6 +157,7 @@ function setupState3() {
     available: ["vikinni"],
     screenViewport: null,
     setScreenViewport: vi.fn(),
+    isAdmin: false,
   });
   mockedUseRemoteSettings.mockReturnValue({
     listenPrefix: "vikinni",
@@ -204,6 +207,7 @@ function setupScreenSelector(
     available: mockAvailable,
     screenViewport: null,
     setScreenViewport: vi.fn(),
+    isAdmin: false,
   });
   mockedUseRemoteSettings.mockReturnValue({
     listenPrefix: "",

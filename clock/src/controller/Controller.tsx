@@ -26,7 +26,12 @@ import {
   useListeners,
   useView,
 } from "../contexts/FirebaseStateContext";
-import { useAuth, useLocalState } from "../contexts/LocalStateContext";
+import {
+  useAuth,
+  useIsAdmin,
+  useLocalState,
+} from "../contexts/LocalStateContext";
+import { Link } from "react-router-dom";
 
 const confirmRefresh = () => confirm("Are you absolutely sure?");
 
@@ -47,6 +52,7 @@ const Controller = () => {
     setScreenViewport,
   } = useLocalState();
   const auth = useAuth();
+  const isAdmin = useIsAdmin();
 
   const [prevAssetView, setPrevAssetView] = useState(controller.assetView);
   const [tab, setTab] = useState<string>(
@@ -167,6 +173,23 @@ const Controller = () => {
     return (
       <div className="screen-selector">
         <h2>Veldu skjá til að stjórna</h2>
+        {isAdmin && (
+          <Link
+            to="/admin"
+            style={{
+              display: "inline-block",
+              padding: "8px 16px",
+              backgroundColor: "#c62828",
+              color: "white",
+              borderRadius: "4px",
+              textDecoration: "none",
+              marginBottom: "12px",
+              fontWeight: "bold",
+            }}
+          >
+            Stjórnborð
+          </Link>
+        )}
         {available === null ? (
           <RingLoader color="#1675e0" size={60} />
         ) : available.length === 0 ? (
@@ -206,6 +229,22 @@ const Controller = () => {
         >
           Útskrá
         </button>
+        {isAdmin && (
+          <span
+            style={{
+              display: "inline-block",
+              marginTop: "8px",
+              padding: "2px 8px",
+              backgroundColor: "#c62828",
+              color: "white",
+              borderRadius: "4px",
+              fontSize: "11px",
+              fontWeight: "bold",
+            }}
+          >
+            Admin
+          </span>
+        )}
       </div>
     );
   }

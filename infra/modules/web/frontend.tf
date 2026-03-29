@@ -17,4 +17,19 @@ module "webpage" {
   parent_zone_name  = var.parent_zone_name
 
   acm_certificate_arn = data.aws_acm_certificate.irdn.arn
+
+  custom_error_response = [
+    {
+      error_code            = 404
+      response_code         = 200
+      response_page_path    = "/index.html"
+      error_caching_min_ttl = 0
+    },
+    {
+      error_code            = 403
+      response_code         = 200
+      response_page_path    = "/index.html"
+      error_caching_min_ttl = 0
+    }
+  ]
 }
