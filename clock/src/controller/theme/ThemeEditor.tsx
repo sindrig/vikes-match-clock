@@ -11,6 +11,7 @@ import {
   Nav,
 } from "rsuite";
 import TrashIcon from "@rsuite/icons/Trash";
+import EditIcon from "@rsuite/icons/Edit";
 import PlusIcon from "@rsuite/icons/Plus";
 import { useView } from "../../contexts/FirebaseStateContext";
 import { useRemoteSettings } from "../../contexts/LocalStateContext";
@@ -807,17 +808,17 @@ const ThemeEditorModal = ({ open, onClose }: ThemeEditorModalProps) => {
                                 onClick={(e) => e.stopPropagation()}
                               />
                             ) : (
-                              <span
-                                onDoubleClick={(e) => {
-                                  e.stopPropagation();
-                                  startRename(entry.id, entry.name);
-                                }}
-                              >
-                                {entry.name}
-                              </span>
+                              entry.name
                             )}
                           </Button>
                           <div className="theme-custom-preset-actions">
+                            <IconButton
+                              icon={<EditIcon />}
+                              size="xs"
+                              appearance="subtle"
+                              title="Endurnefna"
+                              onClick={() => startRename(entry.id, entry.name)}
+                            />
                             <IconButton
                               icon={<TrashIcon />}
                               size="xs"

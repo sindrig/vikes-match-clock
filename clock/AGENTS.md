@@ -350,7 +350,7 @@ The theme editor is a **full rsuite Modal** (`ThemeEditorModal`) launched from a
 - Select any built-in or custom preset to activate it
 - Editing a built-in preset auto-creates an independent copy named `"<preset> (breytt)"` — original stays untouched
 - "Nýtt þema" button creates a blank custom preset from `DEFAULT_THEME`
-- Custom preset names are editable via double-click (inline `Input`)
+- Custom preset names are editable via pencil (edit) icon button next to delete
 - Custom presets can be deleted via `IconButton` with `TrashIcon`
 
 **Editor panels** (extracted into `ThemeEditorPanels` sub-component):
