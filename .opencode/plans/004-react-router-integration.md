@@ -58,7 +58,7 @@ No structural changes needed. The existing conditional rendering logic remains i
 
 Route guard component:
 1. Reads auth state from `useAuth()`
-2. If not authenticated, shows login form (reuse existing login pattern from Controller.tsx)
+2. If not authenticated, redirects to `/` (the main app handles login)
 3. If authenticated but not admin, shows "Access denied" message with link back to `/`
 4. If authenticated and admin, renders `<AdminPortal />`
 
@@ -85,7 +85,7 @@ The admin badge (small "Admin" indicator) is also shown in this state.
 ## Testing
 
 1. Navigating to `/` renders the existing app with no changes
-2. Navigating to `/admin` when not logged in shows login form
+2. Navigating to `/admin` when not logged in redirects to `/`
 3. Navigating to `/admin` as non-admin shows access denied
 4. Navigating to `/admin` as admin renders AdminPortal
 5. Red admin button appears on screen selector for admin users
