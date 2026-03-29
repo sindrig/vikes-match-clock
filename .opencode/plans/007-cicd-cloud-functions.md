@@ -18,7 +18,6 @@ Add to `.github/workflows/build.yml` after the existing `deploy-prod` job:
 ```yaml
 deploy-functions:
   runs-on: ubuntu-latest
-  needs: [build-clock]  # or runs independently
   if: github.ref == 'refs/heads/master'
   steps:
     - uses: actions/checkout@v4
