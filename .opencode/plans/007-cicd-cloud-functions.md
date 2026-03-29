@@ -15,55 +15,80 @@ Firebase Cloud Functions will be deployed via `firebase deploy --only functions`
 
 Add to `.github/workflows/build.yml` after the existing `deploy-prod` job:
 
+### Reusable workflow: `.github/workflows/deploy-functions.yml`
+
+Extract the function build, test, and deploy steps into a reusable workflow to avoid duplication between prod and staging:
+
 ```yaml
-deploy-functions:
-  runs-on: ubuntu-latest
-  if: github.ref == 'refs/heads/master'
-  steps:
-    - uses: actions/checkout@v4
+# .github/workflows/deploy-functions.yml
+name: Deploy Cloud Functions
 
-    - uses: actions/setup-node@v4
-      with:
-        node-version: 20
+on:
+  workflow_call:
+    inputs:
+      firebase_project:
+        required: true
+        type: string
+        description: "Firebase project alias (e.g. vikes-match-clock-firebase)"
+    secrets:
+      FIREBASE_TOKEN:
+        required: true
 
-    - name: Install function dependencies
-      working-directory: ./functions
-      run: npm ci
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
-    - name: Build functions
-      working-directory: ./functions
-      run: npm run build
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
 
-    - name: Run function tests
-      working-directory: ./functions
-      run: npm test
+      - name: Install function dependencies
+        working-directory: ./functions
+        run: npm ci
 
-    - uses: w9jds/setup-firebase@main
-      with:
-        tools-version: 11.9.0
-        firebase_token: ${{ secrets.FIREBASE_TOKEN }}
+      - name: Build functions
+        working-directory: ./functions
+        run: npm run build
 
-    - name: Deploy Cloud Functions
-      run: firebase deploy --only functions -P vikes-match-clock-firebase --token $FIREBASE_TOKEN
-      env:
-        FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+      - name: Run function tests
+        working-directory: ./functions
+        run: npm test
+
+      - uses: w9jds/setup-firebase@main
+        with:
+          tools-version: 11.9.0
+          firebase_token: ${{ secrets.FIREBASE_TOKEN }}
+
+      - name: Deploy Cloud Functions
+        run: firebase deploy --only functions -P ${{ inputs.firebase_project }} --token $FIREBASE_TOKEN
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
 ```
 
-### Staging deployment
+### Calling the reusable workflow from `build.yml`
 
-For staging (PRs with `sandbox-deploy` label), deploy functions to the staging Firebase project:
+In `.github/workflows/build.yml`, replace the inline deploy jobs with calls to the reusable workflow:
 
 ```yaml
+deploy-functions:
+  if: github.ref == 'refs/heads/master'
+  uses: ./.github/workflows/deploy-functions.yml
+  with:
+    firebase_project: vikes-match-clock-firebase
+  secrets:
+    FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+
 deploy-functions-staging:
-  runs-on: ubuntu-latest
-  needs: [build-clock]
   if: |
     github.event_name == 'pull_request' &&
     contains(github.event.pull_request.labels.*.name, 'sandbox-deploy')
-  steps:
-    # Same steps but with -P vikes-match-clock-staging
-    - name: Deploy Cloud Functions (staging)
-      run: firebase deploy --only functions -P vikes-match-clock-staging --token $FIREBASE_TOKEN
+  uses: ./.github/workflows/deploy-functions.yml
+  with:
+    firebase_project: vikes-match-clock-staging
+  secrets:
+    FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
 ```
 
 ### Firebase project configuration
@@ -121,7 +146,8 @@ The emulator already picks up `firebase.json` config, so adding the `functions` 
 
 ## Files affected
 
-- `.github/workflows/build.yml` -- new `deploy-functions` and `deploy-functions-staging` jobs, add rules deployment
+- `.github/workflows/deploy-functions.yml` -- new reusable workflow for function build, test, and deploy
+- `.github/workflows/build.yml` -- call reusable workflow for prod and staging function deploys, add rules deployment
 - `.firebaserc` -- add production and staging project aliases
 - `firebase.json` -- add `functions` config and functions emulator
 - `docker-compose.yml` -- potentially update emulator command if needed
