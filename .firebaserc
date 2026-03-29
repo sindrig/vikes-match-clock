@@ -1,5 +1,7 @@
 {
   "projects": {
-    "default": "vikes-match-clock-test"
+    "default": "vikes-match-clock-test",
+    "production": "vikes-match-clock-firebase",
+    "staging": "vikes-match-clock-staging"
   }
 }

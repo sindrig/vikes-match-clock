@@ -8,11 +8,13 @@ services:
       - ./firebase-rules.json:/app/firebase-rules.json:ro
       - ./storage.rules:/app/storage.rules:ro
       - ./.firebaserc:/app/.firebaserc:ro
+      - ./functions:/app/functions:ro
       - firebase-cache:/root/.cache
     ports:
       - "9099:9099"
       - "9000:9000"
       - "9199:9199"
+      - "5001:5001"
       - "4000:4000"
       - "4400:4400"
     environment:

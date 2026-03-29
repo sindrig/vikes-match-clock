@@ -1,0 +1,44 @@
+name: Deploy Cloud Functions
+
+on:
+  workflow_call:
+    inputs:
+      firebase_project:
+        required: true
+        type: string
+        description: "Firebase project alias (e.g. vikes-match-clock-firebase)"
+    secrets:
+      FIREBASE_TOKEN:
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install function dependencies
+        working-directory: ./functions
+        run: npm ci
+
+      - name: Build functions
+        working-directory: ./functions
+        run: npm run build
+
+      - name: Run function tests
+        working-directory: ./functions
+        run: npm test
+
+      - uses: w9jds/setup-firebase@main
+        with:
+          tools-version: 11.9.0
+          firebase_token: ${{ secrets.FIREBASE_TOKEN }}
+
+      - name: Deploy Cloud Functions
+        run: firebase deploy --only functions -P ${{ inputs.firebase_project }} --token $FIREBASE_TOKEN
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}

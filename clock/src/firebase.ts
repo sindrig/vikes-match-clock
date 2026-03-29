@@ -6,6 +6,11 @@ import {
   connectDatabaseEmulator,
 } from "firebase/database";
 import {
+  getFunctions,
+  Functions,
+  connectFunctionsEmulator,
+} from "firebase/functions";
+import {
   getStorage,
   FirebaseStorage,
   ref as storageRef,
@@ -67,11 +72,13 @@ if (isTest) {
 const app: FirebaseApp = initializeApp(fbConfig);
 const auth: Auth = getAuth(app);
 const database: Database = getDatabase(app);
+const functions: Functions = getFunctions(app);
 const storage: FirebaseStorage = getStorage(app);
 
 if (isTest) {
   connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
   connectDatabaseEmulator(database, "127.0.0.1", 9000);
+  connectFunctionsEmulator(functions, "127.0.0.1", 5001);
   connectStorageEmulator(storage, "127.0.0.1", 9199);
 }
 
@@ -94,6 +101,7 @@ export {
   app,
   auth,
   database,
+  functions,
   storage,
   storageHelpers,
   storageRef,
