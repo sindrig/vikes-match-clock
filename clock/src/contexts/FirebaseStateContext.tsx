@@ -847,7 +847,6 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         return {
           ...prev,
           queues: { ...prev.queues, [queueId]: newQueue },
-          activeQueueId: prev.activeQueueId ?? queueId,
         };
       });
       return queueId;
@@ -1053,6 +1052,8 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       applyControllerUpdate((prev) => ({
         ...prev,
         currentAsset: asset ? { asset, time: null } : null,
+        activeQueueId: null,
+        playing: false,
       }));
     },
     [applyControllerUpdate],
