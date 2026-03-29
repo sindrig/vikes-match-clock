@@ -38,7 +38,7 @@ The admin portal has two main sections displayed on a single page:
 - Toggle location checkboxes -> on save, calls `adminWrite` Cloud Function with `setUserLocations` action
 - Changes appear in real-time because the admin is subscribed to `auth/` via `onValue`
 
-**Empty state**: "Engir notendur skraddir" (No registered users) if the user list is empty.
+**Empty state**: "Engir notendur skráðir" (No registered users) if the user list is empty.
 
 ### Section 2: Pending Invitations
 
