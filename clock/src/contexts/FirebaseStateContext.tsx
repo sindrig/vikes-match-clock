@@ -264,8 +264,7 @@ export const getStateShowingNextAsset = (
   newState.playing = activeQueue.autoPlay;
 
   if (!activeQueue.cycle && updatedItems.length === 0) {
-    delete newState.queues[activeQueueId];
-    newState.activeQueueId = null;
+    newState.queues[activeQueueId] = updatedQueue;
     newState.playing = false;
     return newState;
   }

@@ -11,9 +11,7 @@ const PlaybackBar = () => {
   if (!activeQueue && !currentAsset) return null;
 
   const remaining = activeQueue ? activeQueue.items.length : 0;
-  const hasNext = activeQueue
-    ? activeQueue.items.length > 0 || activeQueue.cycle
-    : false;
+  const hasNext = !!activeQueue;
 
   const handleNext = () => {
     showNextAsset();

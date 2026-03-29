@@ -552,10 +552,8 @@ describe.skipIf(!getStateShowingNextAsset)(
       const result = nextAsset(state);
 
       expect(result.currentAsset!.asset.key).toBe("a1");
-      const queue = result.queues.q1;
-      if (queue) {
-        expect(queue.items).toHaveLength(0);
-      }
+      expect(result.queues.q1).toBeDefined();
+      expect(result.queues.q1!.items).toHaveLength(0);
     });
 
     it("sets currentAsset without time when autoPlay is off", () => {
@@ -634,7 +632,7 @@ describe.skipIf(!getStateShowingNextAsset)(
       expect(result.currentAsset).toBeNull();
     });
 
-    it("plays last item from non-cycling queue then deletes queue and nulls activeQueueId", () => {
+    it("plays last item from non-cycling queue, keeps queue with 0 items and activeQueueId", () => {
       const state = makeControllerState({
         activeQueueId: "q1",
         queues: {
@@ -652,8 +650,9 @@ describe.skipIf(!getStateShowingNextAsset)(
 
       expect(result.currentAsset).not.toBeNull();
       expect(result.currentAsset!.asset.key).toBe("a1");
-      expect(result.queues.q1).toBeUndefined();
-      expect(result.activeQueueId).toBeNull();
+      expect(result.queues.q1).toBeDefined();
+      expect(result.queues.q1!.items).toHaveLength(0);
+      expect(result.activeQueueId).toBe("q1");
       expect(result.playing).toBe(false);
     });
   },

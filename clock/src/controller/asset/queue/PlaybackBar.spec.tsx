@@ -220,7 +220,7 @@ describe("PlaybackBar", () => {
       expect(screen.getByLabelText("Next in queue")).not.toBeDisabled();
     });
 
-    it("is disabled when queue is empty and not cycling", () => {
+    it("is enabled when queue is empty and not cycling (0 remaining state)", () => {
       const queue = makeQueue({ items: [], cycle: false });
       setupMock({
         activeQueueId: "queue-1",
@@ -230,7 +230,21 @@ describe("PlaybackBar", () => {
 
       render(<PlaybackBar />);
 
-      expect(screen.getByLabelText("Next in queue")).toBeDisabled();
+      expect(screen.getByLabelText("Next in queue")).not.toBeDisabled();
+    });
+
+    it("calls showNextAsset when clicked with 0 remaining (triggers cleanup)", () => {
+      const queue = makeQueue({ items: [], cycle: false });
+      const { showNextAsset } = setupMock({
+        activeQueueId: "queue-1",
+        queues: { "queue-1": queue },
+        currentAsset: { asset: { key: "img0", type: "IMAGE" }, time: null },
+      });
+
+      render(<PlaybackBar />);
+      fireEvent.click(screen.getByLabelText("Next in queue"));
+
+      expect(showNextAsset).toHaveBeenCalledOnce();
     });
 
     it("is disabled when queue was deleted (no active queue)", () => {
