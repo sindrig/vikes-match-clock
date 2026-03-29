@@ -17,6 +17,32 @@ The admin portal needs a separate route (`/admin`) so admins can navigate betwee
 pnpm add react-router-dom
 ```
 
+### Infrastructure: SPA routing for CloudFront + S3
+
+Client-side routing requires that all paths (e.g. `/admin`) serve `index.html` instead of returning S3 404s. The CloudFront distribution (managed by `cloudposse/cloudfront-s3-cdn` in `infra/modules/web/frontend.tf`) needs a custom error response:
+
+- **CloudFront custom error response**: Return `index.html` with HTTP 200 for 403/404 errors from S3.
+- **Cache busting**: Ensure the custom error response respects cache invalidation so stale `index.html` is not served. The module's `custom_error_response` variable can configure this.
+
+This change must be applied in the Terraform `webpage` module call. Example:
+
+```hcl
+custom_error_response = [
+  {
+    error_code            = 404
+    response_code         = 200
+    response_page_path    = "/index.html"
+    error_caching_min_ttl = 0
+  },
+  {
+    error_code            = 403
+    response_code         = 200
+    response_page_path    = "/index.html"
+    error_caching_min_ttl = 0
+  }
+]
+```
+
 ### New file: `clock/src/router.tsx`
 
 Define the app's routes:
@@ -81,6 +107,7 @@ The admin badge (small "Admin" indicator) is also shown in this state.
 - `clock/src/admin/AdminRoute.tsx` -- new route guard
 - `clock/src/controller/Controller.tsx` -- add admin button when `isAdmin`
 - `clock/src/contexts/LocalStateContext.tsx` -- expose `isAdmin` (see spec 005)
+- `infra/modules/web/frontend.tf` -- add CloudFront custom error responses for SPA routing
 
 ## Testing
 
