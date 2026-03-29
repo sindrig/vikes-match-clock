@@ -34,6 +34,10 @@ deploy-functions:
       working-directory: ./functions
       run: npm run build
 
+    - name: Run function tests
+      working-directory: ./functions
+      run: npm test
+
     - uses: w9jds/setup-firebase@main
       with:
         tools-version: 11.9.0
