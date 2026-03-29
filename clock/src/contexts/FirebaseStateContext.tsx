@@ -18,10 +18,13 @@ import {
   ViewState,
   ListenersState,
   ViewPort,
+  ThemeConfig,
+  CustomPreset,
   Asset,
   Player,
   Roster,
   TwoMinPenalty,
+  QueueState,
 } from "../types";
 import { Sports, DEFAULT_HALFSTOPS } from "../constants";
 import clubIds from "../club-ids";
@@ -57,10 +60,8 @@ const defaultMatch: Match = {
 };
 
 const defaultController: ControllerState = {
-  selectedAssets: [],
-  cycle: false,
-  imageSeconds: 3,
-  autoPlay: false,
+  queues: {},
+  activeQueueId: null,
   playing: false,
   assetView: "assets",
   view: "idle",
@@ -78,6 +79,43 @@ const defaultListeners: ListenersState = {
   available: [],
   screens: [],
 };
+
+export function computeControllerDiff(
+  prev: ControllerState,
+  next: ControllerState,
+): Record<string, unknown> {
+  const diff: Record<string, unknown> = {};
+
+  for (const key of Object.keys(next) as Array<keyof ControllerState>) {
+    if (key === "queues") {
+      if (prev.queues !== next.queues) {
+        const prevQueues = prev.queues;
+        const nextQueues = next.queues;
+
+        for (const queueId of Object.keys(nextQueues)) {
+          if (prevQueues[queueId] !== nextQueues[queueId]) {
+            diff[`queues/${queueId}`] = nextQueues[queueId];
+          }
+        }
+
+        for (const queueId of Object.keys(prevQueues)) {
+          if (!Object.prototype.hasOwnProperty.call(nextQueues, queueId)) {
+            diff[`queues/${queueId}`] = null;
+          }
+        }
+      }
+      continue;
+    }
+
+    const oldVal = prev[key];
+    const newVal = next[key];
+    if (oldVal !== newVal) {
+      diff[key] = newVal;
+    }
+  }
+
+  return diff;
+}
 
 interface FirebaseStateContextType {
   match: Match;
@@ -109,12 +147,20 @@ interface FirebaseStateContextType {
   updateController: (updates: Partial<ControllerState>) => void;
   selectView: (view: string) => void;
   selectAssetView: (assetView: string) => void;
-  setSelectedAssets: (assets: Asset[]) => void;
-  addAssets: (assets: Asset[]) => void;
-  removeAsset: (asset: Asset) => void;
-  toggleCycle: () => void;
-  setImageSeconds: (seconds: number) => void;
-  toggleAutoPlay: () => void;
+  createQueue: (name: string, options?: { cycle?: boolean }) => string;
+  deleteQueue: (queueId: string) => void;
+  renameQueue: (queueId: string, name: string) => void;
+  reorderQueues: (orderedIds: string[]) => void;
+  addItemsToQueue: (queueId: string, assets: Asset[]) => void;
+  removeItemFromQueue: (queueId: string, assetKey: string) => void;
+  reorderItemsInQueue: (queueId: string, items: Asset[]) => void;
+  updateQueueSettings: (
+    queueId: string,
+    settings: Partial<Pick<QueueState, "autoPlay" | "imageSeconds" | "cycle">>,
+  ) => void;
+  playQueue: (queueId: string) => void;
+  stopPlaying: () => void;
+  showItemNow: (asset: Asset) => void;
   setPlaying: (playing: boolean) => void;
   renderAsset: (asset: Asset | null) => void;
   showNextAsset: () => void;
@@ -137,41 +183,128 @@ interface FirebaseStateContextType {
   setIdleImage: (idleImage: string) => void;
   setBlackoutStart: (blackoutStart: string | undefined) => void;
   setBlackoutEnd: (blackoutEnd: string | undefined) => void;
+  setTheme: (theme: ThemeConfig | undefined) => void;
+  setThemePreset: (preset: string | undefined) => void;
+  saveCustomPreset: (id: string, preset: CustomPreset) => void;
+  deleteCustomPreset: (id: string) => void;
 }
 
 const FirebaseStateContext = createContext<FirebaseStateContextType | null>(
   null,
 );
 
-const getStateShowingNextAsset = (state: ControllerState): ControllerState => {
-  const { cycle, selectedAssets, imageSeconds, autoPlay } = state;
-  const newState = { ...state };
-  if (!selectedAssets.length) {
+export const getStateWithAddedItems = (
+  prev: ControllerState,
+  queueId: string,
+  assets: Asset[],
+): ControllerState => {
+  const queue = prev.queues[queueId];
+  if (!queue) return prev;
+
+  const existingKeys = new Set(queue.items.map((i) => i.key));
+  const validAssetKeys = Object.keys(assetTypes);
+  const newItems = assets.filter(
+    (asset) =>
+      validAssetKeys.indexOf(asset.type) !== -1 &&
+      asset.key &&
+      !existingKeys.has(asset.key),
+  );
+
+  if (newItems.length === 0) return prev;
+
+  return {
+    ...prev,
+    queues: {
+      ...prev.queues,
+      [queueId]: { ...queue, items: [...queue.items, ...newItems] },
+    },
+  };
+};
+
+export const getStateShowingNextAsset = (
+  state: ControllerState,
+): ControllerState => {
+  const { activeQueueId } = state;
+  const newState: ControllerState = {
+    ...state,
+    queues: { ...state.queues },
+  };
+
+  if (!activeQueueId) {
     newState.playing = false;
     newState.currentAsset = null;
-  } else {
-    const assets = [...selectedAssets];
-    const nextAsset = assets.shift();
-    if (!nextAsset) {
-      newState.playing = false;
-      newState.currentAsset = null;
-      return newState;
-    }
-    newState.currentAsset = {
-      asset: nextAsset,
-      time: autoPlay ? imageSeconds : null,
-    };
-    if (autoPlay) {
-      newState.playing = true;
-    }
-    if (cycle) {
-      newState.selectedAssets = [...assets, nextAsset];
-    } else {
-      newState.selectedAssets = [...assets];
-    }
+    return newState;
   }
+
+  const activeQueue = state.queues[activeQueueId];
+  if (!activeQueue) {
+    newState.playing = false;
+    newState.currentAsset = null;
+    newState.activeQueueId = null;
+    return newState;
+  }
+
+  if (activeQueue.items.length === 0) {
+    newState.playing = false;
+    newState.currentAsset = null;
+    return maybeAutoDeleteQueue(newState, activeQueueId);
+  }
+
+  const items = [...activeQueue.items];
+  const nextAsset = items.shift();
+  if (!nextAsset) {
+    newState.playing = false;
+    newState.currentAsset = null;
+    return newState;
+  }
+
+  const updatedItems = activeQueue.cycle ? [...items, nextAsset] : [...items];
+  const updatedQueue: QueueState = {
+    ...activeQueue,
+    items: updatedItems,
+  };
+
+  newState.currentAsset = {
+    asset: nextAsset,
+    time: activeQueue.autoPlay ? activeQueue.imageSeconds : null,
+  };
+  newState.playing = activeQueue.autoPlay;
+
+  if (!activeQueue.cycle && updatedItems.length === 0) {
+    delete newState.queues[activeQueueId];
+    newState.activeQueueId = null;
+    newState.playing = false;
+    return newState;
+  }
+
+  newState.queues[activeQueueId] = updatedQueue;
   return newState;
 };
+
+export function maybeAutoDeleteQueue(
+  state: ControllerState,
+  queueId: string,
+): ControllerState {
+  const queue = state.queues[queueId];
+  if (!queue || queue.cycle || queue.items.length > 0) {
+    return state; // No deletion needed
+  }
+
+  // Delete non-cycling empty queue
+  const queues = { ...state.queues };
+  delete queues[queueId];
+
+  const newState: ControllerState = { ...state, queues };
+
+  // If deleted queue was active, clear active state
+  if (state.activeQueueId === queueId) {
+    newState.activeQueueId = null;
+    newState.playing = false;
+    newState.currentAsset = null;
+  }
+
+  return newState;
+}
 
 interface FirebaseStateProviderProps {
   children: ReactNode;
@@ -348,14 +481,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       if (isAuthenticated) {
         controllerRef.current = newState;
 
-        const diff: Record<string, unknown> = {};
-        for (const key of Object.keys(newState) as (keyof ControllerState)[]) {
-          const oldVal = prev[key];
-          const newVal = newState[key];
-          if (oldVal !== newVal) {
-            diff[key] = newVal;
-          }
-        }
+        const diff = computeControllerDiff(prev, newState);
 
         if (Object.keys(diff).length > 0) {
           firebaseDatabase
@@ -381,7 +507,15 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
           const oldVal = prev[key];
           const newVal = newState[key];
           if (oldVal !== newVal) {
-            diff[key] = newVal;
+            // Firebase update() rejects undefined; use null to delete a key
+            diff[key] = newVal === undefined ? null : newVal;
+          }
+        }
+
+        // Also detect keys removed from newState (present in prev, absent in new)
+        for (const key of Object.keys(prev) as (keyof ViewState)[]) {
+          if (!(key in newState) && !(key in diff) && prev[key] !== undefined) {
+            diff[key] = null;
           }
         }
 
@@ -689,7 +823,6 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     (updates: Partial<ControllerState>) => {
       applyControllerUpdate((prev) => ({
         ...prev,
-        selectedAssets: [],
         ...updates,
       }));
     },
@@ -710,65 +843,218 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     [applyControllerUpdate],
   );
 
-  const setSelectedAssets = useCallback(
-    (assets: Asset[]) => {
-      applyControllerUpdate((prev) => ({
-        ...prev,
-        selectedAssets: assets || [],
-      }));
+  const createQueue = useCallback(
+    (name: string, options?: { cycle?: boolean }) => {
+      const queueId = `queue-${crypto.randomUUID()}`;
+      applyControllerUpdate((prev) => {
+        const existingOrders = Object.values(prev.queues).map((q) => q.order);
+        const nextOrder = existingOrders.length
+          ? Math.max(...existingOrders) + 1
+          : 0;
+        const newQueue: QueueState = {
+          id: queueId,
+          name,
+          items: [],
+          autoPlay: false,
+          imageSeconds: 3,
+          cycle: options?.cycle ?? true,
+          order: nextOrder,
+        };
+        return {
+          ...prev,
+          queues: { ...prev.queues, [queueId]: newQueue },
+          activeQueueId: prev.activeQueueId ?? queueId,
+        };
+      });
+      return queueId;
     },
     [applyControllerUpdate],
   );
 
-  const addAssets = useCallback(
-    (assets: Asset[]) => {
+  const deleteQueue = useCallback(
+    (queueId: string) => {
       applyControllerUpdate((prev) => {
-        const updatedAssets = [...(prev.selectedAssets || [])];
-        assets.forEach((asset) => {
-          if (Object.keys(assetTypes).indexOf(asset.type) !== -1 && asset.key) {
-            if (updatedAssets.map((s) => s.key).indexOf(asset.key) === -1) {
-              updatedAssets.push(asset);
-            }
+        if (!prev.queues[queueId]) return prev;
+        const queues = { ...prev.queues };
+        delete queues[queueId];
+        const isActive = prev.activeQueueId === queueId;
+        return {
+          ...prev,
+          queues,
+          activeQueueId: isActive ? null : prev.activeQueueId,
+          playing: isActive ? false : prev.playing,
+          currentAsset: isActive ? null : prev.currentAsset,
+        };
+      });
+    },
+    [applyControllerUpdate],
+  );
+
+  const renameQueue = useCallback(
+    (queueId: string, name: string) => {
+      applyControllerUpdate((prev) => {
+        const queue = prev.queues[queueId];
+        if (!queue) return prev;
+        return {
+          ...prev,
+          queues: { ...prev.queues, [queueId]: { ...queue, name } },
+        };
+      });
+    },
+    [applyControllerUpdate],
+  );
+
+  const reorderQueues = useCallback(
+    (orderedIds: string[]) => {
+      applyControllerUpdate((prev) => {
+        if (!orderedIds.length) return prev;
+        const queues = { ...prev.queues };
+        const listedIds = new Set(orderedIds);
+
+        // Assign orders to listed queues
+        orderedIds.forEach((queueId, index) => {
+          const queue = queues[queueId];
+          if (queue) {
+            queues[queueId] = { ...queue, order: index };
           }
         });
-        return { ...prev, selectedAssets: updatedAssets };
+
+        // Find unlisted queues and sort them by current order
+        const unlistedQueues = Object.entries(queues)
+          .filter(([id]) => !listedIds.has(id))
+          .sort((a, b) => (a[1].order ?? 0) - (b[1].order ?? 0));
+
+        // Assign sequential orders to unlisted queues after listed ones
+        unlistedQueues.forEach(([queueId, queue], index) => {
+          queues[queueId] = { ...queue, order: orderedIds.length + index };
+        });
+
+        return { ...prev, queues };
       });
     },
     [applyControllerUpdate],
   );
 
-  const removeAsset = useCallback(
-    (asset: Asset) => {
+  const addItemsToQueue = useCallback(
+    (queueId: string, assets: Asset[]) => {
+      applyControllerUpdate((prev) =>
+        getStateWithAddedItems(prev, queueId, assets),
+      );
+    },
+    [applyControllerUpdate],
+  );
+
+  const removeItemFromQueue = useCallback(
+    (queueId: string, assetKey: string) => {
       applyControllerUpdate((prev) => {
-        const idx = prev.selectedAssets.map((a) => a.key).indexOf(asset.key);
-        if (idx > -1) {
-          const newAssets = [...prev.selectedAssets];
-          newAssets.splice(idx, 1);
-          return { ...prev, selectedAssets: newAssets };
+        const queue = prev.queues[queueId];
+        if (!queue) return prev;
+        const idx = queue.items.map((item) => item.key).indexOf(assetKey);
+        if (idx === -1) return prev;
+        const updatedItems = [...queue.items];
+        updatedItems.splice(idx, 1);
+        if (updatedItems.length === 0) {
+          const nextState = {
+            ...prev,
+            queues: {
+              ...prev.queues,
+              [queueId]: { ...queue, items: updatedItems },
+            },
+          };
+          return maybeAutoDeleteQueue(nextState, queueId);
         }
-        return prev;
+        return {
+          ...prev,
+          queues: {
+            ...prev.queues,
+            [queueId]: { ...queue, items: updatedItems },
+          },
+        };
       });
     },
     [applyControllerUpdate],
   );
 
-  const toggleCycle = useCallback(() => {
-    applyControllerUpdate((prev) => ({ ...prev, cycle: !prev.cycle }));
-  }, [applyControllerUpdate]);
-
-  const setImageSeconds = useCallback(
-    (seconds: number) => {
-      applyControllerUpdate((prev) => ({ ...prev, imageSeconds: seconds }));
+  const reorderItemsInQueue = useCallback(
+    (queueId: string, items: Asset[]) => {
+      applyControllerUpdate((prev) => {
+        const queue = prev.queues[queueId];
+        if (!queue) return prev;
+        const filteredItems = items.filter(
+          (asset) =>
+            Object.keys(assetTypes).indexOf(asset.type) !== -1 &&
+            Boolean(asset.key),
+        );
+        const dedupedItems: Asset[] = [];
+        const seenKeys = new Set<string>();
+        filteredItems.forEach((asset) => {
+          if (!seenKeys.has(asset.key)) {
+            dedupedItems.push(asset);
+            seenKeys.add(asset.key);
+          }
+        });
+        if (dedupedItems.length === 0) {
+          const nextState = {
+            ...prev,
+            queues: {
+              ...prev.queues,
+              [queueId]: { ...queue, items: dedupedItems },
+            },
+          };
+          return maybeAutoDeleteQueue(nextState, queueId);
+        }
+        return {
+          ...prev,
+          queues: {
+            ...prev.queues,
+            [queueId]: { ...queue, items: dedupedItems },
+          },
+        };
+      });
     },
     [applyControllerUpdate],
   );
 
-  const toggleAutoPlay = useCallback(() => {
-    applyControllerUpdate((prev) => ({
-      ...prev,
-      autoPlay: !prev.autoPlay,
-      playing: prev.autoPlay ? false : prev.playing,
-    }));
+  const updateQueueSettings = useCallback(
+    (
+      queueId: string,
+      settings: Partial<
+        Pick<QueueState, "autoPlay" | "imageSeconds" | "cycle">
+      >,
+    ) => {
+      applyControllerUpdate((prev) => {
+        const queue = prev.queues[queueId];
+        if (!queue) return prev;
+        const nextState = {
+          ...prev,
+          queues: {
+            ...prev.queues,
+            [queueId]: { ...queue, ...settings },
+          },
+        };
+        if (settings.cycle === false) {
+          return maybeAutoDeleteQueue(nextState, queueId);
+        }
+        return nextState;
+      });
+    },
+    [applyControllerUpdate],
+  );
+
+  const playQueue = useCallback(
+    (queueId: string) => {
+      applyControllerUpdate((prev) => {
+        return getStateShowingNextAsset({
+          ...prev,
+          activeQueueId: queueId,
+        });
+      });
+    },
+    [applyControllerUpdate],
+  );
+
+  const stopPlaying = useCallback(() => {
+    applyControllerUpdate((prev) => ({ ...prev, playing: false }));
   }, [applyControllerUpdate]);
 
   const setPlaying = useCallback(
@@ -788,15 +1074,27 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     [applyControllerUpdate],
   );
 
+  const showItemNow = useCallback(
+    (asset: Asset) => {
+      renderAsset(asset);
+    },
+    [renderAsset],
+  );
+
   const showNextAsset = useCallback(() => {
     applyControllerUpdate((prev) => getStateShowingNextAsset(prev));
   }, [applyControllerUpdate]);
 
   const removeAssetAfterTimeout = useCallback(() => {
     applyControllerUpdate((prev) => {
-      const { playing, autoPlay } = prev;
-      if (autoPlay) {
-        if (playing) {
+      const activeQueue = prev.activeQueueId
+        ? prev.queues[prev.activeQueueId]
+        : null;
+      if (!activeQueue) {
+        return { ...prev, playing: false, currentAsset: null };
+      }
+      if (activeQueue.autoPlay) {
+        if (prev.playing) {
           return getStateShowingNextAsset(prev);
         }
         return prev;
@@ -923,6 +1221,48 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     [applyViewUpdate],
   );
 
+  const setTheme = useCallback(
+    (theme: ThemeConfig | undefined) => {
+      applyViewUpdate((prev) => ({ ...prev, theme }));
+    },
+    [applyViewUpdate],
+  );
+
+  const setThemePreset = useCallback(
+    (preset: string | undefined) => {
+      applyViewUpdate((prev) => ({ ...prev, themePreset: preset }));
+    },
+    [applyViewUpdate],
+  );
+
+  const saveCustomPreset = useCallback(
+    (id: string, preset: CustomPreset) => {
+      applyViewUpdate((prev) => {
+        const existing = prev.customPresets ?? {};
+        return {
+          ...prev,
+          customPresets: { ...existing, [id]: preset },
+        };
+      });
+    },
+    [applyViewUpdate],
+  );
+
+  const deleteCustomPreset = useCallback(
+    (id: string) => {
+      applyViewUpdate((prev) => {
+        if (!prev.customPresets?.[id]) return prev;
+
+        const updated = { ...prev.customPresets };
+        delete updated[id];
+        const newCustomPresets =
+          Object.keys(updated).length > 0 ? updated : undefined;
+        return { ...prev, customPresets: newCustomPresets };
+      });
+    },
+    [applyViewUpdate],
+  );
+
   // Apply screen viewport override from "Birta skjá" selection.
   // The screenViewport from locations.X.screens[Y] takes precedence over
   // the Firebase view.vp, which may not match the physical screen config.
@@ -956,12 +1296,17 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       updateController,
       selectView,
       selectAssetView,
-      setSelectedAssets,
-      addAssets,
-      removeAsset,
-      toggleCycle,
-      setImageSeconds,
-      toggleAutoPlay,
+      createQueue,
+      deleteQueue,
+      renameQueue,
+      reorderQueues,
+      addItemsToQueue,
+      removeItemFromQueue,
+      reorderItemsInQueue,
+      updateQueueSettings,
+      playQueue,
+      stopPlaying,
+      showItemNow,
       setPlaying,
       renderAsset,
       showNextAsset,
@@ -979,6 +1324,10 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       setIdleImage,
       setBlackoutStart,
       setBlackoutEnd,
+      setTheme,
+      setThemePreset,
+      saveCustomPreset,
+      deleteCustomPreset,
     }),
     [
       match,
@@ -1004,12 +1353,17 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       updateController,
       selectView,
       selectAssetView,
-      setSelectedAssets,
-      addAssets,
-      removeAsset,
-      toggleCycle,
-      setImageSeconds,
-      toggleAutoPlay,
+      createQueue,
+      deleteQueue,
+      renameQueue,
+      reorderQueues,
+      addItemsToQueue,
+      removeItemFromQueue,
+      reorderItemsInQueue,
+      updateQueueSettings,
+      playQueue,
+      stopPlaying,
+      showItemNow,
       setPlaying,
       renderAsset,
       showNextAsset,
@@ -1027,6 +1381,10 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       setIdleImage,
       setBlackoutStart,
       setBlackoutEnd,
+      setTheme,
+      setThemePreset,
+      saveCustomPreset,
+      deleteCustomPreset,
     ],
   );
 
@@ -1092,12 +1450,17 @@ export const useController = () => {
     updateController,
     selectView,
     selectAssetView,
-    setSelectedAssets,
-    addAssets,
-    removeAsset,
-    toggleCycle,
-    setImageSeconds,
-    toggleAutoPlay,
+    createQueue,
+    deleteQueue,
+    renameQueue,
+    reorderQueues,
+    addItemsToQueue,
+    removeItemFromQueue,
+    reorderItemsInQueue,
+    updateQueueSettings,
+    playQueue,
+    stopPlaying,
+    showItemNow,
     setPlaying,
     renderAsset,
     showNextAsset,
@@ -1115,12 +1478,17 @@ export const useController = () => {
     updateController,
     selectView,
     selectAssetView,
-    setSelectedAssets,
-    addAssets,
-    removeAsset,
-    toggleCycle,
-    setImageSeconds,
-    toggleAutoPlay,
+    createQueue,
+    deleteQueue,
+    renameQueue,
+    reorderQueues,
+    addItemsToQueue,
+    removeItemFromQueue,
+    reorderItemsInQueue,
+    updateQueueSettings,
+    playQueue,
+    stopPlaying,
+    showItemNow,
     setPlaying,
     renderAsset,
     showNextAsset,
@@ -1144,6 +1512,10 @@ export const useView = () => {
     setIdleImage,
     setBlackoutStart,
     setBlackoutEnd,
+    setTheme,
+    setThemePreset,
+    saveCustomPreset,
+    deleteCustomPreset,
   } = useFirebaseState();
   return {
     view,
@@ -1153,6 +1525,10 @@ export const useView = () => {
     setIdleImage,
     setBlackoutStart,
     setBlackoutEnd,
+    setTheme,
+    setThemePreset,
+    saveCustomPreset,
+    deleteCustomPreset,
   };
 };
 

@@ -24,7 +24,7 @@ const mockedUseLocalState = vi.mocked(useLocalState);
 
 interface TestComponentProps {
   onKeyDown?: (event: KeyboardEvent) => void;
-  inputRef?: React.RefObject<HTMLInputElement>;
+  inputRef?: React.RefObject<HTMLInputElement | null>;
 }
 
 // Component that uses the hook and optionally renders an input
@@ -70,7 +70,8 @@ describe("useGlobalShortcuts", () => {
       controller: {
         view: VIEWS.control,
         assetView: ASSET_VIEWS.assets,
-        selectedAssets: [],
+        queues: {},
+        activeQueueId: null,
         currentAsset: null,
       },
       showNextAsset: mockShowNextAsset,
@@ -118,7 +119,8 @@ describe("useGlobalShortcuts", () => {
           controller: {
             view: VIEWS.match,
             assetView: ASSET_VIEWS.assets,
-            selectedAssets: [],
+            queues: {},
+            activeQueueId: null,
             currentAsset: null,
           },
           showNextAsset: mockShowNextAsset,
@@ -149,7 +151,8 @@ describe("useGlobalShortcuts", () => {
           controller: {
             view: VIEWS.match,
             assetView: ASSET_VIEWS.assets,
-            selectedAssets: [],
+            queues: {},
+            activeQueueId: null,
             currentAsset: null,
           },
           showNextAsset: mockShowNextAsset,
@@ -179,7 +182,8 @@ describe("useGlobalShortcuts", () => {
           controller: {
             view: VIEWS.match,
             assetView: ASSET_VIEWS.assets,
-            selectedAssets: [],
+            queues: {},
+            activeQueueId: null,
             currentAsset: null,
           },
           showNextAsset: mockShowNextAsset,
@@ -196,13 +200,24 @@ describe("useGlobalShortcuts", () => {
   });
 
   describe("Asset View Shortcuts", () => {
-    describe("Space key in asset view with selectedAssets", () => {
-      it("calls showNextAsset when Space pressed with selectedAssets in asset view (match view)", () => {
+    describe("Space key in asset view with queue items", () => {
+      it("calls showNextAsset when Space pressed with queue items in asset view (match view)", () => {
         mockedUseController.mockReturnValue({
           controller: {
             view: VIEWS.match,
             assetView: ASSET_VIEWS.assets,
-            selectedAssets: ["asset-1"],
+            queues: {
+              q1: {
+                id: "q1",
+                name: "Test",
+                items: [{ key: "asset-1", type: "image" }],
+                autoPlay: false,
+                imageSeconds: 10,
+                cycle: false,
+                order: 0,
+              },
+            },
+            activeQueueId: "q1",
             currentAsset: null,
           },
           showNextAsset: mockShowNextAsset,
@@ -217,12 +232,23 @@ describe("useGlobalShortcuts", () => {
         expect(mockRenderAsset).not.toHaveBeenCalled();
       });
 
-      it("calls showNextAsset when Space pressed with selectedAssets in asset view (idle view)", () => {
+      it("calls showNextAsset when Space pressed with queue items in asset view (idle view)", () => {
         mockedUseController.mockReturnValue({
           controller: {
             view: VIEWS.idle,
             assetView: ASSET_VIEWS.assets,
-            selectedAssets: ["asset-2"],
+            queues: {
+              q1: {
+                id: "q1",
+                name: "Test",
+                items: [{ key: "asset-2", type: "image" }],
+                autoPlay: false,
+                imageSeconds: 10,
+                cycle: false,
+                order: 0,
+              },
+            },
+            activeQueueId: "q1",
             currentAsset: null,
           },
           showNextAsset: mockShowNextAsset,
@@ -237,12 +263,13 @@ describe("useGlobalShortcuts", () => {
         expect(mockRenderAsset).not.toHaveBeenCalled();
       });
 
-      it("does not call showNextAsset when Space pressed with empty selectedAssets and no currentAsset", () => {
+      it("does not call showNextAsset when Space pressed with empty queue and no currentAsset", () => {
         mockedUseController.mockReturnValue({
           controller: {
             view: VIEWS.match,
             assetView: ASSET_VIEWS.assets,
-            selectedAssets: [],
+            queues: {},
+            activeQueueId: null,
             currentAsset: null,
           },
           showNextAsset: mockShowNextAsset,
@@ -259,12 +286,13 @@ describe("useGlobalShortcuts", () => {
     });
 
     describe("Space key in asset view with currentAsset", () => {
-      it("calls renderAsset(null) when Space pressed with currentAsset and no selectedAssets", () => {
+      it("calls renderAsset(null) when Space pressed with currentAsset and no queue items", () => {
         mockedUseController.mockReturnValue({
           controller: {
             view: VIEWS.match,
             assetView: ASSET_VIEWS.assets,
-            selectedAssets: [],
+            queues: {},
+            activeQueueId: null,
             currentAsset: { key: "asset-1", type: "image" },
           },
           showNextAsset: mockShowNextAsset,
@@ -280,12 +308,13 @@ describe("useGlobalShortcuts", () => {
         expect(mockShowNextAsset).not.toHaveBeenCalled();
       });
 
-      it("calls renderAsset(null) in idle view with currentAsset and no selectedAssets", () => {
+      it("calls renderAsset(null) in idle view with currentAsset and no queue items", () => {
         mockedUseController.mockReturnValue({
           controller: {
             view: VIEWS.idle,
             assetView: ASSET_VIEWS.assets,
-            selectedAssets: [],
+            queues: {},
+            activeQueueId: null,
             currentAsset: { key: "asset-1", type: "video" },
           },
           showNextAsset: mockShowNextAsset,
@@ -300,12 +329,23 @@ describe("useGlobalShortcuts", () => {
         expect(mockRenderAsset).toHaveBeenCalledWith(null);
       });
 
-      it("prioritizes showNextAsset over renderAsset when both selectedAssets and currentAsset exist", () => {
+      it("prioritizes showNextAsset over renderAsset when both queue items and currentAsset exist", () => {
         mockedUseController.mockReturnValue({
           controller: {
             view: VIEWS.match,
             assetView: ASSET_VIEWS.assets,
-            selectedAssets: ["asset-1"],
+            queues: {
+              q1: {
+                id: "q1",
+                name: "Test",
+                items: [{ key: "asset-1", type: "image" }],
+                autoPlay: false,
+                imageSeconds: 10,
+                cycle: false,
+                order: 0,
+              },
+            },
+            activeQueueId: "q1",
             currentAsset: { key: "asset-2", type: "image" },
           },
           showNextAsset: mockShowNextAsset,
@@ -325,7 +365,8 @@ describe("useGlobalShortcuts", () => {
           controller: {
             view: VIEWS.control,
             assetView: ASSET_VIEWS.assets,
-            selectedAssets: [],
+            queues: {},
+            activeQueueId: null,
             currentAsset: { key: "asset-1", type: "image" },
           },
           showNextAsset: mockShowNextAsset,
@@ -347,7 +388,18 @@ describe("useGlobalShortcuts", () => {
           controller: {
             view: VIEWS.match,
             assetView: "teams",
-            selectedAssets: ["asset-1"],
+            queues: {
+              q1: {
+                id: "q1",
+                name: "Test",
+                items: [{ key: "asset-1", type: "image" }],
+                autoPlay: false,
+                imageSeconds: 10,
+                cycle: false,
+                order: 0,
+              },
+            },
+            activeQueueId: "q1",
             currentAsset: null,
           },
           showNextAsset: mockShowNextAsset,
@@ -472,7 +524,18 @@ describe("useGlobalShortcuts", () => {
           controller: {
             view: VIEWS.match,
             assetView: ASSET_VIEWS.assets,
-            selectedAssets: ["asset-1"],
+            queues: {
+              q1: {
+                id: "q1",
+                name: "Test",
+                items: [{ key: "asset-1", type: "image" }],
+                autoPlay: false,
+                imageSeconds: 10,
+                cycle: false,
+                order: 0,
+              },
+            },
+            activeQueueId: "q1",
             currentAsset: null,
           },
           showNextAsset: mockShowNextAsset,
@@ -510,7 +573,7 @@ describe("useGlobalShortcuts", () => {
       expect(preventDefaultSpy).toHaveBeenCalled();
     });
 
-    it("prevents default for Space key in asset view with selectedAssets", () => {
+    it("prevents default for Space key in asset view with queue items", () => {
       mockedUseController.mockReturnValue({
         controller: {
           view: VIEWS.match,

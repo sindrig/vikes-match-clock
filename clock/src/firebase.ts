@@ -16,6 +16,7 @@ import {
   deleteObject,
   ListResult,
   StorageReference,
+  UploadMetadata,
   connectStorageEmulator,
 } from "firebase/storage";
 
@@ -76,8 +77,11 @@ if (isTest) {
 
 const storageHelpers = {
   ref: (path: string): StorageReference => storageRef(storage, path),
-  uploadBytes: (path: string, data: Blob | Uint8Array | ArrayBuffer) =>
-    uploadBytes(storageRef(storage, path), data),
+  uploadBytes: (
+    path: string,
+    data: Blob | Uint8Array | ArrayBuffer,
+    metadata?: UploadMetadata,
+  ) => uploadBytes(storageRef(storage, path), data, metadata),
   uploadString: (path: string, data: string) =>
     uploadString(storageRef(storage, path), data),
   getDownloadURL: (path: string) => getDownloadURL(storageRef(storage, path)),

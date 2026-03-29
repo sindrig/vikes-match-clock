@@ -23,7 +23,7 @@ function createTestImage(filePath: string) {
 
 async function goToMediaTab(page: Page) {
   await page.getByRole("button", { name: "Myndefni" }).click();
-  await expect(page.getByText("Birta strax")).toBeVisible({ timeout: 5000 });
+  await expect(page.getByText("Myndir")).toBeVisible({ timeout: 5000 });
 }
 
 test.beforeAll(async () => {

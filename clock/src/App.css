@@ -72,6 +72,10 @@ html {
   padding: 0;
 }
 
+.controller-layout .preview-score-buttons .rs-btn:last-child {
+  background-color: rgba(255, 0, 0, 0.06);
+}
+
 .controller-layout
   .preview-with-scores
   > .preview-score-buttons:first-child

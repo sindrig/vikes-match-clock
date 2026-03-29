@@ -13,13 +13,14 @@ export default function useGlobalShortcuts() {
   } = useMatch();
 
   const {
-    controller: { view, assetView, selectedAssets, currentAsset },
+    controller: { view, assetView, activeQueueId, queues, currentAsset },
     showNextAsset,
     renderAsset,
   } = useController();
 
   // Extract primitives to stabilize dependency array
-  const hasSelectedAssets = selectedAssets.length > 0;
+  const activeQueue = activeQueueId ? queues[activeQueueId] : null;
+  const hasQueueItems = (activeQueue?.items.length ?? 0) > 0;
   const hasCurrentAsset = !!currentAsset;
   const isLoggedIn = !auth.isEmpty;
 
@@ -67,7 +68,7 @@ export default function useGlobalShortcuts() {
       ) {
         if (event.code === "Space") {
           event.preventDefault();
-          if (hasSelectedAssets) {
+          if (hasQueueItems) {
             showNextAsset();
           } else if (hasCurrentAsset) {
             renderAsset(null);
@@ -81,7 +82,7 @@ export default function useGlobalShortcuts() {
   }, [
     view,
     assetView,
-    hasSelectedAssets,
+    hasQueueItems,
     hasCurrentAsset,
     started,
     startMatch,

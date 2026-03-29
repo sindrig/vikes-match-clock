@@ -4,13 +4,14 @@ import {
   parseMatch,
   parseController,
   parseView,
+  parseTheme,
+  parseCustomPresets,
 } from "./firebaseParsers";
-import { Sports, DEFAULT_HALFSTOPS } from "../constants";
+import { Sports, DEFAULT_HALFSTOPS, DEFAULT_THEME } from "../constants";
 import type {
   Match,
   ControllerState,
   ViewState,
-  Asset,
   ViewPort,
   TwoMinPenalty,
 } from "../types";
@@ -41,16 +42,15 @@ const defaultMatch: Match = {
 };
 
 const defaultController: ControllerState = {
-  selectedAssets: [],
-  cycle: false,
-  imageSeconds: 5,
-  autoPlay: false,
   playing: false,
   assetView: "grid",
   view: "scoreboard",
   roster: { home: [], away: [] },
   currentAsset: null,
   refreshToken: "",
+  queues: {},
+  activeQueueId: null,
+  tab: undefined,
 };
 
 const defaultView: ViewState = {
@@ -131,7 +131,7 @@ describe("firebaseParsers", () => {
       };
 
       const result = parseLocations(data);
-      expect(result!.screens[0].label).toBe("hasteinsvollur");
+      expect(result!.screens[0]!.label).toBe("hasteinsvollur");
     });
 
     it("parses multiple screens within single location", () => {
@@ -155,8 +155,8 @@ describe("firebaseParsers", () => {
 
       const result = parseLocations(data);
       expect(result!.screens).toHaveLength(2);
-      expect(result!.screens[0].screen.name).toBe("Main");
-      expect(result!.screens[1].screen.name).toBe("Secondary");
+      expect(result!.screens[0]!.screen.name).toBe("Main");
+      expect(result!.screens[1]!.screen.name).toBe("Secondary");
     });
 
     it("parses multiple locations", () => {
@@ -205,7 +205,7 @@ describe("firebaseParsers", () => {
       };
 
       const result = parseLocations(data);
-      expect(result!.screens[0].pitchIds).toEqual(["pitch1", "pitch2"]);
+      expect(result!.screens[0]!.pitchIds).toEqual(["pitch1", "pitch2"]);
     });
 
     it("omits pitchIds when not present", () => {
@@ -223,7 +223,7 @@ describe("firebaseParsers", () => {
       };
 
       const result = parseLocations(data);
-      expect(result!.screens[0].pitchIds).toBeUndefined();
+      expect(result!.screens[0]!.pitchIds).toBeUndefined();
     });
 
     it("skips invalid location values", () => {
@@ -271,8 +271,8 @@ describe("firebaseParsers", () => {
 
       const result = parseLocations(data);
       expect(result!.screens).toHaveLength(2);
-      expect(result!.screens[0].screen.name).toBe("Valid");
-      expect(result!.screens[1].screen.name).toBe("Valid2");
+      expect(result!.screens[0]!.screen.name).toBe("Valid");
+      expect(result!.screens[1]!.screen.name).toBe("Valid2");
     });
 
     it("handles missing screens array", () => {
@@ -314,7 +314,7 @@ describe("firebaseParsers", () => {
       };
 
       const result = parseLocations(data);
-      expect(result!.screens[0].screen.fontSize).toBe("48px");
+      expect(result!.screens[0]!.screen.fontSize).toBe("48px");
     });
   });
 
@@ -661,8 +661,8 @@ describe("firebaseParsers", () => {
 
       const result = parseMatch(data, defaultMatch);
       expect(result!.home2min).toHaveLength(2);
-      expect(result!.home2min[0].key).toBe("p1");
-      expect(result!.home2min[1].key).toBe("p3");
+      expect(result!.home2min[0]!.key).toBe("p1");
+      expect(result!.home2min[1]!.key).toBe("p3");
     });
 
     it("uses default 2-minute arrays when not arrays", () => {
@@ -716,87 +716,22 @@ describe("firebaseParsers", () => {
       expect(result).toEqual(defaultController);
     });
 
-    it("parses selectedAssets array", () => {
-      const assets: Asset[] = [
-        { key: "a1", type: "image" },
-        { key: "a2", type: "video" },
-      ];
+    it("uses empty queues when not object", () => {
       const data = {
-        selectedAssets: assets,
+        queues: "not an object",
       };
 
       const result = parseController(data, defaultController);
-      expect(result!.selectedAssets).toEqual(assets);
+      expect(result!.queues).toEqual({});
     });
 
-    it("filters invalid items from selectedAssets", () => {
+    it("uses default activeQueueId when not string", () => {
       const data = {
-        selectedAssets: [
-          { key: "a1", type: "image" },
-          null,
-          { key: "a2" }, // Missing required 'type' field
-          { type: "video" }, // Missing required 'key' field
-          { key: "a3", type: "text" },
-        ],
+        activeQueueId: 123,
       };
 
       const result = parseController(data, defaultController);
-      expect(result!.selectedAssets).toHaveLength(2);
-      expect(result!.selectedAssets[0].key).toBe("a1");
-      expect(result!.selectedAssets[1].key).toBe("a3");
-    });
-
-    it("uses default selectedAssets when not array", () => {
-      const data = {
-        selectedAssets: "not an array",
-      };
-
-      const result = parseController(data, defaultController);
-      expect(result!.selectedAssets).toEqual([]);
-    });
-
-    it("parses boolean fields", () => {
-      const data = {
-        cycle: true,
-        autoPlay: true,
-        playing: false,
-      };
-
-      const result = parseController(data, defaultController);
-      expect(result!.cycle).toBe(true);
-      expect(result!.autoPlay).toBe(true);
-      expect(result!.playing).toBe(false);
-    });
-
-    it("uses default for non-boolean boolean fields", () => {
-      const data = {
-        cycle: "true",
-        autoPlay: 1,
-        playing: null,
-      };
-
-      const result = parseController(data, defaultController);
-      expect(result!.cycle).toBe(defaultController.cycle);
-      expect(result!.autoPlay).toBe(defaultController.autoPlay);
-      expect(result!.playing).toBe(defaultController.playing);
-    });
-
-    it("parses numeric imageSeconds", () => {
-      const data = {
-        imageSeconds: 10,
-      };
-
-      const result = parseController(data, defaultController);
-      expect(result!.imageSeconds).toBe(10);
-    });
-
-    it("uses default imageSeconds for non-numeric", () => {
-      const data = {
-        imageSeconds: "10",
-      };
-
-      const result = parseController(data, defaultController);
-      expect(result!.imageSeconds).toBe(defaultController.imageSeconds);
+      expect(result!.activeQueueId).toBe(defaultController.activeQueueId);
     });
 
     it("parses string fields", () => {
@@ -873,19 +808,15 @@ describe("firebaseParsers", () => {
 
     it("merges all fields with defaults properly", () => {
       const data = {
-        cycle: true,
-        imageSeconds: 8,
         view: "assets",
       };
 
       const result = parseController(data, defaultController);
       // Provided fields
-      expect(result!.cycle).toBe(true);
-      expect(result!.imageSeconds).toBe(8);
       expect(result!.view).toBe("assets");
       // Default fields
-      expect(result!.autoPlay).toBe(defaultController.autoPlay);
-      expect(result!.selectedAssets).toEqual([]);
+      expect(result!.playing).toBe(defaultController.playing);
+      expect(result!.queues).toEqual({});
       expect(result!.roster).toEqual({ home: [], away: [] });
     });
   });
@@ -1062,6 +993,217 @@ describe("firebaseParsers", () => {
       const result = parseView(data, defaultView);
       expect(result!.blackoutStart).toBe("20:00");
       expect(result!.blackoutEnd).toBeUndefined();
+    });
+  });
+
+  // ---- parseTheme ----
+  describe("parseTheme", () => {
+    it("returns undefined for null", () => {
+      expect(parseTheme(null)).toBeUndefined();
+    });
+
+    it("returns undefined for undefined", () => {
+      expect(parseTheme(undefined)).toBeUndefined();
+    });
+
+    it("returns undefined for non-object (string)", () => {
+      expect(parseTheme("string")).toBeUndefined();
+    });
+
+    it("returns undefined for non-object (number)", () => {
+      expect(parseTheme(123)).toBeUndefined();
+    });
+
+    it("returns DEFAULT_THEME values for empty object", () => {
+      const result = parseTheme({});
+      expect(result).toBeDefined();
+      expect(result!.scoreBoxBg).toBe(DEFAULT_THEME.scoreBoxBg);
+      expect(result!.clockBg).toBe(DEFAULT_THEME.clockBg);
+      expect(result!.backgroundImage).toBe(DEFAULT_THEME.backgroundImage);
+    });
+
+    it("returns a full ThemeConfig with all keys from DEFAULT_THEME", () => {
+      const result = parseTheme({});
+      const defaultKeys = Object.keys(DEFAULT_THEME).sort();
+      const resultKeys = Object.keys(result!).sort();
+      expect(resultKeys).toEqual(defaultKeys);
+    });
+
+    it("uses provided string values", () => {
+      const result = parseTheme({
+        scoreBoxBg: "#ff0000",
+        clockBg: "#00ff00",
+      });
+      expect(result!.scoreBoxBg).toBe("#ff0000");
+      expect(result!.clockBg).toBe("#00ff00");
+    });
+
+    it("falls back to default for non-string values", () => {
+      const result = parseTheme({
+        scoreBoxBg: 42,
+        clockBg: true,
+        scoreBoxColor: null,
+      });
+      expect(result!.scoreBoxBg).toBe(DEFAULT_THEME.scoreBoxBg);
+      expect(result!.clockBg).toBe(DEFAULT_THEME.clockBg);
+      expect(result!.scoreBoxColor).toBe(DEFAULT_THEME.scoreBoxColor);
+    });
+
+    it("ignores extra keys not in DEFAULT_THEME", () => {
+      const result = parseTheme({
+        scoreBoxBg: "#123",
+        unknownField: "value",
+        anotherExtra: 999,
+      });
+      expect(result!.scoreBoxBg).toBe("#123");
+      expect(
+        (result as unknown as Record<string, unknown>)["unknownField"],
+      ).toBeUndefined();
+    });
+
+    it("handles mixed valid and invalid values", () => {
+      const result = parseTheme({
+        scoreBoxBg: "#aaa",
+        scoreBoxColor: 123, // invalid → default
+        clockBg: "rgba(0,0,0,0.5)",
+        clockColor: undefined, // invalid → default
+      });
+      expect(result!.scoreBoxBg).toBe("#aaa");
+      expect(result!.scoreBoxColor).toBe(DEFAULT_THEME.scoreBoxColor);
+      expect(result!.clockBg).toBe("rgba(0,0,0,0.5)");
+      expect(result!.clockColor).toBe(DEFAULT_THEME.clockColor);
+    });
+  });
+
+  // ---- parseCustomPresets ----
+  describe("parseCustomPresets", () => {
+    it("returns undefined for null", () => {
+      expect(parseCustomPresets(null)).toBeUndefined();
+    });
+
+    it("returns undefined for undefined", () => {
+      expect(parseCustomPresets(undefined)).toBeUndefined();
+    });
+
+    it("returns undefined for non-object", () => {
+      expect(parseCustomPresets("string")).toBeUndefined();
+      expect(parseCustomPresets(123)).toBeUndefined();
+    });
+
+    it("returns undefined for empty object", () => {
+      expect(parseCustomPresets({})).toBeUndefined();
+    });
+
+    it("parses a valid custom preset entry", () => {
+      const data = {
+        "preset-1": {
+          name: "My Theme",
+          theme: { scoreBoxBg: "#111" },
+        },
+      };
+      const result = parseCustomPresets(data);
+      expect(result).toBeDefined();
+      expect(result!["preset-1"]).toBeDefined();
+      expect(result!["preset-1"]!.name).toBe("My Theme");
+      expect(result!["preset-1"]!.theme.scoreBoxBg).toBe("#111");
+      // Missing theme keys should get DEFAULT_THEME values
+      expect(result!["preset-1"]!.theme.clockBg).toBe(DEFAULT_THEME.clockBg);
+    });
+
+    it("uses the key as name when name is missing", () => {
+      const data = {
+        "my-key": {
+          theme: { scoreBoxBg: "#222" },
+        },
+      };
+      const result = parseCustomPresets(data);
+      expect(result!["my-key"]!.name).toBe("my-key");
+    });
+
+    it("uses the key as name when name is non-string", () => {
+      const data = {
+        "key-1": {
+          name: 42,
+          theme: { scoreBoxBg: "#333" },
+        },
+      };
+      const result = parseCustomPresets(data);
+      expect(result!["key-1"]!.name).toBe("key-1");
+    });
+
+    it("skips entries with missing theme", () => {
+      const data = {
+        good: { name: "Good", theme: { scoreBoxBg: "#aaa" } },
+        bad: { name: "Bad" }, // no theme → parseTheme returns undefined → skipped
+      };
+      const result = parseCustomPresets(data);
+      expect(result).toBeDefined();
+      expect(Object.keys(result!)).toEqual(["good"]);
+    });
+
+    it("skips entries with null/non-object theme", () => {
+      const data = {
+        a: { name: "A", theme: null },
+        b: { name: "B", theme: "not an object" },
+        c: { name: "C", theme: { scoreBoxBg: "#ccc" } },
+      };
+      const result = parseCustomPresets(data);
+      expect(Object.keys(result!)).toEqual(["c"]);
+    });
+
+    it("skips non-object entries entirely", () => {
+      const data = {
+        good: { name: "Good", theme: {} },
+        bad1: null,
+        bad2: "string",
+        bad3: 123,
+      };
+      const result = parseCustomPresets(data);
+      expect(Object.keys(result!)).toEqual(["good"]);
+    });
+
+    it("includes basedOn when it is a string", () => {
+      const data = {
+        p1: {
+          name: "Derived",
+          theme: { scoreBoxBg: "#444" },
+          basedOn: "Vikes Dark",
+        },
+      };
+      const result = parseCustomPresets(data);
+      expect(result!["p1"]!.basedOn).toBe("Vikes Dark");
+    });
+
+    it("omits basedOn when it is not a string", () => {
+      const data = {
+        p1: {
+          name: "NoBased",
+          theme: { scoreBoxBg: "#555" },
+          basedOn: 42,
+        },
+      };
+      const result = parseCustomPresets(data);
+      expect(result!["p1"]!.basedOn).toBeUndefined();
+    });
+
+    it("returns undefined when all entries are invalid", () => {
+      const data = {
+        a: null,
+        b: "string",
+        c: { name: "NoTheme" },
+      };
+      expect(parseCustomPresets(data)).toBeUndefined();
+    });
+
+    it("parses multiple valid entries", () => {
+      const data = {
+        p1: { name: "First", theme: { scoreBoxBg: "#111" } },
+        p2: { name: "Second", theme: { clockBg: "#222" } },
+      };
+      const result = parseCustomPresets(data);
+      expect(Object.keys(result!)).toHaveLength(2);
+      expect(result!["p1"]!.name).toBe("First");
+      expect(result!["p2"]!.name).toBe("Second");
     });
   });
 });

@@ -2,8 +2,6 @@ import { createRoot } from "react-dom/client";
 import "./index.css";
 import App from "./App";
 import "./raven";
-import { DndProvider } from "react-dnd";
-import { HTML5Backend } from "react-dnd-html5-backend";
 import {
   LocalStateProvider,
   useLocalState,
@@ -33,8 +31,6 @@ if (!container) {
 const root = createRoot(container);
 root.render(
   <LocalStateProvider>
-    <DndProvider backend={HTML5Backend}>
-      <AppWithProviders />
-    </DndProvider>
+    <AppWithProviders />
   </LocalStateProvider>,
 );

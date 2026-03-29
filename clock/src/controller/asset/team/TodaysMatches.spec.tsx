@@ -1,4 +1,3 @@
-import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -40,6 +39,7 @@ import {
 import { useRemoteSettings } from "../../../contexts/LocalStateContext";
 import { getMatches, getMatchInfo, getLineups } from "../../../api/client";
 import { transformLineups, getTeamId } from "../../../lib/matchUtils";
+import type { Roster } from "../../../types";
 
 const mockedUseController = vi.mocked(useController);
 const mockedUseMatch = vi.mocked(useMatch);
@@ -132,8 +132,8 @@ describe("TodaysMatches", () => {
 
       mockedGetMatches.mockResolvedValueOnce({
         data: [apiMatch1, apiMatch2],
-        error: null,
-      });
+        error: undefined,
+      } as unknown as Awaited<ReturnType<typeof getMatches>>);
 
       const user = userEvent.setup();
       render(<TodaysMatches />);
@@ -188,7 +188,7 @@ describe("TodaysMatches", () => {
           setTimeout(() => resolve({ data: [], error: null }), 100),
         );
       mockedGetMatches.mockImplementation(
-        mockImplementationFn as ReturnType<typeof vi.fn>,
+        mockImplementationFn as unknown as typeof getMatches,
       );
 
       const user = userEvent.setup();
@@ -249,22 +249,19 @@ describe("TodaysMatches", () => {
         home: { players: [], officials: [] },
         away: { players: [], officials: [] },
       };
-      const mockPlayers: {
-        home: Array<Record<string, unknown>>;
-        away: Array<Record<string, unknown>>;
-      } = {
+      const mockPlayers: Roster = {
         home: [{ name: "Player 1", number: 10, show: true }],
         away: [{ name: "Player 3", number: 9, show: true }],
       };
 
       mockedGetMatchInfo.mockResolvedValueOnce({
         data: apiMatch,
-        error: null,
-      });
+        error: undefined,
+      } as unknown as Awaited<ReturnType<typeof getMatchInfo>>);
       mockedGetLineups.mockResolvedValueOnce({
         data: mockReportData,
-        error: null,
-      });
+        error: undefined,
+      } as unknown as Awaited<ReturnType<typeof getLineups>>);
       mockedTransformLineups.mockReturnValue(mockPlayers);
 
       const user = userEvent.setup();
@@ -362,10 +359,7 @@ describe("TodaysMatches", () => {
         home: { players: [], officials: [] },
         away: { players: [], officials: [] },
       };
-      const mockPlayers: {
-        home: Array<Record<string, unknown>>;
-        away: Array<Record<string, unknown>>;
-      } = {
+      const mockPlayers: Roster = {
         home: [{ name: "Player 1", number: 10, show: true }],
         away: [{ name: "Player 3", number: 9, show: true }],
       };
@@ -380,12 +374,12 @@ describe("TodaysMatches", () => {
 
       mockedGetMatchInfo.mockResolvedValueOnce({
         data: apiMatch,
-        error: null,
-      });
+        error: undefined,
+      } as unknown as Awaited<ReturnType<typeof getMatchInfo>>);
       mockedGetLineups.mockResolvedValueOnce({
         data: mockReportData,
-        error: null,
-      });
+        error: undefined,
+      } as unknown as Awaited<ReturnType<typeof getLineups>>);
       mockedTransformLineups.mockReturnValue(mockPlayers);
 
       const user = userEvent.setup();
@@ -423,22 +417,19 @@ describe("TodaysMatches", () => {
         home: { players: [], officials: [] },
         away: { players: [], officials: [] },
       };
-      const mockPlayers: {
-        home: Array<Record<string, unknown>>;
-        away: Array<Record<string, unknown>>;
-      } = {
+      const mockPlayers: Roster = {
         home: [{ name: "Player 1", number: 10, show: true }],
         away: [{ name: "Player 3", number: 9, show: true }],
       };
 
       mockedGetMatches.mockResolvedValueOnce({
         data: [apiMatch],
-        error: null,
-      });
+        error: undefined,
+      } as unknown as Awaited<ReturnType<typeof getMatches>>);
       mockedGetLineups.mockResolvedValueOnce({
         data: mockLineups,
-        error: null,
-      });
+        error: undefined,
+      } as unknown as Awaited<ReturnType<typeof getLineups>>);
       mockedTransformLineups.mockReturnValue(mockPlayers);
 
       const user = userEvent.setup();

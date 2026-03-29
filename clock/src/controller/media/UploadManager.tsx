@@ -40,6 +40,7 @@ const UploadManager: React.FC<UploadManagerProps> = ({ prefix, refresh }) => {
             storageHelpers.uploadBytes(
               `/${String(prefix)}/${String(image.name)}`,
               image,
+              { cacheControl: "public, max-age=604800" },
             ),
           ),
         ),

@@ -1,12 +1,11 @@
-import AssetQueue from "./AssetQueue";
+import { useCallback, useState } from "react";
 import { addVideosFromPlaylist } from "./YoutubePlaylist";
+import { QueueBoard } from "./queue";
+import QueuePicker from "./queue/QueuePicker";
 import { ASSET_VIEWS } from "../../constants";
 import TeamAssetController from "./team/TeamAssetController";
 import UrlController from "./UrlController";
 import assetTypes from "./AssetTypes";
-import Button from "rsuite/Button";
-import InputNumber from "rsuite/InputNumber";
-import Checkbox from "rsuite/Checkbox";
 import { Asset } from "../../types";
 import { parseYoutubePlaylistId, isYoutubeUrl } from "../../utils/urlUtils";
 
@@ -16,45 +15,42 @@ import { useController } from "../../contexts/FirebaseStateContext";
 
 const AssetController = () => {
   const {
-    controller: {
-      assetView,
-      selectedAssets,
-      autoPlay,
-      cycle,
-      imageSeconds,
-      playing,
-    },
+    controller,
     selectAssetView,
-    toggleCycle,
-    setImageSeconds,
-    toggleAutoPlay,
-    setPlaying,
-    setSelectedAssets,
-    addAssets,
-    showNextAsset,
-    renderAsset,
+    createQueue,
+    deleteQueue,
+    renameQueue,
+    reorderQueues,
+    addItemsToQueue,
+    removeItemFromQueue,
+    reorderItemsInQueue,
+    updateQueueSettings,
+    playQueue,
+    stopPlaying,
+    showItemNow,
   } = useController();
 
-  const addMultipleAssets = (
-    assetList: Promise<Asset | null>[],
-    options: { showNow?: boolean } = { showNow: false },
-  ) => {
-    void Promise.all(assetList).then((resolvedAssets: unknown[]) => {
-      const validAssets = resolvedAssets.filter(
-        (a): a is Asset => a !== null && typeof a === "object",
-      );
-      if (options.showNow && validAssets.length === 1 && validAssets[0]) {
-        renderAsset(validAssets[0]);
-      } else {
-        addAssets(validAssets);
-      }
-    });
-  };
+  const { assetView, queues, activeQueueId, playing } = controller;
+  const [pendingAssets, setPendingAssets] = useState<Asset[]>([]);
 
-  const onImageSecondsChange = (value: string | number | null) => {
-    if (value !== null) {
-      setImageSeconds(Math.max(parseInt(String(value), 10), 1));
-    }
+  const addMultipleAssets = (
+    promises: (Asset | Promise<Asset | null>)[],
+    { showNow }: { showNow?: boolean } = {},
+  ): void => {
+    void (async () => {
+      const results = await Promise.all(
+        promises.map((p) => Promise.resolve(p)),
+      );
+      const validAssets = results.filter((a): a is Asset => a !== null);
+
+      const [firstAsset] = validAssets;
+
+      if (showNow && firstAsset) {
+        showItemNow(firstAsset);
+      } else if (validAssets.length > 0) {
+        setPendingAssets(validAssets);
+      }
+    })();
   };
 
   const addAssetKey = (asset: Asset) => {
@@ -64,68 +60,74 @@ const AssetController = () => {
         return addVideosFromPlaylist(listId, addAssetKey);
       }
     }
-    return addMultipleAssets([Promise.resolve(asset)]);
+    return addMultipleAssets([asset]);
   };
 
+  const handleShowNow = useCallback(
+    (assets: Asset[]) => {
+      for (const asset of assets) {
+        showItemNow(asset);
+      }
+      setPendingAssets([]);
+    },
+    [showItemNow],
+  );
+
+  const handleAddToQueue = useCallback(
+    (queueId: string, assets: Asset[]) => {
+      addItemsToQueue(queueId, assets);
+      setPendingAssets([]);
+    },
+    [addItemsToQueue],
+  );
+
+  const handleCreateAndAdd = useCallback(
+    (queueName: string, assets: Asset[]) => {
+      const newQueueId = createQueue(queueName);
+      addItemsToQueue(newQueueId, assets);
+      setPendingAssets([]);
+    },
+    [createQueue, addItemsToQueue],
+  );
+
   const renderAssetController = () => {
-    const selectedAssetsList = selectedAssets || [];
     return (
       <div className="withborder">
         <div className="controls control-item">
-          <span>{selectedAssetsList.length} í biðröð</span>
-          {selectedAssetsList.length ? (
-            <Button
-              color="red"
-              size="xs"
-              appearance="primary"
-              onClick={() =>
-                window.confirm("Ertu alveg viss?") && setSelectedAssets([])
-              }
-            >
-              Hreinsa biðröð
-            </Button>
-          ) : null}
-          {playing ? (
-            <Button
-              color="yellow"
-              appearance="primary"
-              onClick={() => setPlaying(false)}
-            >
-              Pause
-            </Button>
-          ) : null}
-          {!playing && selectedAssetsList.length ? (
-            <Button color="green" appearance="primary" onClick={showNextAsset}>
-              Birta
-            </Button>
-          ) : null}
-          <div>
-            <Checkbox onChange={toggleAutoPlay} checked={autoPlay}>
-              Autoplay
-            </Checkbox>
-          </div>
-          {autoPlay && (
-            <div>
-              <InputNumber
-                defaultValue={3}
-                max={600}
-                min={1}
-                onChange={onImageSecondsChange}
-                value={imageSeconds}
-                postfix="sek"
-              />
-            </div>
-          )}
-          <div>
-            <Checkbox onChange={toggleCycle} checked={cycle}>
-              Loop
-            </Checkbox>
-          </div>
           <UrlController addAsset={addAssetKey} />
         </div>
-        <div className="upcoming-assets">
-          <AssetQueue includeRemove />
-        </div>
+        <QueueBoard
+          queues={queues}
+          activeQueueId={activeQueueId}
+          playing={playing}
+          onRenameQueue={renameQueue}
+          onPlayQueue={playQueue}
+          onStopPlaying={stopPlaying}
+          onUpdateSettings={updateQueueSettings}
+          onDeleteQueue={deleteQueue}
+          onShowItemNow={showItemNow}
+          onDeleteAsset={(queueId, assetKey) =>
+            removeItemFromQueue(queueId, assetKey)
+          }
+          onReorderQueues={reorderQueues}
+          onReorderItems={(queueId, newItems) =>
+            reorderItemsInQueue(queueId, newItems)
+          }
+          onCreateQueue={() => {
+            const name = `Biðröð ${Object.keys(queues).length + 1}`;
+            createQueue(name);
+          }}
+        />
+        {pendingAssets.length > 0 && (
+          <QueuePicker
+            queues={queues}
+            assets={pendingAssets}
+            onShowNow={handleShowNow}
+            onAddToQueue={handleAddToQueue}
+            onCreateAndAdd={handleCreateAndAdd}
+            onClose={() => setPendingAssets([])}
+          />
+        )}
       </div>
     );
   };
@@ -139,7 +141,6 @@ const AssetController = () => {
       {assetView === ASSET_VIEWS.assets && renderAssetController()}
       {assetView === ASSET_VIEWS.teams && (
         <TeamAssetController
-          addAssets={addMultipleAssets}
           previousView={() =>
             setTimeout(() => selectAssetView(ASSET_VIEWS.assets), 500)
           }

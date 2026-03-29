@@ -2,11 +2,14 @@ import type {
   Match,
   ControllerState,
   ViewState,
+  ThemeConfig,
+  CustomPreset,
   TwoMinPenalty,
   Asset,
   ViewPort,
+  QueueState,
 } from "../types";
-import { Sports } from "../constants";
+import { Sports, DEFAULT_THEME } from "../constants";
 
 interface LocationData {
   label: string;
@@ -188,16 +191,13 @@ export function parseController(
 
   return {
     ...defaultController,
-    selectedAssets: parseAssetArray(raw.selectedAssets),
-    cycle: typeof raw.cycle === "boolean" ? raw.cycle : defaultController.cycle,
-    imageSeconds:
-      typeof raw.imageSeconds === "number"
-        ? raw.imageSeconds
-        : defaultController.imageSeconds,
-    autoPlay:
-      typeof raw.autoPlay === "boolean"
-        ? raw.autoPlay
-        : defaultController.autoPlay,
+    queues: parseQueueMap(raw.queues),
+    activeQueueId:
+      typeof raw.activeQueueId === "string"
+        ? raw.activeQueueId
+        : raw.activeQueueId === null
+          ? null
+          : defaultController.activeQueueId,
     playing:
       typeof raw.playing === "boolean"
         ? raw.playing
@@ -230,6 +230,48 @@ export function parseController(
   };
 }
 
+export function parseTheme(data: unknown): ThemeConfig | undefined {
+  if (!data || typeof data !== "object") return undefined;
+
+  const raw = data as Record<string, unknown>;
+  const result: Record<string, string> = {};
+  const defaults = DEFAULT_THEME as unknown as Record<string, string>;
+
+  for (const key of Object.keys(defaults)) {
+    const val = raw[key];
+    result[key] = typeof val === "string" ? val : (defaults[key] ?? "");
+  }
+
+  return result as unknown as ThemeConfig;
+}
+
+export function parseCustomPresets(
+  data: unknown,
+): Record<string, CustomPreset> | undefined {
+  if (!data || typeof data !== "object") return undefined;
+
+  const raw = data as Record<string, unknown>;
+  const result: Record<string, CustomPreset> = {};
+
+  for (const [key, value] of Object.entries(raw)) {
+    if (!value || typeof value !== "object") continue;
+    const entry = value as Record<string, unknown>;
+
+    const name = typeof entry.name === "string" ? entry.name : key;
+    const theme = parseTheme(entry.theme);
+    if (!theme) continue;
+
+    const preset: CustomPreset = { name, theme };
+    if (typeof entry.basedOn === "string") {
+      preset.basedOn = entry.basedOn;
+    }
+
+    result[key] = preset;
+  }
+
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
 export function parseView(
   data: unknown,
   defaultView: ViewState,
@@ -252,5 +294,50 @@ export function parseView(
       typeof raw.blackoutStart === "string" ? raw.blackoutStart : undefined,
     blackoutEnd:
       typeof raw.blackoutEnd === "string" ? raw.blackoutEnd : undefined,
+    theme: parseTheme(raw.theme),
+    themePreset:
+      typeof raw.themePreset === "string" ? raw.themePreset : undefined,
+    customPresets: parseCustomPresets(raw.customPresets),
   };
+}
+
+export function parseQueueMap(data: unknown): Record<string, QueueState> {
+  if (!data || typeof data !== "object") return {};
+
+  const raw = data as Record<string, unknown>;
+  const result: Record<string, QueueState> = {};
+
+  for (const [key, value] of Object.entries(raw)) {
+    if (!value || typeof value !== "object") continue;
+
+    const entry = value as Record<string, unknown>;
+
+    result[key] = {
+      id: typeof entry.id === "string" ? entry.id : key,
+      name: typeof entry.name === "string" ? entry.name : key,
+      items: parseAssetArray(entry.items),
+      autoPlay: typeof entry.autoPlay === "boolean" ? entry.autoPlay : false,
+      imageSeconds:
+        typeof entry.imageSeconds === "number" ? entry.imageSeconds : 3,
+      cycle: typeof entry.cycle === "boolean" ? entry.cycle : false,
+      order: typeof entry.order === "number" ? entry.order : 0,
+    };
+  }
+
+  const orders = Object.values(result).map((q) => q.order);
+  const uniqueOrders = new Set(orders);
+
+  if (uniqueOrders.size !== orders.length) {
+    let nextOrder = 0;
+    for (const key of Object.keys(result)) {
+      const queue = result[key];
+      if (!queue) {
+        continue;
+      }
+      result[key] = { ...queue, order: nextOrder };
+      nextOrder += 1;
+    }
+  }
+
+  return result;
 }

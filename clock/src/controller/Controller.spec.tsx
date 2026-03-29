@@ -1,4 +1,3 @@
-import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import Controller from "./Controller";
@@ -13,6 +12,7 @@ vi.mock("../contexts/FirebaseStateContext", () => ({
 vi.mock("../contexts/LocalStateContext", () => ({
   useAuth: vi.fn(),
   useLocalState: vi.fn(),
+  useRemoteSettings: vi.fn(),
 }));
 
 vi.mock("../firebaseAuth", () => ({
@@ -52,7 +52,11 @@ import {
   useView,
   useListeners,
 } from "../contexts/FirebaseStateContext";
-import { useAuth, useLocalState } from "../contexts/LocalStateContext";
+import {
+  useAuth,
+  useLocalState,
+  useRemoteSettings,
+} from "../contexts/LocalStateContext";
 import { firebaseAuth } from "../firebaseAuth";
 
 const mockedUseController = vi.mocked(useController);
@@ -60,6 +64,7 @@ const mockedUseView = vi.mocked(useView);
 const mockedUseListeners = vi.mocked(useListeners);
 const mockedUseAuth = vi.mocked(useAuth);
 const mockedUseLocalState = vi.mocked(useLocalState);
+const mockedUseRemoteSettings = vi.mocked(useRemoteSettings);
 
 const defaultViewport = {
   style: { height: 100, width: 200 },
@@ -80,6 +85,11 @@ function setupState1() {
     available: null,
     screenViewport: null,
     setScreenViewport: vi.fn(),
+  });
+  mockedUseRemoteSettings.mockReturnValue({
+    listenPrefix: "",
+    setListenPrefix: vi.fn(),
+    available: null,
   });
   mockedUseController.mockReturnValue({
     controller: { view: VIEWS.idle, currentAsset: null },
@@ -108,6 +118,11 @@ function setupState2() {
     available: null,
     screenViewport: null,
     setScreenViewport: vi.fn(),
+  });
+  mockedUseRemoteSettings.mockReturnValue({
+    listenPrefix: "vikinni",
+    setListenPrefix: vi.fn(),
+    available: null,
   });
   mockedUseController.mockReturnValue({
     controller: { view: VIEWS.idle, currentAsset: null },
@@ -141,6 +156,11 @@ function setupState3() {
     screenViewport: null,
     setScreenViewport: vi.fn(),
   });
+  mockedUseRemoteSettings.mockReturnValue({
+    listenPrefix: "vikinni",
+    setListenPrefix: vi.fn(),
+    available: ["vikinni"],
+  });
   mockedUseController.mockReturnValue({
     controller: { view: VIEWS.idle, currentAsset: null },
     selectView: vi.fn(),
@@ -159,10 +179,11 @@ function setupState3() {
 function setupScreenSelector(
   overrides: {
     available?: string[] | null;
-    setListenPrefix?: ReturnType<typeof vi.fn>;
+    setListenPrefix?: (prefix: string) => void;
   } = {},
 ) {
-  const mockSetListenPrefix = overrides.setListenPrefix ?? vi.fn();
+  const mockSetListenPrefix =
+    overrides.setListenPrefix ?? vi.fn<(prefix: string) => void>();
   const mockAvailable =
     overrides.available !== undefined
       ? overrides.available
@@ -183,6 +204,11 @@ function setupScreenSelector(
     available: mockAvailable,
     screenViewport: null,
     setScreenViewport: vi.fn(),
+  });
+  mockedUseRemoteSettings.mockReturnValue({
+    listenPrefix: "",
+    setListenPrefix: mockSetListenPrefix,
+    available: mockAvailable,
   });
   mockedUseController.mockReturnValue({
     controller: { view: VIEWS.idle, currentAsset: null },

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button, ButtonGroup, Tooltip, Whisper } from "rsuite";
 import CloseIcon from "@rsuite/icons/CloseOutline";
 import { RingLoader } from "react-spinners";
@@ -23,6 +23,7 @@ import StateListener from "./StateListener";
 import MatchController from "./match-controller/MatchController";
 import useGlobalShortcuts from "./hooks/useGlobalShortcuts";
 import useNightBlackout from "./hooks/useNightBlackout";
+import { useThemeCssVars, resolveTheme } from "./hooks/useThemeCssVars";
 import { shouldShowGoalCelebration } from "./utils/matchUtils";
 import baddi from "./images/baddi.gif";
 import assetTypes from "./controller/asset/AssetTypes";
@@ -54,7 +55,10 @@ const ScoreButtons = ({ side }: { side: "home" | "away" }) => {
   };
 
   return (
-    <div className="preview-score-buttons">
+    <div
+      className="preview-score-buttons"
+      data-testid={`score-buttons-${side}`}
+    >
       <Button
         size="sm"
         appearance="primary"
@@ -149,10 +153,23 @@ function App() {
     useLocalState();
 
   const { view } = controller;
-  const { vp, background, blackoutStart, blackoutEnd } = viewState;
+  const {
+    vp,
+    background,
+    blackoutStart,
+    blackoutEnd,
+    theme,
+    themePreset,
+    customPresets,
+  } = viewState;
   const asset = controller.currentAsset || null;
 
   const isBlackedOut = useNightBlackout(blackoutStart, blackoutEnd, view);
+  const themeCssVars = useThemeCssVars(themePreset, theme, customPresets);
+  const effectiveTheme = useMemo(
+    () => resolveTheme(themePreset, theme, customPresets),
+    [themePreset, theme, customPresets],
+  );
 
   const isAuthenticated = auth.isLoaded && !auth.isEmpty;
 
@@ -208,9 +225,22 @@ function App() {
     }
   };
 
+  /** Sanitize a URL for use inside CSS url() by encoding characters that could break out */
+  const sanitizeCssUrl = (url: string): string =>
+    url.replace(/[()'"\\]/g, (ch) => `\\${ch}`);
+
   const style: React.CSSProperties = {
-    ...getBackground(background),
+    ...getBackground(isBlackedOut ? "Blackout" : background),
+    // Theme background image overrides the background selector when set
+    ...(effectiveTheme.backgroundImage && !isBlackedOut
+      ? {
+          backgroundImage: `url(${sanitizeCssUrl(effectiveTheme.backgroundImage)})`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+        }
+      : {}),
     ...vp.style,
+    ...themeCssVars,
   };
 
   // State 2: listenPrefix set, not authenticated — display screen + disconnect button only
@@ -261,9 +291,12 @@ function App() {
   };
 
   const showController = view === VIEWS.match || view === VIEWS.idle;
+  const showMatchControls = view !== VIEWS.idle;
   const scoreButtonWidth = 44;
   const sidebarWidth = 350;
-  const previewWidth = sidebarWidth - scoreButtonWidth * 2;
+  const previewWidth = showMatchControls
+    ? sidebarWidth - scoreButtonWidth * 2
+    : sidebarWidth;
   const vpWidth = vp.style.width || 960;
   const vpHeight = vp.style.height || 540;
   const previewScale = previewWidth / vpWidth;
@@ -277,7 +310,7 @@ function App() {
           <div className="controller-sidebar">
             <div className="preview-and-controls">
               <div className="preview-with-scores">
-                <ScoreButtons side="home" />
+                {showMatchControls && <ScoreButtons side="home" />}
                 <div
                   className="scoreboard-preview"
                   style={{ height: previewHeight }}
@@ -298,12 +331,12 @@ function App() {
                     ) : null}
                   </div>
                 </div>
-                <ScoreButtons side="away" />
+                {showMatchControls && <ScoreButtons side="away" />}
               </div>
               <ViewModeButtons />
             </div>
             {asset && <ClearOverlayButton />}
-            <MatchActions />
+            {showMatchControls && <MatchActions />}
           </div>
           <div className="controller-controls">
             <Controller />

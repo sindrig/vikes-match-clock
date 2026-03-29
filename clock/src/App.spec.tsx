@@ -1,4 +1,3 @@
-import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import App from "./App";
@@ -29,6 +28,9 @@ vi.mock("./controller/RefreshHandler", () => ({
 }));
 vi.mock("./controller/asset/Asset", () => ({
   default: () => <div data-testid="asset-component">Asset</div>,
+}));
+vi.mock("./controller/GoalScorerDialog", () => ({
+  default: () => <div data-testid="goal-scorer-dialog">GoalScorerDialog</div>,
 }));
 vi.mock("./screens/ScoreBoard", () => ({
   default: () => <div data-testid="scoreboard">ScoreBoard</div>,
@@ -96,14 +98,16 @@ function setupState1() {
 }
 
 function setupState2(
-  view = VIEWS.idle,
+  view: string = VIEWS.idle,
   overrides?: {
-    setListenPrefix?: ReturnType<typeof vi.fn>;
-    setScreenViewport?: ReturnType<typeof vi.fn>;
+    setListenPrefix?: (prefix: string) => void;
+    setScreenViewport?: (vp: unknown) => void;
   },
 ) {
-  const setListenPrefix = overrides?.setListenPrefix ?? vi.fn();
-  const setScreenViewport = overrides?.setScreenViewport ?? vi.fn();
+  const setListenPrefix =
+    overrides?.setListenPrefix ?? vi.fn<(prefix: string) => void>();
+  const setScreenViewport =
+    overrides?.setScreenViewport ?? vi.fn<(vp: unknown) => void>();
   mockedUseLocalState.mockReturnValue({
     auth: { isLoaded: true, isEmpty: true },
     listenPrefix: "vikinni",
@@ -125,14 +129,16 @@ function setupState2(
 }
 
 function setupState3(
-  view = VIEWS.idle,
+  view: string = VIEWS.idle,
   overrides?: {
-    setListenPrefix?: ReturnType<typeof vi.fn>;
-    setScreenViewport?: ReturnType<typeof vi.fn>;
+    setListenPrefix?: (prefix: string) => void;
+    setScreenViewport?: (vp: unknown) => void;
   },
 ) {
-  const setListenPrefix = overrides?.setListenPrefix ?? vi.fn();
-  const setScreenViewport = overrides?.setScreenViewport ?? vi.fn();
+  const setListenPrefix =
+    overrides?.setListenPrefix ?? vi.fn<(prefix: string) => void>();
+  const setScreenViewport =
+    overrides?.setScreenViewport ?? vi.fn<(vp: unknown) => void>();
   mockedUseLocalState.mockReturnValue({
     auth: { isLoaded: true, isEmpty: false, email: "test@test.com" },
     listenPrefix: "vikinni",
@@ -302,6 +308,47 @@ describe("App", () => {
       render(<App />);
 
       expect(screen.queryByTestId("controller")).not.toBeInTheDocument();
+    });
+
+    it("does not render score buttons in idle view", () => {
+      setupState3(VIEWS.idle);
+      render(<App />);
+
+      expect(
+        screen.queryByTestId("score-buttons-home"),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("score-buttons-away"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("does not render match actions in idle view", () => {
+      setupState3(VIEWS.idle);
+      render(<App />);
+
+      expect(screen.queryByTestId("match-actions")).not.toBeInTheDocument();
+    });
+
+    it("renders score buttons in match view", () => {
+      setupState3(VIEWS.match);
+      render(<App />);
+
+      expect(screen.getByTestId("score-buttons-home")).toBeInTheDocument();
+      expect(screen.getByTestId("score-buttons-away")).toBeInTheDocument();
+    });
+
+    it("renders match actions in match view", () => {
+      setupState3(VIEWS.match);
+      render(<App />);
+
+      expect(screen.getByTestId("match-actions")).toBeInTheDocument();
+    });
+
+    it("still renders controller tabs in idle view", () => {
+      setupState3(VIEWS.idle);
+      render(<App />);
+
+      expect(screen.getByTestId("controller")).toBeInTheDocument();
     });
   });
 

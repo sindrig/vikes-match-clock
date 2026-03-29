@@ -1,0 +1,255 @@
+.visual-theme-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.visual-instructions {
+  font-size: 12px;
+  color: #888;
+  margin: 0;
+}
+
+/* 16:9 canvas wrapper */
+.visual-canvas-wrapper {
+  position: relative;
+  width: 100%;
+  padding-bottom: 56.25%; /* 16:9 ratio */
+  border-radius: 6px;
+  /* no overflow:hidden — the color popover needs to overflow when near edges */
+}
+
+.visual-canvas {
+  position: absolute;
+  inset: 0;
+  background: #1a1a2e;
+  background-image: radial-gradient(
+    ellipse at 50% 80%,
+    rgba(34, 87, 34, 0.3) 0%,
+    transparent 70%
+  );
+  border: 1px solid #333;
+  border-radius: 6px;
+}
+
+/* Draggable elements */
+.visual-element {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  border-radius: 3px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.visual-element:hover {
+  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.6);
+  z-index: 10;
+}
+
+.visual-element:active,
+.visual-element.dragging {
+  cursor: grabbing;
+  z-index: 20;
+}
+
+.visual-element-text {
+  font-family: "Anton", sans-serif;
+  font-size: clamp(10px, 2.5vw, 22px);
+  line-height: 1;
+  pointer-events: none;
+}
+
+.visual-element-label {
+  font-size: 8px;
+  opacity: 0.6;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  pointer-events: none;
+  margin-top: 2px;
+}
+
+/* Color picker popover */
+.visual-color-popover {
+  position: absolute;
+  z-index: 100;
+  background: #fff;
+  border: 1px solid #d4d4d8;
+  border-radius: 6px;
+  padding: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 140px;
+}
+
+.visual-color-popover-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.visual-color-popover-label {
+  font-size: 11px;
+  color: #555;
+  min-width: 70px;
+}
+
+.visual-color-swatch {
+  width: 28px;
+  height: 28px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 1px;
+  cursor: pointer;
+  background: none;
+  flex-shrink: 0;
+}
+
+.visual-color-swatch::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.visual-color-swatch::-webkit-color-swatch {
+  border: none;
+  border-radius: 3px;
+}
+
+/* Transparent toggle in visual editor popover */
+.visual-transparent-indicator {
+  display: inline-block;
+  width: 28px;
+  height: 28px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  flex-shrink: 0;
+  background-image: repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%);
+  background-size: 8px 8px;
+}
+
+.visual-transparent-toggle {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.visual-transparent-toggle-label {
+  font-size: 14px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #d4d4d8;
+  border-radius: 4px;
+  color: #999;
+  background: #fafafa;
+}
+
+.visual-transparent-toggle-label.checked {
+  background: #e0f0ff;
+  border-color: #4096ff;
+  color: #4096ff;
+}
+
+/* Upload indicator overlay */
+.visual-upload-indicator {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  font-size: 14px;
+  z-index: 50;
+  pointer-events: none;
+  border-radius: 6px;
+}
+
+/* Clear background image button */
+.visual-clear-bg-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 30;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  padding: 0;
+}
+
+.visual-clear-bg-btn:hover {
+  background: rgba(200, 0, 0, 0.8);
+}
+
+/* Stroke controls inside popover */
+.visual-stroke-row {
+  border-top: 1px solid #eee;
+  padding-top: 6px;
+  margin-top: 2px;
+}
+
+.visual-stroke-slider {
+  width: 60px;
+  height: 4px;
+  cursor: pointer;
+  accent-color: #4096ff;
+  flex-shrink: 0;
+}
+
+.visual-stroke-value {
+  font-size: 10px;
+  color: #555;
+  min-width: 26px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+/* Font size controls inside popover */
+.visual-font-size-row {
+  border-top: 1px solid #eee;
+  padding-top: 6px;
+  margin-top: 2px;
+}
+
+.visual-font-size-slider {
+  width: 60px;
+  height: 4px;
+  cursor: pointer;
+  accent-color: #4096ff;
+  flex-shrink: 0;
+}
+
+.visual-font-size-input {
+  width: 48px;
+  height: 22px;
+  font-size: 11px;
+  text-align: center;
+  border: 1px solid #d4d4d8;
+  border-radius: 4px;
+  padding: 0 2px;
+  flex-shrink: 0;
+}
+
+.visual-font-size-unit {
+  font-size: 10px;
+  color: #555;
+  flex-shrink: 0;
+}
