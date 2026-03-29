@@ -270,8 +270,7 @@ export const getStateShowingNextAsset = (
   newState.playing = activeQueue.autoPlay;
 
   if (!activeQueue.cycle && updatedItems.length === 0) {
-    delete newState.queues[activeQueueId];
-    newState.activeQueueId = null;
+    newState.queues[activeQueueId] = updatedQueue;
     newState.playing = false;
     return newState;
   }
@@ -861,7 +860,6 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         return {
           ...prev,
           queues: { ...prev.queues, [queueId]: newQueue },
-          activeQueueId: prev.activeQueueId ?? queueId,
         };
       });
       return queueId;
@@ -1067,6 +1065,8 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       applyControllerUpdate((prev) => ({
         ...prev,
         currentAsset: asset ? { asset, time: null } : null,
+        activeQueueId: null,
+        playing: false,
       }));
     },
     [applyControllerUpdate],

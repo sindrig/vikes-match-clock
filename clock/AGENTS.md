@@ -131,6 +131,7 @@ interface QueueState {
 | `QueueColumn` | `queue/QueueColumn.tsx` | Per-queue column: play/stop, settings gear, rename, delete |
 | `QueueItem` | `queue/QueueItem.tsx` | Individual asset in a queue |
 | `QueuePicker` | `queue/QueuePicker.tsx` | Modal dialog for adding assets to queues (see **QueuePicker Auto-Add Logic** below) |
+| `PlaybackBar` | `queue/PlaybackBar.tsx` | Appears below screen preview when a queue is active; shows queue name, remaining count, large Next/Stop buttons |
 | `QueueSettingsPopover` | `queue/QueueSettingsPopover.tsx` | Per-queue Autoplay/Loop/Duration settings (rsuite Popover) |
 | `ItemActionDialog` | `queue/ItemActionDialog.tsx` | Context menu for "Show Now" / delete on individual items |
 | `dndUtils` | `queue/dndUtils.ts` | DnD ID namespacing + `typedCollisionDetection` (see **Drag-and-Drop Collision Detection** below) |
@@ -522,6 +523,9 @@ The asset E2E tests (`e2e/assets.spec.ts`) use these selectors for the multi-que
 - `.queue-column-actions .rs-btn` — gear icon to open settings popover
 - `.queue-settings-popover` — the settings popover element
 - `getByLabel("Play Queue")` / `getByLabel("Stop Queue")` — play/stop buttons on queue columns
+- `.playback-bar` — the playback bar shown below the screen preview when a queue is active
+- `getByLabel("Next asset")` / `getByLabel("Stop playback")` — large buttons in the playback bar
+- `"Hreinsa virkt overlay"` — clear button shown only when an overlay is active WITHOUT an active queue
 - rsuite `Toggle` components use `data-checked="true"` attribute (NOT `rs-toggle-checked` class)
 
 ### Playwright MCP Limitations for Multi-Session Testing
@@ -550,7 +554,7 @@ This app requires testing scenarios with **two independent browser sessions** (e
    - Form interactions and validation
    - Visual snapshots of single pages
 
-For testing Firebase sync between controller and display (e.g., "Hreinsa virkt overlay" clearing on remote), you'll need to either test manually or write Playwright tests that can manage multiple browser contexts.
+For testing Firebase sync between controller and display (e.g., PlaybackBar stop clearing on remote), you'll need to either test manually or write Playwright tests that can manage multiple browser contexts.
 
 ## Related Systems
 
