@@ -110,7 +110,10 @@ test.describe("Asset Overlay System", () => {
     // Clicking play on a single-item queue shows the overlay
     // (the item is consumed immediately, so we verify the overlay appeared)
     await playButton.click();
-    await expect(page.getByText("Hreinsa virkt overlay")).toBeVisible();
+    await expect(page.locator(".overlay-container")).toBeVisible();
+    // With an active queue, the playback bar should appear instead of the
+    // clear overlay button
+    await expect(page.getByTestId("playback-bar")).toBeVisible();
   });
 
   test("toggles autoplay and loop options", async ({ page }) => {
@@ -145,11 +148,7 @@ test.describe("Asset Overlay System", () => {
     await expect(loopToggle).not.toHaveAttribute("data-checked", "true");
   });
 
-  test("shows clear overlay button when asset is displayed", async ({
-    page,
-  }) => {
-    await expect(page.getByText("Hreinsa virkt overlay")).not.toBeVisible();
-
+  test("shows playback bar when queue is active", async ({ page }) => {
     const assetController = page.locator(".asset-controller");
     await assetController
       .locator('input[type="text"]')
@@ -160,10 +159,11 @@ test.describe("Asset Overlay System", () => {
       .getByLabel("Play Queue")
       .click();
 
-    await expect(page.getByText("Hreinsa virkt overlay")).toBeVisible();
+    await expect(page.getByTestId("playback-bar")).toBeVisible();
+    await expect(page.getByText("Hreinsa virkt overlay")).not.toBeVisible();
   });
 
-  test("clears active overlay when clear button is clicked", async ({
+  test("stops playback and clears overlay when stop button is clicked", async ({
     page,
   }) => {
     const assetController = page.locator(".asset-controller");
@@ -176,12 +176,33 @@ test.describe("Asset Overlay System", () => {
       .getByLabel("Play Queue")
       .click();
 
-    await expect(page.getByText("Hreinsa virkt overlay")).toBeVisible();
+    await expect(page.getByTestId("playback-bar")).toBeVisible();
     await expect(page.locator(".overlay-container")).toBeVisible();
 
-    await page.getByText("Hreinsa virkt overlay").click();
+    await page.getByLabel("Stop playback").click();
 
+    await expect(page.getByTestId("playback-bar")).not.toBeVisible();
+    await expect(page.locator(".overlay-container")).not.toBeVisible();
+  });
+
+  test("shows clear overlay button for non-queue asset", async ({ page }) => {
     await expect(page.getByText("Hreinsa virkt overlay")).not.toBeVisible();
+
+    const assetController = page.locator(".asset-controller");
+    await assetController
+      .locator('input[type="text"]')
+      .fill("https://www.youtube.com/watch?v=test1");
+    await assetController.getByText("Bæta við").click();
+
+    // Use "Syna" (show now) to display immediately without a queue
+    await assetController
+      .locator('input[type="text"]')
+      .fill("https://www.youtube.com/watch?v=test2");
+    await assetController.getByText("Bæta við").click();
+    await page.locator(".rs-modal").getByText("Sýna").click();
+
+    await expect(page.getByText("Hreinsa virkt overlay")).toBeVisible();
+    await page.getByText("Hreinsa virkt overlay").click();
     await expect(page.locator(".overlay-container")).not.toBeVisible();
   });
 

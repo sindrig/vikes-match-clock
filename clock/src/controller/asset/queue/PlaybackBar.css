@@ -1,0 +1,73 @@
+.playback-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  background: #1a1d24;
+  border-radius: 6px;
+  color: #fff;
+}
+
+.playback-bar-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.playback-bar-name {
+  font-weight: 600;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.playback-bar-remaining {
+  font-size: 11px;
+  color: #adb5bd;
+}
+
+.playback-bar-controls {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.playback-bar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  color: #fff;
+  font-size: 32px;
+  transition:
+    background-color 0.15s,
+    opacity 0.15s;
+}
+
+.playback-bar-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.playback-bar-btn--next {
+  background: #3498ff;
+}
+
+.playback-bar-btn--next:hover:not(:disabled) {
+  background: #2589ef;
+}
+
+.playback-bar-btn--stop {
+  background: #f44336;
+}
+
+.playback-bar-btn--stop:hover:not(:disabled) {
+  background: #d32f2f;
+}
