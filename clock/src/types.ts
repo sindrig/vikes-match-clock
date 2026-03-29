@@ -116,6 +116,88 @@ export interface ControllerState {
   tab?: string;
 }
 
+// Theme configuration for customising the clock layout
+export interface ThemeConfig {
+  // Score boxes
+  scoreBoxBg: string;
+  scoreBoxColor: string;
+  scoreBoxBorder: string;
+  scoreBoxFontSize: string;
+  scoreBoxFontFamily: string;
+  scoreBoxStroke: string;
+
+  // Clock box
+  clockBg: string;
+  clockColor: string;
+  clockBorder: string;
+  clockFontSizeMin: string;
+  clockFontSizeMax: string;
+  clockFontFamily: string;
+  clockStroke: string;
+
+  // Clock position (percentages)
+  clockTop: string;
+  clockLeft: string;
+  clockWidth: string;
+  clockHeight: string;
+
+  // Score position (percentages)
+  scoreTop: string;
+  scoreHeight: string;
+  scoreWidth: string;
+
+  // Logo position (percentages)
+  logoTop: string;
+  logoHeight: string;
+  logoWidth: string;
+
+  // Injury time
+  injuryTimeColor: string;
+  injuryTimeFontSize: string;
+  injuryTimeTop: string;
+  injuryTimeLeft: string;
+  injuryTimeStroke: string;
+
+  // Team name
+  teamNameColor: string;
+  teamNameFontFamily: string;
+
+  // Red cards
+  redCardColor: string;
+
+  // Penalty boxes (handball)
+  penaltyBg: string;
+  penaltyColor: string;
+  penaltyBorder: string;
+
+  // Timeout dots
+  timeoutColor: string;
+
+  // Idle screen
+  idleTextColor: string;
+  idleTextFontSize: string;
+  idleLogoTop: string;
+  idleLogoLeft: string;
+  idleLogoWidth: string;
+  idleTextTop: string;
+
+  // Ad image position (scoreboard)
+  adTop: string;
+  adLeft: string;
+  adWidth: string;
+  adHeight: string;
+
+  // Background image (URL from Firebase Storage, or empty for none)
+  backgroundImage: string;
+}
+
+// Custom theme preset (user-created or copy of built-in)
+export interface CustomPreset {
+  name: string;
+  theme: ThemeConfig;
+  basedOn?: string; // built-in preset name this was derived from
+}
+
 // View state type
 export interface ViewState {
   vp: ViewPort;
@@ -123,6 +205,9 @@ export interface ViewState {
   idleImage?: string;
   blackoutStart?: string;
   blackoutEnd?: string;
+  theme?: ThemeConfig;
+  themePreset?: string;
+  customPresets?: Record<string, CustomPreset>;
 }
 
 // Remote state type

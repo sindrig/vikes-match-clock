@@ -27,6 +27,6 @@
 .team .red-card {
   height: 20%;
   width: 11%;
-  background: #e60000;
+  background: var(--theme-red-card-color, #e60000);
   display: block;
 }
