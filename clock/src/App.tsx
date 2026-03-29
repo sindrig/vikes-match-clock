@@ -13,6 +13,7 @@ import Controller from "./controller/Controller";
 import MatchActions from "./controller/MatchActions";
 import RefreshHandler from "./controller/RefreshHandler";
 import AssetComponent from "./controller/asset/Asset";
+import PlaybackBar from "./controller/asset/queue/PlaybackBar";
 import GoalScorerDialog from "./controller/GoalScorerDialog";
 
 import ScoreBoard from "./screens/ScoreBoard";
@@ -308,7 +309,11 @@ function App() {
               </div>
               <ViewModeButtons />
             </div>
-            {asset && <ClearOverlayButton />}
+            {controller.activeQueueId ? (
+              <PlaybackBar />
+            ) : (
+              asset && <ClearOverlayButton />
+            )}
             {showMatchControls && <MatchActions />}
           </div>
           <div className="controller-controls">
