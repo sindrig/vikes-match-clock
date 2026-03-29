@@ -54,7 +54,7 @@ The admin portal has two main sections displayed on a single page:
 | Actions | -- | Edit / Delete buttons |
 
 **Interactions**:
-- "Bja notanda" (Invite user) button -> opens modal with email input + location checkboxes
+- "Bjóða notanda" (Invite user) button -> opens modal with email input + location checkboxes
 - On submit, calls `adminWrite` Cloud Function with `createInvitation` action
 - "Breyta" (Edit) on invitation row -> opens modal to modify locations
 - "Eyda" (Delete) on invitation row -> confirmation dialog, then calls `adminWrite` with `deleteInvitation`
@@ -134,7 +134,7 @@ export const fetchUsers = () => ...
 
 ### InvitationTable.tsx
 - Receives `invitations` and `locations` as props
-- "Bja notanda" button opens `InvitationModal` in create mode
+- "Bjóða notanda" button opens `InvitationModal` in create mode
 - "Breyta" / "Eyda" buttons per row
 
 ### InvitationModal.tsx

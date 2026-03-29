@@ -115,7 +115,7 @@ Test cases:
 
 **Invitation management**:
 - Admin portal shows pending invitations section
-- Click "Bja notanda" -> invitation modal opens
+- Click "Bjóða notanda" -> invitation modal opens
 - Fill email + select locations -> invitation appears in table
 - Delete invitation -> removed from table
 
