@@ -4,7 +4,6 @@ import {
   THEME_PRESETS,
   BUILT_IN_PRESET_NAMES,
 } from "./constants";
-import type { ThemeConfig } from "./types";
 
 describe("theme constants", () => {
   describe("BUILT_IN_PRESET_NAMES ↔ THEME_PRESETS consistency", () => {
@@ -54,7 +53,7 @@ describe("theme constants", () => {
       });
 
       it(`"${presetName}" has only string values`, () => {
-        for (const [key, value] of Object.entries(
+        for (const [, value] of Object.entries(
           presetTheme as unknown as Record<string, unknown>,
         )) {
           expect(typeof value).toBe("string");

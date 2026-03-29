@@ -14,8 +14,6 @@ import type {
   ViewState,
   ViewPort,
   TwoMinPenalty,
-  ThemeConfig,
-  CustomPreset,
 } from "../types";
 
 // Default values for tests
