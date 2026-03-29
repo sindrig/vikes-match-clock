@@ -2,12 +2,14 @@ import type {
   Match,
   ControllerState,
   ViewState,
+  ThemeConfig,
+  CustomPreset,
   TwoMinPenalty,
   Asset,
   ViewPort,
   QueueState,
 } from "../types";
-import { Sports } from "../constants";
+import { Sports, DEFAULT_THEME } from "../constants";
 
 interface LocationData {
   label: string;
@@ -224,6 +226,48 @@ export function parseController(
   };
 }
 
+export function parseTheme(data: unknown): ThemeConfig | undefined {
+  if (!data || typeof data !== "object") return undefined;
+
+  const raw = data as Record<string, unknown>;
+  const result: Record<string, string> = {};
+  const defaults = DEFAULT_THEME as unknown as Record<string, string>;
+
+  for (const key of Object.keys(defaults)) {
+    const val = raw[key];
+    result[key] = typeof val === "string" ? val : (defaults[key] ?? "");
+  }
+
+  return result as unknown as ThemeConfig;
+}
+
+export function parseCustomPresets(
+  data: unknown,
+): Record<string, CustomPreset> | undefined {
+  if (!data || typeof data !== "object") return undefined;
+
+  const raw = data as Record<string, unknown>;
+  const result: Record<string, CustomPreset> = {};
+
+  for (const [key, value] of Object.entries(raw)) {
+    if (!value || typeof value !== "object") continue;
+    const entry = value as Record<string, unknown>;
+
+    const name = typeof entry.name === "string" ? entry.name : key;
+    const theme = parseTheme(entry.theme);
+    if (!theme) continue;
+
+    const preset: CustomPreset = { name, theme };
+    if (typeof entry.basedOn === "string") {
+      preset.basedOn = entry.basedOn;
+    }
+
+    result[key] = preset;
+  }
+
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
 export function parseView(
   data: unknown,
   defaultView: ViewState,
@@ -246,6 +290,10 @@ export function parseView(
       typeof raw.blackoutStart === "string" ? raw.blackoutStart : undefined,
     blackoutEnd:
       typeof raw.blackoutEnd === "string" ? raw.blackoutEnd : undefined,
+    theme: parseTheme(raw.theme),
+    themePreset:
+      typeof raw.themePreset === "string" ? raw.themePreset : undefined,
+    customPresets: parseCustomPresets(raw.customPresets),
   };
 }
 

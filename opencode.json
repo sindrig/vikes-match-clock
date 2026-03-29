@@ -1,0 +1,15 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "playwright": {
+      "type": "local",
+      "command": [
+        "playwright-mcp",
+        "--headless",
+        "--browser",
+        "chromium",
+        "--no-sandbox"
+      ]
+    }
+  }
+}

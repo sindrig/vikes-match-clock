@@ -18,6 +18,8 @@ import {
   ViewState,
   ListenersState,
   ViewPort,
+  ThemeConfig,
+  CustomPreset,
   Asset,
   Player,
   Roster,
@@ -180,6 +182,10 @@ interface FirebaseStateContextType {
   setIdleImage: (idleImage: string) => void;
   setBlackoutStart: (blackoutStart: string | undefined) => void;
   setBlackoutEnd: (blackoutEnd: string | undefined) => void;
+  setTheme: (theme: ThemeConfig | undefined) => void;
+  setThemePreset: (preset: string | undefined) => void;
+  saveCustomPreset: (id: string, preset: CustomPreset) => void;
+  deleteCustomPreset: (id: string) => void;
 }
 
 const FirebaseStateContext = createContext<FirebaseStateContextType | null>(
@@ -500,7 +506,15 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
           const oldVal = prev[key];
           const newVal = newState[key];
           if (oldVal !== newVal) {
-            diff[key] = newVal;
+            // Firebase update() rejects undefined; use null to delete a key
+            diff[key] = newVal === undefined ? null : newVal;
+          }
+        }
+
+        // Also detect keys removed from newState (present in prev, absent in new)
+        for (const key of Object.keys(prev) as (keyof ViewState)[]) {
+          if (!(key in newState) && !(key in diff) && prev[key] !== undefined) {
+            diff[key] = null;
           }
         }
 
@@ -1205,6 +1219,48 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     [applyViewUpdate],
   );
 
+  const setTheme = useCallback(
+    (theme: ThemeConfig | undefined) => {
+      applyViewUpdate((prev) => ({ ...prev, theme }));
+    },
+    [applyViewUpdate],
+  );
+
+  const setThemePreset = useCallback(
+    (preset: string | undefined) => {
+      applyViewUpdate((prev) => ({ ...prev, themePreset: preset }));
+    },
+    [applyViewUpdate],
+  );
+
+  const saveCustomPreset = useCallback(
+    (id: string, preset: CustomPreset) => {
+      applyViewUpdate((prev) => {
+        const existing = prev.customPresets ?? {};
+        return {
+          ...prev,
+          customPresets: { ...existing, [id]: preset },
+        };
+      });
+    },
+    [applyViewUpdate],
+  );
+
+  const deleteCustomPreset = useCallback(
+    (id: string) => {
+      applyViewUpdate((prev) => {
+        if (!prev.customPresets?.[id]) return prev;
+
+        const updated = { ...prev.customPresets };
+        delete updated[id];
+        const newCustomPresets =
+          Object.keys(updated).length > 0 ? updated : undefined;
+        return { ...prev, customPresets: newCustomPresets };
+      });
+    },
+    [applyViewUpdate],
+  );
+
   // Apply screen viewport override from "Birta skjá" selection.
   // The screenViewport from locations.X.screens[Y] takes precedence over
   // the Firebase view.vp, which may not match the physical screen config.
@@ -1266,6 +1322,10 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       setIdleImage,
       setBlackoutStart,
       setBlackoutEnd,
+      setTheme,
+      setThemePreset,
+      saveCustomPreset,
+      deleteCustomPreset,
     }),
     [
       match,
@@ -1319,6 +1379,10 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       setIdleImage,
       setBlackoutStart,
       setBlackoutEnd,
+      setTheme,
+      setThemePreset,
+      saveCustomPreset,
+      deleteCustomPreset,
     ],
   );
 
@@ -1446,6 +1510,10 @@ export const useView = () => {
     setIdleImage,
     setBlackoutStart,
     setBlackoutEnd,
+    setTheme,
+    setThemePreset,
+    saveCustomPreset,
+    deleteCustomPreset,
   } = useFirebaseState();
   return {
     view,
@@ -1455,6 +1523,10 @@ export const useView = () => {
     setIdleImage,
     setBlackoutStart,
     setBlackoutEnd,
+    setTheme,
+    setThemePreset,
+    saveCustomPreset,
+    deleteCustomPreset,
   };
 };
 
