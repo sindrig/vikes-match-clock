@@ -1,5 +1,6 @@
 import { Navigate } from "react-router-dom";
 import { useAuth, useIsAdmin } from "../contexts/LocalStateContext";
+import { AdminPortal } from "./AdminPortal";
 
 export function AdminRoute() {
   const auth = useAuth();
@@ -19,12 +20,5 @@ export function AdminRoute() {
     );
   }
 
-  // AdminPortal will be added in spec 006, use a placeholder for now
-  return (
-    <div style={{ padding: "2rem" }}>
-      <h2>Stjórnborð</h2>
-      <p>Admin portal loading...</p>
-      <a href="/">Til baka</a>
-    </div>
-  );
+  return <AdminPortal />;
 }
