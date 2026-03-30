@@ -67,14 +67,14 @@ export function useAdminData(): AdminData {
   const [usersFetchCount, setUsersFetchCount] = useState(0);
 
   const refreshUsers = useCallback(() => {
+    setLoading(true);
+    setError(null);
     setUsersFetchCount((c) => c + 1);
   }, []);
 
   // Fetch Firebase Auth users via Cloud Function
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
 
     fetchUsers()
       .then((users) => {

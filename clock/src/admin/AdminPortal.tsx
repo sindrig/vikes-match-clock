@@ -35,7 +35,13 @@ export function AdminPortal() {
               Til baka
             </Button>
           </Link>
-          <Button appearance="ghost" size="sm" onClick={handleLogout}>
+          <Button
+            appearance="ghost"
+            size="sm"
+            onClick={() => {
+              void handleLogout();
+            }}
+          >
             Útskrá
           </Button>
         </div>

@@ -83,7 +83,9 @@ export function UserEditModal({
       <Modal.Footer>
         <Button
           appearance="primary"
-          onClick={handleSave}
+          onClick={() => {
+            void handleSave();
+          }}
           disabled={saving}
           loading={saving}
         >

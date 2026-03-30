@@ -139,8 +139,9 @@ export function LocalStateProvider({ children }: { children: ReactNode }) {
   // Admin Listener
   useEffect(() => {
     if (!auth.uid) {
-      setIsAdmin(false);
-      return;
+      return () => {
+        setIsAdmin(false);
+      };
     }
     const adminRef = ref(database, `admins/${auth.uid}`);
     const unsubscribe = onValue(adminRef, (snapshot) => {

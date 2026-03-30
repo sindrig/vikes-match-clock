@@ -173,7 +173,9 @@ export function InvitationTable({
           <Button
             appearance="primary"
             color="red"
-            onClick={handleDeleteConfirm}
+            onClick={() => {
+              void handleDeleteConfirm();
+            }}
             disabled={deleting}
             loading={deleting}
           >
