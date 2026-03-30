@@ -106,7 +106,9 @@ test.describe("Admin portal", () => {
       .waitFor({ state: "visible", timeout: 15000 });
     await expect(page.getByText("Boð í bið")).toBeVisible();
     await page.getByRole("button", { name: "Bjóða notanda" }).click();
-    await expect(page.getByText("Bjóða notanda")).toBeVisible();
+    await expect(
+      page.getByRole("dialog").getByText("Bjóða notanda"),
+    ).toBeVisible();
   });
 
   test("create invitation shows in table", async ({ page }) => {
@@ -128,7 +130,10 @@ test.describe("Admin portal", () => {
     if (await checkbox.isVisible()) {
       await checkbox.check();
     }
-    await page.getByRole("button", { name: "Bjóða" }).click();
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Bjóða", exact: true })
+      .click();
     await page
       .getByText("invitee@example.com")
       .waitFor({ state: "visible", timeout: 15000 });
@@ -150,7 +155,7 @@ test.describe("Admin portal", () => {
       .getByRole("heading", { name: /Stjórnborð/i })
       .waitFor({ state: "visible", timeout: 15000 });
 
-    await expect(page.getByText("delete-me@example.com")).toBeVisible({
+    await expect(page.getByText("delete-me@example.com").first()).toBeVisible({
       timeout: 15000,
     });
     await page
@@ -159,14 +164,16 @@ test.describe("Admin portal", () => {
       .getByRole("button", { name: "Eyða" })
       .click();
     await page
+      .getByRole("dialog")
       .getByRole("button", { name: "Eyða" })
-      .last()
       .waitFor({ state: "visible", timeout: 5000 });
     await page
+      .getByRole("dialog")
       .getByRole("button", { name: "Eyða", exact: true })
-      .last()
       .click();
-    await expect(page.getByText("delete-me@example.com")).not.toBeVisible({
+    await expect(
+      page.getByRole("table").getByText("delete-me@example.com"),
+    ).not.toBeVisible({
       timeout: 15000,
     });
   });
