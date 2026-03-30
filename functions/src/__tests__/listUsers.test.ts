@@ -55,11 +55,22 @@ vi.mock("firebase-functions", () => {
 vi.mock("firebase-functions/v2/https", () => {
   return {
     onCall: (
-      handler: (request: {
+      optionsOrHandler:
+        | Record<string, unknown>
+        | ((request: {
+            data: unknown;
+            auth?: { uid: string };
+          }) => Promise<unknown>),
+      maybeHandler?: (request: {
         data: unknown;
         auth?: { uid: string };
       }) => Promise<unknown>
     ) => {
+      // Support both onCall(handler) and onCall(options, handler)
+      const handler =
+        typeof optionsOrHandler === "function"
+          ? optionsOrHandler
+          : maybeHandler!;
       const wrappedHandler = (
         dataOrRequest: unknown,
         context?: { auth?: { uid: string } }
@@ -115,6 +126,7 @@ describe("listUsers", () => {
           uid: "u1",
           email: "user1@example.com",
           displayName: "User One",
+          disabled: false,
           metadata: {
             creationTime: "2024-01-01T00:00:00Z",
             lastSignInTime: "2024-06-01T00:00:00Z",
@@ -124,6 +136,7 @@ describe("listUsers", () => {
           uid: "u2",
           email: "user2@example.com",
           displayName: undefined,
+          disabled: true,
           metadata: {
             creationTime: "2024-02-01T00:00:00Z",
             lastSignInTime: undefined,
@@ -144,6 +157,7 @@ describe("listUsers", () => {
           displayName: "User One",
           createdAt: "2024-01-01T00:00:00Z",
           lastSignIn: "2024-06-01T00:00:00Z",
+          disabled: false,
         },
         {
           uid: "u2",
@@ -151,6 +165,7 @@ describe("listUsers", () => {
           displayName: undefined,
           createdAt: "2024-02-01T00:00:00Z",
           lastSignIn: undefined,
+          disabled: true,
         },
       ],
     });
@@ -190,6 +205,7 @@ describe("listUsers", () => {
           uid: "u1",
           email: "a@b.com",
           displayName: "A",
+          disabled: false,
           metadata: { creationTime: "t1", lastSignInTime: "t2" },
         },
       ],
@@ -203,6 +219,7 @@ describe("listUsers", () => {
           uid: "u2",
           email: "c@d.com",
           displayName: "B",
+          disabled: false,
           metadata: { creationTime: "t3", lastSignInTime: "t4" },
         },
       ],

@@ -8,6 +8,7 @@ const mockRemove = vi.fn();
 const mockPush = vi.fn();
 const mockRef = vi.fn();
 const mockGetUser = vi.fn();
+const mockUpdateUser = vi.fn();
 
 vi.mock("firebase-admin", () => {
   const mockDb = {
@@ -23,7 +24,7 @@ vi.mock("firebase-admin", () => {
     apps: [],
     initializeApp: vi.fn(),
     database: mockDatabase,
-    auth: vi.fn(() => ({ getUser: mockGetUser })),
+    auth: vi.fn(() => ({ getUser: mockGetUser, updateUser: mockUpdateUser })),
   };
   return {
     __esModule: true,
@@ -70,11 +71,22 @@ vi.mock("firebase-functions", () => {
 vi.mock("firebase-functions/v2/https", () => {
   return {
     onCall: (
-      handler: (request: {
+      optionsOrHandler:
+        | Record<string, unknown>
+        | ((request: {
+            data: unknown;
+            auth?: { uid: string; token?: { email?: string } };
+          }) => Promise<unknown>),
+      maybeHandler?: (request: {
         data: unknown;
         auth?: { uid: string; token?: { email?: string } };
       }) => Promise<unknown>,
     ) => {
+      // Support both onCall(handler) and onCall(options, handler)
+      const handler =
+        typeof optionsOrHandler === "function"
+          ? optionsOrHandler
+          : maybeHandler!;
       // Wrap handler to accept old (data, context) signature and convert to new
       const wrappedHandler = (
         dataOrRequest: unknown,
@@ -303,6 +315,106 @@ describe("adminWrite", () => {
     });
   });
 
+  // ---------- setUserDisabled ----------
+
+  describe("setUserDisabled", () => {
+    it("disables a user when called by admin", async () => {
+      stubAdminCheck(true);
+      mockUpdateUser.mockResolvedValueOnce(undefined);
+
+      const result = await handler(
+        {
+          action: "setUserDisabled",
+          targetUid: "target-uid",
+          disabled: true,
+        },
+        adminContext(),
+      );
+
+      expect(mockUpdateUser).toHaveBeenCalledWith("target-uid", {
+        disabled: true,
+      });
+      expect(result).toEqual({ success: true });
+    });
+
+    it("enables a user when called by admin", async () => {
+      stubAdminCheck(true);
+      mockUpdateUser.mockResolvedValueOnce(undefined);
+
+      const result = await handler(
+        {
+          action: "setUserDisabled",
+          targetUid: "target-uid",
+          disabled: false,
+        },
+        adminContext(),
+      );
+
+      expect(mockUpdateUser).toHaveBeenCalledWith("target-uid", {
+        disabled: false,
+      });
+      expect(result).toEqual({ success: true });
+    });
+
+    it("rejects self-disable", async () => {
+      stubAdminCheck(true);
+
+      await expect(
+        handler(
+          {
+            action: "setUserDisabled",
+            targetUid: "admin-uid",
+            disabled: true,
+          },
+          adminContext("admin-uid"),
+        ),
+      ).rejects.toMatchObject({
+        code: "invalid-argument",
+        message: "Cannot disable your own account",
+      });
+
+      expect(mockUpdateUser).not.toHaveBeenCalled();
+    });
+
+    it("rejects non-boolean disabled value", async () => {
+      stubAdminCheck(true);
+
+      await expect(
+        handler(
+          {
+            action: "setUserDisabled",
+            targetUid: "target-uid",
+            disabled: "yes",
+          },
+          adminContext(),
+        ),
+      ).rejects.toMatchObject({
+        code: "invalid-argument",
+      });
+
+      expect(mockUpdateUser).not.toHaveBeenCalled();
+    });
+
+    it("rejects non-admin with permission-denied", async () => {
+      stubAdminCheck(false);
+
+      await expect(
+        handler(
+          {
+            action: "setUserDisabled",
+            targetUid: "target-uid",
+            disabled: true,
+          },
+          adminContext("non-admin-uid"),
+        ),
+      ).rejects.toMatchObject({
+        code: "permission-denied",
+      });
+
+      expect(mockUpdateUser).not.toHaveBeenCalled();
+    });
+  });
+
   // ---------- Unauthenticated ----------
 
   describe("unauthenticated caller", () => {
@@ -345,6 +457,19 @@ describe("adminWrite", () => {
             action: "updateInvitation",
             invitationId: "inv-1",
             locations: { a: true },
+          },
+          {},
+        ),
+      ).rejects.toMatchObject({ code: "unauthenticated" });
+    });
+
+    it("rejects setUserDisabled", async () => {
+      await expect(
+        handler(
+          {
+            action: "setUserDisabled",
+            targetUid: "target-uid",
+            disabled: true,
           },
           {},
         ),

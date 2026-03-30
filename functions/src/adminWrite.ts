@@ -16,6 +16,11 @@ type AdminWriteData =
       locations: Record<string, boolean>;
     }
   | {
+      action: "setUserDisabled";
+      targetUid: string;
+      disabled: boolean;
+    }
+  | {
       action: "createInvitation";
       email: string;
       locations: Record<string, boolean>;
@@ -101,6 +106,27 @@ async function handleSetUserLocations(data: {
   return { success: true };
 }
 
+async function handleSetUserDisabled(
+  data: { targetUid: unknown; disabled: unknown },
+  callerUid: string,
+): Promise<{ success: true }> {
+  assertNonEmptyString(data.targetUid, "targetUid");
+  if (typeof data.disabled !== "boolean") {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "disabled must be a boolean",
+    );
+  }
+  if (data.targetUid === callerUid) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "Cannot disable your own account",
+    );
+  }
+  await admin.auth().updateUser(data.targetUid, { disabled: data.disabled });
+  return { success: true };
+}
+
 async function handleCreateInvitation(data: {
   email: unknown;
   locations: unknown;
@@ -158,6 +184,10 @@ export const adminWrite = onCall(
     case "setUserLocations":
       functions.logger.info("setUserLocations", { callerUid });
       return handleSetUserLocations(typedData);
+
+    case "setUserDisabled":
+      functions.logger.info("setUserDisabled", { callerUid });
+      return handleSetUserDisabled(typedData, callerUid);
 
     case "createInvitation": {
       functions.logger.info("createInvitation", { callerUid });

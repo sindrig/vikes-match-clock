@@ -14,6 +14,7 @@ interface UserEntry {
   displayName: string | undefined;
   createdAt: string | undefined;
   lastSignIn: string | undefined;
+  disabled: boolean;
 }
 
 export const listUsers = onCall(
@@ -47,6 +48,7 @@ export const listUsers = onCall(
         displayName: userRecord.displayName,
         createdAt: userRecord.metadata.creationTime,
         lastSignIn: userRecord.metadata.lastSignInTime,
+        disabled: userRecord.disabled,
       });
     }
     nextPageToken = listResult.pageToken;
