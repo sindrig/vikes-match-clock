@@ -140,7 +140,7 @@ async function handleUpdateInvitation(data: {
 }
 
 export const adminWrite = onCall(
-  { invoker: "allUsers" },
+  { enforceAppCheck: true },
   async (request) => {
   if (!request.auth) {
     throw new functions.https.HttpsError(

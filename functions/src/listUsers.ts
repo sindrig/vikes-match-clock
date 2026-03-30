@@ -17,7 +17,7 @@ interface UserEntry {
 }
 
 export const listUsers = onCall(
-  { invoker: "allUsers" },
+  { enforceAppCheck: true },
   async (request) => {
   if (!request.auth) {
     throw new functions.https.HttpsError(

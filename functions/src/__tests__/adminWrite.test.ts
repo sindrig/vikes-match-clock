@@ -70,27 +70,11 @@ vi.mock("firebase-functions", () => {
 vi.mock("firebase-functions/v2/https", () => {
   return {
     onCall: (
-      optionsOrHandler:
-        | { invoker?: string }
-        | ((
-            request: {
-              data: unknown;
-              auth?: { uid: string; token?: { email?: string } };
-            },
-          ) => Promise<unknown>),
-      handler?: (request: {
+      handler: (request: {
         data: unknown;
         auth?: { uid: string; token?: { email?: string } };
       }) => Promise<unknown>,
     ) => {
-      const actualHandler =
-        typeof optionsOrHandler === "function"
-          ? optionsOrHandler
-          : handler ??
-            (() => {
-              throw new Error("No handler provided");
-            });
-
       // Wrap handler to accept old (data, context) signature and convert to new
       const wrappedHandler = (
         dataOrRequest: unknown,
@@ -98,10 +82,10 @@ vi.mock("firebase-functions/v2/https", () => {
       ) => {
         if (context !== undefined) {
           // Old signature: handler(data, context)
-          return actualHandler({ data: dataOrRequest, auth: context.auth });
+          return handler({ data: dataOrRequest, auth: context.auth });
         }
         // New signature: handler(request)
-        return actualHandler(
+        return handler(
           dataOrRequest as {
             data: unknown;
             auth?: { uid: string; token?: { email?: string } };
