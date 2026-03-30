@@ -4,7 +4,7 @@
   },
   "functions": {
     "source": "functions",
-    "runtime": "nodejs22"
+    "runtime": "nodejs24"
   },
   "storage": {
     "rules": "storage.rules"
