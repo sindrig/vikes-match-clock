@@ -39,15 +39,15 @@ describe("AdminRoute", () => {
     expect(nav).toHaveAttribute("data-to", "/");
   });
 
-  it("redirects to / when auth is not loaded", () => {
+  it("shows loading spinner when auth is not loaded", () => {
     mockedUseAuth.mockReturnValue({ isLoaded: false, isEmpty: true });
     mockedUseIsAdmin.mockReturnValue(false);
 
     render(<AdminRoute />);
 
-    const nav = screen.getByTestId("navigate");
-    expect(nav).toBeInTheDocument();
-    expect(nav).toHaveAttribute("data-to", "/");
+    expect(screen.getByText("Hleð...")).toBeInTheDocument();
+    expect(screen.queryByTestId("navigate")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("admin-portal")).not.toBeInTheDocument();
   });
 
   it("shows access denied message when authenticated but not admin", () => {

@@ -35,7 +35,7 @@ jobs:
 
       - uses: w9jds/setup-firebase@main
         with:
-          tools-version: 11.9.0
+          tools-version: 13.29.1
           firebase_token: ${{ secrets.FIREBASE_TOKEN }}
 
       - name: Deploy Cloud Functions

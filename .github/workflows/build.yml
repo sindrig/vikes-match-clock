@@ -101,9 +101,13 @@ jobs:
       - name: Install Firebase CLI
         run: npm install -g firebase-tools
 
+      - name: Build Cloud Functions
+        working-directory: ./functions
+        run: npm ci && npm run build
+
       - name: Start Firebase Emulator
         run: |
-          firebase emulators:start --only auth,database,storage --project vikes-match-clock-test > /tmp/emulator.log 2>&1 &
+          firebase emulators:start --only auth,database,storage,functions --project vikes-match-clock-test > /tmp/emulator.log 2>&1 &
           echo $! > /tmp/emulator.pid
 
       - name: Wait for Firebase Emulator

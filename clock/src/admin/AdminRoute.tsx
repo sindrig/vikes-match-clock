@@ -1,4 +1,5 @@
 import { Navigate } from "react-router-dom";
+import { Loader } from "rsuite";
 import { useAuth, useIsAdmin } from "../contexts/LocalStateContext";
 import { AdminPortal } from "./AdminPortal";
 
@@ -6,7 +7,15 @@ export function AdminRoute() {
   const auth = useAuth();
   const isAdmin = useIsAdmin();
 
-  if (auth.isEmpty || !auth.isLoaded) {
+  if (!auth.isLoaded) {
+    return (
+      <div style={{ padding: "3rem", textAlign: "center" }}>
+        <Loader size="md" content="Hleð..." />
+      </div>
+    );
+  }
+
+  if (auth.isEmpty) {
     return <Navigate to="/" replace />;
   }
 

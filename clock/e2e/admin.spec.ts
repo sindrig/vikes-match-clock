@@ -63,18 +63,18 @@ test.describe("Admin portal", () => {
     });
   }
 
-  test("admin sees Stjórnborð button on screen selector", async ({ page }) => {
+  test("admin sees Stjórnborð link on screen selector", async ({ page }) => {
     await loginAsAdmin(page);
     await page
-      .getByRole("button", { name: /Stjórnborð/i })
+      .getByRole("link", { name: /Stjórnborð/i })
       .waitFor({ state: "visible", timeout: 15000 });
     await expect(page.getByText("Admin")).toBeVisible();
   });
 
-  test("non-admin does not see Stjórnborð button", async ({ page }) => {
+  test("non-admin does not see Stjórnborð link", async ({ page }) => {
     await loginAsRegularUser(page);
     await expect(
-      page.getByRole("button", { name: /Stjórnborð/i }),
+      page.getByRole("link", { name: /Stjórnborð/i }),
     ).not.toBeVisible();
   });
 
