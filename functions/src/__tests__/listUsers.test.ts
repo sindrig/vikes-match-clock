@@ -117,22 +117,24 @@ describe("listUsers", () => {
     const result = await handler(null, { auth: { uid: "admin-uid" } });
 
     expect(mockRef).toHaveBeenCalledWith("admins/admin-uid");
-    expect(result).toEqual([
-      {
-        uid: "u1",
-        email: "user1@example.com",
-        displayName: "User One",
-        createdAt: "2024-01-01T00:00:00Z",
-        lastSignIn: "2024-06-01T00:00:00Z",
-      },
-      {
-        uid: "u2",
-        email: "user2@example.com",
-        displayName: undefined,
-        createdAt: "2024-02-01T00:00:00Z",
-        lastSignIn: undefined,
-      },
-    ]);
+    expect(result).toEqual({
+      users: [
+        {
+          uid: "u1",
+          email: "user1@example.com",
+          displayName: "User One",
+          createdAt: "2024-01-01T00:00:00Z",
+          lastSignIn: "2024-06-01T00:00:00Z",
+        },
+        {
+          uid: "u2",
+          email: "user2@example.com",
+          displayName: undefined,
+          createdAt: "2024-02-01T00:00:00Z",
+          lastSignIn: undefined,
+        },
+      ],
+    });
   });
 
   it("throws permission-denied for non-admin caller", async () => {
@@ -193,6 +195,7 @@ describe("listUsers", () => {
     expect(mockListUsers).toHaveBeenCalledTimes(2);
     expect(mockListUsers).toHaveBeenCalledWith(1000, undefined);
     expect(mockListUsers).toHaveBeenCalledWith(1000, "nextPage");
-    expect(result).toHaveLength(2);
+    expect(result).toHaveProperty("users");
+    expect((result as { users: unknown[] }).users).toHaveLength(2);
   });
 });

@@ -187,6 +187,49 @@ export const test = base.extend<{
   },
 });
 
+export async function seedAdmins(uid: string, isAdmin = true): Promise<void> {
+  const apiContext = await request.newContext();
+  try {
+    await apiContext.put(
+      `http://127.0.0.1:9000/admins/${uid}.json?ns=vikes-match-clock-test`,
+      { data: isAdmin },
+    );
+  } finally {
+    await apiContext.dispose();
+  }
+}
+
+export async function seedInvitations(
+  invitations: Record<string, { email: string; locations: Record<string, boolean>; createdBy: string; createdAt: number }>,
+): Promise<void> {
+  const apiContext = await request.newContext();
+  try {
+    await apiContext.put(
+      `http://127.0.0.1:9000/invitations.json?ns=vikes-match-clock-test`,
+      { data: invitations },
+    );
+  } finally {
+    await apiContext.dispose();
+  }
+}
+
+export async function createEmulatorUser(
+  email: string,
+  password: string,
+): Promise<string> {
+  const apiContext = await request.newContext();
+  try {
+    const response = await apiContext.post(
+      "http://localhost:9099/identitytoolkit.googleapis.com/v1/accounts:signUp?key=test-api-key",
+      { data: { email, password, returnSecureToken: true } },
+    );
+    const body = await response.json();
+    return body.localId as string;
+  } finally {
+    await apiContext.dispose();
+  }
+}
+
 export { ensureEmulatorUser, clearEmulatorData };
 
 export async function goToHomeTab(page: Page) {

@@ -54,5 +54,5 @@ export const listUsers = functions.https.onCall(async (_data, context) => {
     userCount: users.length,
   });
 
-  return users;
+  return { users };
 });

@@ -7,6 +7,7 @@ const mockSet = vi.fn();
 const mockRemove = vi.fn();
 const mockPush = vi.fn();
 const mockRef = vi.fn();
+const mockGetUser = vi.fn();
 
 vi.mock("firebase-admin", () => {
   const mockDb = { ref: (...args: unknown[]) => mockRef(...args) };
@@ -15,11 +16,12 @@ vi.mock("firebase-admin", () => {
       apps: [],
       initializeApp: vi.fn(),
       database: vi.fn(() => mockDb),
-      auth: vi.fn(),
+      auth: vi.fn(() => ({ getUser: mockGetUser })),
     },
     apps: [],
     initializeApp: vi.fn(),
     database: vi.fn(() => mockDb),
+    auth: vi.fn(() => ({ getUser: mockGetUser })),
   };
 });
 
@@ -148,8 +150,12 @@ describe("adminWrite", () => {
   // ---------- createInvitation ----------
 
   describe("createInvitation", () => {
-    it("creates invitation with normalized email", async () => {
+    it("creates invitation with normalized email and admin email", async () => {
       stubAdminCheck(true);
+
+      mockGetUser.mockResolvedValueOnce({
+        email: "admin@example.com",
+      });
 
       const pushKey = "generated-push-key";
       mockPush.mockReturnValueOnce({
@@ -171,6 +177,8 @@ describe("adminWrite", () => {
       expect(mockSet).toHaveBeenCalledWith({
         email: "alice@example.com",
         locations: { stadium1: true },
+        createdBy: "admin@example.com",
+        createdAt: expect.anything(),
       });
       expect(result).toEqual({
         success: true,

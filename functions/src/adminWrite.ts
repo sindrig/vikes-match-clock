@@ -102,6 +102,7 @@ async function handleSetUserLocations(data: {
 async function handleCreateInvitation(data: {
   email: unknown;
   locations: unknown;
+  callerEmail: string;
 }): Promise<{ success: true; invitationId: string }> {
   assertValidEmail(data.email);
   assertValidLocations(data.locations, "locations");
@@ -110,6 +111,8 @@ async function handleCreateInvitation(data: {
   await ref.set({
     email: normalizedEmail,
     locations: data.locations,
+    createdBy: data.callerEmail,
+    createdAt: admin.database.ServerValue.TIMESTAMP,
   });
   return { success: true, invitationId: ref.key! };
 }
@@ -152,9 +155,12 @@ export const adminWrite = functions.https.onCall(async (data, context) => {
       functions.logger.info("setUserLocations", { callerUid });
       return handleSetUserLocations(typedData);
 
-    case "createInvitation":
+    case "createInvitation": {
       functions.logger.info("createInvitation", { callerUid });
-      return handleCreateInvitation(typedData);
+      const caller = await admin.auth().getUser(callerUid);
+      const callerEmail = caller.email ?? callerUid;
+      return handleCreateInvitation({ ...typedData, callerEmail });
+    }
 
     case "deleteInvitation":
       functions.logger.info("deleteInvitation", { callerUid });
