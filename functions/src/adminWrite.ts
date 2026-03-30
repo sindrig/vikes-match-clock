@@ -1,6 +1,7 @@
 import { onCall } from "firebase-functions/v2/https";
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
+import { ServerValue } from "firebase-admin/database";
 
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -113,7 +114,7 @@ async function handleCreateInvitation(data: {
     email: normalizedEmail,
     locations: data.locations,
     createdBy: data.callerEmail,
-    createdAt: admin.database.ServerValue.TIMESTAMP,
+    createdAt: ServerValue.TIMESTAMP,
   });
   return { success: true, invitationId: ref.key! };
 }
