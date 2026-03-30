@@ -10,18 +10,25 @@ const mockRef = vi.fn();
 const mockGetUser = vi.fn();
 
 vi.mock("firebase-admin", () => {
-  const mockDb = { ref: (...args: unknown[]) => mockRef(...args) };
-  return {
-    default: {
-      apps: [],
-      initializeApp: vi.fn(),
-      database: vi.fn(() => mockDb),
-      auth: vi.fn(() => ({ getUser: mockGetUser })),
+  const mockDb = {
+    ref: (...args: unknown[]) => mockRef(...args),
+  };
+  const mockDatabase = vi.fn(() => mockDb);
+  Object.assign(mockDatabase, {
+    ServerValue: {
+      TIMESTAMP: { ".sv": "timestamp" },
     },
+  });
+  const admin = {
     apps: [],
     initializeApp: vi.fn(),
-    database: vi.fn(() => mockDb),
+    database: mockDatabase,
     auth: vi.fn(() => ({ getUser: mockGetUser })),
+  };
+  return {
+    __esModule: true,
+    default: admin,
+    ...admin,
   };
 });
 
@@ -188,6 +195,9 @@ describe("adminWrite", () => {
 
     it("rejects invalid email", async () => {
       stubAdminCheck(true);
+      mockGetUser.mockResolvedValueOnce({
+        email: "admin@example.com",
+      });
 
       await expect(
         handler(
@@ -205,6 +215,9 @@ describe("adminWrite", () => {
 
     it("rejects empty email", async () => {
       stubAdminCheck(true);
+      mockGetUser.mockResolvedValueOnce({
+        email: "admin@example.com",
+      });
 
       await expect(
         handler(
