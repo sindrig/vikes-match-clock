@@ -83,7 +83,7 @@ test.describe("Admin portal", () => {
     await page
       .getByRole("heading", { name: /Stjórnborð/i })
       .waitFor({ state: "visible", timeout: 15000 });
-    await expect(page.getByText("Notendur og skjáaðgangur")).toBeVisible();
+    await expect(page.getByText("Stjórna notendum")).toBeVisible();
     await expect(page.getByText("Boð í bið")).toBeVisible();
   });
 
