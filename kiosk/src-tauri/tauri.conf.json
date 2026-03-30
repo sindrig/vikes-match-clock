@@ -3,9 +3,7 @@
   "productName": "vikes-match-clock",
   "version": "0.0.0",
   "identifier": "com.vikes.matchclock",
-  "build": {
-    "devtools": true
-  },
+  "build": {},
   "app": {
     "windows": [
       {
