@@ -3,8 +3,7 @@
     "rules": "firebase-rules.json"
   },
   "functions": {
-    "source": "functions",
-    "runtime": "nodejs24"
+    "source": "functions"
   },
   "storage": {
     "rules": "storage.rules"
