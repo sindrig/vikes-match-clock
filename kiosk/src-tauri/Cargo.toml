@@ -1,0 +1,19 @@
+[package]
+name = "vikes-match-clock"
+version = "0.0.0"
+description = "Kiosk wrapper for Vikes Match Clock stadium screens"
+authors = ["sindrig"]
+edition = "2021"
+
+[lib]
+name = "vikes_match_clock_lib"
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-autostart = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
