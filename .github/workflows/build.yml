@@ -101,9 +101,13 @@ jobs:
       - name: Install Firebase CLI
         run: npm install -g firebase-tools
 
+      - name: Build Cloud Functions
+        working-directory: ./functions
+        run: npm ci && npm run build
+
       - name: Start Firebase Emulator
         run: |
-          firebase emulators:start --only auth,database,storage --project vikes-match-clock-test > /tmp/emulator.log 2>&1 &
+          firebase emulators:start --only auth,database,storage,functions --project vikes-match-clock-test > /tmp/emulator.log 2>&1 &
           echo $! > /tmp/emulator.pid
 
       - name: Wait for Firebase Emulator
@@ -149,8 +153,14 @@ jobs:
         if: ${{ !cancelled() }}
         with:
           name: playwright-report
-          path: clock/playwright-report/
+          path: |
+            clock/playwright-report/
+            clock/test-results/
           retention-days: 30
+
+      - name: Print emulator logs on failure
+        if: failure()
+        run: cat /tmp/emulator.log || true
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
@@ -224,6 +234,11 @@ jobs:
             firebase -P vikes-match-clock-firebase database:set /states/$baseKey/controller/refreshToken -f -d '"'$(uuidgen)'"' --token $FIREBASE_TOKEN
           done
 
+      - name: Deploy database rules
+        run: firebase deploy --only database -P vikes-match-clock-firebase --token $FIREBASE_TOKEN
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+
   deploy-staging:
     runs-on: ubuntu-latest
     needs: [build-clock]
@@ -293,6 +308,34 @@ jobs:
               body: 'Deployed to staging: https://staging-klukka.irdn.is'
             })
 
+      - uses: w9jds/setup-firebase@main
+        with:
+          tools-version: 11.9.0
+          firebase_token: ${{ secrets.FIREBASE_TOKEN }}
+
+      - name: Deploy database rules
+        run: firebase deploy --only database -P vikes-match-clock-staging --token $FIREBASE_TOKEN
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+
+  deploy-functions:
+    if: github.ref == 'refs/heads/master'
+    uses: ./.github/workflows/deploy-functions.yml
+    with:
+      firebase_project: vikes-match-clock-firebase
+    secrets:
+      FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+
+  deploy-functions-staging:
+    if: |
+      github.event_name == 'pull_request' &&
+      contains(github.event.pull_request.labels.*.name, 'sandbox-deploy')
+    uses: ./.github/workflows/deploy-functions.yml
+    with:
+      firebase_project: vikes-match-clock-staging
+    secrets:
+      FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+
   notify:
     runs-on: ubuntu-latest
     if: always()
@@ -300,6 +343,8 @@ jobs:
       - build-clock
       - deploy-prod
       - deploy-staging
+      - deploy-functions
+      - deploy-functions-staging
     steps:
       - uses: actions/checkout@v2
 

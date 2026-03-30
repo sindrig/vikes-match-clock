@@ -82,3 +82,7 @@ clock/test-results
 .sisyphus
 clock/src/api/client/
 **/.sisyphus/
+
+functions/lib/
+functions/lib/**/*.map
+.opencode/

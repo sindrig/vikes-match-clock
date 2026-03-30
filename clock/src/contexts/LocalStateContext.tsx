@@ -21,6 +21,7 @@ export interface FirebaseAuthState {
 interface LocalStateContextType {
   // Auth state
   auth: FirebaseAuthState;
+  isAdmin: boolean;
 
   // Remote settings
   listenPrefix: string;
@@ -58,6 +59,9 @@ export function LocalStateProvider({ children }: { children: ReactNode }) {
   });
 
   const [available, setAvailable] = useState<string[] | null>(null);
+
+  // Admin state
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
 
   // Screen viewport override (set when selecting a screen via "Birta skjá")
   const [screenViewport, setScreenViewportState] = useState<ViewPort | null>(
@@ -132,8 +136,26 @@ export function LocalStateProvider({ children }: { children: ReactNode }) {
     };
   }, [auth.uid]);
 
+  // Admin Listener
+  useEffect(() => {
+    if (!auth.uid) {
+      return () => {
+        setIsAdmin(false);
+      };
+    }
+    const adminRef = ref(database, `admins/${auth.uid}`);
+    const unsubscribe = onValue(adminRef, (snapshot) => {
+      setIsAdmin(snapshot.val() === true);
+    });
+    return () => {
+      unsubscribe();
+      setIsAdmin(false);
+    };
+  }, [auth.uid]);
+
   const value = {
     auth,
+    isAdmin,
     listenPrefix,
     setListenPrefix,
     available,
@@ -168,4 +190,9 @@ export function useAuth() {
 export function useRemoteSettings() {
   const { listenPrefix, setListenPrefix, available } = useLocalState();
   return { listenPrefix, setListenPrefix, available };
+}
+
+export function useIsAdmin() {
+  const { isAdmin } = useLocalState();
+  return isAdmin;
 }

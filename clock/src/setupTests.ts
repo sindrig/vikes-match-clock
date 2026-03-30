@@ -73,6 +73,11 @@ vi.mock("firebase/storage", () => ({
   deleteObject: vi.fn(() => Promise.resolve()),
 }));
 
+vi.mock("firebase/functions", () => ({
+  getFunctions: vi.fn(() => ({})),
+  connectFunctionsEmulator: vi.fn(),
+}));
+
 vi.mock("hls.js", () => {
   const MockHls = function (this: {
     loadSource: () => void;

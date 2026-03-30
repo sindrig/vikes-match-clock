@@ -1,0 +1,507 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import * as functions from "firebase-functions";
+
+// --- Mock firebase-admin ---
+const mockOnce = vi.fn();
+const mockSet = vi.fn();
+const mockRemove = vi.fn();
+const mockPush = vi.fn();
+const mockRef = vi.fn();
+const mockGetUser = vi.fn();
+const mockUpdateUser = vi.fn();
+
+vi.mock("firebase-admin", () => {
+  const mockDb = {
+    ref: (...args: unknown[]) => mockRef(...args),
+  };
+  const mockDatabase = vi.fn(() => mockDb);
+  Object.assign(mockDatabase, {
+    ServerValue: {
+      TIMESTAMP: { ".sv": "timestamp" },
+    },
+  });
+  const admin = {
+    apps: [],
+    initializeApp: vi.fn(),
+    database: mockDatabase,
+    auth: vi.fn(() => ({ getUser: mockGetUser, updateUser: mockUpdateUser })),
+  };
+  return {
+    __esModule: true,
+    default: admin,
+    ...admin,
+  };
+});
+
+// --- Shared handler storage for both mocks ---
+let sharedOnCallHandler:
+  | ((request: {
+      data: unknown;
+      auth?: { uid: string; token?: { email?: string } };
+    }) => Promise<unknown>)
+  | undefined;
+
+// --- Mock firebase-functions ---
+vi.mock("firebase-functions", () => {
+  const HttpsError = class HttpsError extends Error {
+    code: string;
+    constructor(code: string, message: string) {
+      super(message);
+      this.code = code;
+    }
+  };
+
+  return {
+    default: {},
+    logger: {
+      info: vi.fn(),
+      error: vi.fn(),
+      warn: vi.fn(),
+    },
+    https: {
+      HttpsError,
+    },
+    // Point to shared handler
+    get __onCallHandler() {
+      return sharedOnCallHandler;
+    },
+  };
+});
+
+vi.mock("firebase-functions/v2/https", () => {
+  return {
+    onCall: (
+      optionsOrHandler:
+        | Record<string, unknown>
+        | ((request: {
+            data: unknown;
+            auth?: { uid: string; token?: { email?: string } };
+          }) => Promise<unknown>),
+      maybeHandler?: (request: {
+        data: unknown;
+        auth?: { uid: string; token?: { email?: string } };
+      }) => Promise<unknown>,
+    ) => {
+      // Support both onCall(handler) and onCall(options, handler)
+      const handler =
+        typeof optionsOrHandler === "function"
+          ? optionsOrHandler
+          : maybeHandler!;
+      // Wrap handler to accept old (data, context) signature and convert to new
+      const wrappedHandler = (
+        dataOrRequest: unknown,
+        context?: { auth?: { uid: string; token?: { email?: string } } },
+      ) => {
+        if (context !== undefined) {
+          // Old signature: handler(data, context)
+          return handler({ data: dataOrRequest, auth: context.auth });
+        }
+        // New signature: handler(request)
+        return handler(
+          dataOrRequest as {
+            data: unknown;
+            auth?: { uid: string; token?: { email?: string } };
+          },
+        );
+      };
+      sharedOnCallHandler = wrappedHandler;
+      return wrappedHandler;
+    },
+    get __onCallHandler() {
+      return sharedOnCallHandler;
+    },
+  };
+});
+
+type CallableHandler = (
+  data: unknown,
+  context: { auth?: { uid: string; token?: { email?: string } } },
+) => Promise<unknown>;
+
+function getHandler(): CallableHandler {
+  const mod = functions as unknown as { __onCallHandler: CallableHandler };
+  return mod.__onCallHandler;
+}
+
+let handler: CallableHandler;
+
+beforeEach(async () => {
+  vi.clearAllMocks();
+
+  if (!handler) {
+    await import("../adminWrite");
+    handler = getHandler();
+  }
+
+  // Default mockRef: returns object with once, set, remove, push
+  mockRef.mockImplementation(() => ({
+    once: mockOnce,
+    set: mockSet,
+    remove: mockRemove,
+    push: mockPush,
+  }));
+});
+
+/** Helper to make an admin-authenticated context */
+function adminContext(
+  uid = "admin-uid",
+  email = "admin@example.com",
+): { auth: { uid: string; token: { email: string } } } {
+  return { auth: { uid, token: { email } } };
+}
+
+/** Set the admin check to pass */
+function stubAdminCheck(isAdmin: boolean): void {
+  mockOnce.mockResolvedValueOnce({ val: () => (isAdmin ? true : false) });
+}
+
+describe("adminWrite", () => {
+  // ---------- setUserLocations ----------
+
+  describe("setUserLocations", () => {
+    it("updates auth/{uid} when called by admin", async () => {
+      stubAdminCheck(true);
+      mockSet.mockResolvedValueOnce(undefined);
+
+      const result = await handler(
+        {
+          action: "setUserLocations",
+          targetUid: "target-uid",
+          locations: { stadium1: true, stadium2: false },
+        },
+        adminContext(),
+      );
+
+      expect(mockRef).toHaveBeenCalledWith("admins/admin-uid");
+      expect(mockRef).toHaveBeenCalledWith("auth/target-uid");
+      expect(mockSet).toHaveBeenCalledWith({
+        stadium1: true,
+        stadium2: false,
+      });
+      expect(result).toEqual({ success: true });
+    });
+
+    it("rejects non-admin with permission-denied", async () => {
+      stubAdminCheck(false);
+
+      await expect(
+        handler(
+          {
+            action: "setUserLocations",
+            targetUid: "target-uid",
+            locations: { stadium1: true },
+          },
+          adminContext("non-admin-uid"),
+        ),
+      ).rejects.toMatchObject({
+        code: "permission-denied",
+      });
+
+      // Should not write auth
+      expect(mockSet).not.toHaveBeenCalled();
+    });
+  });
+
+  // ---------- createInvitation ----------
+
+  describe("createInvitation", () => {
+    it("creates invitation with normalized email and admin email", async () => {
+      stubAdminCheck(true);
+
+      const pushKey = "generated-push-key";
+      mockPush.mockReturnValueOnce({
+        key: pushKey,
+        set: mockSet,
+      });
+      mockSet.mockResolvedValueOnce(undefined);
+
+      const result = await handler(
+        {
+          action: "createInvitation",
+          email: "Alice@Example.COM",
+          locations: { stadium1: true },
+        },
+        adminContext(),
+      );
+
+      expect(mockRef).toHaveBeenCalledWith("invitations");
+      expect(mockSet).toHaveBeenCalledWith({
+        email: "alice@example.com",
+        locations: { stadium1: true },
+        createdBy: "admin@example.com",
+        createdAt: expect.anything(),
+      });
+      expect(result).toEqual({
+        success: true,
+        invitationId: pushKey,
+      });
+    });
+
+    it("rejects invalid email", async () => {
+      stubAdminCheck(true);
+
+      await expect(
+        handler(
+          {
+            action: "createInvitation",
+            email: "not-an-email",
+            locations: { stadium1: true },
+          },
+          adminContext(),
+        ),
+      ).rejects.toMatchObject({
+        code: "invalid-argument",
+      });
+    });
+
+    it("rejects empty email", async () => {
+      stubAdminCheck(true);
+
+      await expect(
+        handler(
+          {
+            action: "createInvitation",
+            email: "",
+            locations: { stadium1: true },
+          },
+          adminContext(),
+        ),
+      ).rejects.toMatchObject({
+        code: "invalid-argument",
+      });
+    });
+    it("accepts email with surrounding whitespace", async () => {
+      stubAdminCheck(true);
+
+      const pushKey = "generated-push-key";
+      mockPush.mockReturnValueOnce({
+        key: pushKey,
+        set: mockSet,
+      });
+      mockSet.mockResolvedValueOnce(undefined);
+
+      const result = await handler(
+        {
+          action: "createInvitation",
+          email: " user@example.com ",
+          locations: { stadium1: true },
+        },
+        adminContext(),
+      );
+
+      expect(mockSet).toHaveBeenCalledWith(
+        expect.objectContaining({ email: "user@example.com" }),
+      );
+      expect(result).toEqual({
+        success: true,
+        invitationId: pushKey,
+      });
+    });
+
+  });
+
+  // ---------- deleteInvitation ----------
+
+  describe("deleteInvitation", () => {
+    it("removes invitation by ID", async () => {
+      stubAdminCheck(true);
+      mockRemove.mockResolvedValueOnce(undefined);
+
+      const result = await handler(
+        {
+          action: "deleteInvitation",
+          invitationId: "inv-123",
+        },
+        adminContext(),
+      );
+
+      expect(mockRef).toHaveBeenCalledWith("invitations/inv-123");
+      expect(mockRemove).toHaveBeenCalled();
+      expect(result).toEqual({ success: true });
+    });
+  });
+
+  // ---------- updateInvitation ----------
+
+  describe("updateInvitation", () => {
+    it("updates invitation locations by ID", async () => {
+      stubAdminCheck(true);
+      mockSet.mockResolvedValueOnce(undefined);
+
+      const result = await handler(
+        {
+          action: "updateInvitation",
+          invitationId: "inv-456",
+          locations: { stadium2: true },
+        },
+        adminContext(),
+      );
+
+      expect(mockRef).toHaveBeenCalledWith("invitations/inv-456/locations");
+      expect(mockSet).toHaveBeenCalledWith({ stadium2: true });
+      expect(result).toEqual({ success: true });
+    });
+  });
+
+  // ---------- setUserDisabled ----------
+
+  describe("setUserDisabled", () => {
+    it("disables a user when called by admin", async () => {
+      stubAdminCheck(true);
+      mockUpdateUser.mockResolvedValueOnce(undefined);
+
+      const result = await handler(
+        {
+          action: "setUserDisabled",
+          targetUid: "target-uid",
+          disabled: true,
+        },
+        adminContext(),
+      );
+
+      expect(mockUpdateUser).toHaveBeenCalledWith("target-uid", {
+        disabled: true,
+      });
+      expect(result).toEqual({ success: true });
+    });
+
+    it("enables a user when called by admin", async () => {
+      stubAdminCheck(true);
+      mockUpdateUser.mockResolvedValueOnce(undefined);
+
+      const result = await handler(
+        {
+          action: "setUserDisabled",
+          targetUid: "target-uid",
+          disabled: false,
+        },
+        adminContext(),
+      );
+
+      expect(mockUpdateUser).toHaveBeenCalledWith("target-uid", {
+        disabled: false,
+      });
+      expect(result).toEqual({ success: true });
+    });
+
+    it("rejects self-disable", async () => {
+      stubAdminCheck(true);
+
+      await expect(
+        handler(
+          {
+            action: "setUserDisabled",
+            targetUid: "admin-uid",
+            disabled: true,
+          },
+          adminContext("admin-uid"),
+        ),
+      ).rejects.toMatchObject({
+        code: "invalid-argument",
+        message: "Cannot disable your own account",
+      });
+
+      expect(mockUpdateUser).not.toHaveBeenCalled();
+    });
+
+    it("rejects non-boolean disabled value", async () => {
+      stubAdminCheck(true);
+
+      await expect(
+        handler(
+          {
+            action: "setUserDisabled",
+            targetUid: "target-uid",
+            disabled: "yes",
+          },
+          adminContext(),
+        ),
+      ).rejects.toMatchObject({
+        code: "invalid-argument",
+      });
+
+      expect(mockUpdateUser).not.toHaveBeenCalled();
+    });
+
+    it("rejects non-admin with permission-denied", async () => {
+      stubAdminCheck(false);
+
+      await expect(
+        handler(
+          {
+            action: "setUserDisabled",
+            targetUid: "target-uid",
+            disabled: true,
+          },
+          adminContext("non-admin-uid"),
+        ),
+      ).rejects.toMatchObject({
+        code: "permission-denied",
+      });
+
+      expect(mockUpdateUser).not.toHaveBeenCalled();
+    });
+  });
+
+  // ---------- Unauthenticated ----------
+
+  describe("unauthenticated caller", () => {
+    it("rejects setUserLocations", async () => {
+      await expect(
+        handler(
+          {
+            action: "setUserLocations",
+            targetUid: "t",
+            locations: { a: true },
+          },
+          {},
+        ),
+      ).rejects.toMatchObject({ code: "unauthenticated" });
+    });
+
+    it("rejects createInvitation", async () => {
+      await expect(
+        handler(
+          {
+            action: "createInvitation",
+            email: "a@b.com",
+            locations: { a: true },
+          },
+          {},
+        ),
+      ).rejects.toMatchObject({ code: "unauthenticated" });
+    });
+
+    it("rejects deleteInvitation", async () => {
+      await expect(
+        handler({ action: "deleteInvitation", invitationId: "inv-1" }, {}),
+      ).rejects.toMatchObject({ code: "unauthenticated" });
+    });
+
+    it("rejects updateInvitation", async () => {
+      await expect(
+        handler(
+          {
+            action: "updateInvitation",
+            invitationId: "inv-1",
+            locations: { a: true },
+          },
+          {},
+        ),
+      ).rejects.toMatchObject({ code: "unauthenticated" });
+    });
+
+    it("rejects setUserDisabled", async () => {
+      await expect(
+        handler(
+          {
+            action: "setUserDisabled",
+            targetUid: "target-uid",
+            disabled: true,
+          },
+          {},
+        ),
+      ).rejects.toMatchObject({ code: "unauthenticated" });
+    });
+  });
+});

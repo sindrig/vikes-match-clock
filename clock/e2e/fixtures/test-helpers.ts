@@ -99,19 +99,39 @@ async function clearEmulatorData(): Promise<void> {
   await apiContext.dispose();
 }
 
+async function retryFetch(
+  fn: () => Promise<void>,
+  retries = 10,
+  delayMs = 1000,
+): Promise<void> {
+  for (let i = 0; i < retries; i++) {
+    try {
+      await fn();
+      return;
+    } catch (err: unknown) {
+      const isConnRefused =
+        err instanceof Error && /ECONNREFUSED/.test(err.message);
+      if (!isConnRefused || i === retries - 1) throw err;
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+  }
+}
+
 async function ensureEmulatorUser(): Promise<void> {
   const apiContext = await request.newContext();
   try {
-    await apiContext.post(
-      "http://localhost:9099/identitytoolkit.googleapis.com/v1/accounts:signUp?key=test-api-key",
-      {
-        data: {
-          email: TEST_EMAIL,
-          password: TEST_PASSWORD,
-          returnSecureToken: true,
+    await retryFetch(async () => {
+      await apiContext.post(
+        "http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signUp?key=test-api-key",
+        {
+          data: {
+            email: TEST_EMAIL,
+            password: TEST_PASSWORD,
+            returnSecureToken: true,
+          },
         },
-      },
-    );
+      );
+    });
   } catch {
     // User may already exist, ignore error
   }
@@ -186,6 +206,61 @@ export const test = base.extend<{
     await use(page);
   },
 });
+
+export async function seedAdmins(uid: string, isAdmin = true): Promise<void> {
+  const apiContext = await request.newContext();
+  try {
+    await apiContext.put(
+      `http://127.0.0.1:9000/admins/${uid}.json?ns=vikes-match-clock-test`,
+      { data: isAdmin },
+    );
+  } finally {
+    await apiContext.dispose();
+  }
+}
+
+export async function seedInvitations(
+  invitations: Record<
+    string,
+    {
+      email: string;
+      locations: Record<string, boolean>;
+      createdBy: string;
+      createdAt: number;
+    }
+  >,
+): Promise<void> {
+  const apiContext = await request.newContext();
+  try {
+    await apiContext.put(
+      `http://127.0.0.1:9000/invitations.json?ns=vikes-match-clock-test`,
+      { data: invitations },
+    );
+  } finally {
+    await apiContext.dispose();
+  }
+}
+
+export async function createEmulatorUser(
+  email: string,
+  password: string,
+): Promise<string> {
+  const apiContext = await request.newContext();
+  try {
+    let localId = "";
+    await retryFetch(async () => {
+      const response = await apiContext.post(
+        "http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signUp?key=test-api-key",
+        { data: { email, password, returnSecureToken: true } },
+      );
+      const body = await response.json();
+      localId = body.localId as string;
+    });
+    return localId;
+  } finally {
+    await apiContext.dispose();
+  }
+}
 
 export { ensureEmulatorUser, clearEmulatorData };
 

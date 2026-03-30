@@ -89,6 +89,7 @@ function setupState1() {
     setEmail: vi.fn(),
     password: "",
     setPassword: vi.fn(),
+    isAdmin: false,
   });
   mockedUseFirebaseState.mockReturnValue({
     controller: { view: VIEWS.idle, currentAsset: null },
@@ -119,6 +120,7 @@ function setupState2(
     setEmail: vi.fn(),
     password: "",
     setPassword: vi.fn(),
+    isAdmin: false,
   });
   mockedUseFirebaseState.mockReturnValue({
     controller: { view, currentAsset: null },
@@ -150,6 +152,7 @@ function setupState3(
     setEmail: vi.fn(),
     password: "",
     setPassword: vi.fn(),
+    isAdmin: false,
   });
   mockedUseFirebaseState.mockReturnValue({
     controller: { view, currentAsset: null },
@@ -365,6 +368,7 @@ describe("App", () => {
         setEmail: vi.fn(),
         password: "",
         setPassword: vi.fn(),
+        isAdmin: false,
       });
       mockedUseFirebaseState.mockReturnValue({
         controller: { view: VIEWS.idle, currentAsset: null },
@@ -399,6 +403,7 @@ describe("App", () => {
         setEmail: vi.fn(),
         password: "",
         setPassword: vi.fn(),
+        isAdmin: false,
       });
       mockedUseFirebaseState.mockReturnValue({
         controller: { view: VIEWS.idle, currentAsset: null },
@@ -430,6 +435,7 @@ describe("App", () => {
         setEmail: vi.fn(),
         password: "",
         setPassword: vi.fn(),
+        isAdmin: false,
       });
       mockedUseFirebaseState.mockReturnValue({
         controller: { view: VIEWS.idle, currentAsset: null },
@@ -455,6 +461,7 @@ describe("App", () => {
         setEmail: vi.fn(),
         password: "",
         setPassword: vi.fn(),
+        isAdmin: false,
       });
       mockedUseFirebaseState.mockReturnValue({
         controller: { view: VIEWS.idle, currentAsset: null },

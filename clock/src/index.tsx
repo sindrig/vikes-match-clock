@@ -1,4 +1,5 @@
 import { createRoot } from "react-dom/client";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import "./index.css";
 import App from "./App";
 import "./raven";
@@ -7,6 +8,7 @@ import {
   useLocalState,
 } from "./contexts/LocalStateContext";
 import { FirebaseStateProvider } from "./contexts/FirebaseStateContext";
+import { AdminRoute } from "./admin/AdminRoute";
 
 // Create a wrapper component that bridges LocalState to FirebaseState
 function AppWithProviders() {
@@ -30,7 +32,12 @@ if (!container) {
 }
 const root = createRoot(container);
 root.render(
-  <LocalStateProvider>
-    <AppWithProviders />
-  </LocalStateProvider>,
+  <BrowserRouter>
+    <LocalStateProvider>
+      <Routes>
+        <Route path="/admin" element={<AdminRoute />} />
+        <Route path="/*" element={<AppWithProviders />} />
+      </Routes>
+    </LocalStateProvider>
+  </BrowserRouter>,
 );
