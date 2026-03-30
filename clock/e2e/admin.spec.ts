@@ -111,6 +111,27 @@ test.describe("Admin portal", () => {
   });
 
   test("create invitation shows in table", async ({ page }) => {
+    // Debug: capture console errors and function responses
+    const consoleErrors: string[] = [];
+    page.on("console", (msg) => {
+      if (msg.type() === "error") consoleErrors.push(msg.text());
+    });
+    const functionResponses: { status: number; url: string; body: string }[] =
+      [];
+    page.on("response", async (response) => {
+      if (
+        response.url().includes("adminWrite") ||
+        response.url().includes("5001")
+      ) {
+        const body = await response.text().catch(() => "N/A");
+        functionResponses.push({
+          status: response.status(),
+          url: response.url(),
+          body: body.slice(0, 500),
+        });
+      }
+    });
+
     await loginAsAdmin(page);
     await page.goto("/admin");
     await page
@@ -126,7 +147,27 @@ test.describe("Admin portal", () => {
     await checkbox.waitFor({ state: "visible", timeout: 10000 });
     await checkbox.check();
     await dialog.getByRole("button", { name: "Bjóða", exact: true }).click();
-    await dialog.waitFor({ state: "hidden", timeout: 15000 });
+
+    // Wait for the dialog to close — if it stays open, capture debug info
+    const closed = await dialog
+      .waitFor({ state: "hidden", timeout: 15000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!closed) {
+      const dialogText = await dialog.innerText().catch(() => "N/A");
+      const redText = await dialog
+        .locator("p[style*='color: red'], p[style*='color:red']")
+        .allTextContents()
+        .catch(() => [] as string[]);
+      throw new Error(
+        `Dialog did not close after 15s.\n` +
+          `Dialog text: "${dialogText.slice(0, 500)}"\n` +
+          `Red error text: ${JSON.stringify(redText)}\n` +
+          `Function responses: ${JSON.stringify(functionResponses)}\n` +
+          `Console errors (last 5): ${JSON.stringify(consoleErrors.slice(-5))}`,
+      );
+    }
+
     await page
       .getByText("invitee@example.com")
       .waitFor({ state: "visible", timeout: 15000 });
