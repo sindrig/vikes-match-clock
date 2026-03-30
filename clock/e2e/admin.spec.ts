@@ -111,21 +111,6 @@ test.describe("Admin portal", () => {
   });
 
   test("create invitation shows in table", async ({ page }) => {
-    // Collect console errors and network responses for debugging
-    const consoleErrors: string[] = [];
-    page.on("console", (msg) => {
-      if (msg.type() === "error") consoleErrors.push(msg.text());
-    });
-    const functionResponses: string[] = [];
-    page.on("response", async (response) => {
-      if (response.url().includes("adminWrite")) {
-        const body = await response.text().catch(() => "N/A");
-        functionResponses.push(
-          `${response.status()} ${response.url()} => ${body.slice(0, 500)}`,
-        );
-      }
-    });
-
     await loginAsAdmin(page);
     await page.goto("/admin");
     await page
@@ -141,21 +126,7 @@ test.describe("Admin portal", () => {
     await checkbox.waitFor({ state: "visible", timeout: 10000 });
     await checkbox.check();
     await dialog.getByRole("button", { name: "Bjóða", exact: true }).click();
-    // Wait for the dialog to close — if it stays open, the Cloud Function likely failed
-    const closed = await dialog
-      .waitFor({ state: "hidden", timeout: 15000 })
-      .then(() => true)
-      .catch(() => false);
-    if (!closed) {
-      const paragraphs = await dialog.locator("p").allTextContents();
-      const allText = await dialog.innerText().catch(() => "");
-      throw new Error(
-        `Dialog did not close. Paragraphs: ${JSON.stringify(paragraphs)}. ` +
-          `Full dialog text: "${allText.slice(0, 500)}". ` +
-          `Function responses: ${JSON.stringify(functionResponses)}. ` +
-          `Console errors: ${JSON.stringify(consoleErrors.slice(-5))}`,
-      );
-    }
+    await dialog.waitFor({ state: "hidden", timeout: 15000 });
     await page
       .getByText("invitee@example.com")
       .waitFor({ state: "visible", timeout: 15000 });

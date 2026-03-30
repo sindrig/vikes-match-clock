@@ -29,6 +29,7 @@ interface FirebaseConfig {
   apiKey: string;
   authDomain: string;
   databaseURL: string;
+  projectId: string;
   storageBucket: string;
 }
 
@@ -36,6 +37,7 @@ const prodConfig: FirebaseConfig = {
   apiKey: "AIzaSyDhdG6cVA2xTfHhceCUA6N4I1EgdDIL1oA",
   authDomain: "vikes-match-clock-firebase.firebaseapp.com",
   databaseURL: "https://vikes-match-clock-firebase.firebaseio.com",
+  projectId: "vikes-match-clock-firebase",
   storageBucket: "vikes-match-clock-firebase.appspot.com",
 };
 
@@ -43,6 +45,7 @@ const devConfig: FirebaseConfig = {
   apiKey: "AIzaSyCX-4CXktMfJL47nrrpc1y8Q73j09ItmQI",
   authDomain: "vikes-match-clock-staging.firebaseapp.com",
   databaseURL: "https://vikes-match-clock-staging.firebaseio.com",
+  projectId: "vikes-match-clock-staging",
   storageBucket: "vikes-match-clock-staging.appspot.com",
 };
 
@@ -50,6 +53,7 @@ const emulatorConfig: FirebaseConfig = {
   apiKey: "test-api-key",
   authDomain: "vikes-match-clock-test.firebaseapp.com",
   databaseURL: "http://127.0.0.1:9000?ns=vikes-match-clock-test",
+  projectId: "vikes-match-clock-test",
   storageBucket: "vikes-match-clock-test.appspot.com",
 };
 
