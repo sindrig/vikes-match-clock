@@ -47,9 +47,7 @@ test.describe("Admin portal", () => {
     });
   }
 
-  async function loginAsRegularUser(
-    page: import("@playwright/test").Page,
-  ) {
+  async function loginAsRegularUser(page: import("@playwright/test").Page) {
     await page.goto("/");
     await page.getByPlaceholder("E-mail").fill(REGULAR_USER_EMAIL);
     await page.getByPlaceholder("Lykilorð").fill(REGULAR_USER_PASSWORD);
@@ -65,9 +63,7 @@ test.describe("Admin portal", () => {
     });
   }
 
-  test("admin sees Stjórnborð button on screen selector", async ({
-    page,
-  }) => {
+  test("admin sees Stjórnborð button on screen selector", async ({ page }) => {
     await loginAsAdmin(page);
     await page
       .getByRole("button", { name: /Stjórnborð/i })
@@ -123,13 +119,19 @@ test.describe("Admin portal", () => {
     await page.getByRole("button", { name: "Bjóða notanda" }).click();
     await page.getByLabel("Netfang:").fill("invitee@example.com");
     const checkbox = page.getByRole("checkbox", {
-      name: new RegExp(TEST_LISTEN_PREFIX.replace(/-/g, " ").split(" ").pop() ?? TEST_LISTEN_PREFIX, "i"),
+      name: new RegExp(
+        TEST_LISTEN_PREFIX.replace(/-/g, " ").split(" ").pop() ??
+          TEST_LISTEN_PREFIX,
+        "i",
+      ),
     });
     if (await checkbox.isVisible()) {
       await checkbox.check();
     }
     await page.getByRole("button", { name: "Bjóða" }).click();
-    await page.getByText("invitee@example.com").waitFor({ state: "visible", timeout: 15000 });
+    await page
+      .getByText("invitee@example.com")
+      .waitFor({ state: "visible", timeout: 15000 });
   });
 
   test("delete invitation removes it from table", async ({ page }) => {
@@ -148,9 +150,9 @@ test.describe("Admin portal", () => {
       .getByRole("heading", { name: /Stjórnborð/i })
       .waitFor({ state: "visible", timeout: 15000 });
 
-    await expect(
-      page.getByText("delete-me@example.com"),
-    ).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText("delete-me@example.com")).toBeVisible({
+      timeout: 15000,
+    });
     await page
       .getByRole("row")
       .filter({ hasText: "delete-me@example.com" })
@@ -164,8 +166,8 @@ test.describe("Admin portal", () => {
       .getByRole("button", { name: "Eyða", exact: true })
       .last()
       .click();
-    await expect(
-      page.getByText("delete-me@example.com"),
-    ).not.toBeVisible({ timeout: 15000 });
+    await expect(page.getByText("delete-me@example.com")).not.toBeVisible({
+      timeout: 15000,
+    });
   });
 });

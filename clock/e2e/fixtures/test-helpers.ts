@@ -200,7 +200,15 @@ export async function seedAdmins(uid: string, isAdmin = true): Promise<void> {
 }
 
 export async function seedInvitations(
-  invitations: Record<string, { email: string; locations: Record<string, boolean>; createdBy: string; createdAt: number }>,
+  invitations: Record<
+    string,
+    {
+      email: string;
+      locations: Record<string, boolean>;
+      createdBy: string;
+      createdAt: number;
+    }
+  >,
 ): Promise<void> {
   const apiContext = await request.newContext();
   try {
