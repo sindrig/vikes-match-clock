@@ -4,12 +4,13 @@
   "version": "0.0.0",
   "identifier": "com.vikes.matchclock",
   "build": {
-    "frontendDist": "https://klukka.irdn.is"
+    "devtools": true
   },
   "app": {
     "windows": [
       {
         "title": "Vikes Match Clock",
+        "url": "https://klukka.irdn.is",
         "fullscreen": true,
         "resizable": false,
         "decorations": false,
