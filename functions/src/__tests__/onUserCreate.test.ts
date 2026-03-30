@@ -21,6 +21,9 @@ vi.mock("firebase-admin", () => {
   };
 });
 
+// --- Shared handler storage ---
+let sharedOnCreateHandler: ((user: unknown) => Promise<void>) | undefined;
+
 // --- Mock firebase-functions ---
 vi.mock("firebase-functions", () => {
   const logger = {
@@ -28,22 +31,44 @@ vi.mock("firebase-functions", () => {
     error: vi.fn(),
     warn: vi.fn(),
   };
-  // Capture the handler passed to onCreate
-  let onCreateHandler: ((user: unknown) => Promise<void>) | undefined;
   return {
     default: {},
+    logger,
+    get __onCreateHandler() {
+      return sharedOnCreateHandler;
+    },
+  };
+});
+
+// --- Mock firebase-functions/v1 ---
+vi.mock("firebase-functions/v1", () => {
+  const logger = {
+    info: vi.fn(),
+    error: vi.fn(),
+    warn: vi.fn(),
+  };
+  return {
+    default: {
+      auth: {
+        user: () => ({
+          onCreate: (handler: (user: unknown) => Promise<void>) => {
+            sharedOnCreateHandler = handler;
+            return handler;
+          },
+        }),
+      },
+    },
     logger,
     auth: {
       user: () => ({
         onCreate: (handler: (user: unknown) => Promise<void>) => {
-          onCreateHandler = handler;
+          sharedOnCreateHandler = handler;
           return handler;
         },
       }),
     },
-    // Expose getter so tests can invoke the handler
     get __onCreateHandler() {
-      return onCreateHandler;
+      return sharedOnCreateHandler;
     },
   };
 });
@@ -56,7 +81,6 @@ function getHandler(): (user: {
   uid: string;
   email?: string;
 }) => Promise<void> {
-  // Force module re-evaluation to register the handler
   const mod = functionsModule as unknown as {
     __onCreateHandler: (user: {
       uid: string;

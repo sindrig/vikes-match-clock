@@ -1,4 +1,6 @@
-import * as functions from "firebase-functions";
+import * as functionsV1 from "firebase-functions/v1";
+import { auth } from "firebase-admin";
+type UserRecord = auth.UserRecord;
 import * as admin from "firebase-admin";
 
 if (!admin.apps.length) {
@@ -27,24 +29,24 @@ function isInvitationRecord(value: unknown): value is InvitationRecord {
   return Object.values(locations).every((v) => typeof v === "boolean");
 }
 
-export const onUserCreate = functions.auth.user().onCreate(async (user) => {
+export const onUserCreate = functionsV1.auth.user().onCreate(async (user: UserRecord) => {
   const rawEmail = user.email;
   if (!rawEmail) {
-    functions.logger.info("New user has no email, skipping invitation check", {
+    functionsV1.logger.info("New user has no email, skipping invitation check", {
       uid: user.uid,
     });
     return;
   }
 
   const normalizedEmail = rawEmail.trim().toLowerCase();
-  functions.logger.info("Checking invitations for new user", {
+  functionsV1.logger.info("Checking invitations for new user", {
     uid: user.uid,
     email: normalizedEmail,
   });
 
   const invitationsSnap = await db.ref("invitations").once("value");
   if (!invitationsSnap.exists()) {
-    functions.logger.info("No invitations found");
+    functionsV1.logger.info("No invitations found");
     return;
   }
 
@@ -68,13 +70,13 @@ export const onUserCreate = functions.auth.user().onCreate(async (user) => {
   }
 
   if (matchingKeys.length === 0) {
-    functions.logger.info("No matching invitations for email", {
+    functionsV1.logger.info("No matching invitations for email", {
       email: normalizedEmail,
     });
     return;
   }
 
-  functions.logger.info("Found matching invitations", {
+  functionsV1.logger.info("Found matching invitations", {
     email: normalizedEmail,
     count: matchingKeys.length,
     locations: mergedLocations,
@@ -90,7 +92,7 @@ export const onUserCreate = functions.auth.user().onCreate(async (user) => {
   }
   await db.ref().update(deleteUpdates);
 
-  functions.logger.info("Processed invitations for new user", {
+  functionsV1.logger.info("Processed invitations for new user", {
     uid: user.uid,
     email: normalizedEmail,
     locationsGranted: Object.keys(mergedLocations).length,

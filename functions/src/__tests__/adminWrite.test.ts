@@ -32,6 +32,9 @@ vi.mock("firebase-admin", () => {
   };
 });
 
+// --- Shared handler storage for both mocks ---
+let sharedOnCallHandler: ((request: { data: unknown; auth?: { uid: string } }) => Promise<unknown>) | undefined;
+
 // --- Mock firebase-functions ---
 vi.mock("firebase-functions", () => {
   const HttpsError = class HttpsError extends Error {
@@ -42,10 +45,6 @@ vi.mock("firebase-functions", () => {
     }
   };
 
-  let onCallHandler:
-    | ((data: unknown, context: unknown) => Promise<unknown>)
-    | undefined;
-
   return {
     default: {},
     logger: {
@@ -55,15 +54,39 @@ vi.mock("firebase-functions", () => {
     },
     https: {
       HttpsError,
-      onCall: (
-        handler: (data: unknown, context: unknown) => Promise<unknown>
+    },
+    // Point to shared handler
+    get __onCallHandler() {
+      return sharedOnCallHandler;
+    },
+  };
+});
+
+vi.mock("firebase-functions/v2/https", () => {
+  return {
+    onCall: (
+      handler: (request: {
+        data: unknown;
+        auth?: { uid: string };
+      }) => Promise<unknown>
+    ) => {
+      // Wrap handler to accept old (data, context) signature and convert to new
+      const wrappedHandler = (
+        dataOrRequest: unknown,
+        context?: { auth?: { uid: string } }
       ) => {
-        onCallHandler = handler;
-        return handler;
-      },
+        if (context !== undefined) {
+          // Old signature: handler(data, context)
+          return handler({ data: dataOrRequest, auth: context.auth });
+        }
+        // New signature: handler(request)
+        return handler(dataOrRequest as { data: unknown; auth?: { uid: string } });
+      };
+      sharedOnCallHandler = wrappedHandler;
+      return wrappedHandler;
     },
     get __onCallHandler() {
-      return onCallHandler;
+      return sharedOnCallHandler;
     },
   };
 });

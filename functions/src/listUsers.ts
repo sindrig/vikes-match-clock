@@ -1,3 +1,4 @@
+import { onCall } from "firebase-functions/v2/https";
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 
@@ -15,15 +16,15 @@ interface UserEntry {
   lastSignIn: string | undefined;
 }
 
-export const listUsers = functions.https.onCall(async (_data, context) => {
-  if (!context.auth) {
+export const listUsers = onCall(async (request) => {
+  if (!request.auth) {
     throw new functions.https.HttpsError(
       "unauthenticated",
       "Must be authenticated to list users"
     );
   }
 
-  const callerUid = context.auth.uid;
+  const callerUid = request.auth.uid;
   const adminSnap = await db.ref(`admins/${callerUid}`).once("value");
   if (adminSnap.val() !== true) {
     throw new functions.https.HttpsError(

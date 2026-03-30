@@ -1,3 +1,4 @@
+import { onCall } from "firebase-functions/v2/https";
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 
@@ -137,18 +138,18 @@ async function handleUpdateInvitation(data: {
   return { success: true };
 }
 
-export const adminWrite = functions.https.onCall(async (data, context) => {
-  if (!context.auth) {
+export const adminWrite = onCall(async (request) => {
+  if (!request.auth) {
     throw new functions.https.HttpsError(
       "unauthenticated",
       "Must be authenticated"
     );
   }
 
-  const callerUid = context.auth.uid;
+  const callerUid = request.auth.uid;
   await verifyAdmin(callerUid);
 
-  const typedData = data as AdminWriteData;
+  const typedData = request.data as AdminWriteData;
 
   switch (typedData.action) {
     case "setUserLocations":
@@ -171,7 +172,7 @@ export const adminWrite = functions.https.onCall(async (data, context) => {
       return handleUpdateInvitation(typedData);
 
     default: {
-      const unknownAction = (data as { action?: string }).action;
+      const unknownAction = (request.data as { action?: string }).action;
       throw new functions.https.HttpsError(
         "invalid-argument",
         `Unknown action: ${unknownAction}`
