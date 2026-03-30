@@ -33,24 +33,24 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function assertNonEmptyString(
   value: unknown,
-  fieldName: string
+  fieldName: string,
 ): asserts value is string {
   if (typeof value !== "string" || value.trim().length === 0) {
     throw new functions.https.HttpsError(
       "invalid-argument",
-      `${fieldName} must be a non-empty string`
+      `${fieldName} must be a non-empty string`,
     );
   }
 }
 
 function assertValidLocations(
   value: unknown,
-  fieldName: string
+  fieldName: string,
 ): asserts value is Record<string, boolean> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     throw new functions.https.HttpsError(
       "invalid-argument",
-      `${fieldName} must be a plain object`
+      `${fieldName} must be a plain object`,
     );
   }
   const obj = value as Record<string, unknown>;
@@ -58,13 +58,13 @@ function assertValidLocations(
     if (typeof key !== "string") {
       throw new functions.https.HttpsError(
         "invalid-argument",
-        `${fieldName} keys must be strings`
+        `${fieldName} keys must be strings`,
       );
     }
     if (typeof val !== "boolean") {
       throw new functions.https.HttpsError(
         "invalid-argument",
-        `${fieldName} values must be booleans, got ${typeof val} for key "${key}"`
+        `${fieldName} values must be booleans, got ${typeof val} for key "${key}"`,
       );
     }
   }
@@ -75,7 +75,7 @@ function assertValidEmail(value: unknown): asserts value is string {
   if (!EMAIL_REGEX.test(value)) {
     throw new functions.https.HttpsError(
       "invalid-argument",
-      "email must be a valid email address"
+      "email must be a valid email address",
     );
   }
 }
@@ -85,7 +85,7 @@ async function verifyAdmin(callerUid: string): Promise<void> {
   if (adminSnap.val() !== true) {
     throw new functions.https.HttpsError(
       "permission-denied",
-      "Only admins can perform this operation"
+      "Only admins can perform this operation",
     );
   }
 }
@@ -142,7 +142,7 @@ export const adminWrite = onCall(async (request) => {
   if (!request.auth) {
     throw new functions.https.HttpsError(
       "unauthenticated",
-      "Must be authenticated"
+      "Must be authenticated",
     );
   }
 
@@ -158,8 +158,7 @@ export const adminWrite = onCall(async (request) => {
 
     case "createInvitation": {
       functions.logger.info("createInvitation", { callerUid });
-      const caller = await admin.auth().getUser(callerUid);
-      const callerEmail = caller.email ?? callerUid;
+      const callerEmail = request.auth.token.email ?? callerUid;
       return handleCreateInvitation({ ...typedData, callerEmail });
     }
 
@@ -175,7 +174,7 @@ export const adminWrite = onCall(async (request) => {
       const unknownAction = (request.data as { action?: string }).action;
       throw new functions.https.HttpsError(
         "invalid-argument",
-        `Unknown action: ${unknownAction}`
+        `Unknown action: ${unknownAction}`,
       );
     }
   }

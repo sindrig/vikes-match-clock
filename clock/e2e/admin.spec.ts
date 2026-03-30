@@ -126,25 +126,7 @@ test.describe("Admin portal", () => {
     await checkbox.waitFor({ state: "visible", timeout: 10000 });
     await checkbox.check();
     await dialog.getByRole("button", { name: "Bjóða", exact: true }).click();
-    // Wait for the dialog to close — if it stays open, the Cloud Function likely failed
-    // Check for error messages in the dialog to diagnose
-    const dialogHidden = dialog
-      .waitFor({ state: "hidden", timeout: 15000 })
-      .then(() => true)
-      .catch(() => false);
-    const closed = await dialogHidden;
-    if (!closed) {
-      const errorText = await dialog
-        .locator("p[style*='color: red'], p[style*='color:red']")
-        .textContent()
-        .catch(() => null);
-      const dialogContent = await dialog.textContent().catch(() => "");
-      throw new Error(
-        `Dialog did not close after clicking Bjóða. ` +
-          `Error shown: ${errorText ?? "none"}. ` +
-          `Dialog content: ${dialogContent?.slice(0, 500)}`,
-      );
-    }
+    await dialog.waitFor({ state: "hidden", timeout: 15000 });
     await page
       .getByText("invitee@example.com")
       .waitFor({ state: "visible", timeout: 15000 });

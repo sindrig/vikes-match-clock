@@ -99,19 +99,39 @@ async function clearEmulatorData(): Promise<void> {
   await apiContext.dispose();
 }
 
+async function retryFetch(
+  fn: () => Promise<void>,
+  retries = 10,
+  delayMs = 1000,
+): Promise<void> {
+  for (let i = 0; i < retries; i++) {
+    try {
+      await fn();
+      return;
+    } catch (err: unknown) {
+      const isConnRefused =
+        err instanceof Error && /ECONNREFUSED/.test(err.message);
+      if (!isConnRefused || i === retries - 1) throw err;
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+  }
+}
+
 async function ensureEmulatorUser(): Promise<void> {
   const apiContext = await request.newContext();
   try {
-    await apiContext.post(
-      "http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signUp?key=test-api-key",
-      {
-        data: {
-          email: TEST_EMAIL,
-          password: TEST_PASSWORD,
-          returnSecureToken: true,
+    await retryFetch(async () => {
+      await apiContext.post(
+        "http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signUp?key=test-api-key",
+        {
+          data: {
+            email: TEST_EMAIL,
+            password: TEST_PASSWORD,
+            returnSecureToken: true,
+          },
         },
-      },
-    );
+      );
+    });
   } catch {
     // User may already exist, ignore error
   }
@@ -227,12 +247,16 @@ export async function createEmulatorUser(
 ): Promise<string> {
   const apiContext = await request.newContext();
   try {
-    const response = await apiContext.post(
-      "http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signUp?key=test-api-key",
-      { data: { email, password, returnSecureToken: true } },
-    );
-    const body = await response.json();
-    return body.localId as string;
+    let localId = "";
+    await retryFetch(async () => {
+      const response = await apiContext.post(
+        "http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signUp?key=test-api-key",
+        { data: { email, password, returnSecureToken: true } },
+      );
+      const body = await response.json();
+      localId = body.localId as string;
+    });
+    return localId;
   } finally {
     await apiContext.dispose();
   }
