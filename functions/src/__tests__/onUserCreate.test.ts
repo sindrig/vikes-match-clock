@@ -251,4 +251,60 @@ describe("onUserCreate", () => {
     expect(mockRef).not.toHaveBeenCalledWith("invitations");
     expect(mockOnce).not.toHaveBeenCalled();
   });
+
+  it("merges locations additively — true always wins over false", async () => {
+    const invitations = {
+      inv1: {
+        email: "carol@example.com",
+        locations: { stadium1: true, stadium2: false },
+      },
+      inv2: {
+        email: "carol@example.com",
+        locations: { stadium1: false, stadium2: true },
+      },
+    };
+
+    mockOnce.mockResolvedValueOnce({
+      exists: () => true,
+      val: () => invitations,
+    });
+    mockSet.mockResolvedValueOnce(undefined);
+    mockUpdate.mockResolvedValueOnce(undefined);
+
+    await handler({ uid: "uidCarol", email: "carol@example.com" });
+
+    // stadium1 was true in inv1 — should remain true even though inv2 has false
+    // stadium2 was false in inv1 but true in inv2 — should be true
+    expect(mockSet).toHaveBeenCalledWith({
+      stadium1: true,
+      stadium2: true,
+    });
+  });
+
+  it("does not delete invitations when auth write fails", async () => {
+    const invitations = {
+      inv1: {
+        email: "alice@example.com",
+        locations: { stadium1: true },
+      },
+    };
+
+    mockOnce.mockResolvedValueOnce({
+      exists: () => true,
+      val: () => invitations,
+    });
+
+    // Simulate auth write failure
+    mockSet.mockRejectedValueOnce(new Error("Firebase write failed"));
+
+    await expect(
+      handler({ uid: "uid123", email: "alice@example.com" }),
+    ).rejects.toThrow("Firebase write failed");
+
+    // Should have attempted to write auth
+    expect(mockSet).toHaveBeenCalledWith({ stadium1: true });
+
+    // Should NOT have deleted the invitations
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
 });

@@ -270,6 +270,34 @@ describe("adminWrite", () => {
         code: "invalid-argument",
       });
     });
+    it("accepts email with surrounding whitespace", async () => {
+      stubAdminCheck(true);
+
+      const pushKey = "generated-push-key";
+      mockPush.mockReturnValueOnce({
+        key: pushKey,
+        set: mockSet,
+      });
+      mockSet.mockResolvedValueOnce(undefined);
+
+      const result = await handler(
+        {
+          action: "createInvitation",
+          email: " user@example.com ",
+          locations: { stadium1: true },
+        },
+        adminContext(),
+      );
+
+      expect(mockSet).toHaveBeenCalledWith(
+        expect.objectContaining({ email: "user@example.com" }),
+      );
+      expect(result).toEqual({
+        success: true,
+        invitationId: pushKey,
+      });
+    });
+
   });
 
   // ---------- deleteInvitation ----------

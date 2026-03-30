@@ -8,7 +8,7 @@ services:
       - ./firebase-rules.json:/app/firebase-rules.json:ro
       - ./storage.rules:/app/storage.rules:ro
       - ./.firebaserc:/app/.firebaserc:ro
-      - ./functions:/app/functions:ro
+      - ./functions:/app/functions
       - firebase-cache:/root/.cache
     ports:
       - "9099:9099"
@@ -28,6 +28,7 @@ services:
         apt-get update &&
         apt-get install -y temurin-21-jre curl &&
         npm install -g firebase-tools &&
+        cd /app/functions && npm ci && npm run build && cd /app &&
         firebase emulators:start --project vikes-match-clock-test
       "
     healthcheck:

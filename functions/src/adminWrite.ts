@@ -76,14 +76,16 @@ function assertValidLocations(
   }
 }
 
-function assertValidEmail(value: unknown): asserts value is string {
+function validateAndNormalizeEmail(value: unknown): string {
   assertNonEmptyString(value, "email");
-  if (!EMAIL_REGEX.test(value)) {
+  const normalized = (value as string).trim().toLowerCase();
+  if (!EMAIL_REGEX.test(normalized)) {
     throw new functions.https.HttpsError(
       "invalid-argument",
       "email must be a valid email address",
     );
   }
+  return normalized;
 }
 
 async function verifyAdmin(callerUid: string): Promise<void> {
@@ -132,9 +134,8 @@ async function handleCreateInvitation(data: {
   locations: unknown;
   callerEmail: string;
 }): Promise<{ success: true; invitationId: string }> {
-  assertValidEmail(data.email);
+  const normalizedEmail = validateAndNormalizeEmail(data.email);
   assertValidLocations(data.locations, "locations");
-  const normalizedEmail = data.email.trim().toLowerCase();
   const ref = db.ref("invitations").push();
   await ref.set({
     email: normalizedEmail,

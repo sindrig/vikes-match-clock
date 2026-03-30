@@ -22,7 +22,7 @@ function isInvitationRecord(value: unknown): value is InvitationRecord {
   if (typeof record.email !== "string") {
     return false;
   }
-  if (typeof record.locations !== "object" || record.locations === null) {
+  if (typeof record.locations !== "object" || record.locations === null || Array.isArray(record.locations)) {
     return false;
   }
   const locations = record.locations as Record<string, unknown>;
@@ -65,7 +65,9 @@ export const onUserCreate = functionsV1.auth.user().onCreate(async (user: UserRe
     for (const [locationKey, locationValue] of Object.entries(
       value.locations
     )) {
-      mergedLocations[locationKey] = locationValue;
+      if (locationValue === true) {
+        mergedLocations[locationKey] = true;
+      }
     }
   }
 
