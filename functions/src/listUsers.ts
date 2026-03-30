@@ -17,9 +17,7 @@ interface UserEntry {
   disabled: boolean;
 }
 
-export const listUsers = onCall(
-  { enforceAppCheck: true },
-  async (request) => {
+export const listUsers = onCall(async (request) => {
   if (!request.auth) {
     throw new functions.https.HttpsError(
       "unauthenticated",
