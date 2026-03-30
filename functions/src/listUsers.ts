@@ -16,7 +16,9 @@ interface UserEntry {
   lastSignIn: string | undefined;
 }
 
-export const listUsers = onCall(async (request) => {
+export const listUsers = onCall(
+  { invoker: "allUsers" },
+  async (request) => {
   if (!request.auth) {
     throw new functions.https.HttpsError(
       "unauthenticated",
