@@ -103,7 +103,7 @@ async function ensureEmulatorUser(): Promise<void> {
   const apiContext = await request.newContext();
   try {
     await apiContext.post(
-      "http://localhost:9099/identitytoolkit.googleapis.com/v1/accounts:signUp?key=test-api-key",
+      "http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signUp?key=test-api-key",
       {
         data: {
           email: TEST_EMAIL,
@@ -228,7 +228,7 @@ export async function createEmulatorUser(
   const apiContext = await request.newContext();
   try {
     const response = await apiContext.post(
-      "http://localhost:9099/identitytoolkit.googleapis.com/v1/accounts:signUp?key=test-api-key",
+      "http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signUp?key=test-api-key",
       { data: { email, password, returnSecureToken: true } },
     );
     const body = await response.json();
