@@ -13,6 +13,7 @@ vi.mock("../contexts/LocalStateContext", () => ({
   useAuth: vi.fn(),
   useLocalState: vi.fn(),
   useRemoteSettings: vi.fn(),
+  useIsAdmin: vi.fn(),
 }));
 
 vi.mock("../firebaseAuth", () => ({
@@ -56,6 +57,7 @@ import {
   useAuth,
   useLocalState,
   useRemoteSettings,
+  useIsAdmin,
 } from "../contexts/LocalStateContext";
 import { firebaseAuth } from "../firebaseAuth";
 
@@ -65,6 +67,7 @@ const mockedUseListeners = vi.mocked(useListeners);
 const mockedUseAuth = vi.mocked(useAuth);
 const mockedUseLocalState = vi.mocked(useLocalState);
 const mockedUseRemoteSettings = vi.mocked(useRemoteSettings);
+const mockedUseIsAdmin = vi.mocked(useIsAdmin);
 
 const defaultViewport = {
   style: { height: 100, width: 200 },
@@ -104,6 +107,7 @@ function setupState1() {
     screens: [{ label: "Víkin", screen: { name: "Main" }, key: "vikinni" }],
     available: [],
   } as unknown as ReturnType<typeof useListeners>);
+  mockedUseIsAdmin.mockReturnValue(false);
 }
 
 function setupState2() {
@@ -138,6 +142,7 @@ function setupState2() {
     screens: [],
     available: [],
   } as unknown as ReturnType<typeof useListeners>);
+  mockedUseIsAdmin.mockReturnValue(false);
 }
 
 function setupState3() {
@@ -177,6 +182,7 @@ function setupState3() {
     screens: [],
     available: [],
   } as unknown as ReturnType<typeof useListeners>);
+  mockedUseIsAdmin.mockReturnValue(false);
 }
 
 function setupScreenSelector(
@@ -242,6 +248,7 @@ function setupScreenSelector(
     ],
     available: mockAvailable,
   } as unknown as ReturnType<typeof useListeners>);
+  mockedUseIsAdmin.mockReturnValue(false);
   return { setListenPrefix: mockSetListenPrefix };
 }
 
