@@ -4,7 +4,7 @@ import { signOut } from "firebase/auth";
 import { auth } from "../firebase";
 import { useAuth } from "../contexts/LocalStateContext";
 import { useAdminData } from "./useAdminData";
-import { UserTable } from "./UserTable";
+import { ManageUsers } from "./ManageUsers";
 import { InvitationTable } from "./InvitationTable";
 import "rsuite/dist/rsuite.min.css";
 import "./AdminPortal.css";
@@ -75,8 +75,12 @@ export function AdminPortal() {
       ) : (
         <>
           <section className="admin-section">
-            <Panel header="Notendur og skjáaðgangur" bordered>
-              <UserTable users={users} locations={locations} />
+            <Panel header="Stjórna notendum" bordered>
+              <ManageUsers
+                users={users}
+                locations={locations}
+                onRefresh={refreshUsers}
+              />
             </Panel>
           </section>
 

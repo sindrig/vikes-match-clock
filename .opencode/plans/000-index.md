@@ -33,6 +33,7 @@ Build an authorization management portal inside the clock/ React app that lets a
 | 006 | [006-admin-portal-ui.md](006-admin-portal-ui.md) | Admin portal: user table, invitation table, modals |
 | 007 | [007-cicd-cloud-functions.md](007-cicd-cloud-functions.md) | CI/CD for function + rules deployment |
 | 008 | [008-testing-plan.md](008-testing-plan.md) | Unit, integration, and E2E test plan |
+| 009 | [009-user-disabled-management.md](009-user-disabled-management.md) | User enable/disable management (disabled flag, tabs, toggle) |
 
 ## Implementation order
 

@@ -10,6 +10,7 @@ export interface AdminUser {
   lastSignIn: string | undefined;
   createdAt: string;
   locations: Record<string, boolean>;
+  disabled: boolean;
 }
 
 export interface Invitation {
@@ -57,6 +58,7 @@ export function useAdminData(): AdminData {
       displayName: string | undefined;
       createdAt: string;
       lastSignIn: string | undefined;
+      disabled: boolean;
     }>
   >([]);
   const [authMappings, setAuthMappings] = useState<AuthMapping>({});
@@ -189,6 +191,7 @@ export function useAdminData(): AdminData {
     lastSignIn: u.lastSignIn,
     createdAt: u.createdAt,
     locations: authMappings[u.uid] ?? {},
+    disabled: u.disabled,
   }));
 
   return { users, invitations, locations, loading, error, refreshUsers };

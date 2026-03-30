@@ -8,6 +8,7 @@ interface ListUsersResponse {
     displayName: string | undefined;
     createdAt: string;
     lastSignIn: string | undefined;
+    disabled: boolean;
   }>;
 }
 
@@ -26,6 +27,14 @@ export async function setUserLocations(
 ): Promise<void> {
   const callable = httpsCallable(functions, "adminWrite");
   await callable({ action: "setUserLocations", targetUid, locations });
+}
+
+export async function setUserDisabled(
+  targetUid: string,
+  disabled: boolean,
+): Promise<void> {
+  const callable = httpsCallable(functions, "adminWrite");
+  await callable({ action: "setUserDisabled", targetUid, disabled });
 }
 
 export async function createInvitation(

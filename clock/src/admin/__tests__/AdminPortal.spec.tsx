@@ -23,16 +23,17 @@ vi.mock("../useAdminData", () => ({
   useAdminData: vi.fn(),
 }));
 
-vi.mock("../UserTable", () => ({
-  UserTable: ({
+vi.mock("../ManageUsers", () => ({
+  ManageUsers: ({
     users,
     locations,
   }: {
     users: unknown[];
     locations: unknown[];
+    onRefresh: () => void;
   }) => (
-    <div data-testid="user-table">
-      UserTable users={users.length} locations={locations.length}
+    <div data-testid="manage-users">
+      ManageUsers users={users.length} locations={locations.length}
     </div>
   ),
 }));
@@ -90,7 +91,7 @@ describe("AdminPortal", () => {
     render(<AdminPortal />);
 
     expect(screen.getByText("Hleð gögnum...")).toBeInTheDocument();
-    expect(screen.queryByTestId("user-table")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("manage-users")).not.toBeInTheDocument();
     expect(screen.queryByTestId("invitation-table")).not.toBeInTheDocument();
   });
 
@@ -130,6 +131,7 @@ describe("AdminPortal", () => {
           lastSignIn: "2024-01-01",
           createdAt: "2024-01-01",
           locations: { vikinni: true },
+          disabled: false,
         },
       ],
       invitations: [
@@ -146,7 +148,7 @@ describe("AdminPortal", () => {
 
     render(<AdminPortal />);
 
-    expect(screen.getByTestId("user-table")).toBeInTheDocument();
+    expect(screen.getByTestId("manage-users")).toBeInTheDocument();
     expect(screen.getByTestId("invitation-table")).toBeInTheDocument();
     expect(screen.queryByText("Hleð gögnum...")).not.toBeInTheDocument();
   });
@@ -189,6 +191,7 @@ describe("AdminPortal", () => {
           lastSignIn: undefined,
           createdAt: "2024-01-01",
           locations: {},
+          disabled: false,
         },
       ],
     });
@@ -196,7 +199,7 @@ describe("AdminPortal", () => {
     render(<AdminPortal />);
 
     expect(screen.getByText("Some error")).toBeInTheDocument();
-    expect(screen.getByTestId("user-table")).toBeInTheDocument();
+    expect(screen.getByTestId("manage-users")).toBeInTheDocument();
   });
 
   it("displays fallback badge when email is not available", () => {
