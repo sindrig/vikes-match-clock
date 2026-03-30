@@ -3,7 +3,6 @@ import {
   expect,
   ensureEmulatorUser,
   clearEmulatorData,
-  loginWithEmulatorUser,
   seedAdmins,
   seedInvitations,
   createEmulatorUser,
@@ -119,21 +118,16 @@ test.describe("Admin portal", () => {
       .waitFor({ state: "visible", timeout: 15000 });
 
     await page.getByRole("button", { name: "Bjóða notanda" }).click();
-    await page.getByLabel("Netfang:").fill("invitee@example.com");
-    const checkbox = page.getByRole("checkbox", {
-      name: new RegExp(
-        TEST_LISTEN_PREFIX.replace(/-/g, " ").split(" ").pop() ??
-          TEST_LISTEN_PREFIX,
-        "i",
-      ),
-    });
-    if (await checkbox.isVisible()) {
-      await checkbox.check();
-    }
-    await page
-      .getByRole("dialog")
-      .getByRole("button", { name: "Bjóða", exact: true })
-      .click();
+    const dialog = page.getByRole("dialog");
+    await dialog.waitFor({ state: "visible", timeout: 5000 });
+    await dialog.getByLabel("Netfang:").fill("invitee@example.com");
+    // Wait for location checkboxes to load (onValue may resolve after fetchUsers)
+    const checkbox = dialog.getByRole("checkbox").first();
+    await checkbox.waitFor({ state: "visible", timeout: 10000 });
+    await checkbox.check();
+    await dialog.getByRole("button", { name: "Bjóða", exact: true }).click();
+    // Wait for the dialog to close (indicates successful submission)
+    await dialog.waitFor({ state: "hidden", timeout: 15000 });
     await page
       .getByText("invitee@example.com")
       .waitFor({ state: "visible", timeout: 15000 });
