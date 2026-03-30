@@ -33,7 +33,12 @@ vi.mock("firebase-admin", () => {
 });
 
 // --- Shared handler storage for both mocks ---
-let sharedOnCallHandler: ((request: { data: unknown; auth?: { uid: string } }) => Promise<unknown>) | undefined;
+let sharedOnCallHandler:
+  | ((request: {
+      data: unknown;
+      auth?: { uid: string; token?: { email?: string } };
+    }) => Promise<unknown>)
+  | undefined;
 
 // --- Mock firebase-functions ---
 vi.mock("firebase-functions", () => {
@@ -67,20 +72,25 @@ vi.mock("firebase-functions/v2/https", () => {
     onCall: (
       handler: (request: {
         data: unknown;
-        auth?: { uid: string };
-      }) => Promise<unknown>
+        auth?: { uid: string; token?: { email?: string } };
+      }) => Promise<unknown>,
     ) => {
       // Wrap handler to accept old (data, context) signature and convert to new
       const wrappedHandler = (
         dataOrRequest: unknown,
-        context?: { auth?: { uid: string } }
+        context?: { auth?: { uid: string; token?: { email?: string } } },
       ) => {
         if (context !== undefined) {
           // Old signature: handler(data, context)
           return handler({ data: dataOrRequest, auth: context.auth });
         }
         // New signature: handler(request)
-        return handler(dataOrRequest as { data: unknown; auth?: { uid: string } });
+        return handler(
+          dataOrRequest as {
+            data: unknown;
+            auth?: { uid: string; token?: { email?: string } };
+          },
+        );
       };
       sharedOnCallHandler = wrappedHandler;
       return wrappedHandler;
@@ -93,7 +103,7 @@ vi.mock("firebase-functions/v2/https", () => {
 
 type CallableHandler = (
   data: unknown,
-  context: { auth?: { uid: string } }
+  context: { auth?: { uid: string; token?: { email?: string } } },
 ) => Promise<unknown>;
 
 function getHandler(): CallableHandler {
@@ -121,8 +131,11 @@ beforeEach(async () => {
 });
 
 /** Helper to make an admin-authenticated context */
-function adminContext(uid = "admin-uid"): { auth: { uid: string } } {
-  return { auth: { uid } };
+function adminContext(
+  uid = "admin-uid",
+  email = "admin@example.com",
+): { auth: { uid: string; token: { email: string } } } {
+  return { auth: { uid, token: { email } } };
 }
 
 /** Set the admin check to pass */
@@ -144,7 +157,7 @@ describe("adminWrite", () => {
           targetUid: "target-uid",
           locations: { stadium1: true, stadium2: false },
         },
-        adminContext()
+        adminContext(),
       );
 
       expect(mockRef).toHaveBeenCalledWith("admins/admin-uid");
@@ -166,8 +179,8 @@ describe("adminWrite", () => {
             targetUid: "target-uid",
             locations: { stadium1: true },
           },
-          adminContext("non-admin-uid")
-        )
+          adminContext("non-admin-uid"),
+        ),
       ).rejects.toMatchObject({
         code: "permission-denied",
       });
@@ -183,10 +196,6 @@ describe("adminWrite", () => {
     it("creates invitation with normalized email and admin email", async () => {
       stubAdminCheck(true);
 
-      mockGetUser.mockResolvedValueOnce({
-        email: "admin@example.com",
-      });
-
       const pushKey = "generated-push-key";
       mockPush.mockReturnValueOnce({
         key: pushKey,
@@ -200,7 +209,7 @@ describe("adminWrite", () => {
           email: "Alice@Example.COM",
           locations: { stadium1: true },
         },
-        adminContext()
+        adminContext(),
       );
 
       expect(mockRef).toHaveBeenCalledWith("invitations");
@@ -218,9 +227,6 @@ describe("adminWrite", () => {
 
     it("rejects invalid email", async () => {
       stubAdminCheck(true);
-      mockGetUser.mockResolvedValueOnce({
-        email: "admin@example.com",
-      });
 
       await expect(
         handler(
@@ -229,8 +235,8 @@ describe("adminWrite", () => {
             email: "not-an-email",
             locations: { stadium1: true },
           },
-          adminContext()
-        )
+          adminContext(),
+        ),
       ).rejects.toMatchObject({
         code: "invalid-argument",
       });
@@ -238,9 +244,6 @@ describe("adminWrite", () => {
 
     it("rejects empty email", async () => {
       stubAdminCheck(true);
-      mockGetUser.mockResolvedValueOnce({
-        email: "admin@example.com",
-      });
 
       await expect(
         handler(
@@ -249,8 +252,8 @@ describe("adminWrite", () => {
             email: "",
             locations: { stadium1: true },
           },
-          adminContext()
-        )
+          adminContext(),
+        ),
       ).rejects.toMatchObject({
         code: "invalid-argument",
       });
@@ -269,7 +272,7 @@ describe("adminWrite", () => {
           action: "deleteInvitation",
           invitationId: "inv-123",
         },
-        adminContext()
+        adminContext(),
       );
 
       expect(mockRef).toHaveBeenCalledWith("invitations/inv-123");
@@ -291,7 +294,7 @@ describe("adminWrite", () => {
           invitationId: "inv-456",
           locations: { stadium2: true },
         },
-        adminContext()
+        adminContext(),
       );
 
       expect(mockRef).toHaveBeenCalledWith("invitations/inv-456/locations");
@@ -311,8 +314,8 @@ describe("adminWrite", () => {
             targetUid: "t",
             locations: { a: true },
           },
-          {}
-        )
+          {},
+        ),
       ).rejects.toMatchObject({ code: "unauthenticated" });
     });
 
@@ -324,17 +327,14 @@ describe("adminWrite", () => {
             email: "a@b.com",
             locations: { a: true },
           },
-          {}
-        )
+          {},
+        ),
       ).rejects.toMatchObject({ code: "unauthenticated" });
     });
 
     it("rejects deleteInvitation", async () => {
       await expect(
-        handler(
-          { action: "deleteInvitation", invitationId: "inv-1" },
-          {}
-        )
+        handler({ action: "deleteInvitation", invitationId: "inv-1" }, {}),
       ).rejects.toMatchObject({ code: "unauthenticated" });
     });
 
@@ -346,8 +346,8 @@ describe("adminWrite", () => {
             invitationId: "inv-1",
             locations: { a: true },
           },
-          {}
-        )
+          {},
+        ),
       ).rejects.toMatchObject({ code: "unauthenticated" });
     });
   });
