@@ -85,3 +85,4 @@ clock/src/api/client/
 
 functions/lib/
 functions/lib/**/*.map
+.opencode/
