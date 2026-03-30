@@ -55,19 +55,27 @@ vi.mock("firebase-functions", () => {
 vi.mock("firebase-functions/v2/https", () => {
   return {
     onCall: (
-      handler: (request: {
-        data: unknown;
-        auth?: { uid: string };
-      }) => Promise<unknown>
+      optionsOrHandler:
+        | { invoker?: string }
+        | ((request: { data: unknown; auth?: { uid: string } }) => Promise<unknown>),
+      handler?: (request: { data: unknown; auth?: { uid: string } }) => Promise<unknown>,
     ) => {
+      const actualHandler =
+        typeof optionsOrHandler === "function"
+          ? optionsOrHandler
+          : handler ??
+            (() => {
+              throw new Error("No handler provided");
+            });
+
       const wrappedHandler = (
         dataOrRequest: unknown,
-        context?: { auth?: { uid: string } }
+        context?: { auth?: { uid: string } },
       ) => {
         if (context !== undefined) {
-          return handler({ data: dataOrRequest, auth: context.auth });
+          return actualHandler({ data: dataOrRequest, auth: context.auth });
         }
-        return handler(dataOrRequest as { data: unknown; auth?: { uid: string } });
+        return actualHandler(dataOrRequest as { data: unknown; auth?: { uid: string } });
       };
       sharedOnCallHandler = wrappedHandler;
       return wrappedHandler;
