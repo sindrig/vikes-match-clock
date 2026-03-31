@@ -9,14 +9,13 @@ pub fn run() {
             Some(vec![]),
         ))
         .setup(|app| {
-            let window = app.get_webview_window("main").unwrap();
-            window.open_devtools();
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.open_devtools();
+            }
 
             let autostart = app.autolaunch();
-            if !autostart.is_enabled().unwrap_or(false) {
-                if let Err(e) = autostart.enable() {
-                    eprintln!("Failed to enable autostart: {}", e);
-                }
+            if let Ok(false) = autostart.is_enabled() {
+                let _ = autostart.enable();
             }
             Ok(())
         })
