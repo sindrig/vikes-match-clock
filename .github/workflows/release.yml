@@ -33,7 +33,7 @@ jobs:
         with:
           projectPath: kiosk
           tagName: ${{ github.event_name == 'push' && github.ref_name || format('pr-{0}-{1}', github.event.pull_request.number, github.sha) }}
-          releaseName: ${{ github.event_name == 'push' && github.ref_name || format('PR #{0} build', github.event.pull_request.number) }}
-          releaseBody: ${{ github.event_name == 'push' && 'Kiosk binary for stadium screens. Install the .msi or .exe on the target Windows machine.' || format('Pre-release kiosk build from PR #{0}. For testing only.', github.event.pull_request.number) }}
+          releaseName: ${{ github.event_name == 'push' && github.ref_name || format('PR {0} build', github.event.pull_request.number) }}
+          releaseBody: ${{ github.event_name == 'push' && 'Kiosk binary for stadium screens. Install the .msi or .exe on the target Windows machine.' || format('Pre-release kiosk build from PR {0}. For testing only.', github.event.pull_request.number) }}
           releaseDraft: false
           prerelease: ${{ github.event_name == 'pull_request' }}
