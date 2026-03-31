@@ -2,19 +2,26 @@ use tauri_plugin_autostart::MacosLauncher;
 use tauri_plugin_autostart::ManagerExt;
 
 pub fn run() {
-    tauri::Builder::default()
+    let result = tauri::Builder::default()
         .plugin(tauri_plugin_autostart::init(
             MacosLauncher::LaunchAgent,
             Some(vec![]),
         ))
         .setup(|app| {
-            // Enable autostart so the app launches on Windows login
+            let window = app.get_webview_window("main").unwrap();
+            window.open_devtools();
+
             let autostart = app.autolaunch();
             if !autostart.is_enabled().unwrap_or(false) {
-                let _ = autostart.enable();
+                if let Err(e) = autostart.enable() {
+                    eprintln!("Failed to enable autostart: {}", e);
+                }
             }
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .run(tauri::generate_context!());
+
+    if let Err(e) = result {
+        eprintln!("Error running tauri application: {:?}", e);
+    }
 }
