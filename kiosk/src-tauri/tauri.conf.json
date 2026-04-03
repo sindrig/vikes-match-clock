@@ -36,10 +36,5 @@
         "type": "embedBootstrapper"
       }
     }
-  },
-  "plugins": {
-    "autostart": {
-      "args": []
-    }
   }
 }
