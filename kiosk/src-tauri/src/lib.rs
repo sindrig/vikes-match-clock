@@ -14,6 +14,7 @@ pub fn run() {
         .setup(|app| {
             info!("App setup started");
 
+            #[cfg(debug_assertions)]
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.open_devtools();
                 info!("Opened devtools");
