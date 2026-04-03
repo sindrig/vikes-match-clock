@@ -3,12 +3,14 @@
   "productName": "vikes-match-clock",
   "version": "0.0.0",
   "identifier": "com.vikes.matchclock",
-  "build": {},
+  "build": {
+    "frontendDist": "https://klukka.irdn.is"
+  },
   "app": {
+    "withGlobalTauri": false,
     "windows": [
       {
         "title": "Vikes Match Clock",
-        "url": "https://klukka.irdn.is",
         "fullscreen": true,
         "resizable": false,
         "decorations": false,
@@ -33,11 +35,6 @@
       "webviewInstallMode": {
         "type": "embedBootstrapper"
       }
-    }
-  },
-  "plugins": {
-    "autostart": {
-      "args": []
     }
   }
 }
