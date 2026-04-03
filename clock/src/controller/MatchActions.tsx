@@ -161,7 +161,7 @@ const MatchActions = () => {
               <PlayIcon /> Byrja
             </Button>
           )}
-          {!match.started && !match.timeElapsed
+          {!match.started && !match.timeElapsed && !match.halfOffset
             ? match.matchType === Sports.Football &&
               match.matchStartTime && (
                 <Button
@@ -176,7 +176,8 @@ const MatchActions = () => {
                 </Button>
               )
             : !match.started &&
-              match.showInjuryTime && (
+              match.showInjuryTime &&
+              !!match.timeElapsed && (
                 <Button
                   color="blue"
                   appearance="primary"
@@ -199,6 +200,7 @@ const MatchActions = () => {
               updateMatch({
                 started: 0,
                 timeElapsed: 0,
+                halfOffset: 0,
                 home2min: [],
                 away2min: [],
                 timeout: 0,

@@ -174,6 +174,10 @@ export function parseMatch(data: unknown, defaultMatch: Match): Match | null {
       typeof raw.showInjuryTime === "boolean"
         ? raw.showInjuryTime
         : defaultMatch.showInjuryTime,
+    halfOffset:
+      typeof raw.halfOffset === "number"
+        ? raw.halfOffset
+        : defaultMatch.halfOffset,
   };
 }
 

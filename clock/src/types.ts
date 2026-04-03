@@ -32,6 +32,7 @@ export interface Match {
   buzzer: number | false;
   countdown: boolean;
   showInjuryTime?: boolean;
+  halfOffset: number;
 }
 
 // Player type
