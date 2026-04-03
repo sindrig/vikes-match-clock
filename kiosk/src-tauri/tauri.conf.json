@@ -34,16 +34,16 @@
     "windows": {
       "webviewInstallMode": {
         "type": "embedBootstrapper"
+      },
+      "nsis": {
+        "installerIcon": "installer-assets/nsis-installer-icon.ico",
+        "headerImage": "installer-assets/nsis-header.bmp",
+        "sidebarImage": "installer-assets/nsis-sidebar.bmp"
+      },
+      "wix": {
+        "bannerPath": "installer-assets/msi-banner.bmp",
+        "dialogImagePath": "installer-assets/msi-dialog.bmp"
       }
-    },
-    "nsis": {
-      "installerIcon": "installer-assets/nsis-installer-icon.ico",
-      "headerImage": "installer-assets/nsis-header.bmp",
-      "sidebarImage": "installer-assets/nsis-sidebar.bmp"
-    },
-    "wix": {
-      "bannerPath": "installer-assets/msi-banner.bmp",
-      "dialogImagePath": "installer-assets/msi-dialog.bmp"
     }
   }
 }
