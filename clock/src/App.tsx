@@ -284,8 +284,13 @@ function App() {
     );
   }
 
-  // State 4: authenticated + listenPrefix set — full UI with disconnect/logout button
-  const disconnect = () => {
+  // State 4: authenticated + listenPrefix set — full UI with disconnect/logout buttons
+  const disconnectScreen = () => {
+    setScreenViewport(null);
+    setListenPrefix("");
+  };
+
+  const logout = () => {
     setScreenViewport(null);
     setListenPrefix("");
     firebaseAuth.logout().catch(console.error);
@@ -358,15 +363,21 @@ function App() {
           ) : null}
         </div>
       )}
-      <Button
-        color="red"
-        appearance="primary"
-        size="lg"
-        onClick={disconnect}
+      <ButtonGroup
         style={{ position: "fixed", bottom: 16, right: 16, zIndex: 9999 }}
       >
-        Aftengja skjá
-      </Button>
+        <Button color="red" appearance="primary" size="lg" onClick={logout}>
+          Útskrá
+        </Button>
+        <Button
+          color="orange"
+          appearance="primary"
+          size="lg"
+          onClick={disconnectScreen}
+        >
+          Aftengjast skjá
+        </Button>
+      </ButtonGroup>
       <StateListener />
     </div>
   );

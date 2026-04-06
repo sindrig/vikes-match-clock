@@ -283,14 +283,15 @@ describe("App", () => {
       expect(screen.getByTestId("scoreboard")).toBeInTheDocument();
     });
 
-    it("renders disconnect button", () => {
+    it("renders logout and disconnect screen buttons", () => {
       setupState3();
       render(<App />);
 
-      expect(screen.getByText("Aftengja skjá")).toBeInTheDocument();
+      expect(screen.getByText("Útskrá")).toBeInTheDocument();
+      expect(screen.getByText("Aftengjast skjá")).toBeInTheDocument();
     });
 
-    it("calls logout and disconnects when disconnect button is clicked", () => {
+    it("logout button disconnects and logs out", () => {
       const mockSetListenPrefix = vi.fn();
       const mockSetScreenViewport = vi.fn();
       setupState3(VIEWS.idle, {
@@ -299,11 +300,27 @@ describe("App", () => {
       });
       render(<App />);
 
-      fireEvent.click(screen.getByText("Aftengja skjá"));
+      fireEvent.click(screen.getByText("Útskrá"));
 
       expect(mockSetScreenViewport).toHaveBeenCalledWith(null);
       expect(mockSetListenPrefix).toHaveBeenCalledWith("");
       expect(firebaseAuth.logout).toHaveBeenCalled();
+    });
+
+    it("disconnect screen button clears prefix without logging out", () => {
+      const mockSetListenPrefix = vi.fn();
+      const mockSetScreenViewport = vi.fn();
+      setupState3(VIEWS.idle, {
+        setListenPrefix: mockSetListenPrefix,
+        setScreenViewport: mockSetScreenViewport,
+      });
+      render(<App />);
+
+      fireEvent.click(screen.getByText("Aftengjast skjá"));
+
+      expect(mockSetScreenViewport).toHaveBeenCalledWith(null);
+      expect(mockSetListenPrefix).toHaveBeenCalledWith("");
+      expect(firebaseAuth.logout).not.toHaveBeenCalled();
     });
 
     it("does not render Controller for control view", () => {
