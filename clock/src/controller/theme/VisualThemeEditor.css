@@ -253,3 +253,22 @@
   color: #555;
   flex-shrink: 0;
 }
+
+/* Font family selector inside popover */
+.visual-font-family-row {
+  border-top: 1px solid #eee;
+  padding-top: 6px;
+  margin-top: 2px;
+}
+
+.visual-font-select {
+  flex: 1;
+  min-width: 0;
+  height: 24px;
+  font-size: 11px;
+  border: 1px solid #d4d4d8;
+  border-radius: 4px;
+  padding: 0 4px;
+  background: #fff;
+  cursor: pointer;
+}
