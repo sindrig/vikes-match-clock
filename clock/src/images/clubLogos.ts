@@ -341,7 +341,7 @@ import { default as vestursahara } from "./club-logos/Vestur-Sahara.svg";
 import { default as vængirjúpiters } from "./club-logos/Vængir Júpiters.svg";
 import { default as víetnam } from "./club-logos/Víetnam.svg";
 import { default as víkinguro } from "./club-logos/Víkingur O.svg";
-import { default as víkingurr } from "./club-logos/Víkingur R.svg";
+import { default as víkingurr } from "./club-logos/Víkingur R.png";
 import { default as víðir } from "./club-logos/Víðir.svg";
 import { default as völsungur } from "./club-logos/Völsungur.svg";
 import { default as wales } from "./club-logos/Wales.svg";
