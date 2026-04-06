@@ -149,6 +149,7 @@ const PercentField = ({
 
 const FONT_OPTIONS = [
   '"Anton", sans-serif',
+  '"GT America", sans-serif',
   '"Oswald", sans-serif',
   '"Bebas Neue", sans-serif',
   '"Orbitron", sans-serif',

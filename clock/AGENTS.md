@@ -367,6 +367,17 @@ The theme editor is a **full rsuite Modal** (`ThemeEditorModal`) launched from a
 
 All labels are in Icelandic, consistent with the rest of the controller UI.
 
+#### Fonts
+
+**Google Fonts** (loaded via CDN in `index.html`): Anton, Oswald, Bebas Neue, Orbitron, Russo One.
+
+**Bundled fonts** (self-hosted via `@font-face` in `src/assets/fonts/`):
+- **GT America** (Grilli Type) — Regular + Bold weights (`GT-America-Standard-Regular.otf`, `GT-America-Standard-Bold.otf`). Declared in `src/assets/fonts/gt-america.css`, imported in `src/index.tsx`.
+
+The `FONT_OPTIONS` array in `ThemeEditor.tsx` defines the available fonts in the per-element font dropdowns (score box, clock, team name). To add a new font:
+1. For Google Fonts: add the `<link>` to `index.html` and add the CSS `font-family` string to `FONT_OPTIONS`
+2. For bundled fonts: place files in `src/assets/fonts/`, create a CSS file with `@font-face` declarations (use `format("opentype")` for `.otf`), import the CSS in `src/index.tsx`, and add to `FONT_OPTIONS`
+
 ## Build & Tooling
 
 - **Bundler**: Vite (migrated from Create React App) - config in `vite.config.ts`

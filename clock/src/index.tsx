@@ -1,5 +1,6 @@
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import "./assets/fonts/gt-america.css";
 import "./index.css";
 import App from "./App";
 import "./raven";
