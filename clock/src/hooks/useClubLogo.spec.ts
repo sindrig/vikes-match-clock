@@ -3,7 +3,6 @@ import { renderHook } from "@testing-library/react";
 import type { ClubOverride } from "../types";
 import { useClubLogo } from "./useClubLogo";
 
-// Mock the FirebaseStateContext
 vi.mock("../contexts/FirebaseStateContext", () => ({
   useClubOverrides: vi.fn(),
 }));
@@ -11,6 +10,12 @@ vi.mock("../contexts/FirebaseStateContext", () => ({
 import { useClubOverrides } from "../contexts/FirebaseStateContext";
 
 describe("useClubLogo", () => {
+  const createMockReturnValue = (overrides: Record<string, ClubOverride>) => ({
+    clubOverrides: overrides,
+    saveClubOverride: vi.fn<() => Promise<void>>(),
+    deleteClubOverride: vi.fn<() => Promise<void>>(),
+  });
+
   it("returns override URL when override exists for team name", () => {
     const overrides: Record<string, ClubOverride> = {
       "uuid-1": {
@@ -21,25 +26,16 @@ describe("useClubLogo", () => {
       },
     };
 
-    vi.mocked(useClubOverrides).mockReturnValue({
-      clubOverrides: overrides,
-      saveClubOverride: vi.fn(),
-      deleteClubOverride: vi.fn(),
-    } as any);
+    vi.mocked(useClubOverrides).mockReturnValue(createMockReturnValue(overrides));
 
     const { result } = renderHook(() => useClubLogo("Víkingur R"));
     expect(result.current).toBe("https://override.png");
   });
 
   it("returns bundled logo when no override exists", () => {
-    vi.mocked(useClubOverrides).mockReturnValue({
-      clubOverrides: {},
-      saveClubOverride: vi.fn(),
-      deleteClubOverride: vi.fn(),
-    } as any);
+    vi.mocked(useClubOverrides).mockReturnValue(createMockReturnValue({}));
 
     const { result } = renderHook(() => useClubLogo("Víkingur R"));
-    // Víkingur R is in the bundled clubLogos
     expect(result.current).toBeDefined();
     expect(typeof result.current).toBe("string");
   });
@@ -54,24 +50,15 @@ describe("useClubLogo", () => {
       },
     };
 
-    vi.mocked(useClubOverrides).mockReturnValue({
-      clubOverrides: overrides,
-      saveClubOverride: vi.fn(),
-      deleteClubOverride: vi.fn(),
-    } as any);
+    vi.mocked(useClubOverrides).mockReturnValue(createMockReturnValue(overrides));
 
     const { result } = renderHook(() => useClubLogo("Víkingur R"));
-    // Should fall back to bundled logo since logoUrl is falsy
     expect(result.current).toBeDefined();
     expect(typeof result.current).toBe("string");
   });
 
   it("returns undefined for unknown team with no override and no bundled logo", () => {
-    vi.mocked(useClubOverrides).mockReturnValue({
-      clubOverrides: {},
-      saveClubOverride: vi.fn(),
-      deleteClubOverride: vi.fn(),
-    } as any);
+    vi.mocked(useClubOverrides).mockReturnValue(createMockReturnValue({}));
 
     const { result } = renderHook(() => useClubLogo("NonexistentTeamXYZ123"));
     expect(result.current).toBeUndefined();
@@ -99,11 +86,7 @@ describe("useClubLogo", () => {
       },
     };
 
-    vi.mocked(useClubOverrides).mockReturnValue({
-      clubOverrides: overrides,
-      saveClubOverride: vi.fn(),
-      deleteClubOverride: vi.fn(),
-    } as any);
+    vi.mocked(useClubOverrides).mockReturnValue(createMockReturnValue(overrides));
 
     const result1 = renderHook(() => useClubLogo("Víkingur R"));
     expect(result1.result.current).toBe("https://override1.png");

@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   saveClubOverride,
@@ -8,10 +9,10 @@ import type { ClubOverride } from "./types";
 
 // Mock Firebase database
 vi.mock("firebase/database", () => ({
-  ref: vi.fn((_db, path) => ({ path })),
-  update: vi.fn(),
-  remove: vi.fn(),
-  set: vi.fn(),
+  ref: vi.fn((_db: unknown, path: string) => ({ path })),
+  update: vi.fn() as Mock,
+  remove: vi.fn() as Mock,
+  set: vi.fn() as Mock,
   onValue: vi.fn(),
   off: vi.fn(),
   DatabaseReference: {},
@@ -78,7 +79,8 @@ describe("firebaseDatabase write helpers", () => {
     });
 
     it("writes all override properties correctly", async () => {
-      const { update } = await import("firebase/database");
+      const database = await import("firebase/database");
+      const update = database.update as Mock;
       const override: ClubOverride = {
         name: "Custom Club",
         clubId: "-1",
@@ -88,7 +90,7 @@ describe("firebaseDatabase write helpers", () => {
 
       await saveClubOverride("test", "id1", override);
 
-      const callArgs = (update as any).mock.calls[0];
+      const callArgs = update.mock.calls[0];
       expect(callArgs[1]).toEqual(override);
     });
   });
