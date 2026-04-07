@@ -26,7 +26,9 @@ describe("useClubLogo", () => {
       },
     };
 
-    vi.mocked(useClubOverrides).mockReturnValue(createMockReturnValue(overrides));
+    vi.mocked(useClubOverrides).mockReturnValue(
+      createMockReturnValue(overrides),
+    );
 
     const { result } = renderHook(() => useClubLogo("Víkingur R"));
     expect(result.current).toBe("https://override.png");
@@ -50,7 +52,9 @@ describe("useClubLogo", () => {
       },
     };
 
-    vi.mocked(useClubOverrides).mockReturnValue(createMockReturnValue(overrides));
+    vi.mocked(useClubOverrides).mockReturnValue(
+      createMockReturnValue(overrides),
+    );
 
     const { result } = renderHook(() => useClubLogo("Víkingur R"));
     expect(result.current).toBeDefined();
@@ -86,7 +90,9 @@ describe("useClubLogo", () => {
       },
     };
 
-    vi.mocked(useClubOverrides).mockReturnValue(createMockReturnValue(overrides));
+    vi.mocked(useClubOverrides).mockReturnValue(
+      createMockReturnValue(overrides),
+    );
 
     const result1 = renderHook(() => useClubLogo("Víkingur R"));
     expect(result1.result.current).toBe("https://override1.png");
