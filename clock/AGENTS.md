@@ -202,7 +202,16 @@ The operational heart of the app.
 | Screen       | Purpose                                                                                   |
 | ------------ | ----------------------------------------------------------------------------------------- |
 | `ScoreBoard` | Primary match interface - clock, scores, penalties. Designed for visibility from distance |
-| `Idle`       | Pre/post match or breaks - club logos, weather, rotating sponsor ads                      |
+| `Idle`       | Pre/post match or breaks - club logos, weather, configurable sponsor ad                   |
+
+#### Idle Ad Image
+
+The idle screen can display an optional sponsor ad image. The image is selected from Firebase Storage (`{listenPrefix}/largeAds/`) and stored as a filename string in `states/${listenPrefix}/view/idleAd`.
+
+- **No hardcoded images** — if `idleAd` is null/unset, no ad renders
+- **Selection**: Dropdown in the "Idle skjár" panel of the advanced theme editor tab
+- **Storage path**: `{listenPrefix}/largeAds/{filename}` — download URL resolved at render time
+- **Firebase field**: `states/${listenPrefix}/view/idleAd` (string filename or null)
 
 ### 4. Specialized Logic
 
@@ -358,6 +367,7 @@ The theme editor is a **full rsuite Modal** (`ThemeEditorModal`) launched from a
 
 - Color pickers, text inputs, font family selectors, percentage inputs
 - Collapsible panels for each property group (Score boxes, Clock, Logos, etc.)
+- "Idle skjár" panel includes an `IdleAdPicker` dropdown for selecting the idle ad image from Firebase Storage
 
 **Controller integration** (`Controller.tsx`):
 
