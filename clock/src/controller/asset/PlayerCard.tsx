@@ -1,7 +1,8 @@
 import React, { useMemo } from "react";
 
-import { THUMB_VP, getBackground } from "../../constants";
+import { DEFAULT_THEME, THUMB_VP, getBackground } from "../../constants";
 import { useView } from "../../contexts/FirebaseStateContext";
+import { resolveTheme } from "../../hooks/useThemeCssVars";
 
 // Cached canvas for text measurement performance
 let cachedCanvas: HTMLCanvasElement | null = null;
@@ -19,11 +20,17 @@ const getTextWidth = (text: string, font: string): number => {
   return metrics.width;
 };
 
-const getMaxFontSize = (text: string, width: number, max: number): number => {
+const getMaxFontSize = (
+  text: string,
+  width: number,
+  max: number,
+  fontFamily: string,
+): number => {
   let regular = max;
   while (
     regular > 5 &&
-    getTextWidth(text.replace(" ", "_"), `${regular}px 'Anton'`) > width - 20
+    getTextWidth(text.replace(" ", "_"), `${regular}px ${fontFamily}`) >
+      width - 20
   ) {
     regular -= 1;
   }
@@ -67,9 +74,13 @@ const PlayerCard = (props: Props): React.JSX.Element => {
   } = props;
 
   const {
-    view: { vp, background },
+    view: { vp, background, theme, themePreset, customPresets },
   } = useView();
   const width = vp.style.width;
+
+  const clockFontFamily =
+    resolveTheme(themePreset, theme, customPresets).clockFontFamily ||
+    DEFAULT_THEME.clockFontFamily;
 
   const fontSizes = useMemo(() => {
     const name = asset.name || "";
@@ -78,14 +89,16 @@ const PlayerCard = (props: Props): React.JSX.Element => {
         name,
         THUMB_VP.width * widthMultiplier,
         Math.floor(width / 14),
+        clockFontFamily,
       ),
       regular: getMaxFontSize(
         name,
         width * widthMultiplier,
         Math.floor(width / 5),
+        clockFontFamily,
       ),
     };
-  }, [asset.name, widthMultiplier, width]);
+  }, [asset.name, widthMultiplier, width, clockFontFamily]);
 
   const nameStyle = {
     fontSize: `${thumbnail ? fontSizes.thumbnail : fontSizes.regular}px`,

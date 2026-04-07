@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import {
   Button,
   ButtonGroup,
@@ -24,6 +24,8 @@ import { resolveTheme } from "../../hooks/useThemeCssVars";
 import type { ThemeConfig, CustomPreset } from "../../types";
 import { toHex, parseStroke, composeStroke } from "./themeUtils";
 import VisualThemeEditor from "./VisualThemeEditor";
+import { storageHelpers } from "../../firebase";
+import { IMAGE_TYPES } from "../media";
 
 import "./ThemeEditor.css";
 
@@ -147,8 +149,9 @@ const PercentField = ({
   </div>
 );
 
-const FONT_OPTIONS = [
+export const FONT_OPTIONS = [
   '"Anton", sans-serif',
+  '"GT America", sans-serif',
   '"Oswald", sans-serif',
   '"Bebas Neue", sans-serif',
   '"Orbitron", sans-serif',
@@ -266,16 +269,66 @@ export function buildPresetList(
   return entries;
 }
 
+interface IdleAdPickerProps {
+  listenPrefix: string;
+  idleAd: string | null | undefined;
+  onIdleAdChange: (value: string | null) => void;
+}
+
+const IdleAdPicker = ({
+  listenPrefix,
+  idleAd,
+  onIdleAdChange,
+}: IdleAdPickerProps) => {
+  const [imageNames, setImageNames] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!listenPrefix) {
+      void Promise.resolve().then(() => setImageNames([]));
+      return;
+    }
+    const path = `${String(listenPrefix)}/${IMAGE_TYPES.largeAds}`;
+    void storageHelpers.listAll(path).then(
+      (res) => setImageNames(res.items.map((item) => item.name)),
+      () => setImageNames([]),
+    );
+  }, [listenPrefix]);
+
+  return (
+    <div className="theme-field">
+      <label className="theme-field-label">Idle auglýsing</label>
+      <select
+        className="theme-font-select"
+        value={idleAd ?? ""}
+        onChange={(e) => onIdleAdChange(e.target.value || null)}
+      >
+        <option value="">Engin</option>
+        {imageNames.map((name) => (
+          <option key={name} value={name}>
+            {name}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+};
+
 // ---- Theme property editor panels ----
 
 interface ThemeEditorPanelsProps {
   effective: ThemeConfig;
   onFieldChange: (field: keyof ThemeConfig, value: string) => void;
+  listenPrefix: string;
+  idleAd: string | null | undefined;
+  onIdleAdChange: (value: string | null) => void;
 }
 
 const ThemeEditorPanels = ({
   effective,
   onFieldChange,
+  listenPrefix,
+  idleAd,
+  onIdleAdChange,
 }: ThemeEditorPanelsProps) => (
   <div className="theme-editor-panels">
     <Panel header="Stigabox" collapsible defaultExpanded bordered>
@@ -421,6 +474,18 @@ const ThemeEditorPanels = ({
         defaultValue={DEFAULT_THEME.logoWidth}
         onChange={(v) => onFieldChange("logoWidth", v)}
       />
+      <PercentField
+        label="Stærð heima"
+        value={effective.homeLogoScale}
+        defaultValue={DEFAULT_THEME.homeLogoScale}
+        onChange={(v) => onFieldChange("homeLogoScale", v)}
+      />
+      <PercentField
+        label="Stærð úti"
+        value={effective.awayLogoScale}
+        defaultValue={DEFAULT_THEME.awayLogoScale}
+        onChange={(v) => onFieldChange("awayLogoScale", v)}
+      />
     </Panel>
 
     <Panel header="Uppbótatími" collapsible bordered>
@@ -540,6 +605,12 @@ const ThemeEditorPanels = ({
         defaultValue={DEFAULT_THEME.idleTextTop}
         onChange={(v) => onFieldChange("idleTextTop", v)}
       />
+      <Divider className="theme-divider" />
+      <IdleAdPicker
+        listenPrefix={listenPrefix}
+        idleAd={idleAd}
+        onIdleAdChange={onIdleAdChange}
+      />
     </Panel>
 
     <Panel header="Auglýsing" collapsible bordered>
@@ -603,11 +674,12 @@ interface ThemeEditorModalProps {
 
 const ThemeEditorModal = ({ open, onClose }: ThemeEditorModalProps) => {
   const {
-    view: { theme, themePreset, customPresets },
+    view: { theme, themePreset, customPresets, idleAd },
     setTheme,
     setThemePreset,
     saveCustomPreset,
     deleteCustomPreset,
+    setIdleAd,
   } = useView();
   const { listenPrefix } = useRemoteSettings();
 
@@ -860,6 +932,9 @@ const ThemeEditorModal = ({ open, onClose }: ThemeEditorModalProps) => {
           <ThemeEditorPanels
             effective={effective}
             onFieldChange={handleFieldChange}
+            listenPrefix={listenPrefix}
+            idleAd={idleAd}
+            onIdleAdChange={setIdleAd}
           />
         )}
       </Modal.Body>

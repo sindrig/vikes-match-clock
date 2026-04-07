@@ -190,6 +190,7 @@ interface FirebaseStateContextType {
   setViewPort: (vp: ViewPort) => void;
   setBackground: (background: string) => void;
   setIdleImage: (idleImage: string) => void;
+  setIdleAd: (idleAd: string | null) => void;
   setBlackoutStart: (blackoutStart: string | undefined) => void;
   setBlackoutEnd: (blackoutEnd: string | undefined) => void;
   setTheme: (theme: ThemeConfig | undefined) => void;
@@ -1243,6 +1244,13 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     [applyViewUpdate],
   );
 
+  const setIdleAd = useCallback(
+    (idleAd: string | null) => {
+      applyViewUpdate((prev) => ({ ...prev, idleAd }));
+    },
+    [applyViewUpdate],
+  );
+
   const setBlackoutStart = useCallback(
     (blackoutStart: string | undefined) => {
       applyViewUpdate((prev) => ({ ...prev, blackoutStart }));
@@ -1405,6 +1413,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       setViewPort,
       setBackground,
       setIdleImage,
+      setIdleAd,
       setBlackoutStart,
       setBlackoutEnd,
       setTheme,
@@ -1465,6 +1474,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       setViewPort,
       setBackground,
       setIdleImage,
+      setIdleAd,
       setBlackoutStart,
       setBlackoutEnd,
       setTheme,
@@ -1598,6 +1608,7 @@ export const useView = () => {
     setViewPort,
     setBackground,
     setIdleImage,
+    setIdleAd,
     setBlackoutStart,
     setBlackoutEnd,
     setTheme,
@@ -1611,6 +1622,7 @@ export const useView = () => {
     setViewPort,
     setBackground,
     setIdleImage,
+    setIdleAd,
     setBlackoutStart,
     setBlackoutEnd,
     setTheme,

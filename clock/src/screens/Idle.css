@@ -8,15 +8,9 @@
 }
 
 img.idle-ad {
-  display: none;
-}
-
-.idle-outside img.idle-ad,
-.idle-outsidesafamyri img.idle-ad {
   position: absolute;
   display: block;
   width: 33.4%;
-  height: 45.5%;
   right: 10%;
   top: 10%;
 }
