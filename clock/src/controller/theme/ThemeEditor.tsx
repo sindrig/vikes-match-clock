@@ -284,7 +284,7 @@ const IdleAdPicker = ({
 
   useEffect(() => {
     if (!listenPrefix) {
-      setImageNames([]);
+      void Promise.resolve().then(() => setImageNames([]));
       return;
     }
     const path = `${String(listenPrefix)}/${IMAGE_TYPES.largeAds}`;
