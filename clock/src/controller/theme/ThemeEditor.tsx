@@ -474,6 +474,18 @@ const ThemeEditorPanels = ({
         defaultValue={DEFAULT_THEME.logoWidth}
         onChange={(v) => onFieldChange("logoWidth", v)}
       />
+      <PercentField
+        label="Stærð heima"
+        value={effective.homeLogoScale}
+        defaultValue={DEFAULT_THEME.homeLogoScale}
+        onChange={(v) => onFieldChange("homeLogoScale", v)}
+      />
+      <PercentField
+        label="Stærð úti"
+        value={effective.awayLogoScale}
+        defaultValue={DEFAULT_THEME.awayLogoScale}
+        onChange={(v) => onFieldChange("awayLogoScale", v)}
+      />
     </Panel>
 
     <Panel header="Uppbótatími" collapsible bordered>

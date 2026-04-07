@@ -4,6 +4,12 @@
 
 .team.home .img-wrapper {
   left: 4%;
+  --logo-scale: var(--theme-home-logo-scale, 1);
+}
+
+.team.away .img-wrapper {
+  right: 4%;
+  --logo-scale: var(--theme-away-logo-scale, 1);
 }
 
 .team.away span.score {
@@ -52,6 +58,8 @@
   position: absolute;
   top: var(--theme-logo-top, 10%);
   height: var(--theme-logo-height, 43%);
+  transform: scale(var(--logo-scale, 1));
+  transform-origin: center center;
 }
 
 .team img {
