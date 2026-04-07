@@ -36,7 +36,7 @@ import { default as bosníaoghersegóvína } from "./club-logos/Bosnía og Herse
 import { default as botsvana } from "./club-logos/Botsvana.svg";
 import { default as bouveteyja } from "./club-logos/Bouveteyja.svg";
 import { default as brasilía } from "./club-logos/Brasilía.svg";
-import { default as breiðablik } from "./club-logos/Breiðablik.svg";
+import { default as breiðablik } from "./club-logos/Breiðablik.png";
 import { default as breskuindlandshafseyjar } from "./club-logos/Bresku Indlandshafseyjar.svg";
 import { default as breskujómfrúaeyjar } from "./club-logos/Bresku Jómfrúaeyjar.svg";
 import { default as bretland } from "./club-logos/Bretland.svg";
