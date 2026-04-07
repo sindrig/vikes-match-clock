@@ -63,8 +63,10 @@ const ELEMENTS: ElementDef[] = [
     label: "Merki (heima)",
     left: "4%",
     top: (t) => t.logoTop,
-    width: (t) => t.logoWidth,
-    height: (t) => t.logoHeight,
+    width: (t) =>
+      `${parseFloat(t.logoWidth) * (parseFloat(t.homeLogoScale) / 100)}%`,
+    height: (t) =>
+      `${parseFloat(t.logoHeight) * (parseFloat(t.homeLogoScale) / 100)}%`,
     bg: () => "rgba(255,255,255,0.1)",
     color: () => "#aaa",
     border: () => "1px dashed rgba(255,255,255,0.3)",
@@ -77,8 +79,10 @@ const ELEMENTS: ElementDef[] = [
     label: "Merki (úti)",
     left: "71%",
     top: (t) => t.logoTop,
-    width: (t) => t.logoWidth,
-    height: (t) => t.logoHeight,
+    width: (t) =>
+      `${parseFloat(t.logoWidth) * (parseFloat(t.awayLogoScale) / 100)}%`,
+    height: (t) =>
+      `${parseFloat(t.logoHeight) * (parseFloat(t.awayLogoScale) / 100)}%`,
     bg: () => "rgba(255,255,255,0.1)",
     color: () => "#aaa",
     border: () => "1px dashed rgba(255,255,255,0.3)",

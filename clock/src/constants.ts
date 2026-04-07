@@ -153,6 +153,10 @@ export const DEFAULT_THEME: ThemeConfig = {
   logoHeight: "43%",
   logoWidth: "25%",
 
+  // Per-team logo scale
+  homeLogoScale: "100%",
+  awayLogoScale: "100%",
+
   // Injury time
   injuryTimeColor: "white",
   injuryTimeFontSize: "2rem",

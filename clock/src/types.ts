@@ -151,6 +151,10 @@ export interface ThemeConfig {
   logoHeight: string;
   logoWidth: string;
 
+  // Per-team logo scale (percentage, e.g. "100%")
+  homeLogoScale: string;
+  awayLogoScale: string;
+
   // Injury time
   injuryTimeColor: string;
   injuryTimeFontSize: string;

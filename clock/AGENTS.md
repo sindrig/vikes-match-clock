@@ -245,7 +245,7 @@ All properties are CSS value strings. Grouped by display area:
 |-------|-----------|---------------|
 | Score boxes | `scoreBoxBg`, `scoreBoxColor`, `scoreBoxBorder`, `scoreBoxFontSize`, `scoreBoxFontFamily`, `scoreBoxStroke`, `scoreTop`, `scoreHeight`, `scoreWidth` | `--theme-score-*` |
 | Clock | `clockBg`, `clockColor`, `clockBorder`, `clockFontSizeMin`, `clockFontSizeMax`, `clockFontFamily`, `clockStroke`, `clockTop`, `clockLeft`, `clockWidth`, `clockHeight` | `--theme-clock-*` |
-| Logos | `logoTop`, `logoHeight`, `logoWidth` | `--theme-logo-*` |
+| Logos | `logoTop`, `logoHeight`, `logoWidth`, `homeLogoScale`, `awayLogoScale` | `--theme-logo-*`, `--theme-home-logo-scale`, `--theme-away-logo-scale` |
 | Injury time | `injuryTimeColor`, `injuryTimeFontSize`, `injuryTimeStroke`, `injuryTimeTop`, `injuryTimeLeft` | `--theme-injury-*` |
 | Team names | `teamNameColor`, `teamNameFontFamily` | `--theme-team-name-*` |
 | Red cards | `redCardColor` | `--theme-red-card-color` |
@@ -332,6 +332,10 @@ The ad image (`img.ad` in `ScoreBoard.css`) uses theme CSS vars for all position
 - The Advanced tab has an "Auglýsing" panel with position/size percentage inputs
 
 **Note**: The original CSS used `bottom: 2%` with `height: 25%`, which was converted to the equivalent `top: 73%` for consistency with the theme system's top-based positioning.
+
+#### Per-Team Logo Scaling
+
+Each team's logo can be independently scaled via `homeLogoScale` and `awayLogoScale` (percentage strings, e.g. `"100%"`). The scaling uses CSS `transform: scale()` with `transform-origin: center center` on `.img-wrapper`, so logos resize "middle out" — maintaining their center position and vertical alignment. The `themeToCssVars()` function converts the percentage to a unitless scale factor (e.g. `"100%"` → `"1"`, `"150%"` → `"1.5"`). Because `transform: scale()` is used (not width/height changes), aspect ratio is always preserved.
 
 #### Viewport Variants Note
 
