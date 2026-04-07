@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
 import Clock from "../components/LiveClock";
-import clubLogos from "../images/clubLogos";
 import AdImage from "../utils/AdImage";
 import { getTemp } from "../lib/weather";
 import husasmidjan from "../images/husa.png";
 import { IMAGE_TYPES } from "../controller/media";
 import { useView } from "../contexts/FirebaseStateContext";
+import { useClubLogo } from "../hooks/useClubLogo";
 
 import "./Idle.css";
 
@@ -19,6 +19,8 @@ const Idle = () => {
   const {
     view: { vp, idleImage },
   } = useView();
+
+  const idleLogoUrl = useClubLogo(idleImage || "Víkingur R");
 
   useEffect(() => {
     const updateTemp = () => {
@@ -48,10 +50,7 @@ const Idle = () => {
         time={8}
       />
       <img
-        src={
-          (idleImage && (clubLogos as Record<string, string>)[idleImage]) ||
-          clubLogos["Víkingur R"]
-        }
+        src={idleLogoUrl || ""}
         alt="Vikes"
         className="idle-vikes"
       />

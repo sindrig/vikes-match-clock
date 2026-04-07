@@ -5,19 +5,19 @@ import Clock from "../match/Clock";
 import TimeoutClock from "../match/TimeoutClock";
 import AdImage from "../utils/AdImage";
 
-import clubLogos from "../images/clubLogos";
 import { Sports } from "../constants";
 import buzzer from "../sounds/buzzersound.mp3";
 import { IMAGE_TYPES } from "../controller/media";
 import { Match } from "../types";
 import { useMatch, useView } from "../contexts/FirebaseStateContext";
+import { useClubLogo } from "../hooks/useClubLogo";
 
 import "./ScoreBoard.css";
 
-const getTeam = (id: "home" | "away", match: Match) => {
+const getTeam = (id: "home" | "away", match: Match, getLogoUrl: (name: string) => string | undefined) => {
   const name = match[`${id}Team`];
   return {
-    image: (clubLogos as Record<string, string>)[name] || undefined,
+    image: getLogoUrl(name),
     name,
   };
 };
@@ -81,6 +81,15 @@ const ScoreBoard = () => {
     match.matchType === Sports.Handball ? match.buzzer : null;
   const showBuzzer = useBuzzerTimer(buzzerTimestamp);
 
+  const homeLogoUrl = useClubLogo(match.homeTeam);
+  const awayLogoUrl = useClubLogo(match.awayTeam);
+
+  const getLogoUrl = useCallback((teamName: string): string | undefined => {
+    if (teamName === match.homeTeam) return homeLogoUrl;
+    if (teamName === match.awayTeam) return awayLogoUrl;
+    return undefined;
+  }, [homeLogoUrl, awayLogoUrl, match.homeTeam, match.awayTeam]);
+
   return (
     <div
       className={`scoreboard scoreboard-${match.matchType} scoreboard-${vp.key}`}
@@ -88,7 +97,7 @@ const ScoreBoard = () => {
       <AdImage imageType={IMAGE_TYPES.smallAds} />
       <Team
         className="home"
-        team={getTeam("home", match)}
+        team={getTeam("home", match, getLogoUrl)}
         score={match.homeScore}
         penalties={match.home2min}
         timeouts={match.homeTimeouts}
@@ -96,7 +105,7 @@ const ScoreBoard = () => {
       />
       <Team
         className="away"
-        team={getTeam("away", match)}
+        team={getTeam("away", match, getLogoUrl)}
         score={match.awayScore}
         penalties={match.away2min}
         timeouts={match.awayTimeouts}
