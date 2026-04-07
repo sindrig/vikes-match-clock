@@ -203,6 +203,7 @@ export interface ViewState {
   vp: ViewPort;
   background: string;
   idleImage?: string;
+  idleAd?: string | null;
   blackoutStart?: string;
   blackoutEnd?: string;
   theme?: ThemeConfig;
