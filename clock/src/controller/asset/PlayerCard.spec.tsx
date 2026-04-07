@@ -7,6 +7,10 @@ vi.mock("../../contexts/FirebaseStateContext", () => ({
   useView: vi.fn(),
 }));
 
+vi.mock("../../hooks/useThemeCssVars", () => ({
+  resolveTheme: () => ({ clockFontFamily: '"Anton", sans-serif' }),
+}));
+
 import { useView } from "../../contexts/FirebaseStateContext";
 
 const mockedUseView = vi.mocked(useView);
