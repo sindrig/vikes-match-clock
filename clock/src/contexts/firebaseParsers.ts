@@ -4,6 +4,7 @@ import type {
   ViewState,
   ThemeConfig,
   CustomPreset,
+  ClubOverride,
   TwoMinPenalty,
   Asset,
   ViewPort,
@@ -339,6 +340,36 @@ export function parseQueueMap(data: unknown): Record<string, QueueState> {
       result[key] = { ...queue, order: nextOrder };
       nextOrder += 1;
     }
+  }
+
+  return result;
+}
+
+export function parseClubOverrides(
+  data: unknown,
+): Record<string, ClubOverride> {
+  if (!data || typeof data !== "object") return {};
+
+  const raw = data as Record<string, unknown>;
+  const result: Record<string, ClubOverride> = {};
+
+  for (const [key, value] of Object.entries(raw)) {
+    if (!value || typeof value !== "object") continue;
+    const entry = value as Record<string, unknown>;
+
+    if (typeof entry.name !== "string") continue;
+    if (typeof entry.clubId !== "string") continue;
+    if (typeof entry.logoUrl !== "string") continue;
+    if (typeof entry.isOverride !== "boolean") continue;
+
+    const override: ClubOverride = {
+      name: entry.name,
+      clubId: entry.clubId,
+      logoUrl: entry.logoUrl,
+      isOverride: entry.isOverride,
+    };
+
+    result[key] = override;
   }
 
   return result;

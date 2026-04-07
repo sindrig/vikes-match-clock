@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import Clock from "../components/LiveClock";
-import clubLogos from "../images/clubLogos";
 import AdImage from "../utils/AdImage";
 import { getTemp } from "../lib/weather";
 import { IMAGE_TYPES } from "../controller/media";
 import { useView } from "../contexts/FirebaseStateContext";
+
+import { useClubLogo } from "../hooks/useClubLogo";
 import { useLocalState } from "../contexts/LocalStateContext";
 import { storageHelpers } from "../firebase";
 
@@ -22,6 +23,8 @@ const Idle = () => {
   } = useView();
   const { listenPrefix } = useLocalState();
   const [idleAdUrl, setIdleAdUrl] = useState<string | null>(null);
+
+  const idleLogoUrl = useClubLogo(idleImage || "Víkingur R");
 
   useEffect(() => {
     const updateTemp = () => {
@@ -62,14 +65,7 @@ const Idle = () => {
         blankBetweenImages={idleImage !== "null"}
         time={8}
       />
-      <img
-        src={
-          (idleImage && (clubLogos as Record<string, string>)[idleImage]) ||
-          clubLogos["Víkingur R"]
-        }
-        alt="Vikes"
-        className="idle-vikes"
-      />
+      <img src={idleLogoUrl || ""} alt="Vikes" className="idle-vikes" />
       {idleAdUrl && <img src={idleAdUrl} alt="Idle ad" className="idle-ad" />}
       <div className="idle-text-container">
         <div className="idle-text-box idle-clock">

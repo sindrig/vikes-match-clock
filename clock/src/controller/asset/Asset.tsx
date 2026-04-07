@@ -6,12 +6,12 @@ import PlayerCard from "./PlayerCard";
 import Substitution from "./Substitution";
 
 import assetTypes from "./AssetTypes";
-import clubLogos from "../../images/clubLogos";
 
 import "./Asset.css";
 import VideoPlayer from "./VideoPlayer";
 import { useController, useView } from "../../contexts/FirebaseStateContext";
 import { useAuth } from "../../contexts/LocalStateContext";
+import { useClubLogo } from "../../hooks/useClubLogo";
 
 interface Overlay {
   text: string;
@@ -49,6 +49,7 @@ const AssetComponent = (props: AssetProps) => {
     view: { vp },
   } = useView();
   const auth = useAuth();
+  const teamLogoUrl = useClubLogo(asset?.teamName || "");
 
   useEffect(() => {
     if (auth.isEmpty) {
@@ -105,11 +106,8 @@ const AssetComponent = (props: AssetProps) => {
           {includeBackground !== false && playerAsset.background ? (
             <img src={playerAsset.background} alt={playerAsset.background} />
           ) : null}
-          {teamName && teamName in clubLogos ? (
-            <img
-              src={clubLogos[teamName as keyof typeof clubLogos]}
-              alt="teamName"
-            />
+          {teamName && teamLogoUrl ? (
+            <img src={teamLogoUrl} alt={teamName} />
           ) : null}
         </PlayerCard>
       );

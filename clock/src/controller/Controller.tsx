@@ -16,6 +16,7 @@ const assetViewToTab: Record<string, string> = {
 import { firebaseAuth } from "../firebaseAuth";
 import MatchActionSettings from "./MatchActionSettings";
 import ThemeEditorModal from "./theme/ThemeEditor";
+import ClubOverrideList from "./ClubOverrideList";
 import MediaManager from "./media/MediaManager";
 import RefreshHandler from "./RefreshHandler";
 import AssetController from "./asset/AssetController";
@@ -70,6 +71,7 @@ const Controller = () => {
   const [selectedScreen, setSelectedScreen] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [themeOpen, setThemeOpen] = useState(false);
+  const [overrideListOpen, setOverrideListOpen] = useState(false);
 
   const isAuthenticated = auth.isLoaded && !auth.isEmpty;
 
@@ -321,6 +323,21 @@ const Controller = () => {
               Breyta þema
             </Button>
           </div>
+          <div className="theme-trigger-row">
+            <div className="theme-trigger-info">
+              <span className="theme-trigger-label">Lið override</span>
+            </div>
+            <Button
+              size="sm"
+              appearance="primary"
+              onClick={() => {
+                setSettingsOpen(false);
+                setOverrideListOpen(true);
+              }}
+            >
+              Opna
+            </Button>
+          </div>
           <div className="page-actions control-item withborder">
             <Button
               color="red"
@@ -340,6 +357,10 @@ const Controller = () => {
         </Modal.Body>
       </Modal>
       <ThemeEditorModal open={themeOpen} onClose={() => setThemeOpen(false)} />
+      <ClubOverrideList
+        open={overrideListOpen}
+        onClose={() => setOverrideListOpen(false)}
+      />
     </div>
   );
 };

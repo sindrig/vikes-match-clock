@@ -7,6 +7,11 @@ vi.mock("../contexts/FirebaseStateContext", () => ({
   useMatch: vi.fn(),
   useController: vi.fn(),
   useView: vi.fn(),
+  useClubOverrides: vi.fn(() => ({
+    clubOverrides: {},
+    saveClubOverride: vi.fn(),
+    deleteClubOverride: vi.fn(),
+  })),
 }));
 
 import {
