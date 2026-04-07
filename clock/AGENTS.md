@@ -202,7 +202,16 @@ The operational heart of the app.
 | Screen       | Purpose                                                                                   |
 | ------------ | ----------------------------------------------------------------------------------------- |
 | `ScoreBoard` | Primary match interface - clock, scores, penalties. Designed for visibility from distance |
-| `Idle`       | Pre/post match or breaks - club logos, weather, rotating sponsor ads                      |
+| `Idle`       | Pre/post match or breaks - club logos, weather, configurable sponsor ad                   |
+
+#### Idle Ad Image
+
+The idle screen can display an optional sponsor ad image. The image is selected from Firebase Storage (`{listenPrefix}/largeAds/`) and stored as a filename string in `states/${listenPrefix}/view/idleAd`.
+
+- **No hardcoded images** — if `idleAd` is null/unset, no ad renders
+- **Selection**: Dropdown in the "Idle skjár" panel of the advanced theme editor tab
+- **Storage path**: `{listenPrefix}/largeAds/{filename}` — download URL resolved at render time
+- **Firebase field**: `states/${listenPrefix}/view/idleAd` (string filename or null)
 
 ### 4. Specialized Logic
 
@@ -291,8 +300,8 @@ All properties are CSS value strings. Grouped by display area:
 | `App.tsx` | Applies CSS vars to `.App` container (passes `customPresets` to `useThemeCssVars`) |
 | `controller/theme/ThemeEditor.tsx` | `ThemeEditorModal` — rsuite Modal for preset management and theme editing |
 | `controller/theme/ThemeEditor.css` | Theme editor modal styling |
-| `controller/theme/VisualThemeEditor.tsx` | Visual (drag-and-drop) theme editor with background upload |
-| `controller/theme/VisualThemeEditor.css` | Visual editor styles (upload indicator, clear button) |
+| `controller/theme/VisualThemeEditor.tsx` | Visual (drag-and-drop) theme editor with background upload and element popover (colors, stroke, font size, font family) |
+| `controller/theme/VisualThemeEditor.css` | Visual editor styles (upload indicator, clear button, popover controls) |
 | `screens/ScoreBoard.css` | Uses `var(--theme-*)` for score/clock/penalty display |
 | `screens/Idle.css` | Uses `var(--theme-*)` for idle screen display |
 | `match/RedCard.css` | Uses `var(--theme-red-card-color)` |
@@ -362,6 +371,7 @@ The theme editor is a **full rsuite Modal** (`ThemeEditorModal`) launched from a
 
 - Color pickers, text inputs, font family selectors, percentage inputs
 - Collapsible panels for each property group (Score boxes, Clock, Logos, etc.)
+- "Idle skjár" panel includes an `IdleAdPicker` dropdown for selecting the idle ad image from Firebase Storage
 
 **Controller integration** (`Controller.tsx`):
 
@@ -370,6 +380,17 @@ The theme editor is a **full rsuite Modal** (`ThemeEditorModal`) launched from a
 - `<ThemeEditorModal open={themeOpen} onClose={...} />`
 
 All labels are in Icelandic, consistent with the rest of the controller UI.
+
+#### Fonts
+
+**Google Fonts** (loaded via CDN in `index.html`): Anton, Oswald, Bebas Neue, Orbitron, Russo One.
+
+**Bundled fonts** (self-hosted via `@font-face` in `src/assets/fonts/`):
+- **GT America** (Grilli Type) — Regular + Bold weights (`GT-America-Standard-Regular.otf`, `GT-America-Standard-Bold.otf`). Declared in `src/assets/fonts/gt-america.css`, imported in `src/index.tsx`.
+
+The exported `FONT_OPTIONS` array in `ThemeEditor.tsx` defines the available fonts in the per-element font dropdowns in both the advanced ThemeEditor and the visual VisualThemeEditor (score box, clock, team name). To add a new font:
+1. For Google Fonts: add the `<link>` to `index.html` and add the CSS `font-family` string to `FONT_OPTIONS`
+2. For bundled fonts: place files in `src/assets/fonts/`, create a CSS file with `@font-face` declarations (use `format("opentype")` for `.otf`), import the CSS in `src/index.tsx`, and add to `FONT_OPTIONS`
 
 ## Build & Tooling
 

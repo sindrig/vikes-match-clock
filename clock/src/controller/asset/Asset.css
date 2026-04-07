@@ -62,11 +62,12 @@ div.asset-player-icon.player-card-no-image img {
 }
 
 .asset-player-icon span {
-  font-family: "Anton", sans-serif;
+  font-family: var(--theme-clock-font-family, "Anton", sans-serif);
   position: absolute;
   text-shadow: 2px 2px 5px black;
   text-align: center;
-  color: white;
+  color: var(--theme-clock-color, white);
+  -webkit-text-stroke: var(--theme-clock-stroke, none);
 }
 
 span.asset-player-name {
