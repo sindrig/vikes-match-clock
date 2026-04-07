@@ -73,9 +73,7 @@ describe("useClubLogo", () => {
       deleteClubOverride: vi.fn(),
     } as any);
 
-    const { result } = renderHook(() =>
-      useClubLogo("NonexistentTeamXYZ123")
-    );
+    const { result } = renderHook(() => useClubLogo("NonexistentTeamXYZ123"));
     expect(result.current).toBeUndefined();
   });
 

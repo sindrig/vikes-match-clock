@@ -360,12 +360,6 @@ const Controller = () => {
       <ClubOverrideList
         open={overrideListOpen}
         onClose={() => setOverrideListOpen(false)}
-        onEdit={(id, override) => {
-          console.log("Edit override:", id, override);
-        }}
-        onCreateNew={() => {
-          console.log("Create new override");
-        }}
       />
     </div>
   );

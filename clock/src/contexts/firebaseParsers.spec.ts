@@ -1202,11 +1202,11 @@ describe("firebaseParsers", () => {
         p2: { name: "Second", theme: { clockBg: "#222" } },
       };
       const result = parseCustomPresets(data);
-       expect(Object.keys(result!)).toHaveLength(2);
-       expect(result!["p1"]!.name).toBe("First");
-       expect(result!["p2"]!.name).toBe("Second");
-     });
-   });
+      expect(Object.keys(result!)).toHaveLength(2);
+      expect(result!["p1"]!.name).toBe("First");
+      expect(result!["p2"]!.name).toBe("Second");
+    });
+  });
 
   // ---- parseClubOverrides ----
   describe("parseClubOverrides", () => {
@@ -1291,5 +1291,4 @@ describe("firebaseParsers", () => {
       expect(result["uuid-1"]!.isOverride).toBe(true);
     });
   });
-
 });

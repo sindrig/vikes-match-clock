@@ -13,8 +13,7 @@ export const useClubLogo = (teamName: string): string | undefined => {
   const { clubOverrides } = useClubOverrides();
 
   const override = useMemo(
-    () =>
-      Object.values(clubOverrides).find((o) => o.name === teamName),
+    () => Object.values(clubOverrides).find((o) => o.name === teamName),
     [clubOverrides, teamName],
   );
 

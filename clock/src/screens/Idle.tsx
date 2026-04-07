@@ -49,11 +49,7 @@ const Idle = () => {
         blankBetweenImages={idleImage !== "null"}
         time={8}
       />
-      <img
-        src={idleLogoUrl || ""}
-        alt="Vikes"
-        className="idle-vikes"
-      />
+      <img src={idleLogoUrl || ""} alt="Vikes" className="idle-vikes" />
       <img src={husasmidjan} alt="Vikes" className="idle-ad" />
       <div className="idle-text-container">
         <div className="idle-text-box idle-clock">

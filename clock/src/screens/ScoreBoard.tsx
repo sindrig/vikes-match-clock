@@ -14,7 +14,11 @@ import { useClubLogo } from "../hooks/useClubLogo";
 
 import "./ScoreBoard.css";
 
-const getTeam = (id: "home" | "away", match: Match, getLogoUrl: (name: string) => string | undefined) => {
+const getTeam = (
+  id: "home" | "away",
+  match: Match,
+  getLogoUrl: (name: string) => string | undefined,
+) => {
   const name = match[`${id}Team`];
   return {
     image: getLogoUrl(name),
@@ -84,11 +88,14 @@ const ScoreBoard = () => {
   const homeLogoUrl = useClubLogo(match.homeTeam);
   const awayLogoUrl = useClubLogo(match.awayTeam);
 
-  const getLogoUrl = useCallback((teamName: string): string | undefined => {
-    if (teamName === match.homeTeam) return homeLogoUrl;
-    if (teamName === match.awayTeam) return awayLogoUrl;
-    return undefined;
-  }, [homeLogoUrl, awayLogoUrl, match.homeTeam, match.awayTeam]);
+  const getLogoUrl = useCallback(
+    (teamName: string): string | undefined => {
+      if (teamName === match.homeTeam) return homeLogoUrl;
+      if (teamName === match.awayTeam) return awayLogoUrl;
+      return undefined;
+    },
+    [homeLogoUrl, awayLogoUrl, match.homeTeam, match.awayTeam],
+  );
 
   return (
     <div

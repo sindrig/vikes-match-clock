@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import TeamSelector from "./TeamSelector";
 import HalfStops from "./HalfStops";
 import clubLogos from "../images/clubLogos";
@@ -6,6 +7,7 @@ import {
   useMatch,
   useController,
   useView,
+  useClubOverrides,
 } from "../contexts/FirebaseStateContext";
 
 const MatchActionSettings = () => {
@@ -18,9 +20,18 @@ const MatchActionSettings = () => {
     setBlackoutStart,
     setBlackoutEnd,
   } = useView();
+  const { clubOverrides } = useClubOverrides();
 
   const { view } = controller;
   const { background, idleImage } = viewState;
+
+  const idleLogoOptions = useMemo(() => {
+    const bundledNames = Object.keys(clubLogos);
+    const overrideNames = Object.values(clubOverrides).map((o) => o.name);
+    return [...new Set([...bundledNames, ...overrideNames])].sort((a, b) =>
+      a.localeCompare(b, "is"),
+    );
+  }, [clubOverrides]);
 
   return (
     <div className="control-item playerControls withborder">
@@ -84,7 +95,7 @@ const MatchActionSettings = () => {
               <option value={"null"} key={"null"}>
                 No idle screen between images
               </option>
-              {Object.keys(clubLogos).map((key) => (
+              {idleLogoOptions.map((key) => (
                 <option value={key} key={key}>
                   {key}
                 </option>

@@ -49,7 +49,9 @@ describe("firebaseDatabase write helpers", () => {
       await saveClubOverride(prefix, id, override);
 
       expect(update).toHaveBeenCalledWith(
-        expect.objectContaining({ path: "states/vikinni/clubOverrides/test-uuid-123" }),
+        expect.objectContaining({
+          path: "states/vikinni/clubOverrides/test-uuid-123",
+        }),
         override,
       );
     });

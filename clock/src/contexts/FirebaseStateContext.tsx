@@ -10,7 +10,12 @@ import React, {
 } from "react";
 import moment from "moment";
 import { database, storageHelpers } from "../firebase";
-import { firebaseDatabase, generateClubOverrideId, saveClubOverride as firebaseSaveClubOverride, deleteClubOverride as firebaseDeleteClubOverride } from "../firebaseDatabase";
+import {
+  firebaseDatabase,
+  generateClubOverrideId,
+  saveClubOverride as firebaseSaveClubOverride,
+  deleteClubOverride as firebaseDeleteClubOverride,
+} from "../firebaseDatabase";
 import { ref, onValue } from "firebase/database";
 import {
   Match,
@@ -332,7 +337,8 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     useState<ControllerState>(defaultController);
   const [view, setView] = useState<ViewState>(defaultView);
   const [listeners, setListeners] = useState<ListenersState>(defaultListeners);
-  const [clubOverrides, setClubOverrides] = useState<Record<string, ClubOverride>>(defaultClubOverrides);
+  const [clubOverrides, setClubOverrides] =
+    useState<Record<string, ClubOverride>>(defaultClubOverrides);
   const [ready, setReady] = useState(!listenPrefix);
 
   const matchRef = useRef(match);
@@ -460,10 +466,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
           }
         },
         (error) =>
-          console.error(
-            "Firebase clubOverrides subscription error:",
-            error,
-          ),
+          console.error("Firebase clubOverrides subscription error:", error),
       );
 
       return () => {
@@ -1319,11 +1322,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         };
 
         // Write to RTDB
-        await firebaseSaveClubOverride(
-          listenPrefix,
-          id,
-          clubOverride,
-        );
+        await firebaseSaveClubOverride(listenPrefix, id, clubOverride);
       } catch (error) {
         console.error("Error saving club override:", error);
         throw error;
