@@ -198,6 +198,14 @@ export interface CustomPreset {
   basedOn?: string; // built-in preset name this was derived from
 }
 
+// Club override (bundled or fully custom club with custom logo)
+export interface ClubOverride {
+  name: string; // Display name (e.g., "Víkingur R")
+  clubId: string; // KSÍ club ID (e.g., "2492") or "-1" for custom
+  logoUrl: string; // Firebase Storage download URL
+  isOverride: boolean; // true = bundled club with replaced logo; false = fully custom club
+}
+
 // View state type
 export interface ViewState {
   vp: ViewPort;

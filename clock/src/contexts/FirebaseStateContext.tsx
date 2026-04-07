@@ -9,8 +9,8 @@ import React, {
   useMemo,
 } from "react";
 import moment from "moment";
-import { database } from "../firebase";
-import { firebaseDatabase } from "../firebaseDatabase";
+import { database, storageHelpers } from "../firebase";
+import { firebaseDatabase, generateClubOverrideId, saveClubOverride as firebaseSaveClubOverride, deleteClubOverride as firebaseDeleteClubOverride } from "../firebaseDatabase";
 import { ref, onValue } from "firebase/database";
 import {
   Match,
@@ -25,6 +25,7 @@ import {
   Roster,
   TwoMinPenalty,
   QueueState,
+  ClubOverride,
 } from "../types";
 import { Sports, DEFAULT_HALFSTOPS } from "../constants";
 import clubIds from "../club-ids";
@@ -34,6 +35,7 @@ import {
   parseMatch,
   parseController,
   parseView,
+  parseClubOverrides,
 } from "./firebaseParsers";
 
 const defaultMatch: Match = {
@@ -79,6 +81,8 @@ const defaultListeners: ListenersState = {
   screens: [],
 };
 
+const defaultClubOverrides: Record<string, ClubOverride> = {};
+
 export function computeControllerDiff(
   prev: ControllerState,
   next: ControllerState,
@@ -121,6 +125,7 @@ interface FirebaseStateContextType {
   controller: ControllerState;
   view: ViewState;
   listeners: ListenersState;
+  clubOverrides: Record<string, ClubOverride>;
   ready: boolean;
 
   updateMatch: (updates: Partial<Match>) => void;
@@ -186,6 +191,11 @@ interface FirebaseStateContextType {
   setThemePreset: (preset: string | undefined) => void;
   saveCustomPreset: (id: string, preset: CustomPreset) => void;
   deleteCustomPreset: (id: string) => void;
+
+  saveClubOverride: (
+    override: Omit<ClubOverride, "logoUrl"> & { logoFile: File },
+  ) => Promise<void>;
+  deleteClubOverride: (id: string) => Promise<void>;
 }
 
 const FirebaseStateContext = createContext<FirebaseStateContextType | null>(
@@ -322,11 +332,13 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     useState<ControllerState>(defaultController);
   const [view, setView] = useState<ViewState>(defaultView);
   const [listeners, setListeners] = useState<ListenersState>(defaultListeners);
+  const [clubOverrides, setClubOverrides] = useState<Record<string, ClubOverride>>(defaultClubOverrides);
   const [ready, setReady] = useState(!listenPrefix);
 
   const matchRef = useRef(match);
   const controllerRef = useRef(controller);
   const viewRef = useRef(view);
+  const clubOverridesRef = useRef(clubOverrides);
   const serverTimeOffsetRef = useRef<number>(0);
   const [prevListenPrefix, setPrevListenPrefix] = useState(listenPrefix);
 
@@ -345,6 +357,9 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   useEffect(() => {
     viewRef.current = view;
   }, [view]);
+  useEffect(() => {
+    clubOverridesRef.current = clubOverrides;
+  }, [clubOverrides]);
 
   useEffect(() => {
     const locationsRef = ref(database, "locations");
@@ -377,9 +392,10 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       let matchReady = false;
       let controllerReady = false;
       let viewReady = false;
+      let clubOverridesReady = false;
 
       const checkReady = () => {
-        if (matchReady && controllerReady && viewReady) {
+        if (matchReady && controllerReady && viewReady && clubOverridesReady) {
           setReady(true);
         }
       };
@@ -387,6 +403,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       const matchPath = `states/${listenPrefix}/match`;
       const controllerPath = `states/${listenPrefix}/controller`;
       const viewPath = `states/${listenPrefix}/view`;
+      const clubOverridesPath = `states/${listenPrefix}/clubOverrides`;
 
       const unsubMatch = onValue(
         ref(database, matchPath),
@@ -432,10 +449,28 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         (error) => console.error("Firebase view subscription error:", error),
       );
 
+      const unsubClubOverrides = onValue(
+        ref(database, clubOverridesPath),
+        (snapshot) => {
+          const results = parseClubOverrides(snapshot.val());
+          setClubOverrides(results ?? defaultClubOverrides);
+          if (!clubOverridesReady) {
+            clubOverridesReady = true;
+            checkReady();
+          }
+        },
+        (error) =>
+          console.error(
+            "Firebase clubOverrides subscription error:",
+            error,
+          ),
+      );
+
       return () => {
         unsubMatch();
         unsubController();
         unsubView();
+        unsubClubOverrides();
       };
     }
   }, [listenPrefix]);
@@ -1261,6 +1296,56 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     [applyViewUpdate],
   );
 
+  const saveClubOverride = useCallback(
+    async (override: Omit<ClubOverride, "logoUrl"> & { logoFile: File }) => {
+      if (!listenPrefix || !isAuthenticated) return;
+
+      try {
+        const id = generateClubOverrideId();
+        const storagePath = `${listenPrefix}/club-logos/${id}`;
+
+        // Upload logo file to Storage
+        await storageHelpers.uploadBytes(storagePath, override.logoFile);
+
+        // Get download URL
+        const logoUrl = await storageHelpers.getDownloadURL(storagePath);
+
+        // Create ClubOverride object with download URL
+        const clubOverride: ClubOverride = {
+          name: override.name,
+          clubId: override.clubId,
+          logoUrl,
+          isOverride: override.isOverride,
+        };
+
+        // Write to RTDB
+        await firebaseSaveClubOverride(
+          listenPrefix,
+          id,
+          clubOverride,
+        );
+      } catch (error) {
+        console.error("Error saving club override:", error);
+        throw error;
+      }
+    },
+    [listenPrefix, isAuthenticated],
+  );
+
+  const deleteClubOverride = useCallback(
+    async (id: string) => {
+      if (!listenPrefix || !isAuthenticated) return;
+
+      try {
+        await firebaseDeleteClubOverride(listenPrefix, id);
+      } catch (error) {
+        console.error("Error deleting club override:", error);
+        throw error;
+      }
+    },
+    [listenPrefix, isAuthenticated],
+  );
+
   // Apply screen viewport override from "Birta skjá" selection.
   // The screenViewport from locations.X.screens[Y] takes precedence over
   // the Firebase view.vp, which may not match the physical screen config.
@@ -1275,6 +1360,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       controller,
       view: effectiveView,
       listeners,
+      clubOverrides,
       ready,
       updateMatch,
       startMatch,
@@ -1326,12 +1412,15 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       setThemePreset,
       saveCustomPreset,
       deleteCustomPreset,
+      saveClubOverride,
+      deleteClubOverride,
     }),
     [
       match,
       controller,
       effectiveView,
       listeners,
+      clubOverrides,
       ready,
       updateMatch,
       startMatch,
@@ -1383,6 +1472,8 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       setThemePreset,
       saveCustomPreset,
       deleteCustomPreset,
+      saveClubOverride,
+      deleteClubOverride,
     ],
   );
 
@@ -1533,4 +1624,14 @@ export const useView = () => {
 export const useListeners = () => {
   const { listeners } = useFirebaseState();
   return listeners;
+};
+
+export const useClubOverrides = () => {
+  const { clubOverrides, saveClubOverride, deleteClubOverride } =
+    useFirebaseState();
+  return {
+    clubOverrides,
+    saveClubOverride,
+    deleteClubOverride,
+  };
 };

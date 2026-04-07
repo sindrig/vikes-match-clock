@@ -6,6 +6,7 @@ import {
   parseView,
   parseTheme,
   parseCustomPresets,
+  parseClubOverrides,
 } from "./firebaseParsers";
 import { Sports, DEFAULT_HALFSTOPS, DEFAULT_THEME } from "../constants";
 import type {
@@ -1201,9 +1202,94 @@ describe("firebaseParsers", () => {
         p2: { name: "Second", theme: { clockBg: "#222" } },
       };
       const result = parseCustomPresets(data);
-      expect(Object.keys(result!)).toHaveLength(2);
-      expect(result!["p1"]!.name).toBe("First");
-      expect(result!["p2"]!.name).toBe("Second");
+       expect(Object.keys(result!)).toHaveLength(2);
+       expect(result!["p1"]!.name).toBe("First");
+       expect(result!["p2"]!.name).toBe("Second");
+     });
+   });
+
+  // ---- parseClubOverrides ----
+  describe("parseClubOverrides", () => {
+    it("returns empty object for empty input", () => {
+      expect(parseClubOverrides({})).toEqual({});
+    });
+
+    it("parses valid club override entry with all fields", () => {
+      const data = {
+        "uuid-1": {
+          name: "Test FC",
+          clubId: "1234",
+          logoUrl: "https://example.com/logo.png",
+          isOverride: false,
+        },
+      };
+      const result = parseClubOverrides(data);
+      expect(result).toEqual({
+        "uuid-1": {
+          name: "Test FC",
+          clubId: "1234",
+          logoUrl: "https://example.com/logo.png",
+          isOverride: false,
+        },
+      });
+    });
+
+    it("skips entries missing logoUrl", () => {
+      const data = {
+        "uuid-1": {
+          name: "Test",
+          clubId: "1",
+          isOverride: false,
+        },
+      };
+      const result = parseClubOverrides(data);
+      expect(result).toEqual({});
+    });
+
+    it("returns empty object for null input", () => {
+      expect(parseClubOverrides(null)).toEqual({});
+    });
+
+    it("returns empty object for undefined input", () => {
+      expect(parseClubOverrides(undefined)).toEqual({});
+    });
+
+    it("ignores extra fields and preserves valid fields", () => {
+      const data = {
+        "uuid-1": {
+          name: "Test FC",
+          clubId: "1234",
+          logoUrl: "https://example.com/logo.png",
+          isOverride: false,
+          extraField: "should be ignored",
+          anotherExtra: 123,
+        },
+      };
+      const result = parseClubOverrides(data);
+      expect(result).toEqual({
+        "uuid-1": {
+          name: "Test FC",
+          clubId: "1234",
+          logoUrl: "https://example.com/logo.png",
+          isOverride: false,
+        },
+      });
+      expect(result["uuid-1"]).not.toHaveProperty("extraField");
+      expect(result["uuid-1"]).not.toHaveProperty("anotherExtra");
+    });
+
+    it("preserves isOverride: true flag", () => {
+      const data = {
+        "uuid-1": {
+          name: "Bundled Club",
+          clubId: "2492",
+          logoUrl: "https://example.com/logo.png",
+          isOverride: true,
+        },
+      };
+      const result = parseClubOverrides(data);
+      expect(result["uuid-1"]!.isOverride).toBe(true);
     });
   });
+
 });
