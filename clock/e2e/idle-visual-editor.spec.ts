@@ -94,10 +94,10 @@ test.describe("Idle visual editor", () => {
     const popover = page.locator(".visual-color-popover");
     await expect(popover).toBeVisible({ timeout: 5000 });
 
-    // The idle editor only shows "Litur" field (simplified vs scoreboard)
-    await expect(popover.locator(".visual-color-popover-label")).toHaveText(
-      "Litur",
-    );
+    const labels = popover.locator(".visual-color-popover-label");
+    await expect(labels).toHaveCount(2);
+    await expect(labels.nth(0)).toHaveText("Litur");
+    await expect(labels.nth(1)).toHaveText("Stærð");
 
     // Font size controls should appear for idle-clock (it has fontSizeField)
     await expect(popover.locator(".visual-font-size-slider")).toBeVisible();
