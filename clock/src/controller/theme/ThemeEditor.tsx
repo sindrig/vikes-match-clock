@@ -24,6 +24,7 @@ import { resolveTheme } from "../../hooks/useThemeCssVars";
 import type { ThemeConfig, CustomPreset } from "../../types";
 import { toHex, parseStroke, composeStroke } from "./themeUtils";
 import VisualThemeEditor from "./VisualThemeEditor";
+import IdleVisualThemeEditor from "./IdleVisualThemeEditor";
 
 import "./ThemeEditor.css";
 
@@ -516,6 +517,7 @@ const ThemeEditorPanels = ({
         defaultValue={DEFAULT_THEME.idleTextFontSize}
         onChange={(v) => onFieldChange("idleTextFontSize", v)}
       />
+      <Divider className="theme-divider" />
       <PercentField
         label="Merki ofan"
         value={effective.idleLogoTop}
@@ -534,11 +536,61 @@ const ThemeEditorPanels = ({
         defaultValue={DEFAULT_THEME.idleLogoWidth}
         onChange={(v) => onFieldChange("idleLogoWidth", v)}
       />
+      <TextField
+        label="Merki hæð"
+        value={effective.idleLogoHeight}
+        defaultValue={DEFAULT_THEME.idleLogoHeight}
+        onChange={(v) => onFieldChange("idleLogoHeight", v)}
+      />
+      <Divider className="theme-divider" />
       <PercentField
-        label="Texti ofan"
-        value={effective.idleTextTop}
-        defaultValue={DEFAULT_THEME.idleTextTop}
-        onChange={(v) => onFieldChange("idleTextTop", v)}
+        label="Klukka ofan"
+        value={effective.idleClockTop}
+        defaultValue={DEFAULT_THEME.idleClockTop}
+        onChange={(v) => onFieldChange("idleClockTop", v)}
+      />
+      <PercentField
+        label="Klukka vinstri"
+        value={effective.idleClockLeft}
+        defaultValue={DEFAULT_THEME.idleClockLeft}
+        onChange={(v) => onFieldChange("idleClockLeft", v)}
+      />
+      <PercentField
+        label="Hiti ofan"
+        value={effective.idleTempTop}
+        defaultValue={DEFAULT_THEME.idleTempTop}
+        onChange={(v) => onFieldChange("idleTempTop", v)}
+      />
+      <PercentField
+        label="Hiti vinstri"
+        value={effective.idleTempLeft}
+        defaultValue={DEFAULT_THEME.idleTempLeft}
+        onChange={(v) => onFieldChange("idleTempLeft", v)}
+      />
+      <Divider className="theme-divider" />
+      <PercentField
+        label="Auglýsing ofan"
+        value={effective.idleAdTop}
+        defaultValue={DEFAULT_THEME.idleAdTop}
+        onChange={(v) => onFieldChange("idleAdTop", v)}
+      />
+      <PercentField
+        label="Auglýsing vinstri"
+        value={effective.idleAdLeft}
+        defaultValue={DEFAULT_THEME.idleAdLeft}
+        onChange={(v) => onFieldChange("idleAdLeft", v)}
+      />
+      <PercentField
+        label="Auglýsing breidd"
+        value={effective.idleAdWidth}
+        defaultValue={DEFAULT_THEME.idleAdWidth}
+        onChange={(v) => onFieldChange("idleAdWidth", v)}
+      />
+      <PercentField
+        label="Auglýsing hæð"
+        value={effective.idleAdHeight}
+        defaultValue={DEFAULT_THEME.idleAdHeight}
+        onChange={(v) => onFieldChange("idleAdHeight", v)}
       />
     </Panel>
 
@@ -613,7 +665,9 @@ const ThemeEditorModal = ({ open, onClose }: ThemeEditorModalProps) => {
 
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
-  const [editorTab, setEditorTab] = useState<"visual" | "advanced">("visual");
+  const [editorTab, setEditorTab] = useState<
+    "visual" | "idle-visual" | "advanced"
+  >("visual");
 
   const activePresetId = themePreset ?? "Default";
   const presetList = useMemo(
@@ -842,21 +896,32 @@ const ThemeEditorModal = ({ open, onClose }: ThemeEditorModalProps) => {
         <Nav
           appearance="subtle"
           activeKey={editorTab}
-          onSelect={(key) => setEditorTab(key as "visual" | "advanced")}
+          onSelect={(key) =>
+            setEditorTab(key as "visual" | "idle-visual" | "advanced")
+          }
           className="theme-editor-tabs"
         >
           <Nav.Item eventKey="visual">Sjónrænt</Nav.Item>
+          <Nav.Item eventKey="idle-visual">Sjónrænt (idle)</Nav.Item>
           <Nav.Item eventKey="advanced">Ítarlegt</Nav.Item>
         </Nav>
 
-        {editorTab === "visual" ? (
+        {editorTab === "visual" && (
           <VisualThemeEditor
             effective={effective}
             onFieldChange={handleFieldChange}
             onFieldsChange={handleFieldsChange}
             listenPrefix={listenPrefix}
           />
-        ) : (
+        )}
+        {editorTab === "idle-visual" && (
+          <IdleVisualThemeEditor
+            effective={effective}
+            onFieldChange={handleFieldChange}
+            onFieldsChange={handleFieldsChange}
+          />
+        )}
+        {editorTab === "advanced" && (
           <ThemeEditorPanels
             effective={effective}
             onFieldChange={handleFieldChange}

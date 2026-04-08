@@ -65,7 +65,16 @@ export const themeToCssVars = (theme: ThemeConfig): Record<string, string> => ({
   "--theme-idle-logo-top": theme.idleLogoTop,
   "--theme-idle-logo-left": theme.idleLogoLeft,
   "--theme-idle-logo-width": theme.idleLogoWidth,
+  "--theme-idle-logo-height": theme.idleLogoHeight,
   "--theme-idle-text-top": theme.idleTextTop,
+  "--theme-idle-clock-top": theme.idleClockTop,
+  "--theme-idle-clock-left": theme.idleClockLeft,
+  "--theme-idle-temp-top": theme.idleTempTop,
+  "--theme-idle-temp-left": theme.idleTempLeft,
+  "--theme-idle-ad-top": theme.idleAdTop,
+  "--theme-idle-ad-left": theme.idleAdLeft,
+  "--theme-idle-ad-width": theme.idleAdWidth,
+  "--theme-idle-ad-height": theme.idleAdHeight,
 
   // Ad image
   "--theme-ad-top": theme.adTop,

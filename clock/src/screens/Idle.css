@@ -15,16 +15,38 @@ img.idle-ad {
 .idle-outsidesafamyri img.idle-ad {
   position: absolute;
   display: block;
-  width: 33.4%;
-  height: 45.5%;
-  right: 10%;
-  top: 10%;
+  width: var(--theme-idle-ad-width, 33.4%);
+  height: var(--theme-idle-ad-height, 45.5%);
+  left: var(--theme-idle-ad-left, 57%);
+  top: var(--theme-idle-ad-top, 10%);
 }
 
 .idle .idle-clock {
+  position: absolute;
+  top: var(--theme-idle-clock-top, 65%);
+  left: var(--theme-idle-clock-left, 0%);
+  width: 50%;
   text-align: center;
+  font-size: var(--theme-idle-text-font-size, 40px);
+  font-weight: bold;
+  color: var(--theme-idle-text-color, #ffffff);
+}
+
+.idle .idle-clock .idle-clock-inner {
   display: inline-block;
   width: 100%;
+  text-align: center;
+}
+
+.idle .idle-temp {
+  position: absolute;
+  top: var(--theme-idle-temp-top, 65%);
+  left: var(--theme-idle-temp-left, 50%);
+  width: 50%;
+  text-align: center;
+  font-size: var(--theme-idle-text-font-size, 40px);
+  font-weight: bold;
+  color: var(--theme-idle-text-color, #ffffff);
 }
 
 .idle .idle-temperature {
@@ -33,23 +55,10 @@ img.idle-ad {
   width: 100%;
 }
 
-.idle .idle-text-container {
-  position: absolute;
-  top: var(--theme-idle-text-top, 65%);
-  width: 100%;
-}
-
-.idle .idle-text-box {
-  float: left;
-  width: 50%;
-  font-size: var(--theme-idle-text-font-size, 40px);
-  font-weight: bold;
-  color: var(--theme-idle-text-color, #ffffff);
-}
-
 .idle .idle-vikes {
   position: absolute;
   left: var(--theme-idle-logo-left, 15%);
   top: var(--theme-idle-logo-top, 5%);
   width: var(--theme-idle-logo-width, 30%);
+  height: var(--theme-idle-logo-height, auto);
 }
