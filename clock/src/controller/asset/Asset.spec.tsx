@@ -8,6 +8,11 @@ import assetTypes from "./AssetTypes";
 vi.mock("../../contexts/FirebaseStateContext", () => ({
   useController: vi.fn(),
   useView: vi.fn(),
+  useClubOverrides: vi.fn(() => ({
+    clubOverrides: {},
+    saveClubOverride: vi.fn(),
+    deleteClubOverride: vi.fn(),
+  })),
 }));
 
 vi.mock("../../contexts/LocalStateContext", () => ({

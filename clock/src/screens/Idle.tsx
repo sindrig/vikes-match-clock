@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
 import Clock from "../components/LiveClock";
-import clubLogos from "../images/clubLogos";
 import AdImage from "../utils/AdImage";
 import { getTemp } from "../lib/weather";
-import husasmidjan from "../images/husa.png";
 import { IMAGE_TYPES } from "../controller/media";
 import { useView } from "../contexts/FirebaseStateContext";
+
+import { useClubLogo } from "../hooks/useClubLogo";
+import { useLocalState } from "../contexts/LocalStateContext";
+import { storageHelpers } from "../firebase";
 
 import "./Idle.css";
 
@@ -17,8 +19,12 @@ const useRealTemperature = true;
 const Idle = () => {
   const [temperature, setTemperature] = useState(17);
   const {
-    view: { vp, idleImage },
+    view: { vp, idleImage, idleAd },
   } = useView();
+  const { listenPrefix } = useLocalState();
+  const [idleAdUrl, setIdleAdUrl] = useState<string | null>(null);
+
+  const idleLogoUrl = useClubLogo(idleImage || "Víkingur R");
 
   useEffect(() => {
     const updateTemp = () => {
@@ -40,6 +46,18 @@ const Idle = () => {
     };
   }, []);
 
+  useEffect(() => {
+    if (!idleAd || !listenPrefix) {
+      setIdleAdUrl(null);
+      return;
+    }
+    const path = `${String(listenPrefix)}/${IMAGE_TYPES.largeAds}/${String(idleAd)}`;
+    void storageHelpers.getDownloadURL(path).then(
+      (url) => setIdleAdUrl(url),
+      () => setIdleAdUrl(null),
+    );
+  }, [idleAd, listenPrefix]);
+
   return (
     <div className={`idle idle-${String(vp.key)}`}>
       <AdImage
@@ -47,15 +65,8 @@ const Idle = () => {
         blankBetweenImages={idleImage !== "null"}
         time={8}
       />
-      <img
-        src={
-          (idleImage && (clubLogos as Record<string, string>)[idleImage]) ||
-          clubLogos["Víkingur R"]
-        }
-        alt="Vikes"
-        className="idle-vikes"
-      />
-      <img src={husasmidjan} alt="Vikes" className="idle-ad" />
+      <img src={idleLogoUrl || ""} alt="Vikes" className="idle-vikes" />
+      {idleAdUrl && <img src={idleAdUrl} alt="Idle ad" className="idle-ad" />}
       <div className="idle-clock">
         <Clock format="HH:mm" className="idle-clock-inner" ticking />
       </div>

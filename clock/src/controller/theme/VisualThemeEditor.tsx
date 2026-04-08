@@ -14,6 +14,7 @@ import {
   parseFontSize,
   composeFontSize,
 } from "./themeUtils";
+import { FONT_OPTIONS } from "./ThemeEditor";
 
 import "./VisualThemeEditor.css";
 
@@ -53,6 +54,8 @@ interface ElementDef {
   strokeField?: keyof ThemeConfig;
   /** Optional font-size field (e.g. scoreBoxFontSize, injuryTimeFontSize) */
   fontSizeField?: keyof ThemeConfig;
+  /** Optional font-family field (e.g. clockFontFamily, scoreBoxFontFamily) */
+  fontFamilyField?: keyof ThemeConfig;
   /** Display text inside the element */
   displayText: string;
 }
@@ -63,8 +66,10 @@ const ELEMENTS: ElementDef[] = [
     label: "Merki (heima)",
     left: "4%",
     top: (t) => t.logoTop,
-    width: (t) => t.logoWidth,
-    height: (t) => t.logoHeight,
+    width: (t) =>
+      `${parseFloat(t.logoWidth) * (parseFloat(t.homeLogoScale) / 100)}%`,
+    height: (t) =>
+      `${parseFloat(t.logoHeight) * (parseFloat(t.homeLogoScale) / 100)}%`,
     bg: () => "rgba(255,255,255,0.1)",
     color: () => "#aaa",
     border: () => "1px dashed rgba(255,255,255,0.3)",
@@ -77,8 +82,10 @@ const ELEMENTS: ElementDef[] = [
     label: "Merki (úti)",
     left: "71%",
     top: (t) => t.logoTop,
-    width: (t) => t.logoWidth,
-    height: (t) => t.logoHeight,
+    width: (t) =>
+      `${parseFloat(t.logoWidth) * (parseFloat(t.awayLogoScale) / 100)}%`,
+    height: (t) =>
+      `${parseFloat(t.logoHeight) * (parseFloat(t.awayLogoScale) / 100)}%`,
     bg: () => "rgba(255,255,255,0.1)",
     color: () => "#aaa",
     border: () => "1px dashed rgba(255,255,255,0.3)",
@@ -104,6 +111,7 @@ const ELEMENTS: ElementDef[] = [
     },
     strokeField: "clockStroke",
     fontSizeField: "clockFontSizeMax",
+    fontFamilyField: "clockFontFamily",
     displayText: "45:00",
   },
   {
@@ -124,6 +132,7 @@ const ELEMENTS: ElementDef[] = [
     },
     strokeField: "scoreBoxStroke",
     fontSizeField: "scoreBoxFontSize",
+    fontFamilyField: "scoreBoxFontFamily",
     displayText: "2",
   },
   {
@@ -144,6 +153,7 @@ const ELEMENTS: ElementDef[] = [
     },
     strokeField: "scoreBoxStroke",
     fontSizeField: "scoreBoxFontSize",
+    fontFamilyField: "scoreBoxFontFamily",
     displayText: "1",
   },
   {
@@ -190,6 +200,7 @@ interface ColorPopoverProps {
   fields: { label: string; field: keyof ThemeConfig }[];
   strokeField?: keyof ThemeConfig;
   fontSizeField?: keyof ThemeConfig;
+  fontFamilyField?: keyof ThemeConfig;
   theme: ThemeConfig;
   onFieldChange: (field: keyof ThemeConfig, value: string) => void;
   onClose: () => void;
@@ -204,6 +215,7 @@ const ColorPopover = ({
   fields,
   strokeField,
   fontSizeField,
+  fontFamilyField,
   theme,
   onFieldChange,
   onClose,
@@ -357,6 +369,22 @@ const ColorPopover = ({
           <span className="visual-font-size-unit">{fontParts.unit}</span>
         </div>
       )}
+      {fontFamilyField && (
+        <div className="visual-color-popover-row visual-font-family-row">
+          <span className="visual-color-popover-label">Letur</span>
+          <select
+            className="visual-font-select"
+            value={theme[fontFamilyField]}
+            onChange={(e) => onFieldChange(fontFamilyField, e.target.value)}
+          >
+            {FONT_OPTIONS.map((font) => (
+              <option key={font} value={font}>
+                {font.replace(/"/g, "")}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
     </div>
   );
 };
@@ -374,6 +402,7 @@ interface DraggableElementProps {
     clickY: number,
     strokeField?: keyof ThemeConfig,
     fontSizeField?: keyof ThemeConfig,
+    fontFamilyField?: keyof ThemeConfig,
   ) => void;
   canvasRef: React.RefObject<HTMLDivElement | null>;
 }
@@ -502,6 +531,7 @@ const DraggableElement = ({
             e.clientY - canvasRect.top,
             def.strokeField,
             def.fontSizeField,
+            def.fontFamilyField,
           );
         }
       } else if (dragOverride) {
@@ -568,6 +598,7 @@ const VisualThemeEditor = ({
     fields: ColorPopoverProps["fields"];
     strokeField?: keyof ThemeConfig;
     fontSizeField?: keyof ThemeConfig;
+    fontFamilyField?: keyof ThemeConfig;
     x: number;
     y: number;
   } | null>(null);
@@ -580,8 +611,17 @@ const VisualThemeEditor = ({
       y: number,
       strokeField?: keyof ThemeConfig,
       fontSizeField?: keyof ThemeConfig,
+      fontFamilyField?: keyof ThemeConfig,
     ) => {
-      setPopover({ elementId, fields, x, y, strokeField, fontSizeField });
+      setPopover({
+        elementId,
+        fields,
+        x,
+        y,
+        strokeField,
+        fontSizeField,
+        fontFamilyField,
+      });
     },
     [],
   );
@@ -693,6 +733,7 @@ const VisualThemeEditor = ({
               fields={popover.fields}
               strokeField={popover.strokeField}
               fontSizeField={popover.fontSizeField}
+              fontFamilyField={popover.fontFamilyField}
               theme={effective}
               onFieldChange={onFieldChange}
               onClose={closePopover}

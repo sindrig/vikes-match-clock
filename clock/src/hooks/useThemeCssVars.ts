@@ -36,6 +36,8 @@ export const themeToCssVars = (theme: ThemeConfig): Record<string, string> => ({
   "--theme-logo-top": theme.logoTop,
   "--theme-logo-height": theme.logoHeight,
   "--theme-logo-width": theme.logoWidth,
+  "--theme-home-logo-scale": String(parseFloat(theme.homeLogoScale) / 100),
+  "--theme-away-logo-scale": String(parseFloat(theme.awayLogoScale) / 100),
 
   // Injury time
   "--theme-injury-color": theme.injuryTimeColor,

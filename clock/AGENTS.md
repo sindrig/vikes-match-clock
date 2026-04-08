@@ -202,7 +202,16 @@ The operational heart of the app.
 | Screen       | Purpose                                                                                   |
 | ------------ | ----------------------------------------------------------------------------------------- |
 | `ScoreBoard` | Primary match interface - clock, scores, penalties. Designed for visibility from distance |
-| `Idle`       | Pre/post match or breaks - club logos, weather, rotating sponsor ads                      |
+| `Idle`       | Pre/post match or breaks - club logos, weather, configurable sponsor ad                   |
+
+#### Idle Ad Image
+
+The idle screen can display an optional sponsor ad image. The image is selected from Firebase Storage (`{listenPrefix}/largeAds/`) and stored as a filename string in `states/${listenPrefix}/view/idleAd`.
+
+- **No hardcoded images** — if `idleAd` is null/unset, no ad renders
+- **Selection**: Dropdown in the "Idle skjár" panel of the advanced theme editor tab
+- **Storage path**: `{listenPrefix}/largeAds/{filename}` — download URL resolved at render time
+- **Firebase field**: `states/${listenPrefix}/view/idleAd` (string filename or null)
 
 ### 4. Specialized Logic
 
@@ -241,19 +250,19 @@ The display is styled via **CSS Custom Properties** (CSS variables) applied on t
 
 All properties are CSS value strings. Grouped by display area:
 
-| Group       | Properties                                                                                                                                                                                                                                     | CSS Variables                            |
-| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
-| Score boxes | `scoreBoxBg`, `scoreBoxColor`, `scoreBoxBorder`, `scoreBoxFontSize`, `scoreBoxFontFamily`, `scoreBoxStroke`, `scoreTop`, `scoreHeight`, `scoreWidth`                                                                                           | `--theme-score-*`                        |
-| Clock       | `clockBg`, `clockColor`, `clockBorder`, `clockFontSizeMin`, `clockFontSizeMax`, `clockFontFamily`, `clockStroke`, `clockTop`, `clockLeft`, `clockWidth`, `clockHeight`                                                                         | `--theme-clock-*`                        |
-| Logos       | `logoTop`, `logoHeight`, `logoWidth`                                                                                                                                                                                                           | `--theme-logo-*`                         |
-| Injury time | `injuryTimeColor`, `injuryTimeFontSize`, `injuryTimeStroke`, `injuryTimeTop`, `injuryTimeLeft`                                                                                                                                                 | `--theme-injury-*`                       |
-| Team names  | `teamNameColor`, `teamNameFontFamily`                                                                                                                                                                                                          | `--theme-team-name-*`                    |
-| Red cards   | `redCardColor`                                                                                                                                                                                                                                 | `--theme-red-card-color`                 |
-| Penalties   | `penaltyBg`, `penaltyColor`, `penaltyBorder`                                                                                                                                                                                                   | `--theme-penalty-*`                      |
-| Timeouts    | `timeoutColor`                                                                                                                                                                                                                                 | `--theme-timeout-color`                  |
-| Ad image    | `adTop`, `adLeft`, `adWidth`, `adHeight`                                                                                                                                                                                                       | `--theme-ad-*`                           |
-| Background  | `backgroundImage`                                                                                                                                                                                                                              | `--theme-background-image` (conditional) |
-| Idle screen | `idleTextColor`, `idleTextFontSize`, `idleLogoTop`, `idleLogoLeft`, `idleLogoWidth`, `idleTextTop`, `idleLogoHeight`, `idleClockTop`, `idleClockLeft`, `idleTempTop`, `idleTempLeft`, `idleAdTop`, `idleAdLeft`, `idleAdWidth`, `idleAdHeight` | `--theme-idle-*`                         |
+| Group | Properties | CSS Variables |
+|-------|-----------|---------------|
+| Score boxes | `scoreBoxBg`, `scoreBoxColor`, `scoreBoxBorder`, `scoreBoxFontSize`, `scoreBoxFontFamily`, `scoreBoxStroke`, `scoreTop`, `scoreHeight`, `scoreWidth` | `--theme-score-*` |
+| Clock | `clockBg`, `clockColor`, `clockBorder`, `clockFontSizeMin`, `clockFontSizeMax`, `clockFontFamily`, `clockStroke`, `clockTop`, `clockLeft`, `clockWidth`, `clockHeight` | `--theme-clock-*` |
+| Logos | `logoTop`, `logoHeight`, `logoWidth`, `homeLogoScale`, `awayLogoScale` | `--theme-logo-*`, `--theme-home-logo-scale`, `--theme-away-logo-scale` |
+| Injury time | `injuryTimeColor`, `injuryTimeFontSize`, `injuryTimeStroke`, `injuryTimeTop`, `injuryTimeLeft` | `--theme-injury-*` |
+| Team names | `teamNameColor`, `teamNameFontFamily` | `--theme-team-name-*` |
+| Red cards | `redCardColor` | `--theme-red-card-color` |
+| Penalties | `penaltyBg`, `penaltyColor`, `penaltyBorder` | `--theme-penalty-*` |
+| Timeouts | `timeoutColor` | `--theme-timeout-color` |
+| Ad image | `adTop`, `adLeft`, `adWidth`, `adHeight` | `--theme-ad-*` |
+| Background | `backgroundImage` | `--theme-background-image` (conditional) |
+| Idle screen | `idleTextColor`, `idleTextFontSize`, `idleLogoTop`, `idleLogoLeft`, `idleLogoWidth`, `idleTextTop`, `idleLogoHeight`, `idleClockTop`, `idleClockLeft`, `idleTempTop`, `idleTempLeft`, `idleAdTop`, `idleAdLeft`, `idleAdWidth`, `idleAdHeight` | `--theme-idle-*` |
 
 #### Preset Themes
 
@@ -282,23 +291,23 @@ All properties are CSS value strings. Grouped by display area:
 
 #### Key Files
 
-| File                                         | Role                                                                                                              |
-| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `types.ts`                                   | `ThemeConfig` and `CustomPreset` interface definitions                                                            |
-| `constants.ts`                               | `DEFAULT_THEME`, `THEME_PRESETS`, and `BUILT_IN_PRESET_NAMES`                                                     |
-| `hooks/useThemeCssVars.ts`                   | `useThemeCssVars()` hook (config → CSS vars), `resolveTheme()`, and `lookupPreset()` (custom → built-in fallback) |
-| `contexts/firebaseParsers.ts`                | `parseTheme()`, `parseCustomPresets()` validators for Firebase data                                               |
-| `contexts/FirebaseStateContext.tsx`          | `setTheme()`, `setThemePreset()`, `saveCustomPreset()`, `deleteCustomPreset()` actions                            |
-| `App.tsx`                                    | Applies CSS vars to `.App` container (passes `customPresets` to `useThemeCssVars`)                                |
-| `controller/theme/ThemeEditor.tsx`           | `ThemeEditorModal` — rsuite Modal for preset management and theme editing                                         |
-| `controller/theme/ThemeEditor.css`           | Theme editor modal styling                                                                                        |
-| `controller/theme/VisualThemeEditor.tsx`     | Visual (drag-and-drop) theme editor for scoreboard with background upload                                         |
-| `controller/theme/IdleVisualThemeEditor.tsx` | Visual (drag-and-drop) theme editor for idle screen elements (clock, temp, ad, logo)                              |
-| `controller/theme/VisualThemeEditor.css`     | Visual editor styles (shared by both visual editors)                                                              |
-| `screens/ScoreBoard.css`                     | Uses `var(--theme-*)` for score/clock/penalty display                                                             |
-| `screens/Idle.css`                           | Uses `var(--theme-*)` for idle screen display                                                                     |
-| `match/RedCard.css`                          | Uses `var(--theme-red-card-color)`                                                                                |
-| `match/ClockBase.tsx`                        | Uses CSS var expressions for font size (with prop defaults as fallbacks)                                          |
+| File | Role |
+|------|------|
+| `types.ts` | `ThemeConfig` and `CustomPreset` interface definitions |
+| `constants.ts` | `DEFAULT_THEME`, `THEME_PRESETS`, and `BUILT_IN_PRESET_NAMES` |
+| `hooks/useThemeCssVars.ts` | `useThemeCssVars()` hook (config → CSS vars), `resolveTheme()`, and `lookupPreset()` (custom → built-in fallback) |
+| `contexts/firebaseParsers.ts` | `parseTheme()`, `parseCustomPresets()` validators for Firebase data |
+| `contexts/FirebaseStateContext.tsx` | `setTheme()`, `setThemePreset()`, `saveCustomPreset()`, `deleteCustomPreset()` actions |
+| `App.tsx` | Applies CSS vars to `.App` container (passes `customPresets` to `useThemeCssVars`) |
+| `controller/theme/ThemeEditor.tsx` | `ThemeEditorModal` — rsuite Modal for preset management and theme editing |
+| `controller/theme/ThemeEditor.css` | Theme editor modal styling |
+| `controller/theme/VisualThemeEditor.tsx` | Visual (drag-and-drop) theme editor with background upload and element popover (colors, stroke, font size, font family) |
+| `controller/theme/IdleVisualThemeEditor.tsx` | Visual (drag-and-drop) theme editor for idle screen elements (clock, temp, ad, logo) |
+| `controller/theme/VisualThemeEditor.css` | Visual editor styles (upload indicator, clear button, popover controls) |
+| `screens/ScoreBoard.css` | Uses `var(--theme-*)` for score/clock/penalty display |
+| `screens/Idle.css` | Uses `var(--theme-*)` for idle screen display |
+| `match/RedCard.css` | Uses `var(--theme-red-card-color)` |
+| `match/ClockBase.tsx` | Uses CSS var expressions for font size (with prop defaults as fallbacks) |
 
 #### Adding a New Theme Property
 
@@ -338,6 +347,10 @@ The ad image (`img.ad` in `ScoreBoard.css`) uses theme CSS vars for all position
 - The Advanced tab has an "Auglýsing" panel with position/size percentage inputs
 
 **Note**: The original CSS used `bottom: 2%` with `height: 25%`, which was converted to the equivalent `top: 73%` for consistency with the theme system's top-based positioning.
+
+#### Per-Team Logo Scaling
+
+Each team's logo can be independently scaled via `homeLogoScale` and `awayLogoScale` (percentage strings, e.g. `"100%"`). The scaling uses CSS `transform: scale()` with `transform-origin: center center` on `.img-wrapper`, so logos resize "middle out" — maintaining their center position and vertical alignment. The `themeToCssVars()` function converts the percentage to a unitless scale factor (e.g. `"100%"` → `"1"`, `"150%"` → `"1.5"`). Because `transform: scale()` is used (not width/height changes), aspect ratio is always preserved.
 
 #### Viewport Variants Note
 
@@ -388,6 +401,7 @@ The theme editor is a **full rsuite Modal** (`ThemeEditorModal`) launched from a
 
 - Color pickers, text inputs, font family selectors, percentage inputs
 - Collapsible panels for each property group (Score boxes, Clock, Logos, etc.)
+- "Idle skjár" panel includes an `IdleAdPicker` dropdown for selecting the idle ad image from Firebase Storage
 
 **Controller integration** (`Controller.tsx`):
 
@@ -396,6 +410,17 @@ The theme editor is a **full rsuite Modal** (`ThemeEditorModal`) launched from a
 - `<ThemeEditorModal open={themeOpen} onClose={...} />`
 
 All labels are in Icelandic, consistent with the rest of the controller UI.
+
+#### Fonts
+
+**Google Fonts** (loaded via CDN in `index.html`): Anton, Oswald, Bebas Neue, Orbitron, Russo One.
+
+**Bundled fonts** (self-hosted via `@font-face` in `src/assets/fonts/`):
+- **GT America** (Grilli Type) — Regular + Bold weights (`GT-America-Standard-Regular.otf`, `GT-America-Standard-Bold.otf`). Declared in `src/assets/fonts/gt-america.css`, imported in `src/index.tsx`.
+
+The exported `FONT_OPTIONS` array in `ThemeEditor.tsx` defines the available fonts in the per-element font dropdowns in both the advanced ThemeEditor and the visual VisualThemeEditor (score box, clock, team name). To add a new font:
+1. For Google Fonts: add the `<link>` to `index.html` and add the CSS `font-family` string to `FONT_OPTIONS`
+2. For bundled fonts: place files in `src/assets/fonts/`, create a CSS file with `@font-face` declarations (use `format("opentype")` for `.otf`), import the CSS in `src/index.tsx`, and add to `FONT_OPTIONS`
 
 ## Build & Tooling
 
