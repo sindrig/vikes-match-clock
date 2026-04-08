@@ -183,7 +183,16 @@ export interface ThemeConfig {
   idleLogoTop: string;
   idleLogoLeft: string;
   idleLogoWidth: string;
+  idleLogoHeight: string;
   idleTextTop: string;
+  idleClockTop: string;
+  idleClockLeft: string;
+  idleTempTop: string;
+  idleTempLeft: string;
+  idleAdTop: string;
+  idleAdLeft: string;
+  idleAdWidth: string;
+  idleAdHeight: string;
 
   // Ad image position (scoreboard)
   adTop: string;

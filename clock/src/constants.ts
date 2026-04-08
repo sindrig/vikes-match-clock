@@ -185,7 +185,16 @@ export const DEFAULT_THEME: ThemeConfig = {
   idleLogoTop: "5%",
   idleLogoLeft: "15%",
   idleLogoWidth: "30%",
+  idleLogoHeight: "auto",
   idleTextTop: "65%",
+  idleClockTop: "65%",
+  idleClockLeft: "0%",
+  idleTempTop: "65%",
+  idleTempLeft: "50%",
+  idleAdTop: "10%",
+  idleAdLeft: "57%",
+  idleAdWidth: "33.4%",
+  idleAdHeight: "45.5%",
 
   // Ad image position (scoreboard)
   adTop: "73%",

@@ -67,15 +67,13 @@ const Idle = () => {
       />
       <img src={idleLogoUrl || ""} alt="Vikes" className="idle-vikes" />
       {idleAdUrl && <img src={idleAdUrl} alt="Idle ad" className="idle-ad" />}
-      <div className="idle-text-container">
-        <div className="idle-text-box idle-clock">
-          <Clock format="HH:mm" className="idle-clock" ticking />
-        </div>
-        <div className="idle-text-box idle-temp">
-          <span className="idle-temperature">
-            {useRealTemperature ? `${String(temperature)}°` : "17°"}
-          </span>
-        </div>
+      <div className="idle-clock">
+        <Clock format="HH:mm" className="idle-clock-inner" ticking />
+      </div>
+      <div className="idle-temp">
+        <span className="idle-temperature">
+          {useRealTemperature ? `${String(temperature)}°` : "17°"}
+        </span>
       </div>
     </div>
   );
