@@ -116,8 +116,8 @@ img.ad {
   left: var(--theme-injury-left, 45%);
   font-size: var(--theme-injury-font-size, 2rem);
   position: absolute;
-  color: var(--theme-injury-color, white);
-  -webkit-text-stroke: var(--theme-injury-stroke, none);
+  color: var(--theme-score-color, white);
+  -webkit-text-stroke: var(--theme-score-stroke, none);
   font-family: var(--theme-score-font-family, "Anton", sans-serif);
 }
 
