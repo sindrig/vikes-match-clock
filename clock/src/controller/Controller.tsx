@@ -8,10 +8,35 @@ import ListIcon from "@rsuite/icons/List";
 import PeoplesIcon from "@rsuite/icons/Peoples";
 
 import { TABS, ASSET_VIEWS } from "../constants";
+import useConnectedScreens from "../hooks/useConnectedScreens";
 
 const assetViewToTab: Record<string, string> = {
   [ASSET_VIEWS.teams]: TABS.teams,
   [ASSET_VIEWS.assets]: TABS.queue,
+};
+
+const ScreenSelectorButton = ({
+  locationKey,
+  label,
+  onClick,
+}: {
+  locationKey: string;
+  label: string;
+  onClick: () => void;
+}) => {
+  const count = useConnectedScreens(locationKey);
+  return (
+    <button
+      key={locationKey}
+      className="screen-selector-button"
+      onClick={onClick}
+    >
+      {label}
+      {count > 0 && (
+        <span className="screen-selector-badge">{count} tengd</span>
+      )}
+    </button>
+  );
 };
 import { firebaseAuth } from "../firebaseAuth";
 import MatchActionSettings from "./MatchActionSettings";
@@ -213,13 +238,12 @@ const Controller = () => {
               const buttonLabel = `${label} ${screenNames}`;
 
               return (
-                <button
+                <ScreenSelectorButton
                   key={locationKey}
-                  className="screen-selector-button"
+                  locationKey={locationKey}
+                  label={buttonLabel}
                   onClick={() => setListenPrefix(locationKey)}
-                >
-                  {buttonLabel}
-                </button>
+                />
               );
             })}
           </div>

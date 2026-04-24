@@ -24,6 +24,7 @@ import StateListener from "./StateListener";
 import MatchController from "./match-controller/MatchController";
 import useGlobalShortcuts from "./hooks/useGlobalShortcuts";
 import useNightBlackout from "./hooks/useNightBlackout";
+import useScreenPresence from "./hooks/useScreenPresence";
 import { useThemeCssVars, resolveTheme } from "./hooks/useThemeCssVars";
 import { shouldShowGoalCelebration } from "./utils/matchUtils";
 import baddi from "./images/baddi.gif";
@@ -173,6 +174,8 @@ function App() {
   );
 
   const isAuthenticated = auth.isLoaded && !auth.isEmpty;
+
+  useScreenPresence(isAuthenticated ? "" : listenPrefix);
 
   // Apply viewport fontSize to the root <html> element so all rem-based
   // content (clocks, scores, etc.) scales to the physical screen config.

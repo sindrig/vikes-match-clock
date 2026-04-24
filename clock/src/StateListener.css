@@ -1,11 +1,25 @@
 .connect-indicator {
-  text-align: right;
   position: absolute;
-  top: 0;
-  right: 0;
-  color: green;
-  font-size: 2rem;
-  line-height: 1.5rem;
+  top: 4px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  z-index: 9999;
+  font-family: sans-serif;
+}
+
+.connect-indicator-count {
+  font-size: 0.85rem;
+  font-weight: bold;
+  color: #fff;
+  min-width: 1.2em;
+  text-align: center;
+}
+
+.connect-indicator-icon {
+  font-size: 0.7rem;
+  color: #4caf50;
   animation: state-color 5s infinite;
 }
 
