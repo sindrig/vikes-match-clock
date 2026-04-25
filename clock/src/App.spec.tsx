@@ -187,12 +187,11 @@ describe("App", () => {
   });
 
   describe("State 1: unauthenticated, no listenPrefix", () => {
-    it("renders Controller and StateListener only", () => {
+    it("renders Controller only", () => {
       setupState1();
       render(<App />);
 
       expect(screen.getByTestId("controller")).toBeInTheDocument();
-      expect(screen.getByTestId("state-listener")).toBeInTheDocument();
     });
 
     it("does not render display screens", () => {
