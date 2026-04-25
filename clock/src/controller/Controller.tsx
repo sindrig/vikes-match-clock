@@ -9,6 +9,7 @@ import PeoplesIcon from "@rsuite/icons/Peoples";
 
 import { TABS, ASSET_VIEWS } from "../constants";
 import useConnectedScreens from "../hooks/useConnectedScreens";
+import StateListener from "../StateListener";
 
 const assetViewToTab: Record<string, string> = {
   [ASSET_VIEWS.teams]: TABS.teams,
@@ -318,6 +319,7 @@ const Controller = () => {
         >
           Stillingar
         </IconButton>
+        <StateListener />
       </div>
       {tab === TABS.media && <MediaManager />}
       {(tab === TABS.queue || tab === TABS.teams) && <AssetController />}

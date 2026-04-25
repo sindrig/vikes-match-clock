@@ -1,20 +1,16 @@
 .connect-indicator {
-  position: absolute;
-  top: 4px;
-  right: 8px;
   display: flex;
   align-items: center;
   gap: 4px;
-  z-index: 9999;
   font-family: sans-serif;
+  white-space: nowrap;
+  margin-left: auto;
 }
 
 .connect-indicator-count {
   font-size: 0.85rem;
   font-weight: bold;
-  color: #fff;
-  min-width: 1.2em;
-  text-align: center;
+  color: #333;
 }
 
 .connect-indicator-icon {
