@@ -3,8 +3,7 @@
   align-items: center;
   gap: 4px;
   font-family: sans-serif;
-  white-space: nowrap;
-  margin-left: auto;
+  flex-shrink: 0;
 }
 
 .connect-indicator-count {
