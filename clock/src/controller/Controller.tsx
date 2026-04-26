@@ -310,16 +310,18 @@ const Controller = () => {
             Myndefni
           </Nav.Item>
         </Nav>
-        <IconButton
-          icon={<GearIcon />}
-          appearance="subtle"
-          size="sm"
-          onClick={() => setSettingsOpen(true)}
-          aria-label="Stillingar"
-        >
-          Stillingar
-        </IconButton>
-        <StateListener />
+        <div className="nav-bar-actions">
+          <IconButton
+            icon={<GearIcon />}
+            appearance="subtle"
+            size="sm"
+            onClick={() => setSettingsOpen(true)}
+            aria-label="Stillingar"
+          >
+            Stillingar
+          </IconButton>
+          <StateListener />
+        </div>
       </div>
       {tab === TABS.media && <MediaManager />}
       {(tab === TABS.queue || tab === TABS.teams) && <AssetController />}

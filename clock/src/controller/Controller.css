@@ -16,6 +16,7 @@
 .controller .rs-nav {
   flex: 1;
   min-width: 0;
+  overflow: hidden;
 }
 
 .controller .nav-bar {
@@ -23,6 +24,14 @@
   align-items: center;
   width: 100%;
   gap: 8px;
+  overflow: hidden;
+}
+
+.controller .nav-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 .controller .control-item {
