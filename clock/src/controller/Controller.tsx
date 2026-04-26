@@ -299,17 +299,19 @@ const Controller = () => {
   return (
     <div className="controller">
       <div className="nav-bar">
-        <Nav appearance="tabs" onSelect={handleTabSelect} activeKey={tab}>
-          <Nav.Item eventKey={TABS.queue} icon={<ListIcon />}>
-            Biðröð
-          </Nav.Item>
-          <Nav.Item eventKey={TABS.teams} icon={<PeoplesIcon />}>
-            Lið
-          </Nav.Item>
-          <Nav.Item eventKey={TABS.media} icon={<MediaIcon />}>
-            Myndefni
-          </Nav.Item>
-        </Nav>
+        <div className="nav-bar-tabs">
+          <Nav appearance="tabs" onSelect={handleTabSelect} activeKey={tab}>
+            <Nav.Item eventKey={TABS.queue} icon={<ListIcon />}>
+              Biðröð
+            </Nav.Item>
+            <Nav.Item eventKey={TABS.teams} icon={<PeoplesIcon />}>
+              Lið
+            </Nav.Item>
+            <Nav.Item eventKey={TABS.media} icon={<MediaIcon />}>
+              Myndefni
+            </Nav.Item>
+          </Nav>
+        </div>
         <div className="nav-bar-actions">
           <IconButton
             icon={<GearIcon />}

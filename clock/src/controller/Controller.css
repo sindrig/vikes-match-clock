@@ -13,17 +13,20 @@
   align-items: flex-start;
 }
 
-.controller .rs-nav {
+.controller .nav-bar {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+}
+
+.controller .nav-bar-tabs {
   flex: 1;
   min-width: 0;
   overflow: hidden;
 }
 
-.controller .nav-bar {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  gap: 8px;
+.controller .nav-bar-tabs .rs-nav {
   overflow: hidden;
 }
 
@@ -32,6 +35,7 @@
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
+  padding-left: 8px;
 }
 
 .controller .control-item {
