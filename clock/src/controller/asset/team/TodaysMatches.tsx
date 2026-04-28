@@ -16,6 +16,7 @@ import {
   type Team,
 } from "../../../api/client";
 import { transformLineups, getTeamId } from "../../../lib/matchUtils";
+import { normalizeTimeTo24h } from "../../../utils/matchUtils";
 
 const getClubName = (team: Team): string => team.parent?.name ?? team.name;
 
@@ -70,12 +71,11 @@ const TodaysMatches = (): React.JSX.Element => {
       updateMatch({
         homeTeam: getClubName(match.homeTeam),
         awayTeam: getClubName(match.awayTeam),
-        matchStartTime: new Date(match.dateTimeUTC).toLocaleTimeString(
-          "is-IS",
-          {
+        matchStartTime: normalizeTimeTo24h(
+          new Date(match.dateTimeUTC).toLocaleTimeString("is-IS", {
             hour: "2-digit",
             minute: "2-digit",
-          },
+          }),
         ),
         ksiMatchId: match.id,
       });
@@ -104,10 +104,12 @@ const TodaysMatches = (): React.JSX.Element => {
     updateMatch({
       homeTeam: getClubName(match.homeTeam),
       awayTeam: getClubName(match.awayTeam),
-      matchStartTime: new Date(match.dateTimeUTC).toLocaleTimeString("is-IS", {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
+      matchStartTime: normalizeTimeTo24h(
+        new Date(match.dateTimeUTC).toLocaleTimeString("is-IS", {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      ),
       ksiMatchId: match.id,
     });
 

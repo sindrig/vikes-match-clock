@@ -474,6 +474,8 @@ mockedHook.mockReturnValue({ ... } as unknown as ReturnType<typeof useHook>);
 
 **Important**: Always run `pnpm format` after making changes. CI runs format checks and will fail if code is not properly formatted. To format only specific files: `pnpm exec prettier --write path/to/file.tsx`
 
+**Important**: Always run `pnpm lint` before pushing. CI runs ESLint and will fail on lint errors. Fix all errors in files you touched — do not add `eslint-disable` comments (see ESLint Policy above).
+
 ## Testing & Development
 
 ### Port Configuration

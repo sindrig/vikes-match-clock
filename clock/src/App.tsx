@@ -11,6 +11,7 @@ import { useLocalState, useRemoteSettings } from "./contexts/LocalStateContext";
 import { firebaseAuth } from "./firebaseAuth";
 import Controller from "./controller/Controller";
 import MatchActions from "./controller/MatchActions";
+import MatchCountdownDisplay from "./controller/MatchCountdownDisplay";
 import RefreshHandler from "./controller/RefreshHandler";
 import AssetComponent from "./controller/asset/Asset";
 import PlaybackBar from "./controller/asset/queue/PlaybackBar";
@@ -338,6 +339,7 @@ function App() {
               asset && <ClearOverlayButton />
             )}
             {showMatchControls && <MatchActions />}
+            {showMatchControls && <MatchCountdownDisplay />}
           </div>
           <div className="controller-controls">
             <Controller />

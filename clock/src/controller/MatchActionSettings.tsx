@@ -3,6 +3,7 @@ import TeamSelector from "./TeamSelector";
 import HalfStops from "./HalfStops";
 import clubLogos from "../images/clubLogos";
 import { Sports, VIEWS, BACKGROUNDS } from "../constants";
+import { normalizeTimeTo24h } from "../utils/matchUtils";
 import {
   useMatch,
   useController,
@@ -57,6 +58,12 @@ const MatchActionSettings = () => {
               onChange={({ target: { value } }) =>
                 updateMatch({ matchStartTime: value })
               }
+              onBlur={({ target: { value } }) => {
+                const normalized = normalizeTimeTo24h(value);
+                if (normalized !== value) {
+                  updateMatch({ matchStartTime: normalized });
+                }
+              }}
             />
           </div>
           <div>
