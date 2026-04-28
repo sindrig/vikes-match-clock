@@ -59,3 +59,38 @@ export function translateTeam(team: "home" | "away"): string {
   };
   return translations[team] || team;
 }
+
+/**
+ * Normalizes a time string to 24h HH:mm format.
+ * Handles AM/PM formats (e.g. "7:15 PM" → "19:15") and
+ * already-valid 24h formats (e.g. "19:15" → "19:15").
+ */
+export function normalizeTimeTo24h(time: string): string {
+  const trimmed = time.trim();
+
+  // Already in HH:mm 24h format
+  if (/^\d{1,2}:\d{2}$/.test(trimmed)) {
+    return trimmed;
+  }
+
+  // Match AM/PM patterns like "7:15 PM", "12:00 AM", "11:30 am"
+  const amPmMatch = trimmed.match(
+    /^(\d{1,2}):(\d{2})\s*(AM|PM|am|pm|a\.m\.|p\.m\.)$/i,
+  );
+  if (amPmMatch) {
+    const [, hoursStr, minutes, periodRaw] = amPmMatch;
+    let hours = parseInt(hoursStr!, 10);
+    const period = periodRaw!.toUpperCase().replace(/\./g, "");
+
+    if (period === "PM" && hours !== 12) {
+      hours += 12;
+    } else if (period === "AM" && hours === 12) {
+      hours = 0;
+    }
+
+    return `${String(hours).padStart(2, "0")}:${minutes!}`;
+  }
+
+  // Couldn't parse — return as-is
+  return trimmed;
+}
