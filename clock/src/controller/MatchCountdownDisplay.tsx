@@ -1,17 +1,14 @@
 import { useState, useEffect } from "react";
-import moment from "moment";
+import { msUntilMatchStart, formatTime } from "../utils/timeUtils";
 import { useMatch } from "../contexts/FirebaseStateContext";
 
 const computeRemaining = (matchStartTime: string): string => {
-  const now = moment();
-  const target = moment(matchStartTime, "HH:mm");
-  if (!target.isValid()) return "";
-  if (target <= now) target.add(1, "days");
-  const diff = target.diff(now);
-  if (diff <= 0) return "00:00";
-  const minutes = Math.floor(diff / 60000);
-  const seconds = Math.floor((diff % 60000) / 1000);
-  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  const ms = msUntilMatchStart(matchStartTime);
+  if (ms === null) return "";
+  if (ms <= 0) return formatTime(0, 0);
+  const minutes = Math.floor(ms / 60000);
+  const seconds = Math.floor((ms % 60000) / 1000);
+  return formatTime(minutes, seconds);
 };
 
 const MatchCountdownDisplay = () => {

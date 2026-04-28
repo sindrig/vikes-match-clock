@@ -8,7 +8,6 @@ import React, {
   useRef,
   useMemo,
 } from "react";
-import moment from "moment";
 import { database, storageHelpers } from "../firebase";
 import {
   firebaseDatabase,
@@ -33,6 +32,7 @@ import {
   ClubOverride,
 } from "../types";
 import { Sports, DEFAULT_HALFSTOPS } from "../constants";
+import { msUntilMatchStart } from "../utils/timeUtils";
 import clubIds from "../club-ids";
 import assetTypes from "../controller/asset/AssetTypes";
 import {
@@ -810,7 +810,6 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   const countdown = useCallback(() => {
     applyMatchUpdate((prev) => {
-      // Validate HH:mm format to prevent syncing invalid timestamp to Firebase
       if (
         !prev.matchStartTime ||
         typeof prev.matchStartTime !== "string" ||
@@ -821,21 +820,11 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         );
         return prev;
       }
-      // Compute how far in the future the match starts using local time
-      // (Date.now / moment()), which reflects what the user sees in the UI.
-      // Then place "started" in the server-time coordinate system used by
-      // Clock.tsx (getServerTime()) so elapsed = getServerTime() - started
-      // gives the correct negative countdown value.
-      const localNow = moment();
-      const momentTime = moment(prev.matchStartTime, "HH:mm");
-      if (!momentTime.isValid()) {
+      const duration = msUntilMatchStart(prev.matchStartTime);
+      if (duration === null) {
         console.warn("countdown() invalid moment from matchStartTime");
         return prev;
       }
-      if (momentTime < localNow) {
-        momentTime.add(1, "days");
-      }
-      const duration = momentTime.valueOf() - localNow.valueOf();
       return {
         ...prev,
         started: getServerTime() + duration,
