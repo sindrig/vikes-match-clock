@@ -20,10 +20,10 @@ import ScoreBoard from "./screens/ScoreBoard";
 import Idle from "./screens/Idle";
 
 import { VIEWS, Sports, getBackground } from "./constants";
-import StateListener from "./StateListener";
 import MatchController from "./match-controller/MatchController";
 import useGlobalShortcuts from "./hooks/useGlobalShortcuts";
 import useNightBlackout from "./hooks/useNightBlackout";
+import useScreenPresence from "./hooks/useScreenPresence";
 import { useThemeCssVars, resolveTheme } from "./hooks/useThemeCssVars";
 import { shouldShowGoalCelebration } from "./utils/matchUtils";
 import baddi from "./images/baddi.gif";
@@ -174,6 +174,8 @@ function App() {
 
   const isAuthenticated = auth.isLoaded && !auth.isEmpty;
 
+  useScreenPresence(isAuthenticated ? "" : listenPrefix);
+
   // Apply viewport fontSize to the root <html> element so all rem-based
   // content (clocks, scores, etc.) scales to the physical screen config.
   useEffect(() => {
@@ -187,12 +189,7 @@ function App() {
 
   // State 1: no listenPrefix, not authenticated — Controller handles screen selector + login
   if (!listenPrefix && !isAuthenticated) {
-    return (
-      <div>
-        <Controller />
-        <StateListener />
-      </div>
-    );
+    return <Controller />;
   }
 
   // Show spinner while waiting for auth state or Firebase data to load
@@ -269,19 +266,13 @@ function App() {
         >
           Aftengja skjá
         </Button>
-        <StateListener />
       </div>
     );
   }
 
   // State 3: authenticated, no listenPrefix — show ONLY screen selector
   if (!listenPrefix) {
-    return (
-      <div>
-        <Controller />
-        <StateListener />
-      </div>
-    );
+    return <Controller />;
   }
 
   // State 4: authenticated + listenPrefix set — full UI with disconnect/logout buttons
@@ -378,7 +369,6 @@ function App() {
           Aftengjast skjá
         </Button>
       </ButtonGroup>
-      <StateListener />
     </div>
   );
 }

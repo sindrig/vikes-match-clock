@@ -8,10 +8,36 @@ import ListIcon from "@rsuite/icons/List";
 import PeoplesIcon from "@rsuite/icons/Peoples";
 
 import { TABS, ASSET_VIEWS } from "../constants";
+import useConnectedScreens from "../hooks/useConnectedScreens";
+import StateListener from "../StateListener";
 
 const assetViewToTab: Record<string, string> = {
   [ASSET_VIEWS.teams]: TABS.teams,
   [ASSET_VIEWS.assets]: TABS.queue,
+};
+
+const ScreenSelectorButton = ({
+  locationKey,
+  label,
+  onClick,
+}: {
+  locationKey: string;
+  label: string;
+  onClick: () => void;
+}) => {
+  const count = useConnectedScreens(locationKey);
+  return (
+    <button
+      key={locationKey}
+      className="screen-selector-button"
+      onClick={onClick}
+    >
+      {label}
+      {count > 0 && (
+        <span className="screen-selector-badge">{count} tengd</span>
+      )}
+    </button>
+  );
 };
 import { firebaseAuth } from "../firebaseAuth";
 import MatchActionSettings from "./MatchActionSettings";
@@ -213,13 +239,12 @@ const Controller = () => {
               const buttonLabel = `${label} ${screenNames}`;
 
               return (
-                <button
+                <ScreenSelectorButton
                   key={locationKey}
-                  className="screen-selector-button"
+                  locationKey={locationKey}
+                  label={buttonLabel}
                   onClick={() => setListenPrefix(locationKey)}
-                >
-                  {buttonLabel}
-                </button>
+                />
               );
             })}
           </div>
@@ -274,26 +299,31 @@ const Controller = () => {
   return (
     <div className="controller">
       <div className="nav-bar">
-        <Nav appearance="tabs" onSelect={handleTabSelect} activeKey={tab}>
-          <Nav.Item eventKey={TABS.queue} icon={<ListIcon />}>
-            Biðröð
-          </Nav.Item>
-          <Nav.Item eventKey={TABS.teams} icon={<PeoplesIcon />}>
-            Lið
-          </Nav.Item>
-          <Nav.Item eventKey={TABS.media} icon={<MediaIcon />}>
-            Myndefni
-          </Nav.Item>
-        </Nav>
-        <IconButton
-          icon={<GearIcon />}
-          appearance="subtle"
-          size="sm"
-          onClick={() => setSettingsOpen(true)}
-          aria-label="Stillingar"
-        >
-          Stillingar
-        </IconButton>
+        <div className="nav-bar-tabs">
+          <Nav appearance="tabs" onSelect={handleTabSelect} activeKey={tab}>
+            <Nav.Item eventKey={TABS.queue} icon={<ListIcon />}>
+              Biðröð
+            </Nav.Item>
+            <Nav.Item eventKey={TABS.teams} icon={<PeoplesIcon />}>
+              Lið
+            </Nav.Item>
+            <Nav.Item eventKey={TABS.media} icon={<MediaIcon />}>
+              Myndefni
+            </Nav.Item>
+          </Nav>
+        </div>
+        <div className="nav-bar-actions">
+          <IconButton
+            icon={<GearIcon />}
+            appearance="subtle"
+            size="sm"
+            onClick={() => setSettingsOpen(true)}
+            aria-label="Stillingar"
+          >
+            Stillingar
+          </IconButton>
+          <StateListener />
+        </div>
       </div>
       {tab === TABS.media && <MediaManager />}
       {(tab === TABS.queue || tab === TABS.teams) && <AssetController />}

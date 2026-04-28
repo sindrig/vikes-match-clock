@@ -26,6 +26,15 @@
         ".write": "root.child('auth').child(auth.uid).child($location).val() == true",
         ".read": true
       }
+    },
+    "presence": {
+      "$location": {
+        ".read": true,
+        "$connectionId": {
+          ".write": true,
+          ".validate": "newData.hasChildren(['connectedAt']) && newData.child('connectedAt').isNumber()"
+        }
+      }
     }
   }
 }

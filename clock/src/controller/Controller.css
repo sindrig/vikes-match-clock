@@ -13,16 +13,29 @@
   align-items: flex-start;
 }
 
-.controller .rs-nav {
-  flex: 1;
-  min-width: 0;
-}
-
 .controller .nav-bar {
   display: flex;
   align-items: center;
   width: 100%;
+  min-width: 0;
+}
+
+.controller .nav-bar-tabs {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.controller .nav-bar-tabs .rs-nav {
+  overflow: hidden;
+}
+
+.controller .nav-bar-actions {
+  display: flex;
+  align-items: center;
   gap: 8px;
+  flex-shrink: 0;
+  padding-left: 8px;
 }
 
 .controller .control-item {
@@ -236,6 +249,16 @@ input.longerInput {
 
 .screen-selector-button:hover {
   background-color: #2980d9;
+}
+
+.screen-selector-badge {
+  display: inline-block;
+  margin-left: 10px;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: bold;
+  background-color: rgba(255, 255, 255, 0.25);
+  border-radius: 10px;
 }
 
 .screen-selector-logout {
