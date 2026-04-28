@@ -2,40 +2,31 @@ import { useState, useEffect } from "react";
 import moment from "moment";
 import { useMatch } from "../contexts/FirebaseStateContext";
 
+const computeRemaining = (matchStartTime: string): string => {
+  const now = moment();
+  const target = moment(matchStartTime, "HH:mm");
+  if (!target.isValid()) return "";
+  if (target <= now) target.add(1, "days");
+  const diff = target.diff(now);
+  if (diff <= 0) return "00:00";
+  const minutes = Math.floor(diff / 60000);
+  const seconds = Math.floor((diff % 60000) / 1000);
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+};
+
 const MatchCountdownDisplay = () => {
   const { match } = useMatch();
-  const [remaining, setRemaining] = useState("");
+  const [remaining, setRemaining] = useState(() =>
+    match.matchStartTime ? computeRemaining(match.matchStartTime) : "",
+  );
 
   useEffect(() => {
-    if (!match.matchStartTime) {
-      setRemaining("");
-      return;
-    }
+    if (!match.matchStartTime) return;
 
-    const update = () => {
-      const now = moment();
-      const target = moment(match.matchStartTime, "HH:mm");
-      if (!target.isValid()) {
-        setRemaining("");
-        return;
-      }
-      if (target <= now) {
-        target.add(1, "days");
-      }
-      const diff = target.diff(now);
-      if (diff <= 0) {
-        setRemaining("00:00");
-        return;
-      }
-      const minutes = Math.floor(diff / 60000);
-      const seconds = Math.floor((diff % 60000) / 1000);
-      setRemaining(
-        `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`,
-      );
-    };
+    const interval = setInterval(() => {
+      setRemaining(computeRemaining(match.matchStartTime ?? ""));
+    }, 1000);
 
-    update();
-    const interval = setInterval(update, 1000);
     return () => clearInterval(interval);
   }, [match.matchStartTime]);
 
