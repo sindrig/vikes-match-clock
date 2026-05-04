@@ -12,7 +12,7 @@ const renderWithProviders = () => {
       <FirebaseStateProvider
         listenPrefix=""
         isAuthenticated={false}
-        screenViewport={null}
+        screenKey={null}
       >
         <ScoreBoard />
       </FirebaseStateProvider>
@@ -180,7 +180,7 @@ describe("ScoreBoard component", () => {
           <FirebaseStateProvider
             listenPrefix=""
             isAuthenticated={false}
-            screenViewport={null}
+            screenKey={null}
           >
             <ScoreBoard />
           </FirebaseStateProvider>

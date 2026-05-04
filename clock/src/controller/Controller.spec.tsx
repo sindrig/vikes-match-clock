@@ -91,8 +91,8 @@ function setupState1() {
     setListenPrefix: vi.fn(),
     auth: { isLoaded: true, isEmpty: true },
     available: null,
-    screenViewport: null,
-    setScreenViewport: vi.fn(),
+    screenKey: null,
+    setScreenKey: vi.fn(),
     isAdmin: false,
   });
   mockedUseRemoteSettings.mockReturnValue({
@@ -126,8 +126,8 @@ function setupState2() {
     setListenPrefix: vi.fn(),
     auth: { isLoaded: true, isEmpty: true },
     available: null,
-    screenViewport: null,
-    setScreenViewport: vi.fn(),
+    screenKey: null,
+    setScreenKey: vi.fn(),
     isAdmin: false,
   });
   mockedUseRemoteSettings.mockReturnValue({
@@ -165,8 +165,8 @@ function setupState3() {
     setListenPrefix: vi.fn(),
     auth: { isLoaded: true, isEmpty: false, email: "test@test.com" },
     available: ["vikinni"],
-    screenViewport: null,
-    setScreenViewport: vi.fn(),
+    screenKey: null,
+    setScreenKey: vi.fn(),
     isAdmin: false,
   });
   mockedUseRemoteSettings.mockReturnValue({
@@ -216,8 +216,8 @@ function setupScreenSelector(
     setListenPrefix: mockSetListenPrefix,
     auth: { isLoaded: true, isEmpty: false, email: "test@test.com" },
     available: mockAvailable,
-    screenViewport: null,
-    setScreenViewport: vi.fn(),
+    screenKey: null,
+    setScreenKey: vi.fn(),
     isAdmin: false,
   });
   mockedUseRemoteSettings.mockReturnValue({

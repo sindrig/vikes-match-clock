@@ -9,7 +9,6 @@ import { User } from "firebase/auth";
 import { ref, onValue } from "firebase/database";
 import { firebaseAuth } from "../firebaseAuth";
 import { database } from "../firebase";
-import type { ViewPort } from "../types";
 
 export interface FirebaseAuthState {
   isLoaded: boolean;
@@ -28,9 +27,9 @@ interface LocalStateContextType {
   setListenPrefix: (prefix: string) => void;
   available: string[] | null;
 
-  // Screen viewport override (from "Birta skjá" selection)
-  screenViewport: ViewPort | null;
-  setScreenViewport: (vp: ViewPort | null) => void;
+  // Screen key (from "Birta skjá" selection) — used to resolve viewport from live Firebase locations
+  screenKey: string | null;
+  setScreenKey: (key: string | null) => void;
 
   // Login form state
   email: string;
@@ -44,7 +43,7 @@ const LocalStateContext = createContext<LocalStateContextType | undefined>(
 );
 
 const LISTEN_PREFIX_KEY = "clock_listenPrefix";
-const SCREEN_VIEWPORT_KEY = "clock_screenViewport";
+const SCREEN_KEY_KEY = "clock_screenKey";
 
 export function LocalStateProvider({ children }: { children: ReactNode }) {
   // Auth State
@@ -63,20 +62,27 @@ export function LocalStateProvider({ children }: { children: ReactNode }) {
   // Admin state
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
 
-  // Screen viewport override (set when selecting a screen via "Birta skjá")
-  const [screenViewport, setScreenViewportState] = useState<ViewPort | null>(
-    () => {
-      const stored = localStorage.getItem(SCREEN_VIEWPORT_KEY);
-      if (stored) {
-        try {
-          return JSON.parse(stored) as ViewPort;
-        } catch {
-          return null;
+  // Screen key (set when selecting a screen via "Birta skjá")
+  const [screenKey, setScreenKeyState] = useState<string | null>(() => {
+    const stored = localStorage.getItem(SCREEN_KEY_KEY);
+    if (stored) return stored;
+
+    // Migration: extract key from old screenViewport localStorage format
+    const oldViewport = localStorage.getItem("clock_screenViewport");
+    if (oldViewport) {
+      try {
+        const parsed = JSON.parse(oldViewport) as { key?: string };
+        if (parsed.key) {
+          localStorage.setItem(SCREEN_KEY_KEY, parsed.key);
+          localStorage.removeItem("clock_screenViewport");
+          return parsed.key;
         }
+      } catch {
+        // ignore parse errors
       }
-      return null;
-    },
-  );
+    }
+    return null;
+  });
 
   // Login Form State
   const [email, setEmail] = useState("");
@@ -88,12 +94,12 @@ export function LocalStateProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(LISTEN_PREFIX_KEY, newPrefix);
   };
 
-  const setScreenViewport = (vp: ViewPort | null) => {
-    setScreenViewportState(vp);
-    if (vp) {
-      localStorage.setItem(SCREEN_VIEWPORT_KEY, JSON.stringify(vp));
+  const setScreenKey = (key: string | null) => {
+    setScreenKeyState(key);
+    if (key) {
+      localStorage.setItem(SCREEN_KEY_KEY, key);
     } else {
-      localStorage.removeItem(SCREEN_VIEWPORT_KEY);
+      localStorage.removeItem(SCREEN_KEY_KEY);
     }
   };
 
@@ -159,8 +165,8 @@ export function LocalStateProvider({ children }: { children: ReactNode }) {
     listenPrefix,
     setListenPrefix,
     available,
-    screenViewport,
-    setScreenViewport,
+    screenKey,
+    setScreenKey,
     email,
     setEmail,
     password,

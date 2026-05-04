@@ -6,6 +6,7 @@ import { useAuth } from "../contexts/LocalStateContext";
 import { useAdminData } from "./useAdminData";
 import { ManageUsers } from "./ManageUsers";
 import { InvitationTable } from "./InvitationTable";
+import { LocationsManager } from "./LocationsManager";
 import "rsuite/dist/rsuite.min.css";
 import "./AdminPortal.css";
 
@@ -90,6 +91,12 @@ export function AdminPortal() {
                 invitations={invitations}
                 locations={locations}
               />
+            </Panel>
+          </section>
+
+          <section className="admin-section">
+            <Panel header="Staðsetningar og skjáir" bordered>
+              <LocationsManager />
             </Panel>
           </section>
         </>

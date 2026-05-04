@@ -324,14 +324,14 @@ interface FirebaseStateProviderProps {
   children: ReactNode;
   listenPrefix: string;
   isAuthenticated: boolean;
-  screenViewport: ViewPort | null;
+  screenKey: string | null;
 }
 
 export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   children,
   listenPrefix,
   isAuthenticated,
-  screenViewport,
+  screenKey,
 }) => {
   const [match, setMatch] = useState<Match>(defaultMatch);
   const [controller, setController] =
@@ -1342,13 +1342,18 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     [listenPrefix, isAuthenticated],
   );
 
-  // Apply screen viewport override from "Birta skjá" selection.
-  // The screenViewport from locations.X.screens[Y] takes precedence over
-  // the Firebase view.vp, which may not match the physical screen config.
+  // Resolve viewport from live Firebase locations data by screenKey.
+  // When admin changes screen dimensions, listeners updates and this recomputes.
+  // Filter by listenPrefix (location key) since multiple locations can have
+  // screens with the same key (e.g. "outside" at different venues).
   const effectiveView = useMemo<ViewState>(() => {
-    if (!screenViewport) return view;
-    return { ...view, vp: screenViewport };
-  }, [view, screenViewport]);
+    if (!screenKey) return view;
+    const found = listeners.screens.find(
+      (s) => s.screen.key === screenKey && s.key === listenPrefix,
+    );
+    if (!found) return view;
+    return { ...view, vp: found.screen };
+  }, [view, screenKey, listeners.screens, listenPrefix]);
 
   const value = useMemo(
     () => ({

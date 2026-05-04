@@ -82,8 +82,8 @@ function setupState1() {
     auth: { isLoaded: true, isEmpty: true },
     listenPrefix: "",
     setListenPrefix: vi.fn(),
-    screenViewport: null,
-    setScreenViewport: vi.fn(),
+    screenKey: null,
+    setScreenKey: vi.fn(),
     available: [],
     email: "",
     setEmail: vi.fn(),
@@ -102,19 +102,19 @@ function setupState2(
   view: string = VIEWS.idle,
   overrides?: {
     setListenPrefix?: (prefix: string) => void;
-    setScreenViewport?: (vp: unknown) => void;
+    setScreenKey?: (vp: unknown) => void;
   },
 ) {
   const setListenPrefix =
     overrides?.setListenPrefix ?? vi.fn<(prefix: string) => void>();
-  const setScreenViewport =
-    overrides?.setScreenViewport ?? vi.fn<(vp: unknown) => void>();
+  const setScreenKey =
+    overrides?.setScreenKey ?? vi.fn<(vp: unknown) => void>();
   mockedUseLocalState.mockReturnValue({
     auth: { isLoaded: true, isEmpty: true },
     listenPrefix: "vikinni",
     setListenPrefix,
-    screenViewport: null,
-    setScreenViewport,
+    screenKey: null,
+    setScreenKey,
     available: [],
     email: "",
     setEmail: vi.fn(),
@@ -127,26 +127,26 @@ function setupState2(
     view: { vp: defaultViewport, background: "Default" },
     ready: true,
   } as unknown as ReturnType<typeof useFirebaseState>);
-  return { setListenPrefix, setScreenViewport };
+  return { setListenPrefix, setScreenKey };
 }
 
 function setupState3(
   view: string = VIEWS.idle,
   overrides?: {
     setListenPrefix?: (prefix: string) => void;
-    setScreenViewport?: (vp: unknown) => void;
+    setScreenKey?: (vp: unknown) => void;
   },
 ) {
   const setListenPrefix =
     overrides?.setListenPrefix ?? vi.fn<(prefix: string) => void>();
-  const setScreenViewport =
-    overrides?.setScreenViewport ?? vi.fn<(vp: unknown) => void>();
+  const setScreenKey =
+    overrides?.setScreenKey ?? vi.fn<(vp: unknown) => void>();
   mockedUseLocalState.mockReturnValue({
     auth: { isLoaded: true, isEmpty: false, email: "test@test.com" },
     listenPrefix: "vikinni",
     setListenPrefix,
-    screenViewport: null,
-    setScreenViewport,
+    screenKey: null,
+    setScreenKey,
     available: ["vikinni"],
     email: "test@test.com",
     setEmail: vi.fn(),
@@ -172,7 +172,7 @@ function setupState3(
   mockedUseRemoteSettings.mockReturnValue({
     listenPrefix: "vikinni",
   } as unknown as ReturnType<typeof useRemoteSettings>);
-  return { setListenPrefix, setScreenViewport };
+  return { setListenPrefix, setScreenKey };
 }
 
 describe("App", () => {
@@ -295,7 +295,7 @@ describe("App", () => {
       const mockSetScreenViewport = vi.fn();
       setupState3(VIEWS.idle, {
         setListenPrefix: mockSetListenPrefix,
-        setScreenViewport: mockSetScreenViewport,
+        setScreenKey: mockSetScreenViewport,
       });
       render(<App />);
 
@@ -311,7 +311,7 @@ describe("App", () => {
       const mockSetScreenViewport = vi.fn();
       setupState3(VIEWS.idle, {
         setListenPrefix: mockSetListenPrefix,
-        setScreenViewport: mockSetScreenViewport,
+        setScreenKey: mockSetScreenViewport,
       });
       render(<App />);
 
@@ -377,8 +377,8 @@ describe("App", () => {
         auth: { isLoaded: true, isEmpty: true },
         listenPrefix: "vikinni",
         setListenPrefix: vi.fn(),
-        screenViewport: null,
-        setScreenViewport: vi.fn(),
+        screenKey: null,
+        setScreenKey: vi.fn(),
         available: [],
         email: "",
         setEmail: vi.fn(),
@@ -412,8 +412,8 @@ describe("App", () => {
         auth: { isLoaded: true, isEmpty: true },
         listenPrefix: "vikinni",
         setListenPrefix: vi.fn(),
-        screenViewport: null,
-        setScreenViewport: vi.fn(),
+        screenKey: null,
+        setScreenKey: vi.fn(),
         available: [],
         email: "",
         setEmail: vi.fn(),
@@ -444,8 +444,8 @@ describe("App", () => {
         auth: { isLoaded: true, isEmpty: true },
         listenPrefix: "vikinni",
         setListenPrefix: vi.fn(),
-        screenViewport: null,
-        setScreenViewport: vi.fn(),
+        screenKey: null,
+        setScreenKey: vi.fn(),
         available: [],
         email: "",
         setEmail: vi.fn(),
@@ -470,8 +470,8 @@ describe("App", () => {
         auth: { isLoaded: false, isEmpty: true },
         listenPrefix: "vikinni",
         setListenPrefix: vi.fn(),
-        screenViewport: null,
-        setScreenViewport: vi.fn(),
+        screenKey: null,
+        setScreenKey: vi.fn(),
         available: [],
         email: "",
         setEmail: vi.fn(),
