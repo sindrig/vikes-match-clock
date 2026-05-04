@@ -64,7 +64,24 @@ export function LocalStateProvider({ children }: { children: ReactNode }) {
 
   // Screen key (set when selecting a screen via "Birta skjá")
   const [screenKey, setScreenKeyState] = useState<string | null>(() => {
-    return localStorage.getItem(SCREEN_KEY_KEY) || null;
+    const stored = localStorage.getItem(SCREEN_KEY_KEY);
+    if (stored) return stored;
+
+    // Migration: extract key from old screenViewport localStorage format
+    const oldViewport = localStorage.getItem("clock_screenViewport");
+    if (oldViewport) {
+      try {
+        const parsed = JSON.parse(oldViewport) as { key?: string };
+        if (parsed.key) {
+          localStorage.setItem(SCREEN_KEY_KEY, parsed.key);
+          localStorage.removeItem("clock_screenViewport");
+          return parsed.key;
+        }
+      } catch {
+        // ignore parse errors
+      }
+    }
+    return null;
   });
 
   // Login Form State
