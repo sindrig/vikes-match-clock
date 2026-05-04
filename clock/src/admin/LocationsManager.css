@@ -1,0 +1,67 @@
+.loc-manager {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.loc-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.5rem;
+}
+
+.loc-panel {
+  margin-bottom: 0.5rem;
+}
+
+.loc-key-badge {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  background: #f0f0f5;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  color: #666;
+  font-family: monospace;
+}
+
+.loc-fields {
+  padding: 0.25rem 0;
+}
+
+.loc-label {
+  display: block;
+  font-size: 0.75rem;
+  color: #666;
+  margin-bottom: 2px;
+}
+
+.loc-screens-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid #eee;
+}
+
+.loc-screens-labels {
+  margin-bottom: 0.25rem;
+  color: #888;
+}
+
+.loc-screen-row {
+  margin-bottom: 0.4rem;
+}
+
+.loc-modal-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.loc-modal-fields hr {
+  border: none;
+  border-top: 1px solid #eee;
+  margin: 0.5rem 0;
+}

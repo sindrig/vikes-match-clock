@@ -11,7 +11,7 @@ const renderWithProviders = (ui: React.ReactElement) => {
       <FirebaseStateProvider
         listenPrefix=""
         isAuthenticated={false}
-        screenViewport={null}
+        screenKey={null}
       >
         {ui}
       </FirebaseStateProvider>

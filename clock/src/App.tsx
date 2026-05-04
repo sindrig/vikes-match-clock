@@ -151,8 +151,7 @@ const ClearOverlayButton = () => {
 function App() {
   useGlobalShortcuts();
   const { controller, view: viewState, ready } = useFirebaseState();
-  const { auth, listenPrefix, setListenPrefix, setScreenViewport } =
-    useLocalState();
+  const { auth, listenPrefix, setListenPrefix, setScreenKey } = useLocalState();
 
   const { view } = controller;
   const {
@@ -260,7 +259,7 @@ function App() {
           appearance="primary"
           size="lg"
           onClick={() => {
-            setScreenViewport(null);
+            setScreenKey(null);
             setListenPrefix("");
           }}
           style={{ position: "fixed", bottom: 16, right: 16, zIndex: 9999 }}
@@ -278,12 +277,12 @@ function App() {
 
   // State 4: authenticated + listenPrefix set — full UI with disconnect/logout buttons
   const disconnectScreen = () => {
-    setScreenViewport(null);
+    setScreenKey(null);
     setListenPrefix("");
   };
 
   const logout = () => {
-    setScreenViewport(null);
+    setScreenKey(null);
     setListenPrefix("");
     firebaseAuth.logout().catch(console.error);
   };
