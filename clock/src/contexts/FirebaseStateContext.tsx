@@ -1344,12 +1344,16 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   // Resolve viewport from live Firebase locations data by screenKey.
   // When admin changes screen dimensions, listeners updates and this recomputes.
+  // Filter by listenPrefix (location key) since multiple locations can have
+  // screens with the same key (e.g. "outside" at different venues).
   const effectiveView = useMemo<ViewState>(() => {
     if (!screenKey) return view;
-    const found = listeners.screens.find((s) => s.screen.key === screenKey);
+    const found = listeners.screens.find(
+      (s) => s.screen.key === screenKey && s.key === listenPrefix,
+    );
     if (!found) return view;
     return { ...view, vp: found.screen };
-  }, [view, screenKey, listeners.screens]);
+  }, [view, screenKey, listeners.screens, listenPrefix]);
 
   const value = useMemo(
     () => ({
