@@ -137,6 +137,41 @@ const GoalGifSettingsModal: React.FC<GoalGifSettingsModalProps> = ({
               }}
             >
               <Toggle
+                checked={view.showGoalscorerName ?? true}
+                onChange={(checked) =>
+                  setGoalGifSettings({ showGoalscorerName: checked })
+                }
+              />
+              <span>Sýna nafn markaskorara</span>
+            </label>
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                marginBottom: 12,
+              }}
+            >
+              <Toggle
+                checked={view.showGoalscorerNumber ?? true}
+                onChange={(checked) =>
+                  setGoalGifSettings({ showGoalscorerNumber: checked })
+                }
+              />
+              <span>Sýna númer markaskorara</span>
+            </label>
+          </div>
+
+          <div style={{ borderTop: "1px solid #3c3f43", paddingTop: 16 }}>
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                marginBottom: 12,
+              }}
+            >
+              <Toggle
                 checked={view.goalGifSameImage ?? false}
                 onChange={(checked) =>
                   setGoalGifSettings({ goalGifSameImage: checked })

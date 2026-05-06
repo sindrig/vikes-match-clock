@@ -317,6 +317,14 @@ export function parseView(
       typeof raw.goalGifSameImage === "boolean"
         ? raw.goalGifSameImage
         : undefined,
+    showGoalscorerName:
+      typeof raw.showGoalscorerName === "boolean"
+        ? raw.showGoalscorerName
+        : undefined,
+    showGoalscorerNumber:
+      typeof raw.showGoalscorerNumber === "boolean"
+        ? raw.showGoalscorerNumber
+        : undefined,
   };
 }
 

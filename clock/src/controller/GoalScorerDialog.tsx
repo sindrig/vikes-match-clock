@@ -60,7 +60,10 @@ const GoalScorerDialog = ({
         bgReady,
       ]).then(([asset]) => {
         if (asset) {
-          renderAsset(goalGif2 ? { ...asset, background: goalGif2 } : asset);
+          const goalAsset = goalGif2
+            ? { ...asset, background: goalGif2, isGoalCelebration: true }
+            : { ...asset, isGoalCelebration: true };
+          renderAsset(goalAsset);
         }
       });
       onClose();

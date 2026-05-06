@@ -197,6 +197,8 @@ interface FirebaseStateContextType {
     goalGif1?: string | null;
     goalGif2?: string | null;
     goalGifSameImage?: boolean;
+    showGoalscorerName?: boolean;
+    showGoalscorerNumber?: boolean;
   }) => void;
   setTheme: (theme: ThemeConfig | undefined) => void;
   setThemePreset: (preset: string | undefined) => void;
@@ -1264,6 +1266,8 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       goalGif1?: string | null;
       goalGif2?: string | null;
       goalGifSameImage?: boolean;
+      showGoalscorerName?: boolean;
+      showGoalscorerNumber?: boolean;
     }) => {
       applyViewUpdate((prev) => ({ ...prev, ...settings }));
     },

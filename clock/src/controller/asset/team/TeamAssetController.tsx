@@ -183,7 +183,7 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
         listenPrefix,
       });
       if (!goalAsset) return;
-      showItemNow(goalAsset);
+      showItemNow({ ...goalAsset, isGoalCelebration: true });
       clearState();
     })();
   };

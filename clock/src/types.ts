@@ -64,6 +64,7 @@ export interface Asset {
   originalAssetType?: string;
   subIn?: Asset;
   subOut?: Asset;
+  isGoalCelebration?: boolean;
 }
 
 // Current asset with timing
@@ -233,6 +234,8 @@ export interface ViewState {
   goalGif1?: string | null;
   goalGif2?: string | null;
   goalGifSameImage?: boolean;
+  showGoalscorerName?: boolean;
+  showGoalscorerNumber?: boolean;
 }
 
 // Remote state type
