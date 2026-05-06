@@ -14,6 +14,7 @@ import {
   useController,
   useMatch,
   useListeners,
+  useView,
 } from "../../../contexts/FirebaseStateContext";
 import { useRemoteSettings } from "../../../contexts/LocalStateContext";
 import { transformLineups, getTeamId } from "../../../lib/matchUtils";
@@ -23,6 +24,7 @@ vi.mock("../../../contexts/FirebaseStateContext", () => ({
   useMatch: vi.fn(),
   useController: vi.fn(),
   useListeners: vi.fn(),
+  useView: vi.fn(),
 }));
 
 vi.mock("../../../contexts/LocalStateContext", () => ({
@@ -103,6 +105,7 @@ import { getPlayerAssetObject, getMOTMAsset } from "./assetHelpers";
 const mockedUseMatch = vi.mocked(useMatch);
 const mockedUseController = vi.mocked(useController);
 const mockedUseListeners = vi.mocked(useListeners);
+const mockedUseView = vi.mocked(useView);
 const mockedUseRemoteSettings = vi.mocked(useRemoteSettings);
 const mockedGetLineups = vi.mocked(getLineups);
 const mockedTransformLineups = vi.mocked(transformLineups);
@@ -203,6 +206,11 @@ function setupMocks(overrides?: {
   mockedUseListeners.mockReturnValue({
     screens: [{ key: "vikinni", teamId: 2492 }],
   } as unknown as ReturnType<typeof useListeners>);
+
+  mockedUseView.mockReturnValue({
+    view: {},
+    setGoalGifSettings: vi.fn(),
+  } as unknown as ReturnType<typeof useView>);
 
   mockedGetTeamId.mockReturnValue(2492);
 

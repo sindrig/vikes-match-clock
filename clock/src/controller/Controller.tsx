@@ -43,7 +43,7 @@ import { firebaseAuth } from "../firebaseAuth";
 import MatchActionSettings from "./MatchActionSettings";
 import ThemeEditorModal from "./theme/ThemeEditor";
 import ClubOverrideList from "./ClubOverrideList";
-import GoalGifSettingsModal from "./GoalGifSettingsModal";
+import HomeTeamSettingsModal from "./HomeTeamSettingsModal";
 import MediaManager from "./media/MediaManager";
 import RefreshHandler from "./RefreshHandler";
 import AssetController from "./asset/AssetController";
@@ -372,9 +372,7 @@ const Controller = () => {
           </div>
           <div className="theme-trigger-row">
             <div className="theme-trigger-info">
-              <span className="theme-trigger-label">
-                Heimalið mark stillingar
-              </span>
+              <span className="theme-trigger-label">Heimalið stillingar</span>
             </div>
             <Button
               size="sm"
@@ -410,7 +408,7 @@ const Controller = () => {
         open={overrideListOpen}
         onClose={() => setOverrideListOpen(false)}
       />
-      <GoalGifSettingsModal
+      <HomeTeamSettingsModal
         open={goalGifOpen}
         onClose={() => setGoalGifOpen(false)}
       />

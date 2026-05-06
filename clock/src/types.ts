@@ -242,6 +242,7 @@ export interface ViewState {
   flickerOffDecay?: number;
   flickerCycles?: number;
   flickerJitter?: number;
+  homeTeamRevealBackground?: string | null;
 }
 
 // Remote state type

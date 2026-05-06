@@ -14,12 +14,12 @@ const buildGoalMediaPath = (
   return `${listenPrefix}/goal-media/${slot}-${Date.now()}.${ext}`;
 };
 
-interface GoalGifSettingsModalProps {
+interface HomeTeamSettingsModalProps {
   open: boolean;
   onClose: () => void;
 }
 
-const GoalGifSettingsModal: React.FC<GoalGifSettingsModalProps> = ({
+const HomeTeamSettingsModal: React.FC<HomeTeamSettingsModalProps> = ({
   open,
   onClose,
 }) => {
@@ -27,6 +27,7 @@ const GoalGifSettingsModal: React.FC<GoalGifSettingsModalProps> = ({
   const { listenPrefix } = useRemoteSettings();
   const gif1Ref = useRef<HTMLInputElement>(null);
   const gif2Ref = useRef<HTMLInputElement>(null);
+  const revealBgRef = useRef<HTMLInputElement>(null);
 
   const uploadMedia = async (file: File, slot: "goalGif1" | "goalGif2") => {
     const path = buildGoalMediaPath(listenPrefix, slot, file.name);
@@ -48,10 +49,29 @@ const GoalGifSettingsModal: React.FC<GoalGifSettingsModalProps> = ({
       e.target.value = "";
     };
 
+  const uploadRevealBackground = async (file: File) => {
+    const ext = file.name.split(".").pop() || "png";
+    const path = `${listenPrefix}/goal-media/reveal-bg-${Date.now()}.${ext}`;
+    await storageHelpers.uploadBytes(path, file, {
+      cacheControl: "public, max-age=31536000",
+      contentType: file.type,
+    });
+    const url = await storageHelpers.getDownloadURL(path);
+    setGoalGifSettings({ homeTeamRevealBackground: url });
+  };
+
+  const handleRevealBgChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      void uploadRevealBackground(file);
+    }
+    e.target.value = "";
+  };
+
   return (
     <Modal open={open} onClose={onClose} size="sm">
       <Modal.Header>
-        <Modal.Title>Heimalið mark stillingar</Modal.Title>
+        <Modal.Title>Heimalið stillingar</Modal.Title>
       </Modal.Header>
       <Modal.Body>
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -260,6 +280,80 @@ const GoalGifSettingsModal: React.FC<GoalGifSettingsModalProps> = ({
               style={{
                 fontWeight: "bold",
                 display: "block",
+                marginBottom: 4,
+              }}
+            >
+              Leikmanna bakgrunnur
+            </label>
+            <p style={{ fontSize: 12, opacity: 0.7, margin: "0 0 8px" }}>
+              Birtist á bak við leikmann í liðskynningu, skiptingum og MOTM
+            </p>
+            {view.homeTeamRevealBackground &&
+              (isVideoUrl(view.homeTeamRevealBackground) ? (
+                <video
+                  src={view.homeTeamRevealBackground}
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  style={{
+                    maxWidth: 200,
+                    maxHeight: 120,
+                    display: "block",
+                    marginBottom: 8,
+                    borderRadius: 4,
+                  }}
+                />
+              ) : (
+                <img
+                  src={view.homeTeamRevealBackground}
+                  alt="Reveal background"
+                  style={{
+                    maxWidth: 200,
+                    maxHeight: 120,
+                    display: "block",
+                    marginBottom: 8,
+                    borderRadius: 4,
+                  }}
+                />
+              ))}
+            <input
+              ref={revealBgRef}
+              type="file"
+              accept="image/gif,image/*,video/mp4,video/webm"
+              style={{ display: "none" }}
+              onChange={handleRevealBgChange}
+            />
+            <div style={{ display: "flex", gap: 8 }}>
+              <Button
+                size="sm"
+                appearance="primary"
+                onClick={() => revealBgRef.current?.click()}
+              >
+                Hlaða upp
+              </Button>
+              {view.homeTeamRevealBackground && (
+                <Button
+                  size="sm"
+                  appearance="ghost"
+                  onClick={() =>
+                    setGoalGifSettings({ homeTeamRevealBackground: null })
+                  }
+                >
+                  Fjarlægja
+                </Button>
+              )}
+            </div>
+            <p style={{ fontSize: 11, opacity: 0.5, margin: "4px 0 0" }}>
+              PNG, JPG, GIF, MP4, WebM
+            </p>
+          </div>
+
+          <div style={{ borderTop: "1px solid #3c3f43", paddingTop: 16 }}>
+            <label
+              style={{
+                fontWeight: "bold",
+                display: "block",
                 marginBottom: 8,
               }}
             >
@@ -377,4 +471,4 @@ const GoalGifSettingsModal: React.FC<GoalGifSettingsModalProps> = ({
   );
 };
 
-export default GoalGifSettingsModal;
+export default HomeTeamSettingsModal;
