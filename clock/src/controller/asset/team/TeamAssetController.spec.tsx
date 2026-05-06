@@ -739,7 +739,10 @@ describe("TeamAssetController", () => {
         }),
       );
       await waitFor(() => {
-        expect(mockShowItemNow).toHaveBeenCalledWith(playerAsset);
+        expect(mockShowItemNow).toHaveBeenCalledWith({
+          ...playerAsset,
+          isGoalCelebration: true,
+        });
       });
     });
 

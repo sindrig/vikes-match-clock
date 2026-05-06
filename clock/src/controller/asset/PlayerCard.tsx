@@ -42,6 +42,7 @@ interface PlayerAsset {
   name?: string;
   number?: number | string;
   role?: string;
+  isGoalCelebration?: boolean;
 }
 
 interface Overlay {
@@ -74,7 +75,15 @@ const PlayerCard = (props: Props): React.JSX.Element => {
   } = props;
 
   const {
-    view: { vp, background, theme, themePreset, customPresets },
+    view: {
+      vp,
+      background,
+      theme,
+      themePreset,
+      customPresets,
+      showGoalscorerName,
+      showGoalscorerNumber,
+    },
   } = useView();
   const width = vp.style.width;
 
@@ -106,6 +115,7 @@ const PlayerCard = (props: Props): React.JSX.Element => {
   const style: React.CSSProperties = includeBackground
     ? (getBackground(background) as React.CSSProperties)
     : {};
+  const isGoalCelebration = asset.isGoalCelebration === true;
   return (
     <div
       className={`asset-player-icon ${String(className)}`}
@@ -120,12 +130,16 @@ const PlayerCard = (props: Props): React.JSX.Element => {
       >
         {overlay.text}
       </span>
-      <span className="asset-player-number">
-        {asset.number || (asset.role && asset.role[0])}
-      </span>
-      <span className="asset-player-name" style={nameStyle}>
-        {asset.name}
-      </span>
+      {(!isGoalCelebration || showGoalscorerNumber !== false) && (
+        <span className="asset-player-number">
+          {asset.number || (asset.role && asset.role[0])}
+        </span>
+      )}
+      {(!isGoalCelebration || showGoalscorerName !== false) && (
+        <span className="asset-player-name" style={nameStyle}>
+          {asset.name}
+        </span>
+      )}
     </div>
   );
 };

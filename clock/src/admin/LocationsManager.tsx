@@ -22,7 +22,6 @@ interface ScreenDef {
 
 interface LocationConfig {
   homeTeam?: number;
-  goalScorerBackground?: string;
 }
 
 interface LocationData {
@@ -95,8 +94,6 @@ function useLocationsData(): {
                       const cfg: LocationConfig = {};
                       if (typeof c.homeTeam === "number")
                         cfg.homeTeam = c.homeTeam;
-                      if (typeof c.goalScorerBackground === "string")
-                        cfg.goalScorerBackground = c.goalScorerBackground;
                       return Object.keys(cfg).length > 0 ? cfg : undefined;
                     })()
                   : undefined;
@@ -207,9 +204,6 @@ function LocationEditor({
   const [homeTeam, setHomeTeam] = useState<number | null>(
     location.config?.homeTeam ?? null,
   );
-  const [goalScorerBg, setGoalScorerBg] = useState(
-    location.config?.goalScorerBackground ?? "",
-  );
   const [screens, setScreens] = useState<ScreenDef[]>(location.screens);
   const [dirty, setDirty] = useState(false);
 
@@ -223,7 +217,6 @@ function LocationEditor({
 
     const config: LocationConfig = {};
     if (homeTeam !== null && homeTeam > 0) config.homeTeam = homeTeam;
-    if (goalScorerBg.trim()) config.goalScorerBackground = goalScorerBg.trim();
 
     const data: Record<string, unknown> = {
       label,
@@ -237,7 +230,7 @@ function LocationEditor({
     const locRef = ref(database, `locations/${venueKey}`);
     void set(locRef, data);
     setDirty(false);
-  }, [venueKey, label, pitchIdsStr, homeTeam, goalScorerBg, screens]);
+  }, [venueKey, label, pitchIdsStr, homeTeam, screens]);
 
   const addScreen = () => {
     const newScreen: ScreenDef = {
@@ -304,18 +297,6 @@ function LocationEditor({
               value={homeTeam ?? undefined}
               onChange={(val) => {
                 setHomeTeam(val ? Number(val) : null);
-                markDirty();
-              }}
-            />
-          </FlexboxGrid.Item>
-          <FlexboxGrid.Item colspan={6}>
-            <label className="loc-label">Markaskorari bakgr.</label>
-            <Input
-              size="sm"
-              placeholder="config/baddi.gif"
-              value={goalScorerBg}
-              onChange={(val) => {
-                setGoalScorerBg(val);
                 markDirty();
               }}
             />

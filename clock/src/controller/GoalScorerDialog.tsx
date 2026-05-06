@@ -4,12 +4,30 @@ import { Player } from "../types";
 import { getPlayerAssetObject } from "./asset/team/assetHelpers";
 import { useController } from "../contexts/FirebaseStateContext";
 import { useRemoteSettings } from "../contexts/LocalStateContext";
-import baddi from "../images/baddi.gif";
+import { isVideoUrl } from "../utils/matchUtils";
 
+function preloadMedia(url: string): Promise<void> {
+  if (isVideoUrl(url)) {
+    return new Promise((resolve) => {
+      const video = document.createElement("video");
+      video.preload = "auto";
+      video.oncanplaythrough = () => resolve();
+      video.onerror = () => resolve();
+      video.src = url;
+    });
+  }
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve();
+    img.onerror = () => resolve();
+    img.src = url;
+  });
+}
 interface GoalScorerDialogProps {
   open: boolean;
   players: Player[];
   teamName: string;
+  goalGif2?: string | null;
   onClose: () => void;
 }
 
@@ -17,6 +35,7 @@ const GoalScorerDialog = ({
   open,
   players,
   teamName,
+  goalGif2,
   onClose,
 }: GoalScorerDialogProps) => {
   const { renderAsset } = useController();
@@ -30,19 +49,26 @@ const GoalScorerDialog = ({
 
   const selectPlayer = useCallback(
     (player: Player) => {
-      void getPlayerAssetObject({
-        player,
-        teamName,
-        preferExt: "fagn",
-        listenPrefix,
-      }).then((asset) => {
+      const bgReady = goalGif2 ? preloadMedia(goalGif2) : Promise.resolve();
+      void Promise.all([
+        getPlayerAssetObject({
+          player,
+          teamName,
+          preferExt: "fagn",
+          listenPrefix,
+        }),
+        bgReady,
+      ]).then(([asset]) => {
         if (asset) {
-          renderAsset({ ...asset, background: baddi });
+          const goalAsset = goalGif2
+            ? { ...asset, background: goalGif2, isGoalCelebration: true }
+            : { ...asset, isGoalCelebration: true };
+          renderAsset(goalAsset);
         }
       });
       onClose();
     },
-    [teamName, listenPrefix, renderAsset, onClose],
+    [teamName, listenPrefix, renderAsset, onClose, goalGif2],
   );
 
   const handleEntered = useCallback(() => {

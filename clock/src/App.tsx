@@ -6,14 +6,15 @@ import {
   useFirebaseState,
   useController,
   useMatch,
+  useView,
 } from "./contexts/FirebaseStateContext";
-import { useLocalState, useRemoteSettings } from "./contexts/LocalStateContext";
+import { useLocalState } from "./contexts/LocalStateContext";
 import { firebaseAuth } from "./firebaseAuth";
 import Controller from "./controller/Controller";
 import MatchActions from "./controller/MatchActions";
 import MatchCountdownDisplay from "./controller/MatchCountdownDisplay";
 import RefreshHandler from "./controller/RefreshHandler";
-import AssetComponent from "./controller/asset/Asset";
+import AssetComponent, { useDeferredAsset } from "./controller/asset/Asset";
 import PlaybackBar from "./controller/asset/queue/PlaybackBar";
 import GoalScorerDialog from "./controller/GoalScorerDialog";
 
@@ -26,9 +27,8 @@ import useGlobalShortcuts from "./hooks/useGlobalShortcuts";
 import useNightBlackout from "./hooks/useNightBlackout";
 import useScreenPresence from "./hooks/useScreenPresence";
 import { useThemeCssVars, resolveTheme } from "./hooks/useThemeCssVars";
-import { shouldShowGoalCelebration } from "./utils/matchUtils";
-import baddi from "./images/baddi.gif";
 import assetTypes from "./controller/asset/AssetTypes";
+import { isVideoUrl } from "./utils/matchUtils";
 
 import "./App.css";
 
@@ -38,7 +38,7 @@ const ScoreButtons = ({ side }: { side: "home" | "away" }) => {
     renderAsset,
     controller: { roster },
   } = useController();
-  const { listenPrefix } = useRemoteSettings();
+  const { view } = useView();
   const scoreKeys = { home: "homeScore", away: "awayScore" } as const;
   const score = match[scoreKeys[side]];
   const [scorerDialogOpen, setScorerDialogOpen] = useState(false);
@@ -48,8 +48,11 @@ const ScoreButtons = ({ side }: { side: "home" | "away" }) => {
 
   const handleGoal = () => {
     addGoal(side);
-    if (shouldShowGoalCelebration(match.matchType, teamName, listenPrefix)) {
-      renderAsset({ key: baddi, type: assetTypes.IMAGE });
+    if (side === "home" && view.goalGif1) {
+      renderAsset({
+        key: view.goalGif1,
+        type: isVideoUrl(view.goalGif1) ? assetTypes.VIDEO : assetTypes.IMAGE,
+      });
       if (players.length > 0) {
         setScorerDialogOpen(true);
       }
@@ -83,6 +86,11 @@ const ScoreButtons = ({ side }: { side: "home" | "away" }) => {
         open={scorerDialogOpen}
         players={players}
         teamName={teamName}
+        goalGif2={
+          view.goalGifSameImage || !view.goalGif2
+            ? view.goalGif1
+            : view.goalGif2
+        }
         onClose={() => setScorerDialogOpen(false)}
       />
     </div>
@@ -163,7 +171,8 @@ function App() {
     themePreset,
     customPresets,
   } = viewState;
-  const asset = controller.currentAsset || null;
+  const rawAsset = controller.currentAsset || null;
+  const asset = useDeferredAsset(rawAsset);
 
   const isBlackedOut = useNightBlackout(blackoutStart, blackoutEnd, view);
   const themeCssVars = useThemeCssVars(themePreset, theme, customPresets);

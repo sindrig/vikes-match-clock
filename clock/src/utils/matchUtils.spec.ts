@@ -8,7 +8,7 @@ import {
   teamToStateKey,
   translateTeam,
 } from "./matchUtils";
-import { Sports, DEFAULT_HALFSTOPS } from "../constants";
+import { DEFAULT_HALFSTOPS, Sports } from "../constants";
 import { Match } from "../types";
 
 describe("matchUtils", () => {
@@ -75,34 +75,16 @@ describe("matchUtils", () => {
   });
 
   describe("shouldShowGoalCelebration", () => {
-    it("returns true for Víkingur R football match at viken", () => {
-      expect(
-        shouldShowGoalCelebration(Sports.Football, "Víkingur R", "viken"),
-      ).toBe(true);
+    it("returns true for home with goal gif", () => {
+      expect(shouldShowGoalCelebration("home", "some-url")).toBe(true);
     });
 
-    it("returns true for listenPrefix starting with vik", () => {
-      expect(
-        shouldShowGoalCelebration(Sports.Football, "Víkingur R", "vik-test"),
-      ).toBe(true);
+    it("returns false for away", () => {
+      expect(shouldShowGoalCelebration("away", "some-url")).toBe(false);
     });
 
-    it("returns false for handball", () => {
-      expect(
-        shouldShowGoalCelebration(Sports.Handball, "Víkingur R", "viken"),
-      ).toBe(false);
-    });
-
-    it("returns false for other teams", () => {
-      expect(
-        shouldShowGoalCelebration(Sports.Football, "Breiðablik", "viken"),
-      ).toBe(false);
-    });
-
-    it("returns false for non-vik prefix", () => {
-      expect(
-        shouldShowGoalCelebration(Sports.Football, "Víkingur R", "other"),
-      ).toBe(false);
+    it("returns false when no gif is configured", () => {
+      expect(shouldShowGoalCelebration("home", null)).toBe(false);
     });
   });
 
