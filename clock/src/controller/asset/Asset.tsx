@@ -319,7 +319,6 @@ const AssetComponent = (props: AssetProps) => {
           getPlayerAsset({
             asset: subAsset,
             widthMultiplier: 0.7,
-            includeBackground: false,
           }),
         )}
       </Substitution>
