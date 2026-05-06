@@ -84,7 +84,9 @@ function usePreloadedMedia(urls: string[]): boolean {
 }
 
 function getAssetMediaUrls(
-  asset: { type: string; key: string; url?: string; background?: string } | undefined,
+  asset:
+    | { type: string; key: string; url?: string; background?: string }
+    | undefined,
 ): string[] {
   if (!asset) return [];
   const urls: string[] = [];
