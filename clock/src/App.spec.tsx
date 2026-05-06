@@ -28,6 +28,7 @@ vi.mock("./controller/RefreshHandler", () => ({
 }));
 vi.mock("./controller/asset/Asset", () => ({
   default: () => <div data-testid="asset-component">Asset</div>,
+  useDeferredAsset: (incoming: unknown) => incoming,
 }));
 vi.mock("./controller/GoalScorerDialog", () => ({
   default: () => <div data-testid="goal-scorer-dialog">GoalScorerDialog</div>,
