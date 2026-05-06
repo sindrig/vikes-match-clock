@@ -370,12 +370,10 @@ const Controller = () => {
               Opna
             </Button>
           </div>
-           <div className="theme-trigger-row">
-             <div className="theme-trigger-info">
-               <span className="theme-trigger-label">
-                 Heimalið stillingar
-               </span>
-             </div>
+          <div className="theme-trigger-row">
+            <div className="theme-trigger-info">
+              <span className="theme-trigger-label">Heimalið stillingar</span>
+            </div>
             <Button
               size="sm"
               appearance="primary"
