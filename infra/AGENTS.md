@@ -7,6 +7,7 @@ Terraform-managed AWS infrastructure with modular design and OIDC-based GitHub A
 ```
 infra/
 ├── access/           # OIDC provider + IAM roles for GitHub Actions
+├── devpod-creds/     # IAM user + creds provisioning for devpod staging deploys
 ├── modules/
 │   └── web/          # Reusable module for frontend + API stack
 ├── prod/             # Production environment
@@ -18,6 +19,7 @@ infra/
 | State | S3 Key | Purpose |
 |-------|--------|---------|
 | access | `vikes-match-clock/access/terraform.tfstate` | GitHub OIDC provider, IAM roles |
+| devpod-creds | `vikes-match-clock/devpod-creds/terraform.tfstate` | IAM user + creds for devpod staging deploy |
 | prod | `vikes-match-clock/terraform.tfstate` | Production infrastructure |
 | staging | `vikes-match-clock/staging/terraform.tfstate` | Staging infrastructure |
 

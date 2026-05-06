@@ -85,4 +85,5 @@ clock/src/api/client/
 
 functions/lib/
 functions/lib/**/*.map
-.opencode/
+/.opencode/package-lock.json
+infra/devpod-creds/devpod-creds.txt
