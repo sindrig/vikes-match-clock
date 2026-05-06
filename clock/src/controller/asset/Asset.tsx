@@ -199,7 +199,17 @@ const AssetComponent = (props: AssetProps) => {
           includeBackground={includeBackground}
         >
           {includeBackground !== false && playerAsset.background ? (
-            <img src={playerAsset.background} alt={playerAsset.background} />
+            isVideoUrl(playerAsset.background) ? (
+              <video
+                src={playerAsset.background}
+                autoPlay
+                loop
+                muted
+                playsInline
+              />
+            ) : (
+              <img src={playerAsset.background} alt={playerAsset.background} />
+            )
           ) : null}
           <img src={playerAsset.key} alt={playerAsset.key} />
         </PlayerCard>
@@ -218,7 +228,17 @@ const AssetComponent = (props: AssetProps) => {
           includeBackground={includeBackground}
         >
           {includeBackground !== false && playerAsset.background ? (
-            <img src={playerAsset.background} alt={playerAsset.background} />
+            isVideoUrl(playerAsset.background) ? (
+              <video
+                src={playerAsset.background}
+                autoPlay
+                loop
+                muted
+                playsInline
+              />
+            ) : (
+              <img src={playerAsset.background} alt={playerAsset.background} />
+            )
           ) : null}
           {teamName && teamLogoUrl ? (
             <img src={teamLogoUrl} alt={teamName} />

@@ -288,23 +288,39 @@ const HomeTeamSettingsModal: React.FC<HomeTeamSettingsModalProps> = ({
             <p style={{ fontSize: 12, opacity: 0.7, margin: "0 0 8px" }}>
               Birtist á bak við leikmann í liðskynningu, skiptingum og MOTM
             </p>
-            {view.homeTeamRevealBackground && (
-              <img
-                src={view.homeTeamRevealBackground}
-                alt="Reveal background"
-                style={{
-                  maxWidth: 200,
-                  maxHeight: 120,
-                  display: "block",
-                  marginBottom: 8,
-                  borderRadius: 4,
-                }}
-              />
-            )}
+            {view.homeTeamRevealBackground &&
+              (isVideoUrl(view.homeTeamRevealBackground) ? (
+                <video
+                  src={view.homeTeamRevealBackground}
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  style={{
+                    maxWidth: 200,
+                    maxHeight: 120,
+                    display: "block",
+                    marginBottom: 8,
+                    borderRadius: 4,
+                  }}
+                />
+              ) : (
+                <img
+                  src={view.homeTeamRevealBackground}
+                  alt="Reveal background"
+                  style={{
+                    maxWidth: 200,
+                    maxHeight: 120,
+                    display: "block",
+                    marginBottom: 8,
+                    borderRadius: 4,
+                  }}
+                />
+              ))}
             <input
               ref={revealBgRef}
               type="file"
-              accept="image/*"
+              accept="image/gif,image/*,video/mp4,video/webm"
               style={{ display: "none" }}
               onChange={handleRevealBgChange}
             />
@@ -329,7 +345,7 @@ const HomeTeamSettingsModal: React.FC<HomeTeamSettingsModalProps> = ({
               )}
             </div>
             <p style={{ fontSize: 11, opacity: 0.5, margin: "4px 0 0" }}>
-              PNG, JPG, WebP
+              PNG, JPG, GIF, MP4, WebM
             </p>
           </div>
 
