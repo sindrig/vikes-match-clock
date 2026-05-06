@@ -1,6 +1,6 @@
 ---
 name: deploy-staging
-description: Build the clock frontend and deploy to staging (S3 sync + CloudFront invalidation)
+description: Build the clock frontend and deploy to staging (S3 cp + CloudFront invalidation)
 ---
 
 # Deploy Staging Skill
@@ -55,35 +55,43 @@ Verify the `clock/build/` directory exists and contains `index.html`.
 
 ### 5. Deploy to S3
 
+**Do NOT use `aws s3 sync`** — it skips files with the same size, which can leave stale content. Instead, use `aws s3 cp --recursive` to force-upload all files:
+
 ```bash
 source /home/dev/vikes-creds.txt
-aws s3 sync clock/build/ "s3://$STAGING_BUCKET" --delete --region eu-west-1
+aws s3 rm "s3://$STAGING_BUCKET" --recursive --region eu-west-1
+aws s3 cp clock/build/ "s3://$STAGING_BUCKET" --recursive --region eu-west-1
 ```
 
-The `--delete` flag removes files from the bucket that don't exist in the build output.
+The `rm --recursive` first ensures deleted files are removed. Then `cp --recursive` uploads every file unconditionally.
 
-### 6. Invalidate CloudFront
+### 6. Invalidate CloudFront and wait
 
 ```bash
 source /home/dev/vikes-creds.txt
-aws cloudfront create-invalidation \
+INVALIDATION_ID=$(aws cloudfront create-invalidation \
   --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" \
-  --paths "/index.html"
+  --paths "/index.html" \
+  --query 'Invalidation.Id' --output text)
+echo "Invalidation ID: $INVALIDATION_ID"
+aws cloudfront wait invalidation-completed \
+  --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" \
+  --id "$INVALIDATION_ID"
+echo "Invalidation complete"
 ```
 
 ### 7. Report to user
 
 Summarize:
 - Build succeeded
-- S3 sync complete (bucket name)
-- CloudFront invalidation created (show invalidation ID from output)
-- URL: https://staging-klukka.irdn.is
-- Note: It may take 1-2 minutes for the invalidation to propagate
+- S3 upload complete (bucket name)
+- CloudFront invalidation completed (show invalidation ID)
+- URL: https://staging-klukka.irdn.is (live now)
 
 ## Error handling
 
 - If `pnpm build` fails: show the build errors, do NOT proceed to deploy
-- If S3 sync fails: check credentials are valid (expired key?), suggest re-running `terraform apply` in `infra/staging/`
+- If S3 upload fails: check credentials are valid (expired key?), suggest re-running `terraform apply` in `infra/staging/`
 - If CloudFront invalidation fails: deploy still succeeded (S3 has new files), just note the CF invalidation failed
 
 ## Important notes

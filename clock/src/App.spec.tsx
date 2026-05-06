@@ -62,6 +62,7 @@ import {
   useFirebaseState,
   useController,
   useMatch,
+  useView,
 } from "./contexts/FirebaseStateContext";
 import { useLocalState, useRemoteSettings } from "./contexts/LocalStateContext";
 
@@ -69,6 +70,7 @@ const mockedUseFirebaseState = vi.mocked(useFirebaseState);
 const mockedUseLocalState = vi.mocked(useLocalState);
 const mockedUseController = vi.mocked(useController);
 const mockedUseMatch = vi.mocked(useMatch);
+const mockedUseView = vi.mocked(useView);
 const mockedUseRemoteSettings = vi.mocked(useRemoteSettings);
 
 const defaultViewport = {
@@ -164,6 +166,9 @@ function setupState3(
     selectView: vi.fn(),
     renderAsset: vi.fn(),
   } as unknown as ReturnType<typeof useController>);
+  mockedUseView.mockReturnValue({
+    view: { vp: defaultViewport, background: "Default" },
+  } as unknown as ReturnType<typeof useView>);
   mockedUseMatch.mockReturnValue({
     match: { matchType: "football", homeScore: 0, awayScore: 0 },
     addGoal: vi.fn(),

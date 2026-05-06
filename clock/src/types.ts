@@ -230,6 +230,9 @@ export interface ViewState {
   theme?: ThemeConfig;
   themePreset?: string;
   customPresets?: Record<string, CustomPreset>;
+  goalGif1?: string | null;
+  goalGif2?: string | null;
+  goalGifSameImage?: boolean;
 }
 
 // Remote state type

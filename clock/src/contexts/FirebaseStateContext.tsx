@@ -193,6 +193,11 @@ interface FirebaseStateContextType {
   setIdleAd: (idleAd: string | null) => void;
   setBlackoutStart: (blackoutStart: string | undefined) => void;
   setBlackoutEnd: (blackoutEnd: string | undefined) => void;
+  setGoalGifSettings: (settings: {
+    goalGif1?: string | null;
+    goalGif2?: string | null;
+    goalGifSameImage?: boolean;
+  }) => void;
   setTheme: (theme: ThemeConfig | undefined) => void;
   setThemePreset: (preset: string | undefined) => void;
   saveCustomPreset: (id: string, preset: CustomPreset) => void;
@@ -1254,6 +1259,17 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     [applyViewUpdate],
   );
 
+  const setGoalGifSettings = useCallback(
+    (settings: {
+      goalGif1?: string | null;
+      goalGif2?: string | null;
+      goalGifSameImage?: boolean;
+    }) => {
+      applyViewUpdate((prev) => ({ ...prev, ...settings }));
+    },
+    [applyViewUpdate],
+  );
+
   const setTheme = useCallback(
     (theme: ThemeConfig | undefined) => {
       applyViewUpdate((prev) => ({ ...prev, theme }));
@@ -1410,6 +1426,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       setIdleAd,
       setBlackoutStart,
       setBlackoutEnd,
+      setGoalGifSettings,
       setTheme,
       setThemePreset,
       saveCustomPreset,
@@ -1471,6 +1488,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       setIdleAd,
       setBlackoutStart,
       setBlackoutEnd,
+      setGoalGifSettings,
       setTheme,
       setThemePreset,
       saveCustomPreset,
@@ -1605,6 +1623,7 @@ export const useView = () => {
     setIdleAd,
     setBlackoutStart,
     setBlackoutEnd,
+    setGoalGifSettings,
     setTheme,
     setThemePreset,
     saveCustomPreset,
@@ -1619,6 +1638,7 @@ export const useView = () => {
     setIdleAd,
     setBlackoutStart,
     setBlackoutEnd,
+    setGoalGifSettings,
     setTheme,
     setThemePreset,
     saveCustomPreset,

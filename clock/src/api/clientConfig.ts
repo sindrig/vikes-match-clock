@@ -1,7 +1,11 @@
 import { client } from "./client/client.gen";
 import apiConfig from "../apiConfig";
 
-client.setConfig({
+const configuredClient = client as unknown as {
+  setConfig: (config: { baseUrl: string }) => void;
+};
+
+configuredClient.setConfig({
   baseUrl: apiConfig.gateWayUrl,
 });
 

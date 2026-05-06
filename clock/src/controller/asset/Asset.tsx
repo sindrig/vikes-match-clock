@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import YouTube from "react-youtube";
 
 import MOTM from "./MOTM";
@@ -12,6 +12,86 @@ import VideoPlayer from "./VideoPlayer";
 import { useController, useView } from "../../contexts/FirebaseStateContext";
 import { useAuth } from "../../contexts/LocalStateContext";
 import { useClubLogo } from "../../hooks/useClubLogo";
+import { isVideoUrl } from "../../utils/matchUtils";
+import { CurrentAsset } from "../../types";
+
+function usePreloadedMedia(urls: string[]): boolean {
+  const key = urls.join("\n");
+  const [readyKey, setReadyKey] = useState<string | undefined>(
+    urls.length === 0 ? key : undefined,
+  );
+
+  useEffect(() => {
+    if (urls.length === 0) {
+      return;
+    }
+    let cancelled = false;
+    let loaded = 0;
+    const total = urls.length;
+
+    const check = () => {
+      loaded += 1;
+      if (!cancelled && loaded >= total) setReadyKey(key);
+    };
+
+    for (const url of urls) {
+      if (isVideoUrl(url)) {
+        const video = document.createElement("video");
+        video.preload = "auto";
+        video.oncanplaythrough = check;
+        video.onerror = check;
+        video.src = url;
+      } else {
+        const img = new Image();
+        img.onload = check;
+        img.onerror = check;
+        img.src = url;
+      }
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [key, urls]);
+
+  if (urls.length === 0) return true;
+  return key === readyKey;
+}
+
+function getAssetMediaUrls(
+  asset: { type: string; key: string; url?: string; background?: string } | undefined,
+): string[] {
+  if (!asset) return [];
+  const urls: string[] = [];
+  if (asset.background) urls.push(asset.background);
+  switch (asset.type) {
+    case assetTypes.IMAGE:
+      urls.push(asset.url || asset.key);
+      break;
+    case assetTypes.PLAYER:
+      urls.push(asset.key);
+      break;
+  }
+  return urls;
+}
+
+export function useDeferredAsset(
+  incoming: CurrentAsset | null,
+): CurrentAsset | null {
+  const urls = useMemo(
+    () => getAssetMediaUrls(incoming?.asset),
+    [incoming?.asset],
+  );
+  const ready = usePreloadedMedia(urls);
+  const [displayed, setDisplayed] = useState(incoming);
+
+  const next = !incoming ? null : ready ? incoming : displayed;
+  if (next !== displayed) {
+    setDisplayed(next);
+  }
+
+  return next;
+}
 
 interface Overlay {
   text: string;
@@ -228,11 +308,22 @@ const AssetComponent = (props: AssetProps) => {
         });
         return (
           <>
-            <img
-              src={asset.background}
-              alt="background"
-              style={{ height: "100%", width: "100%" }}
-            />
+            {isVideoUrl(asset.background) ? (
+              <video
+                src={asset.background}
+                autoPlay
+                loop
+                muted
+                playsInline
+                style={{ height: "100%", width: "100%", objectFit: "cover" }}
+              />
+            ) : (
+              <img
+                src={asset.background}
+                alt="background"
+                style={{ height: "100%", width: "100%" }}
+              />
+            )}
             <div
               style={{
                 position: "absolute",

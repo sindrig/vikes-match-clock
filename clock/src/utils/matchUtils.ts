@@ -1,5 +1,5 @@
 import { Match } from "../types";
-import { Sports, DEFAULT_HALFSTOPS } from "../constants";
+import { DEFAULT_HALFSTOPS } from "../constants";
 
 export function roundMillisToSeconds(millis: number): number {
   return Math.floor(millis / 1000) * 1000;
@@ -22,15 +22,10 @@ export function clampRedCards(value: string | number): number {
 }
 
 export function shouldShowGoalCelebration(
-  matchType: Sports,
-  teamName: string,
-  listenPrefix: string,
+  side: "home" | "away",
+  goalGif1: string | null | undefined,
 ): boolean {
-  return (
-    matchType === Sports.Football &&
-    teamName === "Víkingur R" &&
-    listenPrefix.startsWith("vik")
-  );
+  return side === "home" && !!goalGif1;
 }
 
 export function isMatchResetDisabled(match: Match): boolean {
@@ -58,6 +53,11 @@ export function translateTeam(team: "home" | "away"): string {
     away: "Úti",
   };
   return translations[team] || team;
+}
+
+export function isVideoUrl(url: string): boolean {
+  const lower = url.toLowerCase();
+  return /\.(mp4|webm|mov|avi)/.test(lower);
 }
 
 /**

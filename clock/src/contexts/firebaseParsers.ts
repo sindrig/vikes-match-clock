@@ -301,6 +301,22 @@ export function parseView(
     themePreset:
       typeof raw.themePreset === "string" ? raw.themePreset : undefined,
     customPresets: parseCustomPresets(raw.customPresets),
+    goalGif1:
+      typeof raw.goalGif1 === "string"
+        ? raw.goalGif1
+        : raw.goalGif1 === null
+          ? null
+          : undefined,
+    goalGif2:
+      typeof raw.goalGif2 === "string"
+        ? raw.goalGif2
+        : raw.goalGif2 === null
+          ? null
+          : undefined,
+    goalGifSameImage:
+      typeof raw.goalGifSameImage === "boolean"
+        ? raw.goalGifSameImage
+        : undefined,
   };
 }
 
