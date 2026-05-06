@@ -1,5 +1,5 @@
 import React, { useRef } from "react";
-import { Modal, Button, Toggle } from "rsuite";
+import { Modal, Button, Toggle, InputNumber } from "rsuite";
 import { storageHelpers } from "../firebase";
 import { useView } from "../contexts/FirebaseStateContext";
 import { useRemoteSettings } from "../contexts/LocalStateContext";
@@ -254,6 +254,123 @@ const GoalGifSettingsModal: React.FC<GoalGifSettingsModalProps> = ({
               </p>
             </div>
           )}
+
+          <div style={{ borderTop: "1px solid #3c3f43", paddingTop: 16 }}>
+            <label
+              style={{
+                fontWeight: "bold",
+                display: "block",
+                marginBottom: 8,
+              }}
+            >
+              Flicker reveal stillingar
+            </label>
+            <p style={{ fontSize: 12, opacity: 0.7, margin: "0 0 12px" }}>
+              Stýrir blikkandi áhrifum þegar markaskorari birtist
+            </p>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 12,
+              }}
+            >
+              <label style={{ fontSize: 13 }}>
+                <span style={{ display: "block", marginBottom: 2 }}>
+                  Upphafstími ON (sek)
+                </span>
+                <InputNumber
+                  size="sm"
+                  step={0.01}
+                  min={0.01}
+                  max={2}
+                  value={view.flickerInitialOn ?? 0.03}
+                  onChange={(val) =>
+                    setGoalGifSettings({
+                      flickerInitialOn: Number(val) || 0.03,
+                    })
+                  }
+                />
+              </label>
+              <label style={{ fontSize: 13 }}>
+                <span style={{ display: "block", marginBottom: 2 }}>
+                  Upphafstími OFF (sek)
+                </span>
+                <InputNumber
+                  size="sm"
+                  step={0.01}
+                  min={0.01}
+                  max={2}
+                  value={view.flickerInitialOff ?? 0.4}
+                  onChange={(val) =>
+                    setGoalGifSettings({
+                      flickerInitialOff: Number(val) || 0.4,
+                    })
+                  }
+                />
+              </label>
+              <label style={{ fontSize: 13 }}>
+                <span style={{ display: "block", marginBottom: 2 }}>
+                  ON vöxtur (margfaldari)
+                </span>
+                <InputNumber
+                  size="sm"
+                  step={0.05}
+                  min={1}
+                  max={3}
+                  value={view.flickerOnGrowth ?? 1.2}
+                  onChange={(val) =>
+                    setGoalGifSettings({ flickerOnGrowth: Number(val) || 1.2 })
+                  }
+                />
+              </label>
+              <label style={{ fontSize: 13 }}>
+                <span style={{ display: "block", marginBottom: 2 }}>
+                  OFF minnkun (margfaldari)
+                </span>
+                <InputNumber
+                  size="sm"
+                  step={0.05}
+                  min={0.1}
+                  max={1}
+                  value={view.flickerOffDecay ?? 0.82}
+                  onChange={(val) =>
+                    setGoalGifSettings({ flickerOffDecay: Number(val) || 0.82 })
+                  }
+                />
+              </label>
+              <label style={{ fontSize: 13 }}>
+                <span style={{ display: "block", marginBottom: 2 }}>
+                  Fjöldi hringja
+                </span>
+                <InputNumber
+                  size="sm"
+                  step={1}
+                  min={3}
+                  max={30}
+                  value={view.flickerCycles ?? 16}
+                  onChange={(val) =>
+                    setGoalGifSettings({ flickerCycles: Number(val) || 16 })
+                  }
+                />
+              </label>
+              <label style={{ fontSize: 13 }}>
+                <span style={{ display: "block", marginBottom: 2 }}>
+                  Jitter (handahóf ±%)
+                </span>
+                <InputNumber
+                  size="sm"
+                  step={0.05}
+                  min={0}
+                  max={0.8}
+                  value={view.flickerJitter ?? 0.3}
+                  onChange={(val) =>
+                    setGoalGifSettings({ flickerJitter: Number(val) || 0 })
+                  }
+                />
+              </label>
+            </div>
+          </div>
         </div>
       </Modal.Body>
     </Modal>

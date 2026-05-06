@@ -462,26 +462,6 @@ describe("TeamAssetController", () => {
         screen.getByRole("button", { name: "Birta mann leiksins" }),
       ).toBeInTheDocument();
     });
-
-    it("shows effect selector with default blink value", () => {
-      setupMocks({ roster: mockRoster });
-
-      render(<TeamAssetController previousView={mockPreviousView} />);
-
-      const select = screen.getByDisplayValue("Blink");
-      expect(select).toBeInTheDocument();
-    });
-
-    it("allows changing the effect", () => {
-      setupMocks({ roster: mockRoster });
-
-      render(<TeamAssetController previousView={mockPreviousView} />);
-
-      const select = screen.getByDisplayValue("Blink");
-      fireEvent.change(select, { target: { value: "shaker" } });
-
-      expect(screen.getByDisplayValue("Shaker")).toBeInTheDocument();
-    });
   });
 
   describe("substitution flow", () => {
@@ -711,7 +691,7 @@ describe("TeamAssetController", () => {
       ).toBeInTheDocument();
     });
 
-    it("selects goal scorer with overlay effect", async () => {
+    it("selects goal scorer with isGoalCelebration flag", async () => {
       const { mockShowItemNow } = setupMocks({ roster: mockRoster });
 
       const playerAsset = {
@@ -735,7 +715,8 @@ describe("TeamAssetController", () => {
 
       expect(mockedGetPlayerAssetObject).toHaveBeenCalledWith(
         expect.objectContaining({
-          overlay: { text: "", blink: true, effect: "blink" },
+          teamName: "Víkingur R",
+          listenPrefix: "vikinni",
         }),
       );
       await waitFor(() => {
@@ -744,30 +725,6 @@ describe("TeamAssetController", () => {
           isGoalCelebration: true,
         });
       });
-    });
-
-    it("uses selected effect for goal scorer overlay", () => {
-      setupMocks({ roster: mockRoster });
-
-      mockedGetPlayerAssetObject.mockResolvedValue(
-        {} as unknown as Awaited<ReturnType<typeof getPlayerAssetObject>>,
-      );
-
-      render(<TeamAssetController previousView={mockPreviousView} />);
-
-      const select = screen.getByDisplayValue("Blink");
-      fireEvent.change(select, { target: { value: "shaker" } });
-
-      fireEvent.click(
-        screen.getByRole("button", { name: "Birta markaskorara" }),
-      );
-      fireEvent.click(screen.getByTestId("select-player-homeTeam"));
-
-      expect(mockedGetPlayerAssetObject).toHaveBeenCalledWith(
-        expect.objectContaining({
-          overlay: { text: "", blink: true, effect: "shaker" },
-        }),
-      );
     });
   });
 

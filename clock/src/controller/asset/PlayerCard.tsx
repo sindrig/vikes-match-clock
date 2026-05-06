@@ -3,6 +3,7 @@ import React, { useMemo } from "react";
 import { DEFAULT_THEME, THUMB_VP, getBackground } from "../../constants";
 import { useView } from "../../contexts/FirebaseStateContext";
 import { resolveTheme } from "../../hooks/useThemeCssVars";
+import GoalScorerReveal from "./GoalScorerReveal";
 
 // Cached canvas for text measurement performance
 let cachedCanvas: HTMLCanvasElement | null = null;
@@ -116,6 +117,41 @@ const PlayerCard = (props: Props): React.JSX.Element => {
     ? (getBackground(background) as React.CSSProperties)
     : {};
   const isGoalCelebration = asset.isGoalCelebration === true;
+
+  const nameNumberElement = (
+    <>
+      {(!isGoalCelebration || showGoalscorerNumber !== false) && (
+        <span className="asset-player-number">
+          {asset.number || (asset.role && asset.role[0])}
+        </span>
+      )}
+      {(!isGoalCelebration || showGoalscorerName !== false) && (
+        <span className="asset-player-name" style={nameStyle}>
+          {asset.name}
+        </span>
+      )}
+    </>
+  );
+
+  if (isGoalCelebration && !thumbnail) {
+    return (
+      <div
+        className={`asset-player-icon ${String(className)}`}
+        key={asset.key}
+        style={style}
+      >
+        <GoalScorerReveal
+          showNameNumber={
+            showGoalscorerName !== false || showGoalscorerNumber !== false
+          }
+          nameNumberElement={nameNumberElement}
+        >
+          {children}
+        </GoalScorerReveal>
+      </div>
+    );
+  }
+
   return (
     <div
       className={`asset-player-icon ${String(className)}`}
@@ -130,16 +166,7 @@ const PlayerCard = (props: Props): React.JSX.Element => {
       >
         {overlay.text}
       </span>
-      {(!isGoalCelebration || showGoalscorerNumber !== false) && (
-        <span className="asset-player-number">
-          {asset.number || (asset.role && asset.role[0])}
-        </span>
-      )}
-      {(!isGoalCelebration || showGoalscorerName !== false) && (
-        <span className="asset-player-name" style={nameStyle}>
-          {asset.name}
-        </span>
-      )}
+      {nameNumberElement}
     </div>
   );
 };

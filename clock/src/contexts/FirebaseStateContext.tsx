@@ -199,6 +199,12 @@ interface FirebaseStateContextType {
     goalGifSameImage?: boolean;
     showGoalscorerName?: boolean;
     showGoalscorerNumber?: boolean;
+    flickerInitialOn?: number;
+    flickerInitialOff?: number;
+    flickerOnGrowth?: number;
+    flickerOffDecay?: number;
+    flickerCycles?: number;
+    flickerJitter?: number;
   }) => void;
   setTheme: (theme: ThemeConfig | undefined) => void;
   setThemePreset: (preset: string | undefined) => void;

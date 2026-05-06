@@ -341,7 +341,14 @@ const AssetComponent = (props: AssetProps) => {
           includeBackground: false,
         });
         return (
-          <>
+          <div
+            style={{
+              backgroundColor: "black",
+              height: "100%",
+              width: "100%",
+              position: "relative",
+            }}
+          >
             {isVideoUrl(asset.background) ? (
               <video
                 src={asset.background}
@@ -369,7 +376,7 @@ const AssetComponent = (props: AssetProps) => {
             >
               {playerCard}
             </div>
-          </>
+          </div>
         );
       }
       return getPlayerAsset({ asset, widthMultiplier: 1 });

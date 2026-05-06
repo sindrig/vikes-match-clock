@@ -325,6 +325,22 @@ export function parseView(
       typeof raw.showGoalscorerNumber === "boolean"
         ? raw.showGoalscorerNumber
         : undefined,
+    flickerInitialOn:
+      typeof raw.flickerInitialOn === "number"
+        ? raw.flickerInitialOn
+        : undefined,
+    flickerInitialOff:
+      typeof raw.flickerInitialOff === "number"
+        ? raw.flickerInitialOff
+        : undefined,
+    flickerOnGrowth:
+      typeof raw.flickerOnGrowth === "number" ? raw.flickerOnGrowth : undefined,
+    flickerOffDecay:
+      typeof raw.flickerOffDecay === "number" ? raw.flickerOffDecay : undefined,
+    flickerCycles:
+      typeof raw.flickerCycles === "number" ? raw.flickerCycles : undefined,
+    flickerJitter:
+      typeof raw.flickerJitter === "number" ? raw.flickerJitter : undefined,
   };
 }
 
