@@ -236,6 +236,12 @@ export interface ViewState {
   goalGifSameImage?: boolean;
   showGoalscorerName?: boolean;
   showGoalscorerNumber?: boolean;
+  flickerInitialOn?: number;
+  flickerInitialOff?: number;
+  flickerOnGrowth?: number;
+  flickerOffDecay?: number;
+  flickerCycles?: number;
+  flickerJitter?: number;
 }
 
 // Remote state type

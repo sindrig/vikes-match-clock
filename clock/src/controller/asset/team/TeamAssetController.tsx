@@ -50,7 +50,6 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
   const [selectPlayerAsset, setSelectPlayerAsset] = useState(false);
   const [selectGoalScorer, setSelectGoalScorer] = useState(false);
   const [selectMOTM, setSelectMOTM] = useState(false);
-  const [effect, setEffect] = useState("blink");
 
   const refetchRoster = (): void => {
     if (!match.ksiMatchId) return;
@@ -175,11 +174,6 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
       const goalAsset = await getPlayerAssetObject({
         player,
         teamName: actualTeamName,
-        overlay: {
-          text: "",
-          blink: true,
-          effect: effect,
-        },
         listenPrefix,
       });
       if (!goalAsset) return;
@@ -278,15 +272,6 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
                 Birta mann leiksins
               </button>
             </div>
-            <select
-              className="effect-select"
-              onChange={({ target: { value } }) => setEffect(value)}
-              value={effect}
-            >
-              <option value="blink">Blink</option>
-              <option value="shaker">Shaker</option>
-              <option value="scaleit">Scale Up</option>
-            </select>
           </>
         )}
       </div>
