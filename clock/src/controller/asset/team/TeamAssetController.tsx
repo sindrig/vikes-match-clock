@@ -11,6 +11,7 @@ import {
   useController,
   useMatch,
   useListeners,
+  useView,
 } from "../../../contexts/FirebaseStateContext";
 import { useRemoteSettings } from "../../../contexts/LocalStateContext";
 import "../../../api/clientConfig";
@@ -39,6 +40,7 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
   } = useController();
   const { roster } = controller;
   const { screens } = useListeners();
+  const { view } = useView();
   const { listenPrefix } = useRemoteSettings();
 
   const [loading, setLoading] = useState(false);
@@ -106,7 +108,12 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
 
     const resolved = await Promise.all(assetPromises);
     const validAssets: Asset[] = resolved.filter((a) => a !== null);
-    addItemsToQueue(newQueueId, validAssets);
+    const homeRevealBg = view.homeTeamRevealBackground;
+    const assetsWithBg =
+      side === "home" && homeRevealBg
+        ? validAssets.map((a) => ({ ...a, background: homeRevealBg }))
+        : validAssets;
+    addItemsToQueue(newQueueId, assetsWithBg);
 
     previousView();
   };
@@ -138,10 +145,20 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
           listenPrefix,
         });
         if (!subInObj || !subOutObj) return;
+        const homeRevealBg = view.homeTeamRevealBackground;
+        const isHome = subIn.teamName === "homeTeam";
+        const finalSubIn =
+          isHome && homeRevealBg
+            ? { ...subInObj, background: homeRevealBg }
+            : subInObj;
+        const finalSubOut =
+          isHome && homeRevealBg
+            ? { ...subOutObj, background: homeRevealBg }
+            : subOutObj;
         showItemNow({
           type: assetTypes.SUB,
-          subIn: subInObj,
-          subOut: subOutObj,
+          subIn: finalSubIn,
+          subOut: finalSubOut,
           key: `sub-${subInObj.key}-${subOutObj.key}`,
         });
         clearState();
@@ -162,7 +179,12 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
         listenPrefix,
       });
       if (!playerAsset) return;
-      showItemNow(playerAsset);
+      const homeRevealBg = view.homeTeamRevealBackground;
+      const assetWithBg =
+        teamName === "homeTeam" && homeRevealBg
+          ? { ...playerAsset, background: homeRevealBg }
+          : playerAsset;
+      showItemNow(assetWithBg);
       clearState();
     })();
   };
@@ -192,7 +214,12 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
         listenPrefix,
       });
       if (!motmAsset) return;
-      showItemNow(motmAsset);
+      const homeRevealBg = view.homeTeamRevealBackground;
+      const assetWithBg =
+        teamName === "homeTeam" && homeRevealBg
+          ? { ...motmAsset, background: homeRevealBg }
+          : motmAsset;
+      showItemNow(assetWithBg);
       clearState();
     })();
   };

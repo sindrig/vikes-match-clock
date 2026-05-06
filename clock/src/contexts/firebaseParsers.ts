@@ -341,6 +341,12 @@ export function parseView(
       typeof raw.flickerCycles === "number" ? raw.flickerCycles : undefined,
     flickerJitter:
       typeof raw.flickerJitter === "number" ? raw.flickerJitter : undefined,
+    homeTeamRevealBackground:
+      typeof raw.homeTeamRevealBackground === "string"
+        ? raw.homeTeamRevealBackground
+        : raw.homeTeamRevealBackground === null
+          ? null
+          : undefined,
   };
 }
 

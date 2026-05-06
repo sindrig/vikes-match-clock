@@ -205,6 +205,7 @@ interface FirebaseStateContextType {
     flickerOffDecay?: number;
     flickerCycles?: number;
     flickerJitter?: number;
+    homeTeamRevealBackground?: string | null;
   }) => void;
   setTheme: (theme: ThemeConfig | undefined) => void;
   setThemePreset: (preset: string | undefined) => void;
