@@ -314,11 +314,12 @@ const AssetComponent = (props: AssetProps) => {
       return null;
     }
     return (
-      <Substitution thumbnail={thumbnail}>
+      <Substitution thumbnail={thumbnail} backgroundUrl={subIn.background}>
         {[subIn, subOut].map((subAsset) =>
           getPlayerAsset({
             asset: subAsset,
             widthMultiplier: 0.7,
+            includeBackground: false,
           }),
         )}
       </Substitution>

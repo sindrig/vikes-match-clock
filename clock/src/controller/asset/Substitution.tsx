@@ -7,6 +7,7 @@ import "./Substitution.css";
 interface OwnProps {
   children: React.ReactNode[];
   thumbnail?: boolean;
+  backgroundUrl?: string;
 }
 
 type Props = OwnProps;
@@ -14,6 +15,7 @@ type Props = OwnProps;
 const Substitution = ({
   children,
   thumbnail = false,
+  backgroundUrl,
 }: Props): React.JSX.Element => {
   const {
     view: { vp, background },
@@ -31,6 +33,9 @@ const Substitution = ({
       className={`asset-substitution${thumbnail ? " thumbnail" : ""}`}
       style={style}
     >
+      {backgroundUrl && (
+        <img className="substitution-background" src={backgroundUrl} alt="" />
+      )}
       {children}
     </div>
   );
