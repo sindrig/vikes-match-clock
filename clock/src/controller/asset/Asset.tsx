@@ -101,6 +101,13 @@ function getAssetMediaUrls(
     case assetTypes.VIDEO:
       urls.push(asset.url || asset.key);
       break;
+    case assetTypes.SUB: {
+      const sub = asset as { subIn?: { background?: string; key?: string }; subOut?: { key?: string } };
+      if (sub.subIn?.background) urls.push(sub.subIn.background);
+      if (sub.subIn?.key) urls.push(sub.subIn.key);
+      if (sub.subOut?.key) urls.push(sub.subOut.key);
+      break;
+    }
   }
   return urls;
 }
