@@ -1,6 +1,7 @@
 import React from "react";
 import { getBackground } from "../../constants";
 import { useView } from "../../contexts/FirebaseStateContext";
+import { isVideoUrl } from "../../utils/matchUtils";
 
 import "./Substitution.css";
 
@@ -33,9 +34,19 @@ const Substitution = ({
       className={`asset-substitution${thumbnail ? " thumbnail" : ""}`}
       style={style}
     >
-      {backgroundUrl && (
-        <img className="substitution-background" src={backgroundUrl} alt="" />
-      )}
+      {backgroundUrl &&
+        (isVideoUrl(backgroundUrl) ? (
+          <video
+            className="substitution-background"
+            src={backgroundUrl}
+            autoPlay
+            loop
+            muted
+            playsInline
+          />
+        ) : (
+          <img className="substitution-background" src={backgroundUrl} alt="" />
+        ))}
       {children}
     </div>
   );

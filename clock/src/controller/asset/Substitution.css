@@ -8,7 +8,8 @@
   position: relative;
 }
 
-.asset-substitution > img.substitution-background {
+.asset-substitution > img.substitution-background,
+.asset-substitution > video.substitution-background {
   position: absolute;
   top: 0;
   left: 0;
@@ -37,24 +38,24 @@
   left: auto;
 }
 
-.asset-substitution .player-card-no-image:nth-child(1) .asset-player-name {
+.asset-substitution .player-card-no-image:nth-of-type(1) .asset-player-name {
   bottom: 25%;
   left: 5px;
   /*color: red;*/
   /*text-shadow: -1px 0 white, 0 1px white, 1px 0 white, 0 -1px white;*/
 }
 
-.asset-substitution .player-card-no-image:nth-child(2) .asset-player-name {
+.asset-substitution .player-card-no-image:nth-of-type(2) .asset-player-name {
   right: 5px;
   /*color: green;*/
   /*text-shadow: -1px 0 white, 0 1px white, 1px 0 white, 0 -1px white;*/
 }
 
-.asset-substitution > div.player-card-image:nth-child(1) img {
+.asset-substitution > div.player-card-image:nth-of-type(1) img {
   left: -20%;
   right: auto;
 }
-.asset-substitution > div.player-card-image:nth-child(2) img {
+.asset-substitution > div.player-card-image:nth-of-type(2) img {
   right: -20%;
 }
 
@@ -62,12 +63,12 @@
   top: 0px !important;
   z-index: 9;
 }
-.asset-substitution > div:nth-child(1) .asset-player-number {
+.asset-substitution > div:nth-of-type(1) .asset-player-number {
   left: 5px;
   color: red;
 }
 
-.asset-substitution > div:nth-child(2) .asset-player-number {
+.asset-substitution > div:nth-of-type(2) .asset-player-number {
   right: 5px;
   text-align: right;
   color: green;
