@@ -21,7 +21,7 @@ import GoalScorerDialog from "./controller/GoalScorerDialog";
 import ScoreBoard from "./screens/ScoreBoard";
 import Idle from "./screens/Idle";
 
-import { VIEWS, Sports, getBackground } from "./constants";
+import { VIEWS, Sports, getBackground, DEFAULT_THEME } from "./constants";
 import MatchController from "./match-controller/MatchController";
 import useGlobalShortcuts from "./hooks/useGlobalShortcuts";
 import useNightBlackout from "./hooks/useNightBlackout";
@@ -250,6 +250,17 @@ function App() {
     ...themeCssVars,
   };
 
+  // Static font-size overrides for the controller preview so that theme
+  // font-size edits don't break the small preview layout (issue #178).
+  // Font-family settings still apply — only sizes are pinned.
+  const previewFontSizeOverrides: React.CSSProperties = {
+    "--theme-score-font-size": DEFAULT_THEME.scoreBoxFontSize,
+    "--theme-clock-font-size-min": DEFAULT_THEME.clockFontSizeMin,
+    "--theme-clock-font-size-max": DEFAULT_THEME.clockFontSizeMax,
+    "--theme-injury-font-size": DEFAULT_THEME.injuryTimeFontSize,
+    "--theme-idle-text-font-size": DEFAULT_THEME.idleTextFontSize,
+  } as React.CSSProperties;
+
   // State 2: listenPrefix set, not authenticated — display screen + disconnect button only
   if (!isAuthenticated) {
     return (
@@ -325,6 +336,7 @@ function App() {
                     className="App"
                     style={{
                       ...style,
+                      ...previewFontSizeOverrides,
                       transform: `scale(${previewScale})`,
                       transformOrigin: "top left",
                     }}
