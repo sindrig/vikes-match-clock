@@ -40,15 +40,6 @@ vi.mock("../../../lib/matchUtils", () => ({
   getTeamId: vi.fn(),
 }));
 
-vi.mock("../../../utils/matchUtils", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("../../../utils/matchUtils")>();
-  return {
-    ...actual,
-    preloadMedia: vi.fn().mockResolvedValue(undefined),
-  };
-});
-
 vi.mock("./Team", () => ({
   default: ({
     teamName,
