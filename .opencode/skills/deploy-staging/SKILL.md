@@ -107,12 +107,15 @@ GitHub doesn't support programmatic image uploads to PR comments. Use the stagin
 
 ```bash
 source /home/dev/vikes-creds.txt
-aws s3 cp screenshot.png "s3://$STAGING_BUCKET/pr-images/<ISSUE_NUMBER>-<descriptive-name>.png" --region eu-west-1
+TIMESTAMP=$(date +%s)
+aws s3 cp screenshot.png "s3://$STAGING_BUCKET/pr-images/<ISSUE_NUMBER>-<descriptive-name>-${TIMESTAMP}.png" --region eu-west-1
 ```
 
 Then reference in PR/comment markdown:
 ```
-![Description](https://staging-klukka.irdn.is/pr-images/<ISSUE_NUMBER>-<descriptive-name>.png)
+![Description](https://staging-klukka.irdn.is/pr-images/<ISSUE_NUMBER>-<descriptive-name>-<TIMESTAMP>.png)
 ```
+
+**IMPORTANT: CloudFront caches aggressively.** If you reuse the same filename for an updated screenshot, CloudFront will serve the old cached version. Always include a timestamp or unique suffix in the filename to bust the cache. Never reuse a previous screenshot path when updating an image.
 
 These images are served via CloudFront and don't need invalidation (unique paths). The `pr-images/` prefix is excluded from `aws s3 rm` during deploys, so these images persist across deployments.
