@@ -415,16 +415,16 @@ input.longerInput {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 16px;
+  padding: 24px;
   background: #f0f4ff;
   border: 1px solid #b8d0ff;
   border-radius: 5px;
 }
 
 .match-countdown-time {
-  font-size: 40px;
+  font-size: 64px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: #1675e0;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.04em;
 }

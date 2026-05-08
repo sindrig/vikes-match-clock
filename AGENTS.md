@@ -105,3 +105,29 @@ The match data pipeline depends on team IDs matching between the frontend and th
 - `TEST_CREDENTIALS` env var for authentication (format: `EMAIL;PASSWORD`)
 - **Credentials location**: The main worktree's `.envrc-local` contains `TEST_CREDENTIALS` for staging login. Source this file or extract the email/password from it.
 - Multi-session testing requires manual testing or Playwright test runner (Playwright MCP limitations)
+
+## Taking Screenshots for PRs
+
+The local dev server connects to the **staging Firebase database** by default (no emulator flag needed), so you can log in with real credentials and see real match state — making it ideal for capturing screenshots of UI changes.
+
+### Workflow
+
+1. **Start the dev server** using the `dev-server` skill (defaults to port 8000). This runs Vite via tmux so it persists.
+2. **Log in via Playwright**: Navigate to `http://localhost:8000`, enter credentials from `/home/dev/vikes-match-clock/.envrc-local` (`TEST_CREDENTIALS` format: `EMAIL;PASSWORD`), click "Innskrá", then select a screen (e.g., "Víkin úti Skjár").
+3. **Take a screenshot** of the relevant element using `playwright_browser_take_screenshot` with a `target` ref from a snapshot. Save to the project root (e.g., `my-screenshot.png`).
+4. **Upload to the staging S3 bucket** for hosting (GitHub doesn't support programmatic image uploads):
+   ```bash
+   source /home/dev/vikes-creds.txt
+   TIMESTAMP=$(date +%s)
+   aws s3 cp my-screenshot.png "s3://$STAGING_BUCKET/pr-images/<ISSUE>-<name>-${TIMESTAMP}.png" --region eu-west-1
+   ```
+5. **Reference in PR body or comment**:
+   ```
+   ![Description](https://staging-klukka.irdn.is/pr-images/<ISSUE>-<name>-<TIMESTAMP>.png)
+   ```
+
+### Important notes
+
+- Always include a timestamp in the filename — CloudFront caches aggressively and will serve stale images if you reuse a path.
+- The `pr-images/` prefix is excluded from `aws s3 rm` during staging deploys, so screenshots persist.
+- The dev server uses Vite HMR, so CSS/JS changes are reflected immediately without restart — just take a new screenshot after editing.
