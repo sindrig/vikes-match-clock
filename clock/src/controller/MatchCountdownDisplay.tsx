@@ -33,7 +33,6 @@ const MatchCountdownDisplay = () => {
 
   return (
     <div className="match-countdown-display">
-      <span className="match-countdown-label">Niðurtalning:</span>
       <span className="match-countdown-time">{remaining}</span>
     </div>
   );
