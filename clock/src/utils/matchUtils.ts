@@ -60,6 +60,35 @@ export function isVideoUrl(url: string): boolean {
   return /\.(mp4|webm|mov|avi)/.test(lower);
 }
 
+export function resolveGoalBackground(view: {
+  goalGif1?: string | null;
+  goalGif2?: string | null;
+  goalGifSameImage?: boolean;
+}): string | undefined {
+  if (view.goalGifSameImage || !view.goalGif2) {
+    return view.goalGif1 ?? undefined;
+  }
+  return view.goalGif2;
+}
+
+export function preloadMedia(url: string): Promise<void> {
+  if (isVideoUrl(url)) {
+    return new Promise((resolve) => {
+      const video = document.createElement("video");
+      video.preload = "auto";
+      video.oncanplaythrough = () => resolve();
+      video.onerror = () => resolve();
+      video.src = url;
+    });
+  }
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve();
+    img.onerror = () => resolve();
+    img.src = url;
+  });
+}
+
 /**
  * Normalizes a time string to 24h HH:mm format.
  * Handles AM/PM formats (e.g. "7:15 PM" → "19:15") and

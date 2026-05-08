@@ -17,6 +17,7 @@ import { useRemoteSettings } from "../../../contexts/LocalStateContext";
 import "../../../api/clientConfig";
 import { getLineups } from "../../../api/client";
 import { transformLineups, getTeamId } from "../../../lib/matchUtils";
+import { resolveGoalBackground, preloadMedia } from "../../../utils/matchUtils";
 
 interface SubPlayer extends Player {
   teamName: string;
@@ -193,13 +194,21 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
     const actualTeamName =
       teamName === "homeTeam" ? match.homeTeam : match.awayTeam;
     void (async () => {
-      const goalAsset = await getPlayerAssetObject({
-        player,
-        teamName: actualTeamName,
-        listenPrefix,
-      });
+      const goalBg = resolveGoalBackground(view);
+      const [goalAsset] = await Promise.all([
+        getPlayerAssetObject({
+          player,
+          teamName: actualTeamName,
+          listenPrefix,
+        }),
+        goalBg ? preloadMedia(goalBg) : Promise.resolve(),
+      ]);
       if (!goalAsset) return;
-      showItemNow({ ...goalAsset, isGoalCelebration: true });
+      showItemNow({
+        ...goalAsset,
+        isGoalCelebration: true,
+        ...(goalBg ? { background: goalBg } : {}),
+      });
       clearState();
     })();
   };

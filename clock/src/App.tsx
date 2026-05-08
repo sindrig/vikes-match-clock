@@ -28,7 +28,7 @@ import useNightBlackout from "./hooks/useNightBlackout";
 import useScreenPresence from "./hooks/useScreenPresence";
 import { useThemeCssVars, resolveTheme } from "./hooks/useThemeCssVars";
 import assetTypes from "./controller/asset/AssetTypes";
-import { isVideoUrl } from "./utils/matchUtils";
+import { isVideoUrl, resolveGoalBackground } from "./utils/matchUtils";
 
 import "./App.css";
 
@@ -86,11 +86,7 @@ const ScoreButtons = ({ side }: { side: "home" | "away" }) => {
         open={scorerDialogOpen}
         players={players}
         teamName={teamName}
-        goalGif2={
-          view.goalGifSameImage || !view.goalGif2
-            ? view.goalGif1
-            : view.goalGif2
-        }
+        goalGif2={resolveGoalBackground(view)}
         onClose={() => setScorerDialogOpen(false)}
       />
     </div>

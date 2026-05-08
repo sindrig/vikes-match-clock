@@ -40,6 +40,15 @@ vi.mock("../../../lib/matchUtils", () => ({
   getTeamId: vi.fn(),
 }));
 
+vi.mock("../../../utils/matchUtils", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../utils/matchUtils")>();
+  return {
+    ...actual,
+    preloadMedia: vi.fn().mockResolvedValue(undefined),
+  };
+});
+
 vi.mock("./Team", () => ({
   default: ({
     teamName,
@@ -172,6 +181,7 @@ const defaultMatch = {
 function setupMocks(overrides?: {
   match?: Partial<typeof defaultMatch>;
   roster?: Roster;
+  view?: Record<string, unknown>;
 }) {
   const mockClearRoster = vi.fn();
   const mockSetRoster = vi.fn();
@@ -208,7 +218,7 @@ function setupMocks(overrides?: {
   } as unknown as ReturnType<typeof useListeners>);
 
   mockedUseView.mockReturnValue({
-    view: {},
+    view: overrides?.view ?? {},
     setGoalGifSettings: vi.fn(),
   } as unknown as ReturnType<typeof useView>);
 
@@ -731,6 +741,78 @@ describe("TeamAssetController", () => {
         expect(mockShowItemNow).toHaveBeenCalledWith({
           ...playerAsset,
           isGoalCelebration: true,
+        });
+      });
+    });
+
+    it("selects goal scorer with goalGif2 background", async () => {
+      const { mockShowItemNow } = setupMocks({
+        roster: mockRoster,
+        view: { goalGif1: "gif1.gif", goalGif2: "gif2.mp4" },
+      });
+
+      const playerAsset = {
+        type: "PLAYER",
+        key: "player-key",
+        name: "Jón",
+        number: 10,
+      };
+      mockedGetPlayerAssetObject.mockResolvedValue(
+        playerAsset as unknown as Awaited<
+          ReturnType<typeof getPlayerAssetObject>
+        >,
+      );
+
+      render(<TeamAssetController previousView={mockPreviousView} />);
+
+      fireEvent.click(
+        screen.getByRole("button", { name: "Birta markaskorara" }),
+      );
+      fireEvent.click(screen.getByTestId("select-player-homeTeam"));
+
+      await waitFor(() => {
+        expect(mockShowItemNow).toHaveBeenCalledWith({
+          ...playerAsset,
+          isGoalCelebration: true,
+          background: "gif2.mp4",
+        });
+      });
+    });
+
+    it("uses goalGif1 as background when goalGifSameImage is true", async () => {
+      const { mockShowItemNow } = setupMocks({
+        roster: mockRoster,
+        view: {
+          goalGif1: "gif1.gif",
+          goalGif2: "gif2.mp4",
+          goalGifSameImage: true,
+        },
+      });
+
+      const playerAsset = {
+        type: "PLAYER",
+        key: "player-key",
+        name: "Jón",
+        number: 10,
+      };
+      mockedGetPlayerAssetObject.mockResolvedValue(
+        playerAsset as unknown as Awaited<
+          ReturnType<typeof getPlayerAssetObject>
+        >,
+      );
+
+      render(<TeamAssetController previousView={mockPreviousView} />);
+
+      fireEvent.click(
+        screen.getByRole("button", { name: "Birta markaskorara" }),
+      );
+      fireEvent.click(screen.getByTestId("select-player-homeTeam"));
+
+      await waitFor(() => {
+        expect(mockShowItemNow).toHaveBeenCalledWith({
+          ...playerAsset,
+          isGoalCelebration: true,
+          background: "gif1.gif",
         });
       });
     });
