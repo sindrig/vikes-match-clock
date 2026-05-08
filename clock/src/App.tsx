@@ -307,9 +307,7 @@ function App() {
   const showMatchControls = view !== VIEWS.idle;
   const scoreButtonWidth = 44;
   const sidebarWidth = 350;
-  const previewWidth = showMatchControls
-    ? sidebarWidth - scoreButtonWidth * 2
-    : sidebarWidth;
+  const previewWidth = sidebarWidth - scoreButtonWidth * 2;
   const vpWidth = vp.style.width || 960;
   const vpHeight = vp.style.height || 540;
   const previewScale = previewWidth / vpWidth;
@@ -323,7 +321,11 @@ function App() {
           <div className="controller-sidebar">
             <div className="preview-and-controls">
               <div className="preview-with-scores">
-                {showMatchControls && <ScoreButtons side="home" />}
+                {showMatchControls ? (
+                  <ScoreButtons side="home" />
+                ) : (
+                  <div style={{ width: scoreButtonWidth, flexShrink: 0 }} />
+                )}
                 <div
                   className="scoreboard-preview"
                   style={{ height: previewHeight }}
@@ -345,7 +347,11 @@ function App() {
                     ) : null}
                   </div>
                 </div>
-                {showMatchControls && <ScoreButtons side="away" />}
+                {showMatchControls ? (
+                  <ScoreButtons side="away" />
+                ) : (
+                  <div style={{ width: scoreButtonWidth, flexShrink: 0 }} />
+                )}
               </div>
               <ViewModeButtons />
             </div>
