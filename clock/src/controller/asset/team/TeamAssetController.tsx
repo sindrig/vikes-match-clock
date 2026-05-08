@@ -490,7 +490,9 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
       return (roster[modalTeamSide] || []).filter((p) => p.show);
     }
     if (modalMode === "subOn") {
-      return (roster[modalTeamSide] || []).filter((p) => !p.show);
+      return (roster[modalTeamSide] || []).filter(
+        (p) => !p.show && p.number != null,
+      );
     }
     return [];
   };
