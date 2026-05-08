@@ -60,6 +60,7 @@ const GoalScorerDialog = ({
   }, []);
 
   useEffect(() => {
+    if (!open) return;
     if (filtered.length === 1 && numberInput.length > 0) {
       const handleEnter = (e: KeyboardEvent) => {
         if (e.key === "Enter" && filtered[0]) {
@@ -70,7 +71,11 @@ const GoalScorerDialog = ({
       window.addEventListener("keydown", handleEnter);
       return () => window.removeEventListener("keydown", handleEnter);
     }
-  }, [filtered, numberInput, selectPlayer]);
+  }, [open, filtered, numberInput, selectPlayer]);
+
+  const handleExited = useCallback(() => {
+    setNumberInput("");
+  }, []);
 
   const formatPlayer = (p: Player): string => {
     const num = p.number ?? "";
@@ -78,7 +83,13 @@ const GoalScorerDialog = ({
   };
 
   return (
-    <Modal open={open} onClose={onClose} onEntered={handleEntered} size="xs">
+    <Modal
+      open={open}
+      onClose={onClose}
+      onEntered={handleEntered}
+      onExited={handleExited}
+      size="xs"
+    >
       <Modal.Header>
         <Modal.Title>Markaskorari &mdash; {teamName}</Modal.Title>
       </Modal.Header>
