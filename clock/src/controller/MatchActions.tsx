@@ -204,8 +204,6 @@ const MatchActions = () => {
         </div>
       </div>
 
-      <RedCardManipulation />
-
       {match.matchType === Sports.Football && (
         <input
           type="number"
@@ -217,6 +215,8 @@ const MatchActions = () => {
           }
         />
       )}
+
+      <RedCardManipulation />
 
       {match.matchType === Sports.Handball ? (
         <div className="match-actions-handball">
