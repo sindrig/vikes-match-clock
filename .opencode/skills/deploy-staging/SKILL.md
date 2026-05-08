@@ -59,11 +59,11 @@ Verify the `clock/build/` directory exists and contains `index.html`.
 
 ```bash
 source /home/dev/vikes-creds.txt
-aws s3 rm "s3://$STAGING_BUCKET" --recursive --region eu-west-1
+aws s3 rm "s3://$STAGING_BUCKET" --recursive --exclude "pr-images/*" --region eu-west-1
 aws s3 cp clock/build/ "s3://$STAGING_BUCKET" --recursive --region eu-west-1
 ```
 
-The `rm --recursive` first ensures deleted files are removed. Then `cp --recursive` uploads every file unconditionally.
+The `rm --recursive` first ensures deleted files are removed. The `--exclude "pr-images/*"` preserves PR screenshot uploads. Then `cp --recursive` uploads every file unconditionally.
 
 ### 6. Invalidate CloudFront and wait
 
@@ -115,4 +115,4 @@ Then reference in PR/comment markdown:
 ![Description](https://staging-klukka.irdn.is/pr-images/<ISSUE_NUMBER>-<descriptive-name>.png)
 ```
 
-These images are served via CloudFront and don't need invalidation (unique paths). They persist until the next `aws s3 rm --recursive` deploy, so use descriptive names with issue numbers. They are disposable — losing them on next deploy is fine since PRs are already merged by then.
+These images are served via CloudFront and don't need invalidation (unique paths). The `pr-images/` prefix is excluded from `aws s3 rm` during deploys, so these images persist across deployments.
