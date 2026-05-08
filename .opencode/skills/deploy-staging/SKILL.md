@@ -100,3 +100,19 @@ Summarize:
 - The staging environment shares nothing with production — safe to deploy freely.
 - CloudFront caches aggressively; without invalidation, changes may take up to 24h to appear.
 - Only `/index.html` is invalidated because asset files are content-hashed (unique filenames on each build).
+
+## Uploading screenshots for PRs
+
+GitHub doesn't support programmatic image uploads to PR comments. Use the staging S3 bucket instead:
+
+```bash
+source /home/dev/vikes-creds.txt
+aws s3 cp screenshot.png "s3://$STAGING_BUCKET/pr-images/<ISSUE_NUMBER>-<descriptive-name>.png" --region eu-west-1
+```
+
+Then reference in PR/comment markdown:
+```
+![Description](https://staging-klukka.irdn.is/pr-images/<ISSUE_NUMBER>-<descriptive-name>.png)
+```
+
+These images are served via CloudFront and don't need invalidation (unique paths). They persist until the next `aws s3 rm --recursive` deploy, so use descriptive names with issue numbers. They are disposable — losing them on next deploy is fine since PRs are already merged by then.
