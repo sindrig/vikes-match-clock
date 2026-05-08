@@ -96,20 +96,6 @@ const TimeControlDialog = ({
             );
           })}
         </div>
-        {match.matchType === Sports.Football ? (
-          <div className="time-control-section">
-            <label className="time-control-label">Uppbótartími</label>
-            <input
-              type="number"
-              className="longerInput"
-              placeholder="Mín"
-              value={match.injuryTime || ""}
-              onChange={({ target: { value } }) =>
-                updateMatch({ injuryTime: parseInt(value, 10) })
-              }
-            />
-          </div>
-        ) : null}
         {match.matchType === Sports.Handball ? (
           <div className="time-control-section-penalties">
             <PenaltiesManipulationBox team="home" />
@@ -218,7 +204,20 @@ const MatchActions = () => {
         </div>
       </div>
 
-      <RedCardManipulation />
+      <div className="match-actions-clock-secondary">
+        <RedCardManipulation />
+        {match.matchType === Sports.Football && (
+          <input
+            type="number"
+            className="longerInput"
+            placeholder="Uppbót (mín)"
+            value={match.injuryTime || ""}
+            onChange={({ target: { value } }) =>
+              updateMatch({ injuryTime: parseInt(value, 10) })
+            }
+          />
+        )}
+      </div>
 
       {match.matchType === Sports.Handball ? (
         <div className="match-actions-handball">
