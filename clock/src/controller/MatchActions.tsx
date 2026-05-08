@@ -201,21 +201,22 @@ const MatchActions = () => {
           <Button size="xs" onClick={() => setShowTimeDialog(true)}>
             <TimeIcon /> Tímastjórnun
           </Button>
-          {match.matchType === Sports.Football && (
-            <input
-              type="number"
-              className="longerInput"
-              placeholder="Uppbót (mín)"
-              value={match.injuryTime || ""}
-              onChange={({ target: { value } }) =>
-                updateMatch({ injuryTime: parseInt(value, 10) })
-              }
-            />
-          )}
         </div>
       </div>
 
       <RedCardManipulation />
+
+      {match.matchType === Sports.Football && (
+        <input
+          type="number"
+          className="longerInput"
+          placeholder="Uppbót (mín)"
+          value={match.injuryTime || ""}
+          onChange={({ target: { value } }) =>
+            updateMatch({ injuryTime: parseInt(value, 10) })
+          }
+        />
+      )}
 
       {match.matchType === Sports.Handball ? (
         <div className="match-actions-handball">
