@@ -31,7 +31,7 @@
 
 .player-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  grid-template-columns: repeat(5, 1fr);
   gap: 10px;
 }
 
@@ -49,7 +49,7 @@
   transition:
     background 0.15s,
     border-color 0.15s;
-  min-height: 90px;
+  min-height: 110px;
 }
 
 .player-grid-cell:hover {
@@ -63,14 +63,14 @@
 }
 
 .player-grid-number {
-  font-size: 40px;
+  font-size: 48px;
   font-weight: 700;
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
 
 .player-grid-name {
-  font-size: 12px;
+  font-size: 13px;
   margin-top: 6px;
   text-align: center;
   overflow: hidden;
