@@ -7,6 +7,7 @@ import {
   isMatchResetDisabled,
   teamToStateKey,
   translateTeam,
+  resolveGoalBackground,
 } from "./matchUtils";
 import { DEFAULT_HALFSTOPS, Sports } from "../constants";
 import { Match } from "../types";
@@ -162,6 +163,57 @@ describe("matchUtils", () => {
 
     it("translates away to Úti", () => {
       expect(translateTeam("away")).toBe("Úti");
+    });
+  });
+
+  describe("resolveGoalBackground", () => {
+    it("returns goalGif2 when set and sameImage is false", () => {
+      expect(
+        resolveGoalBackground({
+          goalGif1: "gif1.gif",
+          goalGif2: "gif2.mp4",
+          goalGifSameImage: false,
+        }),
+      ).toBe("gif2.mp4");
+    });
+
+    it("returns goalGif1 when goalGifSameImage is true", () => {
+      expect(
+        resolveGoalBackground({
+          goalGif1: "gif1.gif",
+          goalGif2: "gif2.mp4",
+          goalGifSameImage: true,
+        }),
+      ).toBe("gif1.gif");
+    });
+
+    it("returns goalGif1 when goalGif2 is missing", () => {
+      expect(
+        resolveGoalBackground({
+          goalGif1: "gif1.gif",
+          goalGifSameImage: false,
+        }),
+      ).toBe("gif1.gif");
+    });
+
+    it("returns goalGif1 when goalGif2 is null", () => {
+      expect(
+        resolveGoalBackground({
+          goalGif1: "gif1.gif",
+          goalGif2: null,
+          goalGifSameImage: false,
+        }),
+      ).toBe("gif1.gif");
+    });
+
+    it("returns undefined when no goal gifs are set", () => {
+      expect(resolveGoalBackground({})).toBeUndefined();
+    });
+
+    it("returns undefined when goalGif1 is null and sameImage is true", () => {
+      expect(
+        resolveGoalBackground({ goalGif1: null, goalGifSameImage: true }),
+      ).toBeUndefined();
     });
   });
 });

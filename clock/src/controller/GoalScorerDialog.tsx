@@ -4,25 +4,8 @@ import { Player } from "../types";
 import { getPlayerAssetObject } from "./asset/team/assetHelpers";
 import { useController } from "../contexts/FirebaseStateContext";
 import { useRemoteSettings } from "../contexts/LocalStateContext";
-import { isVideoUrl } from "../utils/matchUtils";
+import { preloadMedia } from "../utils/matchUtils";
 
-function preloadMedia(url: string): Promise<void> {
-  if (isVideoUrl(url)) {
-    return new Promise((resolve) => {
-      const video = document.createElement("video");
-      video.preload = "auto";
-      video.oncanplaythrough = () => resolve();
-      video.onerror = () => resolve();
-      video.src = url;
-    });
-  }
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => resolve();
-    img.onerror = () => resolve();
-    img.src = url;
-  });
-}
 interface GoalScorerDialogProps {
   open: boolean;
   players: Player[];

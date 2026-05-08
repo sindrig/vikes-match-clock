@@ -17,6 +17,7 @@ import { useRemoteSettings } from "../../../contexts/LocalStateContext";
 import "../../../api/clientConfig";
 import { getLineups } from "../../../api/client";
 import { transformLineups, getTeamId } from "../../../lib/matchUtils";
+import { resolveGoalBackground } from "../../../utils/matchUtils";
 
 interface SubPlayer extends Player {
   teamName: string;
@@ -199,7 +200,12 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
         listenPrefix,
       });
       if (!goalAsset) return;
-      showItemNow({ ...goalAsset, isGoalCelebration: true });
+      const goalBg = resolveGoalBackground(view);
+      showItemNow({
+        ...goalAsset,
+        isGoalCelebration: true,
+        ...(goalBg ? { background: goalBg } : {}),
+      });
       clearState();
     })();
   };
