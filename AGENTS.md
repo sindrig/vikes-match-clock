@@ -103,4 +103,5 @@ The match data pipeline depends on team IDs matching between the frontend and th
 ### E2E Tests
 - Playwright for browser automation
 - `TEST_CREDENTIALS` env var for authentication (format: `EMAIL;PASSWORD`)
+- **Credentials location**: The main worktree at `/home/dev/vikes-match-clock/.envrc-local` contains `TEST_CREDENTIALS` for staging login. Source this file or extract the email/password from it.
 - Multi-session testing requires manual testing or Playwright test runner (Playwright MCP limitations)
