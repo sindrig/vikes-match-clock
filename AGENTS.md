@@ -128,6 +128,7 @@ The local dev server connects to the **staging Firebase database** by default (n
 
 ### Important notes
 
+- **NEVER commit screenshots or images to the git repository.** Always upload to the staging S3 bucket and reference via URL. The `screenshots/` directory is gitignored.
 - Always include a timestamp in the filename — CloudFront caches aggressively and will serve stale images if you reuse a path.
 - The `pr-images/` prefix is excluded from `aws s3 rm` during staging deploys, so screenshots persist.
 - The dev server uses Vite HMR, so CSS/JS changes are reflected immediately without restart — just take a new screenshot after editing.
