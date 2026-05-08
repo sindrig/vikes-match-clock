@@ -96,20 +96,6 @@ const TimeControlDialog = ({
             );
           })}
         </div>
-        {match.matchType === Sports.Football ? (
-          <div className="time-control-section">
-            <label className="time-control-label">Uppbótartími</label>
-            <input
-              type="number"
-              className="longerInput"
-              placeholder="Mín"
-              value={match.injuryTime || ""}
-              onChange={({ target: { value } }) =>
-                updateMatch({ injuryTime: parseInt(value, 10) })
-              }
-            />
-          </div>
-        ) : null}
         {match.matchType === Sports.Handball ? (
           <div className="time-control-section-penalties">
             <PenaltiesManipulationBox team="home" />
@@ -215,6 +201,17 @@ const MatchActions = () => {
           <Button size="xs" onClick={() => setShowTimeDialog(true)}>
             <TimeIcon /> Tímastjórnun
           </Button>
+          {match.matchType === Sports.Football && (
+            <input
+              type="number"
+              className="longerInput"
+              placeholder="Uppbót (mín)"
+              value={match.injuryTime || ""}
+              onChange={({ target: { value } }) =>
+                updateMatch({ injuryTime: parseInt(value, 10) })
+              }
+            />
+          )}
         </div>
       </div>
 
