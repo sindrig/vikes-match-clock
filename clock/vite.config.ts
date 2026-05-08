@@ -2,7 +2,12 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tsconfigPaths from "vite-tsconfig-paths";
 
+const basePath = process.env.VITE_BASE_PATH
+  ? `/${process.env.VITE_BASE_PATH}/`
+  : "/";
+
 export default defineConfig({
+  base: basePath,
   plugins: [react(), tsconfigPaths()],
   define: {
     // Shim process.env for libraries that expect it (redux, firebase, etc.)

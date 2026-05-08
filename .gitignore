@@ -87,3 +87,4 @@ functions/lib/
 functions/lib/**/*.map
 /.opencode/package-lock.json
 infra/devpod-creds/devpod-creds.txt
+screenshots/

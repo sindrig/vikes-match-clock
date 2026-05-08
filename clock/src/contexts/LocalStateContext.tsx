@@ -54,6 +54,12 @@ export function LocalStateProvider({ children }: { children: ReactNode }) {
 
   // Remote Settings
   const [listenPrefix, setListenPrefixState] = useState<string>(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlPrefix = urlParams.get("prefix");
+    if (urlPrefix) {
+      localStorage.setItem(LISTEN_PREFIX_KEY, urlPrefix);
+      return urlPrefix;
+    }
     return localStorage.getItem(LISTEN_PREFIX_KEY) || "";
   });
 
