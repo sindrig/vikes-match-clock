@@ -263,12 +263,12 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
 
     void (async () => {
       const subInObj = await getPlayerAssetObject({
-        player: subOnTrimmed,
+        player: subOffTrimmed,
         teamName: actualTeamName,
         listenPrefix,
       });
       const subOutObj = await getPlayerAssetObject({
-        player: subOffTrimmed,
+        player: subOnTrimmed,
         teamName: actualTeamName,
         listenPrefix,
       });
