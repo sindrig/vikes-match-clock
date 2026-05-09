@@ -42,7 +42,7 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
     deleteQueue,
     addItemsToQueue,
     showItemNow,
-    playQueue,
+    activateQueue,
   } = useController();
   const { roster } = controller;
   const { screens } = useListeners();
@@ -104,7 +104,7 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
       ? existingQueue.id
       : createQueue(SUBS_QUEUE_NAME, { cycle: false });
     addItemsToQueue(queueId, [asset]);
-    playQueue(queueId);
+    activateQueue(queueId);
   };
 
   const addTeamToQueue = async (side: "home" | "away"): Promise<void> => {

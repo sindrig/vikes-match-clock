@@ -168,6 +168,7 @@ interface FirebaseStateContextType {
     settings: Partial<Pick<QueueState, "autoPlay" | "imageSeconds" | "cycle">>,
   ) => void;
   playQueue: (queueId: string) => void;
+  activateQueue: (queueId: string) => void;
   stopPlaying: () => void;
   showItemNow: (asset: Asset) => void;
   setPlaying: (playing: boolean) => void;
@@ -1091,6 +1092,16 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     [applyControllerUpdate],
   );
 
+  const activateQueue = useCallback(
+    (queueId: string) => {
+      applyControllerUpdate((prev) => ({
+        ...prev,
+        activeQueueId: queueId,
+      }));
+    },
+    [applyControllerUpdate],
+  );
+
   const stopPlaying = useCallback(() => {
     applyControllerUpdate((prev) => ({ ...prev, playing: false }));
   }, [applyControllerUpdate]);
@@ -1417,6 +1428,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       reorderItemsInQueue,
       updateQueueSettings,
       playQueue,
+      activateQueue,
       stopPlaying,
       showItemNow,
       setPlaying,
@@ -1479,6 +1491,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       reorderItemsInQueue,
       updateQueueSettings,
       playQueue,
+      activateQueue,
       stopPlaying,
       showItemNow,
       setPlaying,
@@ -1580,6 +1593,7 @@ export const useController = () => {
     reorderItemsInQueue,
     updateQueueSettings,
     playQueue,
+    activateQueue,
     stopPlaying,
     showItemNow,
     setPlaying,
@@ -1608,6 +1622,7 @@ export const useController = () => {
     reorderItemsInQueue,
     updateQueueSettings,
     playQueue,
+    activateQueue,
     stopPlaying,
     showItemNow,
     setPlaying,

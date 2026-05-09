@@ -231,7 +231,7 @@ function setupMocks(overrides?: {
   const mockSetRoster = vi.fn();
   const mockShowItemNow = vi.fn();
   const mockEditPlayer = vi.fn();
-  const mockPlayQueue = vi.fn();
+  const mockActivateQueue = vi.fn();
   const mockCreateQueue = vi
     .fn<(name: string) => string>()
     .mockReturnValue("new-queue-id");
@@ -254,7 +254,7 @@ function setupMocks(overrides?: {
     createQueue: mockCreateQueue,
     deleteQueue: mockDeleteQueue,
     addItemsToQueue: mockAddItemsToQueue,
-    playQueue: mockPlayQueue,
+    activateQueue: mockActivateQueue,
   } as unknown as ReturnType<typeof useController>);
 
   mockedUseRemoteSettings.mockReturnValue({
@@ -280,7 +280,7 @@ function setupMocks(overrides?: {
     mockCreateQueue,
     mockDeleteQueue,
     mockAddItemsToQueue,
-    mockPlayQueue,
+    mockActivateQueue,
   };
 }
 
@@ -595,7 +595,7 @@ describe("TeamAssetController", () => {
       const {
         mockCreateQueue,
         mockAddItemsToQueue,
-        mockPlayQueue,
+        mockActivateQueue,
         mockEditPlayer,
       } = setupMocks({
         roster: mockRoster,
@@ -645,7 +645,7 @@ describe("TeamAssetController", () => {
           subOut: subOutAsset,
         }),
       ]);
-      expect(mockPlayQueue).toHaveBeenCalledWith("new-queue-id");
+      expect(mockActivateQueue).toHaveBeenCalledWith("new-queue-id");
       expect(mockEditPlayer).toHaveBeenCalled();
     });
 
