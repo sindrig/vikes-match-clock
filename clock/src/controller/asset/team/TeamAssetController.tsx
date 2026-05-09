@@ -42,6 +42,7 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
     deleteQueue,
     addItemsToQueue,
     showItemNow,
+    activateQueue,
   } = useController();
   const { roster } = controller;
   const { screens } = useListeners();
@@ -91,6 +92,19 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
     setSelectMOTM(false);
     setModalMode(null);
     setSubOffPlayer(null);
+  };
+
+  const SUBS_QUEUE_NAME = "Skiptingar";
+
+  const addSubToQueue = (asset: Asset): void => {
+    const existingQueue = Object.values(controller.queues).find(
+      (q) => q.name === SUBS_QUEUE_NAME,
+    );
+    const queueId = existingQueue
+      ? existingQueue.id
+      : createQueue(SUBS_QUEUE_NAME, { cycle: false });
+    addItemsToQueue(queueId, [asset]);
+    activateQueue(queueId);
   };
 
   const addTeamToQueue = async (side: "home" | "away"): Promise<void> => {
@@ -164,7 +178,7 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
           isHome && homeRevealBg
             ? { ...subOutObj, background: homeRevealBg }
             : subOutObj;
-        showItemNow({
+        addSubToQueue({
           type: assetTypes.SUB,
           subIn: finalSubIn,
           subOut: finalSubOut,
@@ -283,7 +297,7 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
         isHome && homeRevealBg
           ? { ...subOutObj, background: homeRevealBg }
           : subOutObj;
-      showItemNow({
+      addSubToQueue({
         type: assetTypes.SUB,
         subIn: finalSubIn,
         subOut: finalSubOut,

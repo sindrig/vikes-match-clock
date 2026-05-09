@@ -231,6 +231,7 @@ function setupMocks(overrides?: {
   const mockSetRoster = vi.fn();
   const mockShowItemNow = vi.fn();
   const mockEditPlayer = vi.fn();
+  const mockActivateQueue = vi.fn();
   const mockCreateQueue = vi
     .fn<(name: string) => string>()
     .mockReturnValue("new-queue-id");
@@ -253,6 +254,7 @@ function setupMocks(overrides?: {
     createQueue: mockCreateQueue,
     deleteQueue: mockDeleteQueue,
     addItemsToQueue: mockAddItemsToQueue,
+    activateQueue: mockActivateQueue,
   } as unknown as ReturnType<typeof useController>);
 
   mockedUseRemoteSettings.mockReturnValue({
@@ -278,6 +280,7 @@ function setupMocks(overrides?: {
     mockCreateQueue,
     mockDeleteQueue,
     mockAddItemsToQueue,
+    mockActivateQueue,
   };
 }
 
@@ -589,7 +592,12 @@ describe("TeamAssetController", () => {
     });
 
     it("completes substitution flow when both players selected", async () => {
-      const { mockShowItemNow, mockEditPlayer } = setupMocks({
+      const {
+        mockCreateQueue,
+        mockAddItemsToQueue,
+        mockActivateQueue,
+        mockEditPlayer,
+      } = setupMocks({
         roster: mockRoster,
       });
 
@@ -625,23 +633,24 @@ describe("TeamAssetController", () => {
       fireEvent.click(screen.getByTestId("modal-player-Siggi Bekkur"));
 
       await waitFor(() => {
-        expect(mockShowItemNow).toHaveBeenCalled();
+        expect(mockCreateQueue).toHaveBeenCalledWith("Skiptingar", {
+          cycle: false,
+        });
       });
 
-      expect(mockEditPlayer).toHaveBeenCalled();
-
-      const callArgs = mockShowItemNow.mock.calls[0]!;
-      expect(callArgs[0]).toEqual(
+      expect(mockAddItemsToQueue).toHaveBeenCalledWith("new-queue-id", [
         expect.objectContaining({
           type: "SUB",
           subIn: subInAsset,
           subOut: subOutAsset,
         }),
-      );
+      ]);
+      expect(mockActivateQueue).toHaveBeenCalledWith("new-queue-id");
+      expect(mockEditPlayer).toHaveBeenCalled();
     });
 
-    it("does not call showItemNow if getPlayerAssetObject returns null for subIn", async () => {
-      const { mockShowItemNow } = setupMocks({ roster: mockRoster });
+    it("does not add to queue if getPlayerAssetObject returns null for subIn", async () => {
+      const { mockAddItemsToQueue } = setupMocks({ roster: mockRoster });
 
       mockedGetPlayerAssetObject.mockResolvedValue(null);
 
@@ -656,7 +665,7 @@ describe("TeamAssetController", () => {
         expect(mockedGetPlayerAssetObject).toHaveBeenCalled();
       });
 
-      expect(mockShowItemNow).not.toHaveBeenCalled();
+      expect(mockAddItemsToQueue).not.toHaveBeenCalled();
     });
   });
 
