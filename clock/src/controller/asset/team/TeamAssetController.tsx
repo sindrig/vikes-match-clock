@@ -4,6 +4,7 @@ import { RingLoader } from "react-spinners";
 
 import Team from "./Team";
 import SubView from "./SubView";
+import TeamPlayerSelectionModal from "./TeamPlayerSelectionModal";
 import assetTypes from "../AssetTypes";
 import { getMOTMAsset, getPlayerAssetObject } from "./assetHelpers";
 import { Asset, Player } from "../../../types";
@@ -23,6 +24,8 @@ interface SubPlayer extends Player {
   teamName: string;
 }
 
+type ModalMode = null | "goalScorer" | "subOff" | "subOn";
+
 interface OwnProps {
   previousView: () => void;
 }
@@ -34,6 +37,7 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
     controller,
     setRoster,
     clearRoster,
+    editPlayer,
     createQueue,
     deleteQueue,
     addItemsToQueue,
@@ -51,8 +55,11 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
   const [subIn, setSubIn] = useState<SubPlayer | null>(null);
   const [subOut, setSubOut] = useState<Player | null>(null);
   const [selectPlayerAsset, setSelectPlayerAsset] = useState(false);
-  const [selectGoalScorer, setSelectGoalScorer] = useState(false);
   const [selectMOTM, setSelectMOTM] = useState(false);
+
+  const [modalMode, setModalMode] = useState<ModalMode>(null);
+  const [modalTeamSide, setModalTeamSide] = useState<"home" | "away">("home");
+  const [subOffPlayer, setSubOffPlayer] = useState<Player | null>(null);
 
   const refetchRoster = (): void => {
     if (!match.ksiMatchId) return;
@@ -81,8 +88,9 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
     setSubIn(null);
     setSubOut(null);
     setSelectPlayerAsset(false);
-    setSelectGoalScorer(false);
     setSelectMOTM(false);
+    setModalMode(null);
+    setSubOffPlayer(null);
   };
 
   const addTeamToQueue = async (side: "home" | "away"): Promise<void> => {
@@ -190,9 +198,9 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
     })();
   };
 
-  const selectGoalScorerAction = (player: Player, teamName: string): void => {
-    const actualTeamName =
-      teamName === "homeTeam" ? match.homeTeam : match.awayTeam;
+  const handleGoalScorerModalSelect = (player: Player): void => {
+    const actualTeamName = match.homeTeam;
+    setModalMode(null);
     void (async () => {
       const goalAsset = await getPlayerAssetObject({
         player,
@@ -206,7 +214,81 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
         isGoalCelebration: true,
         ...(goalBg ? { background: goalBg } : {}),
       });
-      clearState();
+    })();
+  };
+
+  const openSubModal = (side: "home" | "away"): void => {
+    setModalTeamSide(side);
+    setSubOffPlayer(null);
+    setModalMode("subOff");
+  };
+
+  const handleSubOffSelect = (player: Player): void => {
+    setSubOffPlayer(player);
+    setModalMode("subOn");
+  };
+
+  const handleSubOnSelect = (player: Player): void => {
+    if (!subOffPlayer) return;
+    const side = modalTeamSide;
+    const teamKey = side === "home" ? "homeTeam" : "awayTeam";
+    const actualTeamName = side === "home" ? match.homeTeam : match.awayTeam;
+    const players = roster[side] || [];
+
+    const offIdx = players.findIndex(
+      (p) => p.number === subOffPlayer.number && p.name === subOffPlayer.name,
+    );
+    const onIdx = players.findIndex(
+      (p) => p.number === player.number && p.name === player.name,
+    );
+    if (offIdx !== -1) editPlayer(side, offIdx, { show: false });
+    if (onIdx !== -1) editPlayer(side, onIdx, { show: true });
+
+    setModalMode(null);
+
+    const subOffTrimmed: Player = {
+      ...subOffPlayer,
+      name: subOffPlayer.name
+        .split(" ")
+        .slice(0, subOffPlayer.name.split(" ").length - 1)
+        .join(" "),
+    };
+    const subOnTrimmed: Player = {
+      ...player,
+      name: player.name
+        .split(" ")
+        .slice(0, player.name.split(" ").length - 1)
+        .join(" "),
+    };
+
+    void (async () => {
+      const subInObj = await getPlayerAssetObject({
+        player: subOffTrimmed,
+        teamName: actualTeamName,
+        listenPrefix,
+      });
+      const subOutObj = await getPlayerAssetObject({
+        player: subOnTrimmed,
+        teamName: actualTeamName,
+        listenPrefix,
+      });
+      if (!subInObj || !subOutObj) return;
+      const homeRevealBg = view.homeTeamRevealBackground;
+      const isHome = teamKey === "homeTeam";
+      const finalSubIn =
+        isHome && homeRevealBg
+          ? { ...subInObj, background: homeRevealBg }
+          : subInObj;
+      const finalSubOut =
+        isHome && homeRevealBg
+          ? { ...subOutObj, background: homeRevealBg }
+          : subOutObj;
+      showItemNow({
+        type: assetTypes.SUB,
+        subIn: finalSubIn,
+        subOut: finalSubOut,
+        key: `sub-${subInObj.key}-${subOutObj.key}`,
+      });
     })();
   };
 
@@ -230,8 +312,7 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
     })();
   };
 
-  const isPlayerActionActive =
-    selectSubs || selectPlayerAsset || selectGoalScorer || selectMOTM;
+  const isPlayerActionActive = selectSubs || selectPlayerAsset || selectMOTM;
 
   const renderCancelButton = (): React.JSX.Element | null => {
     if (selectSubs) {
@@ -250,14 +331,13 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
         </button>
       );
     }
-    if (selectPlayerAsset || selectGoalScorer || selectMOTM) {
+    if (selectPlayerAsset || selectMOTM) {
       return (
         <button
           type="button"
           className="cancel-btn"
           onClick={() => {
             setSelectPlayerAsset(false);
-            setSelectGoalScorer(false);
             setSelectMOTM(false);
           }}
         >
@@ -292,13 +372,10 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
         ) : (
           <>
             <div className="button-row">
-              <button type="button" onClick={() => setSelectSubs(true)}>
-                Skipting
-              </button>
               <button type="button" onClick={() => setSelectPlayerAsset(true)}>
                 Birta leikmann
               </button>
-              <button type="button" onClick={() => setSelectGoalScorer(true)}>
+              <button type="button" onClick={() => setModalMode("goalScorer")}>
                 Birta markaskorara
               </button>
               <button type="button" onClick={() => setSelectMOTM(true)}>
@@ -354,25 +431,80 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
       }
     } else if (selectPlayerAsset) {
       selectPlayerAction = selectPlayerAssetAction;
-    } else if (selectGoalScorer) {
-      selectPlayerAction = selectGoalScorerAction;
     } else if (selectMOTM) {
       selectPlayerAction = selectMOTMAction;
     }
     return (
       <div className="team-column-wrapper">
         {hasPlayers && !isPlayerActionActive ? (
-          <button
-            type="button"
-            className="queue-team-btn"
-            onClick={() => void addTeamToQueue(side)}
-          >
-            Setja lið í biðröð
-          </button>
+          <>
+            <button
+              type="button"
+              className="queue-team-btn"
+              onClick={() => void addTeamToQueue(side)}
+            >
+              Setja lið í biðröð
+            </button>
+            <button
+              type="button"
+              className="queue-team-btn"
+              onClick={() => openSubModal(side)}
+            >
+              Skipting
+            </button>
+          </>
         ) : null}
         <Team teamName={teamName} selectPlayer={selectPlayerAction} />
       </div>
     );
+  };
+
+  const getModalTitle = (): string => {
+    if (modalMode === "goalScorer") return "Veldu markaskorara";
+    if (modalMode === "subOff") {
+      const teamName =
+        modalTeamSide === "home" ? match.homeTeam : match.awayTeam;
+      return `Skipting – ${teamName}`;
+    }
+    if (modalMode === "subOn") {
+      const teamName =
+        modalTeamSide === "home" ? match.homeTeam : match.awayTeam;
+      return `Skipting – ${teamName}`;
+    }
+    return "";
+  };
+
+  const getModalInstruction = (): string => {
+    if (modalMode === "goalScorer") return "Veldu leikmann sem skoraði";
+    if (modalMode === "subOff") return "Veldu leikmann sem fer AF velli";
+    if (modalMode === "subOn" && subOffPlayer) {
+      const num = subOffPlayer.number ?? "";
+      return `#${String(num)} ${subOffPlayer.name} fer af – veldu leikmann sem kemur INN`;
+    }
+    return "";
+  };
+
+  const getModalPlayers = (): Player[] => {
+    if (modalMode === "goalScorer") return roster.home;
+    if (modalMode === "subOff") {
+      return (roster[modalTeamSide] || []).filter((p) => p.show);
+    }
+    if (modalMode === "subOn") {
+      return (roster[modalTeamSide] || []).filter(
+        (p) => !p.show && p.number != null,
+      );
+    }
+    return [];
+  };
+
+  const handleModalSelect = (player: Player): void => {
+    if (modalMode === "goalScorer") {
+      handleGoalScorerModalSelect(player);
+    } else if (modalMode === "subOff") {
+      handleSubOffSelect(player);
+    } else if (modalMode === "subOn") {
+      handleSubOnSelect(player);
+    }
   };
 
   if (!match.homeTeam || !match.awayTeam) {
@@ -387,6 +519,17 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
         {renderTeam("homeTeam")}
         {renderTeam("awayTeam")}
       </div>
+      <TeamPlayerSelectionModal
+        open={modalMode !== null}
+        onClose={() => {
+          setModalMode(null);
+          setSubOffPlayer(null);
+        }}
+        title={getModalTitle()}
+        instruction={getModalInstruction()}
+        players={getModalPlayers()}
+        onSelect={handleModalSelect}
+      />
     </div>
   );
 };

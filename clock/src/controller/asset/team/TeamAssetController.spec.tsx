@@ -90,6 +90,45 @@ vi.mock("./SubView", () => ({
   ),
 }));
 
+vi.mock("./TeamPlayerSelectionModal", () => ({
+  default: ({
+    open,
+    onClose,
+    title,
+    instruction,
+    players,
+    onSelect,
+  }: {
+    open: boolean;
+    onClose: () => void;
+    title: string;
+    instruction?: string;
+    players: Player[];
+    onSelect: (player: Player) => void;
+  }) =>
+    open ? (
+      <div data-testid="player-select-modal">
+        <div data-testid="player-select-title">{title}</div>
+        {instruction ? (
+          <div data-testid="player-select-instruction">{instruction}</div>
+        ) : null}
+        <button type="button" onClick={onClose}>
+          Close modal
+        </button>
+        {players.map((player) => (
+          <button
+            key={`${String(player.number)}-${player.name}`}
+            type="button"
+            data-testid={`modal-player-${player.name}`}
+            onClick={() => onSelect(player)}
+          >
+            {player.name}
+          </button>
+        ))}
+      </div>
+    ) : null,
+}));
+
 vi.mock("./assetHelpers", () => ({
   getPlayerAssetObject: vi.fn(),
   getMOTMAsset: vi.fn(),
@@ -123,6 +162,13 @@ const mockPlayers: Player[] = [
     role: "keeper",
     show: true,
   },
+  {
+    name: "Siggi Bekkur",
+    id: 104,
+    number: 12,
+    role: "midfielder",
+    show: false,
+  },
 ];
 
 const mockAwayPlayers: Player[] = [
@@ -139,6 +185,13 @@ const mockAwayPlayers: Player[] = [
     number: 5,
     role: "defender",
     show: true,
+  },
+  {
+    name: "Arnar Bekkur",
+    id: 203,
+    number: 14,
+    role: "defender",
+    show: false,
   },
 ];
 
@@ -177,6 +230,7 @@ function setupMocks(overrides?: {
   const mockClearRoster = vi.fn();
   const mockSetRoster = vi.fn();
   const mockShowItemNow = vi.fn();
+  const mockEditPlayer = vi.fn();
   const mockCreateQueue = vi
     .fn<(name: string) => string>()
     .mockReturnValue("new-queue-id");
@@ -195,6 +249,7 @@ function setupMocks(overrides?: {
     clearRoster: mockClearRoster,
     setRoster: mockSetRoster,
     showItemNow: mockShowItemNow,
+    editPlayer: mockEditPlayer,
     createQueue: mockCreateQueue,
     deleteQueue: mockDeleteQueue,
     addItemsToQueue: mockAddItemsToQueue,
@@ -219,6 +274,7 @@ function setupMocks(overrides?: {
     mockClearRoster,
     mockSetRoster,
     mockShowItemNow,
+    mockEditPlayer,
     mockCreateQueue,
     mockDeleteQueue,
     mockAddItemsToQueue,
@@ -458,9 +514,9 @@ describe("TeamAssetController", () => {
 
       render(<TeamAssetController previousView={mockPreviousView} />);
 
-      expect(
-        screen.getByRole("button", { name: "Skipting" }),
-      ).toBeInTheDocument();
+      expect(screen.getAllByRole("button", { name: "Skipting" })).toHaveLength(
+        2,
+      );
       expect(
         screen.getByRole("button", { name: "Birta leikmann" }),
       ).toBeInTheDocument();
@@ -474,59 +530,68 @@ describe("TeamAssetController", () => {
   });
 
   describe("substitution flow", () => {
-    it("enters sub mode and shows cancel button", () => {
+    it("opens sub modal and shows starter instruction", () => {
       setupMocks({ roster: mockRoster });
 
       render(<TeamAssetController previousView={mockPreviousView} />);
 
-      fireEvent.click(screen.getByRole("button", { name: "Skipting" }));
+      const subButtons = screen.getAllByRole("button", { name: "Skipting" });
+      fireEvent.click(subButtons[0]);
 
-      expect(
-        screen.getByRole("button", { name: "Hætta við skiptingu" }),
-      ).toBeInTheDocument();
-      expect(screen.getByTestId("sub-view")).toBeInTheDocument();
-    });
-
-    it("cancels sub mode when cancel button clicked", () => {
-      setupMocks({ roster: mockRoster });
-
-      render(<TeamAssetController previousView={mockPreviousView} />);
-
-      fireEvent.click(screen.getByRole("button", { name: "Skipting" }));
-      fireEvent.click(
-        screen.getByRole("button", { name: "Hætta við skiptingu" }),
+      expect(screen.getByTestId("player-select-modal")).toBeInTheDocument();
+      expect(screen.getByTestId("player-select-instruction")).toHaveTextContent(
+        "Veldu leikmann sem fer AF velli",
       );
+    });
+
+    it("closes sub modal when close button clicked", () => {
+      setupMocks({ roster: mockRoster });
+
+      render(<TeamAssetController previousView={mockPreviousView} />);
+
+      const subButtons = screen.getAllByRole("button", { name: "Skipting" });
+      fireEvent.click(subButtons[0]);
+      fireEvent.click(screen.getByRole("button", { name: "Close modal" }));
 
       expect(
-        screen.getByRole("button", { name: "Skipting" }),
+        screen.queryByTestId("player-select-modal"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("shows sub modal players for the selected team", () => {
+      setupMocks({ roster: mockRoster });
+
+      render(<TeamAssetController previousView={mockPreviousView} />);
+
+      const subButtons = screen.getAllByRole("button", { name: "Skipting" });
+      fireEvent.click(subButtons[0]);
+
+      expect(
+        screen.getByTestId("modal-player-Jón Jónsson"),
       ).toBeInTheDocument();
+      expect(
+        screen.queryByTestId("modal-player-Gunnar Gunnarsson"),
+      ).not.toBeInTheDocument();
     });
 
-    it("enables player selection on Team components during sub mode", () => {
+    it("selects sub off player and advances modal instruction", () => {
       setupMocks({ roster: mockRoster });
 
       render(<TeamAssetController previousView={mockPreviousView} />);
 
-      fireEvent.click(screen.getByRole("button", { name: "Skipting" }));
+      const subButtons = screen.getAllByRole("button", { name: "Skipting" });
+      fireEvent.click(subButtons[0]);
+      fireEvent.click(screen.getByTestId("modal-player-Jón Jónsson"));
 
-      expect(screen.getByTestId("select-player-homeTeam")).toBeInTheDocument();
-      expect(screen.getByTestId("select-player-awayTeam")).toBeInTheDocument();
-    });
-
-    it("selects first sub player (subIn) and shows SubView", () => {
-      setupMocks({ roster: mockRoster });
-
-      render(<TeamAssetController previousView={mockPreviousView} />);
-
-      fireEvent.click(screen.getByRole("button", { name: "Skipting" }));
-      fireEvent.click(screen.getByTestId("select-player-homeTeam"));
-
-      expect(screen.getByTestId("sub-in")).toBeInTheDocument();
-      expect(screen.getByTestId("sub-team")).toHaveTextContent("Víkingur R");
+      expect(screen.getByTestId("player-select-instruction")).toHaveTextContent(
+        "veldu leikmann sem kemur INN",
+      );
     });
 
     it("completes substitution flow when both players selected", async () => {
-      const { mockShowItemNow } = setupMocks({ roster: mockRoster });
+      const { mockShowItemNow, mockEditPlayer } = setupMocks({
+        roster: mockRoster,
+      });
 
       const subInAsset = {
         type: "PLAYER",
@@ -554,13 +619,16 @@ describe("TeamAssetController", () => {
 
       render(<TeamAssetController previousView={mockPreviousView} />);
 
-      fireEvent.click(screen.getByRole("button", { name: "Skipting" }));
-      fireEvent.click(screen.getByTestId("select-player-homeTeam"));
-      fireEvent.click(screen.getByTestId("select-player-homeTeam"));
+      const subButtons = screen.getAllByRole("button", { name: "Skipting" });
+      fireEvent.click(subButtons[0]);
+      fireEvent.click(screen.getByTestId("modal-player-Jón Jónsson"));
+      fireEvent.click(screen.getByTestId("modal-player-Siggi Bekkur"));
 
       await waitFor(() => {
         expect(mockShowItemNow).toHaveBeenCalled();
       });
+
+      expect(mockEditPlayer).toHaveBeenCalled();
 
       const callArgs = mockShowItemNow.mock.calls[0]!;
       expect(callArgs[0]).toEqual(
@@ -579,9 +647,10 @@ describe("TeamAssetController", () => {
 
       render(<TeamAssetController previousView={mockPreviousView} />);
 
-      fireEvent.click(screen.getByRole("button", { name: "Skipting" }));
-      fireEvent.click(screen.getByTestId("select-player-homeTeam"));
-      fireEvent.click(screen.getByTestId("select-player-homeTeam"));
+      const subButtons = screen.getAllByRole("button", { name: "Skipting" });
+      fireEvent.click(subButtons[0]);
+      fireEvent.click(screen.getByTestId("modal-player-Jón Jónsson"));
+      fireEvent.click(screen.getByTestId("modal-player-Siggi Bekkur"));
 
       await waitFor(() => {
         expect(mockedGetPlayerAssetObject).toHaveBeenCalled();
@@ -686,7 +755,7 @@ describe("TeamAssetController", () => {
   });
 
   describe("select goal scorer", () => {
-    it("enters goal scorer mode and shows cancel button", () => {
+    it("opens goal scorer modal with instruction", () => {
       setupMocks({ roster: mockRoster });
 
       render(<TeamAssetController previousView={mockPreviousView} />);
@@ -695,9 +764,10 @@ describe("TeamAssetController", () => {
         screen.getByRole("button", { name: "Birta markaskorara" }),
       );
 
-      expect(
-        screen.getByRole("button", { name: "Hætta við birtingu" }),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId("player-select-modal")).toBeInTheDocument();
+      expect(screen.getByTestId("player-select-instruction")).toHaveTextContent(
+        "Veldu leikmann sem skoraði",
+      );
     });
 
     it("selects goal scorer with isGoalCelebration flag", async () => {
@@ -720,7 +790,7 @@ describe("TeamAssetController", () => {
       fireEvent.click(
         screen.getByRole("button", { name: "Birta markaskorara" }),
       );
-      fireEvent.click(screen.getByTestId("select-player-homeTeam"));
+      fireEvent.click(screen.getByTestId("modal-player-Jón Jónsson"));
 
       expect(mockedGetPlayerAssetObject).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -759,7 +829,7 @@ describe("TeamAssetController", () => {
       fireEvent.click(
         screen.getByRole("button", { name: "Birta markaskorara" }),
       );
-      fireEvent.click(screen.getByTestId("select-player-homeTeam"));
+      fireEvent.click(screen.getByTestId("modal-player-Jón Jónsson"));
 
       await waitFor(() => {
         expect(mockShowItemNow).toHaveBeenCalledWith({
@@ -797,7 +867,7 @@ describe("TeamAssetController", () => {
       fireEvent.click(
         screen.getByRole("button", { name: "Birta markaskorara" }),
       );
-      fireEvent.click(screen.getByTestId("select-player-homeTeam"));
+      fireEvent.click(screen.getByTestId("modal-player-Jón Jónsson"));
 
       await waitFor(() => {
         expect(mockShowItemNow).toHaveBeenCalledWith({
@@ -915,7 +985,7 @@ describe("TeamAssetController", () => {
       expect(screen.getByTestId("select-player-awayTeam")).toBeInTheDocument();
     });
 
-    it("passes selectPlayer to both teams in goal scorer mode", () => {
+    it("does not pass selectPlayer to Team in goal scorer mode", () => {
       setupMocks({ roster: mockRoster });
 
       render(<TeamAssetController previousView={mockPreviousView} />);
@@ -924,8 +994,12 @@ describe("TeamAssetController", () => {
         screen.getByRole("button", { name: "Birta markaskorara" }),
       );
 
-      expect(screen.getByTestId("select-player-homeTeam")).toBeInTheDocument();
-      expect(screen.getByTestId("select-player-awayTeam")).toBeInTheDocument();
+      expect(
+        screen.queryByTestId("select-player-homeTeam"),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("select-player-awayTeam"),
+      ).not.toBeInTheDocument();
     });
 
     it("passes selectPlayer to both teams in MOTM mode", () => {
@@ -943,7 +1017,7 @@ describe("TeamAssetController", () => {
   });
 
   describe("cancel display mode", () => {
-    it("cancels goal scorer mode from cancel button", () => {
+    it("closes goal scorer modal from close button", () => {
       setupMocks({ roster: mockRoster });
 
       render(<TeamAssetController previousView={mockPreviousView} />);
@@ -951,17 +1025,13 @@ describe("TeamAssetController", () => {
       fireEvent.click(
         screen.getByRole("button", { name: "Birta markaskorara" }),
       );
-      expect(
-        screen.getByRole("button", { name: "Hætta við birtingu" }),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId("player-select-modal")).toBeInTheDocument();
 
-      fireEvent.click(
-        screen.getByRole("button", { name: "Hætta við birtingu" }),
-      );
+      fireEvent.click(screen.getByRole("button", { name: "Close modal" }));
 
       expect(
-        screen.getByRole("button", { name: "Skipting" }),
-      ).toBeInTheDocument();
+        screen.queryByTestId("player-select-modal"),
+      ).not.toBeInTheDocument();
     });
 
     it("cancels MOTM mode from cancel button", () => {
@@ -976,36 +1046,37 @@ describe("TeamAssetController", () => {
         screen.getByRole("button", { name: "Hætta við birtingu" }),
       );
 
-      expect(
-        screen.getByRole("button", { name: "Skipting" }),
-      ).toBeInTheDocument();
+      expect(screen.getAllByRole("button", { name: "Skipting" })).toHaveLength(
+        2,
+      );
     });
   });
 
-  describe("SubView during substitution", () => {
-    it("shows correct team name in SubView for home team sub", () => {
+  describe("substitution modal content", () => {
+    it("shows home team name in modal title for home sub", () => {
       setupMocks({ roster: mockRoster });
 
       render(<TeamAssetController previousView={mockPreviousView} />);
 
-      fireEvent.click(screen.getByRole("button", { name: "Skipting" }));
+      const subButtons = screen.getAllByRole("button", { name: "Skipting" });
+      fireEvent.click(subButtons[0]);
 
-      expect(screen.queryByTestId("sub-team")).not.toBeInTheDocument();
-
-      fireEvent.click(screen.getByTestId("select-player-homeTeam"));
-
-      expect(screen.getByTestId("sub-team")).toHaveTextContent("Víkingur R");
+      expect(screen.getByTestId("player-select-title")).toHaveTextContent(
+        "Skipting – Víkingur R",
+      );
     });
 
-    it("shows correct team name in SubView for away team sub", () => {
+    it("shows away team name in modal title for away sub", () => {
       setupMocks({ roster: mockRoster });
 
       render(<TeamAssetController previousView={mockPreviousView} />);
 
-      fireEvent.click(screen.getByRole("button", { name: "Skipting" }));
-      fireEvent.click(screen.getByTestId("select-player-awayTeam"));
+      const subButtons = screen.getAllByRole("button", { name: "Skipting" });
+      fireEvent.click(subButtons[1]);
 
-      expect(screen.getByTestId("sub-team")).toHaveTextContent("KR");
+      expect(screen.getByTestId("player-select-title")).toHaveTextContent(
+        "Skipting – KR",
+      );
     });
   });
 
@@ -1040,8 +1111,8 @@ describe("TeamAssetController", () => {
 
       await waitFor(() => {
         expect(
-          screen.getByRole("button", { name: "Skipting" }),
-        ).toBeInTheDocument();
+          screen.getAllByRole("button", { name: "Skipting" }),
+        ).toHaveLength(2);
       });
     });
 
@@ -1057,12 +1128,12 @@ describe("TeamAssetController", () => {
       fireEvent.click(
         screen.getByRole("button", { name: "Birta markaskorara" }),
       );
-      fireEvent.click(screen.getByTestId("select-player-homeTeam"));
+      fireEvent.click(screen.getByTestId("modal-player-Jón Jónsson"));
 
       await waitFor(() => {
         expect(
-          screen.getByRole("button", { name: "Skipting" }),
-        ).toBeInTheDocument();
+          screen.getAllByRole("button", { name: "Skipting" }),
+        ).toHaveLength(2);
       });
     });
 
@@ -1082,8 +1153,8 @@ describe("TeamAssetController", () => {
 
       await waitFor(() => {
         expect(
-          screen.getByRole("button", { name: "Skipting" }),
-        ).toBeInTheDocument();
+          screen.getAllByRole("button", { name: "Skipting" }),
+        ).toHaveLength(2);
       });
     });
   });
