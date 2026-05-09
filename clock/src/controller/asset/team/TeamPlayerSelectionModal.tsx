@@ -23,8 +23,10 @@ const TeamPlayerSelectionModal: React.FC<TeamPlayerSelectionModalProps> = ({
   onSelect,
   instruction,
 }) => {
-  const starters = players.filter((p) => p.show);
-  const bench = players.filter((p) => !p.show);
+  const byNumber = (a: Player, b: Player): number =>
+    (Number(a.number) || Infinity) - (Number(b.number) || Infinity);
+  const starters = players.filter((p) => p.show).sort(byNumber);
+  const bench = players.filter((p) => !p.show).sort(byNumber);
 
   const renderPlayerButton = (player: Player): React.JSX.Element => (
     <button
