@@ -13,6 +13,7 @@ import {
   subtractHomeGoal,
   adjustTime,
   setInjuryTime,
+  nextHalf,
 } from "./fixtures/test-helpers";
 
 test.describe("Match Flow - Complete Match Simulation", () => {
@@ -66,7 +67,7 @@ test.describe("Match Flow - Complete Match Simulation", () => {
     await expect(page.locator(".matchclock")).toContainText(/46:0\d/);
 
     await page.getByText("Pása").click();
-    await page.getByText("Næsti hálfleikur").click();
+    await nextHalf(page);
 
     await page.getByRole("button", { name: "Stillingar" }).click();
     await expect(page.locator(".halfstops-input")).toHaveCount(3);
@@ -140,7 +141,7 @@ test.describe("Match Flow - Complete Match Simulation", () => {
     await expect(page.locator(".matchclock")).toContainText(/30:0\d/);
 
     await page.getByText("Pása").click();
-    await page.getByText("Næsti hálfleikur").click();
+    await nextHalf(page);
 
     await startClock(page);
     await fakeClock.advance(page, ONE_MINUTE * 10);

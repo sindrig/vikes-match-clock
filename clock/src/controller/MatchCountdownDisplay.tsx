@@ -1,10 +1,8 @@
 import { useState, useEffect } from "react";
-import { msUntilMatchStart, formatTime } from "../utils/timeUtils";
+import { formatTime } from "../utils/timeUtils";
 import { useMatch } from "../contexts/FirebaseStateContext";
 
-const computeRemaining = (matchStartTime: string): string => {
-  const ms = msUntilMatchStart(matchStartTime);
-  if (ms === null) return "";
+const formatRemainingMs = (ms: number): string => {
   if (ms <= 0) return formatTime(0, 0);
   const minutes = Math.floor(ms / 60000);
   const seconds = Math.floor((ms % 60000) / 1000);
@@ -12,22 +10,23 @@ const computeRemaining = (matchStartTime: string): string => {
 };
 
 const MatchCountdownDisplay = () => {
-  const { match } = useMatch();
-  const [remaining, setRemaining] = useState(() =>
-    match.matchStartTime ? computeRemaining(match.matchStartTime) : "",
-  );
+  const { match, getServerTime } = useMatch();
+  const isActive = match.countdown && match.started > 0;
+
+  const [remaining, setRemaining] = useState("");
 
   useEffect(() => {
-    if (!match.matchStartTime) return;
+    if (!isActive) return;
 
-    const interval = setInterval(() => {
-      setRemaining(computeRemaining(match.matchStartTime ?? ""));
-    }, 1000);
+    const update = () =>
+      setRemaining(formatRemainingMs(match.started - getServerTime()));
+    update();
+    const interval = setInterval(update, 1000);
 
     return () => clearInterval(interval);
-  }, [match.matchStartTime]);
+  }, [isActive, match.started, getServerTime]);
 
-  if (!match.matchStartTime || !remaining) {
+  if (!isActive || !remaining) {
     return null;
   }
 

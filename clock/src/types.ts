@@ -31,6 +31,7 @@ export interface Match {
   awayRedCards?: number;
   buzzer: number | false;
   countdown: boolean;
+  halftimeCountdown: boolean;
   showInjuryTime?: boolean;
 }
 

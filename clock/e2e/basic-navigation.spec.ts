@@ -14,6 +14,7 @@ import {
   closeSettings,
   adjustTime,
   setInjuryTime,
+  nextHalf,
 } from "./fixtures/test-helpers";
 
 test.describe("Basic navigation", () => {
@@ -62,7 +63,7 @@ test.describe("Basic navigation", () => {
     await expect(page.locator(".matchclock")).toContainText(/46:3\d/);
     await page.getByText("Pása").click();
     await expect(page.getByText("Hefja niðurtalningu")).toHaveCount(0);
-    await page.getByText("Næsti hálfleikur").click();
+    await nextHalf(page);
     await fakeClock.advance(page, ONE_MINUTE);
     await expect(page.locator(".matchclock")).toHaveText("45:00");
     await page.getByRole("button", { name: "Stillingar" }).click();

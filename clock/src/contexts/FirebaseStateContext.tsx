@@ -43,6 +43,8 @@ import {
   parseClubOverrides,
 } from "./firebaseParsers";
 
+const HALFTIME_DURATION_MS = 15 * 60 * 1000;
+
 const defaultMatch: Match = {
   homeScore: 0,
   awayScore: 0,
@@ -62,6 +64,7 @@ const defaultMatch: Match = {
   awayTimeouts: 0,
   buzzer: false,
   countdown: false,
+  halftimeCountdown: false,
   showInjuryTime: true,
 };
 
@@ -150,6 +153,8 @@ interface FirebaseStateContextType {
   removeTimeout: () => void;
   buzz: (on: boolean) => void;
   countdown: () => void;
+  startHalftimeCountdown: () => void;
+  stopHalftimeCountdown: () => void;
   updateRedCards: (home: number, away: number) => void;
   getServerTime: () => number;
 
@@ -674,6 +679,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       ...prev,
       started: getServerTime(),
       countdown: false,
+      halftimeCountdown: false,
     }));
   }, [applyMatchUpdate, getServerTime]);
 
@@ -681,7 +687,15 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     (isHalfEnd?: boolean) => {
       applyMatchUpdate((prev) => {
         const newState: Match = { ...prev, started: 0 };
-        if (isHalfEnd) {
+        if (prev.halftimeCountdown) {
+          // Cancelling or completing halftime countdown — advance to next half
+          newState.countdown = false;
+          newState.halftimeCountdown = false;
+          newState.timeElapsed = (newState.halfStops[0] ?? 0) * 60 * 1000;
+          if (newState.halfStops.length > 1) {
+            newState.halfStops = newState.halfStops.slice(1);
+          }
+        } else if (isHalfEnd) {
           newState.timeElapsed = (newState.halfStops[0] ?? 0) * 60 * 1000;
           if (newState.halfStops.length > 1) {
             newState.halfStops = newState.halfStops.slice(1);
@@ -847,6 +861,32 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       };
     });
   }, [applyMatchUpdate, getServerTime]);
+
+  const startHalftimeCountdown = useCallback(() => {
+    applyMatchUpdate((prev) => ({
+      ...prev,
+      timeElapsed: 0,
+      started: getServerTime() + HALFTIME_DURATION_MS,
+      countdown: true,
+      halftimeCountdown: true,
+    }));
+  }, [applyMatchUpdate, getServerTime]);
+
+  const stopHalftimeCountdown = useCallback(() => {
+    applyMatchUpdate((prev) => {
+      const newState: Match = {
+        ...prev,
+        started: 0,
+        countdown: false,
+        halftimeCountdown: false,
+      };
+      newState.timeElapsed = (newState.halfStops[0] ?? 0) * 60 * 1000;
+      if (newState.halfStops.length > 1) {
+        newState.halfStops = newState.halfStops.slice(1);
+      }
+      return newState;
+    });
+  }, [applyMatchUpdate]);
 
   const updateRedCards = useCallback(
     (home: number, away: number) => {
@@ -1414,6 +1454,8 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       removeTimeout,
       buzz,
       countdown,
+      startHalftimeCountdown,
+      stopHalftimeCountdown,
       updateRedCards,
       getServerTime,
       updateController,
@@ -1477,6 +1519,8 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       removeTimeout,
       buzz,
       countdown,
+      startHalftimeCountdown,
+      stopHalftimeCountdown,
       updateRedCards,
       getServerTime,
       updateController,
@@ -1555,6 +1599,8 @@ export const useMatch = () => {
     removeTimeout,
     buzz,
     countdown,
+    startHalftimeCountdown,
+    stopHalftimeCountdown,
     updateRedCards,
     getServerTime,
   } = useFirebaseState();
@@ -1573,6 +1619,8 @@ export const useMatch = () => {
     removeTimeout,
     buzz,
     countdown,
+    startHalftimeCountdown,
+    stopHalftimeCountdown,
     updateRedCards,
     getServerTime,
   };

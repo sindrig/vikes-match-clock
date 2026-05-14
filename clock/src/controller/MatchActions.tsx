@@ -116,6 +116,8 @@ const MatchActions = () => {
     matchTimeout,
     removeTimeout,
     countdown,
+    startHalftimeCountdown,
+    stopHalftimeCountdown,
   } = useMatch();
 
   const [showTimeDialog, setShowTimeDialog] = useState(false);
@@ -124,7 +126,17 @@ const MatchActions = () => {
     <div className="match-actions">
       <div className="match-actions-clock">
         <div className="match-actions-clock-primary">
-          {match.started ? (
+          {match.halftimeCountdown ? (
+            <Button
+              color="orange"
+              appearance="primary"
+              size="sm"
+              onClick={stopHalftimeCountdown}
+              block
+            >
+              <PauseIcon /> Stöðva niðurtalningu
+            </Button>
+          ) : match.started ? (
             <Button
               color="yellow"
               appearance="primary"
@@ -167,7 +179,7 @@ const MatchActions = () => {
                   color="blue"
                   appearance="primary"
                   size="sm"
-                  onClick={() => pauseMatch(true)}
+                  onClick={startHalftimeCountdown}
                   disabled={!!match.timeout}
                   block
                 >
@@ -191,6 +203,8 @@ const MatchActions = () => {
                 homeTimeouts: 0,
                 awayTimeouts: 0,
                 buzzer: false,
+                countdown: false,
+                halftimeCountdown: false,
                 halfStops: DEFAULT_HALFSTOPS[match.matchType],
               })
             }

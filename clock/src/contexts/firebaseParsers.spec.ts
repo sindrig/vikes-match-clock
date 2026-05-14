@@ -39,6 +39,7 @@ const defaultMatch: Match = {
   awayRedCards: 0,
   buzzer: false,
   countdown: false,
+  halftimeCountdown: false,
   showInjuryTime: false,
 };
 
