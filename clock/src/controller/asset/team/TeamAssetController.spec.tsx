@@ -219,6 +219,7 @@ const defaultMatch = {
   awayTimeouts: 0,
   buzzer: false as const,
   countdown: false,
+  halftimeCountdown: false,
   ksiMatchId: 12345,
 };
 

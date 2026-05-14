@@ -171,6 +171,10 @@ export function parseMatch(data: unknown, defaultMatch: Match): Match | null {
       typeof raw.countdown === "boolean"
         ? raw.countdown
         : defaultMatch.countdown,
+    halftimeCountdown:
+      typeof raw.halftimeCountdown === "boolean"
+        ? raw.halftimeCountdown
+        : defaultMatch.halftimeCountdown,
     showInjuryTime:
       typeof raw.showInjuryTime === "boolean"
         ? raw.showInjuryTime

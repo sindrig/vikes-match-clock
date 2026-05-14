@@ -109,6 +109,7 @@ describe("matchUtils", () => {
       awayTimeouts: 0,
       buzzer: false,
       countdown: false,
+      halftimeCountdown: false,
       ...overrides,
     });
 
