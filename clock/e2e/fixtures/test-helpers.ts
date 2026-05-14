@@ -342,6 +342,19 @@ export async function startCountdownAndWait(page: Page) {
 
 export async function nextHalf(page: Page) {
   await page.getByText("Næsti hálfleikur").click();
+  await page.getByText("Stöðva niðurtalningu").click();
+}
+
+export async function startHalftimeCountdown(page: Page) {
+  await page.getByText("Næsti hálfleikur").click();
+  await expect(page.getByText("Stöðva niðurtalningu")).toBeVisible({
+    timeout: 5000,
+  });
+}
+
+export async function stopHalftimeCountdown(page: Page) {
+  await page.getByText("Stöðva niðurtalningu").click();
+  await expect(page.getByText("Byrja")).toBeVisible({ timeout: 5000 });
 }
 
 export async function addHomeGoal(page: Page) {
