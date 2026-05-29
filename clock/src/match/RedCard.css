@@ -1,13 +1,13 @@
 .team .red-cards {
   position: absolute;
-  top: 58%;
+  top: var(--theme-red-card-top, 58%);
   z-index: 9999;
   height: 34%;
   width: 25%;
 }
 
 .team.home .red-cards {
-  left: 6%;
+  left: var(--theme-red-card-left, 6%);
 }
 
 .team.home .red-card {
@@ -16,7 +16,7 @@
 }
 
 .team.away .red-cards {
-  right: 6%;
+  right: var(--theme-red-card-left, 6%);
 }
 
 .team.away .red-card {

@@ -171,6 +171,8 @@ export interface ThemeConfig {
 
   // Red cards
   redCardColor: string;
+  redCardTop: string;
+  redCardLeft: string;
 
   // Penalty boxes (handball)
   penaltyBg: string;

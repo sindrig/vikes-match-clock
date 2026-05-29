@@ -148,6 +148,20 @@ const ELEMENTS: ElementDef[] = [
     colorFields: { bg: "adTop", text: "adTop" },
     displayText: "AD",
   },
+  {
+    id: "red-card",
+    label: "Rautt spjald",
+    left: (t) => t.redCardLeft,
+    top: (t) => t.redCardTop,
+    width: () => "4%",
+    height: () => "6%",
+    bg: (t) => t.redCardColor,
+    color: () => "#fff",
+    border: () => "1px solid rgba(0,0,0,0.3)",
+    dragFields: { top: "redCardTop", left: "redCardLeft" },
+    colorFields: { bg: "redCardColor", text: "redCardColor" },
+    displayText: "",
+  },
 ];
 
 /** Sanitize a URL for use inside CSS url() by escaping breakout characters */

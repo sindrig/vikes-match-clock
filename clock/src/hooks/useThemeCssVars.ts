@@ -52,6 +52,8 @@ export const themeToCssVars = (theme: ThemeConfig): Record<string, string> => ({
 
   // Red cards
   "--theme-red-card-color": theme.redCardColor,
+  "--theme-red-card-top": theme.redCardTop,
+  "--theme-red-card-left": theme.redCardLeft,
 
   // Penalty boxes
   "--theme-penalty-bg": theme.penaltyBg,
