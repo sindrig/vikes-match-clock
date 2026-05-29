@@ -16,6 +16,7 @@ import MatchCountdownDisplay from "./controller/MatchCountdownDisplay";
 import RefreshHandler from "./controller/RefreshHandler";
 import AssetComponent, { useDeferredAsset } from "./controller/asset/Asset";
 import PlaybackBar from "./controller/asset/queue/PlaybackBar";
+import SubstitutionInfo from "./controller/asset/queue/SubstitutionInfo";
 import GoalScorerDialog from "./controller/GoalScorerDialog";
 
 import ScoreBoard from "./screens/ScoreBoard";
@@ -360,6 +361,7 @@ function App() {
             ) : (
               asset && <ClearOverlayButton />
             )}
+            <SubstitutionInfo />
             {showMatchControls && <MatchActions />}
             {showMatchControls && <MatchCountdownDisplay />}
           </div>

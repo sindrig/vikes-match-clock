@@ -62,6 +62,7 @@ export interface Asset {
   role?: string;
   overlay?: AssetOverlay | null;
   teamName?: string;
+  fullName?: string;
   originalAssetType?: string;
   subIn?: Asset;
   subOut?: Asset;

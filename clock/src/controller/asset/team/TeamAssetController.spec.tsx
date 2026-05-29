@@ -642,8 +642,8 @@ describe("TeamAssetController", () => {
       expect(mockAddItemsToQueue).toHaveBeenCalledWith("new-queue-id", [
         expect.objectContaining({
           type: "SUB",
-          subIn: subInAsset,
-          subOut: subOutAsset,
+          subIn: { ...subInAsset, fullName: "Jón Jónsson" },
+          subOut: { ...subOutAsset, fullName: "Siggi Bekkur" },
         }),
       ]);
       expect(mockActivateQueue).toHaveBeenCalledWith("new-queue-id");
