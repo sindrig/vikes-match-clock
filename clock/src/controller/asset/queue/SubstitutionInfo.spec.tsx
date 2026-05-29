@@ -76,10 +76,10 @@ describe("SubstitutionInfo", () => {
 
     expect(screen.getByTestId("substitution-info")).toBeInTheDocument();
     expect(screen.getByText("Víkingur R")).toBeInTheDocument();
+    expect(screen.getByText("Af velli: #7 - Jón Jónsson")).toBeInTheDocument();
     expect(
-      screen.getByText("Af velli: #11 - Guðmundur Pétursson"),
+      screen.getByText("Inn á: #11 - Guðmundur Pétursson"),
     ).toBeInTheDocument();
-    expect(screen.getByText("Inn á: #7 - Jón Jónsson")).toBeInTheDocument();
   });
 
   it("falls back to name when fullName is not set", () => {
@@ -88,8 +88,8 @@ describe("SubstitutionInfo", () => {
         asset: {
           key: "sub-2",
           type: "IMAGE",
-          subIn: { key: "in-2", type: "IMAGE", name: "New Player" },
-          subOut: { key: "out-2", type: "IMAGE", name: "Old Player" },
+          subIn: { key: "in-2", type: "IMAGE", name: "Leaving Player" },
+          subOut: { key: "out-2", type: "IMAGE", name: "Entering Player" },
         },
         time: null,
       },
@@ -97,7 +97,7 @@ describe("SubstitutionInfo", () => {
 
     render(<SubstitutionInfo />);
 
-    expect(screen.getByText("Af velli: Old Player")).toBeInTheDocument();
-    expect(screen.getByText("Inn á: New Player")).toBeInTheDocument();
+    expect(screen.getByText("Af velli: Leaving Player")).toBeInTheDocument();
+    expect(screen.getByText("Inn á: Entering Player")).toBeInTheDocument();
   });
 });
