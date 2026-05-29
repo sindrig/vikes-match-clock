@@ -21,10 +21,10 @@ const SubstitutionInfo = () => {
     <div className="substitution-info" data-testid="substitution-info">
       {teamName && <span className="substitution-info-team">{teamName}</span>}
       <span className="substitution-info-player">
-        Af velli: {formatPlayer(subIn.fullName || subIn.name, subIn.number)}
+        Af velli: {formatPlayer(subOut.fullName || subOut.name, subOut.number)}
       </span>
       <span className="substitution-info-player">
-        Inn á: {formatPlayer(subOut.fullName || subOut.name, subOut.number)}
+        Inn á: {formatPlayer(subIn.fullName || subIn.name, subIn.number)}
       </span>
     </div>
   );
