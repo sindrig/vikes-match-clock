@@ -76,10 +76,10 @@ describe("SubstitutionInfo", () => {
 
     expect(screen.getByTestId("substitution-info")).toBeInTheDocument();
     expect(screen.getByText("Víkingur R")).toBeInTheDocument();
-    expect(screen.getByText("Af velli: #11 - Guðmundur Pétursson")).toBeInTheDocument();
     expect(
-      screen.getByText("Inn á: #7 - Jón Jónsson"),
+      screen.getByText("Af velli: #11 - Guðmundur Pétursson"),
     ).toBeInTheDocument();
+    expect(screen.getByText("Inn á: #7 - Jón Jónsson")).toBeInTheDocument();
   });
 
   it("falls back to name when fullName is not set", () => {
