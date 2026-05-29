@@ -22,6 +22,7 @@ import { resolveGoalBackground } from "../../../utils/matchUtils";
 
 interface SubPlayer extends Player {
   teamName: string;
+  fullName: string;
 }
 
 type ModalMode = null | "goalScorer" | "subOff" | "subOn";
@@ -142,6 +143,7 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
   };
 
   const selectSubsAction = (player: Player, teamName: string): void => {
+    const fullName = player.name;
     const asset: Player = {
       ...player,
       name: player.name
@@ -180,14 +182,14 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
             : subOutObj;
         addSubToQueue({
           type: assetTypes.SUB,
-          subIn: finalSubIn,
-          subOut: finalSubOut,
+          subIn: { ...finalSubIn, fullName: subIn.fullName },
+          subOut: { ...finalSubOut, fullName },
           key: `sub-${subInObj.key}-${subOutObj.key}`,
         });
         clearState();
       })();
     } else {
-      setSubIn({ teamName, ...asset });
+      setSubIn({ teamName, fullName, ...asset });
       setSubTeam(teamName);
     }
   };
@@ -299,8 +301,8 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
           : subOutObj;
       addSubToQueue({
         type: assetTypes.SUB,
-        subIn: finalSubIn,
-        subOut: finalSubOut,
+        subIn: { ...finalSubIn, fullName: subOffPlayer.name },
+        subOut: { ...finalSubOut, fullName: player.name },
         key: `sub-${subInObj.key}-${subOutObj.key}`,
       });
     })();

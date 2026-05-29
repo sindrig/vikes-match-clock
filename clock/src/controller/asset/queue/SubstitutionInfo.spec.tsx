@@ -45,7 +45,7 @@ describe("SubstitutionInfo", () => {
     expect(container.innerHTML).toBe("");
   });
 
-  it("renders player names and team for substitution asset", () => {
+  it("renders player full names and team for substitution asset", () => {
     setupMock({
       currentAsset: {
         asset: {
@@ -54,14 +54,16 @@ describe("SubstitutionInfo", () => {
           subIn: {
             key: "in-1",
             type: "IMAGE",
-            name: "Jón Jónsson",
+            name: "Jón",
+            fullName: "Jón Jónsson",
             number: 7,
             teamName: "Víkingur R",
           },
           subOut: {
             key: "out-1",
             type: "IMAGE",
-            name: "Guðmundur Pétursson",
+            name: "Guðmundur",
+            fullName: "Guðmundur Pétursson",
             number: 11,
             teamName: "Víkingur R",
           },
@@ -74,20 +76,20 @@ describe("SubstitutionInfo", () => {
 
     expect(screen.getByTestId("substitution-info")).toBeInTheDocument();
     expect(screen.getByText("Víkingur R")).toBeInTheDocument();
+    expect(screen.getByText("Af velli: #7 - Jón Jónsson")).toBeInTheDocument();
     expect(
-      screen.getByText("Af velli: #11 - Guðmundur Pétursson"),
+      screen.getByText("Inn á: #11 - Guðmundur Pétursson"),
     ).toBeInTheDocument();
-    expect(screen.getByText("Inn á: #7 - Jón Jónsson")).toBeInTheDocument();
   });
 
-  it("renders without number when number is undefined", () => {
+  it("falls back to name when fullName is not set", () => {
     setupMock({
       currentAsset: {
         asset: {
           key: "sub-2",
           type: "IMAGE",
-          subIn: { key: "in-2", type: "IMAGE", name: "Player In" },
-          subOut: { key: "out-2", type: "IMAGE", name: "Player Out" },
+          subIn: { key: "in-2", type: "IMAGE", name: "Player Out" },
+          subOut: { key: "out-2", type: "IMAGE", name: "Player In" },
         },
         time: null,
       },
