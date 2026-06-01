@@ -543,6 +543,18 @@ const ThemeEditorPanels = ({
         defaultValue={DEFAULT_THEME.redCardColor}
         onChange={(v) => onFieldChange("redCardColor", v)}
       />
+      <PercentField
+        label="Rautt spjald ofan"
+        value={effective.redCardTop}
+        defaultValue={DEFAULT_THEME.redCardTop}
+        onChange={(v) => onFieldChange("redCardTop", v)}
+      />
+      <PercentField
+        label="Rautt spjald vinstri"
+        value={effective.redCardLeft}
+        defaultValue={DEFAULT_THEME.redCardLeft}
+        onChange={(v) => onFieldChange("redCardLeft", v)}
+      />
       <ColorField
         label="Vítabox bakgr."
         value={effective.penaltyBg}

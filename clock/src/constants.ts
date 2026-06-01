@@ -170,6 +170,8 @@ export const DEFAULT_THEME: ThemeConfig = {
 
   // Red cards
   redCardColor: "#e60000",
+  redCardTop: "58%",
+  redCardLeft: "6%",
 
   // Penalty boxes
   penaltyBg: "black",
@@ -250,6 +252,8 @@ export const THEME_PRESETS: Record<string, ThemeConfig> = {
     penaltyColor: "#fff",
     penaltyBorder: "2px solid #ff2030",
     redCardColor: "#ff1a1a",
+    redCardTop: "58%",
+    redCardLeft: "6%",
     timeoutColor: "#ff2030",
     idleTextColor: "#ffcccc",
     idleTextFontSize: "44px",
@@ -287,6 +291,8 @@ export const THEME_PRESETS: Record<string, ThemeConfig> = {
     penaltyColor: "#1a0000",
     penaltyBorder: "2px solid #c7000f",
     redCardColor: "#c7000f",
+    redCardTop: "58%",
+    redCardLeft: "6%",
     timeoutColor: "#c7000f",
     idleTextColor: "#1a0000",
     idleTextFontSize: "38px",
@@ -369,6 +375,8 @@ export const THEME_PRESETS: Record<string, ThemeConfig> = {
     penaltyColor: "#00e5ff",
     penaltyBorder: "2px solid #0080ff",
     redCardColor: "#ff2040",
+    redCardTop: "58%",
+    redCardLeft: "6%",
     timeoutColor: "#0080ff",
     idleTextColor: "#80d0ff",
     idleTextFontSize: "36px",
@@ -410,6 +418,8 @@ export const THEME_PRESETS: Record<string, ThemeConfig> = {
     penaltyColor: "#33ff33",
     penaltyBorder: "2px solid #33ff33",
     redCardColor: "#ff3333",
+    redCardTop: "58%",
+    redCardLeft: "6%",
     timeoutColor: "#33ff33",
     idleTextColor: "#33ff33",
     idleTextFontSize: "32px",

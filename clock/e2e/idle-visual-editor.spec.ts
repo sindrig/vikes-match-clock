@@ -190,8 +190,8 @@ test.describe("Idle visual editor", () => {
     const scoreboardCanvas = page.locator(".visual-canvas");
     await expect(scoreboardCanvas).toBeVisible({ timeout: 5000 });
 
-    // Scoreboard editor has 7 elements (home-logo, away-logo, clock, home-score, away-score, injury-time, ad)
-    await expect(page.locator("[data-element-id]")).toHaveCount(7);
+    // Scoreboard editor has 8 elements (home-logo, away-logo, clock, home-score, away-score, injury-time, ad, red-card)
+    await expect(page.locator("[data-element-id]")).toHaveCount(8);
 
     // Switch to idle visual tab
     await switchToIdleVisualTab(page);
