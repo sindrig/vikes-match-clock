@@ -1,7 +1,7 @@
 import clubIds from "../club-ids";
 
 import { Match, TwoMinPenalty } from "../types";
-import { useMatch } from "../contexts/FirebaseStateContext";
+import { useClubOverrides, useMatch } from "../contexts/FirebaseStateContext";
 
 const normalize = (string: string) =>
   string
@@ -39,6 +39,14 @@ interface TeamSelectorProps {
 
 const TeamSelector = ({ teamAttrName }: TeamSelectorProps) => {
   const { match, updateMatch } = useMatch();
+  const { clubOverrides } = useClubOverrides();
+
+  const teamOptions = [
+    ...new Set([
+      ...Object.keys(clubIds),
+      ...Object.values(clubOverrides).map((override) => override.name),
+    ]),
+  ].sort((v1, v2) => v1.localeCompare(v2, "is"));
 
   return (
     <div>
@@ -49,9 +57,8 @@ const TeamSelector = ({ teamAttrName }: TeamSelectorProps) => {
         }
       >
         <option value="">Veldu lið...</option>
-        {Object.keys(clubIds)
+        {teamOptions
           .filter((key) => filterOption(key, match[teamAttrName] as string))
-          .sort((v1, v2) => v1.localeCompare(v2))
           .map((key) => (
             <option value={key} key={key}>
               {key}

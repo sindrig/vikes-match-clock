@@ -1,6 +1,7 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, act } from "@testing-library/react";
+import { onValue, ref } from "firebase/database";
 import {
   FirebaseStateProvider,
   useMatch,
@@ -74,6 +75,24 @@ const TestViewConsumer = ({
 describe("FirebaseStateContext", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+
+    vi.mocked(ref).mockImplementation((_, path) => path as never);
+
+    vi.mocked(onValue).mockImplementation((reference, callback) => {
+      const path = String(reference);
+
+      if (path.includes("clubOverrides")) {
+        callback({
+          val: () => null,
+        } as never);
+      } else {
+        callback({
+          val: () => null,
+        } as never);
+      }
+
+      return vi.fn();
+    });
   });
 
   describe("empty listenPrefix protection", () => {
@@ -847,6 +866,100 @@ describe("FirebaseStateContext", () => {
         "test-location",
         "match",
         { homeTeam: "Víkingur R", homeTeamId: 2492, ksiMatchId: null },
+      );
+    });
+
+    it("looks up custom team IDs from club overrides", () => {
+      vi.mocked(onValue).mockImplementation((reference, callback) => {
+        const path = String(reference);
+
+        callback({
+          val: () =>
+            path.includes("clubOverrides")
+              ? {
+                  customTeam: {
+                    name: "Kjánaprik",
+                    clubId: "-1",
+                    logoUrl: "https://example.com/kjanaprik.png",
+                    isOverride: false,
+                  },
+                }
+              : null,
+        } as never);
+
+        return vi.fn();
+      });
+
+      let matchApi: ReturnType<typeof useMatch> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+          screenKey={null}
+        >
+          <TestMatchConsumer
+            onMount={(api) => {
+              matchApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+
+      act(() => {
+        matchApi!.updateMatch({ homeTeam: "Kjánaprik" });
+      });
+
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "match",
+        { homeTeam: "Kjánaprik", homeTeamId: -1, ksiMatchId: null },
+      );
+    });
+
+    it("normalizes typed custom team names with trailing dots to override canonical name", () => {
+      vi.mocked(onValue).mockImplementation((reference, callback) => {
+        const path = String(reference);
+
+        callback({
+          val: () =>
+            path.includes("clubOverrides")
+              ? {
+                  customTeam: {
+                    name: "Kjánaprik",
+                    clubId: "-1",
+                    logoUrl: "https://example.com/kjanaprik.png",
+                    isOverride: false,
+                  },
+                }
+              : null,
+        } as never);
+
+        return vi.fn();
+      });
+
+      let matchApi: ReturnType<typeof useMatch> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+          screenKey={null}
+        >
+          <TestMatchConsumer
+            onMount={(api) => {
+              matchApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+
+      act(() => {
+        matchApi!.updateMatch({ awayTeam: "Kjánaprik." });
+      });
+
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "match",
+        { awayTeam: "Kjánaprik", awayTeamId: -1, ksiMatchId: null },
       );
     });
 
