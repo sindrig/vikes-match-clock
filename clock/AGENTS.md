@@ -648,6 +648,10 @@ const lookupClubId = (name: string): string =>
 - **`"-1"`**: Teams not found in KSI (combined teams, foreign clubs, national teams). Still selectable in the UI but won't match API data.
 - **`"0"`**: Unknown/unrecognized team name (fallback when lookup fails).
 
+### Custom Team Overrides In Selectors
+
+Firebase `clubOverrides` entries with `isOverride: false` act as fully custom teams. They are merged into the `TeamSelector.tsx` dropdown alongside bundled `club-ids.ts` teams, and `updateMatch()` resolves their configured `clubId` from Firebase before falling back to bundled IDs. This allows custom teams like `Kjánaprik` to be selected in Stillingar and keep `clubId: "-1"` until a real KSI ID is added later.
+
 ### Key Files in the Pipeline
 
 | File                                            | Role                                                                               |

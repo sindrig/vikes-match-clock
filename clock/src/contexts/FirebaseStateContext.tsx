@@ -45,6 +45,19 @@ import {
 
 const HALFTIME_DURATION_MS = 15 * 60 * 1000;
 
+const normalizeClubKey = (name: string): string => name.replace(/\.+$/, "");
+
+const findClubOverrideByName = (
+  overrides: Record<string, ClubOverride>,
+  name: string,
+): ClubOverride | undefined => {
+  const normalizedName = normalizeClubKey(name);
+
+  return Object.values(overrides).find(
+    (override) => normalizeClubKey(override.name) === normalizedName,
+  );
+};
+
 const defaultMatch: Match = {
   homeScore: 0,
   awayScore: 0,
@@ -594,13 +607,18 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       const newState: Match = { ...prev, ...updates };
       const clubIdsMap = clubIds as Record<string, string>;
       const normalizeTeamName = (name: string): string => {
+        const override = findClubOverrideByName(clubOverridesRef.current, name);
+        if (override) return override.name;
         if (clubIdsMap[name]) return name;
-        const stripped = name.replace(/\.+$/, "");
+        const stripped = normalizeClubKey(name);
         if (clubIdsMap[stripped]) return stripped;
         return name;
       };
       const lookupClubId = (name: string): string =>
-        clubIdsMap[name] ?? clubIdsMap[name.replace(/\.+$/, "")] ?? "0";
+        findClubOverrideByName(clubOverridesRef.current, name)?.clubId ??
+        clubIdsMap[name] ??
+        clubIdsMap[normalizeClubKey(name)] ??
+        "0";
       if (newState.homeTeam) {
         newState.homeTeam = normalizeTeamName(newState.homeTeam);
       }
