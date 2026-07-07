@@ -4,7 +4,7 @@ from fastapi import HTTPException
 from httpx import Response
 
 from app.main import app
-from app.models.matches import LineupsResponse, Match
+from app.models.matches import LineupsResponse, Match, TeamLineup
 
 BASE_URL = "https://api-ksi.analyticom.de"
 
@@ -410,3 +410,318 @@ def test_endpoint_get_matches_date_in_openapi():
     schema = app.openapi()
     paths = schema["paths"]
     assert any("/matches/" in p for p in paths)
+
+
+PAST_MATCHES_DATA = [
+    {
+        "id": 102,
+        "homeTeam": {"id": 3, "name": "FH"},
+        "awayTeam": {"id": 1, "name": "Víkingur"},
+        "dateTimeUTC": "2025-06-08T14:00:00Z",
+        "liveStatus": "FINISHED",
+        "competition": {"id": 1, "name": "Pepsi Max deildin"},
+    },
+    {
+        "id": 101,
+        "homeTeam": {"id": 1, "name": "Víkingur"},
+        "awayTeam": {"id": 2, "name": "KR"},
+        "dateTimeUTC": "2025-06-15T14:00:00Z",
+        "liveStatus": "FINISHED",
+        "competition": {"id": 1, "name": "Pepsi Max deildin"},
+    },
+]
+
+LINEUPS_101 = {
+    "home": {
+        "players": [
+            {
+                "shirtNumber": 1,
+                "captain": False,
+                "goalkeeper": True,
+                "startingLineup": True,
+                "person": {"id": 10, "name": "GK One"},
+            },
+            {
+                "shirtNumber": 10,
+                "captain": True,
+                "goalkeeper": False,
+                "startingLineup": True,
+                "person": {"id": 20, "name": "Captain Ten"},
+            },
+            {
+                "shirtNumber": 9,
+                "captain": False,
+                "goalkeeper": False,
+                "startingLineup": True,
+                "person": {"id": 30, "name": "Striker Nine"},
+            },
+        ],
+        "officials": [],
+    },
+    "away": {"players": [], "officials": []},
+}
+
+LINEUPS_102 = {
+    "home": {"players": [], "officials": []},
+    "away": {
+        "players": [
+            {
+                "shirtNumber": 9,
+                "captain": False,
+                "goalkeeper": False,
+                "startingLineup": True,
+                "person": {"id": 30, "name": "Old Striker Nine"},
+            },
+            {
+                "shirtNumber": 7,
+                "captain": False,
+                "goalkeeper": False,
+                "startingLineup": False,
+                "person": {"id": 40, "name": "Winger Seven"},
+            },
+        ],
+        "officials": [],
+    },
+}
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_resolve_roster_success(ksi_client):
+    respx.get(f"{BASE_URL}/api/live/team/1/matches/paginated/past/0").mock(
+        return_value=Response(
+            200, json={"result": PAST_MATCHES_DATA, "size": 2}
+        )
+    )
+    respx.get(f"{BASE_URL}/api/live/match/101/lineups").mock(
+        return_value=Response(200, json=LINEUPS_101)
+    )
+    respx.get(f"{BASE_URL}/api/live/match/102/lineups").mock(
+        return_value=Response(200, json=LINEUPS_102)
+    )
+
+    result = await ksi_client.resolve_roster(
+        starters=[1, 10, 9, 2, 3, 4, 5, 6, 7, 8, 11],
+        substitutes=[12],
+    )
+
+    assert isinstance(result, TeamLineup)
+    assert len(result.players) == 12
+    assert result.officials == []
+
+    by_num = {p.shirtNumber: p for p in result.players}
+    assert by_num[1].person.name == "GK One"
+    assert by_num[1].goalkeeper is True
+    assert by_num[1].startingLineup is True
+
+    assert by_num[10].captain is True
+    assert by_num[10].startingLineup is True
+
+    assert by_num[9].person.name == "Striker Nine"
+    assert by_num[9].startingLineup is True
+
+    assert by_num[7].person.name == "Winger Seven"
+    assert by_num[7].startingLineup is False
+
+    assert by_num[2].person.id == 0
+    assert by_num[2].person.name == "#2"
+    assert by_num[2].startingLineup is True
+
+    assert by_num[12].person.name == "#12"
+    assert by_num[12].startingLineup is False
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_resolve_roster_upstream_error(ksi_client):
+    respx.get(f"{BASE_URL}/api/live/team/1/matches/paginated/past/0").mock(
+        return_value=Response(500, text="Internal Server Error")
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await ksi_client.resolve_roster(starters=[1] * 11, substitutes=[])
+
+    assert exc_info.value.status_code == 502
+
+
+def test_endpoint_resolve_roster_success(client):
+    from unittest.mock import AsyncMock
+
+    from app.dependencies import get_ksi_client
+    from app.models.matches import (
+        Person,
+        TeamLineup,
+        TeamPlayer,
+    )
+
+    mock_lineup = TeamLineup(
+        players=[
+            TeamPlayer(
+                shirtNumber=1,
+                captain=False,
+                goalkeeper=True,
+                startingLineup=True,
+                person=Person(id=10, name="GK One"),
+            ),
+            TeamPlayer(
+                shirtNumber=10,
+                captain=True,
+                goalkeeper=False,
+                startingLineup=True,
+                person=Person(id=20, name="Captain"),
+            ),
+            TeamPlayer(
+                shirtNumber=12,
+                captain=False,
+                goalkeeper=False,
+                startingLineup=False,
+                person=Person(id=0, name="#12"),
+            ),
+        ],
+        officials=[],
+    )
+
+    mock_client = AsyncMock()
+    mock_client.resolve_roster.return_value = mock_lineup
+
+    app.dependency_overrides[get_ksi_client] = lambda: mock_client
+
+    response = client.post(
+        "/v3/1/resolve-roster",
+        json={
+            "starters": [1, 10, 2, 3, 4, 5, 6, 7, 8, 9, 11],
+            "substitutes": [12],
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["players"]) == 3
+    assert data["officials"] == []
+    assert data["players"][0]["shirtNumber"] == 1
+    assert data["players"][0]["goalkeeper"] is True
+    assert data["players"][2]["person"]["name"] == "#12"
+
+    mock_client.resolve_roster.assert_called_once_with(
+        [1, 10, 2, 3, 4, 5, 6, 7, 8, 9, 11], [12]
+    )
+
+    app.dependency_overrides.clear()
+
+
+def test_endpoint_resolve_roster_empty_substitutes(client):
+    from unittest.mock import AsyncMock
+
+    from app.dependencies import get_ksi_client
+    from app.models.matches import TeamLineup
+
+    mock_client = AsyncMock()
+    mock_client.resolve_roster.return_value = TeamLineup(
+        players=[], officials=[]
+    )
+
+    app.dependency_overrides[get_ksi_client] = lambda: mock_client
+
+    response = client.post(
+        "/v3/1/resolve-roster",
+        json={
+            "starters": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+        },
+    )
+
+    assert response.status_code == 200
+    mock_client.resolve_roster.assert_called_once_with(
+        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], []
+    )
+
+    app.dependency_overrides.clear()
+
+
+def test_endpoint_resolve_roster_validation_not_11_starters(client):
+    from unittest.mock import AsyncMock
+
+    from app.dependencies import get_ksi_client
+
+    app.dependency_overrides[get_ksi_client] = lambda: AsyncMock()
+
+    response = client.post(
+        "/v3/1/resolve-roster",
+        json={"starters": [1, 2, 3], "substitutes": []},
+    )
+    assert response.status_code == 422
+
+    app.dependency_overrides.clear()
+
+
+def test_endpoint_resolve_roster_validation_too_many_substitutes(client):
+    from unittest.mock import AsyncMock
+
+    from app.dependencies import get_ksi_client
+
+    app.dependency_overrides[get_ksi_client] = lambda: AsyncMock()
+
+    response = client.post(
+        "/v3/1/resolve-roster",
+        json={
+            "starters": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+            "substitutes": list(range(12, 25)),
+        },
+    )
+    assert response.status_code == 422
+
+    app.dependency_overrides.clear()
+
+
+def test_endpoint_resolve_roster_validation_duplicates(client):
+    from unittest.mock import AsyncMock
+
+    from app.dependencies import get_ksi_client
+
+    app.dependency_overrides[get_ksi_client] = lambda: AsyncMock()
+
+    response = client.post(
+        "/v3/1/resolve-roster",
+        json={
+            "starters": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 10],
+            "substitutes": [],
+        },
+    )
+    assert response.status_code == 422
+
+    app.dependency_overrides.clear()
+
+
+def test_endpoint_resolve_roster_validation_negative_numbers(client):
+    from unittest.mock import AsyncMock
+
+    from app.dependencies import get_ksi_client
+
+    app.dependency_overrides[get_ksi_client] = lambda: AsyncMock()
+
+    response = client.post(
+        "/v3/1/resolve-roster",
+        json={
+            "starters": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, -1],
+            "substitutes": [],
+        },
+    )
+    assert response.status_code == 422
+
+    app.dependency_overrides.clear()
+
+
+def test_endpoint_resolve_roster_in_openapi():
+    from app.main import app
+
+    schema = app.openapi()
+    paths = schema["paths"]
+
+    roster_path = "/v3/{teamId}/resolve-roster"
+    assert roster_path in paths
+    assert "post" in paths[roster_path]
+
+    post_op = paths[roster_path]["post"]
+    assert post_op["operationId"] == "resolve_roster"
+    resp_200 = post_op["responses"]["200"]
+    content = resp_200["content"]["application/json"]["schema"]
+    assert "TeamLineup" in content.get("$ref", "")

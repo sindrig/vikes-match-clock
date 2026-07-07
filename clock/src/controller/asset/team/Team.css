@@ -146,3 +146,92 @@
   margin-top: 6px;
   font-size: 12px;
 }
+
+/* Resolve Roster Modal */
+.resolve-roster-modal .rs-modal-dialog {
+  max-width: 600px;
+}
+
+.roster-number-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.roster-number-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 4px;
+  font-size: 16px;
+  text-align: center;
+  border: 1px solid #3c3f43;
+  border-radius: 4px;
+  background: #1a1d24;
+  color: #fff;
+}
+
+.roster-number-input:focus {
+  border-color: #3498ff;
+  outline: none;
+}
+
+.roster-section-label {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  opacity: 0.6;
+  margin: 12px 0 6px;
+}
+
+.roster-preview {
+  margin-top: 8px;
+}
+
+.roster-preview-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 14px;
+}
+
+.roster-preview-row .player-number {
+  min-width: 24px;
+  font-weight: 600;
+  text-align: right;
+}
+
+.roster-preview-row .player-name {
+  flex: 1;
+}
+
+.roster-preview-row .player-role {
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+.roster-sub-label {
+  border-top: 1px solid #3c3f43;
+  padding-top: 8px;
+  margin-top: 12px;
+}
+
+.roster-confirm-btn {
+  border: 1px solid #4caf50;
+  background-color: #4caf50;
+  color: white;
+  border-radius: 3px;
+  padding: 6px 16px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.roster-confirm-btn:hover {
+  background-color: #43a047;
+}
+
+.roster-confirm-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

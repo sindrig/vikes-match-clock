@@ -1,7 +1,14 @@
 import httpx
 from fastapi import HTTPException
 
-from app.models.matches import LineupsResponse, Match, MatchEvent
+from app.models.matches import (
+    LineupsResponse,
+    Match,
+    MatchEvent,
+    TeamLineup,
+    TeamPlayer,
+    Person,
+)
 
 
 class KsiClient:
@@ -10,6 +17,7 @@ class KsiClient:
         self.api_key = api_key
         self.team_id = team_id
         self.client = httpx.AsyncClient(base_url=self.base_url, timeout=10.0)
+        self.past_matches: list[Match] | None = None
 
     def _check_response(self, response: httpx.Response) -> None:
         if response.is_success:
@@ -54,6 +62,72 @@ class KsiClient:
         )
         self._check_response(response)
         return Match.model_validate(response.json())
+
+    async def get_past_matches(self) -> list[Match]:
+        if self.past_matches is not None:
+            return self.past_matches
+        response = await self.client.get(
+            f"/api/live/team/{self.team_id}/matches/paginated/past/0",
+            headers={"API_KEY": self.api_key},
+            params={
+                "page": 1,
+                "pageSize": 10,
+                "teamIdFilter": self.team_id,
+            },
+        )
+        self._check_response(response)
+        data = response.json()
+        matches = data.get("result", []) if isinstance(data, dict) else data
+        self.past_matches = sorted(
+            [Match.model_validate(m) for m in matches],
+            key=lambda m: m.dateTimeUTC,
+            reverse=True,
+        )
+        return self.past_matches
+
+    async def resolve_roster(
+        self, starters: list[int], substitutes: list[int]
+    ) -> TeamLineup:
+        matches = await self.get_past_matches()
+        seen: dict[int, TeamPlayer] = {}
+        for match in matches:
+            lineups = await self.get_lineups(match.id)
+            if match.homeTeam.id == self.team_id:
+                team_lineup = lineups.home
+            elif match.awayTeam.id == self.team_id:
+                team_lineup = lineups.away
+            else:
+                continue
+            for player in team_lineup.players:
+                num = player.shirtNumber
+                if num is not None and num not in seen:
+                    seen[num] = player
+
+        players: list[TeamPlayer] = []
+        for number in starters + substitutes:
+            starting = number in starters
+            if number in seen:
+                found = seen[number]
+                players.append(
+                    TeamPlayer(
+                        shirtNumber=number,
+                        captain=found.captain,
+                        goalkeeper=found.goalkeeper,
+                        startingLineup=starting,
+                        person=found.person,
+                    )
+                )
+            else:
+                players.append(
+                    TeamPlayer(
+                        shirtNumber=number,
+                        captain=False,
+                        goalkeeper=False,
+                        startingLineup=starting,
+                        person=Person(id=0, name=f"#{number}"),
+                    )
+                )
+        return TeamLineup(players=players, officials=[])
 
     async def close(self):
         await self.client.aclose()

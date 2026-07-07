@@ -172,6 +172,29 @@ createQueue(name: string, options?: { cycle?: boolean })
 
 `TeamAssetController.tsx` renders a "Setja lið í biðröð" button above each team (home/away) separately. Clicking it creates a named queue (e.g., "Víkingur R") containing that team's starting lineup as player card assets. The queue is created with `cycle: false` since lineup presentations are one-shot sequences.
 
+#### Manual Roster Creation (Resolve Roster)
+
+When a team side has no players loaded, `TeamAssetController.tsx` shows a **"Búa til leikmannahóp"** button. This is a manual fallback for when the KSI API does not have lineup data (e.g., youth matches, friendlies, or pre-match).
+
+**Flow**:
+
+1. User clicks "Búa til leikmannahóp" for home or away side
+2. `ResolveRosterModal` opens with two sections: **Byrjunarlið** (11 required number inputs) and **Varamenn** (12 optional number inputs)
+3. Client-side validation enforces: all 11 starters filled, positive integers only, no duplicate numbers across both groups
+4. On submit, sends `POST ${apiConfig.gateWayUrl}v3/{teamId}/resolve-roster` with body `{ starters: number[], substitutes: number[] }`
+5. API returns `{ players: TeamPlayer[], officials: [] }` (TeamLineup shape) for the requested side
+6. Response is transformed using the same `mapRole` semantics as `transformLineups()` in `lib/matchUtils.ts`
+7. A preview shows player numbers, names, and roles grouped by starters/substitutes
+8. On confirm, the generated roster merges into the existing roster via `setRoster({ ...roster, [side]: generatedPlayers })`
+
+**Key files**:
+
+- `controller/asset/team/ResolveRosterModal.tsx` — modal component with form, validation, API call, and preview
+- `controller/asset/team/TeamAssetController.tsx` — integrates the modal and manages `resolveRosterSide` state
+- `controller/asset/team/Team.css` — styles for the modal and preview
+
+**Note**: Unresolved player placeholders from the API (no name match) display as `#number` and are still saved.
+
 #### Tab ↔ assetView Sync Gotcha
 
 `Controller.tsx` has three tabs: **Biðröð** (queue), **Lið** (teams), **Myndefni** (media). The first two map to Firebase's `controller.assetView` (`ASSET_VIEWS.assets` / `ASSET_VIEWS.teams`), but **Myndefni has no corresponding `assetView`** — it's purely local tab state.

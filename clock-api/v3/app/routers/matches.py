@@ -1,7 +1,13 @@
 from fastapi import APIRouter, Depends, Path, Query
 
 from app.dependencies import get_ksi_client
-from app.models.matches import LineupsResponse, Match, MatchEvent
+from app.models.matches import (
+    LineupsResponse,
+    Match,
+    MatchEvent,
+    ResolveRosterRequest,
+    TeamLineup,
+)
 from app.services.ksi import KsiClient
 
 router = APIRouter(tags=["matches"])
@@ -55,3 +61,16 @@ async def get_match_info(
     ksi_client: KsiClient = Depends(get_ksi_client),
 ):
     return await ksi_client.get_match_info(match_id)
+
+
+@router.post(
+    "/{teamId}/resolve-roster",
+    response_model=TeamLineup,
+    operation_id="resolve_roster",
+)
+async def resolve_roster(
+    body: ResolveRosterRequest,
+    team_id: int = Path(alias="teamId"),
+    ksi_client: KsiClient = Depends(get_ksi_client),
+):
+    return await ksi_client.resolve_roster(body.starters, body.substitutes)

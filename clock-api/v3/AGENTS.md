@@ -40,6 +40,7 @@ clock-api/v3/
 | GET | `/{team_id}/matches/{match_id}/lineups` | Lineups for a match |
 | GET | `/{team_id}/matches/{match_id}/events` | Events (goals, cards, subs) for a match |
 | GET | `/{team_id}/matches/{match_id}/info` | Detailed match info |
+| POST | `/{teamId}/resolve-roster` | Resolve shirt numbers to player names from recent match history |
 | GET | `/weather?lat=&lon=` | Weather at coordinates (OpenWeatherMap with vedur.is fallback) |
 
 Note: App is mounted at `root_path="/v3"`, so full production paths are `/v3/health`, `/v3/{team_id}/matches/...`, etc.
@@ -49,6 +50,7 @@ Note: App is mounted at `root_path="/v3"`, so full production paths are `/v3/hea
 **Analyticom KSI API** (`api-ksi.analyticom.de`):
 REST API for Icelandic football data. Requires `API_KEY` header on all requests.
 - Match list: `GET /api/live/matchList/{date}/{utcOffset}?teamIdFilter={teamId}`
+- Past matches (paginated): `GET /api/live/team/{teamId}/matches/paginated/past/{utcOffset}?page=1&pageSize=10`
 - Lineups: `GET /api/live/match/{matchId}/lineups`
 - Events: `GET /api/live/match/{matchId}/events`
 - Match info: `GET /api/live/match/{matchId}`

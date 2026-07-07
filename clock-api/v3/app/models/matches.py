@@ -142,6 +142,40 @@ class MatchEventType(BaseModel):
     name: str
 
 
+class ResolveRosterRequest(BaseModel):
+    starters: list[int]
+    substitutes: list[int] = []
+
+    @field_validator("starters")
+    @classmethod
+    def starters_exactly_11(cls, v: list[int]) -> list[int]:
+        if len(v) != 11:
+            raise ValueError("starters must contain exactly 11 numbers")
+        return v
+
+    @field_validator("substitutes")
+    @classmethod
+    def substitutes_max_12(cls, v: list[int]) -> list[int]:
+        if len(v) > 12:
+            raise ValueError("substitutes must contain at most 12 numbers")
+        return v
+
+    @field_validator("starters", "substitutes", mode="after")
+    @classmethod
+    def positive_integers(cls, v: list[int]) -> list[int]:
+        for n in v:
+            if n <= 0:
+                raise ValueError("all shirt numbers must be positive")
+        return v
+
+    @model_validator(mode="after")
+    def no_duplicate_numbers(self) -> "ResolveRosterRequest":
+        all_numbers = self.starters + self.substitutes
+        if len(all_numbers) != len(set(all_numbers)):
+            raise ValueError("duplicate shirt numbers not allowed")
+        return self
+
+
 class MatchEvent(BaseModel):
     eventId: int
     eventType: MatchEventType

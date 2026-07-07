@@ -5,6 +5,7 @@ import { RingLoader } from "react-spinners";
 import Team from "./Team";
 import SubView from "./SubView";
 import TeamPlayerSelectionModal from "./TeamPlayerSelectionModal";
+import ResolveRosterModal from "./ResolveRosterModal";
 import assetTypes from "../AssetTypes";
 import { getMOTMAsset, getPlayerAssetObject } from "./assetHelpers";
 import { Asset, Player } from "../../../types";
@@ -62,6 +63,9 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
   const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [modalTeamSide, setModalTeamSide] = useState<"home" | "away">("home");
   const [subOffPlayer, setSubOffPlayer] = useState<Player | null>(null);
+  const [resolveRosterSide, setResolveRosterSide] = useState<
+    "home" | "away" | null
+  >(null);
 
   const refetchRoster = (): void => {
     if (!match.ksiMatchId) return;
@@ -93,6 +97,12 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
     setSelectMOTM(false);
     setModalMode(null);
     setSubOffPlayer(null);
+  };
+
+  const handleResolveRosterConfirm = (players: Player[]): void => {
+    if (!resolveRosterSide) return;
+    setRoster({ ...roster, [resolveRosterSide]: players });
+    setResolveRosterSide(null);
   };
 
   const SUBS_QUEUE_NAME = "Skiptingar";
@@ -470,6 +480,16 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
             </button>
           </>
         ) : null}
+        {!hasPlayers &&
+        (side === "home" ? match.homeTeamId : match.awayTeamId) ? (
+          <button
+            type="button"
+            className="queue-team-btn"
+            onClick={() => setResolveRosterSide(side)}
+          >
+            Búa til leikmannahóp
+          </button>
+        ) : null}
         <Team teamName={teamName} selectPlayer={selectPlayerAction} />
       </div>
     );
@@ -545,6 +565,17 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
         instruction={getModalInstruction()}
         players={getModalPlayers()}
         onSelect={handleModalSelect}
+      />
+      <ResolveRosterModal
+        open={resolveRosterSide !== null}
+        onClose={() => setResolveRosterSide(null)}
+        teamId={
+          resolveRosterSide === "home" ? match.homeTeamId : match.awayTeamId
+        }
+        teamName={
+          resolveRosterSide === "home" ? match.homeTeam : match.awayTeam
+        }
+        onConfirm={handleResolveRosterConfirm}
       />
     </div>
   );
