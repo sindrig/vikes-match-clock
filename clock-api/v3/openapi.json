@@ -231,6 +231,59 @@
         }
       }
     },
+    "/v3/{teamId}/resolve-roster": {
+      "post": {
+        "tags": [
+          "matches",
+          "matches"
+        ],
+        "summary": "Resolve Roster",
+        "operationId": "resolve_roster",
+        "parameters": [
+          {
+            "name": "teamId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Teamid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveRosterRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamLineup"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v3/weather/": {
       "get": {
         "tags": [
@@ -809,6 +862,30 @@
           "name"
         ],
         "title": "Person"
+      },
+      "ResolveRosterRequest": {
+        "properties": {
+          "starters": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Starters"
+          },
+          "substitutes": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Substitutes",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "starters"
+        ],
+        "title": "ResolveRosterRequest"
       },
       "Result": {
         "properties": {
