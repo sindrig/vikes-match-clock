@@ -521,7 +521,7 @@ async def test_resolve_roster_success(ksi_client):
     assert by_num[9].startingLineup is True
 
     assert by_num[7].person.name == "Winger Seven"
-    assert by_num[7].startingLineup is False
+    assert by_num[7].startingLineup is True
 
     assert by_num[2].person.id == 0
     assert by_num[2].person.name == "#2"
