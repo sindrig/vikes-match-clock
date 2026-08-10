@@ -1,0 +1,22 @@
+[Unit]
+Description=Tailscale first-boot enrollment
+After=tailscaled.service network-online.target
+Wants=tailscaled.service network-online.target
+# Only run once; the script disables this unit after success.
+ConditionPathExists=!/var/lib/tailscale/.enrolled
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/tailscale-enroll.sh
+StandardOutput=append:/var/log/tailscale-enroll.log
+StandardError=append:/var/log/tailscale-enroll.log
+# Retry indefinitely: the script itself loops until success.
+# On any failure, systemd restarts the service after 60s.
+# No StartLimitBurst/StartLimitIntervalSec — retry forever.
+Restart=on-failure
+RestartSec=60
+# Do not rate-limit; connectivity may return after a long outage.
+StartLimitIntervalSec=0
+
+[Install]
+WantedBy=multi-user.target
