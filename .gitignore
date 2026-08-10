@@ -89,11 +89,8 @@ infra/devpod-creds/devpod-creds.txt
 screenshots/
 .opencode/
 
-# Local planning state and gateway build secrets/artifacts
+# Local planning state and gateway secrets/artifacts
 .slim/deepwork/
 /vikin-gateway/secrets.env
-/vikin-gateway/output/
 /vikin-gateway/.cache/
-/vikin-gateway/stage-vikin/03-enrollment-service/files/ts-auth-key
-/vikin-gateway/stage-vikin/03-enrollment-service/files/ts-enroll.conf
-/vikin-gateway/stage-vikin/01-network-config/files/wifi.nmconnection
+/vikin-gateway/*.img

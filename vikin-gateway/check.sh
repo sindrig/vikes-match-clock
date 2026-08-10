@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Static checks for vikin-gateway build system.
-# No actual image build; no secrets required. Safe to run in CI.
+# Static checks for vikin-gateway cloud-init provisioning kit.
+# No flashing required; no secrets required. Safe to run in CI.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-STAGE_DIR="${SCRIPT_DIR}/stage-vikin"
+BOOTFS_DIR="${SCRIPT_DIR}/bootfs"
 FAILURES=0
 
 pass() { echo "  PASS: $*"; }
@@ -18,19 +18,16 @@ echo ""
 
 echo "[1] Required files exist"
 required_files=(
-    "build.sh"
+    "flash.sh"
     "check.sh"
     "README.md"
     "secrets.env.example"
-    "${STAGE_DIR}/prerun.sh"
-    "${STAGE_DIR}/EXPORT_IMAGE"
-    "${STAGE_DIR}/00-install-tailscale/00-run.sh"
-    "${STAGE_DIR}/01-network-config/01-run.sh"
-    "${STAGE_DIR}/02-disable-openssh/02-run.sh"
-    "${STAGE_DIR}/03-enrollment-service/03-run.sh"
-    "${STAGE_DIR}/03-enrollment-service/files/tailscale-enroll.sh"
-    "${STAGE_DIR}/03-enrollment-service/files/tailscale-enroll.service"
-    "${STAGE_DIR}/04-cleanup/04-run.sh"
+    "${BOOTFS_DIR}/user-data"
+    "${BOOTFS_DIR}/network-config"
+    "${BOOTFS_DIR}/meta-data"
+    "${BOOTFS_DIR}/files/usr/local/bin/tailscale-enroll.sh"
+    "${BOOTFS_DIR}/files/usr/local/sbin/vikin-install-tailscale.sh"
+    "${BOOTFS_DIR}/files/etc/systemd/system/tailscale-enroll.service"
 )
 for f in "${required_files[@]}"; do
     if [[ -f "${f}" ]]; then
@@ -41,38 +38,14 @@ for f in "${required_files[@]}"; do
 done
 echo ""
 
-# --- 2. Expected stage list ---
+# --- 2. Bash syntax checks ---
 
-echo "[2] Expected stage list (stage-vikin stages)"
-expected_stages=(
-    "00-install-tailscale"
-    "01-network-config"
-    "02-disable-openssh"
-    "03-enrollment-service"
-    "04-cleanup"
-)
-for stage in "${expected_stages[@]}"; do
-    if [[ -d "${STAGE_DIR}/${stage}" ]]; then
-        pass "stage ${stage}/"
-    else
-        fail "stage ${stage}/ not found"
-    fi
-done
-echo ""
-
-# --- 3. Bash syntax checks ---
-
-echo "[3] Bash syntax checks"
+echo "[2] Bash syntax checks"
 bash_files=(
-    "build.sh"
+    "flash.sh"
     "check.sh"
-    "${STAGE_DIR}/prerun.sh"
-    "${STAGE_DIR}/00-install-tailscale/00-run.sh"
-    "${STAGE_DIR}/01-network-config/01-run.sh"
-    "${STAGE_DIR}/02-disable-openssh/02-run.sh"
-    "${STAGE_DIR}/03-enrollment-service/03-run.sh"
-    "${STAGE_DIR}/03-enrollment-service/files/tailscale-enroll.sh"
-    "${STAGE_DIR}/04-cleanup/04-run.sh"
+    "${BOOTFS_DIR}/files/usr/local/bin/tailscale-enroll.sh"
+    "${BOOTFS_DIR}/files/usr/local/sbin/vikin-install-tailscale.sh"
 )
 for f in "${bash_files[@]}"; do
     if bash -n "${f}" 2>/dev/null; then
@@ -84,131 +57,169 @@ for f in "${bash_files[@]}"; do
 done
 echo ""
 
-# --- 4. Build config checks ---
+# --- 3. cloud-init YAML sanity (render with dummy secrets, then validate) ---
 
-echo "[4] Build configuration checks"
-build_sh="${SCRIPT_DIR}/build.sh"
-
-if grep -q "DEPLOY_COMPRESSION=none" "${build_sh}" 2>/dev/null; then
-    pass "DEPLOY_COMPRESSION=none in build.sh"
+echo "[3] cloud-init YAML sanity"
+ud="${BOOTFS_DIR}/user-data"
+if head -n1 "${ud}" | grep -q '^#cloud-config$'; then
+    pass "user-data starts with #cloud-config"
 else
-    fail "DEPLOY_COMPRESSION=none not set in build.sh"
+    fail "user-data does not start with #cloud-config"
 fi
 
-if grep -q "^EXPORT_IMAGE=1" "${build_sh}" 2>/dev/null; then
-    fail "EXPORT_IMAGE=1 should not be in build.sh config (use stage EXPORT_IMAGE file)"
+nc="${BOOTFS_DIR}/network-config"
+if grep -q '^network:$' "${nc}" 2>/dev/null; then
+    pass "network-config declares 'network:' top-level key"
 else
-    pass "no EXPORT_IMAGE=1 in build.sh"
+    fail "network-config missing 'network:' top-level key"
 fi
 
-if grep -q "PI_GEN_BRANCH" "${build_sh}" 2>/dev/null; then
-    pass "PI_GEN_BRANCH defined in build.sh"
+# Regression guard: 'regulatory-domain' broke netplan on RPi OS Trixie and
+# took down ALL networking on first boot. It must never come back.
+if grep -v '^\s*#' "${nc}" 2>/dev/null | grep -q 'regulatory-domain'; then
+    fail "network-config contains 'regulatory-domain' (netplan-invalid on Trixie — took down all networking)"
 else
-    fail "PI_GEN_BRANCH not defined in build.sh"
+    pass "network-config has no 'regulatory-domain' (regression guard)"
 fi
 
-if grep -q "PI_GEN_COMMIT" "${build_sh}" 2>/dev/null; then
-    pass "PI_GEN_COMMIT defined in build.sh"
+# End-to-end render with dummy secrets into a temp sandbox, then validate the
+# rendered YAML. Exercises the real flash.sh render pipeline without secrets.
+_sandbox="$(mktemp -d)"
+trap 'rm -rf "${_sandbox}"' EXIT
+cp -r "${BOOTFS_DIR}" "${_sandbox}/bootfs"
+cp "${SCRIPT_DIR}/flash.sh" "${_sandbox}/flash.sh"
+cat > "${_sandbox}/secrets.env" <<'EOF'
+TS_AUTH_KEY="tskey-auth-CHECK-DUMMY"
+WIFI_COUNTRY="IS"
+WIFI_SSID="check-network"
+WIFI_PSK="check-psk-passphrase"
+TS_TAGS="tag:gateway"
+TS_HOSTNAME="vikin-gateway"
+EOF
+if (cd "${_sandbox}" && bash flash.sh --no-write >/dev/null 2>&1); then
+    pass "flash.sh --no-write renders with dummy secrets"
 else
-    fail "PI_GEN_COMMIT not defined in build.sh"
+    fail "flash.sh --no-write failed in sandbox (render pipeline broken)"
 fi
 
-# pi-gen uses WPA_COUNTRY, not WIFI_COUNTRY, for the Wi-Fi regulatory domain.
-# Our build config must map our WIFI_COUNTRY secret to WPA_COUNTRY for pi-gen.
-if grep -q 'WPA_COUNTRY=.*WIFI_COUNTRY' "${build_sh}" 2>/dev/null; then
-    pass "build config maps WIFI_COUNTRY to WPA_COUNTRY for pi-gen"
+if command -v python3 &>/dev/null; then
+    if python3 -c 'import sys, yaml; yaml.safe_load(open(sys.argv[1]))' \
+        "${_sandbox}/.cache/flash-staging/boot/user-data" 2>/dev/null; then
+        pass "rendered user-data parses as valid YAML"
+    else
+        fail "rendered user-data is NOT valid YAML"
+    fi
+    if python3 -c 'import sys, yaml; yaml.safe_load(open(sys.argv[1]))' \
+        "${_sandbox}/.cache/flash-staging/boot/network-config" 2>/dev/null; then
+        pass "rendered network-config parses as valid YAML"
+    else
+        fail "rendered network-config is NOT valid YAML"
+    fi
+    # Semantic checks on the rendered output
+    if python3 -c 'import sys, yaml; d = yaml.safe_load(open(sys.argv[1])); assert "eth0" in d["network"]["ethernets"], "eth0 missing"' \
+        "${_sandbox}/.cache/flash-staging/boot/network-config" 2>/dev/null; then
+        pass "rendered network-config configures eth0"
+    else
+        fail "rendered network-config missing eth0"
+    fi
+    if python3 -c 'import sys, yaml; d = yaml.safe_load(open(sys.argv[1])); assert "regulatory-domain" not in str(d), "regulatory-domain present"' \
+        "${_sandbox}/.cache/flash-staging/boot/network-config" 2>/dev/null; then
+        pass "rendered network-config has no regulatory-domain (regression guard)"
+    else
+        fail "rendered network-config contains regulatory-domain"
+    fi
+    if grep -q 'check-network' "${_sandbox}/.cache/flash-staging/root/etc/NetworkManager/system-connections/wifi.nmconnection" 2>/dev/null; then
+        pass "Wi-Fi rendered as NM connection profile on rootfs"
+    else
+        fail "Wi-Fi NM connection profile missing from rendered rootfs"
+    fi
 else
-    fail "build config missing WPA_COUNTRY mapping (pi-gen expects WPA_COUNTRY, not WIFI_COUNTRY)"
-fi
-
-# The custom stage script must reference WPA_COUNTRY (set by pi-gen from config).
-network_script="${STAGE_DIR}/01-network-config/01-run.sh"
-if grep -q 'WPA_COUNTRY' "${network_script}" 2>/dev/null; then
-    pass "01-network-config uses WPA_COUNTRY (pi-gen variable name)"
-else
-    fail "01-network-config does not use WPA_COUNTRY (should reference pi-gen variable, not WIFI_COUNTRY)"
-fi
-if grep -q 'WIFI_COUNTRY' "${network_script}" 2>/dev/null; then
-    fail "01-network-config still references WIFI_COUNTRY (should be WPA_COUNTRY in pi-gen context)"
-else
-    pass "01-network-config has no stale WIFI_COUNTRY references"
-fi
-
-# Tag normalization: build.sh must normalize whitespace out of TS_TAGS after validation.
-if grep -q 'TS_TAGS=.*\[\[:space:\]\]' "${build_sh}" 2>/dev/null; then
-    pass "TS_TAGS normalized (whitespace stripped) after validation"
-else
-    fail "TS_TAGS not normalized after validation (missing whitespace removal)"
-fi
-
-# Check prerun.sh contains copy_previous
-if grep -q "copy_previous" "${STAGE_DIR}/prerun.sh" 2>/dev/null; then
-    pass "prerun.sh calls copy_previous"
-else
-    fail "prerun.sh does not call copy_previous"
+    warn "python3 not found — skipping rendered YAML validation"
 fi
 echo ""
 
-# --- 5. No secrets tracked by git ---
+# --- 4. Templates contain only known placeholders (no secrets) ---
 
-echo "[5] No secrets or artifacts accidentally tracked by git"
-cd "${SCRIPT_DIR}"
-git_tracked_secrets=()
-# Check if running inside a git repo
-if git rev-parse --is-inside-work-tree &>/dev/null; then
-    # Patterns that should never be tracked
-    forbid_patterns=(
-        "secrets.env"
-        "ts-auth-key.env"
-        "ts-auth-key"
-        "ts-enroll.conf"
-        "*.img"
-        "output/"
-        ".cache/"
-    )
-    for pattern in "${forbid_patterns[@]}"; do
-        # Use git ls-files to check if any matching files are tracked
-        while IFS= read -r tracked; do
-            if [[ -n "${tracked}" ]]; then
-                git_tracked_secrets+=("${tracked}")
+echo "[4] Template placeholder hygiene"
+known_placeholders=(
+    "__TS_HOSTNAME__"
+    "__WIFI_COUNTRY__"
+)
+for tpl in "${BOOTFS_DIR}/user-data" "${BOOTFS_DIR}/network-config" "${BOOTFS_DIR}/meta-data"; do
+    # Skip comment lines; scan for __NAME__ tokens
+    while IFS= read -r token; do
+        if [[ -z "${token}" ]]; then
+            continue
+        fi
+        known=0
+        for kp in "${known_placeholders[@]}"; do
+            if [[ "${token}" == "${kp}" ]]; then
+                known=1
+                break
             fi
-        done < <(git ls-files -- "${pattern}" 2>/dev/null || true)
-    done
-
-    if [[ ${#git_tracked_secrets[@]} -eq 0 ]]; then
-        pass "no secrets/artifacts tracked by git"
-    else
-        for f in "${git_tracked_secrets[@]}"; do
-            fail "secret/artifact tracked by git: ${f}"
         done
-    fi
+        if [[ ${known} -eq 1 ]]; then
+            pass "${tpl}: placeholder ${token} is known"
+        else
+            fail "${tpl}: UNKNOWN placeholder ${token} (possible secret in template!)"
+        fi
+    done < <(grep -v '^\s*#' "${tpl}" 2>/dev/null | grep -oE '__[A-Za-z0-9_]+__' || true)
+done
+echo ""
+
+# --- 5. Tailscale install script security ---
+
+echo "[5] Install script checks"
+install_script="${BOOTFS_DIR}/files/usr/local/sbin/vikin-install-tailscale.sh"
+if grep -q 'signed-by=' "${install_script}" 2>/dev/null; then
+    pass "install script uses signed-by apt repo directive"
 else
-    warn "not a git repository, skipping git tracking check"
+    fail "install script missing signed-by directive"
+fi
+if grep -v '^\s*#' "${install_script}" | grep -qE 'curl .*\|.*sh' 2>/dev/null; then
+    fail "install script uses curl-pipe-sh (forbidden)"
+else
+    pass "no curl-pipe-sh in install script"
 fi
 echo ""
 
-# --- 6. secrets.env.example has required variables ---
+# --- 6. Enrollment script safety checks ---
 
-echo "[6] secrets.env.example contains required variables"
-example_file="${SCRIPT_DIR}/secrets.env.example"
-required_vars=(TS_AUTH_KEY WIFI_COUNTRY TS_TAGS)
-for var in "${required_vars[@]}"; do
-    if grep -q "^${var}=" "${example_file}" 2>/dev/null; then
-        pass "${var} defined in secrets.env.example"
-    else
-        fail "${var} missing from secrets.env.example"
-    fi
-done
+echo "[6] Enrollment script safety checks"
+enroll="${BOOTFS_DIR}/files/usr/local/bin/tailscale-enroll.sh"
+if grep -v '^\s*#' "${enroll}" | grep -q '\bsource\b\|\beval\b' 2>/dev/null; then
+    fail "enrollment script uses source/eval (unsafe)"
+else
+    pass "no source/eval in enrollment script (non-comment lines)"
+fi
+if grep -q "CONF_FILE" "${enroll}" 2>/dev/null; then
+    pass "reads config file (CONF_FILE)"
+else
+    fail "does not read CONF_FILE"
+fi
+if grep -v '^\s*#' "${enroll}" | grep -q '\-\-authkey' 2>/dev/null; then
+    fail "enrollment script uses --authkey (use --auth-key=file: instead)"
+else
+    pass "no --authkey in enrollment script"
+fi
+if grep -v '^\s*#' "${enroll}" | grep -q '\-\-auth-key=.*file:' 2>/dev/null; then
+    pass "enrollment script uses --auth-key=file: (not env/argv)"
+else
+    fail "enrollment script does not use --auth-key=file:"
+fi
+if grep -v '^\s*#' "${enroll}" | grep -q 'TS_AUTHKEY' 2>/dev/null; then
+    fail "enrollment script references TS_AUTHKEY env var (should use file: only)"
+else
+    pass "no TS_AUTHKEY env var references in enrollment script"
+fi
 echo ""
 
 # --- 7. Service file correctness ---
 
 echo "[7] Service file checks"
-svc_file="${STAGE_DIR}/03-enrollment-service/files/tailscale-enroll.service"
-# Check After= and Wants= lines for both targets
+svc_file="${BOOTFS_DIR}/files/etc/systemd/system/tailscale-enroll.service"
 after_line="$(grep '^After=' "${svc_file}" 2>/dev/null || true)"
 wants_line="$(grep '^Wants=' "${svc_file}" 2>/dev/null || true)"
-
 if echo "${after_line}" | grep -q "tailscaled.service"; then
     pass "After= includes tailscaled.service"
 else
@@ -246,74 +257,82 @@ else
 fi
 echo ""
 
-# --- 8. Enrollment script safety checks ---
+# --- 8. flash.sh checks ---
 
-echo "[8] Enrollment script safety checks"
-enroll="${STAGE_DIR}/03-enrollment-service/files/tailscale-enroll.sh"
-# Check for source/eval in non-comment lines only
-if grep -v '^\s*#' "${enroll}" | grep -q '\bsource\b\|\beval\b' 2>/dev/null; then
-    fail "enrollment script uses source/eval (unsafe)"
+echo "[8] flash.sh checks"
+flash_sh="${SCRIPT_DIR}/flash.sh"
+if grep -q '\-\-no-write' "${flash_sh}" 2>/dev/null; then
+    pass "flash.sh supports --no-write dry run"
 else
-    pass "no source/eval in enrollment script (non-comment lines)"
+    fail "flash.sh missing --no-write dry-run mode"
 fi
-if grep -q "CONF_FILE" "${enroll}" 2>/dev/null; then
-    pass "reads config file (CONF_FILE)"
+if grep -q '__TS_HOSTNAME__' "${flash_sh}" 2>/dev/null; then
+    pass "flash.sh renders __TS_HOSTNAME__"
 else
-    fail "does not read CONF_FILE"
+    fail "flash.sh does not render __TS_HOSTNAME__"
 fi
-# Auth key must be passed via --auth-key=file: (not --authkey, not env)
-if grep -v '^\s*#' "${enroll}" | grep -q '\-\-authkey' 2>/dev/null; then
-    fail "enrollment script uses --authkey (use --auth-key=file: instead)"
+if grep -q '__WIFI_COUNTRY__' "${flash_sh}" 2>/dev/null; then
+    pass "flash.sh renders __WIFI_COUNTRY__"
 else
-    pass "no --authkey in enrollment script"
+    fail "flash.sh does not render __WIFI_COUNTRY__"
 fi
-if grep -v '^\s*#' "${enroll}" | grep -q '\-\-auth-key=.*file:' 2>/dev/null; then
-    pass "enrollment script uses --auth-key=file: (not env/argv)"
+if grep -q 'wifi.nmconnection' "${flash_sh}" 2>/dev/null; then
+    pass "flash.sh renders the Wi-Fi NM connection profile"
 else
-    fail "enrollment script does not use --auth-key=file:"
+    fail "flash.sh does not render the Wi-Fi NM connection profile"
 fi
-# Must not reference TS_AUTHKEY env var
-if grep -v '^\s*#' "${enroll}" | grep -q 'TS_AUTHKEY' 2>/dev/null; then
-    fail "enrollment script references TS_AUTHKEY env var (should use file: only)"
+if grep -q 'tailscale-auth-key' "${flash_sh}" 2>/dev/null; then
+    pass "flash.sh writes the auth key to the rootfs"
 else
-    pass "no TS_AUTHKEY env var references in enrollment script"
+    fail "flash.sh does not write the auth key to the rootfs"
 fi
 echo ""
 
-# --- 9. Cleanup and cache path checks ---
+# --- 9. No secrets tracked by git ---
 
-echo "[9] Cleanup and cache path checks"
-if grep -q "PI_GEN_DIR" "${build_sh}" 2>/dev/null; then
-    pass "cleanup references PI_GEN_DIR for cached stage cleanup"
+echo "[9] No secrets or artifacts accidentally tracked by git"
+cd "${SCRIPT_DIR}"
+git_tracked_secrets=()
+if git rev-parse --is-inside-work-tree &>/dev/null; then
+    forbid_patterns=(
+        "secrets.env"
+        "ts-auth-key"
+        "ts-enroll.conf"
+        "*.img"
+        ".cache/"
+    )
+    for pattern in "${forbid_patterns[@]}"; do
+        while IFS= read -r tracked; do
+            if [[ -n "${tracked}" ]]; then
+                git_tracked_secrets+=("${tracked}")
+            fi
+        done < <(git ls-files -- "${pattern}" 2>/dev/null || true)
+    done
+
+    if [[ ${#git_tracked_secrets[@]} -eq 0 ]]; then
+        pass "no secrets/artifacts tracked by git"
+    else
+        for f in "${git_tracked_secrets[@]}"; do
+            fail "secret/artifact tracked by git: ${f}"
+        done
+    fi
 else
-    fail "cleanup does not reference PI_GEN_DIR"
-fi
-if grep -q "stage-vikin" "${build_sh}" 2>/dev/null; then
-    pass "cleanup references stage-vikin cached files"
-else
-    fail "cleanup does not reference stage-vikin cached files"
-fi
-if grep -q "shred" "${build_sh}" 2>/dev/null; then
-    pass "cleanup uses shred for secure deletion"
-else
-    fail "cleanup does not use shred"
+    warn "not a git repository, skipping git tracking check"
 fi
 echo ""
 
-# --- 10. Password locking in disable-openssh stage ---
+# --- 10. secrets.env.example has required variables ---
 
-echo "[10] Password locking checks"
-ssh_stage="${STAGE_DIR}/02-disable-openssh/02-run.sh"
-if grep -q "passwd -l root" "${ssh_stage}" 2>/dev/null; then
-    pass "root password locked"
-else
-    fail "root password not explicitly locked"
-fi
-if grep -q "passwd -l vikin" "${ssh_stage}" 2>/dev/null; then
-    pass "vikin password locked"
-else
-    fail "vikin password not explicitly locked"
-fi
+echo "[10] secrets.env.example contains required variables"
+example_file="${SCRIPT_DIR}/secrets.env.example"
+required_vars=(TS_AUTH_KEY WIFI_COUNTRY TS_TAGS)
+for var in "${required_vars[@]}"; do
+    if grep -q "^${var}=" "${example_file}" 2>/dev/null; then
+        pass "${var} defined in secrets.env.example"
+    else
+        fail "${var} missing from secrets.env.example"
+    fi
+done
 echo ""
 
 # --- Summary ---
