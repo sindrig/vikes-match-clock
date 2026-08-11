@@ -9,6 +9,7 @@ import type {
   Asset,
   ViewPort,
   QueueState,
+  PerimeterState,
 } from "../types";
 import { Sports, DEFAULT_THEME } from "../constants";
 
@@ -393,6 +394,16 @@ export function parseQueueMap(data: unknown): Record<string, QueueState> {
   }
 
   return result;
+}
+
+export function parsePerimeterState(data: unknown): PerimeterState | undefined {
+  if (!data || typeof data !== "object") return undefined;
+
+  const raw = data as Record<string, unknown>;
+  const enabled = typeof raw.enabled === "boolean" ? raw.enabled : false;
+  const state = raw.state === "on" || raw.state === "off" ? raw.state : "off";
+
+  return { enabled, state };
 }
 
 export function parseClubOverrides(

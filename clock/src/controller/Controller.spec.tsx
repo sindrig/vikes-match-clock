@@ -43,6 +43,9 @@ vi.mock("./MatchActionSettings", () => ({
     <div data-testid="match-action-settings">MatchActionSettings</div>
   ),
 }));
+vi.mock("./PerimeterControl", () => ({
+  default: () => <div data-testid="perimeter-control">PerimeterControl</div>,
+}));
 vi.mock("./media/MediaManager", () => ({
   default: () => <div data-testid="media-manager">MediaManager</div>,
 }));
@@ -471,6 +474,15 @@ describe("Controller", () => {
 
       expect(screen.getByTestId("match-action-settings")).toBeInTheDocument();
       expect(screen.getByRole("dialog")).toBeInTheDocument();
+    });
+
+    it("renders PerimeterControl inside the settings modal", () => {
+      setupState3();
+      render(<Controller />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Stillingar" }));
+
+      expect(screen.getByTestId("perimeter-control")).toBeInTheDocument();
     });
 
     it("switches to Myndefni tab locally", () => {

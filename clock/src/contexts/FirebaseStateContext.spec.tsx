@@ -7,6 +7,7 @@ import {
   useMatch,
   useController,
   useView,
+  usePerimeter,
 } from "./FirebaseStateContext";
 import { Asset, Roster, ViewPort } from "../types";
 import { Sports, DEFAULT_HALFSTOPS } from "../constants";
@@ -69,6 +70,22 @@ const TestViewConsumer = ({
   }, [viewApi, onMount]);
   return (
     <div data-testid="view-consumer">Background: {viewApi.view.background}</div>
+  );
+};
+
+const TestPerimeterConsumer = ({
+  onMount,
+}: {
+  onMount: (api: ReturnType<typeof usePerimeter>) => void;
+}) => {
+  const perimeterApi = usePerimeter();
+  React.useEffect(() => {
+    onMount(perimeterApi);
+  }, [perimeterApi, onMount]);
+  return (
+    <div data-testid="perimeter-consumer">
+      State: {perimeterApi.perimeter.state}
+    </div>
   );
 };
 
@@ -2064,6 +2081,91 @@ describe("FirebaseStateContext", () => {
         expect(pauseData.timeElapsed).toBeGreaterThanOrEqual(0);
         expect(pauseData.timeElapsed).toBeLessThan(100);
       }
+    });
+  });
+
+  describe("perimeter", () => {
+    function renderPerimeter(
+      listenPrefix: string,
+      isAuthenticated: boolean,
+      data: unknown = null,
+    ): ReturnType<typeof usePerimeter> | null {
+      vi.mocked(onValue).mockImplementation((reference, callback) => {
+        const path = String(reference);
+        if (path.includes("/perimeter")) {
+          callback({ val: () => data } as never);
+        } else {
+          callback({ val: () => null } as never);
+        }
+        return vi.fn();
+      });
+
+      let perimeterApi: ReturnType<typeof usePerimeter> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix={listenPrefix}
+          isAuthenticated={isAuthenticated}
+          screenKey={null}
+        >
+          <TestPerimeterConsumer
+            onMount={(api) => {
+              perimeterApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      return perimeterApi;
+    }
+
+    it("parses perimeter state from the Firebase subscription", () => {
+      const perimeterApi = renderPerimeter("vikuti", true, {
+        enabled: true,
+        state: "on",
+      });
+
+      expect(perimeterApi).not.toBeNull();
+      expect(perimeterApi!.perimeter).toEqual({ enabled: true, state: "on" });
+    });
+
+    it("defaults to disabled and off when Firebase has no perimeter data", () => {
+      const perimeterApi = renderPerimeter("vikuti", true);
+
+      expect(perimeterApi).not.toBeNull();
+      expect(perimeterApi!.perimeter).toEqual({ enabled: false, state: "off" });
+    });
+
+    it("setPerimeterState writes state to Firebase when authenticated", () => {
+      const perimeterApi = renderPerimeter("vikuti", true);
+
+      act(() => {
+        perimeterApi!.setPerimeterState("on");
+      });
+
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "vikuti",
+        "perimeter",
+        { state: "on" },
+      );
+    });
+
+    it("blocks setPerimeterState when not authenticated", () => {
+      const perimeterApi = renderPerimeter("vikuti", false);
+
+      act(() => {
+        perimeterApi!.setPerimeterState("on");
+      });
+
+      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
+    });
+
+    it("blocks setPerimeterState when listenPrefix is empty", () => {
+      const perimeterApi = renderPerimeter("", true);
+
+      act(() => {
+        perimeterApi!.setPerimeterState("off");
+      });
+
+      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
     });
   });
 });

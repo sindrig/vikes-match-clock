@@ -30,6 +30,7 @@ import {
   TwoMinPenalty,
   QueueState,
   ClubOverride,
+  PerimeterState,
 } from "../types";
 import { Sports, DEFAULT_HALFSTOPS } from "../constants";
 import { msUntilMatchStart } from "../utils/timeUtils";
@@ -41,6 +42,7 @@ import {
   parseController,
   parseView,
   parseClubOverrides,
+  parsePerimeterState,
 } from "./firebaseParsers";
 
 const HALFTIME_DURATION_MS = 15 * 60 * 1000;
@@ -104,6 +106,8 @@ const defaultListeners: ListenersState = {
 
 const defaultClubOverrides: Record<string, ClubOverride> = {};
 
+const defaultPerimeter: PerimeterState = { enabled: false, state: "off" };
+
 export function computeControllerDiff(
   prev: ControllerState,
   next: ControllerState,
@@ -147,6 +151,7 @@ interface FirebaseStateContextType {
   view: ViewState;
   listeners: ListenersState;
   clubOverrides: Record<string, ClubOverride>;
+  perimeter: PerimeterState;
   ready: boolean;
 
   updateMatch: (updates: Partial<Match>) => void;
@@ -235,6 +240,8 @@ interface FirebaseStateContextType {
     override: Omit<ClubOverride, "logoUrl"> & { logoFile: File },
   ) => Promise<void>;
   deleteClubOverride: (id: string) => Promise<void>;
+
+  setPerimeterState: (state: PerimeterState["state"]) => void;
 }
 
 const FirebaseStateContext = createContext<FirebaseStateContextType | null>(
@@ -373,6 +380,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   const [listeners, setListeners] = useState<ListenersState>(defaultListeners);
   const [clubOverrides, setClubOverrides] =
     useState<Record<string, ClubOverride>>(defaultClubOverrides);
+  const [perimeter, setPerimeter] = useState<PerimeterState>(defaultPerimeter);
   const [ready, setReady] = useState(!listenPrefix);
 
   const matchRef = useRef(match);
@@ -444,6 +452,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       const controllerPath = `states/${listenPrefix}/controller`;
       const viewPath = `states/${listenPrefix}/view`;
       const clubOverridesPath = `states/${listenPrefix}/clubOverrides`;
+      const perimeterPath = `states/${listenPrefix}/perimeter`;
 
       const unsubMatch = onValue(
         ref(database, matchPath),
@@ -503,11 +512,21 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
           console.error("Firebase clubOverrides subscription error:", error),
       );
 
+      const unsubPerimeter = onValue(
+        ref(database, perimeterPath),
+        (snapshot) => {
+          setPerimeter(parsePerimeterState(snapshot.val()) ?? defaultPerimeter);
+        },
+        (error) =>
+          console.error("Firebase perimeter subscription error:", error),
+      );
+
       return () => {
         unsubMatch();
         unsubController();
         unsubView();
         unsubClubOverrides();
+        unsubPerimeter();
       };
     }
   }, [listenPrefix]);
@@ -1438,6 +1457,17 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     [listenPrefix, isAuthenticated],
   );
 
+  const setPerimeterState = useCallback(
+    (state: PerimeterState["state"]) => {
+      if (!listenPrefix || !isAuthenticated) return;
+
+      firebaseDatabase
+        .syncState(listenPrefix, "perimeter", { state })
+        .catch(console.error);
+    },
+    [isAuthenticated, listenPrefix],
+  );
+
   // Resolve viewport from live Firebase locations data by screenKey.
   // When admin changes screen dimensions, listeners updates and this recomputes.
   // Filter by listenPrefix (location key) since multiple locations can have
@@ -1458,6 +1488,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       view: effectiveView,
       listeners,
       clubOverrides,
+      perimeter,
       ready,
       updateMatch,
       startMatch,
@@ -1516,6 +1547,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       deleteCustomPreset,
       saveClubOverride,
       deleteClubOverride,
+      setPerimeterState,
     }),
     [
       match,
@@ -1523,6 +1555,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       effectiveView,
       listeners,
       clubOverrides,
+      perimeter,
       ready,
       updateMatch,
       startMatch,
@@ -1581,6 +1614,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       deleteCustomPreset,
       saveClubOverride,
       deleteClubOverride,
+      setPerimeterState,
     ],
   );
 
@@ -1751,4 +1785,9 @@ export const useClubOverrides = () => {
     saveClubOverride,
     deleteClubOverride,
   };
+};
+
+export const usePerimeter = () => {
+  const { perimeter, setPerimeterState } = useFirebaseState();
+  return { perimeter, setPerimeterState };
 };

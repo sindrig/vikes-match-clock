@@ -55,6 +55,46 @@ Multiple controllers can connect to the same `listenPrefix` simultaneously:
 - Uses **last-write-wins** semantics (no conflict resolution)
 - For production use, coordinate with your team to avoid simultaneous edits
 
+### Perimeter Control
+
+The perimeter LED screens at the Víkin stadium are driven by a dedicated
+Resolume Arena composition. Control flows through the **fourth** Firebase
+state subtree, `states/${listenPrefix}/perimeter`:
+
+```json
+{
+  "enabled": true,
+  "state": "on"
+}
+```
+
+- `enabled` is an admin-created UI feature flag: the controller only shows the
+  perimeter control when `enabled === true`.
+- `state` is the desired state, either `"on"` or `"off"`.
+
+**Frontend** (`clock/`):
+
+- `parsePerimeterState()` in `firebaseParsers.ts` preserves `enabled` only when
+  boolean and `state` only when `"on"`/`"off"` (anything else falls back to
+  disabled/off).
+- `FirebaseStateContext.tsx` subscribes independently to
+  `states/${listenPrefix}/perimeter` and exposes the parsed `perimeter` state
+  plus the authenticated `setPerimeterState(state)` write action (writes only
+  `{ state }`, never `enabled`).
+- `PerimeterControl.tsx` renders the Icelandic `Kveikt` / `Slökkt` control and
+  self-hides when `perimeter.enabled !== true`. It is mounted inside the
+  `Stillingar` dialog in `Controller.tsx`.
+- Follows the 100% Firebase model: the UI writes to Firebase and updates only
+  after the subscription receives the new value (no optimistic updates).
+
+**Daemon** (`perimeter-control/` at repo root): a systemd-managed Python
+service streams `states/vikuti/perimeter/state` from Firebase RTDB over SSE
+and applies it to Resolume — `off` → `POST /api/v1/composition/disconnect-all`
+(global stop), `on` → `POST /api/v1/composition/columns/1/connect`. It replays
+the current state on every reconnect and retries Resolume failures with
+bounded exponential backoff, superseded by any newer Firebase value. See
+`perimeter-control/README.md` for installation and operation.
+
 ### The `listenPrefix` System
 
 The `listenPrefix` (e.g., `"vikinni"`, `"hasteinsvollur"`) determines which Firebase path the instance subscribes to:
@@ -62,6 +102,7 @@ The `listenPrefix` (e.g., `"vikinni"`, `"hasteinsvollur"`) determines which Fire
 - `states/${listenPrefix}/match` - Match state (scores, clock, etc.)
 - `states/${listenPrefix}/controller` - Controller state (assets, view mode, etc.)
 - `states/${listenPrefix}/view` - View settings (viewport, background, etc.)
+- `states/${listenPrefix}/perimeter` - Perimeter LED control (see **Perimeter Control** below)
 
 Empty `listenPrefix` blocks all write operations (prevents invalid paths like `states//match`).
 

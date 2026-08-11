@@ -7,6 +7,7 @@ import {
   parseTheme,
   parseCustomPresets,
   parseClubOverrides,
+  parsePerimeterState,
 } from "./firebaseParsers";
 import { Sports, DEFAULT_HALFSTOPS, DEFAULT_THEME } from "../constants";
 import type {
@@ -1290,6 +1291,57 @@ describe("firebaseParsers", () => {
       };
       const result = parseClubOverrides(data);
       expect(result["uuid-1"]!.isOverride).toBe(true);
+    });
+  });
+
+  describe("parsePerimeterState", () => {
+    it("returns undefined for null input", () => {
+      expect(parsePerimeterState(null)).toBeUndefined();
+    });
+
+    it("returns undefined for undefined input", () => {
+      expect(parsePerimeterState(undefined)).toBeUndefined();
+    });
+
+    it("returns undefined for non-object input", () => {
+      expect(parsePerimeterState("on")).toBeUndefined();
+      expect(parsePerimeterState(123)).toBeUndefined();
+      expect(parsePerimeterState(true)).toBeUndefined();
+    });
+
+    it("parses enabled and state together", () => {
+      const result = parsePerimeterState({ enabled: true, state: "on" });
+      expect(result).toEqual({ enabled: true, state: "on" });
+    });
+
+    it("parses off state", () => {
+      const result = parsePerimeterState({ enabled: true, state: "off" });
+      expect(result).toEqual({ enabled: true, state: "off" });
+    });
+
+    it("defaults to disabled and off for an empty object", () => {
+      expect(parsePerimeterState({})).toEqual({
+        enabled: false,
+        state: "off",
+      });
+    });
+
+    it("does not preserve enabled when it is not a boolean", () => {
+      expect(parsePerimeterState({ enabled: "yes", state: "on" })).toEqual({
+        enabled: false,
+        state: "on",
+      });
+    });
+
+    it("does not preserve state when it is not on or off", () => {
+      expect(parsePerimeterState({ enabled: true, state: "paused" })).toEqual({
+        enabled: true,
+        state: "off",
+      });
+      expect(parsePerimeterState({ enabled: true, state: 1 })).toEqual({
+        enabled: true,
+        state: "off",
+      });
     });
   });
 });
