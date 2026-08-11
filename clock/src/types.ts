@@ -277,6 +277,12 @@ export interface ListenersState {
   }>;
 }
 
+// Perimeter LED (Resolume) state type
+export interface PerimeterState {
+  enabled: boolean;
+  state: "on" | "off";
+}
+
 // Root state type
 export interface RootState {
   match: Match;

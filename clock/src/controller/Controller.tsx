@@ -47,6 +47,7 @@ import HomeTeamSettingsModal from "./HomeTeamSettingsModal";
 import MediaManager from "./media/MediaManager";
 import RefreshHandler from "./RefreshHandler";
 import AssetController from "./asset/AssetController";
+import PerimeterControl from "./PerimeterControl";
 import "rsuite/dist/rsuite.min.css";
 import "./Controller.css";
 import {
@@ -335,6 +336,7 @@ const Controller = () => {
         </Modal.Header>
         <Modal.Body>
           <MatchActionSettings />
+          <PerimeterControl />
           <div className="theme-trigger-row">
             <div className="theme-trigger-info">
               <span className="theme-trigger-label">Klukku þema</span>
