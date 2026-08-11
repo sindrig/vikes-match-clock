@@ -16,7 +16,7 @@ import {
   deleteClubOverride as firebaseDeleteClubOverride,
 } from "../firebaseDatabase";
 import { ref, onValue } from "firebase/database";
-import { update } from "firebase/database";
+import { set } from "firebase/database";
 import {
   Match,
   ControllerState,
@@ -252,6 +252,10 @@ interface FirebaseStateContextType {
   deleteClubOverride: (id: string) => Promise<void>;
 
   setPerimeterState: (state: PerimeterState["state"]) => void;
+  setPerimeterOverlay: (overlay: PerimeterOverlay) => void;
+  clearPerimeterOverlay: () => void;
+  perimeterOverlay: PerimeterOverlay | null;
+  perimeterOverlayStatus: PerimeterOverlayStatus | null;
 }
 
 const FirebaseStateContext = createContext<FirebaseStateContextType | null>(
@@ -1568,7 +1572,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     (overlay: PerimeterOverlay) => {
       if (!listenPrefix || !isAuthenticated) return;
 
-      update(ref(database, `states/${listenPrefix}/perimeter/overlay`), overlay).catch(
+      set(ref(database, `states/${listenPrefix}/perimeter/overlay`), overlay).catch(
         console.error,
       );
     },
@@ -1578,7 +1582,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   const clearPerimeterOverlay = useCallback(() => {
     if (!listenPrefix || !isAuthenticated) return;
 
-    update(ref(database, `states/${listenPrefix}/perimeter/overlay`), null).catch(
+    set(ref(database, `states/${listenPrefix}/perimeter/overlay`), null).catch(
       console.error,
     );
   }, [isAuthenticated, listenPrefix]);

@@ -3,7 +3,7 @@
  *
  * Validates overlay documents from Firebase, stages assets from GCS to the
  * Windows Resolume host via SCP, loads clips into reserved layer slots,
- * triggers paired-column playback, schedules sequential column transitions,
+ * triggers paired-clip playback, schedules sequential column transitions,
  * and enforces looping for the final column.
  */
 
@@ -13,7 +13,6 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import { Storage } from "@google-cloud/storage";
-import { ServerValue } from "firebase-admin/database";
 
 const execFileAsync = promisify(execFile);
 
@@ -23,16 +22,43 @@ const MAX_DURATION_MS = 120_000;
 const MIN_DURATION_MS = 100;
 const ALLOWED_BUCKET = "vikes-match-clock-firebase.appspot.com";
 const ALLOWED_GCS_PREFIX = "gs://";
+const UNSAFE_FILENAME_RE = /["%\\/\x00-\x1f\x7f]/;
 
 // -- Validation ----------------------------------------------------------------
 
-function validateOverlayDoc(data) {
+function validateFileName(name) {
+  if (!name || typeof name !== "string") return false;
+  if (UNSAFE_FILENAME_RE.test(name)) return false;
+  if (name.length > 255) return false;
+  const base = path.basename(name);
+  if (!base || base !== name) return false;
+  return true;
+}
+
+function validateGcsSource(source) {
+  if (!source || typeof source !== "string") return false;
+  if (!source.startsWith(ALLOWED_GCS_PREFIX)) return false;
+  const bucketAndPath = source.slice(ALLOWED_GCS_PREFIX.length);
+  const slashIdx = bucketAndPath.indexOf("/");
+  if (slashIdx < 0) return false;
+  const bucketName = bucketAndPath.slice(0, slashIdx);
+  if (bucketName !== ALLOWED_BUCKET) return false;
+  const objectPath = bucketAndPath.slice(slashIdx + 1);
+  if (!objectPath) return false;
+  return true;
+}
+
+function validateOverlayDoc(data, configuredLayerIds) {
   if (data === null || data === undefined) return { valid: true, clear: true };
-  if (!data || typeof data !== "object") return { valid: false };
+  if (!data || typeof data !== "object") {
+    return { valid: false, reason: "not an object" };
+  }
 
   const raw = data;
   const version = typeof raw.version === "number" ? raw.version : 0;
-  if (!VALID_OVERLAY_VERSIONS.has(version)) return { valid: false, reason: "unsupported version" };
+  if (!VALID_OVERLAY_VERSIONS.has(version)) {
+    return { valid: false, reason: "unsupported version" };
+  }
   const docId = typeof raw.id === "string" ? raw.id : "";
   if (!docId) return { valid: false, reason: "missing id" };
   if (!Array.isArray(raw.columns) || raw.columns.length === 0) {
@@ -42,9 +68,13 @@ function validateOverlayDoc(data) {
     return { valid: false, reason: "too many columns" };
   }
 
+  const expectedLayerSet = new Set(configuredLayerIds || []);
+
   for (let ci = 0; ci < raw.columns.length; ci += 1) {
     const col = raw.columns[ci];
-    if (!col || typeof col !== "object") return { valid: false, reason: `column ${ci} is not an object` };
+    if (!col || typeof col !== "object") {
+      return { valid: false, reason: `column ${ci} is not an object` };
+    }
     if (
       typeof col.durationMs !== "number" ||
       col.durationMs < MIN_DURATION_MS ||
@@ -59,46 +89,48 @@ function validateOverlayDoc(data) {
     if (fileKeys.length === 0) {
       return { valid: false, reason: `column ${ci} has no files` };
     }
+
+    // Enforce paired layer targets: every column must have exactly the
+    // configured layer IDs and no others.
+    if (expectedLayerSet.size > 0) {
+      const columnLayerSet = new Set(fileKeys);
+      if (columnLayerSet.size !== expectedLayerSet.size) {
+        return {
+          valid: false,
+          reason: `column ${ci} file count mismatch (expected ${expectedLayerSet.size}, got ${columnLayerSet.size})`,
+        };
+      }
+      for (const lid of expectedLayerSet) {
+        if (!columnLayerSet.has(lid)) {
+          return {
+            valid: false,
+            reason: `column ${ci} missing required layer ${lid}`,
+          };
+        }
+      }
+    }
+
+    // Check for duplicate filenames within the column
+    const names = new Set();
     for (const key of fileKeys) {
       const f = col.files[key];
       if (typeof f !== "object" || !f) {
         return { valid: false, reason: `column ${ci} file ${key} is not an object` };
       }
-      if (typeof f.name !== "string" || !f.name) {
-        return { valid: false, reason: `column ${ci} file ${key} missing name` };
+      if (!validateFileName(f.name)) {
+        return { valid: false, reason: `column ${ci} file ${key} invalid filename` };
       }
-      if (f.name.includes("/") || f.name.includes("\\")) {
-        return { valid: false, reason: `column ${ci} file ${key} unsafe filename` };
+      if (names.has(f.name)) {
+        return { valid: false, reason: `column ${ci} duplicate filename ${f.name}` };
       }
-      if (typeof f.source !== "string" || !f.source) {
-        return { valid: false, reason: `column ${ci} file ${key} missing source` };
-      }
-      if (!f.source.startsWith(ALLOWED_GCS_PREFIX)) {
-        return { valid: false, reason: `column ${ci} file ${key} source not gs://` };
-      }
-      const bucketAndPath = f.source.slice(ALLOWED_GCS_PREFIX.length);
-      const slashIdx = bucketAndPath.indexOf("/");
-      if (slashIdx < 0) {
-        return { valid: false, reason: `column ${ci} file ${key} invalid gs:// path` };
-      }
-      const bucketName = bucketAndPath.slice(0, slashIdx);
-      if (bucketName !== ALLOWED_BUCKET) {
-        return { valid: false, reason: `column ${ci} file ${key} wrong bucket` };
+      names.add(f.name);
+      if (!validateGcsSource(f.source)) {
+        return { valid: false, reason: `column ${ci} file ${key} invalid source` };
       }
     }
   }
 
   return { valid: true, clear: false, doc: data };
-}
-
-function resolveRequiredLayers(doc) {
-  const layers = new Set();
-  for (const col of doc.columns) {
-    for (const key of Object.keys(col.files)) {
-      layers.add(key);
-    }
-  }
-  return [...layers].sort();
 }
 
 // -- Asset Stager --------------------------------------------------------------
@@ -107,9 +139,10 @@ export class AssetStager {
   constructor(config) {
     this.config = config;
     this.storage = new Storage({
-      projectId: config.projectId,
+      projectId: config.overlayProjectId,
       keyFilename: config.serviceAccountFile,
     });
+    this._validatedRemoteDir = false;
   }
 
   _parseGcsUrl(url) {
@@ -138,6 +171,16 @@ export class AssetStager {
   }
 
   async stageAsset(gcsUrl, remoteName) {
+    if (!this._validatedRemoteDir) {
+      const expected = path.normalize(this.config.overlayRemoteContentDir);
+      if (!expected.startsWith("C:") || expected.includes("..")) {
+        throw new Error(
+          `overlayRemoteContentDir must be under C: — got ${JSON.stringify(expected)}`,
+        );
+      }
+      this._validatedRemoteDir = true;
+    }
+
     const parsed = this._parseGcsUrl(gcsUrl);
     const cacheKey = this._cacheKey(gcsUrl);
     const cacheDir = await this._ensureCacheDir();
@@ -159,7 +202,6 @@ export class AssetStager {
     }
 
     if (!alreadyCached) {
-      // Clean old cached versions for this key before downloading
       try {
         const entries = await fs.readdir(cacheDir);
         for (const entry of entries) {
@@ -182,16 +224,15 @@ export class AssetStager {
   }
 
   async copyToWindows(localPath, remoteName) {
-    const safeName = path.basename(remoteName.replace(/\\/g, "/"));
-    if (!safeName || safeName.includes("/") || safeName.includes("\\")) {
+    if (!validateFileName(remoteName)) {
       throw new Error(`unsafe remote filename: ${JSON.stringify(remoteName)}`);
     }
 
     const winDir = this.config.overlayRemoteContentDir
       .replace(/\\/g, "/")
       .replace(/\/+$/, "");
-    const finalPath = `${winDir}/${safeName}`;
-    const tmpPath = `${winDir}/${safeName}.part`;
+    const finalPath = `${winDir}/${remoteName}`;
+    const tmpPath = `${winDir}/${remoteName}.part`;
 
     const sshArgs = [
       "-i",
@@ -204,16 +245,12 @@ export class AssetStager {
       "ServerAliveInterval=15",
     ];
 
-    // SCP to temp file
     await execFileAsync("scp", [
       ...sshArgs,
-      "-o",
-      "StrictHostKeyChecking=accept-new",
       localPath,
       `${this.config.overlaySshUser}@${this.config.overlaySshHost}:${tmpPath}`,
     ]);
 
-    // Atomic rename on remote
     await execFileAsync("ssh", [
       ...sshArgs,
       `${this.config.overlaySshUser}@${this.config.overlaySshHost}`,
@@ -236,14 +273,16 @@ export class ResolumeOverlayClient {
     return this.config.resolumeBaseUrl.replace(/\/+$/, "");
   }
 
-  async _post(url) {
+  async _post(url, body = null) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this._timeoutMs);
     try {
-      const response = await fetch(url, {
-        method: "POST",
-        signal: controller.signal,
-      });
+      const opts = { method: "POST", signal: controller.signal };
+      if (body) {
+        opts.headers = { "Content-Type": "application/json" };
+        opts.body = JSON.stringify(body);
+      }
+      const response = await fetch(url, opts);
       if (!response.ok) {
         throw new Error(`Resolume ${url} returned HTTP ${response.status}`);
       }
@@ -253,56 +292,50 @@ export class ResolumeOverlayClient {
   }
 
   async loadClip(layerId, clipSlot, filePath) {
-    // Resolume API: set the clip source for a specific clip slot in a layer
-    // POST /api/v1/composition/layers/{layerId}/clips/{clipSlotId}/connect
-    // To load a file, we use the clip properties endpoint
-    const base = this._baseUrl();
-    // Load file into the clip slot by setting its path via transport
-    const url = `${base}/composition/layers/${layerId}/clips/${clipSlot}/open`;
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), this._timeoutMs);
-    try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename: filePath }),
-        signal: controller.signal,
-      });
-      if (!response.ok) {
-        throw new Error(
-          `Failed to load clip layer=${layerId} slot=${clipSlot}: HTTP ${response.status}`,
-        );
-      }
-    } finally {
-      clearTimeout(timer);
-    }
-  }
-
-  async triggerColumn(layerId, columnId) {
     const base = this._baseUrl();
     await this._post(
-      `${base}/composition/layers/${layerId}/columns/${columnId}/connect`,
+      `${base}/composition/layers/${layerId}/clips/${clipSlot}/open`,
+      { filename: filePath },
     );
   }
 
-  async disconnectLayer(layerId) {
+  async connectClip(layerId, clipSlot) {
     const base = this._baseUrl();
     await this._post(
-      `${base}/composition/layers/${layerId}/disconnect`,
+      `${base}/composition/layers/${layerId}/clips/${clipSlot}/connect`,
+    );
+  }
+
+  async clearLayer(layerId) {
+    const base = this._baseUrl();
+    await this._post(
+      `${base}/composition/layers/${layerId}/clear`,
     );
   }
 
   async setClipLoop(layerId, clipId, loop) {
-    // Resolume clip transport controls
     const base = this._baseUrl();
     const url = loop
       ? `${base}/composition/layers/${layerId}/clips/${clipId}/transport/loop-on`
       : `${base}/composition/layers/${layerId}/clips/${clipId}/transport/loop-off`;
     await this._post(url);
   }
+
+  async setClipPause(layerId, clipId, pause) {
+    const base = this._baseUrl();
+    const url = pause
+      ? `${base}/composition/layers/${layerId}/clips/${clipId}/transport/pause`
+      : `${base}/composition/layers/${layerId}/clips/${clipId}/transport/play`;
+    await this._post(url);
+  }
 }
 
 // -- Overlay Controller --------------------------------------------------------
+
+// Retry backoff constants for overlay operations
+const OVERLAY_INITIAL_BACKOFF_MS = 500;
+const OVERLAY_MAX_BACKOFF_MS = 10_000;
+const OVERLAY_MAX_RETRIES = 5;
 
 export class OverlayController {
   constructor(config) {
@@ -321,8 +354,7 @@ export class OverlayController {
     if (!err) return null;
     if (typeof err === "string") return err.slice(0, 500);
     if (err instanceof Error) {
-      const msg = err.message || String(err);
-      return msg.slice(0, 500);
+      return (err.message || String(err)).slice(0, 500);
     }
     return String(err).slice(0, 500);
   }
@@ -341,28 +373,50 @@ export class OverlayController {
     }
   }
 
+  async _retryOp(description, fn) {
+    let backoff = OVERLAY_INITIAL_BACKOFF_MS;
+    for (let attempt = 0; attempt < OVERLAY_MAX_RETRIES; attempt += 1) {
+      if (this._stopping) throw new Error("controller stopping");
+      try {
+        return await fn();
+      } catch (err) {
+        const isLast = attempt === OVERLAY_MAX_RETRIES - 1;
+        if (isLast) {
+          console.error(`${description} failed after ${OVERLAY_MAX_RETRIES} attempts: ${err.message}`);
+          throw err;
+        }
+        console.warn(
+          `${description} attempt ${attempt + 1} failed: ${err.message} — retrying in ${backoff}ms`,
+        );
+        await this._sleep(backoff);
+        backoff = Math.min(backoff * 2, OVERLAY_MAX_BACKOFF_MS);
+      }
+    }
+  }
+
+  _sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
   // -- Firebase ---------------------------------------------------------------
 
   attach(db) {
     this._dbRef = db.ref(this.config.overlayPath);
     this._statusRef = db.ref(this.config.overlayStatusPath);
+    // on("value") fires immediately with the current snapshot, so it handles
+    // restart reconciliation naturally — no separate _reconcile needed.
     this._dbRef.on("value", (snapshot) => {
       this._handleSnapshot(snapshot.val());
     });
-    // Reconcile existing state on restart
-    setTimeout(() => {
-      if (!this._stopping) {
-        this._reconcile();
-      }
-    }, 2000);
+    console.log(`Overlay control listening on: ${this.config.overlayPath}`);
   }
 
   _handleSnapshot(data) {
-    const result = validateOverlayDoc(data);
+    const result = validateOverlayDoc(data, this.config.overlayLayerIds);
     if (!result.valid) {
-      console.warn(
-        `Ignoring invalid overlay document${result.reason ? `: ${result.reason}` : ""}`,
-      );
+      const reason = result.reason || "unknown";
+      console.warn(`Ignoring invalid overlay document: ${reason}`);
+      this._publishError(`Invalid overlay: ${reason}`);
       return;
     }
     if (result.clear) {
@@ -371,31 +425,22 @@ export class OverlayController {
       return;
     }
     const doc = result.doc;
-    if (doc.id === this._currentId) return; // same invocation, no-op
+    if (doc.id === this._currentId) return;
     console.log(`New overlay command: ${doc.id}`);
     this._startOverlay(doc);
   }
 
-  // -- Reconciliation ---------------------------------------------------------
-
-  async _reconcile() {
-    if (!this._dbRef) return;
+  async _publishError(errorText) {
+    if (!this._statusRef) return;
     try {
-      const snapshot = await this._dbRef.once("value");
-      const data = snapshot.val();
-      if (data === null || data === undefined) {
-        // No active overlay
-        this._handleClear();
-        return;
-      }
-      const result = validateOverlayDoc(data);
-      if (!result.valid) return;
-      if (!result.clear && result.doc) {
-        console.log(`Reconciling overlay on restart: ${result.doc.id}`);
-        this._startOverlay(result.doc);
-      }
-    } catch (err) {
-      console.error(`Reconcile error: ${err.message}`);
+      await this._statusRef.set({
+        commandId: null,
+        phase: "error",
+        activeColumn: -1,
+        error: String(errorText).slice(0, 500),
+      });
+    } catch {
+      // best-effort
     }
   }
 
@@ -408,25 +453,20 @@ export class OverlayController {
       clearTimeout(this._columnTimer);
       this._columnTimer = null;
     }
-    // Disconnect overlay layers only (not the whole deck)
     for (const layerId of this.config.overlayLayerIds) {
       try {
-        await this.resolume.disconnectLayer(layerId);
+        await this.resolume.clearLayer(layerId);
       } catch (err) {
-        console.error(`Failed to disconnect overlay layer ${layerId}: ${err.message}`);
+        console.error(
+          `Failed to clear overlay layer ${layerId}: ${err.message}`,
+        );
       }
     }
-    // Clear status
-    await this._publishStatus("playing", -1).catch(() => {});
-    // Write null to status
-    if (this._statusRef) {
-      await this._statusRef.set(null).catch(() => {});
-    }
+    this._publishStatus("playing", -1).catch(() => {});
     console.log("Overlay cleared");
   }
 
   async _startOverlay(doc) {
-    // Cancel running overlay
     if (this._columnTimer) {
       clearTimeout(this._columnTimer);
       this._columnTimer = null;
@@ -434,28 +474,12 @@ export class OverlayController {
     this._currentId = doc.id;
     this._currentColumn = 0;
 
-    // Validate required layers exist in config
-    const requiredLayers = resolveRequiredLayers(doc);
-    for (const layer of requiredLayers) {
-      if (!this.config.overlayLayerClipColumns[layer]) {
-        console.error(
-          `Overlay requires layer ${layer} which is not configured in overlayLayerClipColumns`,
-        );
-        await this._publishStatus(
-          "error",
-          0,
-          `Missing configuration for layer ${layer}`,
-        );
-        return;
-      }
-    }
-
     await this._playColumn(doc, 0);
   }
 
   async _playColumn(doc, colIdx) {
     if (this._stopping) return;
-    if (this._currentId !== doc.id) return; // superseded
+    if (this._currentId !== doc.id) return;
 
     const col = doc.columns[colIdx];
     if (!col) {
@@ -468,7 +492,9 @@ export class OverlayController {
 
     try {
       await this._publishStatus("downloading", colIdx);
-      await this._stageAndLoadColumn(col);
+      await this._retryOp(`stage column ${colIdx}`, () =>
+        this._stageAndLoadColumn(col, isFinal),
+      );
     } catch (err) {
       console.error(`Failed to stage/load column ${colIdx}: ${err.message}`);
       await this._publishStatus("error", colIdx, err);
@@ -477,7 +503,9 @@ export class OverlayController {
 
     try {
       await this._publishStatus("loading", colIdx);
-      await this._triggerColumn(col);
+      await this._retryOp(`trigger column ${colIdx}`, () =>
+        this._triggerColumn(col, isFinal),
+      );
     } catch (err) {
       console.error(`Failed to trigger column ${colIdx}: ${err.message}`);
       await this._publishStatus("error", colIdx, err);
@@ -487,19 +515,17 @@ export class OverlayController {
     await this._publishStatus("playing", colIdx);
 
     if (isFinal) {
-      // Final column loops until explicit clear
       console.log("Final column playing, looping until clear");
       return;
     }
 
-    // Schedule next column
     this._columnTimer = setTimeout(() => {
       this._columnTimer = null;
       this._playColumn(doc, colIdx + 1);
     }, col.durationMs);
   }
 
-  async _stageAndLoadColumn(col) {
+  async _stageAndLoadColumn(col, isFinal) {
     const promises = [];
     for (const [layerId, fileDef] of Object.entries(col.files)) {
       const clipSlot = this.config.overlayLayerClipColumns[layerId];
@@ -513,6 +539,8 @@ export class OverlayController {
             fileDef.name,
           );
           await this.resolume.loadClip(layerId, clipSlot, winPath);
+          // Set loop state before triggering
+          await this.resolume.setClipLoop(layerId, clipSlot, isFinal);
         })(),
       );
     }
@@ -521,10 +549,10 @@ export class OverlayController {
 
   async _triggerColumn(col) {
     const promises = [];
-    for (const [layerId, fileDef] of Object.entries(col.files)) {
+    for (const [layerId] of Object.entries(col.files)) {
       const clipSlot = this.config.overlayLayerClipColumns[layerId];
       if (clipSlot === undefined) continue;
-      promises.push(this.resolume.triggerColumn(layerId, clipSlot));
+      promises.push(this.resolume.connectClip(layerId, clipSlot));
     }
     await Promise.all(promises);
   }

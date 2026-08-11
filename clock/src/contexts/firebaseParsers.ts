@@ -462,14 +462,37 @@ export function parsePerimeterPreview(
 
 const MAX_OVERLAY_COLUMNS = 20;
 const MAX_OVERLAY_DURATION_MS = 120_000;
+const MIN_OVERLAY_DURATION_MS = 100;
 const VALID_OVERLAY_VERSIONS = new Set([1]);
+const ALLOWED_OVERLAY_BUCKET = "vikes-match-clock-firebase.appspot.com";
+const UNSAFE_FILENAME_RE = /["%\\/\x00-\x1f\x7f]/;
+
+function validateOverlayFileName(name: string): boolean {
+  if (!name || name.length > 255) return false;
+  if (UNSAFE_FILENAME_RE.test(name)) return false;
+  return true;
+}
+
+function validateOverlaySource(source: string): boolean {
+  if (!source) return false;
+  if (!source.startsWith("gs://")) return false;
+  const bucketAndPath = source.slice(5);
+  const slashIdx = bucketAndPath.indexOf("/");
+  if (slashIdx < 0) return false;
+  const bucketName = bucketAndPath.slice(0, slashIdx);
+  if (bucketName !== ALLOWED_OVERLAY_BUCKET) return false;
+  const objectPath = bucketAndPath.slice(slashIdx + 1);
+  if (!objectPath) return false;
+  return true;
+}
 
 function parseOverlayFile(data: unknown): PerimeterOverlayFile | undefined {
   if (!data || typeof data !== "object") return undefined;
   const raw = data as Record<string, unknown>;
   const name = typeof raw.name === "string" ? raw.name : "";
   const source = typeof raw.source === "string" ? raw.source : "";
-  if (!name || !source) return undefined;
+  if (!validateOverlayFileName(name)) return undefined;
+  if (!validateOverlaySource(source)) return undefined;
   return { name, source };
 }
 
@@ -478,7 +501,7 @@ function parseOverlayColumn(data: unknown): PerimeterOverlayColumn | undefined {
   const raw = data as Record<string, unknown>;
   const durationMs =
     typeof raw.durationMs === "number" &&
-    raw.durationMs > 0 &&
+    raw.durationMs >= MIN_OVERLAY_DURATION_MS &&
     raw.durationMs <= MAX_OVERLAY_DURATION_MS
       ? raw.durationMs
       : 0;
@@ -486,17 +509,17 @@ function parseOverlayColumn(data: unknown): PerimeterOverlayColumn | undefined {
   const filesRaw = raw.files;
   if (!filesRaw || typeof filesRaw !== "object") return undefined;
   const files: Record<string, PerimeterOverlayFile> = {};
-  let hasPairedTargets = false;
+  const names = new Set<string>();
   for (const [key, value] of Object.entries(
     filesRaw as Record<string, unknown>,
   )) {
     const parsed = parseOverlayFile(value);
-    if (parsed) {
-      files[key] = parsed;
-      hasPairedTargets = true;
-    }
+    if (!parsed) return undefined;
+    if (names.has(parsed.name)) return undefined;
+    names.add(parsed.name);
+    files[key] = parsed;
   }
-  if (!hasPairedTargets) return undefined;
+  if (names.size === 0) return undefined;
   return { durationMs, files };
 }
 
@@ -504,26 +527,22 @@ export function parsePerimeterOverlay(
   data: unknown,
 ): PerimeterOverlay | null {
   if (data === null) return null;
-  if (!data || typeof data !== "object") return undefined as unknown as null;
+  if (!data || typeof data !== "object") return null;
   const raw = data as Record<string, unknown>;
   const version = typeof raw.version === "number" ? raw.version : 0;
-  if (!VALID_OVERLAY_VERSIONS.has(version)) return undefined as unknown as null;
+  if (!VALID_OVERLAY_VERSIONS.has(version)) return null;
   const id = typeof raw.id === "string" ? raw.id : "";
-  if (!id) return undefined as unknown as null;
+  if (!id) return null;
   const columnsRaw = raw.columns;
-  if (!Array.isArray(columnsRaw) || columnsRaw.length === 0) {
-    return undefined as unknown as null;
-  }
-  if (columnsRaw.length > MAX_OVERLAY_COLUMNS) {
-    return undefined as unknown as null;
-  }
+  if (!Array.isArray(columnsRaw) || columnsRaw.length === 0) return null;
+  if (columnsRaw.length > MAX_OVERLAY_COLUMNS) return null;
   const columns: PerimeterOverlayColumn[] = [];
   for (const entry of columnsRaw) {
     const column = parseOverlayColumn(entry);
-    if (!column) return undefined as unknown as null;
+    if (!column) return null;
     columns.push(column);
   }
-  return { version, id, columns } as PerimeterOverlay;
+  return { version, id, columns };
 }
 
 export function parseClubOverrides(
