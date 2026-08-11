@@ -10,6 +10,9 @@ import type {
   ViewPort,
   QueueState,
   PerimeterState,
+  PerimeterPreview,
+  PerimeterColumn,
+  PerimeterClip,
 } from "../types";
 import { Sports, DEFAULT_THEME } from "../constants";
 
@@ -404,6 +407,54 @@ export function parsePerimeterState(data: unknown): PerimeterState | undefined {
   const state = raw.state === "on" || raw.state === "off" ? raw.state : "off";
 
   return { enabled, state };
+}
+
+// Strict, tolerant parse of the daemon-published composition preview. Clips
+// and columns without usable data are dropped; the snapshot only becomes
+// undefined when the whole payload is not an object.
+export function parsePerimeterPreview(
+  data: unknown,
+): PerimeterPreview | undefined {
+  if (!data || typeof data !== "object") return undefined;
+
+  const raw = data as Record<string, unknown>;
+  const updatedAt = typeof raw.updatedAt === "number" ? raw.updatedAt : null;
+
+  const columns: PerimeterColumn[] = [];
+  if (Array.isArray(raw.columns)) {
+    for (const entry of raw.columns) {
+      if (!entry || typeof entry !== "object") continue;
+      const column = entry as Record<string, unknown>;
+      const name = typeof column.name === "string" ? column.name : "";
+      if (!name) continue;
+
+      const clips: PerimeterClip[] = [];
+      if (Array.isArray(column.clips)) {
+        for (const clipEntry of column.clips) {
+          if (!clipEntry || typeof clipEntry !== "object") continue;
+          const clip = clipEntry as Record<string, unknown>;
+          const filename =
+            typeof clip.filename === "string" ? clip.filename : "";
+          if (!filename) continue;
+          const thumbnail =
+            typeof clip.thumbnail === "string" ? clip.thumbnail : undefined;
+          clips.push({
+            id: typeof clip.id === "number" ? clip.id : null,
+            filename,
+            thumbnail,
+          });
+        }
+      }
+
+      columns.push({
+        id: typeof column.id === "number" ? column.id : null,
+        name,
+        clips,
+      });
+    }
+  }
+
+  return { updatedAt, columns };
 }
 
 export function parseClubOverrides(

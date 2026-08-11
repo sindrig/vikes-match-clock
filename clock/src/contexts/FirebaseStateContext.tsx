@@ -31,6 +31,7 @@ import {
   QueueState,
   ClubOverride,
   PerimeterState,
+  PerimeterPreview,
 } from "../types";
 import { Sports, DEFAULT_HALFSTOPS, VIEWS } from "../constants";
 import { msUntilMatchStart } from "../utils/timeUtils";
@@ -43,6 +44,7 @@ import {
   parseView,
   parseClubOverrides,
   parsePerimeterState,
+  parsePerimeterPreview,
 } from "./firebaseParsers";
 
 const HALFTIME_DURATION_MS = 15 * 60 * 1000;
@@ -108,6 +110,8 @@ const defaultClubOverrides: Record<string, ClubOverride> = {};
 
 const defaultPerimeter: PerimeterState = { enabled: false, state: "off" };
 
+const defaultPerimeterPreview: PerimeterPreview | null = null;
+
 export function computeControllerDiff(
   prev: ControllerState,
   next: ControllerState,
@@ -152,6 +156,8 @@ interface FirebaseStateContextType {
   listeners: ListenersState;
   clubOverrides: Record<string, ClubOverride>;
   perimeter: PerimeterState;
+  perimeterPreview: PerimeterPreview | null;
+  perimeterPreviewLoaded: boolean;
   ready: boolean;
 
   updateMatch: (updates: Partial<Match>) => void;
@@ -381,6 +387,9 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   const [clubOverrides, setClubOverrides] =
     useState<Record<string, ClubOverride>>(defaultClubOverrides);
   const [perimeter, setPerimeter] = useState<PerimeterState>(defaultPerimeter);
+  const [perimeterPreview, setPerimeterPreview] =
+    useState<PerimeterPreview | null>(defaultPerimeterPreview);
+  const [perimeterPreviewLoaded, setPerimeterPreviewLoaded] = useState(false);
   const [ready, setReady] = useState(!listenPrefix);
 
   const matchRef = useRef(match);
@@ -395,6 +404,8 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   if (prevListenPrefix !== listenPrefix) {
     setPrevListenPrefix(listenPrefix);
     setReady(!listenPrefix);
+    setPerimeterPreview(defaultPerimeterPreview);
+    setPerimeterPreviewLoaded(false);
   }
 
   useEffect(() => {
@@ -465,6 +476,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       const viewPath = `states/${listenPrefix}/view`;
       const clubOverridesPath = `states/${listenPrefix}/clubOverrides`;
       const perimeterPath = `states/${listenPrefix}/perimeter`;
+      const perimeterPreviewPath = `perimeter/${listenPrefix}`;
 
       const unsubMatch = onValue(
         ref(database, matchPath),
@@ -537,12 +549,31 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
           console.error("Firebase perimeter subscription error:", error),
       );
 
+      // The preview snapshot is published by the perimeter-control daemon to
+      // `perimeter/{location}`. It is deliberately NOT part of readiness:
+      // absent metadata must not block the controller.
+      const unsubPerimeterPreview = onValue(
+        ref(database, perimeterPreviewPath),
+        (snapshot) => {
+          setPerimeterPreviewLoaded(true);
+          setPerimeterPreview(
+            parsePerimeterPreview(snapshot.val()) ?? defaultPerimeterPreview,
+          );
+        },
+        (error) =>
+          console.error(
+            "Firebase perimeter preview subscription error:",
+            error,
+          ),
+      );
+
       return () => {
         unsubMatch();
         unsubController();
         unsubView();
         unsubClubOverrides();
         unsubPerimeter();
+        unsubPerimeterPreview();
       };
     }
   }, [listenPrefix]);
@@ -1526,6 +1557,8 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       listeners,
       clubOverrides,
       perimeter,
+      perimeterPreview,
+      perimeterPreviewLoaded,
       ready,
       updateMatch,
       startMatch,
@@ -1593,6 +1626,8 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       listeners,
       clubOverrides,
       perimeter,
+      perimeterPreview,
+      perimeterPreviewLoaded,
       ready,
       updateMatch,
       startMatch,
@@ -1825,6 +1860,18 @@ export const useClubOverrides = () => {
 };
 
 export const usePerimeter = () => {
-  const { perimeter, setPerimeterState } = useFirebaseState();
-  return { perimeter, setPerimeterState };
+  const {
+    perimeter,
+    perimeterPreview,
+    perimeterPreviewLoaded,
+    setPerimeterState,
+    getServerTime,
+  } = useFirebaseState();
+  return {
+    perimeter,
+    preview: perimeterPreview,
+    previewLoaded: perimeterPreviewLoaded,
+    setPerimeterState,
+    getServerTime,
+  };
 };

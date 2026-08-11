@@ -27,6 +27,12 @@
         ".read": true
       }
     },
+    "perimeter": {
+      "$location": {
+        ".read": "root.child('auth').child(auth.uid).child($location).val() == true",
+        ".write": false
+      }
+    },
     "presence": {
       "$location": {
         ".read": true,

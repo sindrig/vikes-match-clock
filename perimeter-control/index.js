@@ -5,14 +5,19 @@
  * Firebase Admin SDK and mirrors it onto a Resolume Arena composition
  * through its HTTP API.
  *
- * Firebase is the desired-state authority. The daemon never writes back to
- * Firebase; it only reads the `state` child and applies it to Resolume.
+ * Firebase is the desired-state authority. The daemon reads the `state` child
+ * and applies it to Resolume, and writes the Resolume composition preview
+ * snapshot to `perimeter/{location}` (outside the writable `states/` subtree)
+ * through the Admin SDK, which bypasses the public read rules.
  *
  * Design notes:
  *   * Only the exact string values "on" and "off" are valid desired states.
  *     Missing, null, malformed or unknown values cause no Resolume request.
  *   * Authentication uses a service-account credential file. The Admin SDK
  *     bypasses the public `states` read rules.
+ *   * The preview snapshot (columns, clips, bounded JPEG thumbnails) is read
+ *     from Resolume on startup and after each successful `on`. A failed
+ *     Resolume query leaves the last published snapshot intact.
  *   * The JS Admin SDK uses the Realtime Database WebSocket protocol (the
  *     same transport the clock apps use), unlike the Python SDK's listen(),
  *     which is built on the REST SSE streaming endpoint. As a safety net the
@@ -31,7 +36,8 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { cert, initializeApp } from "firebase-admin/app";
-import { getDatabase } from "firebase-admin/database";
+import { getDatabase, ServerValue } from "firebase-admin/database";
+import { ResolumeCompositionReader } from "./resolume-preview.js";
 
 export const VALID_STATES = new Set(["on", "off"]);
 
@@ -45,6 +51,11 @@ const DEFAULT_REQUEST_TIMEOUT_MS = 10_000;
 const DEFAULT_LISTENER_REFRESH_MS = 300_000;
 const DEFAULT_INITIAL_BACKOFF_MS = 1_000;
 const DEFAULT_MAX_BACKOFF_MS = 60_000;
+const DEFAULT_PREVIEW_PATH = "perimeter/vikuti";
+const DEFAULT_THUMBNAIL_MAX_DIM = 320;
+const DEFAULT_THUMBNAIL_QUALITY = 0.7;
+const DEFAULT_THUMBNAIL_MAX_BYTES = 100_000;
+const DEFAULT_PREVIEW_MAX_BYTES = 8_000_000;
 
 const RESOLUME_OFF_PATH = "/composition/disconnect-all";
 const RESOLUME_ON_PATH = "/composition/columns/{column}/connect";
@@ -62,6 +73,11 @@ function positiveMs(value, fallback) {
 function nonNegativeMs(value, fallback) {
   const n = Number(value);
   return Number.isFinite(n) && n >= 0 ? n * 1000 : fallback;
+}
+
+function quality(value, fallback) {
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.min(1, Math.max(0.1, n)) : fallback;
 }
 
 export function loadConfig(environ = process.env) {
@@ -92,6 +108,24 @@ export function loadConfig(environ = process.env) {
     maxBackoffMs: positiveMs(
       environ.PERIMETER_MAX_BACKOFF_SECONDS,
       DEFAULT_MAX_BACKOFF_MS,
+    ),
+    previewEnabled: environ.PERIMETER_PREVIEW_ENABLED !== "false",
+    previewPath: environ.PERIMETER_PREVIEW_PATH ?? DEFAULT_PREVIEW_PATH,
+    thumbnailMaxDim: positiveInt(
+      environ.PERIMETER_THUMBNAIL_MAX_DIM,
+      DEFAULT_THUMBNAIL_MAX_DIM,
+    ),
+    thumbnailQuality: quality(
+      environ.PERIMETER_THUMBNAIL_QUALITY,
+      DEFAULT_THUMBNAIL_QUALITY,
+    ),
+    thumbnailMaxBytes: positiveInt(
+      environ.PERIMETER_THUMBNAIL_MAX_BYTES,
+      DEFAULT_THUMBNAIL_MAX_BYTES,
+    ),
+    previewMaxBytes: positiveInt(
+      environ.PERIMETER_PREVIEW_MAX_BYTES,
+      DEFAULT_PREVIEW_MAX_BYTES,
     ),
   };
 }
@@ -151,11 +185,13 @@ export class PerimeterController {
   constructor(config) {
     this.config = config;
     this.resolume = new ResolumeClient(config);
+    this.previewReader = new ResolumeCompositionReader(config);
     this._desired = null;
     this._lastSeen = null;
     this._stopping = false;
     this._notifier = new Notifier();
     this._ref = null;
+    this._previewRef = null;
     this._refreshTimer = null;
   }
 
@@ -188,7 +224,9 @@ export class PerimeterController {
   attach(db) {
     this._ref = db.ref(this.config.path);
     this._ref.on("value", this._handleSnapshot);
+    this._previewRef = db.ref(this.config.previewPath);
     console.log(`Listening on Firebase path: ${this.config.path}`);
+    console.log(`Publishing preview to Firebase path: ${this.config.previewPath}`);
   }
 
   _reopenListener() {
@@ -227,6 +265,11 @@ export class PerimeterController {
       try {
         await this.resolume.applyState(target);
         console.log(`Applied state ${target} to Resolume`);
+        if (target === "on") {
+          // Non-blocking: a preview refresh must never delay or change the
+          // on/off command retry behavior.
+          void this.refreshPreview();
+        }
         return;
       } catch (err) {
         console.error(
@@ -244,6 +287,61 @@ export class PerimeterController {
 
   _sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  // -- preview ----------------------------------------------------------------
+
+  // Build the normalized snapshot for the preview path. `updatedAt` uses the
+  // Firebase server timestamp so all browsers see a consistent value.
+  async _buildPreviewSnapshot() {
+    const { columns } = await this.previewReader.collectPreview();
+    const snapshot = { updatedAt: ServerValue.TIMESTAMP, columns };
+    const payloadBytes = Buffer.byteLength(
+      JSON.stringify({ updatedAt: 0, columns }),
+      "utf8",
+    );
+    if (payloadBytes > this.config.previewMaxBytes) {
+      throw new Error(
+        `perimeter preview payload ${payloadBytes} bytes exceeds the ` +
+          `${this.config.previewMaxBytes} byte limit`,
+      );
+    }
+    return snapshot;
+  }
+
+  // Re-read the Resolume composition and publish the normalized snapshot to
+  // the preview path. Any failure is logged and the last published snapshot
+  // is left intact; this method never throws. Concurrent refreshes are
+  // serialized so an older collection can never overwrite a newer snapshot.
+  async refreshPreview() {
+    if (!this.config.previewEnabled) return;
+    const previous = this._refreshPromise;
+    const run = previous
+      ? previous.then(() => this._doRefreshPreview())
+      : this._doRefreshPreview();
+    this._refreshPromise = run;
+    try {
+      await run;
+    } finally {
+      if (this._refreshPromise === run) this._refreshPromise = null;
+    }
+  }
+
+  async _doRefreshPreview() {
+    try {
+      const snapshot = await this._buildPreviewSnapshot();
+      await this._previewRef.set(snapshot);
+      console.log("Published perimeter preview snapshot");
+    } catch (err) {
+      console.error(
+        `Failed to refresh perimeter preview (keeping last snapshot): ${err.message}`,
+      );
+    }
+  }
+
+  // Publish the snapshot once at startup, without blocking the daemon.
+  startPreview() {
+    void this.refreshPreview();
   }
 
   // -- refresh ----------------------------------------------------------------
@@ -292,6 +390,7 @@ function main() {
   controller.attach(getDatabase(app));
   controller.startApplicator();
   controller.startRefreshLoop();
+  controller.startPreview();
 
   const shutdown = () => {
     console.log("Shutting down");

@@ -283,6 +283,27 @@ export interface PerimeterState {
   state: "on" | "off";
 }
 
+// A single clip in the perimeter composition preview.
+export interface PerimeterClip {
+  id: number | null;
+  filename: string;
+  thumbnail?: string;
+}
+
+// A Resolume column in the perimeter composition preview.
+export interface PerimeterColumn {
+  id: number | null;
+  name: string;
+  clips: PerimeterClip[];
+}
+
+// Read-only snapshot of the Resolume composition, published by the
+// perimeter-control daemon to `perimeter/{location}`.
+export interface PerimeterPreview {
+  updatedAt: number | null;
+  columns: PerimeterColumn[];
+}
+
 // Root state type
 export interface RootState {
   match: Match;

@@ -81,9 +81,22 @@ state subtree, `states/${listenPrefix}/perimeter`:
   `states/${listenPrefix}/perimeter` and exposes the parsed `perimeter` state
   plus the authenticated `setPerimeterState(state)` write action (writes only
   `{ state }`, never `enabled`).
-- `PerimeterControl.tsx` renders the Icelandic `Kveikt` / `Slökkt` control and
-  self-hides when `perimeter.enabled !== true`. It is mounted inside the
-  `Stillingar` dialog in `Controller.tsx`.
+- The daemon publishes a **preview snapshot** of the Resolume composition
+  (columns, clips, filenames and bounded JPEG thumbnails) to the top-level
+  `perimeter/${listenPrefix}` path (see **Preview snapshot** below).
+  `FirebaseStateContext.tsx` subscribes to it independently and exposes it as
+  `preview` through `usePerimeter()`. It is deliberately **not** part of app
+  readiness: absent metadata must never block the controller.
+- `PerimeterControl.tsx` renders a `Jaðarskjár` settings row (matching the
+  other settings trigger rows) and self-hides when `perimeter.enabled !== true`.
+  It is mounted inside the `Stillingar` dialog in `Controller.tsx`. There are
+  **no manual on/off controls** — the perimeter turns on/off automatically on
+  view transitions (see below). Clicking the row opens a preview-only modal
+  showing every clip grouped by Resolume column with filename and a
+  320px-or-smaller JPEG thumbnail. There is no manual refresh; the daemon
+  publishes on startup and after it turns Resolume on. The dialog handles
+  loading, "no preview yet", stale `updatedAt`, and unavailable-thumbnail
+  states; styles live in `PerimeterControl.css`.
 - `FirebaseStateContext.tsx` **auto-toggles the perimeter on view transitions**:
   entering the match view (`controller.view` `idle` → `match`) writes
   `state: "on"`, and leaving any view for `idle` writes `state: "off"`. Both
@@ -95,6 +108,37 @@ state subtree, `states/${listenPrefix}/perimeter`:
   behavior).
 - Follows the 100% Firebase model: the UI writes to Firebase and updates only
   after the subscription receives the new value (no optimistic updates).
+
+**Preview snapshot** (`perimeter/${listenPrefix}`, read-only for clients):
+
+```json
+{
+  "updatedAt": 1723392000000,
+  "columns": [
+    {
+      "id": 1,
+      "name": "Column 1",
+      "clips": [
+        {
+          "id": 12,
+          "filename": "sponsor-loop.mp4",
+          "thumbnail": "data:image/jpeg;base64,..."
+        }
+      ]
+    }
+  ]
+}
+```
+
+- `updatedAt` is a Firebase **server timestamp** (set by the daemon with
+  `ServerValue.TIMESTAMP`).
+- `parsePerimeterPreview()` in `firebaseParsers.ts` strictly parses the
+  snapshot: clips without a filename and columns without a name are dropped;
+  missing ids become `null`; a `thumbnail` is optional.
+- The path lives **outside** the writable `states/` subtree. `firebase-rules.json`
+  denies all client writes and permits reads only when
+  `auth/$uid/$location` is `true`. Only the daemon's service account can write
+  (through the Admin SDK).
 
 **Daemon** (`perimeter-control/` at repo root): a systemd-managed **Node.js**
 service listens to `states/vikuti/perimeter/state` in Firebase Realtime
@@ -109,8 +153,13 @@ the clock apps) — the Python SDK's `listen()` is SSE-based and intermittently
 stalled for minutes on this network. The listener is periodically reopened as
 a safety net. It authenticates with a service-account credential file
 (required by `install.sh`), and retries Resolume failures with bounded
-exponential backoff, superseded by any newer Firebase value. See
-`perimeter-control/README.md` for installation and operation.
+exponential backoff, superseded by any newer Firebase value. It also publishes
+the **preview snapshot** above to `perimeter/vikuti` once at startup and after
+each successful `on` (non-blocking, never delaying the on/off retry behavior);
+a failed Resolume query or an oversized payload leaves the last published
+snapshot intact. All Resolume-version-specific parsing is isolated in
+`resolume-preview.js`; see `perimeter-control/README.md` for installation and
+operation.
 
 ### The `listenPrefix` System
 
