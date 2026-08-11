@@ -398,8 +398,9 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   const [perimeterPreview, setPerimeterPreview] =
     useState<PerimeterPreview | null>(defaultPerimeterPreview);
   const [perimeterPreviewLoaded, setPerimeterPreviewLoaded] = useState(false);
-  const [perimeterOverlay, setOverlay] =
-    useState<PerimeterOverlay | null>(null);
+  const [perimeterOverlay, setOverlay] = useState<PerimeterOverlay | null>(
+    null,
+  );
   const [perimeterOverlayStatus, setPerimeterOverlayStatus] =
     useState<PerimeterOverlayStatus | null>(null);
   const [ready, setReady] = useState(!listenPrefix);
@@ -551,7 +552,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       const unsubPerimeter = onValue(
         ref(database, perimeterPath),
         (snapshot) => {
-          const raw = snapshot.val();
+          const raw: unknown = snapshot.val();
           setPerimeter(parsePerimeterState(raw) ?? defaultPerimeter);
           const overlay =
             raw && typeof raw === "object"
@@ -591,7 +592,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       const unsubOverlayStatus = onValue(
         ref(database, overlayStatusPath),
         (snapshot) => {
-          const raw = snapshot.val();
+          const raw: unknown = snapshot.val();
           if (!raw || typeof raw !== "object") {
             setPerimeterOverlayStatus(null);
             return;
@@ -605,11 +606,8 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
                 ? (status.phase as PerimeterOverlayStatus["phase"])
                 : "error",
             activeColumn:
-              typeof status.activeColumn === "number"
-                ? status.activeColumn
-                : 0,
-            error:
-              typeof status.error === "string" ? status.error : null,
+              typeof status.activeColumn === "number" ? status.activeColumn : 0,
+            error: typeof status.error === "string" ? status.error : null,
           });
         },
         (error) =>
@@ -1572,9 +1570,10 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     (overlay: PerimeterOverlay) => {
       if (!listenPrefix || !isAuthenticated) return;
 
-      set(ref(database, `states/${listenPrefix}/perimeter/overlay`), overlay).catch(
-        console.error,
-      );
+      set(
+        ref(database, `states/${listenPrefix}/perimeter/overlay`),
+        overlay,
+      ).catch(console.error);
     },
     [isAuthenticated, listenPrefix],
   );

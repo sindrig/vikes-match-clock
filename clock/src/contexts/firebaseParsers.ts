@@ -465,7 +465,9 @@ const MAX_OVERLAY_DURATION_MS = 120_000;
 const MIN_OVERLAY_DURATION_MS = 100;
 const VALID_OVERLAY_VERSIONS = new Set([1]);
 const ALLOWED_OVERLAY_BUCKET = "vikes-match-clock-firebase.appspot.com";
-const UNSAFE_FILENAME_RE = /["%\\/\x00-\x1f\x7f]/;
+// \p{Cc} matches control characters (\x00-\x1f and \x7f-\x9f); written as a
+// property escape so the literal contains no raw control characters.
+const UNSAFE_FILENAME_RE = /["%\\/]|[\p{Cc}]/u;
 
 function validateOverlayFileName(name: string): boolean {
   if (!name || name.length > 255) return false;
@@ -523,9 +525,7 @@ function parseOverlayColumn(data: unknown): PerimeterOverlayColumn | undefined {
   return { durationMs, files };
 }
 
-export function parsePerimeterOverlay(
-  data: unknown,
-): PerimeterOverlay | null {
+export function parsePerimeterOverlay(data: unknown): PerimeterOverlay | null {
   if (data === null) return null;
   if (!data || typeof data !== "object") return null;
   const raw = data as Record<string, unknown>;
