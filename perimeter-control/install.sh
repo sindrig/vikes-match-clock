@@ -49,6 +49,7 @@ install -d -o root -g perimeter-control -m 0750 "$ETC_DIR"
 
 install -o root -g root -m 0644 "$SCRIPT_DIR/index.js" "$APP_DIR/index.js"
 install -o root -g root -m 0644 "$SCRIPT_DIR/resolume-preview.js" "$APP_DIR/resolume-preview.js"
+install -o root -g root -m 0644 "$SCRIPT_DIR/overlay.js" "$APP_DIR/overlay.js"
 install -o root -g root -m 0644 "$SCRIPT_DIR/package.json" "$APP_DIR/package.json"
 install -o root -g root -m 0644 "$SCRIPT_DIR/package-lock.json" "$APP_DIR/package-lock.json"
 
