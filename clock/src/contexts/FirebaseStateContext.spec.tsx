@@ -2120,6 +2120,7 @@ describe("FirebaseStateContext", () => {
     function renderPerimeterViewTransitions(
       data: unknown = null,
       initialView: string = VIEWS.idle,
+      isAuthenticated = true,
     ) {
       let controllerCallback: ((snapshot: unknown) => void) | null = null;
 
@@ -2140,7 +2141,7 @@ describe("FirebaseStateContext", () => {
       render(
         <FirebaseStateProvider
           listenPrefix="vikuti"
-          isAuthenticated={true}
+          isAuthenticated={isAuthenticated}
           screenKey={null}
         >
           <TestPerimeterConsumer
@@ -2293,6 +2294,74 @@ describe("FirebaseStateContext", () => {
       renderPerimeterViewTransitions(
         { enabled: true, state: "off" },
         VIEWS.match,
+      );
+
+      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
+    });
+
+    it("does not auto-toggle the perimeter for an unauthenticated display", () => {
+      const { setView } = renderPerimeterViewTransitions(
+        { enabled: true, state: "off" },
+        VIEWS.idle,
+        false,
+      );
+
+      setView(VIEWS.match);
+      setView(VIEWS.idle);
+
+      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
+    });
+
+    it("writes only once when switching to the same view twice", () => {
+      const { setView } = renderPerimeterViewTransitions({
+        enabled: true,
+        state: "off",
+      });
+
+      setView(VIEWS.match);
+      setView(VIEWS.match);
+
+      expect(firebaseDatabase.syncState).toHaveBeenCalledTimes(1);
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "vikuti",
+        "perimeter",
+        { state: "on" },
+      );
+    });
+
+    it("does not write the perimeter state when switching listenPrefix to a venue already in match view", () => {
+      let currentControllerView: string = VIEWS.idle;
+      vi.mocked(onValue).mockImplementation((reference, callback) => {
+        const path = String(reference);
+        if (path.includes("/controller")) {
+          callback({ val: () => ({ view: currentControllerView }) } as never);
+        } else if (path.includes("/perimeter")) {
+          callback({ val: () => ({ enabled: true, state: "off" }) } as never);
+        } else {
+          callback({ val: () => null } as never);
+        }
+        return vi.fn();
+      });
+
+      const { rerender } = render(
+        <FirebaseStateProvider
+          listenPrefix="venue-a"
+          isAuthenticated={true}
+          screenKey={null}
+        >
+          <TestPerimeterConsumer onMount={() => undefined} />
+        </FirebaseStateProvider>,
+      );
+
+      currentControllerView = VIEWS.match;
+      rerender(
+        <FirebaseStateProvider
+          listenPrefix="venue-b"
+          isAuthenticated={true}
+          screenKey={null}
+        >
+          <TestPerimeterConsumer onMount={() => undefined} />
+        </FirebaseStateProvider>,
       );
 
       expect(firebaseDatabase.syncState).not.toHaveBeenCalled();

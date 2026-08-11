@@ -438,13 +438,24 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   useEffect(() => {
     if (listenPrefix) {
+      // Reset the transition baseline so a new venue's loaded view is treated
+      // as an initial load, never a stale cross-venue transition.
+      prevControllerViewRef.current = null;
+
       let matchReady = false;
       let controllerReady = false;
       let viewReady = false;
       let clubOverridesReady = false;
+      let perimeterReady = false;
 
       const checkReady = () => {
-        if (matchReady && controllerReady && viewReady && clubOverridesReady) {
+        if (
+          matchReady &&
+          controllerReady &&
+          viewReady &&
+          clubOverridesReady &&
+          perimeterReady
+        ) {
           setReady(true);
         }
       };
@@ -517,6 +528,10 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         ref(database, perimeterPath),
         (snapshot) => {
           setPerimeter(parsePerimeterState(snapshot.val()) ?? defaultPerimeter);
+          if (!perimeterReady) {
+            perimeterReady = true;
+            checkReady();
+          }
         },
         (error) =>
           console.error("Firebase perimeter subscription error:", error),

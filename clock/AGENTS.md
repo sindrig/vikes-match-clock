@@ -89,8 +89,10 @@ state subtree, `states/${listenPrefix}/perimeter`:
   `state: "on"`, and leaving any view for `idle` writes `state: "off"`. Both
   writes happen only when `perimeter.enabled === true`; other transitions
   (`match` ↔ `control`, `idle` → `control`) leave the perimeter unchanged. The
-  transition is detected in a `useEffect` gated on `ready`, so a reload or
-  reconnect never replays a stale command (matching the daemon's behavior).
+  transition is detected in a `useEffect` gated on `ready` (which also waits for
+  the perimeter subscription, so `enabled` is known before any transition), so a
+  reload or reconnect never replays a stale command (matching the daemon's
+  behavior).
 - Follows the 100% Firebase model: the UI writes to Firebase and updates only
   after the subscription receives the new value (no optimistic updates).
 
