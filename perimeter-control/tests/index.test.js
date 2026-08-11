@@ -498,16 +498,16 @@ function makePng(width, height) {
   return PNG.sync.write(png);
 }
 
-test("reencodeThumbnail produces a bounded JPEG data URL", () => {
-  const result = reencodeThumbnail(makePng(640, 360), {
+test("reencodeThumbnail produces a PNG data URL", () => {
+  const result = reencodeThumbnail(makePng(320, 240), {
     maxDim: 320,
     quality: 0.6,
     maxBytes: 100_000,
   });
   assert.ok(result);
   assert.equal(result.width, 320);
-  assert.equal(result.height, 180);
-  assert.match(result.dataUrl, /^data:image\/jpeg;base64,/);
+  assert.equal(result.height, 240);
+  assert.match(result.dataUrl, /^data:image\/png;base64,/);
   assert.ok(result.bytes > 0);
   assert.equal(
     Buffer.from(result.dataUrl.split(",")[1], "base64").length,
@@ -546,7 +546,7 @@ test("reencodeThumbnail returns null for invalid or empty input", () => {
   assert.equal(reencodeThumbnail(null, {}), null);
 });
 
-test("reencodeThumbnail rejects a JPEG that exceeds maxBytes", () => {
+test("reencodeThumbnail rejects a PNG that exceeds maxBytes", () => {
   const png = makePng(640, 360);
   const result = reencodeThumbnail(png, {
     maxDim: 320,
@@ -620,14 +620,14 @@ test("collectPreview normalizes columns, clips and thumbnails", async (t) => {
   assert.equal(preview.columns[0].clips[0].filename, "sponsor-loop.mp4");
   assert.match(
     preview.columns[0].clips[0].thumbnail,
-    /^data:image\/jpeg;base64,/,
+    /^data:image\/png;base64,/,
   );
 
   assert.equal(preview.columns[1].clips.length, 2);
   assert.equal(preview.columns[1].clips[0].filename, "second.mp4");
   assert.match(
     preview.columns[1].clips[0].thumbnail,
-    /^data:image\/jpeg;base64,/,
+    /^data:image\/png;base64,/,
   );
   // The layer-2 clip thumbnail was not provided: it is omitted, not fatal.
   assert.equal(preview.columns[1].clips[1].filename, "intro.wav");
