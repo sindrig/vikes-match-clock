@@ -85,12 +85,14 @@ export function collectClipsByColumn(composition) {
         : [];
     clips.forEach((raw, clipIndex) => {
       if (!raw || typeof raw !== "object") return;
+      const filename = extractClipFilename(raw);
+      if (filename === undefined) return;
       const columnIndex = clipIndex + 1;
       if (!byColumn.has(columnIndex)) byColumn.set(columnIndex, []);
       byColumn.get(columnIndex).push({
         id: typeof raw.id === "number" ? raw.id : undefined,
         name: paramValue(raw, "name"),
-        filename: extractClipFilename(raw),
+        filename,
         layerIndex: layerIndex + 1,
         columnIndex,
       });
