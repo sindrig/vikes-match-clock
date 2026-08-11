@@ -169,6 +169,17 @@ export function reencodeThumbnail(
   const { width, height, data } = decoded;
   if (width <= 0 || height <= 0) return null;
 
+  const samplePixels =
+    data.length >= 40
+      ? Array.from(data.slice(0, 40))
+          .map((b) => b.toString().padStart(3))
+          .join(" ")
+      : "too short";
+  console.log(
+    `reencodeThumbnail: PNG ${pngBuffer.length}B → ${width}×${height} ` +
+      `(${data.length}B RGBA, first 40B: [${samplePixels}])`,
+  );
+
   const scale = Math.min(1, maxDim / Math.max(width, height));
   const outW = Math.max(1, Math.round(width * scale));
   const outH = Math.max(1, Math.round(height * scale));
