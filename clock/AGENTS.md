@@ -92,8 +92,10 @@ state subtree, `states/${listenPrefix}/perimeter`:
   It is mounted inside the `Stillingar` dialog in `Controller.tsx`. There are
   **no manual on/off controls** — the perimeter turns on/off automatically on
   view transitions (see below). Clicking the row opens a preview-only modal
-  showing every clip grouped by Resolume column with filename and a
-  320px-or-smaller JPEG thumbnail. There is no manual refresh; the daemon
+  showing every clip grouped into side-by-side, horizontally scrollable Resolume
+  columns with filename and a 320px-or-smaller JPEG thumbnail. Because rsuite
+  renders the dialog in a portal, its preview styles are scoped to
+  `.perimeter-preview-modal`, rather than `.controller`. There is no manual refresh; the daemon
   publishes on startup and after it turns Resolume on. The dialog handles
   loading, "no preview yet", stale `updatedAt`, and unavailable-thumbnail
   states; styles live in `PerimeterControl.css`.
