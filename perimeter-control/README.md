@@ -218,6 +218,75 @@ curl -X PATCH 'https://vikes-match-clock-firebase.firebaseio.com/states/vikuti/p
   -d '{"state":"on"}'
 ```
 
+## Perimeter overlay (goal-triggered video sequences)
+
+The daemon also runs an **overlay state machine** that plays video columns on
+reserved Resolume layers when a goal is scored. This is independent of the
+base perimeter on/off toggle.
+
+### How it works
+
+1. The clock controller writes an overlay document to
+   `states/${location}/perimeter/overlay` when a home goal is scored.
+2. The overlay controller validates the document (version, id, column count,
+   durations, paired file targets, filename safety, approved bucket only).
+3. `null` at the overlay path is treated as a clear command.
+4. Assets are downloaded from GCS (`gs://vikes-match-clock-firebase.appspot.com`)
+   to a local Linux cache, deduplicated by object generation.
+5. Missing/changed files are SCP-copied to the Windows Resolume host's
+   `C:/Content` directory using a temporary remote filename, then renamed
+   atomically.
+6. Clips are loaded into reserved Resolume clip slots (configured by
+   `PERIMETER_OVERLAY_LAYER_CLIP_COLUMNS`).
+7. All paired layers are triggered together.
+8. Sequential columns advance after their configured `durationMs`.
+9. The final column loops until the overlay is explicitly cleared.
+10. Clearing disconnects only the overlay layers (never the base content layers
+    or the full deck).
+11. On daemon restart, the overlay controller reconciles the active overlay
+    document and restores playback.
+
+### Resolume composition requirements
+
+The `Efni` deck must contain reserved overlay layers above the base content:
+
+```
+40 skjáir group
+  existing base layer
+  40 overlay layer   (configured via PERIMETER_OVERLAY_LAYER_IDS)
+48 skjáir group
+  existing base layer
+  48 overlay layer   (configured via PERIMETER_OVERLAY_LAYER_IDS)
+```
+
+The daemon only uses existing clip slots — it never creates groups, layers,
+or columns.
+
+### Status reporting
+
+The daemon publishes its overlay state to `perimeter/${location}/overlayStatus`:
+
+```json
+{
+  "commandId": "overlay-uuid",
+  "phase": "downloading|copying|loading|playing|error",
+  "activeColumn": 0,
+  "error": null
+}
+```
+
+Clients have read-only access to this path; only the daemon writes to it.
+
+### Configuration
+
+See `perimeter-control.env.example` for all overlay environment variables:
+`PERIMETER_OVERLAY_ENABLED`, `PERIMETER_OVERLAY_PATH`, `PERIMETER_OVERLAY_STATUS_PATH`,
+`PERIMETER_OVERLAY_GCP_PROJECT`, `PERIMETER_OVERLAY_CACHE_DIR`,
+`PERIMETER_OVERLAY_SSH_HOST/USER/KEY`, `PERIMETER_OVERLAY_REMOTE_CONTENT_DIR`,
+`PERIMETER_OVERLAY_LAYER_IDS`, `PERIMETER_OVERLAY_LAYER_CLIP_COLUMNS`.
+
+The SSH key must provide passwordless access to the Windows Resolume host.
+
 ## Tests
 
 ```bash

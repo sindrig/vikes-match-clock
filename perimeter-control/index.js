@@ -38,6 +38,7 @@ import { fileURLToPath } from "node:url";
 import { cert, initializeApp } from "firebase-admin/app";
 import { getDatabase, ServerValue } from "firebase-admin/database";
 import { ResolumeCompositionReader } from "./resolume-preview.js";
+import { OverlayController } from "./overlay.js";
 
 export const VALID_STATES = new Set(["on", "off"]);
 
@@ -56,6 +57,17 @@ const DEFAULT_THUMBNAIL_MAX_DIM = 320;
 const DEFAULT_THUMBNAIL_QUALITY = 0.7;
 const DEFAULT_THUMBNAIL_MAX_BYTES = 100_000;
 const DEFAULT_PREVIEW_MAX_BYTES = 8_000_000;
+
+// Overlay defaults
+const DEFAULT_OVERLAY_BASE_PATH = "states/vikuti/perimeter/overlay";
+const DEFAULT_OVERLAY_STATUS_PATH = "perimeter/vikuti/overlayStatus";
+const DEFAULT_OVERLAY_SSH_HOST = "127.0.0.1";
+const DEFAULT_OVERLAY_SSH_USER = "Administrator";
+const DEFAULT_OVERLAY_SSH_KEY =
+  "/etc/perimeter-control/overlay-ssh-key";
+const DEFAULT_OVERLAY_REMOTE_CONTENT_DIR = "C:/Content";
+const DEFAULT_OVERLAY_CACHE_DIR = "/var/cache/perimeter-control";
+const DEFAULT_OVERLAY_LAYER_CLIP_COLUMNS = '{"40":1,"48":1}';
 
 const RESOLUME_OFF_PATH = "/composition/disconnect-all";
 const RESOLUME_ON_PATH = "/composition/columns/{column}/connect";
@@ -78,6 +90,33 @@ function nonNegativeMs(value, fallback) {
 function quality(value, fallback) {
   const n = Number(value);
   return Number.isFinite(n) ? Math.min(1, Math.max(0.1, n)) : fallback;
+}
+
+function parseLayerMap(envValue, fallback) {
+  const raw = envValue ?? fallback;
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      const map = {};
+      for (const [key, val] of Object.entries(parsed)) {
+        const n = Number(val);
+        if (Number.isInteger(n) && n > 0) {
+          map[String(key)] = n;
+        }
+      }
+      if (Object.keys(map).length > 0) return map;
+    }
+  } catch {
+    // fall through
+  }
+  try {
+    const fallbackParsed = JSON.parse(fallback);
+    return fallbackParsed && typeof fallbackParsed === "object"
+      ? fallbackParsed
+      : {};
+  } catch {
+    return {};
+  }
 }
 
 export function loadConfig(environ = process.env) {
@@ -127,6 +166,32 @@ export function loadConfig(environ = process.env) {
       environ.PERIMETER_PREVIEW_MAX_BYTES,
       DEFAULT_PREVIEW_MAX_BYTES,
     ),
+    // Overlay settings
+    overlayEnabled: environ.PERIMETER_OVERLAY_ENABLED !== "false",
+    overlayPath:
+      environ.PERIMETER_OVERLAY_PATH ?? DEFAULT_OVERLAY_BASE_PATH,
+    overlayStatusPath:
+      environ.PERIMETER_OVERLAY_STATUS_PATH ?? DEFAULT_OVERLAY_STATUS_PATH,
+    overlayProjectId: environ.PERIMETER_OVERLAY_GCP_PROJECT ?? "",
+    overlayCacheDir:
+      environ.PERIMETER_OVERLAY_CACHE_DIR ?? DEFAULT_OVERLAY_CACHE_DIR,
+    overlaySshHost:
+      environ.PERIMETER_OVERLAY_SSH_HOST ?? DEFAULT_OVERLAY_SSH_HOST,
+    overlaySshUser:
+      environ.PERIMETER_OVERLAY_SSH_USER ?? DEFAULT_OVERLAY_SSH_USER,
+    overlaySshKey:
+      environ.PERIMETER_OVERLAY_SSH_KEY ?? DEFAULT_OVERLAY_SSH_KEY,
+    overlayRemoteContentDir:
+      environ.PERIMETER_OVERLAY_REMOTE_CONTENT_DIR ??
+      DEFAULT_OVERLAY_REMOTE_CONTENT_DIR,
+    overlayLayerClipColumns: parseLayerMap(
+      environ.PERIMETER_OVERLAY_LAYER_CLIP_COLUMNS,
+      DEFAULT_OVERLAY_LAYER_CLIP_COLUMNS,
+    ),
+    overlayLayerIds: (environ.PERIMETER_OVERLAY_LAYER_IDS ?? "40,48")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
   };
 }
 
@@ -193,6 +258,10 @@ export class PerimeterController {
     this._ref = null;
     this._previewRef = null;
     this._refreshTimer = null;
+    this._overlayController = null;
+    if (config.overlayEnabled) {
+      this._overlayController = new OverlayController(config);
+    }
   }
 
   // -- state --------------------------------------------------------------
@@ -227,6 +296,10 @@ export class PerimeterController {
     this._previewRef = db.ref(this.config.previewPath);
     console.log(`Listening on Firebase path: ${this.config.path}`);
     console.log(`Publishing preview to Firebase path: ${this.config.previewPath}`);
+    if (this._overlayController) {
+      this._overlayController.attach(db);
+      console.log(`Overlay control listening on: ${this.config.overlayPath}`);
+    }
   }
 
   _reopenListener() {
@@ -367,6 +440,9 @@ export class PerimeterController {
     }
     if (this._ref !== null) {
       this._ref.off("value", this._handleSnapshot);
+    }
+    if (this._overlayController) {
+      this._overlayController.shutdown();
     }
     this._notifier.notify();
   }

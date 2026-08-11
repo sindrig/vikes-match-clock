@@ -35,6 +35,10 @@ describe("PerimeterControl", () => {
       preview: basePreview,
       previewLoaded: true,
       setPerimeterState: vi.fn(),
+      setPerimeterOverlay: vi.fn(),
+      clearPerimeterOverlay: vi.fn(),
+      overlay: null,
+      overlayStatus: null,
       getServerTime: () => Date.now(),
     });
   });
@@ -45,6 +49,10 @@ describe("PerimeterControl", () => {
       preview: null,
       previewLoaded: true,
       setPerimeterState: vi.fn(),
+      setPerimeterOverlay: vi.fn(),
+      clearPerimeterOverlay: vi.fn(),
+      overlay: null,
+      overlayStatus: null,
       getServerTime: () => Date.now(),
     });
 
@@ -98,6 +106,10 @@ describe("PerimeterControl", () => {
       preview: null,
       previewLoaded: true,
       setPerimeterState: vi.fn(),
+      setPerimeterOverlay: vi.fn(),
+      clearPerimeterOverlay: vi.fn(),
+      overlay: null,
+      overlayStatus: null,
       getServerTime: () => Date.now(),
     });
     render(<PerimeterControl />);
@@ -115,6 +127,10 @@ describe("PerimeterControl", () => {
       preview: null,
       previewLoaded: false,
       setPerimeterState: vi.fn(),
+      setPerimeterOverlay: vi.fn(),
+      clearPerimeterOverlay: vi.fn(),
+      overlay: null,
+      overlayStatus: null,
       getServerTime: () => Date.now(),
     });
     render(<PerimeterControl />);
@@ -130,6 +146,10 @@ describe("PerimeterControl", () => {
       preview: { updatedAt: Date.now(), columns: [] },
       previewLoaded: true,
       setPerimeterState: vi.fn(),
+      setPerimeterOverlay: vi.fn(),
+      clearPerimeterOverlay: vi.fn(),
+      overlay: null,
+      overlayStatus: null,
       getServerTime: () => Date.now(),
     });
     render(<PerimeterControl />);
@@ -147,6 +167,10 @@ describe("PerimeterControl", () => {
       preview: { updatedAt: Date.now() - 60 * 60 * 1000, columns: [] },
       previewLoaded: true,
       setPerimeterState: vi.fn(),
+      setPerimeterOverlay: vi.fn(),
+      clearPerimeterOverlay: vi.fn(),
+      overlay: null,
+      overlayStatus: null,
       getServerTime: () => Date.now(),
     });
     render(<PerimeterControl />);

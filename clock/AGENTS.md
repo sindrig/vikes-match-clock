@@ -93,7 +93,7 @@ state subtree, `states/${listenPrefix}/perimeter`:
   **no manual on/off controls** — the perimeter turns on/off automatically on
   view transitions (see below). Clicking the row opens a preview-only modal
   showing every clip grouped into side-by-side, horizontally scrollable Resolume
-  columns with filename and a 320px-or-smaller JPEG thumbnail. Because rsuite
+  columns with filename and a 320px-or-smaller PNG thumbnail. Because rsuite
   renders the dialog in a portal, its preview styles are scoped to
   `.perimeter-preview-modal`, rather than `.controller`. There is no manual refresh; the daemon
   publishes on startup and after it turns Resolume on. The dialog handles
@@ -162,6 +162,73 @@ a failed Resolume query or an oversized payload leaves the last published
 snapshot intact. All Resolume-version-specific parsing is isolated in
 `resolume-preview.js`; see `perimeter-control/README.md` for installation and
 operation.
+
+#### Perimeter Overlay (Goal-Triggered Video Sequences)
+
+When a **home goal** is scored, a Firebase-controlled perimeter overlay
+sequence is triggered. The overlay plays paired video columns on the perimeter
+LED screens above the existing `Efni` advertisements, then loops the final
+column until explicitly cleared.
+
+**Firebase path**: `states/${listenPrefix}/perimeter/overlay`
+
+```json
+{
+  "version": 1,
+  "id": "uuid",
+  "columns": [
+    {
+      "durationMs": 10000,
+      "files": {
+        "40": {
+          "name": "goal-40.mp4",
+          "source": "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/goal-40.mp4"
+        },
+        "48": {
+          "name": "goal-48.mp4",
+          "source": "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/goal-48.mp4"
+        }
+      }
+    }
+  ]
+}
+```
+
+- `overlay: null` clears the overlay (disconnects only overlay layers).
+- Each column must include both `40` and `48` file entries.
+- Earlier columns advance after `durationMs`; the final column loops forever.
+- A new `id` replaces/restarts an active sequence.
+- Only files from the approved `gs://vikes-match-clock-firebase.appspot.com`
+  bucket are accepted. The daemon copies them only into `C:/Content` on the
+  Windows Resolume host.
+
+**Daemon status**: Published to `perimeter/${listenPrefix}/overlayStatus` by
+the daemon (read-only for clients). Contains `commandId`, `phase`
+(`downloading`/`copying`/`loading`/`playing`/`error`), `activeColumn`, and
+safe `error` text.
+
+**Clearing**: The "Hreinsa virkt overlay" button in the controller UI clears
+both the main screen overlay (`controller.currentAsset`) **and** the perimeter
+overlay (`states/${listenPrefix}/perimeter/overlay`).
+
+**Away goals** do not trigger a perimeter overlay — only home goals.
+
+Types are defined in `types.ts`:
+- `PerimeterOverlay` — overlay document
+- `PerimeterOverlayColumn` — a column with duration and paired files
+- `PerimeterOverlayFile` — filename + GCS source
+- `PerimeterOverlayStatus` — daemon-published status
+- `PerimeterOverlayPhase` — phase enum
+
+Parsing is in `firebaseParsers.ts`:
+- `parsePerimeterOverlay()` — strict validation (version, id, column count,
+  duration bounds, paired targets, filename safety, approved bucket only).
+
+Write actions are in `FirebaseStateContext.tsx`:
+- `setPerimeterOverlay(overlay)` — writes overlay document
+- `clearPerimeterOverlay()` — writes null to clear
+
+These are exposed via `usePerimeter()` hook.
 
 ### The `listenPrefix` System
 

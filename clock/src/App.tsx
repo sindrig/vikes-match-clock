@@ -7,6 +7,7 @@ import {
   useController,
   useMatch,
   useView,
+  usePerimeter,
 } from "./contexts/FirebaseStateContext";
 import { useLocalState } from "./contexts/LocalStateContext";
 import { firebaseAuth } from "./firebaseAuth";
@@ -39,7 +40,9 @@ const ScoreButtons = ({ side }: { side: "home" | "away" }) => {
     renderAsset,
     controller: { roster },
   } = useController();
+  const { setPerimeterOverlay } = usePerimeter();
   const { view } = useView();
+  const { listenPrefix } = useLocalState();
   const scoreKeys = { home: "homeScore", away: "awayScore" } as const;
   const score = match[scoreKeys[side]];
   const [scorerDialogOpen, setScorerDialogOpen] = useState(false);
@@ -49,13 +52,35 @@ const ScoreButtons = ({ side }: { side: "home" | "away" }) => {
 
   const handleGoal = () => {
     addGoal(side);
-    if (side === "home" && view.goalGif1) {
-      renderAsset({
-        key: view.goalGif1,
-        type: isVideoUrl(view.goalGif1) ? assetTypes.VIDEO : assetTypes.IMAGE,
+    if (side === "home") {
+      const bucketName = "vikes-match-clock-firebase.appspot.com";
+      setPerimeterOverlay({
+        version: 1,
+        id: crypto.randomUUID(),
+        columns: [
+          {
+            durationMs: 10000,
+            files: {
+              "40": {
+                name: "goal-40.mp4",
+                source: `gs://${bucketName}/${listenPrefix}/perimeter/goal-40.mp4`,
+              },
+              "48": {
+                name: "goal-48.mp4",
+                source: `gs://${bucketName}/${listenPrefix}/perimeter/goal-48.mp4`,
+              },
+            },
+          },
+        ],
       });
-      if (players.length > 0) {
-        setScorerDialogOpen(true);
+      if (view.goalGif1) {
+        renderAsset({
+          key: view.goalGif1,
+          type: isVideoUrl(view.goalGif1) ? assetTypes.VIDEO : assetTypes.IMAGE,
+        });
+        if (players.length > 0) {
+          setScorerDialogOpen(true);
+        }
       }
     }
   };
@@ -132,6 +157,7 @@ const tooltipClear = <Tooltip>Birtir aftur stöðu leiksins á skjá.</Tooltip>;
 
 const ClearOverlayButton = () => {
   const { renderAsset } = useController();
+  const { clearPerimeterOverlay } = usePerimeter();
 
   return (
     <Whisper
@@ -144,7 +170,10 @@ const ClearOverlayButton = () => {
         color="cyan"
         appearance="primary"
         size="sm"
-        onClick={() => renderAsset(null)}
+        onClick={() => {
+          renderAsset(null);
+          clearPerimeterOverlay();
+        }}
         block
       >
         <CloseIcon /> Hreinsa virkt overlay

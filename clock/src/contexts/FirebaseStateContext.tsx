@@ -16,6 +16,7 @@ import {
   deleteClubOverride as firebaseDeleteClubOverride,
 } from "../firebaseDatabase";
 import { ref, onValue } from "firebase/database";
+import { set } from "firebase/database";
 import {
   Match,
   ControllerState,
@@ -32,6 +33,8 @@ import {
   ClubOverride,
   PerimeterState,
   PerimeterPreview,
+  PerimeterOverlay,
+  PerimeterOverlayStatus,
 } from "../types";
 import { Sports, DEFAULT_HALFSTOPS, VIEWS } from "../constants";
 import { msUntilMatchStart } from "../utils/timeUtils";
@@ -45,6 +48,7 @@ import {
   parseClubOverrides,
   parsePerimeterState,
   parsePerimeterPreview,
+  parsePerimeterOverlay,
 } from "./firebaseParsers";
 
 const HALFTIME_DURATION_MS = 15 * 60 * 1000;
@@ -248,6 +252,10 @@ interface FirebaseStateContextType {
   deleteClubOverride: (id: string) => Promise<void>;
 
   setPerimeterState: (state: PerimeterState["state"]) => void;
+  setPerimeterOverlay: (overlay: PerimeterOverlay) => void;
+  clearPerimeterOverlay: () => void;
+  perimeterOverlay: PerimeterOverlay | null;
+  perimeterOverlayStatus: PerimeterOverlayStatus | null;
 }
 
 const FirebaseStateContext = createContext<FirebaseStateContextType | null>(
@@ -390,6 +398,11 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   const [perimeterPreview, setPerimeterPreview] =
     useState<PerimeterPreview | null>(defaultPerimeterPreview);
   const [perimeterPreviewLoaded, setPerimeterPreviewLoaded] = useState(false);
+  const [perimeterOverlay, setOverlay] = useState<PerimeterOverlay | null>(
+    null,
+  );
+  const [perimeterOverlayStatus, setPerimeterOverlayStatus] =
+    useState<PerimeterOverlayStatus | null>(null);
   const [ready, setReady] = useState(!listenPrefix);
 
   const matchRef = useRef(match);
@@ -539,7 +552,15 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       const unsubPerimeter = onValue(
         ref(database, perimeterPath),
         (snapshot) => {
-          setPerimeter(parsePerimeterState(snapshot.val()) ?? defaultPerimeter);
+          const raw: unknown = snapshot.val();
+          setPerimeter(parsePerimeterState(raw) ?? defaultPerimeter);
+          const overlay =
+            raw && typeof raw === "object"
+              ? parsePerimeterOverlay(
+                  (raw as Record<string, unknown>).overlay ?? null,
+                )
+              : null;
+          setOverlay(overlay);
           if (!perimeterReady) {
             perimeterReady = true;
             checkReady();
@@ -567,6 +588,35 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
           ),
       );
 
+      const overlayStatusPath = `perimeter/${listenPrefix}/overlayStatus`;
+      const unsubOverlayStatus = onValue(
+        ref(database, overlayStatusPath),
+        (snapshot) => {
+          const raw: unknown = snapshot.val();
+          if (!raw || typeof raw !== "object") {
+            setPerimeterOverlayStatus(null);
+            return;
+          }
+          const status = raw as Record<string, unknown>;
+          setPerimeterOverlayStatus({
+            commandId:
+              typeof status.commandId === "string" ? status.commandId : null,
+            phase:
+              typeof status.phase === "string"
+                ? (status.phase as PerimeterOverlayStatus["phase"])
+                : "error",
+            activeColumn:
+              typeof status.activeColumn === "number" ? status.activeColumn : 0,
+            error: typeof status.error === "string" ? status.error : null,
+          });
+        },
+        (error) =>
+          console.error(
+            "Firebase perimeter overlayStatus subscription error:",
+            error,
+          ),
+      );
+
       return () => {
         unsubMatch();
         unsubController();
@@ -574,6 +624,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         unsubClubOverrides();
         unsubPerimeter();
         unsubPerimeterPreview();
+        unsubOverlayStatus();
       };
     }
   }, [listenPrefix]);
@@ -1515,6 +1566,26 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     [isAuthenticated, listenPrefix],
   );
 
+  const setPerimeterOverlay = useCallback(
+    (overlay: PerimeterOverlay) => {
+      if (!listenPrefix || !isAuthenticated) return;
+
+      set(
+        ref(database, `states/${listenPrefix}/perimeter/overlay`),
+        overlay,
+      ).catch(console.error);
+    },
+    [isAuthenticated, listenPrefix],
+  );
+
+  const clearPerimeterOverlay = useCallback(() => {
+    if (!listenPrefix || !isAuthenticated) return;
+
+    set(ref(database, `states/${listenPrefix}/perimeter/overlay`), null).catch(
+      console.error,
+    );
+  }, [isAuthenticated, listenPrefix]);
+
   // Auto-start/stop the perimeter LEDs on view transitions: entering the match
   // view turns the perimeter on, leaving any view for idle turns it off. Only
   // writes when the perimeter is enabled, and only after initial subscriptions
@@ -1618,6 +1689,10 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       saveClubOverride,
       deleteClubOverride,
       setPerimeterState,
+      setPerimeterOverlay,
+      clearPerimeterOverlay,
+      perimeterOverlay,
+      perimeterOverlayStatus,
     }),
     [
       match,
@@ -1687,6 +1762,10 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       saveClubOverride,
       deleteClubOverride,
       setPerimeterState,
+      setPerimeterOverlay,
+      clearPerimeterOverlay,
+      perimeterOverlay,
+      perimeterOverlayStatus,
     ],
   );
 
@@ -1865,6 +1944,10 @@ export const usePerimeter = () => {
     perimeterPreview,
     perimeterPreviewLoaded,
     setPerimeterState,
+    setPerimeterOverlay,
+    clearPerimeterOverlay,
+    perimeterOverlay,
+    perimeterOverlayStatus,
     getServerTime,
   } = useFirebaseState();
   return {
@@ -1872,6 +1955,10 @@ export const usePerimeter = () => {
     preview: perimeterPreview,
     previewLoaded: perimeterPreviewLoaded,
     setPerimeterState,
+    setPerimeterOverlay,
+    clearPerimeterOverlay,
+    overlay: perimeterOverlay,
+    overlayStatus: perimeterOverlayStatus,
     getServerTime,
   };
 };
