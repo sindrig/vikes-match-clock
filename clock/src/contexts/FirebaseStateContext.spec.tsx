@@ -10,7 +10,7 @@ import {
   usePerimeter,
 } from "./FirebaseStateContext";
 import { Asset, Roster, ViewPort } from "../types";
-import { Sports, DEFAULT_HALFSTOPS } from "../constants";
+import { Sports, DEFAULT_HALFSTOPS, VIEWS } from "../constants";
 
 import { firebaseDatabase } from "../firebaseDatabase";
 
@@ -2117,6 +2117,50 @@ describe("FirebaseStateContext", () => {
       return perimeterApi;
     }
 
+    function renderPerimeterViewTransitions(
+      data: unknown = null,
+      initialView: string = VIEWS.idle,
+    ) {
+      let controllerCallback: ((snapshot: unknown) => void) | null = null;
+
+      vi.mocked(onValue).mockImplementation((reference, callback) => {
+        const path = String(reference);
+        if (path.includes("/controller")) {
+          controllerCallback = callback as (snapshot: unknown) => void;
+          callback({ val: () => ({ view: initialView }) } as never);
+        } else if (path.includes("/perimeter")) {
+          callback({ val: () => data } as never);
+        } else {
+          callback({ val: () => null } as never);
+        }
+        return vi.fn();
+      });
+
+      let perimeterApi: ReturnType<typeof usePerimeter> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="vikuti"
+          isAuthenticated={true}
+          screenKey={null}
+        >
+          <TestPerimeterConsumer
+            onMount={(api) => {
+              perimeterApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+
+      return {
+        perimeterApi,
+        setView: (view: string) => {
+          act(() => {
+            controllerCallback!({ val: () => ({ view }) } as never);
+          });
+        },
+      };
+    }
+
     it("parses perimeter state from the Firebase subscription", () => {
       const perimeterApi = renderPerimeter("vikuti", true, {
         enabled: true,
@@ -2164,6 +2208,92 @@ describe("FirebaseStateContext", () => {
       act(() => {
         perimeterApi!.setPerimeterState("off");
       });
+
+      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
+    });
+
+    it("auto-turns the perimeter on when transitioning idle to match", () => {
+      const { setView } = renderPerimeterViewTransitions({
+        enabled: true,
+        state: "off",
+      });
+
+      setView(VIEWS.match);
+
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "vikuti",
+        "perimeter",
+        { state: "on" },
+      );
+    });
+
+    it("auto-turns the perimeter off when transitioning match to idle", () => {
+      const { setView } = renderPerimeterViewTransitions({
+        enabled: true,
+        state: "off",
+      });
+
+      setView(VIEWS.match);
+      setView(VIEWS.idle);
+
+      expect(firebaseDatabase.syncState).toHaveBeenLastCalledWith(
+        "vikuti",
+        "perimeter",
+        { state: "off" },
+      );
+    });
+
+    it("auto-turns the perimeter off when transitioning control to idle", () => {
+      const { setView } = renderPerimeterViewTransitions({
+        enabled: true,
+        state: "off",
+      });
+
+      setView(VIEWS.control);
+      setView(VIEWS.idle);
+
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "vikuti",
+        "perimeter",
+        { state: "off" },
+      );
+    });
+
+    it("does not auto-toggle the perimeter when it is disabled", () => {
+      const { setView } = renderPerimeterViewTransitions({
+        enabled: false,
+        state: "off",
+      });
+
+      setView(VIEWS.match);
+      setView(VIEWS.idle);
+
+      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
+    });
+
+    it("leaves the perimeter unchanged for unrelated view transitions", () => {
+      const { setView } = renderPerimeterViewTransitions({
+        enabled: true,
+        state: "off",
+      });
+
+      setView(VIEWS.match);
+      setView(VIEWS.control);
+      setView(VIEWS.match);
+
+      expect(firebaseDatabase.syncState).toHaveBeenCalledTimes(1);
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "vikuti",
+        "perimeter",
+        { state: "on" },
+      );
+    });
+
+    it("does not write the perimeter state on initial load in match view", () => {
+      renderPerimeterViewTransitions(
+        { enabled: true, state: "off" },
+        VIEWS.match,
+      );
 
       expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
     });

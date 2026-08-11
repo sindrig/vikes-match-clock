@@ -32,7 +32,7 @@ import {
   ClubOverride,
   PerimeterState,
 } from "../types";
-import { Sports, DEFAULT_HALFSTOPS } from "../constants";
+import { Sports, DEFAULT_HALFSTOPS, VIEWS } from "../constants";
 import { msUntilMatchStart } from "../utils/timeUtils";
 import clubIds from "../club-ids";
 import assetTypes from "../controller/asset/AssetTypes";
@@ -385,6 +385,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   const matchRef = useRef(match);
   const controllerRef = useRef(controller);
+  const prevControllerViewRef = useRef<string | null>(null);
   const viewRef = useRef(view);
   const clubOverridesRef = useRef(clubOverrides);
   const serverTimeOffsetRef = useRef<number>(0);
@@ -1467,6 +1468,27 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     },
     [isAuthenticated, listenPrefix],
   );
+
+  // Auto-start/stop the perimeter LEDs on view transitions: entering the match
+  // view turns the perimeter on, leaving any view for idle turns it off. Only
+  // writes when the perimeter is enabled, and only after initial subscriptions
+  // have loaded so a reload/reconnect never replays a stale perimeter command.
+  useEffect(() => {
+    if (!ready) return;
+
+    const nextView = controller.view;
+    const prevView = prevControllerViewRef.current;
+    prevControllerViewRef.current = nextView;
+
+    if (prevView === null || prevView === nextView) return;
+    if (!perimeter.enabled) return;
+
+    if (prevView === VIEWS.idle && nextView === VIEWS.match) {
+      setPerimeterState("on");
+    } else if (nextView === VIEWS.idle) {
+      setPerimeterState("off");
+    }
+  }, [ready, controller.view, perimeter.enabled, setPerimeterState]);
 
   // Resolve viewport from live Firebase locations data by screenKey.
   // When admin changes screen dimensions, listeners updates and this recomputes.
