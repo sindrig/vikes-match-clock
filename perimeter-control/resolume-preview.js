@@ -145,12 +145,19 @@ function downscaleToRgb(src, srcW, srcH, dstW, dstH) {
 
 // Re-encode a PNG thumbnail as a bounded JPEG data URL. Returns
 // `{ dataUrl, bytes, width, height }` or null when the input is not a valid
-// PNG or the resulting JPEG would exceed `maxBytes`.
+// PNG, the input is too large to decode safely, or the resulting data URL
+// would exceed `maxBytes`.
 export function reencodeThumbnail(
   pngBuffer,
-  { maxDim = 320, quality = 0.7, maxBytes = 100_000 } = {},
+  {
+    maxDim = 320,
+    quality = 0.7,
+    maxBytes = 100_000,
+    maxInputBytes = 4_000_000,
+  } = {},
 ) {
   if (!Buffer.isBuffer(pngBuffer) || pngBuffer.length === 0) return null;
+  if (pngBuffer.length > maxInputBytes) return null;
   let decoded;
   try {
     decoded = PNG.sync.read(pngBuffer);
@@ -164,7 +171,9 @@ export function reencodeThumbnail(
   const outW = Math.max(1, Math.round(width * scale));
   const outH = Math.max(1, Math.round(height * scale));
   const rgb =
-    scale < 1 ? downscaleToRgb(data, width, height, outW, outH) : rgbaToRgb(data, width, height);
+    scale < 1
+      ? downscaleToRgb(data, width, height, outW, outH)
+      : rgbaToRgb(data, width, height);
 
   let encoded;
   try {
@@ -172,9 +181,11 @@ export function reencodeThumbnail(
   } catch {
     return null;
   }
-  if (encoded.data.length > maxBytes) return null;
+  const dataUrl = `data:image/jpeg;base64,${encoded.data.toString("base64")}`;
+  // Bound the size actually published (the base64 data URL), not the raw JPEG.
+  if (dataUrl.length > maxBytes) return null;
   return {
-    dataUrl: `data:image/jpeg;base64,${encoded.data.toString("base64")}`,
+    dataUrl,
     bytes: encoded.data.length,
     width: outW,
     height: outH,

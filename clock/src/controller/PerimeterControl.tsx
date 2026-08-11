@@ -14,14 +14,14 @@ const formatTimestamp = (updatedAt: number | null): string => {
 };
 
 const PerimeterControl = () => {
-  const { perimeter, preview, previewLoaded } = usePerimeter();
+  const { perimeter, preview, previewLoaded, getServerTime } = usePerimeter();
   const [open, setOpen] = useState(false);
   const [now, setNow] = useState(0);
 
   if (!perimeter.enabled) return null;
 
   const openDialog = () => {
-    setNow(Date.now());
+    setNow(getServerTime());
     setOpen(true);
   };
 
@@ -76,10 +76,10 @@ const PerimeterControl = () => {
                   Engar klippur í jaðarskjánum.
                 </p>
               ) : (
-                preview.columns.map((column) => (
+                preview.columns.map((column, columnIndex) => (
                   <section
                     className="perimeter-column"
-                    key={column.id ?? column.name}
+                    key={column.id ?? `column-${columnIndex}`}
                   >
                     <h4 className="perimeter-column-name">{column.name}</h4>
                     {column.clips.length === 0 ? (
@@ -89,7 +89,7 @@ const PerimeterControl = () => {
                         {column.clips.map((clip, idx) => (
                           <div
                             className="perimeter-clip"
-                            key={clip.id ?? `${column.name}-${idx}`}
+                            key={clip.id ?? `clip-${columnIndex}-${idx}`}
                           >
                             {clip.thumbnail ? (
                               <img

@@ -100,7 +100,7 @@ Edit `/etc/perimeter-control/perimeter-control.env`:
 | `PERIMETER_PREVIEW_PATH`          | `perimeter/vikuti`                                                      | Path of the published preview snapshot         |
 | `PERIMETER_THUMBNAIL_MAX_DIM`     | `320`                                                                   | Longest side of re-encoded thumbnails (px)     |
 | `PERIMETER_THUMBNAIL_QUALITY`     | `0.7`                                                                   | JPEG quality (0.1–1.0) for thumbnails          |
-| `PERIMETER_THUMBNAIL_MAX_BYTES`   | `100000`                                                                | Per-thumbnail byte cap (larger is omitted)     |
+| `PERIMETER_THUMBNAIL_MAX_BYTES`   | `100000`                                                                | Per-thumbnail cap in published data-URL chars (larger is omitted) |
 | `PERIMETER_PREVIEW_MAX_BYTES`     | `8000000`                                                               | Whole-snapshot byte cap (larger is rejected)   |
 
 After changing the environment file:
@@ -164,6 +164,8 @@ is:
   breaking the whole snapshot.
 - Thumbnails are re-encoded client-side in the daemon as bounded JPEG data
   URLs (`PERIMETER_THUMBNAIL_MAX_DIM`, `PERIMETER_THUMBNAIL_QUALITY`).
+  `PERIMETER_THUMBNAIL_MAX_BYTES` bounds the **published data URL** (base64
+  characters), not the raw JPEG bytes, so the payload stays predictable.
 - A snapshot whose whole payload would exceed `PERIMETER_PREVIEW_MAX_BYTES` is
   **rejected** (never written); the last published snapshot is kept and the
   failure is logged.

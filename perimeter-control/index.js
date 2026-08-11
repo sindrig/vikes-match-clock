@@ -296,7 +296,10 @@ export class PerimeterController {
   async _buildPreviewSnapshot() {
     const { columns } = await this.previewReader.collectPreview();
     const snapshot = { updatedAt: ServerValue.TIMESTAMP, columns };
-    const payloadBytes = Buffer.byteLength(JSON.stringify({ columns }), "utf8");
+    const payloadBytes = Buffer.byteLength(
+      JSON.stringify({ updatedAt: 0, columns }),
+      "utf8",
+    );
     if (payloadBytes > this.config.previewMaxBytes) {
       throw new Error(
         `perimeter preview payload ${payloadBytes} bytes exceeds the ` +
@@ -308,9 +311,23 @@ export class PerimeterController {
 
   // Re-read the Resolume composition and publish the normalized snapshot to
   // the preview path. Any failure is logged and the last published snapshot
-  // is left intact; this method never throws.
+  // is left intact; this method never throws. Concurrent refreshes are
+  // serialized so an older collection can never overwrite a newer snapshot.
   async refreshPreview() {
     if (!this.config.previewEnabled) return;
+    const previous = this._refreshPromise;
+    const run = previous
+      ? previous.then(() => this._doRefreshPreview())
+      : this._doRefreshPreview();
+    this._refreshPromise = run;
+    try {
+      await run;
+    } finally {
+      if (this._refreshPromise === run) this._refreshPromise = null;
+    }
+  }
+
+  async _doRefreshPreview() {
     try {
       const snapshot = await this._buildPreviewSnapshot();
       await this._previewRef.set(snapshot);

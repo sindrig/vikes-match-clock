@@ -556,6 +556,17 @@ test("reencodeThumbnail rejects a JPEG that exceeds maxBytes", () => {
   assert.equal(result, null);
 });
 
+test("reencodeThumbnail rejects an oversized PNG input before decoding", () => {
+  const png = makePng(16, 16);
+  const result = reencodeThumbnail(png, {
+    maxDim: 320,
+    quality: 0.6,
+    maxBytes: 100_000,
+    maxInputBytes: 10,
+  });
+  assert.equal(result, null);
+});
+
 // -- preview reader --------------------------------------------------------------------
 
 function mockReaderFetch(t, composition, thumbs) {
@@ -682,6 +693,32 @@ test("publishes preview after a successful on", async () => {
   await waitFor(() => db.refs[1].setCalls.length >= 1);
 
   assert.equal(db.refs[1].setCalls.length, 1);
+  controller.shutdown();
+});
+
+test("concurrent refreshPreview calls are serialized", async () => {
+  const controller = makeController();
+  const db = new FakeDb();
+  controller.attach(db);
+  let release;
+  const gate = new Promise((resolve) => {
+    release = resolve;
+  });
+  let calls = 0;
+  controller.previewReader.collectPreview = async () => {
+    calls += 1;
+    await gate;
+    return { columns: [{ id: 1, name: `Column ${calls}`, clips: [] }] };
+  };
+
+  const first = controller.refreshPreview();
+  const second = controller.refreshPreview();
+  release();
+  await Promise.all([first, second]);
+
+  assert.equal(db.refs[1].setCalls.length, 2);
+  assert.equal(db.refs[1].setCalls[0].columns[0].name, "Column 1");
+  assert.equal(db.refs[1].setCalls[1].columns[0].name, "Column 2");
   controller.shutdown();
 });
 

@@ -404,6 +404,8 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   if (prevListenPrefix !== listenPrefix) {
     setPrevListenPrefix(listenPrefix);
     setReady(!listenPrefix);
+    setPerimeterPreview(defaultPerimeterPreview);
+    setPerimeterPreviewLoaded(false);
   }
 
   useEffect(() => {
@@ -1863,11 +1865,13 @@ export const usePerimeter = () => {
     perimeterPreview,
     perimeterPreviewLoaded,
     setPerimeterState,
+    getServerTime,
   } = useFirebaseState();
   return {
     perimeter,
     preview: perimeterPreview,
     previewLoaded: perimeterPreviewLoaded,
     setPerimeterState,
+    getServerTime,
   };
 };
