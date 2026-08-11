@@ -169,15 +169,27 @@ export function reencodeThumbnail(
   const { width, height, data } = decoded;
   if (width <= 0 || height <= 0) return null;
 
+  const ihdrInfo = {
+    colorType: decoded.colorType,
+    bitDepth: decoded.bitDepth,
+    palette: decoded.palette ? decoded.palette.length : 0,
+    interlace: decoded.interlace,
+  };
   const samplePixels =
     data.length >= 40
       ? Array.from(data.slice(0, 40))
           .map((b) => b.toString().padStart(3))
           .join(" ")
       : "too short";
+  const nonZero = data.slice(0, 1000).filter((b) => b !== 0).length;
   console.log(
     `reencodeThumbnail: PNG ${pngBuffer.length}B → ${width}×${height} ` +
-      `(${data.length}B RGBA, first 40B: [${samplePixels}])`,
+      `(${data.length}B RGBA), ` +
+      `colorType=${ihdrInfo.colorType} ` +
+      `depth=${ihdrInfo.bitDepth} ` +
+      `palette=${ihdrInfo.palette} ` +
+      `nonZero=${nonZero}/first1000, ` +
+      `first 40B: [${samplePixels}]`,
   );
 
   const scale = Math.min(1, maxDim / Math.max(width, height));
