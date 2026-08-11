@@ -2162,6 +2162,37 @@ describe("FirebaseStateContext", () => {
       };
     }
 
+    function renderPerimeterWithPreview(
+      listenPrefix: string,
+      preview: unknown,
+    ): ReturnType<typeof usePerimeter> | null {
+      vi.mocked(onValue).mockImplementation((reference, callback) => {
+        const path = String(reference);
+        if (path.startsWith("perimeter/")) {
+          callback({ val: () => preview } as never);
+        } else {
+          callback({ val: () => null } as never);
+        }
+        return vi.fn();
+      });
+
+      let perimeterApi: ReturnType<typeof usePerimeter> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix={listenPrefix}
+          isAuthenticated={true}
+          screenKey={null}
+        >
+          <TestPerimeterConsumer
+            onMount={(api) => {
+              perimeterApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      return perimeterApi;
+    }
+
     it("parses perimeter state from the Firebase subscription", () => {
       const perimeterApi = renderPerimeter("vikuti", true, {
         enabled: true,
@@ -2365,6 +2396,40 @@ describe("FirebaseStateContext", () => {
       );
 
       expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
+    });
+
+    it("subscribes to the daemon preview path and parses the snapshot", () => {
+      const perimeterApi = renderPerimeterWithPreview("vikuti", {
+        updatedAt: 1723392000000,
+        columns: [
+          {
+            id: 1,
+            name: "Column 1",
+            clips: [{ id: 12, filename: "sponsor-loop.mp4" }],
+          },
+        ],
+      });
+
+      expect(perimeterApi).not.toBeNull();
+      expect(perimeterApi!.preview).toEqual({
+        updatedAt: 1723392000000,
+        columns: [
+          {
+            id: 1,
+            name: "Column 1",
+            clips: [
+              { id: 12, filename: "sponsor-loop.mp4", thumbnail: undefined },
+            ],
+          },
+        ],
+      });
+    });
+
+    it("defaults the preview to null when no snapshot has been published", () => {
+      const perimeterApi = renderPerimeterWithPreview("vikuti", null);
+
+      expect(perimeterApi).not.toBeNull();
+      expect(perimeterApi!.preview).toBeNull();
     });
   });
 });

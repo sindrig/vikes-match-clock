@@ -2,7 +2,9 @@
 
 Daemon that mirrors the `states/vikuti/perimeter` Firebase state onto a
 dedicated Resolume Arena composition that drives the perimeter LED screens at
-the Víkin stadium.
+the Víkin stadium, and publishes a read-only **preview snapshot** of that
+composition (columns, clips, filenames and bounded JPEG thumbnails) so the
+controller UI can show operators what is loaded.
 
 The daemon is a long-lived Node.js process:
 
@@ -16,6 +18,9 @@ The daemon is a long-lived Node.js process:
      Stop — stops **all** content controlled by this Resolume instance).
    - `on` → `POST /api/v1/composition/columns/1/connect` (starts column 1,
      which drives both perimeter outputs).
+4. Publishes the composition **preview snapshot** to `perimeter/vikuti` (see
+   [Preview snapshot](#preview-snapshot) below) once at startup and after each
+   successful `on`, through the Admin SDK.
 
 ### Why Node?
 
@@ -91,6 +96,12 @@ Edit `/etc/perimeter-control/perimeter-control.env`:
 | `PERIMETER_LISTENER_REFRESH_SECONDS` | `300`                                                                 | Listener refresh interval (0 disables)       |
 | `PERIMETER_INITIAL_BACKOFF_SECONDS` | `1`                                                                   | Initial retry backoff in seconds              |
 | `PERIMETER_MAX_BACKOFF_SECONDS`   | `60`                                                                    | Maximum retry backoff in seconds              |
+| `PERIMETER_PREVIEW_ENABLED`       | `true`                                                                  | Set to `false` to disable the preview snapshot |
+| `PERIMETER_PREVIEW_PATH`          | `perimeter/vikuti`                                                      | Path of the published preview snapshot         |
+| `PERIMETER_THUMBNAIL_MAX_DIM`     | `320`                                                                   | Longest side of re-encoded thumbnails (px)     |
+| `PERIMETER_THUMBNAIL_QUALITY`     | `0.7`                                                                   | JPEG quality (0.1–1.0) for thumbnails          |
+| `PERIMETER_THUMBNAIL_MAX_BYTES`   | `100000`                                                                | Per-thumbnail byte cap (larger is omitted)     |
+| `PERIMETER_PREVIEW_MAX_BYTES`     | `8000000`                                                               | Whole-snapshot byte cap (larger is rejected)   |
 
 After changing the environment file:
 
@@ -115,6 +126,52 @@ The daemon logs to stdout/stderr, captured by journald:
 journalctl -u perimeter-control -f
 ```
 
+## Preview snapshot
+
+The daemon publishes a normalized read-only snapshot of the Resolume
+composition to `PERIMETER_PREVIEW_PATH` (`perimeter/vikuti`) so the controller
+UI can preview which clips are loaded, grouped by Resolume column. The shape
+is:
+
+```json
+{
+  "updatedAt": 1723392000000,
+  "columns": [
+    {
+      "id": 1,
+      "name": "Column 1",
+      "clips": [
+        {
+          "id": 12,
+          "filename": "sponsor-loop.mp4",
+          "thumbnail": "data:image/jpeg;base64,..."
+        }
+      ]
+    }
+  ]
+}
+```
+
+- `updatedAt` is a **Firebase server timestamp**.
+- The snapshot is refreshed **once at startup and after each successful `on`**.
+  There is no manual refresh; the refresh never delays or changes the on/off
+  command retry behavior.
+- The composition is read through the Resolume HTTP API
+  (`GET /api/v1/composition` for columns and the layer→column clip grid,
+  `GET /api/v1/composition/layers/{layer}/clips/{column}/thumbnail` for the
+  PNG thumbnails). All Resolume-version-specific parsing is isolated in
+  `resolume-preview.js`; invalid or missing fields are omitted rather than
+  breaking the whole snapshot.
+- Thumbnails are re-encoded client-side in the daemon as bounded JPEG data
+  URLs (`PERIMETER_THUMBNAIL_MAX_DIM`, `PERIMETER_THUMBNAIL_QUALITY`).
+- A snapshot whose whole payload would exceed `PERIMETER_PREVIEW_MAX_BYTES` is
+  **rejected** (never written); the last published snapshot is kept and the
+  failure is logged.
+- The snapshot lives at the top-level `perimeter/{location}` path, **outside**
+  the writable `states/` subtree, and is denied to clients by the database
+  rules (see `firebase-rules.json`). The service account writes it through the
+  Admin SDK.
+
 ## Behavior on failure
 
 - **Credential missing/unreadable**: the daemon exits with a clear error; the
@@ -125,6 +182,9 @@ journalctl -u perimeter-control -f
   exponential backoff. A newer Firebase value supersedes a failed operation
   still awaiting retry, so stale requests are never applied after the state
   has moved on.
+- **Preview refresh fails** (Resolume query error, oversized payload, or a
+  rejected thumbnail batch): the failure is logged and the **last published
+  snapshot is left intact** — the UI simply shows a stale `updatedAt`.
 - **Convergence**: the current Firebase value is applied as soon as it is
   observed (the listener's initial snapshot, and again after each refresh or
   SDK reconnect). A state that changed while the daemon was down is applied
@@ -137,9 +197,10 @@ The daemon authenticates to Realtime Database with the **service-account
 credential** installed to `/etc/perimeter-control/perimeter-service-account.json`
 (mode `0640`, group `perimeter-control`), which the systemd service reads as
 the `perimeter-control` user. The Admin SDK has full read access and bypasses
-the public `states` read rules (`firebase-rules.json`). The daemon never
-writes to Firebase. Keep the credential file out of version control and
-rotate it if it ever leaks.
+the public `states` read rules (`firebase-rules.json`), and writes the
+preview snapshot to `perimeter/vikuti` — a path denied to unauthenticated
+clients (see `firebase-rules.json`). Keep the credential file out of version
+control and rotate it if it ever leaks.
 
 ## Manual API verification
 

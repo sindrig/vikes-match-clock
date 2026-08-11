@@ -8,6 +8,7 @@ import {
   parseCustomPresets,
   parseClubOverrides,
   parsePerimeterState,
+  parsePerimeterPreview,
 } from "./firebaseParsers";
 import { Sports, DEFAULT_HALFSTOPS, DEFAULT_THEME } from "../constants";
 import type {
@@ -1342,6 +1343,100 @@ describe("firebaseParsers", () => {
         enabled: true,
         state: "off",
       });
+    });
+  });
+
+  describe("parsePerimeterPreview", () => {
+    it("returns undefined for null or non-object input", () => {
+      expect(parsePerimeterPreview(null)).toBeUndefined();
+      expect(parsePerimeterPreview(undefined)).toBeUndefined();
+      expect(parsePerimeterPreview("x")).toBeUndefined();
+      expect(parsePerimeterPreview(12)).toBeUndefined();
+    });
+
+    it("parses columns, clips, filenames and thumbnails", () => {
+      const result = parsePerimeterPreview({
+        updatedAt: 1723392000000,
+        columns: [
+          {
+            id: 1,
+            name: "Column 1",
+            clips: [
+              {
+                id: 12,
+                filename: "sponsor-loop.mp4",
+                thumbnail: "data:image/jpeg;base64,abc",
+              },
+              { id: 13, filename: "logo.png" },
+            ],
+          },
+        ],
+      });
+      expect(result).toEqual({
+        updatedAt: 1723392000000,
+        columns: [
+          {
+            id: 1,
+            name: "Column 1",
+            clips: [
+              {
+                id: 12,
+                filename: "sponsor-loop.mp4",
+                thumbnail: "data:image/jpeg;base64,abc",
+              },
+              { id: 13, filename: "logo.png", thumbnail: undefined },
+            ],
+          },
+        ],
+      });
+    });
+
+    it("treats a missing updatedAt as null", () => {
+      expect(parsePerimeterPreview({ columns: [] })).toEqual({
+        updatedAt: null,
+        columns: [],
+      });
+    });
+
+    it("drops clips without a filename and columns without a name", () => {
+      const result = parsePerimeterPreview({
+        columns: [
+          { id: 1, name: "Column 1", clips: [{ id: 2 }] },
+          { id: 3, name: "", clips: [{ id: 4, filename: "x.mp4" }] },
+          { id: 5, name: "Column 3", clips: null },
+        ],
+      });
+      expect(result).toEqual({
+        updatedAt: null,
+        columns: [
+          { id: 1, name: "Column 1", clips: [] },
+          { id: 5, name: "Column 3", clips: [] },
+        ],
+      });
+    });
+
+    it("ignores malformed column and clip entries", () => {
+      const result = parsePerimeterPreview({
+        columns: [
+          "junk",
+          {
+            id: 1,
+            name: "Column 1",
+            clips: [{ id: 2, filename: "a.mp4" }, null, "junk"],
+          },
+        ],
+      });
+      expect(result!.columns).toHaveLength(1);
+      expect(result!.columns[0].clips).toHaveLength(1);
+      expect(result!.columns[0].clips[0].filename).toBe("a.mp4");
+    });
+
+    it("falls back to null ids when a numeric id is missing", () => {
+      const result = parsePerimeterPreview({
+        columns: [{ name: "Column 1", clips: [{ filename: "a.mp4" }] }],
+      });
+      expect(result!.columns[0].id).toBeNull();
+      expect(result!.columns[0].clips[0].id).toBeNull();
     });
   });
 });

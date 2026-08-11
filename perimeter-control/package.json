@@ -12,6 +12,8 @@
     "test": "node --test"
   },
   "dependencies": {
-    "firebase-admin": "^14.2.0"
+    "firebase-admin": "^14.2.0",
+    "jpeg-js": "^0.4.4",
+    "pngjs": "^7.0.0"
   }
 }
