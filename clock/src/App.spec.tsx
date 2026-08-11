@@ -9,6 +9,7 @@ vi.mock("./contexts/FirebaseStateContext", () => ({
   useMatch: vi.fn(),
   useController: vi.fn(),
   useView: vi.fn(),
+  usePerimeter: vi.fn(),
 }));
 
 vi.mock("./contexts/LocalStateContext", () => ({
@@ -64,6 +65,7 @@ import {
   useController,
   useMatch,
   useView,
+  usePerimeter,
 } from "./contexts/FirebaseStateContext";
 import { useLocalState, useRemoteSettings } from "./contexts/LocalStateContext";
 
@@ -73,6 +75,7 @@ const mockedUseController = vi.mocked(useController);
 const mockedUseMatch = vi.mocked(useMatch);
 const mockedUseView = vi.mocked(useView);
 const mockedUseRemoteSettings = vi.mocked(useRemoteSettings);
+const mockedUsePerimeter = vi.mocked(usePerimeter);
 
 const defaultViewport = {
   style: { height: 100, width: 200 },
@@ -178,6 +181,17 @@ function setupState3(
   mockedUseRemoteSettings.mockReturnValue({
     listenPrefix: "vikinni",
   } as unknown as ReturnType<typeof useRemoteSettings>);
+  mockedUsePerimeter.mockReturnValue({
+    perimeter: { enabled: false, state: "off" },
+    preview: null,
+    previewLoaded: false,
+    setPerimeterState: vi.fn(),
+    setPerimeterOverlay: vi.fn(),
+    clearPerimeterOverlay: vi.fn(),
+    overlay: null,
+    overlayStatus: null,
+    getServerTime: vi.fn(),
+  } as unknown as ReturnType<typeof usePerimeter>);
   return { setListenPrefix, setScreenKey };
 }
 

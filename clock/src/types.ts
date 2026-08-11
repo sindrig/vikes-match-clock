@@ -304,6 +304,38 @@ export interface PerimeterPreview {
   columns: PerimeterColumn[];
 }
 
+// -- Perimeter overlay (goal-triggered video sequences) ----------------------
+
+export interface PerimeterOverlayFile {
+  name: string;
+  source: string;
+}
+
+export interface PerimeterOverlayColumn {
+  durationMs: number;
+  files: Record<string, PerimeterOverlayFile>;
+}
+
+export interface PerimeterOverlay {
+  version: number;
+  id: string;
+  columns: PerimeterOverlayColumn[];
+}
+
+export type PerimeterOverlayPhase =
+  | "downloading"
+  | "copying"
+  | "loading"
+  | "playing"
+  | "error";
+
+export interface PerimeterOverlayStatus {
+  commandId: string | null;
+  phase: PerimeterOverlayPhase;
+  activeColumn: number;
+  error: string | null;
+}
+
 // Root state type
 export interface RootState {
   match: Match;

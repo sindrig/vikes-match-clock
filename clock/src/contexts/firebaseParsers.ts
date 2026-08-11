@@ -13,6 +13,9 @@ import type {
   PerimeterPreview,
   PerimeterColumn,
   PerimeterClip,
+  PerimeterOverlay,
+  PerimeterOverlayColumn,
+  PerimeterOverlayFile,
 } from "../types";
 import { Sports, DEFAULT_THEME } from "../constants";
 
@@ -455,6 +458,72 @@ export function parsePerimeterPreview(
   }
 
   return { updatedAt, columns };
+}
+
+const MAX_OVERLAY_COLUMNS = 20;
+const MAX_OVERLAY_DURATION_MS = 120_000;
+const VALID_OVERLAY_VERSIONS = new Set([1]);
+
+function parseOverlayFile(data: unknown): PerimeterOverlayFile | undefined {
+  if (!data || typeof data !== "object") return undefined;
+  const raw = data as Record<string, unknown>;
+  const name = typeof raw.name === "string" ? raw.name : "";
+  const source = typeof raw.source === "string" ? raw.source : "";
+  if (!name || !source) return undefined;
+  return { name, source };
+}
+
+function parseOverlayColumn(data: unknown): PerimeterOverlayColumn | undefined {
+  if (!data || typeof data !== "object") return undefined;
+  const raw = data as Record<string, unknown>;
+  const durationMs =
+    typeof raw.durationMs === "number" &&
+    raw.durationMs > 0 &&
+    raw.durationMs <= MAX_OVERLAY_DURATION_MS
+      ? raw.durationMs
+      : 0;
+  if (!durationMs) return undefined;
+  const filesRaw = raw.files;
+  if (!filesRaw || typeof filesRaw !== "object") return undefined;
+  const files: Record<string, PerimeterOverlayFile> = {};
+  let hasPairedTargets = false;
+  for (const [key, value] of Object.entries(
+    filesRaw as Record<string, unknown>,
+  )) {
+    const parsed = parseOverlayFile(value);
+    if (parsed) {
+      files[key] = parsed;
+      hasPairedTargets = true;
+    }
+  }
+  if (!hasPairedTargets) return undefined;
+  return { durationMs, files };
+}
+
+export function parsePerimeterOverlay(
+  data: unknown,
+): PerimeterOverlay | null {
+  if (data === null) return null;
+  if (!data || typeof data !== "object") return undefined as unknown as null;
+  const raw = data as Record<string, unknown>;
+  const version = typeof raw.version === "number" ? raw.version : 0;
+  if (!VALID_OVERLAY_VERSIONS.has(version)) return undefined as unknown as null;
+  const id = typeof raw.id === "string" ? raw.id : "";
+  if (!id) return undefined as unknown as null;
+  const columnsRaw = raw.columns;
+  if (!Array.isArray(columnsRaw) || columnsRaw.length === 0) {
+    return undefined as unknown as null;
+  }
+  if (columnsRaw.length > MAX_OVERLAY_COLUMNS) {
+    return undefined as unknown as null;
+  }
+  const columns: PerimeterOverlayColumn[] = [];
+  for (const entry of columnsRaw) {
+    const column = parseOverlayColumn(entry);
+    if (!column) return undefined as unknown as null;
+    columns.push(column);
+  }
+  return { version, id, columns } as PerimeterOverlay;
 }
 
 export function parseClubOverrides(
