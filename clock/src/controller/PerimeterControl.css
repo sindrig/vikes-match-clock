@@ -66,7 +66,8 @@
 
 .controller .perimeter-thumb {
   width: 100%;
-  aspect-ratio: 16 / 9;
+  height: auto;
+  max-height: 320px;
   object-fit: contain;
   background: #111;
   display: block;

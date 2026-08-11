@@ -179,7 +179,7 @@ export function reencodeThumbnail(
 
   let encoded;
   try {
-    encoded = jpeg.encode({ data: rgb, width: outW, height: outH }, quality);
+    encoded = jpeg.encode({ data: rgb, width: outW, height: outH }, Math.round(quality * 100));
   } catch {
     return null;
   }

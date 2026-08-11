@@ -46,7 +46,7 @@ const PerimeterControl = () => {
       </div>
       <Modal open={open} onClose={() => setOpen(false)} size="lg">
         <Modal.Header>
-          <Modal.Title>Jaðarskjár — forskoðun</Modal.Title>
+          <Modal.Title>Jaðarskjár forskoðun</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           {preview === null ? (
