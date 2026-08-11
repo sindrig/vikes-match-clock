@@ -26,7 +26,6 @@
 
 import path from "node:path";
 import { PNG } from "pngjs";
-import jpeg from "jpeg-js";
 
 // Unwrap a Resolume parameter value: `{ value: "x" }` -> "x", plain string
 // -> itself, anything else -> undefined.
@@ -85,12 +84,14 @@ export function collectClipsByColumn(composition) {
         : [];
     clips.forEach((raw, clipIndex) => {
       if (!raw || typeof raw !== "object") return;
+      const filename = extractClipFilename(raw);
+      if (filename === undefined) return;
       const columnIndex = clipIndex + 1;
       if (!byColumn.has(columnIndex)) byColumn.set(columnIndex, []);
       byColumn.get(columnIndex).push({
         id: typeof raw.id === "number" ? raw.id : undefined,
         name: paramValue(raw, "name"),
-        filename: extractClipFilename(raw),
+        filename,
         layerIndex: layerIndex + 1,
         columnIndex,
       });
@@ -99,54 +100,9 @@ export function collectClipsByColumn(composition) {
   return byColumn;
 }
 
-function rgbaToRgb(src, width, height) {
-  const out = Buffer.alloc(width * height * 3);
-  for (let i = 0, j = 0; i < src.length; i += 4, j += 3) {
-    out[j] = src[i];
-    out[j + 1] = src[i + 1];
-    out[j + 2] = src[i + 2];
-  }
-  return out;
-}
-
-// Area-average downscale from RGBA to RGB. Keeps aspect ratio and avoids the
-// aliasing nearest-neighbor produces at large reductions.
-function downscaleToRgb(src, srcW, srcH, dstW, dstH) {
-  const out = Buffer.alloc(dstW * dstH * 3);
-  const xRatio = srcW / dstW;
-  const yRatio = srcH / dstH;
-  for (let y = 0; y < dstH; y += 1) {
-    const srcY0 = Math.floor(y * yRatio);
-    const srcY1 = Math.min(srcH, Math.ceil((y + 1) * yRatio));
-    for (let x = 0; x < dstW; x += 1) {
-      const srcX0 = Math.floor(x * xRatio);
-      const srcX1 = Math.min(srcW, Math.ceil((x + 1) * xRatio));
-      let r = 0;
-      let g = 0;
-      let b = 0;
-      let count = 0;
-      for (let sy = srcY0; sy < srcY1; sy += 1) {
-        for (let sx = srcX0; sx < srcX1; sx += 1) {
-          const i = (sy * srcW + sx) * 4;
-          r += src[i];
-          g += src[i + 1];
-          b += src[i + 2];
-          count += 1;
-        }
-      }
-      const j = (y * dstW + x) * 3;
-      out[j] = Math.round(r / count);
-      out[j + 1] = Math.round(g / count);
-      out[j + 2] = Math.round(b / count);
-    }
-  }
-  return out;
-}
-
-// Re-encode a PNG thumbnail as a bounded JPEG data URL. Returns
-// `{ dataUrl, bytes, width, height }` or null when the input is not a valid
-// PNG, the input is too large to decode safely, or the resulting data URL
-// would exceed `maxBytes`.
+// Validate and return a PNG thumbnail as a base64 data URL. PNGs from
+// Resolume are already small (2–11 KB for 320×240) so no re-encoding is
+// needed — we just validate the header and wrap it.
 export function reencodeThumbnail(
   pngBuffer,
   {
@@ -164,31 +120,17 @@ export function reencodeThumbnail(
   } catch {
     return null;
   }
-  const { width, height, data } = decoded;
+  const { width, height } = decoded;
   if (width <= 0 || height <= 0) return null;
+  if (Math.max(width, height) > maxDim * 4) return null;
 
-  const scale = Math.min(1, maxDim / Math.max(width, height));
-  const outW = Math.max(1, Math.round(width * scale));
-  const outH = Math.max(1, Math.round(height * scale));
-  const rgb =
-    scale < 1
-      ? downscaleToRgb(data, width, height, outW, outH)
-      : rgbaToRgb(data, width, height);
-
-  let encoded;
-  try {
-    encoded = jpeg.encode({ data: rgb, width: outW, height: outH }, quality);
-  } catch {
-    return null;
-  }
-  const dataUrl = `data:image/jpeg;base64,${encoded.data.toString("base64")}`;
-  // Bound the size actually published (the base64 data URL), not the raw JPEG.
+  const dataUrl = `data:image/png;base64,${pngBuffer.toString("base64")}`;
   if (dataUrl.length > maxBytes) return null;
   return {
     dataUrl,
-    bytes: encoded.data.length,
-    width: outW,
-    height: outH,
+    bytes: pngBuffer.length,
+    width,
+    height,
   };
 }
 

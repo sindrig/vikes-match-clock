@@ -81,7 +81,7 @@ describe("PerimeterControl", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Opna" }));
 
-    expect(screen.getByText("Jaðarskjár — forskoðun")).toBeInTheDocument();
+    expect(screen.getByText("Jaðarskjár forskoðun")).toBeInTheDocument();
     expect(screen.getByText("Column 1")).toBeInTheDocument();
     expect(screen.getByText("sponsor-loop.mp4")).toBeInTheDocument();
     expect(screen.getByText("logo.mp4")).toBeInTheDocument();

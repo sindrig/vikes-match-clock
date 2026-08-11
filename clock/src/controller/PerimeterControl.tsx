@@ -44,9 +44,14 @@ const PerimeterControl = () => {
           Opna
         </Button>
       </div>
-      <Modal open={open} onClose={() => setOpen(false)} size="lg">
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        size="full"
+        className="perimeter-preview-modal"
+      >
         <Modal.Header>
-          <Modal.Title>Jaðarskjár — forskoðun</Modal.Title>
+          <Modal.Title>Jaðarskjár forskoðun</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           {preview === null ? (
@@ -76,44 +81,46 @@ const PerimeterControl = () => {
                   Engar klippur í jaðarskjánum.
                 </p>
               ) : (
-                preview.columns.map((column, columnIndex) => (
-                  <section
-                    className="perimeter-column"
-                    key={column.id ?? `column-${columnIndex}`}
-                  >
-                    <h4 className="perimeter-column-name">{column.name}</h4>
-                    {column.clips.length === 0 ? (
-                      <p className="perimeter-column-empty">Engar klippur</p>
-                    ) : (
-                      <div className="perimeter-clips">
-                        {column.clips.map((clip, idx) => (
-                          <div
-                            className="perimeter-clip"
-                            key={clip.id ?? `clip-${columnIndex}-${idx}`}
-                          >
-                            {clip.thumbnail ? (
-                              <img
-                                className="perimeter-thumb"
-                                src={clip.thumbnail}
-                                alt={clip.filename}
-                              />
-                            ) : (
-                              <div className="perimeter-thumb perimeter-thumb-unavailable">
-                                <span>Engin mynd</span>
-                              </div>
-                            )}
+                <div className="perimeter-columns">
+                  {preview.columns.map((column, columnIndex) => (
+                    <section
+                      className="perimeter-column"
+                      key={column.id ?? `column-${columnIndex}`}
+                    >
+                      <h4 className="perimeter-column-name">{column.name}</h4>
+                      {column.clips.length === 0 ? (
+                        <p className="perimeter-column-empty">Engar klippur</p>
+                      ) : (
+                        <div className="perimeter-clips">
+                          {column.clips.map((clip, idx) => (
                             <div
-                              className="perimeter-filename"
-                              title={clip.filename}
+                              className="perimeter-clip"
+                              key={clip.id ?? `clip-${columnIndex}-${idx}`}
                             >
-                              {clip.filename}
+                              {clip.thumbnail ? (
+                                <img
+                                  className="perimeter-thumb"
+                                  src={clip.thumbnail}
+                                  alt={clip.filename}
+                                />
+                              ) : (
+                                <div className="perimeter-thumb perimeter-thumb-unavailable">
+                                  <span>Engin mynd</span>
+                                </div>
+                              )}
+                              <div
+                                className="perimeter-filename"
+                                title={clip.filename}
+                              >
+                                {clip.filename}
+                              </div>
                             </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </section>
-                ))
+                          ))}
+                        </div>
+                      )}
+                    </section>
+                  ))}
+                </div>
               )}
             </div>
           )}
