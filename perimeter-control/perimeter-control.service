@@ -8,11 +8,13 @@ Type=simple
 User=perimeter-control
 Group=perimeter-control
 EnvironmentFile=/etc/perimeter-control/perimeter-control.env
-ExecStart=/opt/perimeter-control/venv/bin/python /opt/perimeter-control/perimeter_control.py
+Environment=HOME=/tmp
+ExecStart=@NODE_BIN@ /opt/perimeter-control/index.js
 Restart=always
 RestartSec=5
 
-# Hardening
+# Hardening. Note: MemoryDenyWriteExecute is intentionally omitted because
+# Node/V8 needs to allocate writable+executable memory for JIT compilation.
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
@@ -26,7 +28,6 @@ ProtectClock=true
 RestrictRealtime=true
 RestrictSUIDSGID=true
 LockPersonality=true
-MemoryDenyWriteExecute=true
 SystemCallArchitectures=native
 RestrictNamespaces=true
 CapabilityBoundingSet=

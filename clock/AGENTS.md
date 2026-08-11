@@ -96,17 +96,21 @@ state subtree, `states/${listenPrefix}/perimeter`:
 - Follows the 100% Firebase model: the UI writes to Firebase and updates only
   after the subscription receives the new value (no optimistic updates).
 
-**Daemon** (`perimeter-control/` at repo root): a systemd-managed Python
-service streams `states/vikuti/perimeter/state` from Firebase RTDB over SSE
-and applies it to Resolume — `off` → `POST /api/v1/composition/disconnect-all`
-(global stop), `on` → `POST /api/v1/composition/columns/1/connect`. It applies
-the current state only on **startup** (first connection's initial `put`); the
-replay is deliberately skipped after reconnects so a stale command is never
-replayed — the operator re-toggles the perimeter manually. It retries
-Resolume failures with bounded exponential backoff, superseded by any newer
-Firebase value. The daemon reads the perimeter path **unauthenticated**, which
-relies on the existing public `states` read rules (`firebase-rules.json`).
-See `perimeter-control/README.md` for installation and operation.
+**Daemon** (`perimeter-control/` at repo root): a systemd-managed **Node.js**
+service listens to `states/vikuti/perimeter/state` in Firebase Realtime
+Database via the **Firebase Admin SDK** (`ref.on("value", ...)`) and applies
+it to Resolume — `off` → `POST /api/v1/composition/disconnect-all` (global
+stop), `on` → `POST /api/v1/composition/columns/1/connect`. It converges to
+the current desired state: the first valid value observed is applied, and a
+value that changed while the daemon was down is applied on the next delivery
+(unchanged state is never re-applied). It deliberately uses Node because the
+JS Admin SDK reads RTDB over its **WebSocket protocol** (same transport as
+the clock apps) — the Python SDK's `listen()` is SSE-based and intermittently
+stalled for minutes on this network. The listener is periodically reopened as
+a safety net. It authenticates with a service-account credential file
+(required by `install.sh`), and retries Resolume failures with bounded
+exponential backoff, superseded by any newer Firebase value. See
+`perimeter-control/README.md` for installation and operation.
 
 ### The `listenPrefix` System
 
