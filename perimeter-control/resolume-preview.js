@@ -25,6 +25,7 @@
  */
 
 import path from "node:path";
+import fs from "node:fs";
 import { PNG } from "pngjs";
 import jpeg from "jpeg-js";
 
@@ -169,28 +170,18 @@ export function reencodeThumbnail(
   const { width, height, data } = decoded;
   if (width <= 0 || height <= 0) return null;
 
-  const ihdrInfo = {
-    colorType: decoded.colorType,
-    bitDepth: decoded.bitDepth,
-    palette: decoded.palette ? decoded.palette.length : 0,
-    interlace: decoded.interlace,
-  };
-  const samplePixels =
-    data.length >= 40
-      ? Array.from(data.slice(0, 40))
-          .map((b) => b.toString().padStart(3))
-          .join(" ")
-      : "too short";
-  const nonZero = data.slice(0, 1000).filter((b) => b !== 0).length;
-  console.log(
-    `reencodeThumbnail: PNG ${pngBuffer.length}B → ${width}×${height} ` +
-      `(${data.length}B RGBA), ` +
-      `colorType=${ihdrInfo.colorType} ` +
-      `depth=${ihdrInfo.bitDepth} ` +
-      `palette=${ihdrInfo.palette} ` +
-      `nonZero=${nonZero}/first1000, ` +
-      `first 40B: [${samplePixels}]`,
-  );
+  const nonZeroCount = data.slice(0, 1000).filter((b) => b !== 0).length;
+  if (nonZeroCount === 0 && width * height > 1000) {
+    const dumpPath = `/tmp/resolume-png-dump-${Date.now()}-${pngBuffer.length}.png`;
+    fs.writeFileSync(dumpPath, pngBuffer);
+    console.log(
+      `reencodeThumbnail: ALL-ZERO pixels from ${width}×${height} RGBA ` +
+        `PNG (${pngBuffer.length}B compressed, ` +
+        `colorType=${decoded.colorType} ` +
+        `interlace=${decoded.interlace}), ` +
+        `saved raw PNG → ${dumpPath}`,
+    );
+  }
 
   const scale = Math.min(1, maxDim / Math.max(width, height));
   const outW = Math.max(1, Math.round(width * scale));
