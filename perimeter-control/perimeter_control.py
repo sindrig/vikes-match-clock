@@ -9,9 +9,10 @@ Firebase; it only reads the ``state`` child and applies it to Resolume.
 Design notes:
   * Only the exact string values "on" and "off" are valid desired states.
     Missing, null, malformed or unknown values cause no Resolume request.
-  * Every fresh stream connection delivers the current value as an initial
-    "put" event, which replays the desired state on startup and after
-    reconnects.
+  * The current value is applied only on startup, via the first stream
+    connection's initial "put" event. After a reconnect the replay is
+    deliberately skipped: an operator manually re-toggles the perimeter
+    rather than risking a stale command being replayed.
   * Resolume failures retry indefinitely with bounded exponential backoff.
     A newer Firebase value supersedes any failed operation still awaiting
     retry, so stale requests are never applied after the state has moved on.
@@ -40,6 +41,7 @@ DEFAULT_FIREBASE_URL = (
 DEFAULT_RESOLUME_BASE_URL = "http://localhost:80/api/v1"
 DEFAULT_RESOLUME_COLUMN = 1
 DEFAULT_REQUEST_TIMEOUT = 10.0
+DEFAULT_STREAM_READ_TIMEOUT = 90.0
 DEFAULT_INITIAL_BACKOFF = 1.0
 DEFAULT_MAX_BACKOFF = 60.0
 
@@ -53,6 +55,7 @@ class Config:
     resolume_base_url: str
     resolume_column: int
     request_timeout: float
+    stream_read_timeout: float
     initial_backoff_seconds: float
     max_backoff_seconds: float
 
@@ -98,6 +101,11 @@ def load_config(environ: Mapping[str, str] | None = None) -> Config:
         ),
         request_timeout=_env_float(
             environ, "PERIMETER_REQUEST_TIMEOUT", DEFAULT_REQUEST_TIMEOUT
+        ),
+        stream_read_timeout=_env_float(
+            environ,
+            "PERIMETER_STREAM_READ_TIMEOUT",
+            DEFAULT_STREAM_READ_TIMEOUT,
         ),
         initial_backoff_seconds=_env_float(
             environ,
@@ -222,6 +230,7 @@ class PerimeterController:
         self._desired_state: str | None = None
         self._condition = threading.Condition()
         self._stop = threading.Event()
+        self._replay_pending = True
 
     # -- desired state --------------------------------------------------
 
@@ -268,10 +277,16 @@ class PerimeterController:
         url = f"{self.config.firebase_url}.json"
         headers = {"Accept": "text/event-stream"}
         logger.info("Connecting to Firebase stream: %s", url)
+        # Short connect timeout, long read timeout: Firebase keepalives can be
+        # minutes apart, so a normal request timeout would force constant
+        # reconnects on an idle stream.
         with requests.get(
             url,
             stream=True,
-            timeout=self.config.request_timeout,
+            timeout=(
+                self.config.request_timeout,
+                self.config.stream_read_timeout,
+            ),
             headers=headers,
         ) as response:
             if response.status_code != 200:
@@ -279,9 +294,23 @@ class PerimeterController:
                     f"Firebase returned HTTP {response.status_code}"
                 )
             logger.info("Firebase stream connected")
-            for event, data in iter_sse_events(self._response_lines(response)):
-                if event in ("put", "patch"):
-                    self._handle_event(data)
+            self._consume_stream(response)
+
+    def _consume_stream(self, response) -> None:
+        first_event = True
+        for event, data in iter_sse_events(self._response_lines(response)):
+            if event not in ("put", "patch"):
+                continue
+            if first_event:
+                first_event = False
+                if self._replay_pending:
+                    self._replay_pending = False
+                else:
+                    # Initial "put" of a reconnect: skip it rather than risk
+                    # replaying a stale command. The operator re-toggles.
+                    logger.info("Skipping state replay after reconnect")
+                    continue
+            self._handle_event(data)
 
     # -- Resolume application ----------------------------------------------
 
@@ -335,16 +364,22 @@ class PerimeterController:
             daemon=True,
         )
         applicator.start()
+        stream_backoff = self.config.initial_backoff_seconds
         while not self._stop.is_set():
             try:
                 self._stream_forever()
                 logger.info("Firebase stream disconnected")
+                stream_backoff = self.config.initial_backoff_seconds
             except Exception as exc:  # noqa: BLE001 - reconnect loop
                 logger.error("Firebase stream error: %s", exc)
-            self._sleep_backoff()
+            if self._sleep_backoff(stream_backoff):
+                break
+            stream_backoff = min(
+                stream_backoff * 2, self.config.max_backoff_seconds
+            )
 
-    def _sleep_backoff(self) -> None:
-        self._stop.wait(self.config.initial_backoff_seconds)
+    def _sleep_backoff(self, seconds: float) -> bool:
+        return self._stop.wait(seconds)
 
 
 def main() -> None:

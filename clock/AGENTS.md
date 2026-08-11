@@ -90,10 +90,14 @@ state subtree, `states/${listenPrefix}/perimeter`:
 **Daemon** (`perimeter-control/` at repo root): a systemd-managed Python
 service streams `states/vikuti/perimeter/state` from Firebase RTDB over SSE
 and applies it to Resolume — `off` → `POST /api/v1/composition/disconnect-all`
-(global stop), `on` → `POST /api/v1/composition/columns/1/connect`. It replays
-the current state on every reconnect and retries Resolume failures with
-bounded exponential backoff, superseded by any newer Firebase value. See
-`perimeter-control/README.md` for installation and operation.
+(global stop), `on` → `POST /api/v1/composition/columns/1/connect`. It applies
+the current state only on **startup** (first connection's initial `put`); the
+replay is deliberately skipped after reconnects so a stale command is never
+replayed — the operator re-toggles the perimeter manually. It retries
+Resolume failures with bounded exponential backoff, superseded by any newer
+Firebase value. The daemon reads the perimeter path **unauthenticated**, which
+relies on the existing public `states` read rules (`firebase-rules.json`).
+See `perimeter-control/README.md` for installation and operation.
 
 ### The `listenPrefix` System
 

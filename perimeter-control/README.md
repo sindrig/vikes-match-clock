@@ -60,7 +60,8 @@ Edit `/etc/perimeter-control/perimeter-control.env`:
 | `PERIMETER_FIREBASE_URL`          | `https://vikes-match-clock-firebase.firebaseio.com/states/vikuti/perimeter/state` | Firebase stream location (`.json` is appended) |
 | `PERIMETER_RESOLUME_BASE_URL`     | `http://localhost:80/api/v1`                                            | Resolume HTTP API base URL                    |
 | `PERIMETER_RESOLUME_COLUMN`       | `1`                                                                     | Column started by `on`                        |
-| `PERIMETER_REQUEST_TIMEOUT`       | `10`                                                                    | HTTP timeout in seconds                       |
+| `PERIMETER_REQUEST_TIMEOUT`       | `10`                                                                    | HTTP connect timeout in seconds              |
+| `PERIMETER_STREAM_READ_TIMEOUT`   | `90`                                                                    | SSE stream read timeout in seconds           |
 | `PERIMETER_INITIAL_BACKOFF_SECONDS` | `1`                                                                   | Initial retry backoff in seconds              |
 | `PERIMETER_MAX_BACKOFF_SECONDS`   | `60`                                                                    | Maximum retry backoff in seconds              |
 
@@ -95,9 +96,21 @@ journalctl -u perimeter-control -f
   exponential backoff. A newer Firebase value supersedes a failed operation
   still awaiting retry, so stale requests are never applied after the state
   has moved on.
-- **Replay on reconnect**: every fresh stream connection redelivers the
-  current Firebase value as an initial `put` event, so the daemon re-applies
-  the desired state on startup and after any reconnect without further input.
+- **Replay**: the current Firebase value is applied only on **startup**, from
+  the first stream connection's initial `put` event. After a reconnect the
+  initial replay is deliberately **skipped** — the operator re-toggles the
+  perimeter manually instead of risking a stale command being replayed. Live
+  `put`/`patch` events received while a stream is open are always applied.
+
+## Security
+
+The daemon reads `states/vikuti/perimeter/state` **unauthenticated** via the
+Realtime Database REST stream. This relies on the existing public read rules
+(`states/$location/.read: true` in `firebase-rules.json`). The daemon never
+writes to Firebase. If the read rules are ever tightened, the daemon will
+receive HTTP 401/403 on connect; add token authentication (e.g. a
+`PERIMETER_FIREBASE_TOKEN` appended as `?auth=...`) before deploying under
+restricted rules.
 
 ## Manual API verification
 

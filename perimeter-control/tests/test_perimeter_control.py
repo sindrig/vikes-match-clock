@@ -17,6 +17,7 @@ def test_load_config_defaults():
     assert config.resolume_base_url == pc.DEFAULT_RESOLUME_BASE_URL
     assert config.resolume_column == pc.DEFAULT_RESOLUME_COLUMN
     assert config.request_timeout == pc.DEFAULT_REQUEST_TIMEOUT
+    assert config.stream_read_timeout == pc.DEFAULT_STREAM_READ_TIMEOUT
     assert config.initial_backoff_seconds == pc.DEFAULT_INITIAL_BACKOFF
     assert config.max_backoff_seconds == pc.DEFAULT_MAX_BACKOFF
 
@@ -28,6 +29,7 @@ def test_load_config_overrides():
             "PERIMETER_RESOLUME_BASE_URL": "http://host:80/api/v1",
             "PERIMETER_RESOLUME_COLUMN": "2",
             "PERIMETER_REQUEST_TIMEOUT": "5",
+            "PERIMETER_STREAM_READ_TIMEOUT": "120",
             "PERIMETER_INITIAL_BACKOFF_SECONDS": "0.5",
             "PERIMETER_MAX_BACKOFF_SECONDS": "30",
         }
@@ -36,6 +38,7 @@ def test_load_config_overrides():
     assert config.resolume_base_url == "http://host:80/api/v1"
     assert config.resolume_column == 2
     assert config.request_timeout == 5.0
+    assert config.stream_read_timeout == 120.0
     assert config.initial_backoff_seconds == 0.5
     assert config.max_backoff_seconds == 30.0
 
@@ -45,10 +48,12 @@ def test_load_config_invalid_numeric_falls_back_to_default():
         {
             "PERIMETER_REQUEST_TIMEOUT": "not-a-number",
             "PERIMETER_RESOLUME_COLUMN": "not-a-number",
+            "PERIMETER_STREAM_READ_TIMEOUT": "not-a-number",
         }
     )
     assert config.request_timeout == pc.DEFAULT_REQUEST_TIMEOUT
     assert config.resolume_column == pc.DEFAULT_RESOLUME_COLUMN
+    assert config.stream_read_timeout == pc.DEFAULT_STREAM_READ_TIMEOUT
 
 
 # -- SSE parsing ------------------------------------------------------------
@@ -184,6 +189,87 @@ def test_startup_replay_put_event_is_applied():
     thread.start()
     _wait_until(lambda: len(recorded) >= 1)
     assert recorded == ["on"]
+    controller.shutdown()
+    thread.join(timeout=2)
+
+
+# -- stream replay behavior ----------------------------------------------------
+
+
+def test_first_connection_applies_startup_replay():
+    controller = make_controller()
+    recorded = []
+    controller.resolume.apply_state = lambda state: recorded.append(state)
+    lines = [
+        'event: put',
+        'data: {"path":"/","data":"on"}',
+        "",
+    ]
+    controller._consume_stream(_FakeResponse(lines))
+    assert controller._read_desired() == "on"
+
+    thread = threading.Thread(target=controller._applicator_loop, daemon=True)
+    thread.start()
+    _wait_until(lambda: len(recorded) >= 1)
+    assert recorded == ["on"]
+    controller.shutdown()
+    thread.join(timeout=2)
+
+
+def test_reconnect_replay_is_skipped(caplog):
+    controller = make_controller()
+    recorded = []
+    controller.resolume.apply_state = lambda state: recorded.append(state)
+    lines = [
+        'event: put',
+        'data: {"path":"/","data":"off"}',
+        "",
+    ]
+
+    # First connection: startup replay applied.
+    controller._consume_stream(_FakeResponse(lines))
+    thread = threading.Thread(target=controller._applicator_loop, daemon=True)
+    thread.start()
+    _wait_until(lambda: len(recorded) >= 1)
+    assert recorded == ["off"]
+
+    # Reconnect: the initial put is skipped, no stale replay.
+    with caplog.at_level(logging.INFO, logger="perimeter_control"):
+        controller._consume_stream(_FakeResponse(lines))
+    assert "Skipping state replay after reconnect" in caplog.text
+    assert recorded == ["off"]
+    controller.shutdown()
+    thread.join(timeout=2)
+
+
+def test_live_events_still_applied_after_reconnect():
+    controller = make_controller()
+    recorded = []
+    controller.resolume.apply_state = lambda state: recorded.append(state)
+    thread = threading.Thread(target=controller._applicator_loop, daemon=True)
+    thread.start()
+
+    # First connection: startup replay.
+    controller._consume_stream(
+        _FakeResponse(['event: put', 'data: {"path":"/","data":"off"}', ""])
+    )
+    _wait_until(lambda: len(recorded) >= 1)
+
+    # Reconnect: replay skipped, but a live patch is applied.
+    controller._consume_stream(
+        _FakeResponse(
+            [
+                'event: put',
+                'data: {"path":"/","data":"off"}',
+                "",
+                'event: patch',
+                'data: {"path":"/state","data":"on"}',
+                "",
+            ]
+        )
+    )
+    _wait_until(lambda: recorded.count("on") >= 1)
+    assert recorded == ["off", "on"]
     controller.shutdown()
     thread.join(timeout=2)
 
@@ -326,6 +412,14 @@ def test_newer_state_supersedes_before_apply():
 class _Response:
     def __init__(self, status_code):
         self.status_code = status_code
+
+
+class _FakeResponse:
+    def __init__(self, lines):
+        self._lines = lines
+
+    def iter_lines(self, decode_unicode=True):
+        return iter(self._lines)
 
 
 def _wait_until(predicate, timeout=3.0):
