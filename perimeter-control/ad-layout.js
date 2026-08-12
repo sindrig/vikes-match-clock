@@ -508,6 +508,9 @@ export class AdLayoutController {
     // as soon as a newer snapshot arrives (see AdLayoutSupersededError).
     this._generation = 0;
     this._sleepers = new Set();
+    // Snapshot of the most recently published status payload, so the listener
+    // refresh can re-publish it and self-heal a silently lost write.
+    this._lastStatus = null;
   }
 
   _safeError(err) {
@@ -519,21 +522,44 @@ export class AdLayoutController {
     return String(err).slice(0, 500);
   }
 
-  async _publishStatus(phase, activeColumn, error = null, lanes = null) {
+  async _setStatus(payload) {
+    this._lastStatus = { ...payload, columns: [...(payload.columns || [])] };
     if (!this._statusRef) return;
+    await this._statusRef.set(payload);
+  }
+
+  async _publishStatus(phase, activeColumn, error = null, lanes = null) {
+    if (!this._statusRef) return false;
+    const payload = {
+      lanes: lanes || [],
+      revision: this._currentRevision || "",
+      phase,
+      activeColumn,
+      error: this._safeError(error),
+      updatedAt: ServerValue.TIMESTAMP,
+      columns: this._appliedColumns,
+    };
     try {
-      const payload = {
-        lanes: lanes || [],
-        revision: this._currentRevision || "",
-        phase,
-        activeColumn,
-        error: this._safeError(error),
-        updatedAt: ServerValue.TIMESTAMP,
-        columns: this._appliedColumns,
-      };
-      await this._statusRef.set(payload);
+      await this._setStatus(payload);
+      return true;
     } catch (err) {
       console.error(`Failed to publish ad-layout status: ${err.message}`);
+      return false;
+    }
+  }
+
+  // Re-publish the most recently published status so a silently lost write
+  // self-heals on the next listener refresh, mirroring the "refresh as safety
+  // net" design the daemon already uses for reads. Never throws.
+  async republishStatus() {
+    if (!this._lastStatus || !this._statusRef) return;
+    try {
+      await this._statusRef.set({
+        ...this._lastStatus,
+        updatedAt: ServerValue.TIMESTAMP,
+      });
+    } catch (err) {
+      console.error(`Failed to re-publish ad-layout status: ${err.message}`);
     }
   }
 
@@ -675,7 +701,7 @@ export class AdLayoutController {
     }
     if (result.clear) {
       console.log("Ad-layout clear command received");
-      await this._handleClear(null);
+      await this._handleClear(null, gen);
       return;
     }
     if (result.revision === this._currentRevision) return;
@@ -693,8 +719,9 @@ export class AdLayoutController {
   // Clear the ad-layout clips. `revision` is preserved when the clear comes
   // from an empty-columns layout (so the idle status carries the submitted
   // revision and identical clears are deduplicated); it is `null` only for a
-  // deleted desired document.
-  async _handleClear(revision) {
+  // deleted desired document. `gen` is the snapshot generation the clear
+  // belongs to, so the idle-status publish retries abort on supersession.
+  async _handleClear(revision, gen = this._generation) {
     this._currentRevision = revision;
     this._currentColumn = -1;
     this._appliedColumns = [];
@@ -719,14 +746,24 @@ export class AdLayoutController {
       }
     }
     const lanes = await this._discoverLanes();
-    this._publishStatus("idle", 0, null, lanes).catch(() => {});
+    // Publish the idle status with retry: a fire-and-forget write can be
+    // silently lost right after a daemon restart, and since the desired
+    // document may never change again it would never be re-published.
+    await this._retryOp(
+      "publish ad-layout idle status",
+      async () => {
+        const ok = await this._publishStatus("idle", 0, null, lanes);
+        if (!ok) throw new Error("ad-layout status publish failed");
+      },
+      gen,
+    );
     console.log("Ad-layout cleared");
   }
 
   async _startLayout(revision, columns, gen) {
     if (columns && columns.length === 0) {
       console.log("Ad-layout empty-columns clear received");
-      await this._handleClear(revision);
+      await this._handleClear(revision, gen);
       return;
     }
 
@@ -969,12 +1006,28 @@ export class AdLayoutController {
       this._appliedColumns = prevApplied;
       this._fallbackApplied = null;
       const lanes2 = await this._discoverLanes().catch(() => []);
-      await this._publishStatus(
-        "error",
-        this._currentColumn >= 0 ? this._currentColumn + 1 : 0,
-        err,
-        lanes2,
-      );
+      try {
+        await this._retryOp(
+          "publish ad-layout error status",
+          async () => {
+            const ok = await this._publishStatus(
+              "error",
+              this._currentColumn >= 0 ? this._currentColumn + 1 : 0,
+              err,
+              lanes2,
+            );
+            if (!ok) throw new Error("ad-layout status publish failed");
+          },
+          gen,
+        );
+      } catch (publishErr) {
+        if (publishErr instanceof AdLayoutSupersededError) return;
+        // Retries exhausted: log and fall through so the previous layout still
+        // resumes below instead of leaving the perimeter frozen.
+        console.error(
+          `Failed to publish ad-layout error status: ${publishErr.message}`,
+        );
+      }
       // Resume the previously applied layout's cycle so a failed replacement
       // never leaves the perimeter frozen on a stale column.
       if (prevState && prevApplied.length > 0) {

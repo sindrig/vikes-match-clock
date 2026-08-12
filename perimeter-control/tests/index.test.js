@@ -285,6 +285,35 @@ test("reopen re-syncs the listener", () => {
   assert.equal(ref.onCalls, 2);
 });
 
+test("reopen re-publishes the ad-layout status as a safety net", async () => {
+  const controller = makeController();
+  const db = new FakeDb();
+  controller.attach(db);
+  let republishCalls = 0;
+  controller._adLayoutController.republishStatus = async () => {
+    republishCalls += 1;
+  };
+  controller._reopenListener();
+  assert.equal(republishCalls, 1);
+  controller.shutdown();
+});
+
+test("reopen skips ad-layout status re-publish when disabled", () => {
+  const controller = makeController({ PERIMETER_AD_LAYOUT_ENABLED: "false" });
+  const db = new FakeDb();
+  controller.attach(db);
+  let republishCalls = 0;
+  const adLayout = controller._adLayoutController;
+  if (adLayout) {
+    adLayout.republishStatus = async () => {
+      republishCalls += 1;
+    };
+  }
+  controller._reopenListener();
+  assert.equal(republishCalls, 0);
+  controller.shutdown();
+});
+
 test("refresh loop reopens the listener periodically", async () => {
   const controller = makeController({
     PERIMETER_LISTENER_REFRESH_SECONDS: "0.05",

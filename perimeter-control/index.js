@@ -381,6 +381,13 @@ export class PerimeterController {
   _reopenListener() {
     this._ref.off("value", this._handleSnapshot);
     this._ref.on("value", this._handleSnapshot);
+    // Re-publish the ad-layout status as a safety net: the status is otherwise
+    // only written when the desired document changes, so a write lost right
+    // after a daemon restart (with a null desired doc) would never self-heal
+    // without this refresh-driven re-publish.
+    if (this._adLayoutController) {
+      void this._adLayoutController.republishStatus();
+    }
     console.log("Refreshed Firebase listener");
   }
 

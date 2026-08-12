@@ -576,6 +576,60 @@ test("AdLayoutController clears only the ad clip slots, not the whole layer", as
   controller.shutdown();
 });
 
+test("AdLayoutController retries the idle status publish on a failed write", async () => {
+  const controller = makeAdController();
+  controller._sleep = async () => {};
+  controller.resolume.clearClip = async () => {};
+  controller._discoverLanes = async () => [
+    { id: "2", name: "Lane 2" },
+    { id: "4", name: "Lane 4" },
+  ];
+  const db = new FakeDb();
+  controller.attach(db);
+  const statusRef = db.refs[1];
+  const writes = [];
+  statusRef.set = (value) => {
+    writes.push(value);
+    if (writes.length === 1) return Promise.reject(new Error("write lost"));
+    return Promise.resolve();
+  };
+  db.refs[0].emit(null);
+  await waitFor(() => writes.length >= 2);
+  const idle = writes.find((w) => w.phase === "idle");
+  assert.equal(idle.phase, "idle");
+  assert.equal(idle.activeColumn, 0);
+  controller.shutdown();
+});
+
+test("AdLayoutController.republishStatus re-publishes the last status", async () => {
+  const controller = makeAdController();
+  controller.resolume.clearClip = async () => {};
+  controller._discoverLanes = async () => [
+    { id: "2", name: "Lane 2" },
+    { id: "4", name: "Lane 4" },
+  ];
+  const db = new FakeDb();
+  controller.attach(db);
+  db.refs[0].emit(null);
+  await waitFor(() => db.refs[1].setCalls.some((s) => s.phase === "idle"));
+  const before = db.refs[1].setCalls.length;
+  await controller.republishStatus();
+  assert.equal(db.refs[1].setCalls.length, before + 1);
+  const republished = db.refs[1].setCalls[before];
+  assert.equal(republished.phase, "idle");
+  assert.equal(republished.activeColumn, 0);
+  controller.shutdown();
+});
+
+test("AdLayoutController.republishStatus is a no-op before any status publish", async () => {
+  const controller = makeAdController();
+  const db = new FakeDb();
+  controller.attach(db);
+  await controller.republishStatus();
+  assert.equal(db.refs[1].setCalls.length, 0);
+  controller.shutdown();
+});
+
 test("AdLayoutController._retryOp aborts when a newer generation supersedes during backoff", async () => {
   const controller = makeAdController();
   controller._sleep = async () => {};
