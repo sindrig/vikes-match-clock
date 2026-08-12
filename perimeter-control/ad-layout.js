@@ -6,8 +6,11 @@
  * columns on the configured base layers. The composition's existing autopilot
  * owns all column cycling — this controller never calls clip-level transport
  * or loop endpoints and never touches the autopilot. It only opens files into
- * clip slots and clears them, with one exception: because the clear-then-load
- * on a new revision stops the deck, it restarts playback with
+ * clip slots and clears them, with two exceptions: after opening a clip it
+ * sets the clip's transport duration (Resolume's "Transport → Duration") to
+ * the deck column's autopilot seconds so every ad fills a full column instead
+ * of looping or being cut short, and because the clear-then-load on a new
+ * revision stops the deck, it restarts playback with
  * `POST /composition/columns/{column}/connect` after a successful apply when
  * the base perimeter state was `on` (so the ads keep playing across a layout
  * change). Each layout column maps 1:1 to a deck column (see
@@ -424,6 +427,24 @@ export class ResolumeAdClient {
     }
   }
 
+  async _put(url, body) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this._timeoutMs);
+    try {
+      const response = await fetch(url, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        throw new Error(`Resolume ${url} returned HTTP ${response.status}`);
+      }
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   async loadClip(layerId, clipSlot, filePath) {
     const base = this._baseUrl();
     const fileUrl = `file:///${filePath.replace(/\\/g, "/")}`;
@@ -451,6 +472,33 @@ export class ResolumeAdClient {
   async getClipInfo(layerId, clipSlot) {
     const base = this._baseUrl();
     return this._get(`${base}/composition/layers/${layerId}/clips/${clipSlot}`);
+  }
+
+  // Stretch a loaded ad clip to a fixed duration (Resolume's "Transport →
+  // Duration"): the clip is read back to find its unique transport-duration
+  // parameter id, then set via /parameter/by-id. Resolume then plays the file
+  // over `seconds`, speeding up short videos and slowing down long ones, so
+  // every ad matches the deck column's autopilot duration instead of looping
+  // or being cut off.
+  async setClipTransportDuration(layerId, clipSlot, seconds) {
+    if (!Number.isFinite(seconds) || seconds <= 0) {
+      throw new Error(
+        `invalid transport duration ${JSON.stringify(seconds)} for lane ${layerId} clip ${clipSlot}`,
+      );
+    }
+    const base = this._baseUrl();
+    const clip = await this._get(
+      `${base}/composition/layers/${layerId}/clips/${clipSlot}`,
+    );
+    const duration = clip?.transport?.controls?.duration;
+    if (!duration || duration.id == null) {
+      throw new Error(
+        `no transport duration parameter on lane ${layerId} clip ${clipSlot}`,
+      );
+    }
+    await this._put(`${base}/parameter/by-id/${duration.id}`, {
+      value: seconds,
+    });
   }
 
   async getClipThumbnail(layerId, clipSlot) {
@@ -787,6 +835,13 @@ export class AdLayoutController {
           for (const slot of deckColumns) {
             await this.resolume.loadClip(laneId, slot, winPath);
           }
+          // Stretch every loaded clip to the deck column's autopilot duration
+          // so short videos don't loop and long ones don't get cut off. The
+          // autopilot holds each column for `deckAutopilotSeconds`, so clips
+          // set to the same value fill the whole column.
+          for (const slot of deckColumns) {
+            await this._setClipDurationBestEffort(laneId, slot);
+          }
 
           const fileEntry = { name: fileDef.name };
           if (deckColumns.length > 0) {
@@ -833,6 +888,28 @@ export class AdLayoutController {
       return converted?.dataUrl ?? null;
     } catch {
       return null;
+    }
+  }
+
+  // Stretch a loaded ad clip to the deck column's autopilot duration. A
+  // failure is retried, then logged and swallowed: the clip is already loaded
+  // and the layout applies; a mis-timed duration would only make that ad loop
+  // or get cut off, never stop the deck.
+  async _setClipDurationBestEffort(laneId, slot) {
+    try {
+      await this._retryOp(
+        `set clip transport duration on lane ${laneId} slot ${slot}`,
+        () =>
+          this.resolume.setClipTransportDuration(
+            laneId,
+            slot,
+            this.config.deckAutopilotSeconds,
+          ),
+      );
+    } catch (err) {
+      console.error(
+        `Failed to set transport duration on lane ${laneId} slot ${slot}: ${err.message}`,
+      );
     }
   }
 

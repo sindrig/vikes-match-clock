@@ -362,6 +362,60 @@ test("ResolumeAdClient never offers transport endpoints", async (t) => {
   assert.ok(urls.every((u) => !/transport|connect|loop/.test(u)));
 });
 
+test("ResolumeAdClient.setClipTransportDuration PUTs the clip's duration param by id", async (t) => {
+  const calls = [];
+  t.mock.method(globalThis, "fetch", async (url, options) => {
+    calls.push({ url, method: options?.method, body: options?.body });
+    if (!options?.method || options.method === "GET") {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          transport: {
+            controls: { duration: { id: 12345, value: 1 } },
+          },
+        }),
+      };
+    }
+    return { ok: true, status: 204 };
+  });
+  const client = new ResolumeAdClient({
+    resolumeBaseUrl: "http://localhost:80/api/v1",
+    requestTimeoutMs: 1_000,
+  });
+  await client.setClipTransportDuration("1", 2, 20);
+  assert.equal(
+    calls[0].url,
+    "http://localhost:80/api/v1/composition/layers/1/clips/2",
+  );
+  assert.equal(calls[1].method, "PUT");
+  assert.equal(
+    calls[1].url,
+    "http://localhost:80/api/v1/parameter/by-id/12345",
+  );
+  assert.equal(JSON.parse(calls[1].body).value, 20);
+});
+
+test("ResolumeAdClient.setClipTransportDuration rejects missing or invalid durations", async (t) => {
+  t.mock.method(globalThis, "fetch", async () => ({
+    ok: true,
+    status: 200,
+    json: async () => ({ transport: { controls: {} } }),
+  }));
+  const client = new ResolumeAdClient({
+    resolumeBaseUrl: "http://localhost:80/api/v1",
+    requestTimeoutMs: 1_000,
+  });
+  await assert.rejects(
+    client.setClipTransportDuration("1", 2, 20),
+    /no transport duration/,
+  );
+  await assert.rejects(
+    client.setClipTransportDuration("1", 2, "20"),
+    /invalid transport duration/,
+  );
+});
+
 test("ResolumeAdClient.getClipThumbnail returns bytes or null", async (t) => {
   const client = new ResolumeAdClient({
     resolumeBaseUrl: "http://localhost:80/api/v1",
@@ -472,6 +526,7 @@ function makeAdController() {
     resolumeBaseUrl: "http://localhost:80/api/v1",
     requestTimeoutMs: 1_000,
     resolumeColumn: 1,
+    deckAutopilotSeconds: 20,
     thumbnailMaxDim: 320,
     thumbnailQuality: 0.7,
     thumbnailMaxBytes: 100_000,
@@ -527,6 +582,9 @@ function instrumentResolume(controller, composition = mockComposition()) {
     calls.push(`clear:${laneId}:${slot}`);
   };
   controller.resolume.getClipThumbnail = async () => null;
+  controller.resolume.setClipTransportDuration = async (laneId, slot, seconds) => {
+    calls.push(`duration:${laneId}:${slot}:${seconds}`);
+  };
   return calls;
 }
 
@@ -597,6 +655,100 @@ test("AdLayoutController loads a valid layout into a single deck column", async 
   assert.deepEqual(playing.columns[0].deckColumns, [1]);
   assert.equal(playing.columns[0].files["1"].name, "ad-48.png");
   assert.equal(playing.columns[0].files["3"].name, "ad-40.mp4");
+  controller.shutdown();
+});
+
+test("AdLayoutController stretches every loaded clip to the deck column duration", async () => {
+  const controller = makeAdController();
+  const calls = instrumentResolume(controller);
+
+  const db = new FakeDb();
+  controller.attach(db);
+  db.refs[0].emit(validLayout());
+  await waitFor(() => db.refs[1].setCalls.some((s) => s.phase === "playing"));
+
+  // Each loaded slot (deck column 1 on both lanes) gets a 20s transport
+  // duration, so short videos don't loop and long ones don't get cut off.
+  assert.ok(calls.includes("duration:1:1:20"));
+  assert.ok(calls.includes("duration:3:1:20"));
+  controller.shutdown();
+});
+
+test("AdLayoutController sets durations on every mapped deck column", async () => {
+  const controller = makeAdController();
+  const calls = instrumentResolume(controller);
+
+  const layout = {
+    ...validLayout(),
+    revision: "two-cols",
+    columns: [
+      {
+        id: "col-a",
+        files: {
+          1: {
+            name: "a-48.png",
+            source: `gs://${BUCKET}/${LOCATION}/perimeter/a-48.png`,
+          },
+          3: {
+            name: "a-40.png",
+            source: `gs://${BUCKET}/${LOCATION}/perimeter/a-40.png`,
+          },
+        },
+      },
+      {
+        id: "col-b",
+        files: {
+          1: {
+            name: "b-48.png",
+            source: `gs://${BUCKET}/${LOCATION}/perimeter/b-48.png`,
+          },
+          3: {
+            name: "b-40.png",
+            source: `gs://${BUCKET}/${LOCATION}/perimeter/b-40.png`,
+          },
+        },
+      },
+    ],
+  };
+
+  const db = new FakeDb();
+  controller.attach(db);
+  db.refs[0].emit(layout);
+  await waitFor(() => db.refs[1].setCalls.some((s) => s.phase === "playing"));
+
+  for (const laneId of ["1", "3"]) {
+    for (const slot of [1, 2]) {
+      assert.ok(
+        calls.includes(`duration:${laneId}:${slot}:20`),
+        `missing duration on lane ${laneId} slot ${slot}`,
+      );
+    }
+  }
+  controller.shutdown();
+});
+
+test("AdLayoutController tolerates a failed duration set", async () => {
+  const controller = makeAdController();
+  const calls = instrumentResolume(controller);
+  controller._sleep = async () => {};
+  controller.resolume.setClipTransportDuration = async () => {
+    calls.push("duration:fail");
+    throw new Error("boom");
+  };
+  controller.resolume.connectColumn = async (column) => {
+    calls.push(`connect:${column}`);
+  };
+
+  const db = new FakeDb();
+  controller.attach(db);
+  db.refs[2].emit("on");
+  db.refs[0].emit(validLayout());
+  await waitFor(() => db.refs[1].setCalls.some((s) => s.phase === "playing"));
+  // The clip is loaded and the layout applies even though the stretch failed;
+  // the deck restart still runs because the perimeter was on.
+  assert.ok(calls.includes("load:1:1:C:/Content/ad-48.png"));
+  assert.ok(calls.includes("connect:1"));
+  assert.equal(db.refs[1].setCalls.some((s) => s.phase === "error"), false);
   controller.shutdown();
 });
 
