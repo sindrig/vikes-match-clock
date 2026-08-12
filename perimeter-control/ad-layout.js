@@ -469,6 +469,36 @@ export class ResolumeAdClient {
     await this._post(`${base}/composition/columns/${column}/connect`);
   }
 
+  // Force a loaded clip's source to fill its canvas. Resolume exposes the
+  // "Video → Resize" fit mode as a `video.resize` ParamChoice on each clip
+  // ("Fill" / "Fit" / "Stretch" / "Original"); the daemon reads the clip back
+  // to find that parameter's id and sets the mode via /parameter/by-id, the
+  // same pattern used for the autopilot target and the transport duration.
+  // This guarantees the ad fills its lane's native canvas edge-to-edge
+  // regardless of the source's own dimensions or aspect ratio, instead of
+  // leaving side gaps or cropping when a file is off-spec.
+  async setClipFit(layerId, clipSlot, mode) {
+    if (!mode || typeof mode !== "string") {
+      throw new Error(
+        `invalid clip fit ${JSON.stringify(mode)} for lane ${layerId} clip ${clipSlot}`,
+      );
+    }
+    const base = this._baseUrl();
+    const clip = await this._get(
+      `${base}/composition/layers/${layerId}/clips/${clipSlot}`,
+    );
+    const resize = clip?.video?.resize;
+    if (!resize || resize.id == null) {
+      throw new Error(`no resize parameter on lane ${layerId} clip ${clipSlot}`);
+    }
+    if (!Array.isArray(resize.options) || !resize.options.includes(mode)) {
+      throw new Error(
+        `resize option ${JSON.stringify(mode)} not available on lane ${layerId} clip ${clipSlot}`,
+      );
+    }
+    await this._put(`${base}/parameter/by-id/${resize.id}`, { value: mode });
+  }
+
   async getClipInfo(layerId, clipSlot) {
     const base = this._baseUrl();
     return this._get(`${base}/composition/layers/${layerId}/clips/${clipSlot}`);
@@ -835,10 +865,14 @@ export class AdLayoutController {
           for (const slot of deckColumns) {
             await this.resolume.loadClip(laneId, slot, winPath);
           }
-          // Stretch every loaded clip to the deck column's autopilot duration
-          // so short videos don't loop and long ones don't get cut off. The
-          // autopilot holds each column for `deckAutopilotSeconds`, so clips
-          // set to the same value fill the whole column.
+          // Stretch every loaded clip to fill its lane's canvas, then to the
+          // deck column's autopilot duration so short videos don't loop and
+          // long ones don't get cut off. The autopilot holds each column for
+          // `deckAutopilotSeconds`, so clips set to the same value fill the
+          // whole column.
+          for (const slot of deckColumns) {
+            await this._setClipFitBestEffort(laneId, slot);
+          }
           for (const slot of deckColumns) {
             await this._setClipDurationBestEffort(laneId, slot);
           }
@@ -888,6 +922,28 @@ export class AdLayoutController {
       return converted?.dataUrl ?? null;
     } catch {
       return null;
+    }
+  }
+
+  // Force a loaded ad clip to fill its lane's canvas (Video → Resize →
+  // Stretch) so an off-aspect source can never leave side gaps on the LED
+  // strip. A failure is retried, then logged and swallowed: the clip is
+  // already loaded and native-size ads are unaffected.
+  async _setClipFitBestEffort(laneId, slot) {
+    try {
+      await this._retryOp(
+        `set clip fit on lane ${laneId} slot ${slot}`,
+        () =>
+          this.resolume.setClipFit(
+            laneId,
+            slot,
+            this.config.clipFit || "Stretch",
+          ),
+      );
+    } catch (err) {
+      console.error(
+        `Failed to set clip fit on lane ${laneId} slot ${slot}: ${err.message}`,
+      );
     }
   }
 

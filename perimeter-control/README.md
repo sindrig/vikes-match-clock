@@ -294,9 +294,14 @@ base perimeter on/off toggle.
    each layer's reference slot (the fallback if the composition read fails).
    Loading one slot per layer keeps the trigger fast (~1-2s). Resolume's clip
    `open` takes a `file:///` URL (e.g. `file:///C:/Content/goal-48.mp4`) as a
-   plain-text body. Playback loops via the clip transport's default `Loop`
-   playmode, so no separate loop endpoints are needed (this Resolume REST
-   version exposes no clip transport endpoints).
+    plain-text body. Playback loops via the clip transport's default `Loop`
+    playmode, so no separate loop endpoints are needed (this Resolume REST
+    version exposes no clip transport endpoints). Each loaded overlay clip is
+    then forced to **fill its layer's native canvas** (`Video → Resize` →
+    `Stretch`, set via `PUT /api/v1/parameter/by-id/{id}` on the clip's
+    `video.resize` parameter), so a goal video with a non-native aspect ratio
+    can never leave side gaps on the LED strip. Best-effort: retried, failure
+    logged, never fails the trigger.
 8. All paired layers are triggered together by connecting the clip in the
    **currently active deck column** (read from the live composition right
    before triggering). Because the autopilot is paused, the deck stays on
@@ -367,7 +372,7 @@ See `perimeter-control.env.example` for all overlay environment variables:
 `PERIMETER_OVERLAY_GCP_PROJECT`, `PERIMETER_OVERLAY_CACHE_DIR`,
 `PERIMETER_OVERLAY_SSH_HOST/USER/KEY`, `PERIMETER_OVERLAY_REMOTE_CONTENT_DIR`,
 `PERIMETER_OVERLAY_LAYER_IDS`, `PERIMETER_OVERLAY_LAYER_CLIP_COLUMNS`,
-`PERIMETER_OVERLAY_LAYER_TARGET_FOLDERS`.
+`PERIMETER_OVERLAY_LAYER_TARGET_FOLDERS`, `PERIMETER_CLIP_FIT`.
 
 The SSH key must provide passwordless access to the Windows Resolume host.
 
@@ -400,14 +405,17 @@ The ad-layout controller is a **content deployer**: it stages ad files from
 Firebase Storage and opens them into the deck columns of the configured base
 layers. It never drives clip-level transport and never touches the autopilot —
 the composition's existing autopilot cycles the deck columns exactly as it
-cycles the Efni content, so the Resolume UI stays fully functional. Two
+cycles the Efni content, so the Resolume UI stays fully functional. Three
 exceptions: it **stretches every loaded clip** to the deck column's autopilot
 duration (Resolume's clip "Transport → Duration", so every ad fills a full
-column instead of looping or being cut short), and it does a **playback
-restart** — applying a new revision clears every ad slot and reloads them
-(which stops the deck), so when the base perimeter state is `on` the daemon
-reconnects the base column with `POST /composition/columns/{column}/connect`
-after a successful apply to put the new ads back into rotation.
+column instead of looping or being cut short), it **forces every loaded clip
+to fill its lane's native canvas** (`Video → Resize` → `Stretch`, so an
+off-aspect ad file can never leave side gaps on the LED strip), and it does a
+**playback restart** — applying a new revision clears every ad slot and
+reloads them (which stops the deck), so when the base perimeter state is `on`
+the daemon reconnects the base column with
+`POST /composition/columns/{column}/connect` after a successful apply to put
+the new ads back into rotation.
 
 The goal overlay (above) uses the disjoint **overlay** layers; the ad layout
 uses the **base** layers. `assertNoSlotConflicts` in `index.js` rejects any
@@ -433,18 +441,23 @@ overlapping lane configuration at startup.
    speeds up shorter videos and slows down longer ones to fill the full 20s, so
    no ad loops mid-column or gets cut off. Best-effort: retried, failure
    logged, never fails the layout.
-6. The daemon publishes the applied status to
+6. **Fixed clip fit**: every opened clip is also forced to **fill its lane's
+   native canvas** (`Video → Resize` → `Stretch`, via
+   `PUT /api/v1/parameter/by-id/{id}` on the clip's `video.resize` parameter),
+   so an ad file with a non-native aspect ratio can never leave side gaps on
+   the LED strip. Best-effort: retried, failure logged, never fails the layout.
+7. The daemon publishes the applied status to
    `perimeter/${location}/adLayout` with `phase: "loading"` → `"playing"`.
    The autopilot then cycles the columns; the ads play with no further daemon
    involvement.
-7. Because the clear-then-load stops the deck, a layout change while the ads
+8. Because the clear-then-load stops the deck, a layout change while the ads
    were playing would leave them stopped. The daemon tracks the base perimeter
    state (`states/${location}/perimeter/state`); after a successful apply it
    restarts the deck with `POST /composition/columns/{column}/connect` (the
    same primitive the `on` state uses) when the perimeter was `on` before the
    clear — and still is — so the new ads resume from column 1. The restart is
    best-effort (retried, failure logged, never fails the applied layout).
-8. An empty `columns` array (or a deleted document) clears all ad slots on the
+9. An empty `columns` array (or a deleted document) clears all ad slots on the
    ad lanes and publishes `phase: "idle"`.
 
 Thumbnails are fetched once per unique ad file (from its first deck column)
@@ -472,7 +485,8 @@ write lost right after a daemon restart self-heals.
 See `perimeter-control.env.example` for all ad-layout environment variables:
 `PERIMETER_AD_LAYOUT_ENABLED`, `PERIMETER_AD_LAYOUT_PATH`,
 `PERIMETER_AD_LAYOUT_STATUS_PATH`, `PERIMETER_AD_LANE_IDS` (default `1,3`),
-`PERIMETER_AD_LAYOUT_BUCKET`, `PERIMETER_AD_MAX_FILE_BYTES`.
+`PERIMETER_AD_LAYOUT_BUCKET`, `PERIMETER_AD_MAX_FILE_BYTES`,
+`PERIMETER_CLIP_FIT`.
 
 The deck column range is derived from the live composition at runtime; there
 is no per-slot configuration. The deck autopilot the ads rely on is asserted

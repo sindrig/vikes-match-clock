@@ -476,6 +476,36 @@ export class ResolumeOverlayClient {
     );
   }
 
+  // Force a loaded clip's source to fill its canvas. Resolume exposes the
+  // "Video → Resize" fit mode as a `video.resize` ParamChoice on each clip
+  // ("Fill" / "Fit" / "Stretch" / "Original"); the daemon reads the clip back
+  // to find that parameter's id and sets the mode via /parameter/by-id, the
+  // same pattern used for the autopilot target and transport duration. This
+  // guarantees the overlay fills its layer's native canvas edge-to-edge
+  // regardless of the source's own dimensions or aspect ratio, instead of
+  // leaving side gaps or cropping when a source is off-spec.
+  async setClipFit(layerId, clipSlot, mode) {
+    if (!mode || typeof mode !== "string") {
+      throw new Error(
+        `invalid clip fit ${JSON.stringify(mode)} for layer ${layerId} clip ${clipSlot}`,
+      );
+    }
+    const base = this._baseUrl();
+    const clip = await this._getJson(
+      `${base}/composition/layers/${layerId}/clips/${clipSlot}`,
+    );
+    const resize = clip?.video?.resize;
+    if (!resize || resize.id == null) {
+      throw new Error(`no resize parameter on layer ${layerId} clip ${clipSlot}`);
+    }
+    if (!Array.isArray(resize.options) || !resize.options.includes(mode)) {
+      throw new Error(
+        `resize option ${JSON.stringify(mode)} not available on layer ${layerId} clip ${clipSlot}`,
+      );
+    }
+    await this._put(`${base}/parameter/by-id/${resize.id}`, { value: mode });
+  }
+
   async clearClip(layerId, clipSlot) {
     const base = this._baseUrl();
     await this._post(
@@ -828,6 +858,28 @@ export class OverlayController {
     }, col.durationMs);
   }
 
+  // Force the loaded overlay clip to fill its canvas (Video → Resize →
+  // Stretch) so a source with the wrong aspect ratio can never leave side
+  // gaps on the LED strip. Best-effort: a failure is logged and swallowed —
+  // the clip is already loaded and native-size media is unaffected.
+  async _setClipFitBestEffort(layerId, clipSlot) {
+    try {
+      await this._retryOp(
+        `set clip fit on layer ${layerId} slot ${clipSlot}`,
+        () =>
+          this.resolume.setClipFit(
+            layerId,
+            clipSlot,
+            this.config.clipFit || "Stretch",
+          ),
+      );
+    } catch (err) {
+      console.error(
+        `Failed to set clip fit on layer ${layerId} slot ${clipSlot}: ${err.message}`,
+      );
+    }
+  }
+
   async _stageAndLoadColumn(col, activeColumn) {
     const promises = [];
     for (const [layerId, fileDef] of Object.entries(col.files)) {
@@ -851,6 +903,7 @@ export class OverlayController {
             fileDef.name,
           );
           await this.resolume.loadClip(layerId, targetSlot, winPath);
+          await this._setClipFitBestEffort(layerId, targetSlot);
         })(),
       );
     }

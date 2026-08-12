@@ -416,6 +416,71 @@ test("ResolumeAdClient.setClipTransportDuration rejects missing or invalid durat
   );
 });
 
+test("ResolumeAdClient.setClipFit PUTs the clip's resize param by id", async (t) => {
+  const calls = [];
+  t.mock.method(globalThis, "fetch", async (url, options) => {
+    calls.push({ url, method: options?.method, body: options?.body });
+    if (!options?.method || options.method === "GET") {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          video: {
+            resize: {
+              id: 999,
+              valuetype: "ParamChoice",
+              value: "Original",
+              options: ["Fill", "Fit", "Stretch", "Original"],
+            },
+          },
+        }),
+      };
+    }
+    return { ok: true, status: 204 };
+  });
+  const client = new ResolumeAdClient({
+    resolumeBaseUrl: "http://localhost:80/api/v1",
+    requestTimeoutMs: 1_000,
+  });
+  await client.setClipFit("3", 4, "Stretch");
+  assert.equal(
+    calls[0].url,
+    "http://localhost:80/api/v1/composition/layers/3/clips/4",
+  );
+  assert.equal(calls[1].method, "PUT");
+  assert.equal(calls[1].url, "http://localhost:80/api/v1/parameter/by-id/999");
+  assert.equal(JSON.parse(calls[1].body).value, "Stretch");
+});
+
+test("ResolumeAdClient.setClipFit rejects missing params and unknown modes", async (t) => {
+  t.mock.method(globalThis, "fetch", async () => ({
+    ok: true,
+    status: 200,
+    json: async () => ({ video: {} }),
+  }));
+  const client = new ResolumeAdClient({
+    resolumeBaseUrl: "http://localhost:80/api/v1",
+    requestTimeoutMs: 1_000,
+  });
+  await assert.rejects(
+    client.setClipFit("1", 2, "Stretch"),
+    /no resize parameter/,
+  );
+  await assert.rejects(client.setClipFit("1", 2, ""), /invalid clip fit/);
+
+  t.mock.method(globalThis, "fetch", async () => ({
+    ok: true,
+    status: 200,
+    json: async () => ({
+      video: { resize: { id: 1, options: ["Fill", "Original"] } },
+    }),
+  }));
+  await assert.rejects(
+    client.setClipFit("1", 2, "Stretch"),
+    /not available/,
+  );
+});
+
 test("ResolumeAdClient.getClipThumbnail returns bytes or null", async (t) => {
   const client = new ResolumeAdClient({
     resolumeBaseUrl: "http://localhost:80/api/v1",
@@ -585,6 +650,9 @@ function instrumentResolume(controller, composition = mockComposition()) {
   controller.resolume.setClipTransportDuration = async (laneId, slot, seconds) => {
     calls.push(`duration:${laneId}:${slot}:${seconds}`);
   };
+  controller.resolume.setClipFit = async (laneId, slot, mode) => {
+    calls.push(`fit:${laneId}:${slot}:${mode}`);
+  };
   return calls;
 }
 
@@ -671,6 +739,41 @@ test("AdLayoutController stretches every loaded clip to the deck column duration
   // duration, so short videos don't loop and long ones don't get cut off.
   assert.ok(calls.includes("duration:1:1:20"));
   assert.ok(calls.includes("duration:3:1:20"));
+  controller.shutdown();
+});
+
+test("AdLayoutController forces every loaded clip to stretch (Video → Resize)", async () => {
+  const controller = makeAdController();
+  const calls = instrumentResolume(controller);
+
+  const db = new FakeDb();
+  controller.attach(db);
+  db.refs[0].emit(validLayout());
+  await waitFor(() => db.refs[1].setCalls.some((s) => s.phase === "playing"));
+
+  // Every loaded slot (deck column 1 on both lanes) is set to Stretch so an
+  // off-aspect ad still fills its lane's native canvas edge-to-edge.
+  assert.ok(calls.includes("fit:1:1:Stretch"));
+  assert.ok(calls.includes("fit:3:1:Stretch"));
+  controller.shutdown();
+});
+
+test("AdLayoutController tolerates a failed fit set", async () => {
+  const controller = makeAdController();
+  const calls = instrumentResolume(controller);
+  controller._sleep = async () => {};
+  controller.resolume.setClipFit = async () => {
+    calls.push("fit:fail");
+    throw new Error("boom");
+  };
+
+  const db = new FakeDb();
+  controller.attach(db);
+  db.refs[0].emit(validLayout());
+  await waitFor(() => db.refs[1].setCalls.some((s) => s.phase === "playing"));
+  // The clip is loaded and the layout applies even though the fit failed.
+  assert.ok(calls.includes("load:1:1:C:/Content/ad-48.png"));
+  assert.ok(db.refs[1].setCalls.some((s) => s.phase === "playing"));
   controller.shutdown();
 });
 

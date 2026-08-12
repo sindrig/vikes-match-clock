@@ -50,6 +50,7 @@ test("loadConfig defaults", () => {
   assert.equal(config.deckAutopilot, "Play Next Column");
   assert.equal(config.deckAutopilotDuration, "Seconds");
   assert.equal(config.deckAutopilotSeconds, 20);
+  assert.equal(config.clipFit, "Stretch");
 });
 
 test("loadConfig overrides", () => {
@@ -72,6 +73,7 @@ test("loadConfig overrides", () => {
     PERIMETER_DECK_AUTOPILOT: "Play Random Column",
     PERIMETER_DECK_AUTOPILOT_DURATION: "Longest Clip",
     PERIMETER_DECK_AUTOPILOT_SECONDS: "15",
+    PERIMETER_CLIP_FIT: "Fill",
   });
   assert.equal(config.databaseURL, "https://example.com");
   assert.equal(config.path, "states/x/perimeter");
@@ -91,6 +93,7 @@ test("loadConfig overrides", () => {
   assert.equal(config.deckAutopilot, "Play Random Column");
   assert.equal(config.deckAutopilotDuration, "Longest Clip");
   assert.equal(config.deckAutopilotSeconds, 15);
+  assert.equal(config.clipFit, "Fill");
 });
 
 test("loadConfig invalid numerics fall back to defaults", () => {
@@ -1290,6 +1293,76 @@ test("ResolumeOverlayClient.setAutopilot PUTs the value by parameter id", async 
   assert.equal(calls[0].body, JSON.stringify({ value: "Off" }));
 });
 
+test("ResolumeOverlayClient.setClipFit PUTs the clip's resize param by id", async (t) => {
+  const calls = [];
+  t.mock.method(globalThis, "fetch", async (url, options) => {
+    calls.push({ url, method: options?.method, body: options?.body });
+    if (!options?.method || options.method === "GET") {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          video: {
+            resize: {
+              id: 4242,
+              valuetype: "ParamChoice",
+              value: "Original",
+              options: ["Fill", "Fit", "Stretch", "Original"],
+            },
+          },
+        }),
+      };
+    }
+    return { ok: true, status: 204 };
+  });
+  const client = new ResolumeOverlayClient({
+    resolumeBaseUrl: "http://localhost:80/api/v1",
+    requestTimeoutMs: 1_000,
+  });
+  await client.setClipFit("4", 2, "Stretch");
+  assert.equal(
+    calls[0].url,
+    "http://localhost:80/api/v1/composition/layers/4/clips/2",
+  );
+  assert.equal(calls[1].method, "PUT");
+  assert.equal(
+    calls[1].url,
+    "http://localhost:80/api/v1/parameter/by-id/4242",
+  );
+  assert.equal(JSON.parse(calls[1].body).value, "Stretch");
+});
+
+test("ResolumeOverlayClient.setClipFit rejects missing params and unknown modes", async (t) => {
+  t.mock.method(globalThis, "fetch", async () => ({
+    ok: true,
+    status: 200,
+    json: async () => ({ video: {} }),
+  }));
+  const client = new ResolumeOverlayClient({
+    resolumeBaseUrl: "http://localhost:80/api/v1",
+    requestTimeoutMs: 1_000,
+  });
+  await assert.rejects(
+    client.setClipFit("2", 1, "Stretch"),
+    /no resize parameter/,
+  );
+  await assert.rejects(client.setClipFit("2", 1, ""), /invalid clip fit/);
+
+  t.mock.method(globalThis, "fetch", async () => ({
+    ok: true,
+    status: 200,
+    json: async () => ({
+      video: {
+        resize: { id: 1, options: ["Fill", "Original"] },
+      },
+    }),
+  }));
+  await assert.rejects(
+    client.setClipFit("2", 1, "Stretch"),
+    /not available/,
+  );
+});
+
 // -- overlay playback with a frozen deck ------------------------------------------------
 
 async function makeTmpCache() {
@@ -1341,6 +1414,7 @@ test("overlay stage loads the file into the currently active column only", async
   controller.resolume = {
     clearClip: async (layerId, slot) => calls.push(["clear", layerId, slot]),
     loadClip: async (layerId, slot) => calls.push(["load", layerId, slot]),
+    setClipFit: async () => {},
     connectClip: async () => {},
   };
   controller.stager.stageAsset = async () => "C:/Content/goal-48.mp4";
@@ -1363,6 +1437,7 @@ test("overlay stage falls back to the reference slot when active column is unkno
   controller.resolume = {
     clearClip: async (layerId, slot) => calls.push(["clear", layerId, slot]),
     loadClip: async (layerId, slot) => calls.push(["load", layerId, slot]),
+    setClipFit: async () => {},
     connectClip: async () => {},
   };
   controller.stager.stageAsset = async () => "C:/Content/x.mp4";
@@ -1375,6 +1450,37 @@ test("overlay stage falls back to the reference slot when active column is unkno
     ["load", "2", 1],
     ["load", "4", 1],
   ]);
+});
+
+test("overlay stage forces the loaded clip to stretch after loading", async () => {
+  const controller = await makeOverlayController();
+  const calls = [];
+  controller.resolume = {
+    clearClip: async (layerId, slot) => calls.push(["clear", layerId, slot]),
+    loadClip: async (layerId, slot) => calls.push(["load", layerId, slot]),
+    setClipFit: async (layerId, slot, mode) =>
+      calls.push(["fit", layerId, slot, mode]),
+    connectClip: async () => {},
+  };
+  controller.stager.stageAsset = async () => "C:/Content/x.mp4";
+
+  await controller._stageAndLoadColumn(OVERLAY_DOC.columns[0], 2);
+
+  // Every loaded overlay slot gets Video → Resize → Stretch so an off-aspect
+  // source fills the layer's native canvas edge-to-edge.
+  assert.deepEqual(
+    calls.filter((c) => c[0] === "fit").sort(),
+    [
+      ["fit", "2", 2, "Stretch"],
+      ["fit", "4", 2, "Stretch"],
+    ],
+  );
+  // The fit is set after the load, on the same slot.
+  const loadIdx = (l, s) => calls.findIndex((c) => c[0] === "load" && c[1] === l && c[2] === s);
+  const fitIdx = (l, s) => calls.findIndex((c) => c[0] === "fit" && c[1] === l && c[2] === s);
+  for (const laneId of ["2", "4"]) {
+    assert.ok(fitIdx(laneId, 2) > loadIdx(laneId, 2), `fit after load on lane ${laneId}`);
+  }
 });
 
 test("overlay trigger connects the clip in the currently active column", async () => {
@@ -1445,6 +1551,7 @@ test("overlay start pauses the deck autopilot and persists the restore value", a
     setAutopilot: async (id, value) => puts.push([id, value]),
     clearClip: async () => {},
     loadClip: async () => {},
+    setClipFit: async () => {},
     connectClip: async () => {},
   };
   controller.stager.stageAsset = async () => "C:/Content/x.mp4";
@@ -1473,6 +1580,7 @@ test("overlay start preserves a previously persisted autopilot value (restart)",
     setAutopilot: async (id, value) => puts.push([id, value]),
     clearClip: async () => {},
     loadClip: async () => {},
+    setClipFit: async () => {},
     connectClip: async () => {},
   };
   controller.stager.stageAsset = async () => "C:/Content/x.mp4";
@@ -1551,6 +1659,7 @@ test("overlay freeze failure aborts and publishes error status", async () => {
     setAutopilot: async () => {},
     clearClip: async () => {},
     loadClip: async () => {},
+    setClipFit: async () => {},
     connectClip: async () => {},
     _statusRef: null,
   };
@@ -1588,6 +1697,7 @@ test("overlay freeze failure allows re-trigger of same doc id", async () => {
     setAutopilot: async () => {},
     clearClip: async () => {},
     loadClip: async () => {},
+    setClipFit: async () => {},
     connectClip: async () => {},
   };
   controller.stager.stageAsset = async () => "C:/Content/x.mp4";
@@ -1615,6 +1725,7 @@ test("overlay serialization: clear after start is handled sequentially", async (
     clearClip: async (layerId, slot) => calls.push(["clear", layerId, slot]),
     clearLayer: async () => {},
     loadClip: async () => {},
+    setClipFit: async () => {},
     connectClip: async () => {},
   };
   controller.stager.stageAsset = async () => "C:/Content/x.mp4";

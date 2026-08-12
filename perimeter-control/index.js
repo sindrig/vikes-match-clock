@@ -108,6 +108,12 @@ const DEFAULT_DECK_AUTOPILOT = "Play Next Column";
 const DEFAULT_DECK_AUTOPILOT_DURATION = "Seconds";
 const DEFAULT_DECK_AUTOPILOT_SECONDS = 20;
 
+// Resolume clip "Video → Resize" mode applied to every overlay and ad clip
+// the daemon opens, so sources fill their layer's native canvas edge-to-edge
+// regardless of their own dimensions or aspect ratio (a wrong-size file can
+// otherwise leave side gaps on the LED strip).
+const DEFAULT_CLIP_FIT = "Stretch";
+
 // Legacy freeze record written by an earlier daemon build that paused the
 // autopilot for the ad-layout; nothing reads it today, so the "on" self-heal
 // removes it when it restores the autopilot.
@@ -296,6 +302,10 @@ export function loadConfig(environ = process.env) {
       environ.PERIMETER_OVERLAY_LAYER_TARGET_FOLDERS,
       DEFAULT_OVERLAY_LAYER_TARGET_FOLDERS,
     ),
+    // "Video → Resize" fit mode applied to every overlay and ad clip the
+    // daemon opens (Stretch by default so off-aspect sources still fill
+    // their layer's native canvas edge-to-edge).
+    clipFit: (environ.PERIMETER_CLIP_FIT || DEFAULT_CLIP_FIT).trim(),
     // Ad-layout settings. The deck column range is derived from the live
     // composition at runtime; only the lane IDs are configured.
     adLayoutEnabled: environ.PERIMETER_AD_LAYOUT_ENABLED !== "false",
