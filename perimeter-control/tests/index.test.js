@@ -923,20 +923,20 @@ test("overlay: disabled does not create overlay controller", () => {
   assert.equal(controller._overlayController, null);
 });
 
-test("overlay: ad-layout slot overlap is rejected at construction", () => {
+test("overlay: ad-layout lane overlap is rejected at construction", () => {
   const config = loadConfig({
-    PERIMETER_OVERLAY_LAYER_CLIP_COLUMNS: '{"2":2}',
+    PERIMETER_OVERLAY_LAYER_IDS: "1,4",
   });
   assert.throws(
     () => new PerimeterController(config),
-    /Overlapping Resolume clip slot configuration/,
+    /Overlapping Resolume layer configuration/,
   );
 });
 
-test("overlay: disjoint slot maps construct without error", () => {
+test("overlay: disjoint lanes construct without error", () => {
   const config = loadConfig({
-    PERIMETER_OVERLAY_LAYER_CLIP_COLUMNS: '{"2":1}',
-    PERIMETER_AD_LAYER_CLIP_SLOTS: '{"2":2}',
+    PERIMETER_OVERLAY_LAYER_IDS: "2,4",
+    PERIMETER_AD_LANE_IDS: "1,3",
   });
   const controller = new PerimeterController(config);
   assert.notEqual(controller._adLayoutController, null);
@@ -1395,7 +1395,9 @@ test("overlay serialization: clear after start is handled sequentially", async (
 
   const db = new FakeDb();
   controller.attach(db);
-  const overlayRef = db.refs.find((r) => r.path === controller.config.overlayPath);
+  const overlayRef = db.refs.find(
+    (r) => r.path === controller.config.overlayPath,
+  );
 
   // Fire a start followed immediately by a clear (synchronous).
   overlayRef.emit(OVERLAY_DOC);
@@ -1406,7 +1408,9 @@ test("overlay serialization: clear after start is handled sequentially", async (
 
   // Autopilot should be paused then restored (not stuck Off).
   assert.ok(calls.some((c) => c[0] === "autopilot" && c[2] === "Off"));
-  assert.ok(calls.some((c) => c[0] === "autopilot" && c[2] === "Play Next Column"));
+  assert.ok(
+    calls.some((c) => c[0] === "autopilot" && c[2] === "Play Next Column"),
+  );
   // The clear should have unloaded clips.
   assert.ok(calls.some((c) => c[0] === "clear"));
   // _currentId should be null after the clear.
@@ -1442,14 +1446,20 @@ test("stageAsset returns a generation-suffixed path and skips re-copy for same g
   const cacheKey = stager._cacheKey(
     "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/goal-48.mp4",
   );
-  await fs.writeFile(path.join(cacheSubdir, `${cacheKey}-1234567890123.mp4`), "data");
+  await fs.writeFile(
+    path.join(cacheSubdir, `${cacheKey}-1234567890123.mp4`),
+    "data",
+  );
 
   const result = await stager.stageAsset(
     "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/goal-48.mp4",
     "goal-48.mp4",
   );
 
-  assert.ok(result.endsWith("-1234567890123.mp4"), `expected generation suffix, got ${result}`);
+  assert.ok(
+    result.endsWith("-1234567890123.mp4"),
+    `expected generation suffix, got ${result}`,
+  );
   assert.equal(copyCalls.length, 1);
   assert.equal(copyCalls[0], "goal-48-1234567890123.mp4");
 
@@ -1474,7 +1484,7 @@ test("validateOverlayDoc rejects filenames with #, ?, &", () => {
       {
         durationMs: 1000,
         files: {
-          "2": {
+          2: {
             name: "goal#48.mp4",
             source:
               "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/goal.mp4",
@@ -1497,7 +1507,7 @@ test("validateOverlayDoc rejects filenames with ?", () => {
       {
         durationMs: 1000,
         files: {
-          "2": {
+          2: {
             name: "goal?.mp4",
             source:
               "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/goal.mp4",
@@ -1519,7 +1529,7 @@ test("validateOverlayDoc rejects filenames with &", () => {
       {
         durationMs: 1000,
         files: {
-          "2": {
+          2: {
             name: "goal&48.mp4",
             source:
               "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/goal.mp4",
@@ -1541,7 +1551,7 @@ test("validateOverlayDoc accepts filenames with spaces", () => {
       {
         durationMs: 1000,
         files: {
-          "2": {
+          2: {
             name: "goal 48.mp4",
             source:
               "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/goal.mp4",

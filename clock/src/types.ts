@@ -361,32 +361,27 @@ export interface PerimeterAdLane {
   name: string;
 }
 
-// Applied file with daemon-resolved duration and thumbnail
+// Applied file with daemon-resolved thumbnail
 export interface PerimeterAppliedAdFile {
   name: string;
   thumbnail?: string; // base64 data URL
-  transportDurationMs: number;
 }
 
-// Applied column with daemon-resolved files
+// Applied column: which deck columns hold this ad, and the per-lane files.
+// The deck autopilot cycles these columns; the daemon only deploys content.
 export interface PerimeterAppliedAdColumn {
   id: string; // uuid matching desired column
+  deckColumns: number[]; // 1-based deck column indices holding this ad
   files: Record<string, PerimeterAppliedAdFile>;
 }
 
-export type PerimeterAdPhase =
-  | "staging"
-  | "loading"
-  | "playing"
-  | "error"
-  | "idle";
+export type PerimeterAdPhase = "loading" | "playing" | "error" | "idle";
 
 // Daemon-published applied layout at perimeter/{location}/adLayout
 export interface PerimeterAppliedAdLayout {
   lanes: PerimeterAdLane[];
   revision: string; // matching the applied desired revision
   phase: PerimeterAdPhase;
-  activeColumn: number; // 1-based, 0 when idle
   error: string | null;
   updatedAt: number; // Firebase server timestamp
   columns: PerimeterAppliedAdColumn[];

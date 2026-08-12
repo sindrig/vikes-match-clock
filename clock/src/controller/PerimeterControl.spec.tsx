@@ -52,7 +52,6 @@ const baseAppliedAdLayout = {
   ],
   revision: "rev-123",
   phase: "idle" as const,
-  activeColumn: 0,
   error: null,
   updatedAt: Date.now(),
   columns: [],
@@ -263,22 +262,6 @@ describe("PerimeterControl", () => {
     expect(screen.getByText("Lifandi")).toBeInTheDocument();
   });
 
-  it("shows active column when activeColumn > 0", () => {
-    mockedUsePerimeter.mockReturnValue(
-      createMockPerimeterReturn({
-        appliedAdLayout: {
-          ...baseAppliedAdLayout,
-          activeColumn: 2,
-        },
-      }),
-    );
-    render(<PerimeterControl />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Opna" }));
-
-    expect(screen.getByText("Virkur dálkur: 2")).toBeInTheDocument();
-  });
-
   it("shows stale warning based on the applied ad-layout status timestamp", () => {
     mockedUsePerimeter.mockReturnValue(
       createMockPerimeterReturn({
@@ -318,11 +301,11 @@ describe("PerimeterControl", () => {
           columns: [
             {
               id: "col-1",
+              deckColumns: [1],
               files: {
                 "lane-1": {
                   name: "test.mp4",
                   thumbnail: "data:image/png;base64,abc",
-                  transportDurationMs: 5000,
                 },
               },
             },
@@ -381,10 +364,10 @@ describe("PerimeterControl", () => {
           columns: [
             {
               id: "col-test",
+              deckColumns: [1],
               files: {
                 "lane-1": {
                   name: "file.mp4",
-                  transportDurationMs: 3000,
                 },
               },
             },

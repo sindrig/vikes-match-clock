@@ -168,11 +168,6 @@
   background: #bbb;
 }
 
-.perimeter-preview-modal .perimeter-active-col {
-  color: #333;
-  font-weight: 500;
-}
-
 .perimeter-preview-modal .perimeter-status-error {
   color: #d32f2f;
   font-size: 12px;
@@ -375,13 +370,6 @@
   overflow-wrap: anywhere;
   word-break: break-word;
   line-height: 1.3;
-}
-
-.perimeter-preview-modal .perimeter-file-duration {
-  padding: 4px 8px 6px;
-  font-size: 11px;
-  color: #666;
-  font-variant-numeric: tabular-nums;
 }
 
 .perimeter-preview-modal .perimeter-file-empty {

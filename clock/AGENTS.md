@@ -250,23 +250,42 @@ Write actions are in `FirebaseStateContext.tsx`:
 
 These are exposed via `usePerimeter()` hook.
 
-#### Perimeter Ad Layout (Column-Based Ad Playback)
+#### Perimeter Ad Layout (Content Deployer on the Base Layers)
 
 The controller writes a **desired layout** to `states/${listenPrefix}/perimeter/adLayout`,
 defining columns of ad files across daemon-published lanes. The daemon reads
-this path, validates, stages assets, loads clips into reserved Resolume slots,
-and publishes the **applied layout** to `perimeter/${listenPrefix}/adLayout`.
+this path, validates, stages assets, and **deploys** the ad files into the
+Resolume deck columns on the base layers, then publishes the **applied
+layout** to `perimeter/${listenPrefix}/adLayout`.
+
+The ad-layout is a **content deployer, not a playback driver**: it only opens
+files into clip slots (and clears them). It never calls `connect`,
+`disconnect`, `loop-*`, or `transport/*` endpoints and never touches the
+composition autopilot. The deck autopilot cycles the columns exactly as it
+cycles the Efni content, so the Resolume UI (column count, autopilot speed,
+manual column selection) keeps working untouched.
 
 **Data ownership**:
 
 | Path                                   | Writer     | Purpose                                            |
 | -------------------------------------- | ---------- | -------------------------------------------------- |
 | `states/{location}/perimeter/adLayout` | Controller | Desired layout command                             |
-| `perimeter/{location}/adLayout`        | Daemon     | Applied layout, lanes, status, durations, previews |
+| `perimeter/{location}/adLayout`        | Daemon     | Applied layout, lanes, column mapping, previews    |
 | `{location}/perimeter/*` in Storage    | Controller | Selectable/uploaded source assets                  |
 
 The daemon never writes to the desired path, eliminating a self-write
 feedback loop.
+
+**Layer separation** — the ad layout and the goal overlay use **disjoint
+layers** and never interfere:
+
+| System | Layers | Code |
+|--------|--------|------|
+| Ad layout | base layers (`PERIMETER_AD_LANE_IDS`, default `1,3`) | ad-layout.js |
+| Goal overlay | overlay layers (`PERIMETER_OVERLAY_LAYER_IDS`, default `2,4`) | overlay.js |
+
+`assertNoSlotConflicts` in `perimeter-control/index.js` rejects any
+overlapping lane configuration at daemon startup.
 
 **Desired layout schema** (`states/${listenPrefix}/perimeter/adLayout`):
 
@@ -278,11 +297,11 @@ feedback loop.
     {
       "id": "uuid",
       "files": {
-        "2": {
+        "1": {
           "name": "ad-48.png",
           "source": "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/ad-48.png"
         },
-        "4": {
+        "3": {
           "name": "ad-40.mp4",
           "source": "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/ad-40.mp4"
         }
@@ -295,37 +314,52 @@ feedback loop.
 - `revision` is a UUID that changes for every edit (including reorder).
 - `columns` is the complete intended order, not an incremental log.
 - Each column must have exactly one valid file for every configured lane.
-- An empty `columns` array is valid and clears/stops only the ad-layout lanes.
+- An empty `columns` array is valid and clears the ad clips from all deck
+  columns on the ad lanes.
 - Source objects must belong to the approved bucket and the current
   location's `perimeter/` prefix.
 - File names are basename-only; traversal and control characters are rejected.
+
+**Column mapping** — the daemon reads the deck column count `M` from the live
+composition and distributes the `N` layout columns across contiguous ranges:
+
+```
+base      = floor(M / N)
+remainder = M mod N
+layout column i (0-based) covers deck columns
+  [ i*base + min(i, remainder) + 1 .. i*base + min(i, remainder) + base + (i < remainder ? 1 : 0) ]
+```
+
+- 3 layout columns on a 15-column deck → columns 1–5, 6–10, 11–15
+  (~100s per ad at a 20s autopilot).
+- 1 layout column → all 15 columns.
+- Each ad file is loaded into its mapped deck columns on **every** configured
+  lane. The autopilot then cycles them naturally.
 
 **Applied layout schema** (`perimeter/${listenPrefix}/adLayout`, daemon-published):
 
 ```json
 {
   "lanes": [
-    { "id": "2", "name": "48 skjair" },
-    { "id": "4", "name": "40 skjair" }
+    { "id": "1", "name": "48 skjair" },
+    { "id": "3", "name": "40 skjair" }
   ],
   "revision": "uuid",
-  "phase": "staging|loading|playing|error|idle",
-  "activeColumn": 1,
+  "phase": "loading|playing|error|idle",
   "error": null,
   "updatedAt": 1723392000000,
   "columns": [
     {
       "id": "uuid",
+      "deckColumns": [1, 2, 3, 4, 5],
       "files": {
-        "2": {
+        "1": {
           "name": "ad-48.png",
-          "thumbnail": "data:image/png;base64,...",
-          "transportDurationMs": 20000
+          "thumbnail": "data:image/png;base64,..."
         },
-        "4": {
+        "3": {
           "name": "ad-40.mp4",
-          "thumbnail": "data:image/png;base64,...",
-          "transportDurationMs": 15342
+          "thumbnail": "data:image/png;base64,..."
         }
       }
     }
@@ -338,24 +372,27 @@ feedback loop.
 - Lane metadata is daemon-owned from local Resolume configuration; the UI
   renders lanes dynamically and must not hard-code two lanes.
 - The UI shows the applied layout, not merely the submitted request.
-- `transportDurationMs` is the daemon-resolved duration: exactly 20,000ms
-  for static images (set via Resolume API), Resolume-reported for videos
-  (bounded; unusable or extreme values fall back to the 20s static duration).
-- Columns play in order and cycle from the final column back to the first.
-- A newer revision supersedes all pending timers and callbacks (generation
-  tracking — a newer snapshot invalidates in-flight staging, retries, and
-  playback immediately).
-- A failed replacement restores the previously applied layout and its cycling
-  timer instead of freezing the perimeter on a stale column.
-- An empty `columns` layout clears only the ad-layout clip slots (never the
-  whole layer) while preserving the submitted revision in the idle status.
+- `deckColumns` lists which deck column indices hold each ad; thumbnails are
+  fetched once per unique ad file (not per deck column instance).
+- The phase model is `loading` (staging/opening), `playing` (all files
+  deployed, autopilot cycling), `error`, and `idle` (no layout).
+- Layout changes are **clear-then-load**: the daemon empties all old ad slots
+  across the deck, then stages and opens the new files. A brief blank flash
+  is expected.
+- On a staging/load failure the daemon publishes an `error` status and clears
+  the slots it already emptied.
+- An empty `columns` layout clears the ad clips from all deck columns on the
+  ad lanes (never the whole layer) while preserving the submitted revision in
+  the idle status.
 - The same Storage object may be reused across lanes (identical name +
   source); a filename mapped to two different sources is rejected because
   staging copies lane files to a shared remote dir keyed by name.
 - On daemon restart, the desired revision is read and restored; no new
   revision is created.
-- The goal overlay protocol remains separate and uses independent clip slots;
-  overlapping configured slot maps are rejected at daemon startup.
+- The status publish is retried and re-published on the listener refresh, so
+  a write lost right after restart self-heals.
+- The goal overlay protocol remains separate and uses the disjoint overlay
+  layers; overlapping lane configuration is rejected at daemon startup.
 
 **UI operations**:
 
@@ -391,16 +428,16 @@ Types are defined in `types.ts`:
 - `PerimeterAdLayoutFile` — filename + `gs://` source
 - `PerimeterAdLane` — lane ID + display name
 - `PerimeterAppliedAdLayout` — daemon-published applied layout
-- `PerimeterAppliedAdColumn` — applied column with resolved durations
-- `PerimeterAppliedAdFile` — applied file with thumbnail and duration
-- `PerimeterAdPhase` — phase enum
+- `PerimeterAppliedAdColumn` — applied column with deck column mapping
+- `PerimeterAppliedAdFile` — applied file with thumbnail
+- `PerimeterAdPhase` — phase enum (`loading|playing|error|idle`)
 
 Parsing is in `firebaseParsers.ts`:
 
 - `parsePerimeterAdLayout()` — validates desired layout (version, revision,
   column count, lane set enforcement, filename/bucket safety, duplicate IDs)
 - `parsePerimeterAppliedAdLayout()` — validates applied layout (lanes,
-  revision, phase, columns, files, durations)
+  revision, phase, columns with `deckColumns`, files)
 
 Write actions are in `FirebaseStateContext.tsx`:
 

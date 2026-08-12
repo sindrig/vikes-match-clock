@@ -1,11 +1,14 @@
 /**
- * Perimeter ad-layout control — column-based ad playback across lanes.
+ * Perimeter ad-layout control — content deployer across lanes.
  *
  * Validates ad-layout documents from Firebase, stages assets from GCS to the
- * Windows Resolume host via SCP, loads clips into reserved layer slots,
- * triggers all lane clips together per column, schedules sequential column
- * transitions with 20s static duration or Resolume-reported video duration,
- * and cycles from the final column back to the first.
+ * Windows Resolume host via SCP, and loads clips into the Resolume deck
+ * columns on the configured base layers. The composition's existing autopilot
+ * owns all column cycling and transport — this controller never calls connect,
+ * disconnect, loop, or transport endpoints. It only opens files into clip
+ * slots and clears them. A layout column is distributed across a contiguous
+ * range of deck columns (see mapLayoutToDeckColumns); the autopilot then
+ * cycles through them exactly as it cycles the Efni content.
  */
 
 import { createHash } from "node:crypto";
@@ -21,12 +24,6 @@ const execFileAsync = promisify(execFile);
 
 const VALID_AD_VERSION = 1;
 const MAX_AD_COLUMNS = 20;
-const STATIC_DURATION_MS = 20_000;
-// Upper bound for Resolume-reported clip durations. A value above this (or
-// Infinity/NaN) would stall a column for days or overflow setTimeout (an
-// overflowed delay collapses to ~1ms and causes rapid column cycling), so it
-// falls back to the static 20s duration.
-const MAX_AD_DURATION_MS = 15 * 60 * 1000;
 const ALLOWED_GCS_PREFIX = "gs://";
 const UNSAFE_FILENAME_RE = /["%\\/\x00-\x1f\x7f]/;
 
@@ -195,6 +192,36 @@ export function validateAdLayout(
   }
 
   return { valid: true, clear: false, revision, columns: raw.columns };
+}
+
+// Distribute N layout columns across M deck columns. Each layout column is
+// loaded into a contiguous range of 1-based deck column indices. The base
+// share is floor(M/N); the remainder (M mod N) is distributed one extra deck
+// column to each of the first `M mod N` layout columns.
+//
+//   mapLayoutToDeckColumns(3, 15) -> [[1..5], [6..10], [11..15]]
+//   mapLayoutToDeckColumns(1, 15) -> [[1..15]]
+//   mapLayoutToDeckColumns(0, 15) -> []
+//   mapLayoutToDeckColumns(5, 7)  -> [[1,2], [3,4], [5], [6], [7]]
+export function mapLayoutToDeckColumns(layoutColumnCount, deckColumnCount) {
+  if (!Number.isInteger(layoutColumnCount) || layoutColumnCount <= 0) return [];
+  if (!Number.isInteger(deckColumnCount) || deckColumnCount <= 0) return [];
+  const base = Math.floor(deckColumnCount / layoutColumnCount);
+  const remainder = deckColumnCount % layoutColumnCount;
+  const ranges = [];
+  let start = 1;
+  for (let i = 0; i < layoutColumnCount; i += 1) {
+    const length = base + (i < remainder ? 1 : 0);
+    if (length <= 0) {
+      ranges.push([]);
+      continue;
+    }
+    const range = [];
+    for (let j = 0; j < length; j += 1) range.push(start + j);
+    ranges.push(range);
+    start += length;
+  }
+  return ranges;
 }
 
 // -- Asset Stager (reuses GCS + SCP pattern from overlay.js) ------------------
@@ -403,13 +430,6 @@ export class ResolumeAdClient {
     );
   }
 
-  async connectClip(layerId, clipSlot) {
-    const base = this._baseUrl();
-    await this._post(
-      `${base}/composition/layers/${layerId}/clips/${clipSlot}/connect`,
-    );
-  }
-
   async clearClip(layerId, clipSlot) {
     const base = this._baseUrl();
     await this._post(
@@ -417,37 +437,9 @@ export class ResolumeAdClient {
     );
   }
 
-  async clearLayer(layerId) {
-    const base = this._baseUrl();
-    await this._post(`${base}/composition/layers/${layerId}/clear`);
-  }
-
-  async setClipLoop(layerId, clipId, loop) {
-    const base = this._baseUrl();
-    const url = loop
-      ? `${base}/composition/layers/${layerId}/clips/${clipId}/transport/loop-on`
-      : `${base}/composition/layers/${layerId}/clips/${clipId}/transport/loop-off`;
-    await this._post(url);
-  }
-
-  async setTransportDuration(layerId, clipId, durationMs) {
-    const base = this._baseUrl();
-    await this._post(
-      `${base}/composition/layers/${layerId}/clips/${clipId}/transport/duration`,
-      { duration: Math.round(durationMs) },
-    );
-  }
-
   async getClipInfo(layerId, clipSlot) {
     const base = this._baseUrl();
     return this._get(`${base}/composition/layers/${layerId}/clips/${clipSlot}`);
-  }
-
-  async getClipTransport(layerId, clipSlot) {
-    const base = this._baseUrl();
-    return this._get(
-      `${base}/composition/layers/${layerId}/clips/${clipSlot}/transport`,
-    );
   }
 
   async getClipThumbnail(layerId, clipSlot) {
@@ -473,44 +465,26 @@ const AD_INITIAL_BACKOFF_MS = 500;
 const AD_MAX_BACKOFF_MS = 10_000;
 const AD_MAX_RETRIES = 5;
 
-class AdLayoutSupersededError extends Error {
-  constructor() {
-    super("ad-layout superseded by a newer revision");
-    this.name = "AdLayoutSupersededError";
-  }
-}
-
-function boundedDurationMs(value) {
-  if (typeof value !== "number" || !Number.isFinite(value)) return null;
-  if (value <= 0 || value > MAX_AD_DURATION_MS) return null;
-  return Math.round(value);
-}
-
 export class AdLayoutController {
-  constructor(config, configuredLaneIds, adLayerClipSlots) {
+  constructor(config, configuredLaneIds) {
     this.config = config;
     this.configuredLaneIds = configuredLaneIds || [];
-    this.adLayerClipSlots = adLayerClipSlots || {};
     this.stager = new AdAssetStager(config);
     this.resolume = new ResolumeAdClient(config);
     this._currentRevision = null;
-    this._currentColumn = -1;
-    this._columnTimer = null;
     this._stopping = false;
     this._dbRef = null;
     this._statusRef = null;
+    // Applied columns in published status form: { id, deckColumns, files }.
     this._appliedColumns = [];
-    this._stagedColumns = null;
-    this._fallbackApplied = null;
     this._snapshotChain = Promise.resolve();
-    // Monotonic "generation" counter. Every Firebase snapshot delivery bumps
-    // it; all in-flight work captures the generation it belongs to and aborts
-    // as soon as a newer snapshot arrives (see AdLayoutSupersededError).
-    this._generation = 0;
-    this._sleepers = new Set();
     // Snapshot of the most recently published status payload, so the listener
     // refresh can re-publish it and self-heal a silently lost write.
     this._lastStatus = null;
+    // Cached deck column count, discovered from the composition. Falls back
+    // to a single column when Resolume is unreachable so a clear/load still
+    // has a bounded target set.
+    this._deckColumnCount = 1;
   }
 
   _safeError(err) {
@@ -528,13 +502,12 @@ export class AdLayoutController {
     await this._statusRef.set(payload);
   }
 
-  async _publishStatus(phase, activeColumn, error = null, lanes = null) {
+  async _publishStatus(phase, error = null, lanes = null) {
     if (!this._statusRef) return false;
     const payload = {
       lanes: lanes || [],
       revision: this._currentRevision || "",
       phase,
-      activeColumn,
       error: this._safeError(error),
       updatedAt: ServerValue.TIMESTAMP,
       columns: this._appliedColumns,
@@ -563,20 +536,16 @@ export class AdLayoutController {
     }
   }
 
-  async _retryOp(description, fn, gen) {
+  // Retry an operation with bounded exponential backoff. No generation
+  // tracking: snapshots are serialized through _snapshotChain, so a newer
+  // revision never races an in-flight load.
+  async _retryOp(description, fn) {
     let backoff = AD_INITIAL_BACKOFF_MS;
     for (let attempt = 0; attempt < AD_MAX_RETRIES; attempt += 1) {
       if (this._stopping) throw new Error("controller stopping");
-      if (gen !== this._generation) throw new AdLayoutSupersededError();
       try {
-        const result = await fn();
-        if (gen !== this._generation) throw new AdLayoutSupersededError();
-        return result;
+        return await fn();
       } catch (err) {
-        if (err instanceof AdLayoutSupersededError) throw err;
-        if (this._stopping || gen !== this._generation) {
-          throw new AdLayoutSupersededError();
-        }
         const isLast = attempt === AD_MAX_RETRIES - 1;
         if (isLast) {
           console.error(
@@ -594,28 +563,10 @@ export class AdLayoutController {
   }
 
   _sleep(ms) {
-    return new Promise((resolve) => {
-      const timer = setTimeout(() => {
-        this._sleepers.delete(resolve);
-        resolve();
-      }, ms);
-      this._sleepers.add(resolve);
-      resolve._sleepTimer = timer;
-    });
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  // Resolve any pending retry sleeps early so superseded work aborts promptly
-  // instead of sleeping out the full backoff before observing cancellation.
-  _wakeSleepers() {
-    const sleepers = [...this._sleepers];
-    this._sleepers = new Set();
-    for (const resolve of sleepers) {
-      clearTimeout(resolve._sleepTimer);
-      resolve();
-    }
-  }
-
-  // -- Lane discovery ----------------------------------------------------------
+  // -- Lane and deck discovery -------------------------------------------------
 
   _fallbackLanes() {
     return this.configuredLaneIds.map((id) => ({
@@ -624,7 +575,10 @@ export class AdLayoutController {
     }));
   }
 
-  async _discoverLanes() {
+  // Read the live composition to resolve lane names and the deck column count.
+  // A non-2xx or failed read falls back to the configured lane ids and the
+  // cached column count so the ad-layout keeps working on a degraded link.
+  async _discoverComposition() {
     const base = this.config.resolumeBaseUrl.replace(/\/+$/, "");
     const url = `${base}/composition`;
     const controller = new AbortController();
@@ -634,15 +588,17 @@ export class AdLayoutController {
     );
     try {
       const response = await fetch(url, { signal: controller.signal });
-      // A non-2xx composition read must not publish an empty lane list, which
-      // would disable layout editing in the controller; fall back to the
-      // configured lane ids exactly like a network failure.
-      if (!response.ok) return this._fallbackLanes();
+      if (!response.ok) {
+        return {
+          lanes: this._fallbackLanes(),
+          columnCount: this._deckColumnCount,
+        };
+      }
       const composition = await response.json();
       const layers = Array.isArray(composition?.layers)
         ? composition.layers
         : [];
-      return this.configuredLaneIds.map((id) => {
+      const lanes = this.configuredLaneIds.map((id) => {
         const layerIndex = parseInt(id, 10);
         const layer = layers[layerIndex - 1];
         const name =
@@ -656,9 +612,17 @@ export class AdLayoutController {
               : `Lane ${id}`;
         return { id, name };
       });
+      const columnCount = Array.isArray(composition?.columns)
+        ? composition.columns.length
+        : 1;
+      this._deckColumnCount = columnCount;
+      return { lanes, columnCount };
     } catch (err) {
       console.error(`Failed to discover lanes: ${err.message}`);
-      return this._fallbackLanes();
+      return {
+        lanes: this._fallbackLanes(),
+        columnCount: this._deckColumnCount,
+      };
     } finally {
       clearTimeout(timer);
     }
@@ -670,23 +634,18 @@ export class AdLayoutController {
     this._dbRef = db.ref(this.config.adLayoutPath);
     this._statusRef = db.ref(this.config.adLayoutStatusPath);
     this._dbRef.on("value", (snapshot) => {
-      // Bump the generation on every delivery so any older in-flight staging,
-      // retry, or playback immediately observes that it has been superseded.
-      this._generation += 1;
-      this._wakeSleepers();
-      const gen = this._generation;
+      // Serialize snapshot processing so a newer revision never races an
+      // in-flight load; the previous cycle completes before the next begins.
       this._snapshotChain = this._snapshotChain
-        .then(() => this._processSnapshot(snapshot.val(), gen))
+        .then(() => this._processSnapshot(snapshot.val()))
         .catch((err) => {
-          if (err instanceof AdLayoutSupersededError) return;
           console.error(`Ad-layout snapshot processing error: ${err.message}`);
         });
     });
     console.log(`Ad-layout control listening on: ${this.config.adLayoutPath}`);
   }
 
-  async _processSnapshot(data, gen) {
-    if (gen !== this._generation) return;
+  async _processSnapshot(data) {
     const result = validateAdLayout(
       data,
       this.configuredLaneIds,
@@ -696,17 +655,17 @@ export class AdLayoutController {
     if (!result.valid) {
       const reason = result.reason || "unknown";
       console.warn(`Ignoring invalid ad-layout document: ${reason}`);
-      await this._publishStatus("error", 0, `Invalid layout: ${reason}`);
+      await this._publishStatus("error", `Invalid layout: ${reason}`);
       return;
     }
     if (result.clear) {
       console.log("Ad-layout clear command received");
-      await this._handleClear(null, gen);
+      await this._handleClear(null);
       return;
     }
     if (result.revision === this._currentRevision) return;
     console.log(`New ad-layout revision: ${result.revision}`);
-    await this._startLayout(result.revision, result.columns, gen);
+    await this._startLayout(result.revision, result.columns);
   }
 
   _locationFromPath() {
@@ -714,334 +673,116 @@ export class AdLayoutController {
     return parts.length >= 2 ? parts[1] : null;
   }
 
-  // -- State Machine -----------------------------------------------------------
+  // -- Content deployment ------------------------------------------------------
+
+  // Clear every ad-layout clip slot across all deck columns on all configured
+  // lanes. Never clears a whole layer: the goal overlay reserves its own
+  // independent clips on the overlay layers and a full layer clear would
+  // disconnect them mid-celebration.
+  async _clearAllSlots(columnCount) {
+    for (const laneId of this.configuredLaneIds) {
+      for (let slot = 1; slot <= columnCount; slot += 1) {
+        try {
+          await this.resolume.clearClip(laneId, slot);
+        } catch (err) {
+          console.error(
+            `Failed to clear ad clip on lane ${laneId} slot ${slot}: ${err.message}`,
+          );
+        }
+      }
+    }
+  }
 
   // Clear the ad-layout clips. `revision` is preserved when the clear comes
   // from an empty-columns layout (so the idle status carries the submitted
   // revision and identical clears are deduplicated); it is `null` only for a
-  // deleted desired document. `gen` is the snapshot generation the clear
-  // belongs to, so the idle-status publish retries abort on supersession.
-  async _handleClear(revision, gen = this._generation) {
+  // deleted desired document.
+  async _handleClear(revision) {
     this._currentRevision = revision;
-    this._currentColumn = -1;
     this._appliedColumns = [];
-    this._stagedColumns = null;
-    this._fallbackApplied = null;
-    if (this._columnTimer) {
-      clearTimeout(this._columnTimer);
-      this._columnTimer = null;
-    }
-    // Clear only the ad-layout clip slots, never the whole layer: the goal
-    // overlay reserves its own independent clips on the same layers and a
-    // full layer clear would disconnect them mid-celebration.
-    for (const laneId of this.configuredLaneIds) {
-      const clipSlot = this.adLayerClipSlots[laneId];
-      if (clipSlot === undefined) continue;
-      try {
-        await this.resolume.clearClip(laneId, clipSlot);
-      } catch (err) {
-        console.error(
-          `Failed to clear ad clip on lane ${laneId}: ${err.message}`,
-        );
-      }
-    }
-    const lanes = await this._discoverLanes();
+    const { lanes, columnCount } = await this._discoverComposition();
+    await this._clearAllSlots(columnCount);
     // Publish the idle status with retry: a fire-and-forget write can be
     // silently lost right after a daemon restart, and since the desired
     // document may never change again it would never be re-published.
-    await this._retryOp(
-      "publish ad-layout idle status",
-      async () => {
-        const ok = await this._publishStatus("idle", 0, null, lanes);
-        if (!ok) throw new Error("ad-layout status publish failed");
-      },
-      gen,
-    );
+    await this._retryOp("publish ad-layout idle status", async () => {
+      const ok = await this._publishStatus("idle", null, lanes);
+      if (!ok) throw new Error("ad-layout status publish failed");
+    });
     console.log("Ad-layout cleared");
   }
 
-  async _startLayout(revision, columns, gen) {
-    if (columns && columns.length === 0) {
+  async _startLayout(revision, columns) {
+    if (columns.length === 0) {
       console.log("Ad-layout empty-columns clear received");
-      await this._handleClear(revision, gen);
+      await this._handleClear(revision);
       return;
     }
-
-    // Remember the previously applied cycle so a failed replacement can resume
-    // it instead of leaving the perimeter frozen on a stale column.
-    const prevState = {
-      applied: this._appliedColumns,
-      revision: this._currentRevision,
-      column: this._currentColumn,
-    };
-
-    if (this._columnTimer) {
-      clearTimeout(this._columnTimer);
-      this._columnTimer = null;
-    }
     this._currentRevision = revision;
-    this._currentColumn = -1;
-
-    const lanes = await this._discoverLanes();
-    await this._publishStatus("staging", 0, null, lanes);
-    await this._executeFullLayout(revision, columns, gen, prevState);
-  }
-
-  async _playColumn(colIdx, gen = this._generation) {
-    if (this._stopping || gen !== this._generation) return;
+    const { lanes, columnCount } = await this._discoverComposition();
+    await this._publishStatus("loading", null, lanes);
 
     try {
-      const staged = this._stagedColumns;
-      if (!staged || staged.length === 0) return;
+      // Clear-then-load: empty the old ad slots first so a layout change
+      // never leaves stale clips playing in unmapped deck columns. The brief
+      // blank flash is expected and acceptable.
+      await this._clearAllSlots(columnCount);
 
-      if (colIdx >= staged.length) {
-        colIdx = 0;
-      }
-
-      this._currentColumn = colIdx;
-      const col = staged[colIdx];
-
-      for (const [laneId, fileDef] of Object.entries(col.files)) {
-        if (this._stopping || gen !== this._generation) return;
-        const clipSlot = this.adLayerClipSlots[laneId];
-        if (clipSlot === undefined) continue;
-
-        await this.resolume.loadClip(laneId, clipSlot, fileDef.winPath);
-        await this.resolume.setClipLoop(laneId, clipSlot, false);
-
-        let transportDurationMs = STATIC_DURATION_MS;
-        try {
-          const clipInfo = await this.resolume.getClipInfo(laneId, clipSlot);
-          const hasVideo = clipInfo?.video;
-          if (hasVideo) {
-            try {
-              const transport = await this.resolume.getClipTransport(
-                laneId,
-                clipSlot,
-              );
-              const bounded = boundedDurationMs(transport?.duration);
-              if (bounded !== null) {
-                transportDurationMs = bounded;
-              } else if (
-                transport?.duration &&
-                typeof transport.duration === "object" &&
-                typeof transport.duration.value === "number"
-              ) {
-                const boundedValue = boundedDurationMs(
-                  transport.duration.value,
-                );
-                if (boundedValue !== null) transportDurationMs = boundedValue;
-              }
-            } catch {
-              const clipDuration =
-                clipInfo?.duration ||
-                clipInfo?.video?.duration ||
-                clipInfo?.audio?.duration;
-              const bounded = boundedDurationMs(
-                typeof clipDuration === "object"
-                  ? clipDuration?.value
-                  : clipDuration,
-              );
-              if (bounded !== null) transportDurationMs = bounded;
-            }
-          }
-          if (!hasVideo) {
-            await this.resolume.setTransportDuration(
-              laneId,
-              clipSlot,
-              STATIC_DURATION_MS,
-            );
-          }
-        } catch (durErr) {
-          console.warn(
-            `Could not determine duration for ad ${fileDef.name}, using ${STATIC_DURATION_MS}ms: ${durErr.message}`,
-          );
-        }
-
-        fileDef.transportDurationMs = transportDurationMs;
-
-        try {
-          const png = await this.resolume.getClipThumbnail(laneId, clipSlot);
-          if (png) {
-            const converted = reencodeThumbnail(png, {
-              maxDim: this.config.thumbnailMaxDim,
-              quality: this.config.thumbnailQuality,
-              maxBytes: this.config.thumbnailMaxBytes,
-            });
-            if (converted) {
-              fileDef.thumbnail = converted.dataUrl;
-            }
-          }
-        } catch {
-          // best-effort
-        }
-      }
-
-      if (this._stopping || gen !== this._generation) return;
-
-      await this._retryOp(
-        `trigger ad column ${colIdx}`,
-        async () => {
-          const promises = Object.keys(col.files).map((laneId) => {
-            const clipSlot = this.adLayerClipSlots[laneId];
-            if (clipSlot === undefined) return Promise.resolve();
-            return this.resolume.connectClip(laneId, clipSlot);
-          });
-          await Promise.all(promises);
-        },
-        gen,
-      );
-
-      this._appliedColumns[colIdx] = {
-        id: col.id,
-        files: Object.fromEntries(
-          Object.entries(col.files).map(([lid, f]) => [
-            lid,
-            {
-              name: f.name,
-              transportDurationMs: f.transportDurationMs,
-              thumbnail: f.thumbnail,
-            },
-          ]),
-        ),
-      };
-      this._fallbackApplied = null;
-
-      const lanes = await this._discoverLanes();
-      await this._publishStatus("playing", colIdx + 1, null, lanes);
-
-      const effectiveDuration = this._getColumnDuration(
-        this._appliedColumns[colIdx],
-      );
-      this._columnTimer = setTimeout(() => {
-        this._columnTimer = null;
-        if (this._stopping) return;
-        if (gen !== this._generation) return;
-        this._playColumn(colIdx + 1, gen);
-      }, effectiveDuration);
-    } catch (err) {
-      if (err instanceof AdLayoutSupersededError || this._stopping) return;
-      if (gen !== this._generation) return;
-      console.error(`Failed to play ad column ${colIdx}: ${err.message}`);
-      if (this._fallbackApplied) {
-        this._appliedColumns = this._fallbackApplied;
-        this._fallbackApplied = null;
-      }
-      await this._publishStatus("error", colIdx + 1, err);
-    }
-  }
-
-  _getColumnDuration(appliedColumn) {
-    if (!appliedColumn?.files) return STATIC_DURATION_MS;
-    const durations = Object.values(appliedColumn.files)
-      .filter((f) => typeof f === "object" && f)
-      .map((f) => f.transportDurationMs || STATIC_DURATION_MS)
-      .filter((d) => Number.isFinite(d) && d > 0 && d <= MAX_AD_DURATION_MS);
-    if (durations.length === 0) return STATIC_DURATION_MS;
-    return Math.max(...durations);
-  }
-
-  async _executeFullLayout(revision, columns, gen, prevState) {
-    if (gen !== this._generation || this._currentRevision !== revision) return;
-
-    const prevApplied = prevState?.applied ?? this._appliedColumns;
-    const lanes = await this._discoverLanes();
-    const stagedColumns = [];
-
-    try {
+      const ranges = mapLayoutToDeckColumns(columns.length, columnCount);
+      const appliedColumns = [];
       for (let ci = 0; ci < columns.length; ci += 1) {
-        if (
-          this._stopping ||
-          gen !== this._generation ||
-          this._currentRevision !== revision
-        )
-          return;
+        if (this._stopping) return;
         const col = columns[ci];
-        const stagedFiles = {};
+        const deckColumns = ranges[ci] ?? [];
+        const files = {};
 
         for (const [laneId, fileDef] of Object.entries(col.files)) {
-          if (
-            this._stopping ||
-            gen !== this._generation ||
-            this._currentRevision !== revision
-          )
-            return;
-          const clipSlot = this.adLayerClipSlots[laneId];
-          if (clipSlot === undefined) {
-            throw new Error(`No clip slot configured for ad lane ${laneId}`);
-          }
-
-          await this._publishStatus("staging", ci + 1, null, lanes);
           const winPath = await this._retryOp(
             `stage ad column ${ci} lane ${laneId}`,
             () => this.stager.stageAsset(fileDef.source, fileDef.name),
-            gen,
           );
+          for (const slot of deckColumns) {
+            await this.resolume.loadClip(laneId, slot, winPath);
+          }
 
-          stagedFiles[laneId] = { name: fileDef.name, winPath };
+          const fileEntry = { name: fileDef.name };
+          if (deckColumns.length > 0) {
+            // Thumbnails are fetched once per unique ad file, not per deck
+            // column instance, to avoid redundant Resolume API calls.
+            const thumbnail = await this._fetchThumbnail(
+              laneId,
+              deckColumns[0],
+            );
+            if (thumbnail) fileEntry.thumbnail = thumbnail;
+          }
+          files[laneId] = fileEntry;
         }
 
-        stagedColumns.push({
-          id: col.id,
-          files: stagedFiles,
-          _revision: revision,
-        });
+        appliedColumns.push({ id: col.id, deckColumns, files });
       }
 
-      if (
-        this._stopping ||
-        gen !== this._generation ||
-        this._currentRevision !== revision
-      )
-        return;
-
-      this._stagedColumns = stagedColumns;
-      this._appliedColumns = [];
-      this._fallbackApplied = prevApplied;
-      await this._playColumn(0, gen);
+      this._appliedColumns = appliedColumns;
+      await this._publishStatus("playing", null, lanes);
     } catch (err) {
-      if (err instanceof AdLayoutSupersededError || this._stopping) return;
-      if (gen !== this._generation) return;
-      console.error(`Failed to execute ad layout: ${err.message}`);
-      this._appliedColumns = prevApplied;
-      this._fallbackApplied = null;
-      const lanes2 = await this._discoverLanes().catch(() => []);
-      try {
-        await this._retryOp(
-          "publish ad-layout error status",
-          async () => {
-            const ok = await this._publishStatus(
-              "error",
-              this._currentColumn >= 0 ? this._currentColumn + 1 : 0,
-              err,
-              lanes2,
-            );
-            if (!ok) throw new Error("ad-layout status publish failed");
-          },
-          gen,
-        );
-      } catch (publishErr) {
-        if (publishErr instanceof AdLayoutSupersededError) return;
-        // Retries exhausted: log and fall through so the previous layout still
-        // resumes below instead of leaving the perimeter frozen.
-        console.error(
-          `Failed to publish ad-layout error status: ${publishErr.message}`,
-        );
-      }
-      // Resume the previously applied layout's cycle so a failed replacement
-      // never leaves the perimeter frozen on a stale column.
-      if (prevState && prevApplied.length > 0) {
-        this._currentRevision = prevState.revision;
-        this._currentColumn = prevState.column;
-        const resumeDuration = this._getColumnDuration(
-          prevApplied[Math.max(0, prevState.column)],
-        );
-        this._columnTimer = setTimeout(() => {
-          this._columnTimer = null;
-          if (this._stopping) return;
-          this._playColumn(prevState.column + 1, gen);
-        }, resumeDuration);
-      }
+      console.error(`Failed to load ad layout: ${err.message}`);
+      this._appliedColumns = [];
+      const lanes2 = await this._discoverComposition();
+      await this._publishStatus("error", err, lanes2.lanes);
+    }
+  }
+
+  async _fetchThumbnail(laneId, slot) {
+    try {
+      const png = await this.resolume.getClipThumbnail(laneId, slot);
+      if (!png) return null;
+      const converted = reencodeThumbnail(png, {
+        maxDim: this.config.thumbnailMaxDim,
+        quality: this.config.thumbnailQuality,
+        maxBytes: this.config.thumbnailMaxBytes,
+      });
+      return converted?.dataUrl ?? null;
+    } catch {
+      return null;
     }
   }
 
@@ -1049,10 +790,6 @@ export class AdLayoutController {
 
   shutdown() {
     this._stopping = true;
-    if (this._columnTimer) {
-      clearTimeout(this._columnTimer);
-      this._columnTimer = null;
-    }
     if (this._dbRef) {
       this._dbRef.off("value");
     }

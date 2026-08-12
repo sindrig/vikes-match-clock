@@ -28,7 +28,7 @@ The **JS Admin SDK** reads Realtime Database over its native **WebSocket
 protocol** (`@firebase/database`) — the same transport the clock apps use,
 which delivers toggles instantly. The Python Admin SDK never implemented that
 protocol; its `listen()` is built on the REST SSE streaming endpoint, which is
-marked *experimental* and intermittently held events for **minutes** on this
+marked _experimental_ and intermittently held events for **minutes** on this
 network (the original motivation for this daemon). A Node daemon therefore
 fixes the delayed-delivery problem at the transport level.
 
@@ -91,23 +91,23 @@ The installer:
 
 Edit `/etc/perimeter-control/perimeter-control.env`:
 
-| Variable                          | Default                                                                 | Description                                  |
-| --------------------------------- | ----------------------------------------------------------------------- | -------------------------------------------- |
-| `PERIMETER_FIREBASE_DATABASE_URL` | `https://vikes-match-clock-firebase.firebaseio.com`                     | Realtime Database root URL                    |
-| `PERIMETER_FIREBASE_PATH`         | `states/vikuti/perimeter/state`                                         | Path of the state child to listen to          |
-| `PERIMETER_SERVICE_ACCOUNT_FILE`  | `/etc/perimeter-control/perimeter-service-account.json`                 | Admin SDK credential file                     |
-| `PERIMETER_RESOLUME_BASE_URL`     | `http://localhost:80/api/v1`                                            | Resolume HTTP API base URL                    |
-| `PERIMETER_RESOLUME_COLUMN`       | `1`                                                                     | Column started by `on`                        |
-| `PERIMETER_REQUEST_TIMEOUT`       | `10`                                                                    | HTTP timeout in seconds                       |
-| `PERIMETER_LISTENER_REFRESH_SECONDS` | `300`                                                                 | Listener refresh interval (0 disables)       |
-| `PERIMETER_INITIAL_BACKOFF_SECONDS` | `1`                                                                   | Initial retry backoff in seconds              |
-| `PERIMETER_MAX_BACKOFF_SECONDS`   | `60`                                                                    | Maximum retry backoff in seconds              |
-| `PERIMETER_PREVIEW_ENABLED`       | `true`                                                                  | Set to `false` to disable the preview snapshot |
-| `PERIMETER_PREVIEW_PATH`          | `perimeter/vikuti`                                                      | Path of the published preview snapshot         |
-| `PERIMETER_THUMBNAIL_MAX_DIM`     | `320`                                                                   | Longest side of re-encoded thumbnails (px)     |
-| `PERIMETER_THUMBNAIL_QUALITY`     | `0.7`                                                                   | JPEG quality (0.1–1.0) for thumbnails          |
-| `PERIMETER_THUMBNAIL_MAX_BYTES`   | `100000`                                                                | Per-thumbnail cap in published data-URL chars (larger is omitted) |
-| `PERIMETER_PREVIEW_MAX_BYTES`     | `8000000`                                                               | Whole-snapshot byte cap (larger is rejected)   |
+| Variable                             | Default                                                 | Description                                                       |
+| ------------------------------------ | ------------------------------------------------------- | ----------------------------------------------------------------- |
+| `PERIMETER_FIREBASE_DATABASE_URL`    | `https://vikes-match-clock-firebase.firebaseio.com`     | Realtime Database root URL                                        |
+| `PERIMETER_FIREBASE_PATH`            | `states/vikuti/perimeter/state`                         | Path of the state child to listen to                              |
+| `PERIMETER_SERVICE_ACCOUNT_FILE`     | `/etc/perimeter-control/perimeter-service-account.json` | Admin SDK credential file                                         |
+| `PERIMETER_RESOLUME_BASE_URL`        | `http://localhost:80/api/v1`                            | Resolume HTTP API base URL                                        |
+| `PERIMETER_RESOLUME_COLUMN`          | `1`                                                     | Column started by `on`                                            |
+| `PERIMETER_REQUEST_TIMEOUT`          | `10`                                                    | HTTP timeout in seconds                                           |
+| `PERIMETER_LISTENER_REFRESH_SECONDS` | `300`                                                   | Listener refresh interval (0 disables)                            |
+| `PERIMETER_INITIAL_BACKOFF_SECONDS`  | `1`                                                     | Initial retry backoff in seconds                                  |
+| `PERIMETER_MAX_BACKOFF_SECONDS`      | `60`                                                    | Maximum retry backoff in seconds                                  |
+| `PERIMETER_PREVIEW_ENABLED`          | `true`                                                  | Set to `false` to disable the preview snapshot                    |
+| `PERIMETER_PREVIEW_PATH`             | `perimeter/vikuti`                                      | Path of the published preview snapshot                            |
+| `PERIMETER_THUMBNAIL_MAX_DIM`        | `320`                                                   | Longest side of re-encoded thumbnails (px)                        |
+| `PERIMETER_THUMBNAIL_QUALITY`        | `0.7`                                                   | JPEG quality (0.1–1.0) for thumbnails                             |
+| `PERIMETER_THUMBNAIL_MAX_BYTES`      | `100000`                                                | Per-thumbnail cap in published data-URL chars (larger is omitted) |
+| `PERIMETER_PREVIEW_MAX_BYTES`        | `8000000`                                               | Whole-snapshot byte cap (larger is rejected)                      |
 
 After changing the environment file:
 
@@ -343,6 +343,69 @@ See `perimeter-control.env.example` for all overlay environment variables:
 `PERIMETER_OVERLAY_LAYER_IDS`, `PERIMETER_OVERLAY_LAYER_CLIP_COLUMNS`.
 
 The SSH key must provide passwordless access to the Windows Resolume host.
+
+## Perimeter ad layout (content deployer on the base layers)
+
+The ad-layout controller is a **content deployer**: it stages ad files from
+Firebase Storage and opens them into the deck columns of the configured base
+layers. It **never drives playback** — no connect, disconnect, loop, or
+transport calls, and no autopilot manipulation. The composition's existing
+autopilot cycles the deck columns exactly as it cycles the Efni content, so
+the Resolume UI stays fully functional.
+
+The goal overlay (above) uses the disjoint **overlay** layers; the ad layout
+uses the **base** layers. `assertNoSlotConflicts` in `index.js` rejects any
+overlapping lane configuration at startup.
+
+### How it works
+
+1. The controller writes a desired layout to
+   `states/${location}/perimeter/adLayout` (`version`, `revision`,
+   `columns[]`, each column with one file per configured lane).
+2. The daemon reads the live composition for lane names and the deck column
+   count `M`.
+3. `N` layout columns are distributed across the deck's `M` columns
+   (`mapLayoutToDeckColumns`): each layout column owns a contiguous range of
+   `floor(M/N)` deck columns, with `M mod N` extra columns spread over the
+   first ranges.
+4. **Clear-then-load**: the daemon empties all ad slots across the deck on the
+   ad lanes, then stages each file (GCS → local cache → SCP to the Windows
+   host) and opens it into its mapped deck columns on every lane.
+5. The daemon publishes the applied status to
+   `perimeter/${location}/adLayout` with `phase: "loading"` → `"playing"`.
+   The autopilot then cycles the columns; the ads play with no further daemon
+   involvement.
+6. An empty `columns` array (or a deleted document) clears all ad slots on the
+   ad lanes and publishes `phase: "idle"`.
+
+Thumbnails are fetched once per unique ad file (from its first deck column)
+and included in the status. A staging or load failure publishes
+`phase: "error"` with the failure text.
+
+The status publish is retried and re-published on the listener refresh, so a
+write lost right after a daemon restart self-heals.
+
+### Resolume composition requirements
+
+- The ad lanes must be the base content layers (1-based layer indices) that
+  the deck autopilot cycles. For the Víkin composition these are layers
+  **1** ("48 skjáir") and **3** ("40 skjáir"); the overlay layers above them
+  are **2** and **4**.
+- The daemon only uses existing deck columns and clip slots — it never
+  creates groups, layers, or columns.
+- A single-layout-column setup loads the ad into every deck column, so a
+  change is a full-content swap; multi-column layouts give each ad a
+  contiguous share of the deck.
+
+### Configuration
+
+See `perimeter-control.env.example` for all ad-layout environment variables:
+`PERIMETER_AD_LAYOUT_ENABLED`, `PERIMETER_AD_LAYOUT_PATH`,
+`PERIMETER_AD_LAYOUT_STATUS_PATH`, `PERIMETER_AD_LANE_IDS` (default `1,3`),
+`PERIMETER_AD_LAYOUT_BUCKET`, `PERIMETER_AD_MAX_FILE_BYTES`.
+
+The deck column range is derived from the live composition at runtime; there
+is no per-slot configuration.
 
 ## Tests
 

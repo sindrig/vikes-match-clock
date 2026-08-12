@@ -70,11 +70,14 @@ const DEFAULT_OVERLAY_REMOTE_CONTENT_DIR = "C:/Content";
 const DEFAULT_OVERLAY_CACHE_DIR = "/var/cache/perimeter-control";
 const DEFAULT_OVERLAY_LAYER_CLIP_COLUMNS = '{"2":1,"4":1}';
 
-// Ad-layout defaults
+// Ad-layout defaults. The ad lanes are the base content layers (1-based layer
+// indices) that the deck autopilot cycles; the goal overlay uses the separate
+// overlay layers (default 2,4). The daemon derives the deck column range from
+// the live composition and loads each layout column into a contiguous range of
+// deck columns (see mapLayoutToDeckColumns).
 const DEFAULT_AD_LAYOUT_PATH = "states/vikuti/perimeter/adLayout";
 const DEFAULT_AD_LAYOUT_STATUS_PATH = "perimeter/vikuti/adLayout";
-const DEFAULT_AD_LAYER_CLIP_SLOTS = '{"2":2,"4":2}';
-const DEFAULT_AD_LANE_IDS = "2,4";
+const DEFAULT_AD_LANE_IDS = "1,3";
 const DEFAULT_AD_LAYOUT_BUCKET = "vikes-match-clock-firebase.appspot.com";
 const DEFAULT_AD_MAX_FILE_BYTES = 250 * 1024 * 1024;
 
@@ -101,28 +104,21 @@ function quality(value, fallback) {
   return Number.isFinite(n) ? Math.min(1, Math.max(0.1, n)) : fallback;
 }
 
-// Reject configurations where the goal overlay and ad-layout controllers would
-// drive the same Resolume clip slot on the same layer. Both controllers use
-// their configured slot maps as the fallback/reserved slot per layer, so an
-// overlap lets each replace or clear the other's clip despite the documented
-// slot-isolation guarantee.
+// Reject configurations where the goal overlay and ad-layout controllers
+// would drive the same Resolume layer. The ad-layout controller loads clips
+// into every deck column of its lanes, so any overlap with the overlay layer
+// IDs would let one controller replace or clear the other's clips despite the
+// documented layer-isolation guarantee.
 function assertNoSlotConflicts(config) {
   if (!config.overlayEnabled || !config.adLayoutEnabled) return;
-  const conflicts = [];
-  for (const [layer, overlaySlot] of Object.entries(
-    config.overlayLayerClipColumns,
-  )) {
-    const adSlot = config.adLayerClipSlots[layer];
-    if (adSlot !== undefined && adSlot === overlaySlot) {
-      conflicts.push(`layer ${layer} slot ${adSlot}`);
-    }
-  }
+  const overlayLayers = new Set(config.overlayLayerIds);
+  const conflicts = config.adLaneIds.filter((id) => overlayLayers.has(id));
   if (conflicts.length > 0) {
     throw new Error(
-      "Overlapping Resolume clip slot configuration: the ad-layout and " +
-        `goal-overlay controllers both use ${conflicts.join(", ")}. ` +
-        "Configure disjoint PERIMETER_AD_LAYER_CLIP_SLOTS and " +
-        "PERIMETER_OVERLAY_LAYER_CLIP_COLUMNS.",
+      "Overlapping Resolume layer configuration: the ad-layout and " +
+        `goal-overlay controllers both drive layers ${conflicts.join(", ")}. ` +
+        "Configure disjoint PERIMETER_AD_LANE_IDS and " +
+        "PERIMETER_OVERLAY_LAYER_IDS.",
     );
   }
 }
@@ -230,15 +226,12 @@ export function loadConfig(environ = process.env) {
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean),
-    // Ad-layout settings
+    // Ad-layout settings. The deck column range is derived from the live
+    // composition at runtime; only the lane IDs are configured.
     adLayoutEnabled: environ.PERIMETER_AD_LAYOUT_ENABLED !== "false",
     adLayoutPath: environ.PERIMETER_AD_LAYOUT_PATH ?? DEFAULT_AD_LAYOUT_PATH,
     adLayoutStatusPath:
       environ.PERIMETER_AD_LAYOUT_STATUS_PATH ?? DEFAULT_AD_LAYOUT_STATUS_PATH,
-    adLayerClipSlots: parseLayerMap(
-      environ.PERIMETER_AD_LAYER_CLIP_SLOTS,
-      DEFAULT_AD_LAYER_CLIP_SLOTS,
-    ),
     adLaneIds: (environ.PERIMETER_AD_LANE_IDS ?? DEFAULT_AD_LANE_IDS)
       .split(",")
       .map((s) => s.trim())
@@ -325,7 +318,6 @@ export class PerimeterController {
       this._adLayoutController = new AdLayoutController(
         config,
         config.adLaneIds,
-        config.adLayerClipSlots,
       );
     }
   }

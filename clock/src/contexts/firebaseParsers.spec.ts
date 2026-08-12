@@ -1731,26 +1731,24 @@ describe("firebaseParsers", () => {
   describe("parsePerimeterAppliedAdLayout", () => {
     const validApplied = {
       lanes: [
-        { id: "2", name: "48 skjair" },
-        { id: "4", name: "40 skjair" },
+        { id: "1", name: "48 skjair" },
+        { id: "3", name: "40 skjair" },
       ],
       revision: "rev-abc",
       phase: "playing",
-      activeColumn: 1,
       error: null,
       updatedAt: 1723392000000,
       columns: [
         {
           id: "col-1",
+          deckColumns: [1, 2, 3],
           files: {
-            "2": {
+            "1": {
               name: "ad-48.png",
               thumbnail: "data:image/png;base64,abc",
-              transportDurationMs: 20000,
             },
-            "4": {
+            "3": {
               name: "ad-40.mp4",
-              transportDurationMs: 15342,
             },
           },
         },
@@ -1762,9 +1760,9 @@ describe("firebaseParsers", () => {
       expect(result).toBeDefined();
       expect(result!.revision).toBe("rev-abc");
       expect(result!.phase).toBe("playing");
-      expect(result!.activeColumn).toBe(1);
       expect(result!.lanes).toHaveLength(2);
       expect(result!.columns).toHaveLength(1);
+      expect(result!.columns[0]?.deckColumns).toEqual([1, 2, 3]);
     });
 
     it("returns undefined for non-object input", () => {
@@ -1788,6 +1786,14 @@ describe("firebaseParsers", () => {
       expect(result!.phase).toBe("idle");
     });
 
+    it("defaults a legacy staging phase to idle", () => {
+      const result = parsePerimeterAppliedAdLayout({
+        ...validApplied,
+        phase: "staging",
+      });
+      expect(result!.phase).toBe("idle");
+    });
+
     it("uses Date.now() when updatedAt is missing", () => {
       const noTimestamp = { ...validApplied };
       delete (noTimestamp as Record<string, unknown>).updatedAt;
@@ -1798,42 +1804,27 @@ describe("firebaseParsers", () => {
       expect(result!.updatedAt).toBeLessThanOrEqual(after);
     });
 
-    it("drops columns with files that have transportDurationMs <= 0", () => {
-      const badApplied = {
+    it("parses deckColumns and filters invalid entries", () => {
+      const result = parsePerimeterAppliedAdLayout({
         ...validApplied,
         columns: [
           {
-            id: "col-bad",
+            id: "col-1",
+            deckColumns: [1, 2, -3, 0, 4.5, 5],
             files: {
-              "2": {
-                name: "bad.png",
-                transportDurationMs: 0,
-              },
+              "1": { name: "ad-48.png" },
             },
           },
         ],
-      };
-      const result = parsePerimeterAppliedAdLayout(badApplied);
-      expect(result!.columns).toHaveLength(0);
+      });
+      expect(result!.columns[0]?.deckColumns).toEqual([1, 2, 5]);
     });
 
-    it("drops columns with files that have negative transportDurationMs", () => {
-      const badApplied = {
-        ...validApplied,
-        columns: [
-          {
-            id: "col-bad",
-            files: {
-              "2": {
-                name: "bad.png",
-                transportDurationMs: -100,
-              },
-            },
-          },
-        ],
-      };
-      const result = parsePerimeterAppliedAdLayout(badApplied);
-      expect(result!.columns).toHaveLength(0);
+    it("defaults to an empty deckColumns array when absent", () => {
+      const noDeck = { ...validApplied };
+      delete (noDeck.columns[0] as Record<string, unknown>).deckColumns;
+      const result = parsePerimeterAppliedAdLayout(noDeck);
+      expect(result!.columns[0]?.deckColumns).toEqual([]);
     });
 
     it("drops columns with invalid filenames", () => {
@@ -1842,10 +1833,10 @@ describe("firebaseParsers", () => {
         columns: [
           {
             id: "col-bad",
+            deckColumns: [1],
             files: {
-              "2": {
+              "1": {
                 name: "..",
-                transportDurationMs: 20000,
               },
             },
           },
@@ -1857,22 +1848,22 @@ describe("firebaseParsers", () => {
 
     it("preserves lanes with valid id and name", () => {
       const result = parsePerimeterAppliedAdLayout(validApplied);
-      expect(result!.lanes[0]).toEqual({ id: "2", name: "48 skjair" });
+      expect(result!.lanes[0]).toEqual({ id: "1", name: "48 skjair" });
     });
 
     it("drops lanes with missing id or name", () => {
       const withBadLanes = {
         ...validApplied,
         lanes: [
-          { id: "2", name: "Good" },
+          { id: "1", name: "Good" },
           { id: "", name: "No Id" },
-          { id: "4", name: "" },
+          { id: "3", name: "" },
           null,
         ],
       };
       const result = parsePerimeterAppliedAdLayout(withBadLanes);
       expect(result!.lanes).toHaveLength(1);
-      expect(result!.lanes[0]?.id).toBe("2");
+      expect(result!.lanes[0]?.id).toBe("1");
     });
   });
 });

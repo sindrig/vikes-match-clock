@@ -46,7 +46,6 @@ const MAX_UPLOAD_BYTES = 250 * 1024 * 1024;
 const MAX_AD_COLUMNS = 20;
 
 const PHASE_LABELS: Record<string, string> = {
-  staging: "Undirbýr",
   loading: "Hleður",
   playing: "Spilar",
   error: "Villa",
@@ -59,13 +58,6 @@ const formatTimestamp = (updatedAt: number | null): string => {
     hour: "2-digit",
     minute: "2-digit",
   });
-};
-
-const formatDuration = (ms: number): string => {
-  const seconds = Math.round(ms / 1000);
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return m > 0 ? `${m}:${s.toString().padStart(2, "0")}` : `${s}s`;
 };
 
 interface SortableColumnProps {
@@ -155,11 +147,6 @@ const SortableColumn = ({
                     >
                       {applied?.name ?? file.name}
                     </div>
-                    {applied && (
-                      <div className="perimeter-file-duration">
-                        {formatDuration(applied.transportDurationMs)}
-                      </div>
-                    )}
                   </>
                 ) : (
                   <div className="perimeter-file-empty">
@@ -546,11 +533,6 @@ const PerimeterControl = () => {
                   }
                   className={`perimeter-phase-badge phase-${appliedAdLayout.phase}`}
                 />
-                {appliedAdLayout.activeColumn > 0 && (
-                  <span className="perimeter-active-col">
-                    Virkur dálkur: {appliedAdLayout.activeColumn}
-                  </span>
-                )}
                 {appliedAdLayout.error && (
                   <span className="perimeter-status-error">
                     {appliedAdLayout.error}

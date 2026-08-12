@@ -5,6 +5,7 @@ import {
   validateAdLayout,
   validateFileName,
   validateGcsSource,
+  mapLayoutToDeckColumns,
   ResolumeAdClient,
   AdLayoutController,
 } from "../ad-layout.js";
@@ -20,11 +21,11 @@ function validLayout() {
       {
         id: "col-1",
         files: {
-          2: {
+          1: {
             name: "ad-48.png",
             source: `gs://${BUCKET}/${LOCATION}/perimeter/ad-48.png`,
           },
-          4: {
+          3: {
             name: "ad-40.mp4",
             source: `gs://${BUCKET}/${LOCATION}/perimeter/ad-40.mp4`,
           },
@@ -34,7 +35,7 @@ function validLayout() {
   };
 }
 
-const LANES = ["2", "4"];
+const LANES = ["1", "3"];
 
 // -- validateFileName ---------------------------------------------------------
 
@@ -189,11 +190,11 @@ test("validateAdLayout rejects too many columns", () => {
     columns: Array.from({ length: 21 }, (_, i) => ({
       id: `col-${i}`,
       files: {
-        2: {
+        1: {
           name: "ad-48.png",
           source: `gs://${BUCKET}/${LOCATION}/perimeter/ad-48.png`,
         },
-        4: {
+        3: {
           name: "ad-40.png",
           source: `gs://${BUCKET}/${LOCATION}/perimeter/ad-40.png`,
         },
@@ -211,13 +212,13 @@ test("validateAdLayout rejects duplicate column ids", () => {
 
 test("validateAdLayout rejects wrong lane counts and missing required lanes", () => {
   const missingLane = validLayout();
-  missingLane.columns[0].files = { 2: missingLane.columns[0].files["2"] };
+  missingLane.columns[0].files = { 1: missingLane.columns[0].files["1"] };
   assert.equal(
     validateAdLayout(missingLane, LANES, BUCKET, LOCATION).valid,
     false,
   );
   const extraLane = validLayout();
-  extraLane.columns[0].files["6"] = {
+  extraLane.columns[0].files["5"] = {
     name: "ad-60.png",
     source: `gs://${BUCKET}/${LOCATION}/perimeter/ad-60.png`,
   };
@@ -229,17 +230,17 @@ test("validateAdLayout rejects wrong lane counts and missing required lanes", ()
 
 test("validateAdLayout rejects unsafe filenames and duplicate filenames", () => {
   const badName = validLayout();
-  badName.columns[0].files["2"].name = "..";
+  badName.columns[0].files["1"].name = "..";
   assert.equal(validateAdLayout(badName, LANES, BUCKET, LOCATION).valid, false);
 
   const dupName = validLayout();
-  dupName.columns[0].files["4"].name = dupName.columns[0].files["2"].name;
+  dupName.columns[0].files["3"].name = dupName.columns[0].files["1"].name;
   assert.equal(validateAdLayout(dupName, LANES, BUCKET, LOCATION).valid, false);
 });
 
 test("validateAdLayout rejects sources outside the location prefix", () => {
   const badSource = validLayout();
-  badSource.columns[0].files["2"].source =
+  badSource.columns[0].files["1"].source =
     `gs://${BUCKET}/other/perimeter/x.png`;
   assert.equal(
     validateAdLayout(badSource, LANES, BUCKET, LOCATION).valid,
@@ -249,20 +250,67 @@ test("validateAdLayout rejects sources outside the location prefix", () => {
 
 test("validateAdLayout allows the same Storage object reused across lanes", () => {
   const shared = validLayout();
-  shared.columns[0].files["4"] = { ...shared.columns[0].files["2"] };
+  shared.columns[0].files["3"] = { ...shared.columns[0].files["1"] };
   const result = validateAdLayout(shared, LANES, BUCKET, LOCATION);
   assert.equal(result.valid, true);
 });
 
 test("validateAdLayout rejects the same filename pointing at two different sources", () => {
   const clash = validLayout();
-  clash.columns[0].files["4"] = {
-    name: clash.columns[0].files["2"].name,
+  clash.columns[0].files["3"] = {
+    name: clash.columns[0].files["1"].name,
     source: `gs://${BUCKET}/${LOCATION}/perimeter/other.png`,
   };
   const result = validateAdLayout(clash, LANES, BUCKET, LOCATION);
   assert.equal(result.valid, false);
   assert.match(result.reason, /two different sources/);
+});
+
+// -- mapLayoutToDeckColumns ---------------------------------------------------
+
+test("mapLayoutToDeckColumns distributes N layout columns across M deck columns", () => {
+  assert.deepEqual(mapLayoutToDeckColumns(3, 15), [
+    [1, 2, 3, 4, 5],
+    [6, 7, 8, 9, 10],
+    [11, 12, 13, 14, 15],
+  ]);
+});
+
+test("mapLayoutToDeckColumns single layout column covers every deck column", () => {
+  assert.deepEqual(mapLayoutToDeckColumns(1, 15), [
+    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+  ]);
+});
+
+test("mapLayoutToDeckColumns distributes the remainder across the first columns", () => {
+  assert.deepEqual(mapLayoutToDeckColumns(5, 7), [
+    [1, 2],
+    [3, 4],
+    [5],
+    [6],
+    [7],
+  ]);
+});
+
+test("mapLayoutToDeckColumns one column per layout column when counts match", () => {
+  assert.deepEqual(
+    mapLayoutToDeckColumns(15, 15),
+    Array.from({ length: 15 }, (_, i) => [i + 1]),
+  );
+});
+
+test("mapLayoutToDeckColumns returns an empty array for no layout columns", () => {
+  assert.deepEqual(mapLayoutToDeckColumns(0, 15), []);
+});
+
+test("mapLayoutToDeckColumns handles more layout columns than deck columns", () => {
+  assert.deepEqual(mapLayoutToDeckColumns(4, 3), [[1], [2], [3], []]);
+});
+
+test("mapLayoutToDeckColumns guards against invalid counts", () => {
+  assert.deepEqual(mapLayoutToDeckColumns(3, 0), []);
+  assert.deepEqual(mapLayoutToDeckColumns(-1, 15), []);
+  assert.deepEqual(mapLayoutToDeckColumns(2.5, 15), []);
 });
 
 // -- ResolumeAdClient.loadClip ------------------------------------------------
@@ -281,37 +329,35 @@ test("ResolumeAdClient.loadClip sends a file:// URL as a plain-text body", async
     resolumeBaseUrl: "http://localhost:80/api/v1",
     requestTimeoutMs: 1_000,
   });
-  await client.loadClip("2", 2, "C:/Content/ad-48.png");
+  await client.loadClip("1", 2, "C:/Content/ad-48.png");
   assert.equal(
     calls[0].url,
-    "http://localhost:80/api/v1/composition/layers/2/clips/2/open",
+    "http://localhost:80/api/v1/composition/layers/1/clips/2/open",
   );
   assert.equal(calls[0].contentType, "text/plain");
   assert.match(calls[0].body, /file:\/\//);
   assert.match(calls[0].body, /ad-48\.png/);
 });
 
-test("ResolumeAdClient.setTransportDuration sends JSON", async (t) => {
+test("ResolumeAdClient never offers transport endpoints", async (t) => {
   const calls = [];
   t.mock.method(globalThis, "fetch", async (url, options) => {
-    calls.push({
-      url,
-      body: options?.body,
-      contentType: options?.headers?.["Content-Type"],
-    });
+    calls.push({ url, method: options?.method });
     return { ok: true, status: 200 };
   });
   const client = new ResolumeAdClient({
     resolumeBaseUrl: "http://localhost:80/api/v1",
     requestTimeoutMs: 1_000,
   });
-  await client.setTransportDuration("2", 2, 20_000);
-  assert.equal(
-    calls[0].url,
-    "http://localhost:80/api/v1/composition/layers/2/clips/2/transport/duration",
-  );
-  assert.equal(calls[0].contentType, "application/json");
-  assert.deepEqual(JSON.parse(calls[0].body), { duration: 20000 });
+  assert.equal(typeof client.connectClip, "undefined");
+  assert.equal(typeof client.setClipLoop, "undefined");
+  assert.equal(typeof client.setTransportDuration, "undefined");
+  assert.equal(typeof client.getClipTransport, "undefined");
+  assert.equal(typeof client.clearLayer, "undefined");
+  await client.clearClip("1", 2);
+  await client.loadClip("1", 2, "C:/Content/ad-48.png");
+  const urls = calls.map((c) => c.url);
+  assert.ok(urls.every((u) => !/transport|connect|loop/.test(u)));
 });
 
 test("ResolumeAdClient.getClipThumbnail returns bytes or null", async (t) => {
@@ -324,12 +370,12 @@ test("ResolumeAdClient.getClipThumbnail returns bytes or null", async (t) => {
     status: 200,
     arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
   }));
-  const bytes = await client.getClipThumbnail("2", 2);
+  const bytes = await client.getClipThumbnail("1", 2);
   assert.ok(Buffer.isBuffer(bytes));
   assert.equal(bytes.length, 3);
 
   t.mock.method(globalThis, "fetch", async () => ({ ok: false, status: 404 }));
-  assert.equal(await client.getClipThumbnail("2", 2), null);
+  assert.equal(await client.getClipThumbnail("1", 2), null);
 });
 
 // -- AdLayoutController snapshot flow ------------------------------------------
@@ -387,7 +433,7 @@ function makeAdController() {
     thumbnailQuality: 0.7,
     thumbnailMaxBytes: 100_000,
   };
-  return new AdLayoutController(config, ["2", "4"], { 2: 2, 4: 2 });
+  return new AdLayoutController(config, ["1", "3"]);
 }
 
 async function waitFor(cond, timeoutMs = 500) {
@@ -397,6 +443,48 @@ async function waitFor(cond, timeoutMs = 500) {
     await new Promise((resolve) => setTimeout(resolve, 5));
   }
   assert.fail("waitFor timed out");
+}
+
+// The composition mock used for lane/column discovery. Layer "1" is the
+// "48 skjáir" base layer, layer "3" the "40 skjáir" base layer, with a
+// 15-column deck.
+function mockComposition() {
+  return {
+    layers: [
+      { id: 1781190959609, name: { value: "48 skjáir" } },
+      { id: 1786467697195, name: { value: "Overlay" } },
+      { id: 1781190959748, name: { value: "40 skjáir" } },
+      { id: 1786467695334, name: { value: "Overlay" } },
+    ],
+    columns: Array.from({ length: 15 }, (_, i) => ({
+      id: 1000 + i,
+      name: { value: `Column ${i + 1}` },
+    })),
+  };
+}
+
+function instrumentResolume(controller, composition = mockComposition()) {
+  const calls = [];
+  controller._discoverComposition = async () => {
+    const layers = composition.layers;
+    const lanes = ["1", "3"].map((id) => {
+      const layer = layers[parseInt(id, 10) - 1];
+      return {
+        id,
+        name: layer?.name?.value ?? `Lane ${id}`,
+      };
+    });
+    return { lanes, columnCount: composition.columns.length };
+  };
+  controller.stager.stageAsset = async (source, name) => `C:/Content/${name}`;
+  controller.resolume.loadClip = async (laneId, slot, winPath) => {
+    calls.push(`load:${laneId}:${slot}:${winPath}`);
+  };
+  controller.resolume.clearClip = async (laneId, slot) => {
+    calls.push(`clear:${laneId}:${slot}`);
+  };
+  controller.resolume.getClipThumbnail = async () => null;
+  return calls;
 }
 
 test("AdLayoutController attaches to the desired and status paths", () => {
@@ -422,21 +510,9 @@ test("AdLayoutController publishes an error status for an invalid layout", async
   controller.shutdown();
 });
 
-test("AdLayoutController processes a valid layout and stages before playing", async () => {
+test("AdLayoutController loads a valid layout into mapped deck columns", async () => {
   const controller = makeAdController();
-  controller.stager.stageAsset = async (source, name) => `C:/Content/${name}`;
-  const resolumeCalls = [];
-  controller.resolume.loadClip = async (laneId, slot, winPath) => {
-    resolumeCalls.push(`load:${laneId}:${winPath}`);
-  };
-  controller.resolume.setClipLoop = async () => {};
-  controller.resolume.getClipInfo = async () => ({});
-  controller.resolume.setTransportDuration = async () => {};
-  controller.resolume.getClipThumbnail = async () => null;
-  controller.resolume.connectClip = async (laneId) => {
-    resolumeCalls.push(`connect:${laneId}`);
-  };
-  controller._getColumnDuration = () => 5;
+  const calls = instrumentResolume(controller);
 
   const db = new FakeDb();
   controller.attach(db);
@@ -444,99 +520,154 @@ test("AdLayoutController processes a valid layout and stages before playing", as
 
   await waitFor(() => db.refs[1].setCalls.some((s) => s.phase === "playing"));
   const statuses = db.refs[1].setCalls.map((s) => s.phase);
-  assert.ok(statuses.includes("staging"));
+  assert.ok(statuses.includes("loading"));
   assert.ok(statuses.includes("playing"));
-  assert.ok(resolumeCalls.some((c) => c.startsWith("load:")));
-  assert.ok(resolumeCalls.some((c) => c.startsWith("connect:")));
+
+  // Single layout column with a 15-column deck: the ad file is loaded into
+  // every deck column on both lanes.
+  for (const laneId of ["1", "3"]) {
+    for (let slot = 1; slot <= 15; slot += 1) {
+      assert.ok(
+        calls.includes(
+          `load:${laneId}:${slot}:C:/Content/${laneId === "1" ? "ad-48.png" : "ad-40.mp4"}`,
+        ),
+        `missing load on lane ${laneId} slot ${slot}`,
+      );
+    }
+  }
+  // The deck is cleared before loading (clear-then-load).
+  assert.ok(calls.some((c) => c.startsWith("clear:1:")));
+  assert.ok(calls.some((c) => c.startsWith("clear:3:")));
 
   const playing = db.refs[1].setCalls.find((s) => s.phase === "playing");
-  assert.equal(playing.activeColumn, 1);
+  assert.equal(playing.lanes.length, 2);
+  assert.equal(playing.lanes[0].name, "48 skjáir");
+  assert.equal(playing.lanes[1].name, "40 skjáir");
+  assert.equal(playing.columns.length, 1);
+  assert.equal(playing.columns[0].id, "col-1");
+  assert.deepEqual(
+    playing.columns[0].deckColumns,
+    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+  );
+  assert.equal(playing.columns[0].files["1"].name, "ad-48.png");
+  assert.equal(playing.columns[0].files["3"].name, "ad-40.mp4");
+  controller.shutdown();
+});
+
+test("AdLayoutController distributes multiple layout columns across the deck", async () => {
+  const controller = makeAdController();
+  const calls = instrumentResolume(controller);
+
+  const layout = {
+    ...validLayout(),
+    revision: "multi-rev",
+    columns: [
+      {
+        id: "col-a",
+        files: {
+          1: {
+            name: "a-48.png",
+            source: `gs://${BUCKET}/${LOCATION}/perimeter/a-48.png`,
+          },
+          3: {
+            name: "a-40.png",
+            source: `gs://${BUCKET}/${LOCATION}/perimeter/a-40.png`,
+          },
+        },
+      },
+      {
+        id: "col-b",
+        files: {
+          1: {
+            name: "b-48.png",
+            source: `gs://${BUCKET}/${LOCATION}/perimeter/b-48.png`,
+          },
+          3: {
+            name: "b-40.png",
+            source: `gs://${BUCKET}/${LOCATION}/perimeter/b-40.png`,
+          },
+        },
+      },
+      {
+        id: "col-c",
+        files: {
+          1: {
+            name: "c-48.png",
+            source: `gs://${BUCKET}/${LOCATION}/perimeter/c-48.png`,
+          },
+          3: {
+            name: "c-40.png",
+            source: `gs://${BUCKET}/${LOCATION}/perimeter/c-40.png`,
+          },
+        },
+      },
+    ],
+  };
+
+  const db = new FakeDb();
+  controller.attach(db);
+  db.refs[0].emit(layout);
+
+  await waitFor(() => db.refs[1].setCalls.some((s) => s.phase === "playing"));
+  const playing = db.refs[1].setCalls.find((s) => s.phase === "playing");
+  assert.deepEqual(
+    playing.columns.map((c) => c.deckColumns),
+    [
+      [1, 2, 3, 4, 5],
+      [6, 7, 8, 9, 10],
+      [11, 12, 13, 14, 15],
+    ],
+  );
+  // Each ad file lands in exactly its own 5-column range on lane 1.
+  assert.ok(calls.includes("load:1:1:C:/Content/a-48.png"));
+  assert.ok(calls.includes("load:1:5:C:/Content/a-48.png"));
+  assert.ok(!calls.includes("load:1:6:C:/Content/a-48.png"));
+  assert.ok(calls.includes("load:1:6:C:/Content/b-48.png"));
+  assert.ok(calls.includes("load:1:11:C:/Content/c-48.png"));
   controller.shutdown();
 });
 
 test("AdLayoutController deduplicates identical revisions", async () => {
   const controller = makeAdController();
-  controller.stager.stageAsset = async () => "C:/Content/x.png";
-  controller.resolume.loadClip = async () => {};
-  controller.resolume.setClipLoop = async () => {};
-  controller.resolume.getClipInfo = async () => ({});
-  controller.resolume.setTransportDuration = async () => {};
-  controller.resolume.getClipThumbnail = async () => null;
-  controller.resolume.connectClip = async () => {};
-  controller._getColumnDuration = () => 100;
+  instrumentResolume(controller);
 
   const db = new FakeDb();
   controller.attach(db);
   db.refs[0].emit(validLayout());
   await waitFor(() => db.refs[1].setCalls.some((s) => s.phase === "playing"));
   const countBefore = db.refs[1].setCalls.length;
-  // Re-emit the same revision — must be ignored (no new staging).
   db.refs[0].emit(validLayout());
   await new Promise((resolve) => setTimeout(resolve, 30));
   assert.equal(db.refs[1].setCalls.length, countBefore);
   controller.shutdown();
 });
 
-test("AdLayoutController preserves the previous layout and cycle timer on a staging error", async () => {
+test("AdLayoutController publishes an error status and clears slots on a staging error", async () => {
   const controller = makeAdController();
+  const calls = instrumentResolume(controller);
   controller._sleep = async () => {};
-  controller._getColumnDuration = () => 500;
-  controller.stager.stageAsset = async (source, name) => `C:/Content/${name}`;
-  controller.resolume.loadClip = async () => {};
-  controller.resolume.setClipLoop = async () => {};
-  controller.resolume.getClipInfo = async () => ({});
-  controller.resolume.setTransportDuration = async () => {};
-  controller.resolume.getClipThumbnail = async () => null;
-  controller.resolume.connectClip = async () => {};
-
-  const db = new FakeDb();
-  controller.attach(db);
-
-  // Apply the first revision successfully so there is a real applied layout.
-  db.refs[0].emit(validLayout());
-  await waitFor(() => db.refs[1].setCalls.some((s) => s.phase === "playing"));
-  const playing = db.refs[1].setCalls.find((s) => s.phase === "playing");
-  assert.equal(playing.columns.length, 1);
-  assert.equal(playing.columns[0].id, "col-1");
-
-  // A newer revision fails during staging.
   controller.stager.stageAsset = async () => {
     throw new Error("scp failed");
   };
-  const newer = { ...validLayout(), revision: "newer-revision" };
-  db.refs[0].emit(newer);
+
+  const db = new FakeDb();
+  controller.attach(db);
+  db.refs[0].emit(validLayout());
   await waitFor(() =>
     db.refs[1].setCalls.some(
       (s) => s.phase === "error" && /scp failed/.test(s.error || ""),
     ),
   );
-  await new Promise((resolve) => setTimeout(resolve, 10));
-
-  const error = db.refs[1].setCalls.find(
-    (s) => s.phase === "error" && /scp failed/.test(s.error || ""),
-  );
-  // The previously applied columns survive the failed replacement...
-  assert.equal(error.columns.length, 1);
-  assert.equal(error.columns[0].id, "col-1");
-  // ...and the previous cycle timer is restored so playback is not frozen.
-  assert.notEqual(controller._columnTimer, null);
-  assert.equal(
-    controller._currentRevision,
-    "9f04a3f8-7c2a-4f1e-8d4b-2a1f3c5d7e9b",
-  );
+  const error = db.refs[1].setCalls.find((s) => s.phase === "error");
+  assert.equal(error.columns.length, 0);
+  // Clear-then-load: the old slots were cleared even though staging failed.
+  assert.ok(calls.some((c) => c.startsWith("clear:")));
   controller.shutdown();
 });
 
 test("AdLayoutController preserves the revision for an empty-columns clear", async () => {
   const controller = makeAdController();
-  controller.stager.stageAsset = async () => "C:/Content/x.png";
-  controller.resolume.clearClip = async () => {};
-  controller.resolume.loadClip = async () => {};
-  controller.resolume.setClipLoop = async () => {};
-  controller.resolume.getClipInfo = async () => ({});
-  controller.resolume.setTransportDuration = async () => {};
-  controller.resolume.getClipThumbnail = async () => null;
-  controller.resolume.connectClip = async () => {};
+  instrumentResolume(controller);
 
   const db = new FakeDb();
   controller.attach(db);
@@ -556,34 +687,47 @@ test("AdLayoutController preserves the revision for an empty-columns clear", asy
   controller.shutdown();
 });
 
-test("AdLayoutController clears only the ad clip slots, not the whole layer", async () => {
+test("AdLayoutController clears every deck column on clear, not just one slot", async () => {
   const controller = makeAdController();
-  controller.resolume.clearLayer = async () => {
-    throw new Error("must not clear the whole layer");
-  };
-  const cleared = [];
-  controller.resolume.clearClip = async (laneId, slot) =>
-    cleared.push([laneId, slot]);
+  const calls = instrumentResolume(controller);
 
   const db = new FakeDb();
   controller.attach(db);
   db.refs[0].emit(null);
-  await waitFor(() => cleared.length >= 2);
-  assert.deepEqual(cleared.sort(), [
-    ["2", 2],
-    ["4", 2],
-  ]);
+  await waitFor(() => db.refs[1].setCalls.some((s) => s.phase === "idle"));
+  // Both lanes cleared across all 15 deck columns.
+  for (const laneId of ["1", "3"]) {
+    for (let slot = 1; slot <= 15; slot += 1) {
+      assert.ok(
+        calls.includes(`clear:${laneId}:${slot}`),
+        `missing clear on lane ${laneId} slot ${slot}`,
+      );
+    }
+  }
+  controller.shutdown();
+});
+
+test("AdLayoutController never calls transport endpoints during load or clear", async () => {
+  const controller = makeAdController();
+  const calls = instrumentResolume(controller);
+
+  const db = new FakeDb();
+  controller.attach(db);
+  db.refs[0].emit(validLayout());
+  await waitFor(() => db.refs[1].setCalls.some((s) => s.phase === "playing"));
+  db.refs[0].emit(null);
+  await waitFor(() => db.refs[1].setCalls.some((s) => s.phase === "idle"));
+
+  for (const call of calls) {
+    assert.ok(!/connect|transport|loop/.test(call), `unexpected call: ${call}`);
+  }
   controller.shutdown();
 });
 
 test("AdLayoutController retries the idle status publish on a failed write", async () => {
   const controller = makeAdController();
+  instrumentResolume(controller);
   controller._sleep = async () => {};
-  controller.resolume.clearClip = async () => {};
-  controller._discoverLanes = async () => [
-    { id: "2", name: "Lane 2" },
-    { id: "4", name: "Lane 4" },
-  ];
   const db = new FakeDb();
   controller.attach(db);
   const statusRef = db.refs[1];
@@ -597,17 +741,12 @@ test("AdLayoutController retries the idle status publish on a failed write", asy
   await waitFor(() => writes.length >= 2);
   const idle = writes.find((w) => w.phase === "idle");
   assert.equal(idle.phase, "idle");
-  assert.equal(idle.activeColumn, 0);
   controller.shutdown();
 });
 
 test("AdLayoutController.republishStatus re-publishes the last status", async () => {
   const controller = makeAdController();
-  controller.resolume.clearClip = async () => {};
-  controller._discoverLanes = async () => [
-    { id: "2", name: "Lane 2" },
-    { id: "4", name: "Lane 4" },
-  ];
+  instrumentResolume(controller);
   const db = new FakeDb();
   controller.attach(db);
   db.refs[0].emit(null);
@@ -617,7 +756,6 @@ test("AdLayoutController.republishStatus re-publishes the last status", async ()
   assert.equal(db.refs[1].setCalls.length, before + 1);
   const republished = db.refs[1].setCalls[before];
   assert.equal(republished.phase, "idle");
-  assert.equal(republished.activeColumn, 0);
   controller.shutdown();
 });
 
@@ -627,21 +765,5 @@ test("AdLayoutController.republishStatus is a no-op before any status publish", 
   controller.attach(db);
   await controller.republishStatus();
   assert.equal(db.refs[1].setCalls.length, 0);
-  controller.shutdown();
-});
-
-test("AdLayoutController._retryOp aborts when a newer generation supersedes during backoff", async () => {
-  const controller = makeAdController();
-  controller._sleep = async () => {};
-  controller._generation = 1;
-  const run = controller._retryOp(
-    "test op",
-    async () => {
-      throw new Error("boom");
-    },
-    1,
-  );
-  controller._generation = 2;
-  await assert.rejects(run, /superseded/);
   controller.shutdown();
 });

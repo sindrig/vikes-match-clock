@@ -698,10 +698,7 @@ function parseAppliedAdFile(data: unknown): PerimeterAppliedAdFile | undefined {
   if (!validateAdFileName(name)) return undefined;
   const thumbnail =
     typeof raw.thumbnail === "string" ? raw.thumbnail : undefined;
-  const transportDurationMs =
-    typeof raw.transportDurationMs === "number" ? raw.transportDurationMs : 0;
-  if (transportDurationMs <= 0) return undefined;
-  return { name, thumbnail, transportDurationMs };
+  return { name, thumbnail };
 }
 
 function parseAppliedAdColumn(
@@ -711,6 +708,14 @@ function parseAppliedAdColumn(
   const raw = data as Record<string, unknown>;
   const id = typeof raw.id === "string" ? raw.id : "";
   if (!id) return undefined;
+  // deckColumns is optional: a layout column with no mapped deck columns
+  // (more layout columns than deck columns) still reports its files.
+  let deckColumns: number[] = [];
+  if (Array.isArray(raw.deckColumns)) {
+    deckColumns = raw.deckColumns
+      .map((dc) => (typeof dc === "number" && Number.isInteger(dc) ? dc : -1))
+      .filter((dc) => dc >= 1);
+  }
   const filesRaw = raw.files;
   if (!filesRaw || typeof filesRaw !== "object") return undefined;
   const files: Record<string, PerimeterAppliedAdFile> = {};
@@ -722,7 +727,7 @@ function parseAppliedAdColumn(
     files[key] = parsed;
   }
   if (Object.keys(files).length === 0) return undefined;
-  return { id, files };
+  return { id, deckColumns, files };
 }
 
 export function parsePerimeterAppliedAdLayout(
@@ -745,7 +750,6 @@ export function parsePerimeterAppliedAdLayout(
 
   const revision = typeof raw.revision === "string" ? raw.revision : "";
   const phase: PerimeterAdPhase = [
-    "staging",
     "loading",
     "playing",
     "error",
@@ -753,8 +757,6 @@ export function parsePerimeterAppliedAdLayout(
   ].includes(raw.phase as string)
     ? (raw.phase as PerimeterAdPhase)
     : "idle";
-  const activeColumn =
-    typeof raw.activeColumn === "number" ? raw.activeColumn : 0;
   const error = typeof raw.error === "string" ? raw.error : null;
   const updatedAt =
     typeof raw.updatedAt === "number" ? raw.updatedAt : Date.now();
@@ -767,5 +769,5 @@ export function parsePerimeterAppliedAdLayout(
     }
   }
 
-  return { lanes, revision, phase, activeColumn, error, updatedAt, columns };
+  return { lanes, revision, phase, error, updatedAt, columns };
 }
