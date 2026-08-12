@@ -53,6 +53,20 @@ export function extractClipFilename(clip) {
   return basename || undefined;
 }
 
+// The clip's full source path on the Resolume host (used to pull the deck
+// files off the Windows machine during an import). Prefers the video/audio
+// fileinfo path, falling back to the plain `filename` field.
+export function extractClipSourcePath(clip) {
+  if (!clip || typeof clip !== "object") return undefined;
+  const video = clip.video?.fileinfo?.path;
+  const audio = clip.audio?.fileinfo?.path;
+  const direct = typeof clip.filename === "string" ? clip.filename : undefined;
+  const candidate = (typeof video === "string" ? video : undefined)
+    ?? (typeof audio === "string" ? audio : undefined)
+    ?? direct;
+  return candidate || undefined;
+}
+
 // Top-level columns of the composition tree. The unique id is used when
 // present, otherwise the 1-based position in the tree is a stable fallback.
 export function parseColumns(composition) {

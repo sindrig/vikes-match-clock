@@ -271,6 +271,7 @@ test("attach listens on the configured path and sets up the preview ref", () => 
   const controller = makeController({
     PERIMETER_OVERLAY_ENABLED: "false",
     PERIMETER_AD_LAYOUT_ENABLED: "false",
+    PERIMETER_IMPORT_ENABLED: "false",
   });
   const db = new FakeDb();
   controller.attach(db);
@@ -901,6 +902,50 @@ test("loadConfig overlay invalid layer-clip JSON falls back to default", () => {
   assert.deepEqual(config.overlayLayerClipColumns, { 2: 1, 4: 1 });
 });
 
+// -- import config ---------------------------------------------------------------
+
+test("loadConfig import defaults", () => {
+  const config = loadConfig({});
+  assert.equal(config.importEnabled, true);
+  assert.equal(config.importPath, "states/vikuti/perimeter/import");
+  assert.equal(config.importStatusPath, "perimeter/vikuti/importStatus");
+});
+
+test("loadConfig import override", () => {
+  const config = loadConfig({
+    PERIMETER_IMPORT_ENABLED: "false",
+    PERIMETER_IMPORT_PATH: "states/x/perimeter/import",
+    PERIMETER_IMPORT_STATUS_PATH: "perimeter/x/importStatus",
+  });
+  assert.equal(config.importEnabled, false);
+  assert.equal(config.importPath, "states/x/perimeter/import");
+  assert.equal(config.importStatusPath, "perimeter/x/importStatus");
+});
+
+test("import: disabled does not create the import controller", () => {
+  const controller = makeController({ PERIMETER_IMPORT_ENABLED: "false" });
+  assert.equal(controller._importController, null);
+});
+
+test("import: attach creates the command, desired, and status refs", () => {
+  const controller = makeController();
+  const db = new FakeDb();
+  controller.attach(db);
+  const commandRef = db.refs.find(
+    (r) => r.path === controller.config.importPath,
+  );
+  assert.ok(commandRef, "expected an import command ref");
+  assert.equal(commandRef.handlers.has("value"), true);
+  assert.ok(
+    db.refs.some((r) => r.path === controller.config.importStatusPath),
+  );
+  assert.ok(
+    db.refs.some((r) => r.path === controller.config.adLayoutPath),
+  );
+  controller.shutdown();
+  assert.equal(commandRef.handlers.has("value"), false);
+});
+
 test("loadConfig overlay empty layer-clip JSON falls back to default", () => {
   const config = loadConfig({
     PERIMETER_OVERLAY_LAYER_CLIP_COLUMNS: "{}",
@@ -946,6 +991,7 @@ test("overlay: attach with overlay enabled creates overlay refs", () => {
   const controller = makeController({
     PERIMETER_OVERLAY_ENABLED: "true",
     PERIMETER_AD_LAYOUT_ENABLED: "false",
+    PERIMETER_IMPORT_ENABLED: "false",
   });
   const db = new FakeDb();
   controller.attach(db);

@@ -271,10 +271,16 @@ manual column selection) keeps working untouched.
 | -------------------------------------- | ---------- | -------------------------------------------------- |
 | `states/{location}/perimeter/adLayout` | Controller | Desired layout command                             |
 | `perimeter/{location}/adLayout`        | Daemon     | Applied layout, lanes, column mapping, previews    |
+| `states/{location}/perimeter/import`   | Controller | One-shot deck import command (`from-resolume`)     |
+| `perimeter/{location}/importStatus`    | Daemon     | Import result (phase, columnsImported, errors)     |
 | `{location}/perimeter/*` in Storage    | Controller | Selectable/uploaded source assets                  |
 
 The daemon never writes to the desired path, eliminating a self-write
-feedback loop.
+feedback loop. The single deliberate exception is the deck import command: it
+writes a generated layout to `states/{location}/perimeter/adLayout` once per
+explicit `{ commandId, command: "from-resolume" }` write to the separate
+`states/{location}/perimeter/import` path (deduped by `commandId`), so it
+cannot loop.
 
 **Layer separation** — the ad layout and the goal overlay use **disjoint
 layers** and never interfere:

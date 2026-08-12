@@ -23,7 +23,7 @@ import { reencodeThumbnail } from "./resolume-preview.js";
 const execFileAsync = promisify(execFile);
 
 const VALID_AD_VERSION = 1;
-const MAX_AD_COLUMNS = 20;
+export const MAX_AD_COLUMNS = 20;
 const ALLOWED_GCS_PREFIX = "gs://";
 const UNSAFE_FILENAME_RE = /["%\\/\x00-\x1f\x7f]/;
 
@@ -233,6 +233,7 @@ export class AdAssetStager {
       projectId: config.overlayProjectId,
       keyFilename: config.serviceAccountFile,
     });
+    this._execFileAsync = execFileAsync;
     this._validatedRemoteDir = false;
   }
 
@@ -334,6 +335,21 @@ export class AdAssetStager {
     return `${this.config.overlayRemoteContentDir.replace(/\\+$/, "")}/${remoteName.replace(/\\/g, "/")}`;
   }
 
+  _sshArgs() {
+    return [
+      "-i",
+      this.config.overlaySshKey,
+      "-o",
+      "StrictHostKeyChecking=accept-new",
+      "-o",
+      `UserKnownHostsFile=${path.join(this.config.overlayCacheDir, "known_hosts")}`,
+      "-o",
+      "ConnectTimeout=10",
+      "-o",
+      "ServerAliveInterval=15",
+    ];
+  }
+
   async copyToWindows(localPath, remoteName) {
     if (!validateFileName(remoteName)) {
       throw new Error(`unsafe remote filename: ${JSON.stringify(remoteName)}`);
@@ -342,33 +358,28 @@ export class AdAssetStager {
     const winDir = this.config.overlayRemoteContentDir
       .replace(/\\/g, "/")
       .replace(/\/+$/, "");
-    const finalPath = `${winDir}/${remoteName}`;
-    const tmpPath = `${winDir}/${remoteName}.part`;
+    // scp accepts forward slashes; cmd's `move` does not, so the move command
+    // uses a backslash version of the same paths.
+    const scpPath = `${winDir}/${remoteName}.part`;
+    const moveDir = winDir.replace(/\//g, "\\");
+    const moveTmpPath = `${moveDir}\\${remoteName}.part`;
+    const moveFinalPath = `${moveDir}\\${remoteName}`;
 
-    const sshArgs = [
-      "-i",
-      this.config.overlaySshKey,
-      "-o",
-      "StrictHostKeyChecking=accept-new",
-      "-o",
-      "ConnectTimeout=10",
-      "-o",
-      "ServerAliveInterval=15",
-    ];
+    const sshArgs = this._sshArgs();
 
-    await execFileAsync("scp", [
+    await this._execFileAsync("scp", [
       ...sshArgs,
       localPath,
-      `${this.config.overlaySshUser}@${this.config.overlaySshHost}:${tmpPath}`,
+      `${this.config.overlaySshUser}@${this.config.overlaySshHost}:${scpPath}`,
     ]);
 
-    await execFileAsync("ssh", [
+    await this._execFileAsync("ssh", [
       ...sshArgs,
       `${this.config.overlaySshUser}@${this.config.overlaySshHost}`,
-      `move /Y "${tmpPath}" "${finalPath}"`,
+      `move /Y "${moveTmpPath}" "${moveFinalPath}"`,
     ]);
 
-    return finalPath;
+    return moveFinalPath;
   }
 }
 

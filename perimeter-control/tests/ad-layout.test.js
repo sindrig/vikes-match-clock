@@ -8,6 +8,7 @@ import {
   mapLayoutToDeckColumns,
   ResolumeAdClient,
   AdLayoutController,
+  AdAssetStager,
 } from "../ad-layout.js";
 
 const BUCKET = "vikes-match-clock-firebase.appspot.com";
@@ -376,6 +377,45 @@ test("ResolumeAdClient.getClipThumbnail returns bytes or null", async (t) => {
 
   t.mock.method(globalThis, "fetch", async () => ({ ok: false, status: 404 }));
   assert.equal(await client.getClipThumbnail("1", 2), null);
+});
+
+// -- AdAssetStager.copyToWindows ----------------------------------------------
+
+test("AdAssetStager.copyToWindows uses backslashes for the Windows move command", async () => {
+  const stager = new AdAssetStager({
+    overlayCacheDir: "/tmp/cache",
+    overlayRemoteContentDir: "C:/Content",
+    overlaySshKey: "/tmp/key",
+    overlaySshHost: "10.0.0.1",
+    overlaySshUser: "user",
+    overlayProjectId: "test",
+    serviceAccountFile: "/tmp/sa.json",
+  });
+  const calls = [];
+  stager._execFileAsync = async (cmd, args) => {
+    calls.push({ cmd, args });
+  };
+
+  await stager.copyToWindows("/tmp/foo.mp4", "Freyja 48 4608x192_Draumur 2.mp4");
+
+  const scp = calls.find((c) => c.cmd === "scp");
+  assert.ok(scp, "expected an scp call");
+  assert.ok(
+    scp.args.some((a) =>
+      a.startsWith("user@10.0.0.1:C:/Content/Freyja 48 4608x192_Draumur 2.mp4.part"),
+    ),
+  );
+  const ssh = calls.find((c) => c.cmd === "ssh");
+  assert.ok(ssh, "expected an ssh move call");
+  // Persistent known-hosts file (the service user has no home directory).
+  assert.ok(
+    ssh.args.some((a) => a === "UserKnownHostsFile=/tmp/cache/known_hosts"),
+  );
+  // cmd's `move` rejects forward slashes: backslashes required.
+  assert.match(
+    ssh.args[ssh.args.length - 1],
+    /move \/Y "C:\\Content\\Freyja 48 4608x192_Draumur 2\.mp4\.part" "C:\\Content\\Freyja 48 4608x192_Draumur 2\.mp4"/,
+  );
 });
 
 // -- AdLayoutController snapshot flow ------------------------------------------

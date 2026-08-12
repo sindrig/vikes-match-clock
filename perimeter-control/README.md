@@ -407,6 +407,31 @@ See `perimeter-control.env.example` for all ad-layout environment variables:
 The deck column range is derived from the live composition at runtime; there
 is no per-slot configuration.
 
+### Deck import (one-shot)
+
+The controller's ad-layout manager starts empty; the operator can **import the
+existing Resolume deck** into the editable layout system with a one-shot
+command. A write to `states/${location}/perimeter/import` of the form
+`{ commandId: "<uuid>", command: "from-resolume" }` makes the daemon:
+
+1. read the live Resolume composition,
+2. map each deck column position → an ad-layout column (`files` keyed by the ad
+   lanes; a column is skipped when a lane has no valid clip),
+3. pull the deck clip files off the Windows host and upload any missing ones to
+   GCS at `<location>/perimeter/<basename>` (reusing objects that already exist;
+   files over `PERIMETER_AD_MAX_FILE_BYTES` are skipped),
+4. write the generated layout to `states/${location}/perimeter/adLayout` with a
+   fresh revision (the ad-layout controller then stages and plays it),
+5. publish `{ commandId, phase, columnsImported, columnsSkipped, errors }` to
+   `perimeter/${location}/importStatus`.
+
+The command is deduped by `commandId` (persisted in
+`<cache-dir>/import-last-command.json` so a restart never re-imports) and is
+deliberately left in place; a retry needs a fresh `commandId`. The write to the
+desired `adLayout` path is a deliberate one-shot exception to the "daemon never
+writes the desired path" rule — it cannot self-loop because it only reacts to
+the separate import command path.
+
 ## Tests
 
 ```bash

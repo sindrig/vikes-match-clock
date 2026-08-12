@@ -40,6 +40,7 @@ import { getDatabase, ServerValue } from "firebase-admin/database";
 import { ResolumeCompositionReader } from "./resolume-preview.js";
 import { OverlayController } from "./overlay.js";
 import { AdLayoutController } from "./ad-layout.js";
+import { ResolumeImportController } from "./resolume-import.js";
 
 export const VALID_STATES = new Set(["on", "off"]);
 
@@ -80,6 +81,10 @@ const DEFAULT_AD_LAYOUT_STATUS_PATH = "perimeter/vikuti/adLayout";
 const DEFAULT_AD_LANE_IDS = "1,3";
 const DEFAULT_AD_LAYOUT_BUCKET = "vikes-match-clock-firebase.appspot.com";
 const DEFAULT_AD_MAX_FILE_BYTES = 250 * 1024 * 1024;
+
+// Import defaults
+const DEFAULT_IMPORT_PATH = "states/vikuti/perimeter/import";
+const DEFAULT_IMPORT_STATUS_PATH = "perimeter/vikuti/importStatus";
 
 const RESOLUME_OFF_PATH = "/composition/disconnect-all";
 const RESOLUME_ON_PATH = "/composition/columns/{column}/connect";
@@ -242,6 +247,11 @@ export function loadConfig(environ = process.env) {
       environ.PERIMETER_AD_MAX_FILE_BYTES,
       DEFAULT_AD_MAX_FILE_BYTES,
     ),
+    // Import settings
+    importEnabled: environ.PERIMETER_IMPORT_ENABLED !== "false",
+    importPath: environ.PERIMETER_IMPORT_PATH ?? DEFAULT_IMPORT_PATH,
+    importStatusPath:
+      environ.PERIMETER_IMPORT_STATUS_PATH ?? DEFAULT_IMPORT_STATUS_PATH,
   };
 }
 
@@ -320,6 +330,10 @@ export class PerimeterController {
         config.adLaneIds,
       );
     }
+    this._importController = null;
+    if (config.importEnabled) {
+      this._importController = new ResolumeImportController(config);
+    }
   }
 
   // -- state --------------------------------------------------------------
@@ -367,6 +381,10 @@ export class PerimeterController {
       console.log(
         `Ad-layout control listening on: ${this.config.adLayoutPath}`,
       );
+    }
+    if (this._importController) {
+      this._importController.attach(db);
+      console.log(`Import control listening on: ${this.config.importPath}`);
     }
   }
 
@@ -526,6 +544,9 @@ export class PerimeterController {
     }
     if (this._adLayoutController) {
       this._adLayoutController.shutdown();
+    }
+    if (this._importController) {
+      this._importController.shutdown();
     }
     this._notifier.notify();
   }
