@@ -95,6 +95,13 @@ const RESOLUME_ON_PATH = "/composition/columns/{column}/connect";
 // stay stuck on a single ad. Defaults to the Víkin deck's autopilot.
 const DEFAULT_DECK_AUTOPILOT = "Play Next Column";
 
+// The deck autopilot column duration. The Víkin deck used "Longest Clip",
+// which makes still-image ad columns advance after Resolume's 1s default for
+// stills while video columns play their full length. "Seconds" + 20 keeps
+// every column — images included — on screen for a uniform 20s.
+const DEFAULT_DECK_AUTOPILOT_DURATION = "Seconds";
+const DEFAULT_DECK_AUTOPILOT_SECONDS = 20;
+
 // Legacy freeze record written by an earlier daemon build that paused the
 // autopilot for the ad-layout; nothing reads it today, so the "on" self-heal
 // removes it when it restores the autopilot.
@@ -261,6 +268,14 @@ export function loadConfig(environ = process.env) {
     deckAutopilot: (
       environ.PERIMETER_DECK_AUTOPILOT || DEFAULT_DECK_AUTOPILOT
     ).trim(),
+    deckAutopilotDuration: (
+      environ.PERIMETER_DECK_AUTOPILOT_DURATION ||
+      DEFAULT_DECK_AUTOPILOT_DURATION
+    ).trim(),
+    deckAutopilotSeconds: positiveInt(
+      environ.PERIMETER_DECK_AUTOPILOT_SECONDS,
+      DEFAULT_DECK_AUTOPILOT_SECONDS,
+    ),
     // Import settings
     importEnabled: environ.PERIMETER_IMPORT_ENABLED !== "false",
     importPath: environ.PERIMETER_IMPORT_PATH ?? DEFAULT_IMPORT_PATH,
@@ -470,27 +485,46 @@ export class PerimeterController {
   // ads the ad-layout controller deploys into the deck columns — keeps
   // cycling. The autopilot is the ads' transport: if a stale freeze (e.g. a
   // leftover from an earlier daemon build) left it paused, the deck would stay
-  // stuck on a single ad. Called fire-and-forget after the perimeter turns on
-  // ("off" never touches the autopilot, "on" overrides any stale leftover).
-  // Skips when a goal overlay is actively freezing the deck (its restore
-  // record exists in the cache dir) so a live celebration is never unpaused.
-  // Never throws.
+  // stuck on a single ad; and with "Longest Clip" duration a still-image
+  // column would advance after Resolume's 1s still default. Called
+  // fire-and-forget after the perimeter turns on ("off" never touches the
+  // autopilot, "on" overrides any stale leftover). Skips when a goal overlay
+  // is actively freezing the deck (its restore record exists in the cache
+  // dir) so a live celebration is never unpaused. Never throws.
   async _ensureDeckAutopilot() {
     try {
       const base = this.config.resolumeBaseUrl.replace(/\/+$/, "");
       const composition = await this._getJson(`${base}/composition`);
-      const target = composition?.autopilot?.target;
-      if (!target || target.id == null) return;
-      if (target.value === this.config.deckAutopilot) return;
+      const autopilot = composition?.autopilot;
+      if (!autopilot) return;
+
+      const desired = [
+        { target: autopilot.target, value: this.config.deckAutopilot },
+        {
+          target: autopilot.duration_type,
+          value: this.config.deckAutopilotDuration,
+        },
+        { target: autopilot.seconds, value: this.config.deckAutopilotSeconds },
+      ].filter(({ target }) => target && target.id != null);
+      const stale = desired.filter(
+        ({ target, value }) => String(target.value) !== String(value),
+      );
+      if (stale.length === 0) return;
+
       // Re-check immediately before restoring: the freeze record is written
       // before the overlay pauses the autopilot, so this is the freshest
       // possible signal that a goal overlay is mid-flight.
       if (await this._overlayController?.isAutopilotFrozen()) return;
-      await this._putJson(`${base}/parameter/by-id/${target.id}`, {
-        value: this.config.deckAutopilot,
-      });
+
+      for (const { target, value } of stale) {
+        await this._putJson(`${base}/parameter/by-id/${target.id}`, { value });
+      }
       await this._deleteLegacyAutopilotFreeze();
-      console.log(`Deck autopilot set to "${this.config.deckAutopilot}"`);
+      console.log(
+        `Deck autopilot asserted (${this.config.deckAutopilot}, ` +
+          `${this.config.deckAutopilotDuration}, ` +
+          `${this.config.deckAutopilotSeconds}s)`,
+      );
     } catch (err) {
       console.error(`Failed to ensure deck autopilot: ${err.message}`);
     }

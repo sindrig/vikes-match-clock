@@ -56,10 +56,16 @@ freezes the autopilot while a celebration plays and restores it on clear
 restart mid-celebration still restores it).
 
 Because stale paused state can otherwise accumulate, every `on` **asserts** the
-autopilot target to `PERIMETER_DECK_AUTOPILOT` (default `Play Next Column`)
-right after connecting, overriding any leftover. The assertion is skipped while
-a goal overlay is actively freezing the deck (`overlay-autopilot.json` present),
-so a live celebration is never unpaused, and it deletes the dead legacy
+autopilot target to `PERIMETER_DECK_AUTOPILOT` (default `Play Next Column`),
+the column duration type to `PERIMETER_DECK_AUTOPILOT_DURATION` (default
+`Seconds`) and the duration to `PERIMETER_DECK_AUTOPILOT_SECONDS` (default
+`20`) right after connecting, overriding any leftover. The `Seconds`/20
+duration exists because Resolume defaults still-image clips to 1s: with a
+`Longest Clip` deck a PNG ad column would advance after 1s while video columns
+play their full length, so a uniform 20s keeps every ad — images included — on
+screen the same time. The assertion is skipped while a goal overlay is actively
+freezing the deck (`overlay-autopilot.json` present), so a live celebration is
+never unpaused, and it deletes the dead legacy
 `<cache-dir>/autopilot-freeze.json` record from an earlier daemon build. `off`
 never touches the autopilot.
 
