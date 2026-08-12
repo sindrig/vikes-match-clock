@@ -89,6 +89,17 @@ const DEFAULT_IMPORT_STATUS_PATH = "perimeter/vikuti/importStatus";
 const RESOLUME_OFF_PATH = "/composition/disconnect-all";
 const RESOLUME_ON_PATH = "/composition/columns/{column}/connect";
 
+// The deck autopilot value the base content relies on to cycle its columns
+// (and with them the ads the ad-layout controller deploys). The "on" state
+// asserts this value, overriding any stale leftover, so the deck can never
+// stay stuck on a single ad. Defaults to the Víkin deck's autopilot.
+const DEFAULT_DECK_AUTOPILOT = "Play Next Column";
+
+// Legacy freeze record written by an earlier daemon build that paused the
+// autopilot for the ad-layout; nothing reads it today, so the "on" self-heal
+// removes it when it restores the autopilot.
+const LEGACY_AUTOPILOT_FREEZE_FILE = "autopilot-freeze.json";
+
 function positiveInt(value, fallback) {
   const n = Number(value);
   return Number.isInteger(n) && n > 0 ? n : fallback;
@@ -247,6 +258,9 @@ export function loadConfig(environ = process.env) {
       environ.PERIMETER_AD_MAX_FILE_BYTES,
       DEFAULT_AD_MAX_FILE_BYTES,
     ),
+    deckAutopilot: (
+      environ.PERIMETER_DECK_AUTOPILOT || DEFAULT_DECK_AUTOPILOT
+    ).trim(),
     // Import settings
     importEnabled: environ.PERIMETER_IMPORT_ENABLED !== "false",
     importPath: environ.PERIMETER_IMPORT_PATH ?? DEFAULT_IMPORT_PATH,
@@ -435,6 +449,7 @@ export class PerimeterController {
           // Non-blocking: a preview refresh must never delay or change the
           // on/off command retry behavior.
           void this.refreshPreview();
+          void this._ensureDeckAutopilot();
         }
         return;
       } catch (err) {
@@ -448,6 +463,82 @@ export class PerimeterController {
         await this._sleep(backoff);
         backoff = Math.min(backoff * 2, this.config.maxBackoffMs);
       }
+    }
+  }
+
+  // Ensure the deck autopilot is running so the base content — and with it the
+  // ads the ad-layout controller deploys into the deck columns — keeps
+  // cycling. The autopilot is the ads' transport: if a stale freeze (e.g. a
+  // leftover from an earlier daemon build) left it paused, the deck would stay
+  // stuck on a single ad. Called fire-and-forget after the perimeter turns on
+  // ("off" never touches the autopilot, "on" overrides any stale leftover).
+  // Skips when a goal overlay is actively freezing the deck (its restore
+  // record exists in the cache dir) so a live celebration is never unpaused.
+  // Never throws.
+  async _ensureDeckAutopilot() {
+    try {
+      const base = this.config.resolumeBaseUrl.replace(/\/+$/, "");
+      const composition = await this._getJson(`${base}/composition`);
+      const target = composition?.autopilot?.target;
+      if (!target || target.id == null) return;
+      if (target.value === this.config.deckAutopilot) return;
+      // Re-check immediately before restoring: the freeze record is written
+      // before the overlay pauses the autopilot, so this is the freshest
+      // possible signal that a goal overlay is mid-flight.
+      if (await this._overlayController?.isAutopilotFrozen()) return;
+      await this._putJson(`${base}/parameter/by-id/${target.id}`, {
+        value: this.config.deckAutopilot,
+      });
+      await this._deleteLegacyAutopilotFreeze();
+      console.log(`Deck autopilot set to "${this.config.deckAutopilot}"`);
+    } catch (err) {
+      console.error(`Failed to ensure deck autopilot: ${err.message}`);
+    }
+  }
+
+  _getJson(url) {
+    const controller = new AbortController();
+    const timer = setTimeout(
+      () => controller.abort(),
+      this.config.requestTimeoutMs,
+    );
+    return fetch(url, { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(`Resolume ${url} returned HTTP ${response.status}`);
+        }
+        return response.json();
+      })
+      .finally(() => clearTimeout(timer));
+  }
+
+  _putJson(url, body) {
+    const controller = new AbortController();
+    const timer = setTimeout(
+      () => controller.abort(),
+      this.config.requestTimeoutMs,
+    );
+    return fetch(url, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`Resolume ${url} returned HTTP ${response.status}`);
+        }
+      })
+      .finally(() => clearTimeout(timer));
+  }
+
+  async _deleteLegacyAutopilotFreeze() {
+    try {
+      await fs.promises.unlink(
+        path.join(this.config.overlayCacheDir, LEGACY_AUTOPILOT_FREEZE_FILE),
+      );
+    } catch {
+      // nothing stale to clean up
     }
   }
 

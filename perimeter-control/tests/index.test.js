@@ -47,6 +47,7 @@ test("loadConfig defaults", () => {
   assert.equal(config.thumbnailQuality, 0.7);
   assert.equal(config.thumbnailMaxBytes, 100_000);
   assert.equal(config.previewMaxBytes, 8_000_000);
+  assert.equal(config.deckAutopilot, "Play Next Column");
 });
 
 test("loadConfig overrides", () => {
@@ -66,6 +67,7 @@ test("loadConfig overrides", () => {
     PERIMETER_THUMBNAIL_QUALITY: "0.4",
     PERIMETER_THUMBNAIL_MAX_BYTES: "5000",
     PERIMETER_PREVIEW_MAX_BYTES: "10000",
+    PERIMETER_DECK_AUTOPILOT: "Play Random Column",
   });
   assert.equal(config.databaseURL, "https://example.com");
   assert.equal(config.path, "states/x/perimeter");
@@ -82,6 +84,7 @@ test("loadConfig overrides", () => {
   assert.equal(config.thumbnailQuality, 0.4);
   assert.equal(config.thumbnailMaxBytes, 5_000);
   assert.equal(config.previewMaxBytes, 10_000);
+  assert.equal(config.deckAutopilot, "Play Random Column");
 });
 
 test("loadConfig invalid numerics fall back to defaults", () => {
@@ -431,6 +434,122 @@ test("newer state supersedes before applying", async () => {
   await waitFor(() => recorded.length >= 1);
   controller.onDesiredState("off");
   await waitFor(() => recorded.includes("off"));
+  controller.shutdown();
+});
+
+// -- deck autopilot self-heal on "on" ---------------------------------------------
+
+function mockAutopilotFetch(t, autopilotValue) {
+  const calls = [];
+  t.mock.method(globalThis, "fetch", async (url, options) => {
+    calls.push({ url, method: options?.method });
+    if (url.endsWith("/composition")) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          autopilot: { target: { id: 111, value: autopilotValue, index: 0 } },
+        }),
+      };
+    }
+    return { ok: true, status: 204 };
+  });
+  return calls;
+}
+
+test("ensureDeckAutopilot restores a stale autopilot pause on on", async (t) => {
+  const cacheDir = await makeTmpCache();
+  const controller = makeController({ PERIMETER_OVERLAY_ENABLED: "false" });
+  controller.config.overlayCacheDir = cacheDir;
+  await fs.writeFile(
+    path.join(cacheDir, "autopilot-freeze.json"),
+    JSON.stringify({ id: 111, value: "Play Next Column", owners: ["ad-layout"] }),
+  );
+  const calls = mockAutopilotFetch(t, "Off");
+
+  await controller._ensureDeckAutopilot();
+
+  const put = calls.find((c) => c.method === "PUT");
+  assert.ok(put, "expected a PUT restoring the autopilot");
+  assert.equal(put.url, "http://localhost:80/api/v1/parameter/by-id/111");
+  // The stale legacy freeze record is cleaned up with the restore.
+  await assert.rejects(fs.access(path.join(cacheDir, "autopilot-freeze.json")));
+  controller.shutdown();
+});
+
+test("ensureDeckAutopilot skips when the autopilot is already correct", async (t) => {
+  const controller = makeController({ PERIMETER_OVERLAY_ENABLED: "false" });
+  const calls = mockAutopilotFetch(t, "Play Next Column");
+
+  await controller._ensureDeckAutopilot();
+
+  assert.equal(calls.some((c) => c.method === "PUT"), false);
+  controller.shutdown();
+});
+
+test("ensureDeckAutopilot skips when a goal overlay is actively freezing the deck", async (t) => {
+  const cacheDir = await makeTmpCache();
+  await fs.writeFile(
+    path.join(cacheDir, "overlay-autopilot.json"),
+    JSON.stringify({ id: 111, value: "Play Next Column" }),
+  );
+  const controller = makeController({ PERIMETER_OVERLAY_CACHE_DIR: cacheDir });
+  const calls = mockAutopilotFetch(t, "Off");
+
+  await controller._ensureDeckAutopilot();
+
+  assert.equal(calls.some((c) => c.method === "PUT"), false);
+  controller.shutdown();
+});
+
+test("ensureDeckAutopilot proceeds when the overlay controller exists but is not frozen", async (t) => {
+  const cacheDir = await makeTmpCache();
+  const controller = makeController({ PERIMETER_OVERLAY_CACHE_DIR: cacheDir });
+  const calls = mockAutopilotFetch(t, "Off");
+
+  await controller._ensureDeckAutopilot();
+
+  assert.ok(
+    calls.some(
+      (c) => c.method === "PUT" && c.url.includes("/parameter/by-id/111"),
+    ),
+    "expected the autopilot to be restored despite the overlay controller being present",
+  );
+  controller.shutdown();
+});
+
+test("ensureDeckAutopilot is silent when the composition has no autopilot target", async (t) => {
+  const controller = makeController({ PERIMETER_OVERLAY_ENABLED: "false" });
+  const calls = [];
+  t.mock.method(globalThis, "fetch", async (url) => {
+    calls.push(url);
+    return { ok: true, status: 200, json: async () => ({}) };
+  });
+
+  await controller._ensureDeckAutopilot();
+
+  assert.equal(calls.some((c) => c.includes("/parameter/by-id/")), false);
+  controller.shutdown();
+});
+
+test("applying on restores the deck autopilot", async (t) => {
+  const controller = makeController({
+    PERIMETER_PREVIEW_ENABLED: "false",
+    PERIMETER_OVERLAY_ENABLED: "false",
+  });
+  const db = new FakeDb();
+  controller.attach(db);
+  controller.resolume.applyState = async () => undefined;
+  const calls = mockAutopilotFetch(t, "Off");
+  controller.startApplicator();
+
+  controller.onDesiredState("on");
+
+  await waitFor(() =>
+    calls.some(
+      (c) => c.method === "PUT" && c.url.includes("/parameter/by-id/111"),
+    ),
+  );
   controller.shutdown();
 });
 
@@ -1353,6 +1472,17 @@ test("overlay clear without a freeze does not touch the autopilot", async () => 
   };
   await controller._handleClear();
   assert.equal(puts, 0);
+});
+
+test("isAutopilotFrozen tracks the persisted freeze record", async () => {
+  const cacheDir = await makeTmpCache();
+  const controller = await makeOverlayController({}, cacheDir);
+  assert.equal(await controller.isAutopilotFrozen(), false);
+  await fs.writeFile(
+    path.join(cacheDir, "overlay-autopilot.json"),
+    JSON.stringify({ id: 111, value: "Play Next Column" }),
+  );
+  assert.equal(await controller.isAutopilotFrozen(), true);
 });
 
 // -- overlay freeze failure aborts -----------------------------------------------

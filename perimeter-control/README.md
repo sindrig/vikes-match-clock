@@ -17,7 +17,9 @@ The daemon is a long-lived Node.js process:
    - `off` → `POST /api/v1/composition/disconnect-all` (Resolume's global
      Stop — stops **all** content controlled by this Resolume instance).
    - `on` → `POST /api/v1/composition/columns/1/connect` (starts column 1,
-     which drives both perimeter outputs).
+     which drives both perimeter outputs), then **asserts the deck autopilot**
+     to `PERIMETER_DECK_AUTOPILOT` (default `Play Next Column`) — see
+     [Deck autopilot self-heal](#deck-autopilot-self-heal).
 4. Publishes the composition **preview snapshot** to `perimeter/vikuti` (see
    [Preview snapshot](#preview-snapshot) below) once at startup and after each
    successful `on`, through the Admin SDK.
@@ -42,6 +44,24 @@ re-applied, so the periodic reconnect causes no spurious Resolume calls.
 This version controls **column 1** and uses the **global `disconnect-all`**
 endpoint. `disconnect-all` intentionally stops every Resolume-accessible
 output on the dedicated composition, not only column 1.
+
+## Deck autopilot self-heal
+
+The base content deck — and with it the ads the ad-layout controller deploys
+into its columns — cycles via the composition autopilot (`Play Next Column`).
+That autopilot is the ads' transport: if it is ever left paused, the deck stays
+stuck on a single ad. The only legitimate pausing is the goal overlay, which
+freezes the autopilot while a celebration plays and restores it on clear
+(persisting the original value to `<cache-dir>/overlay-autopilot.json` so a
+restart mid-celebration still restores it).
+
+Because stale paused state can otherwise accumulate, every `on` **asserts** the
+autopilot target to `PERIMETER_DECK_AUTOPILOT` (default `Play Next Column`)
+right after connecting, overriding any leftover. The assertion is skipped while
+a goal overlay is actively freezing the deck (`overlay-autopilot.json` present),
+so a live celebration is never unpaused, and it deletes the dead legacy
+`<cache-dir>/autopilot-freeze.json` record from an earlier daemon build. `off`
+never touches the autopilot.
 
 ## Prerequisites
 
@@ -405,7 +425,9 @@ See `perimeter-control.env.example` for all ad-layout environment variables:
 `PERIMETER_AD_LAYOUT_BUCKET`, `PERIMETER_AD_MAX_FILE_BYTES`.
 
 The deck column range is derived from the live composition at runtime; there
-is no per-slot configuration.
+is no per-slot configuration. The deck autopilot the ads rely on is asserted
+on every `on` state (see [Deck autopilot self-heal](#deck-autopilot-self-heal);
+`PERIMETER_DECK_AUTOPILOT`).
 
 ### Deck import (one-shot)
 

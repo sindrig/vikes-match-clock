@@ -382,6 +382,9 @@ layout column i (0-based) covers deck columns
   fetched once per unique ad file (not per deck column instance).
 - The phase model is `loading` (staging/opening), `playing` (all files
   deployed, autopilot cycling), `error`, and `idle` (no layout).
+- The deck autopilot is the ads' transport: every perimeter `on` asserts it to
+  `PERIMETER_DECK_AUTOPILOT` (skipped while a goal overlay is freezing the
+  deck), so a stale pause never leaves the deck stuck on a single ad.
 - Layout changes are **clear-then-load**: the daemon empties all old ad slots
   across the deck, then stages and opens the new files. A brief blank flash
   is expected.

@@ -527,6 +527,20 @@ export class OverlayController {
     await fs.unlink(this._autopilotRestorePath()).catch(() => {});
   }
 
+  // True while the deck autopilot is frozen for an active overlay. Reads the
+  // persisted restore record (not the in-memory flag) so it stays correct
+  // across a daemon restart, when the record survives but `_autopilotFrozen`
+  // resets. Used by the perimeter controller to avoid unpausing the deck
+  // under a live goal celebration.
+  async isAutopilotFrozen() {
+    try {
+      await fs.access(this._autopilotRestorePath());
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   async _freezeDeck() {
     if (this._autopilotFrozen) return;
     const grid = await this.resolume.getColumnGrid();
