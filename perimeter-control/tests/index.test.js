@@ -1309,6 +1309,7 @@ test("ResolumeOverlayClient.setAutopilot PUTs the value by parameter id", async 
 
 test("ResolumeOverlayClient.setClipFit PUTs resize and pins the native canvas", async (t) => {
   const calls = [];
+  const state = { width: 4608, height: 192 };
   t.mock.method(globalThis, "fetch", async (url, options) => {
     calls.push({ url, method: options?.method, body: options?.body });
     if (!options?.method || options.method === "GET") {
@@ -1317,8 +1318,8 @@ test("ResolumeOverlayClient.setClipFit PUTs resize and pins the native canvas", 
         status: 200,
         json: async () => ({
           video: {
-            width: { id: 11 },
-            height: { id: 12 },
+            width: { id: 11, value: state.width },
+            height: { id: 12, value: state.height },
             resize: {
               id: 4242,
               valuetype: "ParamChoice",
@@ -1329,6 +1330,9 @@ test("ResolumeOverlayClient.setClipFit PUTs resize and pins the native canvas", 
         }),
       };
     }
+    const body = JSON.parse(options.body);
+    if (url.endsWith("/11")) state.width = body.value;
+    if (url.endsWith("/12")) state.height = body.value;
     return { ok: true, status: 204 };
   });
   const client = new ResolumeOverlayClient({
@@ -1342,9 +1346,9 @@ test("ResolumeOverlayClient.setClipFit PUTs resize and pins the native canvas", 
     "http://localhost:80/api/v1/composition/layers/4/clips/2",
   );
   // resize -> Stretch, then the clip canvas is pinned to the 40-native
-  // 3840x192 so the stretch fills the correct region instead of the full
-  // 4608x192 layer output.
-  const puts = calls.slice(1).filter((c) => c.method === "PUT");
+  // 3840x192 (and re-verified) so the stretch fills the correct region
+  // instead of the full 4608x192 layer output.
+  const puts = calls.filter((c) => c.method === "PUT");
   assert.deepEqual(puts.map((c) => c.url), [
     "http://localhost:80/api/v1/parameter/by-id/4242",
     "http://localhost:80/api/v1/parameter/by-id/11",
@@ -1353,6 +1357,49 @@ test("ResolumeOverlayClient.setClipFit PUTs resize and pins the native canvas", 
   assert.equal(JSON.parse(puts[0].body).value, "Stretch");
   assert.equal(JSON.parse(puts[1].body).value, 3840);
   assert.equal(JSON.parse(puts[2].body).value, 192);
+});
+
+test("ResolumeOverlayClient.setClipFit re-pins a canvas the resize reaction overwrote", async (t) => {
+  const calls = [];
+  const state = { width: 4608, height: 192 };
+  let firstPin = true;
+  t.mock.method(globalThis, "fetch", async (url, options) => {
+    calls.push({ url, method: options?.method, body: options?.body });
+    if (!options?.method || options.method === "GET") {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          video: {
+            width: { id: 11, value: state.width },
+            height: { id: 12, value: state.height },
+            resize: { id: 4242, options: ["Fill", "Fit", "Stretch", "Original"] },
+          },
+        }),
+      };
+    }
+    // Simulate Resolume's async layer-resize: the first width pin is silently
+    // overwritten back to 4608, so the daemon must verify and re-pin.
+    if (url.endsWith("/11")) {
+      if (firstPin) {
+        firstPin = false;
+      } else {
+        state.width = JSON.parse(options.body).value;
+      }
+    }
+    if (url.endsWith("/12")) state.height = JSON.parse(options.body).value;
+    return { ok: true, status: 204 };
+  });
+  const client = new ResolumeOverlayClient({
+    resolumeBaseUrl: "http://localhost:80/api/v1",
+    requestTimeoutMs: 1_000,
+    clipCanvases: { 4: "3840x192" },
+  });
+  await client.setClipFit("4", 2, "Stretch");
+  const widthPins = calls
+    .filter((c) => c.method === "PUT" && c.url.endsWith("/11"))
+    .map((c) => JSON.parse(c.body).value);
+  assert.deepEqual(widthPins, [3840, 3840]);
 });
 
 test("ResolumeOverlayClient.setClipFit skips canvas pinning when unconfigured", async (t) => {

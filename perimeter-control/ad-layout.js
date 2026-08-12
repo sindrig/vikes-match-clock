@@ -499,25 +499,40 @@ export class ResolumeAdClient {
     }
     await this._put(`${base}/parameter/by-id/${resize.id}`, { value: mode });
 
-    // Setting a non-Original resize mode makes this Resolume version pin the
-    // clip's canvas to the layer output size (4608x192 for every layer here),
-    // which is wrong for the 40-screen lanes whose native canvas is 3840x192 —
-    // the stretch would overflow the LED strip horizontally. Pin the clip
-    // canvas back to the lane's native size (`PERIMETER_CLIP_CANVASES`, e.g.
-    // "3840x192") so the fill lands on the correct region. Native-size media
-    // is unaffected.
+    // Setting a non-Original resize mode makes this Resolume version re-size
+    // the clip's canvas to the layer output size (4608x192 for every layer
+    // here), applied asynchronously right after the resize change, so a single
+    // canvas write can be overwritten. That is wrong for the 40-screen lanes
+    // whose native canvas is 3840x192 — the stretch would overflow the LED
+    // strip. Pin the canvas back to the lane's native size
+    // (`PERIMETER_CLIP_CANVASES`, e.g. "3840x192") and re-verify until it
+    // holds. Native-size media is unaffected.
     const canvas = this.config.clipCanvases?.[String(layerId)];
-    if (canvas && video?.width?.id != null && video?.height?.id != null) {
-      const match = /^(\d+)x(\d+)$/.exec(String(canvas));
-      if (match) {
-        await this._put(`${base}/parameter/by-id/${video.width.id}`, {
-          value: Number(match[1]),
-        });
-        await this._put(`${base}/parameter/by-id/${video.height.id}`, {
-          value: Number(match[2]),
-        });
-      }
+    if (!canvas || video?.width?.id == null || video?.height?.id == null) {
+      return;
     }
+    const match = /^(\d+)x(\d+)$/.exec(String(canvas));
+    if (!match) return;
+    const wantW = Number(match[1]);
+    const wantH = Number(match[2]);
+    const clipUrl = `${base}/composition/layers/${layerId}/clips/${clipSlot}`;
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await this._put(`${base}/parameter/by-id/${video.width.id}`, {
+        value: wantW,
+      });
+      await this._put(`${base}/parameter/by-id/${video.height.id}`, {
+        value: wantH,
+      });
+      // Let the resize reaction settle, then confirm the canvas held.
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      const re = await this._get(clipUrl);
+      const w = re?.video?.width?.value;
+      const h = re?.video?.height?.value;
+      if (w === wantW && h === wantH) return;
+    }
+    throw new Error(
+      `clip canvas did not hold at ${wantW}x${wantH} on lane ${layerId} clip ${clipSlot}`,
+    );
   }
 
   async getClipInfo(layerId, clipSlot) {

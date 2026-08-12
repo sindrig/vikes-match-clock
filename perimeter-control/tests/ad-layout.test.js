@@ -418,6 +418,7 @@ test("ResolumeAdClient.setClipTransportDuration rejects missing or invalid durat
 
 test("ResolumeAdClient.setClipFit PUTs resize and pins the native canvas", async (t) => {
   const calls = [];
+  const state = { width: 4608, height: 192 };
   t.mock.method(globalThis, "fetch", async (url, options) => {
     calls.push({ url, method: options?.method, body: options?.body });
     if (!options?.method || options.method === "GET") {
@@ -426,8 +427,8 @@ test("ResolumeAdClient.setClipFit PUTs resize and pins the native canvas", async
         status: 200,
         json: async () => ({
           video: {
-            width: { id: 21 },
-            height: { id: 22 },
+            width: { id: 21, value: state.width },
+            height: { id: 22, value: state.height },
             resize: {
               id: 999,
               valuetype: "ParamChoice",
@@ -438,6 +439,9 @@ test("ResolumeAdClient.setClipFit PUTs resize and pins the native canvas", async
         }),
       };
     }
+    const body = JSON.parse(options.body);
+    if (url.endsWith("/21")) state.width = body.value;
+    if (url.endsWith("/22")) state.height = body.value;
     return { ok: true, status: 204 };
   });
   const client = new ResolumeAdClient({
@@ -451,9 +455,9 @@ test("ResolumeAdClient.setClipFit PUTs resize and pins the native canvas", async
     "http://localhost:80/api/v1/composition/layers/3/clips/4",
   );
   // resize -> Stretch, then the clip canvas is pinned to the 40-native
-  // 3840x192 so the stretch fills the correct region instead of the full
-  // 4608x192 layer output.
-  const puts = calls.slice(1).filter((c) => c.method === "PUT");
+  // 3840x192 (and re-verified) so the stretch fills the correct region
+  // instead of the full 4608x192 layer output.
+  const puts = calls.filter((c) => c.method === "PUT");
   assert.deepEqual(puts.map((c) => c.url), [
     "http://localhost:80/api/v1/parameter/by-id/999",
     "http://localhost:80/api/v1/parameter/by-id/21",
