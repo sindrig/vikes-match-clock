@@ -39,6 +39,7 @@ import { cert, initializeApp } from "firebase-admin/app";
 import { getDatabase, ServerValue } from "firebase-admin/database";
 import { ResolumeCompositionReader } from "./resolume-preview.js";
 import { OverlayController } from "./overlay.js";
+import { AdLayoutController } from "./ad-layout.js";
 
 export const VALID_STATES = new Set(["on", "off"]);
 
@@ -68,6 +69,12 @@ const DEFAULT_OVERLAY_SSH_KEY =
 const DEFAULT_OVERLAY_REMOTE_CONTENT_DIR = "C:/Content";
 const DEFAULT_OVERLAY_CACHE_DIR = "/var/cache/perimeter-control";
 const DEFAULT_OVERLAY_LAYER_CLIP_COLUMNS = '{"2":1,"4":1}';
+
+// Ad-layout defaults
+const DEFAULT_AD_LAYOUT_PATH = "states/vikuti/perimeter/adLayout";
+const DEFAULT_AD_LAYOUT_STATUS_PATH = "perimeter/vikuti/adLayout";
+const DEFAULT_AD_LAYER_CLIP_SLOTS = '{"2":2,"4":2}';
+const DEFAULT_AD_LANE_IDS = "2,4";
 
 const RESOLUME_OFF_PATH = "/composition/disconnect-all";
 const RESOLUME_ON_PATH = "/composition/columns/{column}/connect";
@@ -197,6 +204,20 @@ export function loadConfig(environ = process.env) {
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean),
+    // Ad-layout settings
+    adLayoutEnabled: environ.PERIMETER_AD_LAYOUT_ENABLED !== "false",
+    adLayoutPath:
+      environ.PERIMETER_AD_LAYOUT_PATH ?? DEFAULT_AD_LAYOUT_PATH,
+    adLayoutStatusPath:
+      environ.PERIMETER_AD_LAYOUT_STATUS_PATH ?? DEFAULT_AD_LAYOUT_STATUS_PATH,
+    adLayerClipSlots: parseLayerMap(
+      environ.PERIMETER_AD_LAYER_CLIP_SLOTS,
+      DEFAULT_AD_LAYER_CLIP_SLOTS,
+    ),
+    adLaneIds: (environ.PERIMETER_AD_LANE_IDS ?? DEFAULT_AD_LANE_IDS)
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
   };
 }
 
@@ -267,6 +288,14 @@ export class PerimeterController {
     if (config.overlayEnabled) {
       this._overlayController = new OverlayController(config);
     }
+    this._adLayoutController = null;
+    if (config.adLayoutEnabled) {
+      this._adLayoutController = new AdLayoutController(
+        config,
+        config.adLaneIds,
+        config.adLayerClipSlots,
+      );
+    }
   }
 
   // -- state --------------------------------------------------------------
@@ -304,6 +333,10 @@ export class PerimeterController {
     if (this._overlayController) {
       this._overlayController.attach(db);
       console.log(`Overlay control listening on: ${this.config.overlayPath}`);
+    }
+    if (this._adLayoutController) {
+      this._adLayoutController.attach(db);
+      console.log(`Ad-layout control listening on: ${this.config.adLayoutPath}`);
     }
   }
 
@@ -448,6 +481,9 @@ export class PerimeterController {
     }
     if (this._overlayController) {
       this._overlayController.shutdown();
+    }
+    if (this._adLayoutController) {
+      this._adLayoutController.shutdown();
     }
     this._notifier.notify();
   }

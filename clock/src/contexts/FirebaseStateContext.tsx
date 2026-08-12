@@ -35,6 +35,8 @@ import {
   PerimeterPreview,
   PerimeterOverlay,
   PerimeterOverlayStatus,
+  PerimeterAdLayout,
+  PerimeterAppliedAdLayout,
 } from "../types";
 import { Sports, DEFAULT_HALFSTOPS, VIEWS } from "../constants";
 import { msUntilMatchStart } from "../utils/timeUtils";
@@ -49,6 +51,8 @@ import {
   parsePerimeterState,
   parsePerimeterPreview,
   parsePerimeterOverlay,
+  parsePerimeterAdLayout,
+  parsePerimeterAppliedAdLayout,
 } from "./firebaseParsers";
 
 const HALFTIME_DURATION_MS = 15 * 60 * 1000;
@@ -254,8 +258,12 @@ interface FirebaseStateContextType {
   setPerimeterState: (state: PerimeterState["state"]) => void;
   setPerimeterOverlay: (overlay: PerimeterOverlay) => void;
   clearPerimeterOverlay: () => void;
+  setPerimeterAdLayout: (layout: PerimeterAdLayout | null) => void;
   perimeterOverlay: PerimeterOverlay | null;
   perimeterOverlayStatus: PerimeterOverlayStatus | null;
+  perimeterAdLayout: PerimeterAdLayout | null;
+  perimeterAppliedAdLayout: PerimeterAppliedAdLayout | undefined;
+  perimeterAppliedAdLayoutLoaded: boolean;
 }
 
 const FirebaseStateContext = createContext<FirebaseStateContextType | null>(
@@ -403,6 +411,13 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   );
   const [perimeterOverlayStatus, setPerimeterOverlayStatus] =
     useState<PerimeterOverlayStatus | null>(null);
+  const [perimeterAdLayout, setPerimeterAdLayoutState] =
+    useState<PerimeterAdLayout | null>(null);
+  const [perimeterAppliedAdLayout, setPerimeterAppliedAdLayout] = useState<
+    PerimeterAppliedAdLayout | undefined
+  >(undefined);
+  const [perimeterAppliedAdLayoutLoaded, setPerimeterAppliedAdLayoutLoaded] =
+    useState(false);
   const [ready, setReady] = useState(!listenPrefix);
 
   const matchRef = useRef(match);
@@ -419,6 +434,9 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     setReady(!listenPrefix);
     setPerimeterPreview(defaultPerimeterPreview);
     setPerimeterPreviewLoaded(false);
+    setPerimeterAdLayoutState(null);
+    setPerimeterAppliedAdLayout(undefined);
+    setPerimeterAppliedAdLayoutLoaded(false);
   }
 
   useEffect(() => {
@@ -617,6 +635,38 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
           ),
       );
 
+      // Ad-layout subscriptions: desired (states/*/perimeter/adLayout) and
+      // daemon-published applied (perimeter/*/adLayout).
+      const adLayoutPath = `states/${listenPrefix}/perimeter/adLayout`;
+      const unsubAdLayout = onValue(
+        ref(database, adLayoutPath),
+        (snapshot) => {
+          const raw: unknown = snapshot.val();
+          setPerimeterAdLayoutState(parsePerimeterAdLayout(raw));
+        },
+        (error) =>
+          console.error(
+            "Firebase perimeter adLayout subscription error:",
+            error,
+          ),
+      );
+
+      const appliedAdLayoutPath = `perimeter/${listenPrefix}/adLayout`;
+      const unsubAppliedAdLayout = onValue(
+        ref(database, appliedAdLayoutPath),
+        (snapshot) => {
+          setPerimeterAppliedAdLayoutLoaded(true);
+          setPerimeterAppliedAdLayout(
+            parsePerimeterAppliedAdLayout(snapshot.val()),
+          );
+        },
+        (error) =>
+          console.error(
+            "Firebase perimeter appliedAdLayout subscription error:",
+            error,
+          ),
+      );
+
       return () => {
         unsubMatch();
         unsubController();
@@ -625,6 +675,8 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         unsubPerimeter();
         unsubPerimeterPreview();
         unsubOverlayStatus();
+        unsubAdLayout();
+        unsubAppliedAdLayout();
       };
     }
   }, [listenPrefix]);
@@ -1586,6 +1638,17 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     );
   }, [isAuthenticated, listenPrefix]);
 
+  const setPerimeterAdLayout = useCallback(
+    (layout: PerimeterAdLayout | null) => {
+      if (!listenPrefix || !isAuthenticated) return;
+      set(
+        ref(database, `states/${listenPrefix}/perimeter/adLayout`),
+        layout,
+      ).catch(console.error);
+    },
+    [isAuthenticated, listenPrefix],
+  );
+
   // Auto-start/stop the perimeter LEDs on view transitions: entering the match
   // view turns the perimeter on, leaving any view for idle turns it off. Only
   // writes when the perimeter is enabled, and only after initial subscriptions
@@ -1693,6 +1756,10 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       clearPerimeterOverlay,
       perimeterOverlay,
       perimeterOverlayStatus,
+      setPerimeterAdLayout,
+      perimeterAdLayout,
+      perimeterAppliedAdLayout,
+      perimeterAppliedAdLayoutLoaded,
     }),
     [
       match,
@@ -1766,6 +1833,10 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       clearPerimeterOverlay,
       perimeterOverlay,
       perimeterOverlayStatus,
+      setPerimeterAdLayout,
+      perimeterAdLayout,
+      perimeterAppliedAdLayout,
+      perimeterAppliedAdLayoutLoaded,
     ],
   );
 
@@ -1946,8 +2017,12 @@ export const usePerimeter = () => {
     setPerimeterState,
     setPerimeterOverlay,
     clearPerimeterOverlay,
+    setPerimeterAdLayout,
     perimeterOverlay,
     perimeterOverlayStatus,
+    perimeterAdLayout,
+    perimeterAppliedAdLayout,
+    perimeterAppliedAdLayoutLoaded,
     getServerTime,
   } = useFirebaseState();
   return {
@@ -1957,8 +2032,12 @@ export const usePerimeter = () => {
     setPerimeterState,
     setPerimeterOverlay,
     clearPerimeterOverlay,
+    setPerimeterAdLayout,
     overlay: perimeterOverlay,
     overlayStatus: perimeterOverlayStatus,
+    adLayout: perimeterAdLayout,
+    appliedAdLayout: perimeterAppliedAdLayout,
+    appliedAdLayoutLoaded: perimeterAppliedAdLayoutLoaded,
     getServerTime,
   };
 };
