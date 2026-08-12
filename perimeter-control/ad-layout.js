@@ -4,9 +4,13 @@
  * Validates ad-layout documents from Firebase, stages assets from GCS to the
  * Windows Resolume host via SCP, and loads clips into the Resolume deck
  * columns on the configured base layers. The composition's existing autopilot
- * owns all column cycling and transport — this controller never calls connect,
- * disconnect, loop, or transport endpoints. It only opens files into clip
- * slots and clears them. Each layout column maps 1:1 to a deck column (see
+ * owns all column cycling — this controller never calls clip-level transport
+ * or loop endpoints and never touches the autopilot. It only opens files into
+ * clip slots and clears them, with one exception: because the clear-then-load
+ * on a new revision stops the deck, it restarts playback with
+ * `POST /composition/columns/{column}/connect` after a successful apply when
+ * the base perimeter state was `on` (so the ads keep playing across a layout
+ * change). Each layout column maps 1:1 to a deck column (see
  * mapLayoutToDeckColumns); the autopilot cycles the non-empty columns exactly
  * as it cycles the Efni content, skipping empty trailing columns.
  */
@@ -436,6 +440,14 @@ export class ResolumeAdClient {
     );
   }
 
+  // Restart deck playback by connecting a deck column — the same primitive the
+  // base perimeter `on` state uses. After an ad-layout apply clears and
+  // reloads the clips, this is what puts the new ads back into rotation.
+  async connectColumn(column) {
+    const base = this._baseUrl();
+    await this._post(`${base}/composition/columns/${column}/connect`);
+  }
+
   async getClipInfo(layerId, clipSlot) {
     const base = this._baseUrl();
     return this._get(`${base}/composition/layers/${layerId}/clips/${clipSlot}`);
@@ -474,6 +486,10 @@ export class AdLayoutController {
     this._stopping = false;
     this._dbRef = null;
     this._statusRef = null;
+    // Last known base perimeter state (`on`/`off`), so a layout apply can
+    // restart deck playback when the ads were playing before the clear.
+    this._baseState = null;
+    this._stateRef = null;
     // Applied columns in published status form: { id, deckColumns, files }.
     this._appliedColumns = [];
     this._snapshotChain = Promise.resolve();
@@ -629,6 +645,16 @@ export class AdLayoutController {
 
   // -- Firebase ---------------------------------------------------------------
 
+  // Track the base perimeter state (`states/{location}/perimeter/state`) so a
+  // layout apply knows whether the ads were playing before the clear-then-load
+  // and should be restarted afterwards. Reuses the same `path` the perimeter
+  // controller listens to.
+  _handleBaseState = (snapshot) => {
+    const data = snapshot.val();
+    const state = data !== null && typeof data === "object" ? data.state : data;
+    if (state === "on" || state === "off") this._baseState = state;
+  };
+
   attach(db) {
     this._dbRef = db.ref(this.config.adLayoutPath);
     this._statusRef = db.ref(this.config.adLayoutStatusPath);
@@ -641,6 +667,10 @@ export class AdLayoutController {
           console.error(`Ad-layout snapshot processing error: ${err.message}`);
         });
     });
+    if (this.config.path) {
+      this._stateRef = db.ref(this.config.path);
+      this._stateRef.on("value", this._handleBaseState);
+    }
     console.log(`Ad-layout control listening on: ${this.config.adLayoutPath}`);
   }
 
@@ -718,6 +748,7 @@ export class AdLayoutController {
       return;
     }
     this._currentRevision = revision;
+    const wasOn = this._baseState === "on";
     const { lanes, columnCount } = await this._discoverComposition();
     if (columns.length > columnCount) {
       // The layout maps 1:1 to deck columns; it cannot fit on a deck with
@@ -774,6 +805,13 @@ export class AdLayoutController {
       }
 
       this._appliedColumns = appliedColumns;
+      // The clear-then-load stops the deck even on a working layout, so a
+      // layout change while the perimeter is on would leave the ads stopped.
+      // Restart playback when the ads were playing before the clear (base
+      // state `on` then, and still `on` now).
+      if (wasOn && this._baseState === "on") {
+        await this._restartDeckPlayback();
+      }
       await this._publishStatus("playing", null, lanes);
     } catch (err) {
       console.error(`Failed to load ad layout: ${err.message}`);
@@ -798,12 +836,36 @@ export class AdLayoutController {
     }
   }
 
+  // Restart deck playback after an ad-layout apply that cleared and reloaded
+  // the clips, using the same column the base perimeter `on` state connects.
+  // Best-effort: a failure is logged but does not fail the applied layout —
+  // the next `on` self-heal asserts the autopilot and restarts the deck.
+  async _restartDeckPlayback() {
+    const column = this.config.resolumeColumn || 1;
+    try {
+      await this._retryOp(
+        `restart deck playback (column ${column})`,
+        () => this.resolume.connectColumn(column),
+      );
+      console.log(
+        `Deck playback restarted after ad-layout apply (column ${column})`,
+      );
+    } catch (err) {
+      console.error(
+        `Failed to restart deck playback after ad-layout apply: ${err.message}`,
+      );
+    }
+  }
+
   // -- Shutdown ----------------------------------------------------------------
 
   shutdown() {
     this._stopping = true;
     if (this._dbRef) {
       this._dbRef.off("value");
+    }
+    if (this._stateRef) {
+      this._stateRef.off("value");
     }
   }
 }

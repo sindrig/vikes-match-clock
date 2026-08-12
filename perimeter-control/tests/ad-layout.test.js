@@ -465,11 +465,13 @@ class FakeDb {
 
 function makeAdController() {
   const config = {
+    path: `states/${LOCATION}/perimeter/state`,
     adLayoutPath: `states/${LOCATION}/perimeter/adLayout`,
     adLayoutStatusPath: `perimeter/${LOCATION}/adLayout`,
     adLayoutBucket: BUCKET,
     resolumeBaseUrl: "http://localhost:80/api/v1",
     requestTimeoutMs: 1_000,
+    resolumeColumn: 1,
     thumbnailMaxDim: 320,
     thumbnailQuality: 0.7,
     thumbnailMaxBytes: 100_000,
@@ -528,14 +530,16 @@ function instrumentResolume(controller, composition = mockComposition()) {
   return calls;
 }
 
-test("AdLayoutController attaches to the desired and status paths", () => {
+test("AdLayoutController attaches to the desired, status, and base-state paths", () => {
   const controller = makeAdController();
   const db = new FakeDb();
   controller.attach(db);
-  assert.equal(db.refs.length, 2);
+  assert.equal(db.refs.length, 3);
   assert.equal(db.refs[0].path, `states/${LOCATION}/perimeter/adLayout`);
   assert.equal(db.refs[1].path, `perimeter/${LOCATION}/adLayout`);
+  assert.equal(db.refs[2].path, `states/${LOCATION}/perimeter/state`);
   assert.equal(db.refs[0].handlers.has("value"), true);
+  assert.equal(db.refs[2].handlers.has("value"), true);
   controller.shutdown();
 });
 
@@ -795,6 +799,87 @@ test("AdLayoutController never calls transport endpoints during load or clear", 
   for (const call of calls) {
     assert.ok(!/connect|transport|loop/.test(call), `unexpected call: ${call}`);
   }
+  controller.shutdown();
+});
+
+test("AdLayoutController restarts deck playback after an apply when the perimeter was on", async () => {
+  const controller = makeAdController();
+  const calls = instrumentResolume(controller);
+  controller.resolume.connectColumn = async (column) => {
+    calls.push(`connect:${column}`);
+  };
+
+  const db = new FakeDb();
+  controller.attach(db);
+  db.refs[2].emit("on");
+  db.refs[0].emit(validLayout());
+  await waitFor(() => db.refs[1].setCalls.some((s) => s.phase === "playing"));
+  // The clear-then-load stopped the deck, so the controller reconnects the
+  // base column to put the new ads back into rotation.
+  assert.ok(calls.includes("connect:1"), "expected a deck restart on column 1");
+  controller.shutdown();
+});
+
+test("AdLayoutController leaves the deck stopped when the perimeter is off", async () => {
+  const controller = makeAdController();
+  const calls = instrumentResolume(controller);
+  controller.resolume.connectColumn = async (column) => {
+    calls.push(`connect:${column}`);
+  };
+
+  const db = new FakeDb();
+  controller.attach(db);
+  db.refs[2].emit("off");
+  db.refs[0].emit(validLayout());
+  await waitFor(() => db.refs[1].setCalls.some((s) => s.phase === "playing"));
+  assert.equal(
+    calls.some((c) => c.startsWith("connect:")),
+    false,
+    "deck must stay stopped while the perimeter is off",
+  );
+  controller.shutdown();
+});
+
+test("AdLayoutController does not restart when the perimeter turned off mid-apply", async () => {
+  const controller = makeAdController();
+  const calls = instrumentResolume(controller);
+  controller.resolume.connectColumn = async (column) => {
+    calls.push(`connect:${column}`);
+  };
+
+  const db = new FakeDb();
+  controller.attach(db);
+  db.refs[2].emit("on");
+  db.refs[0].emit(validLayout());
+  // The operator switches the perimeter off before the apply finishes.
+  db.refs[2].emit("off");
+  await waitFor(() => db.refs[1].setCalls.some((s) => s.phase === "playing"));
+  assert.equal(
+    calls.some((c) => c.startsWith("connect:")),
+    false,
+    "deck must not restart once the perimeter is off",
+  );
+  controller.shutdown();
+});
+
+test("AdLayoutController retries a failed deck restart and still publishes playing", async () => {
+  const controller = makeAdController();
+  const calls = instrumentResolume(controller);
+  let attempts = 0;
+  controller.resolume.connectColumn = async () => {
+    attempts += 1;
+    if (attempts < 3) throw new Error("transient");
+  };
+  controller._sleep = async () => {};
+
+  const db = new FakeDb();
+  controller.attach(db);
+  db.refs[2].emit("on");
+  db.refs[0].emit(validLayout());
+  await waitFor(() => db.refs[1].setCalls.some((s) => s.phase === "playing"));
+  assert.ok(attempts >= 3, "the deck restart should have been retried");
+  // A failed restart does not turn the applied layout into an error status.
+  assert.equal(db.refs[1].setCalls.some((s) => s.phase === "error"), false);
   controller.shutdown();
 });
 

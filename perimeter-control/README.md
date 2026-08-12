@@ -374,10 +374,14 @@ The SSH key must provide passwordless access to the Windows Resolume host.
 
 The ad-layout controller is a **content deployer**: it stages ad files from
 Firebase Storage and opens them into the deck columns of the configured base
-layers. It **never drives playback** — no connect, disconnect, loop, or
-transport calls, and no autopilot manipulation. The composition's existing
-autopilot cycles the deck columns exactly as it cycles the Efni content, so
-the Resolume UI stays fully functional.
+layers. It never drives clip-level transport and never touches the autopilot —
+the composition's existing autopilot cycles the deck columns exactly as it
+cycles the Efni content, so the Resolume UI stays fully functional. The one
+exception is a **playback restart**: applying a new revision clears every ad
+slot and reloads them (which stops the deck), so when the base perimeter state
+is `on` the daemon reconnects the base column with
+`POST /composition/columns/{column}/connect` after a successful apply to put
+the new ads back into rotation.
 
 The goal overlay (above) uses the disjoint **overlay** layers; the ad layout
 uses the **base** layers. `assertNoSlotConflicts` in `index.js` rejects any
@@ -401,7 +405,14 @@ overlapping lane configuration at startup.
    `perimeter/${location}/adLayout` with `phase: "loading"` → `"playing"`.
    The autopilot then cycles the columns; the ads play with no further daemon
    involvement.
-6. An empty `columns` array (or a deleted document) clears all ad slots on the
+6. Because the clear-then-load stops the deck, a layout change while the ads
+   were playing would leave them stopped. The daemon tracks the base perimeter
+   state (`states/${location}/perimeter/state`); after a successful apply it
+   restarts the deck with `POST /composition/columns/{column}/connect` (the
+   same primitive the `on` state uses) when the perimeter was `on` before the
+   clear — and still is — so the new ads resume from column 1. The restart is
+   best-effort (retried, failure logged, never fails the applied layout).
+7. An empty `columns` array (or a deleted document) clears all ad slots on the
    ad lanes and publishes `phase: "idle"`.
 
 Thumbnails are fetched once per unique ad file (from its first deck column)
