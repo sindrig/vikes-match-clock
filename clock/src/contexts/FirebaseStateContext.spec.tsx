@@ -1,7 +1,7 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, act } from "@testing-library/react";
-import { onValue, ref } from "firebase/database";
+import { onValue, ref, set, remove } from "firebase/database";
 import {
   FirebaseStateProvider,
   useMatch,
@@ -28,6 +28,8 @@ vi.mock("../firebase", () => ({
 vi.mock("firebase/database", () => ({
   ref: vi.fn(),
   onValue: vi.fn(() => vi.fn()),
+  set: vi.fn(() => Promise.resolve()),
+  remove: vi.fn(() => Promise.resolve()),
 }));
 
 const TestMatchConsumer = ({
@@ -2431,6 +2433,119 @@ describe("FirebaseStateContext", () => {
 
       expect(perimeterApi).not.toBeNull();
       expect(perimeterApi!.preview).toBeNull();
+    });
+  });
+
+  describe("perimeter media pairs", () => {
+    const pairId = "11111111-1111-4111-8111-111111111111";
+    const pair = {
+      name: "Sindri",
+      files: {
+        "2": {
+          name: "48-1-sindri.mp4",
+          source:
+            "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter-overlays/11111111-1111-4111-8111-111111111111/48/48-1-sindri.mp4",
+        },
+        "4": {
+          name: "40-1-sindri.png",
+          source:
+            "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter-overlays/11111111-1111-4111-8111-111111111111/40/40-1-sindri.png",
+        },
+      },
+    };
+
+    function renderMediaPairs(
+      listenPrefix: string,
+      isAuthenticated: boolean,
+      mediaPairsData: unknown = null,
+    ): ReturnType<typeof usePerimeter> | null {
+      vi.mocked(onValue).mockImplementation((reference, callback) => {
+        const path = String(reference);
+        if (path.includes("perimeter/mediaPairs")) {
+          callback({ val: () => mediaPairsData } as never);
+        } else {
+          callback({ val: () => null } as never);
+        }
+        return vi.fn();
+      });
+
+      let perimeterApi: ReturnType<typeof usePerimeter> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix={listenPrefix}
+          isAuthenticated={isAuthenticated}
+          screenKey={null}
+        >
+          <TestPerimeterConsumer
+            onMount={(api) => {
+              perimeterApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      return perimeterApi;
+    }
+
+    it("parses the media pairs library from the Firebase subscription", () => {
+      const perimeterApi = renderMediaPairs("vikuti", true, {
+        [pairId]: pair,
+      });
+
+      expect(perimeterApi).not.toBeNull();
+      expect(perimeterApi!.mediaPairs).toEqual({ [pairId]: pair });
+    });
+
+    it("defaults to an empty library when no pairs exist", () => {
+      const perimeterApi = renderMediaPairs("vikuti", true, null);
+
+      expect(perimeterApi).not.toBeNull();
+      expect(perimeterApi!.mediaPairs).toEqual({});
+    });
+
+    it("createPerimeterMediaPair writes the pair to the mediaPairs path", async () => {
+      const perimeterApi = renderMediaPairs("vikuti", true);
+
+      await act(async () => {
+        await perimeterApi!.createPerimeterMediaPair(pairId, pair);
+      });
+
+      expect(set).toHaveBeenCalledWith(
+        `states/vikuti/perimeter/mediaPairs/${pairId}`,
+        pair,
+      );
+    });
+
+    it("deletePerimeterMediaPair removes only the library record", async () => {
+      const perimeterApi = renderMediaPairs("vikuti", true);
+
+      await act(async () => {
+        await perimeterApi!.deletePerimeterMediaPair(pairId);
+      });
+
+      expect(remove).toHaveBeenCalledWith(
+        `states/vikuti/perimeter/mediaPairs/${pairId}`,
+      );
+      expect(set).not.toHaveBeenCalled();
+    });
+
+    it("blocks createPerimeterMediaPair when not authenticated", async () => {
+      const perimeterApi = renderMediaPairs("vikuti", false);
+
+      await act(async () => {
+        await perimeterApi!.createPerimeterMediaPair(pairId, pair);
+      });
+
+      expect(set).not.toHaveBeenCalled();
+    });
+
+    it("blocks deletePerimeterMediaPair when listenPrefix is empty", async () => {
+      const perimeterApi = renderMediaPairs("", true);
+
+      await act(async () => {
+        await perimeterApi!.deletePerimeterMediaPair(pairId);
+      });
+
+      expect(remove).not.toHaveBeenCalled();
     });
   });
 });

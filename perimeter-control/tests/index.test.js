@@ -1610,6 +1610,120 @@ test("validateOverlayDoc accepts filenames with spaces", () => {
   assert.equal(result.valid, true);
 });
 
+// -- overlay named media-pair source validation --------------------------------
+
+const BUCKET = "vikes-match-clock-firebase.appspot.com";
+const TARGET_FOLDERS = { 2: "48", 4: "40" };
+const PAIR_ID = "11111111-1111-4111-8111-111111111111";
+
+function pairOverlayDoc(layer2Source, layer4Source) {
+  return {
+    version: 1,
+    id: "pair-1",
+    columns: [
+      {
+        durationMs: 10000,
+        files: {
+          2: { name: "48-1-a.mp4", source: layer2Source },
+          4: { name: "40-1-b.png", source: layer4Source },
+        },
+      },
+    ],
+  };
+}
+
+test("validateOverlayDoc accepts named-pair sources under the pair target folders", () => {
+  const doc = pairOverlayDoc(
+    `gs://${BUCKET}/vikuti/perimeter-overlays/${PAIR_ID}/48/48-1-a.mp4`,
+    `gs://${BUCKET}/vikuti/perimeter-overlays/${PAIR_ID}/40/40-1-b.png`,
+  );
+  const result = validateOverlayDoc(doc, ["2", "4"], {
+    location: "vikuti",
+    targetFolders: TARGET_FOLDERS,
+  });
+  assert.equal(result.valid, true);
+});
+
+test("validateOverlayDoc accepts legacy goal sources under {location}/perimeter/", () => {
+  const doc = pairOverlayDoc(
+    `gs://${BUCKET}/vikuti/perimeter/goal-48.mp4`,
+    `gs://${BUCKET}/vikuti/perimeter/goal-40.mp4`,
+  );
+  const result = validateOverlayDoc(doc, ["2", "4"], {
+    location: "vikuti",
+    targetFolders: TARGET_FOLDERS,
+  });
+  assert.equal(result.valid, true);
+});
+
+test("validateOverlayDoc rejects cross-location sources", () => {
+  const doc = pairOverlayDoc(
+    `gs://${BUCKET}/other/perimeter-overlays/${PAIR_ID}/48/48-1-a.mp4`,
+    `gs://${BUCKET}/other/perimeter-overlays/${PAIR_ID}/40/40-1-b.png`,
+  );
+  const result = validateOverlayDoc(doc, ["2", "4"], {
+    location: "vikuti",
+    targetFolders: TARGET_FOLDERS,
+  });
+  assert.equal(result.valid, false);
+  assert.ok(result.reason.includes("invalid source"));
+});
+
+test("validateOverlayDoc rejects a wrong bucket", () => {
+  const doc = pairOverlayDoc(
+    `gs://wrong-bucket.appspot.com/vikuti/perimeter-overlays/${PAIR_ID}/48/48-1-a.mp4`,
+    `gs://wrong-bucket.appspot.com/vikuti/perimeter-overlays/${PAIR_ID}/40/40-1-b.png`,
+  );
+  const result = validateOverlayDoc(doc, ["2", "4"], {
+    location: "vikuti",
+    targetFolders: TARGET_FOLDERS,
+  });
+  assert.equal(result.valid, false);
+});
+
+test("validateOverlayDoc rejects traversal in the source path", () => {
+  const doc = pairOverlayDoc(
+    `gs://${BUCKET}/vikuti/perimeter/../goal-48.mp4`,
+    `gs://${BUCKET}/vikuti/perimeter/goal-40.mp4`,
+  );
+  const result = validateOverlayDoc(doc, ["2", "4"], {
+    location: "vikuti",
+    targetFolders: TARGET_FOLDERS,
+  });
+  assert.equal(result.valid, false);
+});
+
+test("validateOverlayDoc rejects arbitrary perimeter-overlays paths", () => {
+  const doc = pairOverlayDoc(
+    `gs://${BUCKET}/vikuti/perimeter-overlays/${PAIR_ID}/48/48-1-a.mp4`,
+    `gs://${BUCKET}/vikuti/perimeter-overlays/loose-file.mp4`,
+  );
+  const result = validateOverlayDoc(doc, ["2", "4"], {
+    location: "vikuti",
+    targetFolders: TARGET_FOLDERS,
+  });
+  assert.equal(result.valid, false);
+});
+
+test("validateOverlayDoc rejects a target/layer folder mismatch", () => {
+  // Layer "2" must point at /48/; a /40/ path is invalid for that layer.
+  const doc = pairOverlayDoc(
+    `gs://${BUCKET}/vikuti/perimeter-overlays/${PAIR_ID}/40/40-1-b.png`,
+    `gs://${BUCKET}/vikuti/perimeter-overlays/${PAIR_ID}/40/40-1-b.png`,
+  );
+  const result = validateOverlayDoc(doc, ["2", "4"], {
+    location: "vikuti",
+    targetFolders: TARGET_FOLDERS,
+  });
+  assert.equal(result.valid, false);
+  assert.ok(result.reason.includes("invalid source"));
+});
+
+test("loadConfig exposes default overlay layer target folders", () => {
+  const config = loadConfig({});
+  assert.deepEqual(config.overlayLayerTargetFolders, { 2: "48", 4: "40" });
+});
+
 // -- overlay sshArgs known-hosts -------------------------------------------------
 
 test("_sshArgs uses a persistent known-hosts file in the cache dir", () => {

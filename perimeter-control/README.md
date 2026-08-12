@@ -340,9 +340,31 @@ See `perimeter-control.env.example` for all overlay environment variables:
 `PERIMETER_OVERLAY_ENABLED`, `PERIMETER_OVERLAY_PATH`, `PERIMETER_OVERLAY_STATUS_PATH`,
 `PERIMETER_OVERLAY_GCP_PROJECT`, `PERIMETER_OVERLAY_CACHE_DIR`,
 `PERIMETER_OVERLAY_SSH_HOST/USER/KEY`, `PERIMETER_OVERLAY_REMOTE_CONTENT_DIR`,
-`PERIMETER_OVERLAY_LAYER_IDS`, `PERIMETER_OVERLAY_LAYER_CLIP_COLUMNS`.
+`PERIMETER_OVERLAY_LAYER_IDS`, `PERIMETER_OVERLAY_LAYER_CLIP_COLUMNS`,
+`PERIMETER_OVERLAY_LAYER_TARGET_FOLDERS`.
 
 The SSH key must provide passwordless access to the Windows Resolume host.
+
+### Accepted GCS source paths (goal + named pairs)
+
+The overlay controller accepts exactly two source families, both in the
+approved `vikes-match-clock-firebase.appspot.com` bucket:
+
+1. **Legacy home-goal files** — `gs://{bucket}/{location}/perimeter/{filename}`
+   (e.g. `goal-48.mp4`, `goal-40.mp4`). The location is derived from the
+   overlay path (`states/{location}/perimeter/overlay`).
+2. **Named media-pair files** —
+   `gs://{bucket}/{location}/perimeter-overlays/{pairId}/{48|40}/{filename}`.
+   The target folder must match the layer's configured target folder: layer
+   `"2"` → `48`, layer `"4"` → `40`
+   (`PERIMETER_OVERLAY_LAYER_TARGET_FOLDERS`, default
+   `{"2":"48","4":"40"}`). Any other object path — a foreign location, an
+   arbitrary `perimeter-overlays` path, a traversal (`..`), or a
+   target/layer mismatch — is rejected.
+
+These named pairs use the same single active overlay channel as the goal
+overlay: whichever overlay document is written most recently wins, and the
+pair keeps looping until `overlay: null` (the shared clear path).
 
 ## Perimeter ad layout (content deployer on the base layers)
 

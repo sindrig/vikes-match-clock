@@ -16,6 +16,7 @@ import type {
   PerimeterOverlay,
   PerimeterOverlayColumn,
   PerimeterOverlayFile,
+  PerimeterMediaPair,
   PerimeterAdLayout,
   PerimeterAdLayoutColumn,
   PerimeterAdLayoutFile,
@@ -483,30 +484,54 @@ function validateOverlayFileName(name: string): boolean {
   return true;
 }
 
-function validateOverlaySource(source: string): boolean {
+// Two source families are permitted for the single active overlay channel:
+// the legacy home-goal files under `{location}/perimeter/` and named media-pair
+// files under `{location}/perimeter-overlays/{pairId}/48|40/`. Bucket stays the
+// approved overlay bucket; the location (when provided) scopes the object path.
+function validateOverlaySource(
+  source: string,
+  options?: { location?: string; bucket?: string },
+): boolean {
   if (!source) return false;
   if (!source.startsWith("gs://")) return false;
   const bucketAndPath = source.slice(5);
   const slashIdx = bucketAndPath.indexOf("/");
   if (slashIdx < 0) return false;
   const bucketName = bucketAndPath.slice(0, slashIdx);
-  if (bucketName !== ALLOWED_OVERLAY_BUCKET) return false;
+  const expectedBucket = options?.bucket ?? ALLOWED_OVERLAY_BUCKET;
+  if (bucketName !== expectedBucket) return false;
   const objectPath = bucketAndPath.slice(slashIdx + 1);
   if (!objectPath) return false;
+  if (options?.location) {
+    const goalPrefix = `${options.location}/perimeter/`;
+    const pairPrefix = `${options.location}/perimeter-overlays/`;
+    if (
+      !objectPath.startsWith(goalPrefix) &&
+      !objectPath.startsWith(pairPrefix)
+    ) {
+      return false;
+    }
+  }
   return true;
 }
 
-function parseOverlayFile(data: unknown): PerimeterOverlayFile | undefined {
+function parseOverlayFile(
+  data: unknown,
+  options?: { location?: string; bucket?: string },
+): PerimeterOverlayFile | undefined {
   if (!data || typeof data !== "object") return undefined;
   const raw = data as Record<string, unknown>;
   const name = typeof raw.name === "string" ? raw.name : "";
   const source = typeof raw.source === "string" ? raw.source : "";
   if (!validateOverlayFileName(name)) return undefined;
-  if (!validateOverlaySource(source)) return undefined;
+  if (!validateOverlaySource(source, options)) return undefined;
   return { name, source };
 }
 
-function parseOverlayColumn(data: unknown): PerimeterOverlayColumn | undefined {
+function parseOverlayColumn(
+  data: unknown,
+  options?: { location?: string; bucket?: string },
+): PerimeterOverlayColumn | undefined {
   if (!data || typeof data !== "object") return undefined;
   const raw = data as Record<string, unknown>;
   const durationMs =
@@ -523,7 +548,7 @@ function parseOverlayColumn(data: unknown): PerimeterOverlayColumn | undefined {
   for (const [key, value] of Object.entries(
     filesRaw as Record<string, unknown>,
   )) {
-    const parsed = parseOverlayFile(value);
+    const parsed = parseOverlayFile(value, options);
     if (!parsed) return undefined;
     if (names.has(parsed.name)) return undefined;
     names.add(parsed.name);
@@ -533,7 +558,10 @@ function parseOverlayColumn(data: unknown): PerimeterOverlayColumn | undefined {
   return { durationMs, files };
 }
 
-export function parsePerimeterOverlay(data: unknown): PerimeterOverlay | null {
+export function parsePerimeterOverlay(
+  data: unknown,
+  options?: { location?: string; bucket?: string },
+): PerimeterOverlay | null {
   if (data === null) return null;
   if (!data || typeof data !== "object") return null;
   const raw = data as Record<string, unknown>;
@@ -546,11 +574,119 @@ export function parsePerimeterOverlay(data: unknown): PerimeterOverlay | null {
   if (columnsRaw.length > MAX_OVERLAY_COLUMNS) return null;
   const columns: PerimeterOverlayColumn[] = [];
   for (const entry of columnsRaw) {
-    const column = parseOverlayColumn(entry);
+    const column = parseOverlayColumn(entry, options);
     if (!column) return null;
     columns.push(column);
   }
   return { version, id, columns };
+}
+
+// -- Named perimeter media pairs ----------------------------------------------
+//
+// A library of operator-created overlay pairs stored under
+// `states/{location}/perimeter/mediaPairs/{pairId}`. Each pair has a required
+// name and exactly two files: layer "2" targets the 48-screen column and layer
+// "4" targets the 40-screen column. Files must live under the pair's own
+// `perimeter-overlays/{pairId}/{48|40}/` prefix in the approved bucket.
+
+const MEDIA_PAIR_TARGETS = [
+  { key: "2", folder: "48" },
+  { key: "4", folder: "40" },
+] as const;
+const MEDIA_PAIR_TARGET_KEYS = MEDIA_PAIR_TARGETS.map((target) => target.key);
+const MEDIA_PAIR_ID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// Must match the daemon's SAFE_FILENAME_RE so a saved pair is always stageable.
+const MEDIA_PAIR_FILENAME_RE = /^[A-Za-z0-9._ -]+$/;
+const MAX_MEDIA_PAIR_NAME_LENGTH = 80;
+
+function validateMediaPairFileName(name: string): boolean {
+  if (!name || name.length > 255) return false;
+  if (!MEDIA_PAIR_FILENAME_RE.test(name)) return false;
+  return true;
+}
+
+function validateMediaPairSource(
+  source: string,
+  options: { location: string; bucket: string },
+  pairId: string,
+  targetFolder: string,
+): boolean {
+  const prefix = `gs://${options.bucket}/${options.location}/perimeter-overlays/${pairId}/${targetFolder}/`;
+  if (!source.startsWith(prefix)) return false;
+  return source.length > prefix.length;
+}
+
+export function parsePerimeterMediaPairs(
+  data: unknown,
+  options?: { location?: string; bucket?: string },
+): Record<string, PerimeterMediaPair> {
+  if (!data || typeof data !== "object") return {};
+  const raw = data as Record<string, unknown>;
+  const location = options?.location;
+  const bucket = options?.bucket ?? ALLOWED_OVERLAY_BUCKET;
+
+  const result: Record<string, PerimeterMediaPair> = {};
+  for (const [pairId, value] of Object.entries(raw)) {
+    if (!MEDIA_PAIR_ID_RE.test(pairId)) continue;
+    if (!value || typeof value !== "object") continue;
+    const entry = value as Record<string, unknown>;
+
+    const name = typeof entry.name === "string" ? entry.name.trim() : "";
+    if (!name || name.length > MAX_MEDIA_PAIR_NAME_LENGTH) continue;
+
+    const filesRaw = entry.files;
+    if (!filesRaw || typeof filesRaw !== "object") continue;
+    const filesMap = filesRaw as Record<string, unknown>;
+    const keys = Object.keys(filesMap);
+    if (
+      keys.length !== MEDIA_PAIR_TARGET_KEYS.length ||
+      !MEDIA_PAIR_TARGET_KEYS.every((key) => keys.includes(key))
+    ) {
+      continue;
+    }
+
+    const files: Record<string, PerimeterOverlayFile> = {};
+    const seenNames = new Set<string>();
+    let valid = true;
+    for (const target of MEDIA_PAIR_TARGETS) {
+      const fileData = filesMap[target.key];
+      if (!fileData || typeof fileData !== "object") {
+        valid = false;
+        break;
+      }
+      const file = fileData as Record<string, unknown>;
+      const fileName = typeof file.name === "string" ? file.name : "";
+      const source = typeof file.source === "string" ? file.source : "";
+      if (!validateMediaPairFileName(fileName) || seenNames.has(fileName)) {
+        valid = false;
+        break;
+      }
+      seenNames.add(fileName);
+      if (location) {
+        if (
+          !validateMediaPairSource(
+            source,
+            { location, bucket },
+            pairId,
+            target.folder,
+          )
+        ) {
+          valid = false;
+          break;
+        }
+      } else if (!validateOverlaySource(source)) {
+        valid = false;
+        break;
+      }
+      files[target.key] = { name: fileName, source };
+    }
+    if (!valid) continue;
+
+    result[pairId] = { name, files };
+  }
+
+  return result;
 }
 
 export function parseClubOverrides(

@@ -38,7 +38,7 @@ function validateFileName(name) {
   return true;
 }
 
-function validateGcsSource(source) {
+function validateGcsSource(source, options = {}) {
   if (!source || typeof source !== "string") return false;
   if (!source.startsWith(ALLOWED_GCS_PREFIX)) return false;
   const bucketAndPath = source.slice(ALLOWED_GCS_PREFIX.length);
@@ -48,10 +48,34 @@ function validateGcsSource(source) {
   if (bucketName !== ALLOWED_BUCKET) return false;
   const objectPath = bucketAndPath.slice(slashIdx + 1);
   if (!objectPath) return false;
+  // Reject traversal and control characters in the object path.
+  if (/\.\.|\p{Cc}/u.test(objectPath)) return false;
+
+  const location = options.location;
+  if (!location) return true;
+
+  // Family 1 — legacy home-goal files under `{location}/perimeter/`.
+  const goalPrefix = `${location}/perimeter/`;
+  if (objectPath.startsWith(goalPrefix)) return true;
+
+  // Family 2 — named media-pair files under
+  // `{location}/perimeter-overlays/{pairId}/{48|40}/{filename}`. The target
+  // folder must match the layer's configured folder (layer "2" -> "48",
+  // layer "4" -> "40").
+  const pairPrefix = `${location}/perimeter-overlays/`;
+  if (!objectPath.startsWith(pairPrefix)) return false;
+  const rest = objectPath.slice(pairPrefix.length);
+  const parts = rest.split("/");
+  if (parts.length !== 3) return false;
+  const [pairId, targetFolder, filename] = parts;
+  if (!pairId || !targetFolder || !filename) return false;
+  if (options.targetFolder && targetFolder !== options.targetFolder) {
+    return false;
+  }
   return true;
 }
 
-export function validateOverlayDoc(data, configuredLayerIds) {
+export function validateOverlayDoc(data, configuredLayerIds, options = {}) {
   if (data === null || data === undefined) return { valid: true, clear: true };
   if (!data || typeof data !== "object") {
     return { valid: false, reason: "not an object" };
@@ -72,6 +96,8 @@ export function validateOverlayDoc(data, configuredLayerIds) {
   }
 
   const expectedLayerSet = new Set(configuredLayerIds || []);
+  const location = options.location;
+  const targetFolders = options.targetFolders || {};
 
   for (let ci = 0; ci < raw.columns.length; ci += 1) {
     const col = raw.columns[ci];
@@ -127,7 +153,12 @@ export function validateOverlayDoc(data, configuredLayerIds) {
         return { valid: false, reason: `column ${ci} duplicate filename ${f.name}` };
       }
       names.add(f.name);
-      if (!validateGcsSource(f.source)) {
+      if (
+        !validateGcsSource(f.source, {
+          location,
+          targetFolder: targetFolders[key],
+        })
+      ) {
         return { valid: false, reason: `column ${ci} file ${key} invalid source` };
       }
     }
@@ -628,8 +659,16 @@ export class OverlayController {
     console.log(`Overlay control listening on: ${this.config.overlayPath}`);
   }
 
+  _locationFromPath() {
+    const parts = (this.config.overlayPath || "").split("/");
+    return parts.length >= 2 ? parts[1] : null;
+  }
+
   async _handleSnapshot(data) {
-    const result = validateOverlayDoc(data, this.config.overlayLayerIds);
+    const result = validateOverlayDoc(data, this.config.overlayLayerIds, {
+      location: this._locationFromPath(),
+      targetFolders: this.config.overlayLayerTargetFolders,
+    });
     if (!result.valid) {
       const reason = result.reason || "unknown";
       console.warn(`Ignoring invalid overlay document: ${reason}`);
