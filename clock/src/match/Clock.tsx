@@ -9,7 +9,8 @@ interface ClockProps {
 
 const Clock: React.FC<ClockProps> = ({ className }) => {
   const { match, pauseMatch, buzz, getServerTime } = useMatch();
-  const { started, halfStops, timeElapsed, showInjuryTime, countdown } = match;
+  const { started, halfStops, timeElapsed, injuryTimeDisplayMode, countdown } =
+    match;
 
   const halfStop = halfStops[0];
 
@@ -23,19 +24,28 @@ const Clock: React.FC<ClockProps> = ({ className }) => {
     }
     const secondsElapsed = Math.floor(milliSecondsElapsed / 1000);
     const minutesElapsed = Math.floor(secondsElapsed / 60);
-    let minutes = showInjuryTime
-      ? minutesElapsed
-      : Math.min(minutesElapsed, halfStop ?? 0);
+    const halfStopReached = !!halfStop && minutesElapsed >= halfStop;
+    let minutes;
     let seconds;
-    if (!showInjuryTime && halfStop && minutes >= halfStop && started) {
-      seconds = 0;
-      if (!hasFiredHalfStop.current) {
-        hasFiredHalfStop.current = true;
-        pauseMatch(true);
-        buzz(true);
+    if (injuryTimeDisplayMode === "stop") {
+      minutes = Math.min(minutesElapsed, halfStop ?? 0);
+      if (halfStopReached && started) {
+        seconds = 0;
+        if (!hasFiredHalfStop.current) {
+          hasFiredHalfStop.current = true;
+          pauseMatch(true);
+          buzz(true);
+        }
+      } else {
+        seconds = secondsElapsed % 60;
       }
     } else {
-      seconds = secondsElapsed % 60;
+      minutes = minutesElapsed;
+      if (injuryTimeDisplayMode === "minutes" && halfStopReached) {
+        seconds = 0;
+      } else {
+        seconds = secondsElapsed % 60;
+      }
     }
     if (countdown) {
       seconds *= -1;
@@ -59,7 +69,7 @@ const Clock: React.FC<ClockProps> = ({ className }) => {
     timeElapsed,
     pauseMatch,
     buzz,
-    showInjuryTime,
+    injuryTimeDisplayMode,
     countdown,
     getServerTime,
   ]);

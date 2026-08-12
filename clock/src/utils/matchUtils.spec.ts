@@ -110,6 +110,7 @@ describe("matchUtils", () => {
       buzzer: false,
       countdown: false,
       halftimeCountdown: false,
+      injuryTimeDisplayMode: "full",
       ...overrides,
     });
 

@@ -19,6 +19,7 @@ import { ref, onValue } from "firebase/database";
 import { set } from "firebase/database";
 import {
   Match,
+  InjuryTimeDisplayMode,
   ControllerState,
   ViewState,
   ListenersState,
@@ -90,7 +91,7 @@ const defaultMatch: Match = {
   buzzer: false,
   countdown: false,
   halftimeCountdown: false,
-  showInjuryTime: true,
+  injuryTimeDisplayMode: "full",
 };
 
 const defaultController: ControllerState = {
@@ -180,7 +181,7 @@ interface FirebaseStateContextType {
   removePenalty: (key: string) => void;
   addToPenalty: (key: string, toAdd: number) => void;
   updateHalfLength: (currentValue: number, newValue: string) => void;
-  setHalfStops: (halfStops: number[], showInjuryTime: boolean) => void;
+  setHalfStops: (halfStops: number[], mode: InjuryTimeDisplayMode) => void;
   matchTimeout: (team: "home" | "away") => void;
   removeTimeout: () => void;
   buzz: (on: boolean) => void;
@@ -1000,11 +1001,11 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   );
 
   const setHalfStops = useCallback(
-    (halfStops: number[], showInjuryTime: boolean) => {
+    (halfStops: number[], mode: InjuryTimeDisplayMode) => {
       applyMatchUpdate((prev) => ({
         ...prev,
         halfStops,
-        showInjuryTime: showInjuryTime || false,
+        injuryTimeDisplayMode: mode,
       }));
     },
     [applyMatchUpdate],

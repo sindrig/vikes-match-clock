@@ -44,7 +44,7 @@ const defaultMatch: Match = {
   buzzer: false,
   countdown: false,
   halftimeCountdown: false,
-  showInjuryTime: false,
+  injuryTimeDisplayMode: "full",
 };
 
 const defaultController: ControllerState = {
@@ -452,23 +452,59 @@ describe("firebaseParsers", () => {
     it("parses boolean fields", () => {
       const data = {
         countdown: true,
-        showInjuryTime: true,
+        injuryTimeDisplayMode: "minutes",
       };
 
       const result = parseMatch(data, defaultMatch);
       expect(result!.countdown).toBe(true);
-      expect(result!.showInjuryTime).toBe(true);
+      expect(result!.injuryTimeDisplayMode).toBe("minutes");
     });
 
-    it("uses default for non-boolean countdown/showInjuryTime", () => {
+    it("uses default for non-boolean countdown", () => {
       const data = {
         countdown: "true",
-        showInjuryTime: 1,
       };
 
       const result = parseMatch(data, defaultMatch);
       expect(result!.countdown).toBe(defaultMatch.countdown);
-      expect(result!.showInjuryTime).toBe(defaultMatch.showInjuryTime);
+    });
+
+    it("parses each injuryTimeDisplayMode value", () => {
+      (["stop", "full", "minutes"] as const).forEach((mode) => {
+        const result = parseMatch(
+          { injuryTimeDisplayMode: mode },
+          defaultMatch,
+        );
+        expect(result!.injuryTimeDisplayMode).toBe(mode);
+      });
+    });
+
+    it("uses default injuryTimeDisplayMode when value is invalid", () => {
+      const result = parseMatch(
+        { injuryTimeDisplayMode: "bogus" },
+        defaultMatch,
+      );
+      expect(result!.injuryTimeDisplayMode).toBe(
+        defaultMatch.injuryTimeDisplayMode,
+      );
+    });
+
+    it("migrates legacy showInjuryTime false to stop", () => {
+      const result = parseMatch({ showInjuryTime: false }, defaultMatch);
+      expect(result!.injuryTimeDisplayMode).toBe("stop");
+    });
+
+    it("migrates legacy showInjuryTime true to full", () => {
+      const result = parseMatch({ showInjuryTime: true }, defaultMatch);
+      expect(result!.injuryTimeDisplayMode).toBe("full");
+    });
+
+    it("prefers injuryTimeDisplayMode over legacy showInjuryTime", () => {
+      const result = parseMatch(
+        { showInjuryTime: false, injuryTimeDisplayMode: "minutes" },
+        defaultMatch,
+      );
+      expect(result!.injuryTimeDisplayMode).toBe("minutes");
     });
 
     it("parses matchType string field", () => {

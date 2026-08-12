@@ -45,7 +45,7 @@ describe("MatchActionSettings", () => {
         matchStartTime: "15:00",
         matchType: Sports.Football,
         halfStops: [45, 90],
-        showInjuryTime: false,
+        injuryTimeDisplayMode: "stop",
       },
       updateMatch: mockUpdateMatch,
       updateHalfLength: mockUpdateHalfLength,
@@ -166,7 +166,7 @@ describe("MatchActionSettings", () => {
           matchStartTime: "17:45",
           matchType: Sports.Football,
           halfStops: [45, 90],
-          showInjuryTime: false,
+          injuryTimeDisplayMode: "stop",
         },
         updateMatch: mockUpdateMatch,
         updateHalfLength: mockUpdateHalfLength,
@@ -184,7 +184,7 @@ describe("MatchActionSettings", () => {
           matchStartTime: "15:00",
           matchType: Sports.Handball,
           halfStops: [30, 60],
-          showInjuryTime: false,
+          injuryTimeDisplayMode: "stop",
         },
         updateMatch: mockUpdateMatch,
         updateHalfLength: mockUpdateHalfLength,
@@ -223,6 +223,25 @@ describe("MatchActionSettings", () => {
         ".background-selector",
       ) as HTMLSelectElement;
       expect(updatedSelect.value).toBe(newBackground);
+    });
+  });
+
+  describe("Injury Time Display Mode Selector", () => {
+    it("renders the three mode options", () => {
+      render(<MatchActionSettings />);
+
+      expect(screen.getByDisplayValue("Stoppa við lok")).toBeInTheDocument();
+      expect(screen.getByText("Mínútur og sekúndur")).toBeInTheDocument();
+      expect(screen.getByText("Aðeins mínútur")).toBeInTheDocument();
+    });
+
+    it("calls setHalfStops with the selected mode", () => {
+      render(<MatchActionSettings />);
+
+      const select = screen.getByDisplayValue("Stoppa við lok");
+      fireEvent.change(select, { target: { value: "minutes" } });
+
+      expect(mockSetHalfStops).toHaveBeenCalledWith([45, 90], "minutes");
     });
   });
 

@@ -72,7 +72,7 @@ async function clearEmulatorData(): Promise<void> {
             awayTimeouts: 0,
             buzzer: false,
             countdown: false,
-            showInjuryTime: true,
+            injuryTimeDisplayMode: "full",
           },
           controller: {
             queues: {},

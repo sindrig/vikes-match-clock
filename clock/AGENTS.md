@@ -649,7 +649,7 @@ The idle screen can display an optional sponsor ad image. The image is selected 
 #### Clock Management (`src/match/Clock.tsx`)
 
 - Main match timer with "half stops" (auto-stop at 45:00/90:00)
-- Injury time logic
+- Injury time display modes (see **Injury Time Display Mode** below)
 
 #### Penalties/Red Cards
 
@@ -659,6 +659,29 @@ The idle screen can display an optional sponsor ad image. The image is selected 
 #### HalfStops (`src/controller/HalfStops.tsx`)
 
 Ensures the clock stops exactly at period end (e.g., 45:00) even if the controller doesn't click precisely.
+
+#### Injury Time Display Mode
+
+The legacy boolean `showInjuryTime` was replaced by the typed
+`injuryTimeDisplayMode` field on `Match`. The mode applies after **every**
+half-stop (not just the final one), matching the old behavior.
+
+| Mode      | Behavior at half-stop                                          |
+| --------- | -------------------------------------------------------------- |
+| `stop`    | Pause, force seconds to `00`, buzz once (legacy `false`).      |
+| `full`    | Continue counting elapsed minutes and seconds (legacy `true`). |
+| `minutes` | Continue counting, but render whole minutes with `:00` seconds (e.g. `91:00`). |
+
+**Migration**: `firebaseParsers.ts` derives the mode from a legacy
+`showInjuryTime` snapshot when `injuryTimeDisplayMode` is absent
+(`false → "stop"`, `true → "full"`). The legacy field is never retained in
+application state and never written. Read-only displays derive the mode
+without writing; authenticated controllers persist the new field on their
+next write.
+
+**Controller**: `HalfStops.tsx` renders a three-option selector and calls
+`setHalfStops(halfStops, mode)`. `MatchActions.tsx` shows the
+"Næsti hálfleikur" button whenever the mode is not `stop`.
 
 ### 5. Global Shortcuts (`src/hooks/useGlobalShortcuts.ts`)
 
