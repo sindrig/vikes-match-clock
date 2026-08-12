@@ -11,10 +11,12 @@ import {
 import {
   ResolumeCompositionReader,
   collectClipsByColumn,
+  compositionGrid,
   extractClipFilename,
   parseColumns,
   reencodeThumbnail,
 } from "../resolume-preview.js";
+import { OverlayController, ResolumeOverlayClient } from "../overlay.js";
 
 // -- config ---------------------------------------------------------------
 
@@ -888,6 +890,271 @@ test("loadConfig overlay disabled still returns overlay config fields", () => {
   const config = loadConfig({ PERIMETER_OVERLAY_ENABLED: "false" });
   assert.equal(config.overlayEnabled, false);
   assert.equal(config.overlayPath, "states/vikuti/perimeter/overlay");
+});
+
+// -- overlay deck geometry -----------------------------------------------------------
+
+test("compositionGrid reads column count, active column and per-layer slots", () => {
+  const grid = compositionGrid({
+    columns: [
+      { id: 1, selected: { value: false } },
+      { id: 2, selected: { value: true } },
+      { id: 3, selected: { value: false } },
+    ],
+    layers: [
+      { clips: [null, {}, {}] },
+      { clips: [{}, {}] },
+      null,
+    ],
+  });
+  assert.deepEqual(grid, {
+    columnCount: 3,
+    activeColumn: 2,
+    layerClipCounts: { 1: 3, 2: 2 },
+  });
+});
+
+test("compositionGrid tolerates boolean and string selected values", () => {
+  assert.equal(
+    compositionGrid({
+      columns: [{ selected: true }, { selected: false }, {}],
+    }).activeColumn,
+    1,
+  );
+  assert.equal(
+    compositionGrid({
+      columns: [{ selected: false }, { selected: "true" }, {}],
+    }).activeColumn,
+    2,
+  );
+});
+
+test("compositionGrid defaults on malformed composition", () => {
+  assert.deepEqual(compositionGrid(null), {
+    columnCount: 0,
+    activeColumn: 1,
+    layerClipCounts: {},
+  });
+  assert.deepEqual(compositionGrid({ layers: [] }), {
+    columnCount: 0,
+    activeColumn: 1,
+    layerClipCounts: {},
+  });
+});
+
+test("ResolumeOverlayClient.getColumnGrid reads the live composition", async (t) => {
+  t.mock.method(globalThis, "fetch", async () => ({
+    ok: true,
+    status: 200,
+    json: async () => ({
+      columns: [{ selected: { value: false } }, { selected: { value: true } }],
+      layers: [{ clips: [null, null] }],
+    }),
+  }));
+  const client = new ResolumeOverlayClient({
+    resolumeBaseUrl: "http://localhost:80/api/v1",
+    requestTimeoutMs: 1_000,
+  });
+  const grid = await client.getColumnGrid();
+  assert.deepEqual(grid, {
+    columnCount: 2,
+    activeColumn: 2,
+    layerClipCounts: { 1: 2 },
+  });
+});
+
+test("ResolumeOverlayClient.getColumnGrid rejects a failed read", async (t) => {
+  t.mock.method(globalThis, "fetch", async () => ({
+    ok: false,
+    status: 500,
+  }));
+  const client = new ResolumeOverlayClient({
+    resolumeBaseUrl: "http://localhost:80/api/v1",
+    requestTimeoutMs: 1_000,
+  });
+  await assert.rejects(client.getColumnGrid(), /HTTP 500/);
+});
+
+// -- overlay playback across deck columns ---------------------------------------------
+
+function makeOverlayController(env = {}) {
+  const config = loadConfig({
+    PERIMETER_INITIAL_BACKOFF_SECONDS: "0.01",
+    PERIMETER_MAX_BACKOFF_SECONDS: "0.02",
+    ...env,
+  });
+  return new OverlayController(config);
+}
+
+const OVERLAY_DOC = {
+  version: 1,
+  id: "overlay-1",
+  columns: [
+    {
+      durationMs: 10000,
+      files: {
+        "2": {
+          name: "goal-48.mp4",
+          source:
+            "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/goal-48.mp4",
+        },
+        "4": {
+          name: "goal-40.mp4",
+          source:
+            "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/goal-40.mp4",
+        },
+      },
+    },
+  ],
+};
+
+test("overlay stage mirrors the file into every clip column of each layer", async () => {
+  const controller = makeOverlayController();
+  const calls = [];
+  controller.resolume = {
+    getColumnGrid: async () => ({
+      columnCount: 3,
+      activeColumn: 2,
+      layerClipCounts: { 2: 3, 4: 3 },
+    }),
+    clearClip: async (layerId, slot) => calls.push(["clear", layerId, slot]),
+    loadClip: async (layerId, slot, path) =>
+      calls.push(["load", layerId, slot, path]),
+    connectClip: async () => {},
+  };
+  controller.stager.stageAsset = async () => "C:/Content/goal-48.mp4";
+
+  await controller._stageAndLoadColumn(OVERLAY_DOC.columns[0]);
+
+  assert.equal(controller._activeColumn, 2);
+  const sortKey = ([op, l, s]) => `${op}:${l}:${s}`;
+  const clears = calls.filter(([op]) => op === "clear").map(sortKey).sort();
+  const loads = calls.filter(([op]) => op === "load").map(sortKey).sort();
+  // Both layers: clear slots 1-3, then load slots 1-3 (layers run in parallel).
+  assert.deepEqual(clears, [
+    "clear:2:1",
+    "clear:2:2",
+    "clear:2:3",
+    "clear:4:1",
+    "clear:4:2",
+    "clear:4:3",
+  ]);
+  assert.deepEqual(loads, [
+    "load:2:1",
+    "load:2:2",
+    "load:2:3",
+    "load:4:1",
+    "load:4:2",
+    "load:4:3",
+  ]);
+});
+
+test("overlay stage caps slots by the layer's own clip count", async () => {
+  const controller = makeOverlayController();
+  const calls = [];
+  controller.resolume = {
+    getColumnGrid: async () => ({
+      columnCount: 5,
+      activeColumn: 4,
+      layerClipCounts: { 2: 5, 4: 2 },
+    }),
+    clearClip: async (layerId, slot) => calls.push(["clear", layerId, slot]),
+    loadClip: async (layerId, slot) => calls.push(["load", layerId, slot]),
+  };
+  controller.stager.stageAsset = async () => "C:/Content/x.mp4";
+  await controller._stageAndLoadColumn(OVERLAY_DOC.columns[0]);
+  // Layer 2 gets 5 slots, layer 4 only has 2 slots.
+  assert.equal(calls.filter(([op]) => op === "load").length, 7);
+  assert.equal(calls.filter(([op, l]) => op === "load" && l === "4").length, 2);
+  assert.equal(calls.filter(([op, l]) => op === "load" && l === "2").length, 5);
+});
+
+test("overlay stage falls back to the reference slot when the grid cannot be read", async () => {
+  const controller = makeOverlayController();
+  const calls = [];
+  controller.resolume = {
+    getColumnGrid: async () => {
+      throw new Error("down");
+    },
+    clearClip: async (layerId, slot) => calls.push(["clear", layerId, slot]),
+    loadClip: async (layerId, slot) => calls.push(["load", layerId, slot]),
+    connectClip: async () => {},
+  };
+  controller.stager.stageAsset = async () => "C:/Content/x.mp4";
+  await controller._stageAndLoadColumn(OVERLAY_DOC.columns[0]);
+  assert.equal(controller._activeColumn, undefined);
+  // One slot per layer when the composition cannot be read.
+  assert.equal(calls.filter(([op]) => op === "load").length, 2);
+});
+
+test("overlay trigger connects the clip in the currently active column", async () => {
+  const controller = makeOverlayController();
+  const connects = [];
+  controller.resolume = {
+    getColumnGrid: async () => ({
+      columnCount: 3,
+      activeColumn: 2,
+      layerClipCounts: {},
+    }),
+    connectClip: async (layerId, slot) => connects.push([layerId, slot]),
+  };
+  await controller._triggerColumn(OVERLAY_DOC.columns[0]);
+  assert.deepEqual(connects, [
+    ["2", 2],
+    ["4", 2],
+  ]);
+});
+
+test("overlay trigger falls back to the configured slot when the grid cannot be read", async () => {
+  const controller = makeOverlayController();
+  const connects = [];
+  controller.resolume = {
+    getColumnGrid: async () => {
+      throw new Error("down");
+    },
+    connectClip: async (layerId, slot) => connects.push([layerId, slot]),
+  };
+  await controller._triggerColumn(OVERLAY_DOC.columns[0]);
+  assert.deepEqual(connects, [
+    ["2", 1],
+    ["4", 1],
+  ]);
+});
+
+test("overlay clear unloads every column slot", async () => {
+  const controller = makeOverlayController();
+  const calls = [];
+  controller.resolume = {
+    getColumnGrid: async () => ({ columnCount: 3, layerClipCounts: {} }),
+    clearClip: async (layerId, slot) => calls.push([layerId, slot]),
+    clearLayer: async () => {},
+  };
+  await controller._handleClear();
+  assert.deepEqual(calls, [
+    ["2", 1],
+    ["2", 2],
+    ["2", 3],
+    ["4", 1],
+    ["4", 2],
+    ["4", 3],
+  ]);
+});
+
+test("overlay clear falls back to the reference slot when the grid cannot be read", async () => {
+  const controller = makeOverlayController();
+  const calls = [];
+  controller.resolume = {
+    getColumnGrid: async () => {
+      throw new Error("down");
+    },
+    clearClip: async (layerId, slot) => calls.push([layerId, slot]),
+    clearLayer: async () => {},
+  };
+  await controller._handleClear();
+  assert.deepEqual(calls, [
+    ["2", 1],
+    ["4", 1],
+  ]);
 });
 
 // -- helpers --------------------------------------------------------------------------

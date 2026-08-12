@@ -249,17 +249,29 @@ base perimeter on/off toggle.
 6. Before staging, the target clip slot is cleared first: Resolume holds a
    loaded video file open on Windows, so overwriting it without unloading
    fails with "Access is denied".
-7. Clips are loaded into reserved Resolume clip slots (configured by
-   `PERIMETER_OVERLAY_LAYER_CLIP_COLUMNS`). Resolume's clip `open` takes a
-   `file:///` URL (e.g. `file:///C:/Content/goal-48.mp4`) as a plain-text
-   body. Playback loops via the clip transport's default `Loop` playmode, so
-   no separate loop endpoints are needed (this Resolume REST version exposes
-   no clip transport endpoints).
-8. All paired layers are triggered together.
+7. The overlay file is loaded into **every clip column** of the reserved
+   overlay layers (the deck has multiple columns because the base content
+   auto-advances every ~20s via the composition autopilot). The daemon reads
+   the live composition to learn the column count and each layer's slot
+   count, and mirrors the file across all of them so the overlay survives
+   column transitions; `PERIMETER_OVERLAY_LAYER_CLIP_COLUMNS` still identifies
+   each layer's reference slot (the fallback if the composition read fails).
+   Resolume's clip `open` takes a `file:///` URL (e.g.
+   `file:///C:/Content/goal-48.mp4`) as a plain-text body. Playback loops via
+   the clip transport's default `Loop` playmode, so no separate loop
+   endpoints are needed (this Resolume REST version exposes no clip transport
+   endpoints).
+8. All paired layers are triggered together by connecting the clip in the
+   **currently active deck column** (read from the live composition right
+   before triggering). When the deck later advances onto a different column,
+   that column's copy of the overlay clip plays automatically — the overlay
+   keeps looping until it is explicitly cleared, regardless of how often the
+   base content rotates underneath it.
 9. Sequential columns advance after their configured `durationMs`.
 10. The final column loops until the overlay is explicitly cleared.
-11. Clearing unloads the overlay clip slots (releasing the file handles) —
-    never the base content layers or the full deck.
+11. Clearing unloads every overlay column slot on the overlay layers
+    (releasing the file handles) — never the base content layers or the full
+    deck.
 12. On daemon restart, the overlay controller reconciles the active overlay
     document and restores playback.
 
@@ -283,6 +295,14 @@ internal IDs. For the Víkin composition (flat layer list):
 the 40-screen array. If the composition is reorganized the indices must be
 updated here **and** in the clock app's overlay document (which keys its
 `files` by the same indices).
+
+The overlay file is mirrored into every clip column of the overlay layers and
+triggered in the currently-active column. This is deliberate: the base
+content (`48 skjáir` / `40 skjáir`) is a multi-column deck that auto-advances
+on a ~20s timer, and an overlay placed only in column 1 would disappear as
+soon as the deck moved to column 2 (the overlay layers would have nothing in
+the new column). Mirroring means the goal celebration keeps looping on top of
+whichever ad is showing until the overlay is cleared.
 
 The daemon only uses existing clip slots — it never creates groups, layers,
 or columns.

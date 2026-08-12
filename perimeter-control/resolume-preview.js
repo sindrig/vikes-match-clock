@@ -72,6 +72,36 @@ export function parseColumns(composition) {
     .filter(Boolean);
 }
 
+// Deck geometry used by the overlay controller: the total number of deck
+// columns, the currently active (selected) column, and how many clip slots
+// each layer exposes. Layers always hold one clip per column in the grid, so
+// the per-layer slot count is the layer's clips array length. Returns
+// conservative defaults when the tree is missing or malformed.
+export function compositionGrid(composition) {
+  const rawColumns = Array.isArray(composition?.columns)
+    ? composition.columns
+    : [];
+  const layers = Array.isArray(composition?.layers) ? composition.layers : [];
+  let activeColumn = 1;
+  rawColumns.forEach((col, index) => {
+    if (!col || typeof col !== "object") return;
+    const sel = col.selected;
+    const isActive =
+      sel && typeof sel === "object"
+        ? sel.value === true || sel.value === "true"
+        : sel === true || sel === "true";
+    if (isActive) activeColumn = index + 1;
+  });
+  const layerClipCounts = {};
+  layers.forEach((layer, index) => {
+    if (!layer || typeof layer !== "object") return;
+    layerClipCounts[index + 1] = Array.isArray(layer.clips)
+      ? layer.clips.length
+      : 0;
+  });
+  return { columnCount: rawColumns.length, activeColumn, layerClipCounts };
+}
+
 // Collect every non-empty clip, keyed by 1-based column position. Each entry
 // carries its grid coordinates so the thumbnail endpoint can be addressed.
 export function collectClipsByColumn(composition) {

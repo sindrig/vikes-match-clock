@@ -13,6 +13,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import { Storage } from "@google-cloud/storage";
+import { compositionGrid } from "./resolume-preview.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -353,6 +354,27 @@ export class ResolumeOverlayClient {
     }
   }
 
+  async _getJson(url) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this._timeoutMs);
+    try {
+      const response = await fetch(url, { signal: controller.signal });
+      if (!response.ok) {
+        throw new Error(`Resolume ${url} returned HTTP ${response.status}`);
+      }
+      return await response.json();
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  // Deck geometry for overlay playback: total column count, the currently
+  // active column, and per-layer clip slot counts.
+  async getColumnGrid() {
+    const composition = await this._getJson(`${this._baseUrl()}/composition`);
+    return compositionGrid(composition);
+  }
+
   async loadClip(layerId, clipSlot, filePath) {
     const base = this._baseUrl();
     // Resolume's clip `open` takes a `file:///` URL as a plain-text body.
@@ -399,6 +421,7 @@ export class OverlayController {
     this.resolume = new ResolumeOverlayClient(config);
     this._currentId = null;
     this._currentColumn = 0;
+    this._activeColumn = null;
     this._columnTimer = null;
     this._stopping = false;
     this._dbRef = null;
@@ -508,6 +531,7 @@ export class OverlayController {
       clearTimeout(this._columnTimer);
       this._columnTimer = null;
     }
+    const grid = await this.resolume.getColumnGrid().catch(() => null);
     for (const layerId of this.config.overlayLayerIds) {
       const clipSlot = this.config.overlayLayerClipColumns[layerId];
       try {
@@ -515,9 +539,15 @@ export class OverlayController {
           // No reserved slot configured — fall back to clearing the whole layer.
           await this.resolume.clearLayer(layerId);
         } else {
-          // Unload the clip content so Resolume releases the file handle;
+          // Unload every overlay column slot so Resolume releases the file
+          // handle (the overlay clip is mirrored across all deck columns);
           // otherwise a later re-staging move would be denied.
-          await this.resolume.clearClip(layerId, clipSlot);
+          const columnCount = grid?.columnCount
+            ? Math.max(1, grid.columnCount)
+            : 1;
+          for (let c = 1; c <= columnCount; c += 1) {
+            await this.resolume.clearClip(layerId, c);
+          }
         }
       } catch (err) {
         console.error(
@@ -589,23 +619,42 @@ export class OverlayController {
   }
 
   async _stageAndLoadColumn(col) {
+    const grid = await this.resolume.getColumnGrid().catch(() => null);
+    const columnCount = grid?.columnCount ? Math.max(1, grid.columnCount) : 1;
+    this._activeColumn =
+      grid?.activeColumn && grid.activeColumn >= 1
+        ? grid.activeColumn
+        : undefined;
+
     const promises = [];
     for (const [layerId, fileDef] of Object.entries(col.files)) {
       const clipSlot = this.config.overlayLayerClipColumns[layerId];
       if (clipSlot === undefined) {
         throw new Error(`No clip slot configured for layer ${layerId}`);
       }
+      // Load the file only into slots the layer actually has, bounded by the
+      // number of deck columns. Layer clips always form one slot per column.
+      const layerSlots = grid?.layerClipCounts
+        ? Math.max(1, Math.min(columnCount, grid.layerClipCounts[layerId] || 1))
+        : 1;
       promises.push(
         (async () => {
-          // Unload anything still in the slot: Resolume holds the previously
-          // loaded file open, so the staging move would fail with "Access is
-          // denied" unless the clip is cleared first.
-          await this.resolume.clearClip(layerId, clipSlot);
+          // Unload every overlay slot on the layer first: Resolume holds a
+          // loaded video file open, so the staging move would fail with
+          // "Access is denied" unless all referencing clips are cleared.
+          for (let c = 1; c <= layerSlots; c += 1) {
+            await this.resolume.clearClip(layerId, c);
+          }
           const winPath = await this.stager.stageAsset(
             fileDef.source,
             fileDef.name,
           );
-          await this.resolume.loadClip(layerId, clipSlot, winPath);
+          // Mirror the file into every column slot so the overlay survives
+          // deck column transitions (the base content auto-advances on a
+          // timer); the clip in the column the deck lands on is what plays.
+          for (let c = 1; c <= layerSlots; c += 1) {
+            await this.resolume.loadClip(layerId, c, winPath);
+          }
         })(),
       );
     }
@@ -613,11 +662,19 @@ export class OverlayController {
   }
 
   async _triggerColumn(col) {
+    const grid = await this.resolume.getColumnGrid().catch(() => null);
+    const activeColumn =
+      grid?.activeColumn && grid.activeColumn >= 1
+        ? grid.activeColumn
+        : this._activeColumn;
     const promises = [];
     for (const [layerId] of Object.entries(col.files)) {
       const clipSlot = this.config.overlayLayerClipColumns[layerId];
       if (clipSlot === undefined) continue;
-      promises.push(this.resolume.connectClip(layerId, clipSlot));
+      // Trigger the clip in the column the deck is currently on so the
+      // overlay starts immediately; other columns play automatically when the
+      // deck advances onto them.
+      promises.push(this.resolume.connectClip(layerId, activeColumn ?? clipSlot));
     }
     await Promise.all(promises);
   }

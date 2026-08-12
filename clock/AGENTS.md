@@ -201,6 +201,12 @@ column until explicitly cleared.
   the overlay above the `40 skjáir` base layer (plays `goal-40.mp4`). They
   must match `PERIMETER_OVERLAY_LAYER_IDS` on the daemon.
 - Earlier columns advance after `durationMs`; the final column loops forever.
+- The overlay keeps looping **until cleared even though the base `Efni`
+  content auto-advances through its ~20s deck columns** (composition autopilot
+  = "Play Next Column"). The daemon mirrors the overlay file into every clip
+  column of the overlay layers and triggers the copy in the currently active
+  deck column, so the goal celebration survives column transitions. A goal
+  placed only in one column would vanish after the first Efni transition.
 - A new `id` replaces/restarts an active sequence.
 - Only files from the approved `gs://vikes-match-clock-firebase.appspot.com`
   bucket are accepted. The daemon copies them only into `C:/Content` on the
