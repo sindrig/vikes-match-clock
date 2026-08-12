@@ -180,13 +180,13 @@ column until explicitly cleared.
     {
       "durationMs": 10000,
       "files": {
-        "40": {
-          "name": "goal-40.mp4",
-          "source": "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/goal-40.mp4"
-        },
-        "48": {
+        "2": {
           "name": "goal-48.mp4",
           "source": "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/goal-48.mp4"
+        },
+        "4": {
+          "name": "goal-40.mp4",
+          "source": "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/goal-40.mp4"
         }
       }
     }
@@ -195,7 +195,11 @@ column until explicitly cleared.
 ```
 
 - `overlay: null` clears the overlay (disconnects only overlay layers).
-- Each column must include both `40` and `48` file entries.
+- Each column must include one file entry per configured Resolume overlay
+  layer index. The keys are Resolume **layer indices** (not IDs): `2` is the
+  overlay above the `48 skjáir` base layer (plays `goal-48.mp4`) and `4` is
+  the overlay above the `40 skjáir` base layer (plays `goal-40.mp4`). They
+  must match `PERIMETER_OVERLAY_LAYER_IDS` on the daemon.
 - Earlier columns advance after `durationMs`; the final column loops forever.
 - A new `id` replaces/restarts an active sequence.
 - Only files from the approved `gs://vikes-match-clock-firebase.appspot.com`

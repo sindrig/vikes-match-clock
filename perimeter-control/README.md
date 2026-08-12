@@ -63,10 +63,11 @@ output on the dedicated composition, not only column 1.
 ## Installation
 
 Requires root. The service account file is a required argument and the
-installer **fails if it is missing**:
+installer **fails if it is missing**. The overlay SSH key is optional and
+defaults to the installing user's `~/.ssh/id_ed25519`:
 
 ```bash
-sudo ./install.sh /path/to/firebase-service-account.json
+sudo ./install.sh /path/to/firebase-service-account.json [/path/to/overlay-ssh-key]
 ```
 
 The installer:
@@ -74,9 +75,14 @@ The installer:
 - **Fails** unless a service-account JSON file is given and exists, and unless
   `node` is on `PATH`.
 - Creates the `perimeter-control` system user.
+- Creates the overlay asset cache directory `/var/cache/perimeter-control`
+  (owned by the service user).
 - Installs the daemon to `/opt/perimeter-control` and runs `npm ci` there.
 - Installs the service account to `/etc/perimeter-control/perimeter-service-account.json`
   (mode `0640`, readable by the service user).
+- Installs the overlay SSH key (if found/given) to
+  `/etc/perimeter-control/overlay-ssh-key` (mode `0600`, owned by the service
+  user) for passwordless SCP to the Windows Resolume host.
 - Creates `/etc/perimeter-control/perimeter-control.env` from the example
   (an existing file is **never** overwritten).
 - Installs, enables and starts the `perimeter-control` systemd service.
@@ -248,16 +254,24 @@ base perimeter on/off toggle.
 
 ### Resolume composition requirements
 
-The `Efni` deck must contain reserved overlay layers above the base content:
+The `Efni` deck must contain reserved overlay layers above the base content.
+Resolume's HTTP API addresses layers by **1-based index**, so
+`PERIMETER_OVERLAY_LAYER_IDS` must be the layer **indices**, not Resolume
+internal IDs. For the Víkin composition (flat layer list):
 
 ```
-40 skjáir group
-  existing base layer
-  40 overlay layer   (configured via PERIMETER_OVERLAY_LAYER_IDS)
-48 skjáir group
-  existing base layer
-  48 overlay layer   (configured via PERIMETER_OVERLAY_LAYER_IDS)
+1  48 skjáir     (base layer, 4608×192)
+2  Overlay       (48-screen overlay — configured as layer index 2)
+3  40 skjáir     (base layer, 3840×192)
+4  Overlay       (40-screen overlay — configured as layer index 4)
 ```
+
+`PERIMETER_OVERLAY_LAYER_IDS=2,4` and
+`PERIMETER_OVERLAY_LAYER_CLIP_COLUMNS={"2":1,"4":1}`, so layer index 2 plays
+`goal-48.mp4` on the 48-screen array and layer index 4 plays `goal-40.mp4` on
+the 40-screen array. If the composition is reorganized the indices must be
+updated here **and** in the clock app's overlay document (which keys its
+`files` by the same indices).
 
 The daemon only uses existing clip slots — it never creates groups, layers,
 or columns.

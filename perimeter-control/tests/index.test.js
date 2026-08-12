@@ -795,16 +795,16 @@ test("loadConfig overlay defaults", () => {
   assert.equal(config.overlayEnabled, true);
   assert.equal(config.overlayPath, "states/vikuti/perimeter/overlay");
   assert.equal(config.overlayStatusPath, "perimeter/vikuti/overlayStatus");
-  assert.equal(config.overlaySshHost, "127.0.0.1");
-  assert.equal(config.overlaySshUser, "Administrator");
+  assert.equal(config.overlaySshHost, "10.182.45.53");
+  assert.equal(config.overlaySshUser, "user");
   assert.equal(
     config.overlaySshKey,
     "/etc/perimeter-control/overlay-ssh-key",
   );
   assert.equal(config.overlayRemoteContentDir, "C:/Content");
   assert.equal(config.overlayCacheDir, "/var/cache/perimeter-control");
-  assert.deepEqual(config.overlayLayerClipColumns, { "40": 1, "48": 1 });
-  assert.deepEqual(config.overlayLayerIds, ["40", "48"]);
+  assert.deepEqual(config.overlayLayerClipColumns, { "2": 1, "4": 1 });
+  assert.deepEqual(config.overlayLayerIds, ["2", "4"]);
 });
 
 test("loadConfig overlay override", () => {
@@ -836,14 +836,14 @@ test("loadConfig overlay invalid layer-clip JSON falls back to default", () => {
   const config = loadConfig({
     PERIMETER_OVERLAY_LAYER_CLIP_COLUMNS: "not-json",
   });
-  assert.deepEqual(config.overlayLayerClipColumns, { "40": 1, "48": 1 });
+  assert.deepEqual(config.overlayLayerClipColumns, { "2": 1, "4": 1 });
 });
 
 test("loadConfig overlay empty layer-clip JSON falls back to default", () => {
   const config = loadConfig({
     PERIMETER_OVERLAY_LAYER_CLIP_COLUMNS: "{}",
   });
-  assert.deepEqual(config.overlayLayerClipColumns, { "40": 1, "48": 1 });
+  assert.deepEqual(config.overlayLayerClipColumns, { "2": 1, "4": 1 });
 });
 
 // -- overlay validation ---------------------------------------------------------

@@ -61,13 +61,13 @@ const ScoreButtons = ({ side }: { side: "home" | "away" }) => {
           {
             durationMs: 10000,
             files: {
-              "40": {
-                name: "goal-40.mp4",
-                source: `gs://${bucketName}/${listenPrefix}/perimeter/goal-40.mp4`,
-              },
-              "48": {
+              "2": {
                 name: "goal-48.mp4",
                 source: `gs://${bucketName}/${listenPrefix}/perimeter/goal-48.mp4`,
+              },
+              "4": {
+                name: "goal-40.mp4",
+                source: `gs://${bucketName}/${listenPrefix}/perimeter/goal-40.mp4`,
               },
             },
           },

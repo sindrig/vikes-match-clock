@@ -61,13 +61,13 @@ const DEFAULT_PREVIEW_MAX_BYTES = 8_000_000;
 // Overlay defaults
 const DEFAULT_OVERLAY_BASE_PATH = "states/vikuti/perimeter/overlay";
 const DEFAULT_OVERLAY_STATUS_PATH = "perimeter/vikuti/overlayStatus";
-const DEFAULT_OVERLAY_SSH_HOST = "127.0.0.1";
-const DEFAULT_OVERLAY_SSH_USER = "Administrator";
+const DEFAULT_OVERLAY_SSH_HOST = "10.182.45.53";
+const DEFAULT_OVERLAY_SSH_USER = "user";
 const DEFAULT_OVERLAY_SSH_KEY =
   "/etc/perimeter-control/overlay-ssh-key";
 const DEFAULT_OVERLAY_REMOTE_CONTENT_DIR = "C:/Content";
 const DEFAULT_OVERLAY_CACHE_DIR = "/var/cache/perimeter-control";
-const DEFAULT_OVERLAY_LAYER_CLIP_COLUMNS = '{"40":1,"48":1}';
+const DEFAULT_OVERLAY_LAYER_CLIP_COLUMNS = '{"2":1,"4":1}';
 
 const RESOLUME_OFF_PATH = "/composition/disconnect-all";
 const RESOLUME_ON_PATH = "/composition/columns/{column}/connect";
@@ -172,7 +172,8 @@ export function loadConfig(environ = process.env) {
       environ.PERIMETER_OVERLAY_PATH ?? DEFAULT_OVERLAY_BASE_PATH,
     overlayStatusPath:
       environ.PERIMETER_OVERLAY_STATUS_PATH ?? DEFAULT_OVERLAY_STATUS_PATH,
-    overlayProjectId: environ.PERIMETER_OVERLAY_GCP_PROJECT ?? "",
+    overlayProjectId:
+      environ.PERIMETER_OVERLAY_GCP_PROJECT ?? "vikes-match-clock-firebase",
     overlayCacheDir:
       environ.PERIMETER_OVERLAY_CACHE_DIR ?? DEFAULT_OVERLAY_CACHE_DIR,
     overlaySshHost:
@@ -188,7 +189,7 @@ export function loadConfig(environ = process.env) {
       environ.PERIMETER_OVERLAY_LAYER_CLIP_COLUMNS,
       DEFAULT_OVERLAY_LAYER_CLIP_COLUMNS,
     ),
-    overlayLayerIds: (environ.PERIMETER_OVERLAY_LAYER_IDS ?? "40,48")
+    overlayLayerIds: (environ.PERIMETER_OVERLAY_LAYER_IDS ?? "2,4")
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean),
