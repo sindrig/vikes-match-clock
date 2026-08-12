@@ -261,7 +261,10 @@ class FakeDb {
 }
 
 test("attach listens on the configured path and sets up the preview ref", () => {
-  const controller = makeController({ PERIMETER_OVERLAY_ENABLED: "false" });
+  const controller = makeController({
+    PERIMETER_OVERLAY_ENABLED: "false",
+    PERIMETER_AD_LAYOUT_ENABLED: "false",
+  });
   const db = new FakeDb();
   controller.attach(db);
   assert.equal(db.refs.length, 2);
@@ -867,7 +870,10 @@ test("overlay: disabled does not create overlay controller", () => {
 });
 
 test("overlay: attach with overlay enabled creates overlay refs", () => {
-  const controller = makeController({ PERIMETER_OVERLAY_ENABLED: "true" });
+  const controller = makeController({
+    PERIMETER_OVERLAY_ENABLED: "true",
+    PERIMETER_AD_LAYOUT_ENABLED: "false",
+  });
   const db = new FakeDb();
   controller.attach(db);
   // 2 base refs + 2 overlay refs = 4

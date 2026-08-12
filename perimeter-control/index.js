@@ -75,6 +75,8 @@ const DEFAULT_AD_LAYOUT_PATH = "states/vikuti/perimeter/adLayout";
 const DEFAULT_AD_LAYOUT_STATUS_PATH = "perimeter/vikuti/adLayout";
 const DEFAULT_AD_LAYER_CLIP_SLOTS = '{"2":2,"4":2}';
 const DEFAULT_AD_LANE_IDS = "2,4";
+const DEFAULT_AD_LAYOUT_BUCKET = "vikes-match-clock-firebase.appspot.com";
+const DEFAULT_AD_MAX_FILE_BYTES = 250 * 1024 * 1024;
 
 const RESOLUME_OFF_PATH = "/composition/disconnect-all";
 const RESOLUME_ON_PATH = "/composition/columns/{column}/connect";
@@ -218,6 +220,12 @@ export function loadConfig(environ = process.env) {
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean),
+    adLayoutBucket:
+      environ.PERIMETER_AD_LAYOUT_BUCKET ?? DEFAULT_AD_LAYOUT_BUCKET,
+    adMaxFileBytes: positiveInt(
+      environ.PERIMETER_AD_MAX_FILE_BYTES,
+      DEFAULT_AD_MAX_FILE_BYTES,
+    ),
   };
 }
 

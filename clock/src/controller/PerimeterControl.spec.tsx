@@ -12,6 +12,14 @@ vi.mock("../contexts/LocalStateContext", () => ({
   useLocalState: vi.fn(),
 }));
 
+vi.mock("../firebase", () => ({
+  FIREBASE_STORAGE_BUCKET: "vikes-match-clock-staging.appspot.com",
+  storageHelpers: {
+    listAll: vi.fn().mockResolvedValue({ items: [] }),
+    uploadBytes: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+
 vi.mock("../asset/queue/dndUtils", () => ({
   typedCollisionDetection: vi.fn(),
 }));
@@ -214,7 +222,7 @@ describe("PerimeterControl", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Opna" }));
 
-    expect(screen.getByText("idle")).toBeInTheDocument();
+    expect(screen.getByText("Í bið")).toBeInTheDocument();
     expect(screen.getByText("2 raðir")).toBeInTheDocument();
   });
 
@@ -335,7 +343,7 @@ describe("PerimeterControl", () => {
     expect(saveBtn).toBeDisabled();
   });
 
-  it("seeds localColumns from adLayout when available", () => {
+  it("derives columns from adLayout when available", () => {
     const testColumn = {
       id: "col-test",
       files: {

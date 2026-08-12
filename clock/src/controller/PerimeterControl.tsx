@@ -32,12 +32,24 @@ import {
 } from "../types";
 import { usePerimeter } from "../contexts/FirebaseStateContext";
 import { useLocalState } from "../contexts/LocalStateContext";
-import { storageHelpers, ListResult } from "../firebase";
+import {
+  storageHelpers,
+  ListResult,
+  FIREBASE_STORAGE_BUCKET,
+} from "../firebase";
 import { typedCollisionDetection } from "./asset/queue/dndUtils";
 import "./PerimeterControl.css";
 
 const STALE_MS = 15 * 60 * 1000;
-const FIREBASE_BUCKET = "vikes-match-clock-firebase.appspot.com";
+const MAX_UPLOAD_BYTES = 250 * 1024 * 1024;
+
+const PHASE_LABELS: Record<string, string> = {
+  staging: "Undirbýr",
+  loading: "Hleður",
+  playing: "Spilar",
+  error: "Villa",
+  idle: "Í bið",
+};
 
 const formatTimestamp = (updatedAt: number | null): string => {
   if (updatedAt === null) return "";
@@ -194,6 +206,16 @@ const FilePicker = ({
   const handleUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    if (file.size === 0) {
+      window.alert("Skrá er tóm.");
+      event.target.value = "";
+      return;
+    }
+    if (file.size > MAX_UPLOAD_BYTES) {
+      window.alert("Skrá er of stór (max 250 MB)");
+      event.target.value = "";
+      return;
+    }
     setUploading(true);
     storageHelpers
       .uploadBytes(`${storagePath}${file.name}`, file)
@@ -207,7 +229,7 @@ const FilePicker = ({
   };
 
   const makeGsUri = (filename: string) =>
-    `gs://${FIREBASE_BUCKET}/${storagePath}${filename}`;
+    `gs://${FIREBASE_STORAGE_BUCKET}/${storagePath}${filename}`;
 
   return (
     <div className="perimeter-file-picker">
@@ -265,9 +287,6 @@ const PerimeterControl = () => {
 
   const [open, setOpen] = useState(false);
   const [now, setNow] = useState(0);
-  const [localColumns, setLocalColumns] = useState<PerimeterAdLayoutColumn[]>(
-    [],
-  );
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [addSelections, setAddSelections] = useState<
     Record<string, PerimeterAdLayoutFile>
@@ -278,6 +297,7 @@ const PerimeterControl = () => {
   const [writePending, setWritePending] = useState(false);
 
   const lanes = appliedAdLayout?.lanes ?? [];
+  const columns = adLayout?.columns ?? [];
   const appliedColumnsMap = useMemo(() => {
     const map: Record<
       string,
@@ -311,38 +331,22 @@ const PerimeterControl = () => {
     }),
   );
 
-  const writeLayout = (columns: PerimeterAdLayoutColumn[]) => {
+  const writeLayout = async (cols: PerimeterAdLayoutColumn[]) => {
     setWritePending(true);
-    const newRevision = crypto.randomUUID();
-    const layout: PerimeterAdLayout = {
-      version: 1,
-      revision: newRevision,
-      columns,
-    };
-    setPerimeterAdLayout(layout);
-    setWritePending(false);
+    try {
+      const layout: PerimeterAdLayout = {
+        version: 1,
+        revision: crypto.randomUUID(),
+        columns: cols,
+      };
+      await setPerimeterAdLayout(layout);
+    } finally {
+      setWritePending(false);
+    }
   };
 
   const openDialog = () => {
     setNow(getServerTime());
-    if (adLayout?.columns) {
-      setLocalColumns(adLayout.columns);
-    } else if (appliedAdLayout?.columns) {
-      const converted: PerimeterAdLayoutColumn[] = appliedAdLayout.columns.map(
-        (col) => ({
-          id: col.id,
-          files: Object.fromEntries(
-            Object.entries(col.files).map(([key, file]) => [
-              key,
-              { name: file.name, source: "" },
-            ]),
-          ),
-        }),
-      );
-      setLocalColumns(converted);
-    } else {
-      setLocalColumns([]);
-    }
     setOpen(true);
     setShowAddDialog(false);
     setAddSelections({});
@@ -363,13 +367,12 @@ const PerimeterControl = () => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
-    const oldIndex = localColumns.findIndex((c) => c.id === active.id);
-    const newIndex = localColumns.findIndex((c) => c.id === over.id);
+    const oldIndex = columns.findIndex((c) => c.id === active.id);
+    const newIndex = columns.findIndex((c) => c.id === over.id);
     if (oldIndex === -1 || newIndex === -1) return;
 
-    const reordered = arrayMove(localColumns, oldIndex, newIndex);
-    setLocalColumns(reordered);
-    writeLayout(reordered);
+    const reordered = arrayMove(columns, oldIndex, newIndex);
+    void writeLayout(reordered);
   };
 
   const handleDeleteColumn = (columnId: string) => {
@@ -380,9 +383,8 @@ const PerimeterControl = () => {
     ) {
       return;
     }
-    const remaining = localColumns.filter((c) => c.id !== columnId);
-    setLocalColumns(remaining);
-    writeLayout(remaining);
+    const remaining = columns.filter((c) => c.id !== columnId);
+    void writeLayout(remaining);
   };
 
   const handleAddColumn = () => {
@@ -395,15 +397,14 @@ const PerimeterControl = () => {
       id: crypto.randomUUID(),
       files: { ...addSelections },
     };
-    const updated = [...localColumns, newColumn];
-    setLocalColumns(updated);
-    writeLayout(updated);
+    const updated = [...columns, newColumn];
+    void writeLayout(updated);
     setShowAddDialog(false);
     setAddSelections({});
   };
 
   const activeDragColumn = activeDragId
-    ? localColumns.find((c) => c.id === activeDragId)
+    ? columns.find((c) => c.id === activeDragId)
     : null;
 
   const lanesConfigured = lanes.length > 0;
@@ -463,7 +464,9 @@ const PerimeterControl = () => {
               {/* Status Bar */}
               <div className="perimeter-status-bar">
                 <Badge
-                  content={appliedAdLayout.phase}
+                  content={
+                    PHASE_LABELS[appliedAdLayout.phase] ?? appliedAdLayout.phase
+                  }
                   className={`perimeter-phase-badge phase-${appliedAdLayout.phase}`}
                 />
                 {appliedAdLayout.activeColumn > 0 && (
@@ -505,7 +508,7 @@ const PerimeterControl = () => {
                     Raðir eru skilgreindar í stillingum daemonins.
                   </p>
                 </div>
-              ) : localColumns.length === 0 ? (
+              ) : columns.length === 0 ? (
                 <div className="perimeter-empty-columns">
                   <p className="perimeter-empty-text">
                     Engir dálkar í jaðarskjánum.
@@ -529,10 +532,10 @@ const PerimeterControl = () => {
                 >
                   <div className="perimeter-columns-scroll">
                     <SortableContext
-                      items={localColumns.map((c) => c.id)}
+                      items={columns.map((c) => c.id)}
                       strategy={horizontalListSortingStrategy}
                     >
-                      {localColumns.map((column, idx) => {
+                      {columns.map((column, idx) => {
                         const appliedCol = appliedColumnsMap[column.id];
                         return (
                           <SortableColumn
@@ -563,8 +566,7 @@ const PerimeterControl = () => {
                               <DragIcon />
                             </span>
                             <span className="perimeter-column-index">
-                              Dálkur{" "}
-                              {localColumns.indexOf(activeDragColumn) + 1}
+                              Dálkur {columns.indexOf(activeDragColumn) + 1}
                             </span>
                           </div>
                           <div className="perimeter-column-files">
@@ -617,7 +619,7 @@ const PerimeterControl = () => {
                 </DndContext>
               )}
 
-              {lanesConfigured && localColumns.length > 0 && (
+              {lanesConfigured && columns.length > 0 && (
                 <div className="perimeter-add-section">
                   <Button
                     appearance="ghost"

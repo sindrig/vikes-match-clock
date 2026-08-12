@@ -8,7 +8,7 @@ import React, {
   useRef,
   useMemo,
 } from "react";
-import { database, storageHelpers } from "../firebase";
+import { database, storageHelpers, FIREBASE_STORAGE_BUCKET } from "../firebase";
 import {
   firebaseDatabase,
   generateClubOverrideId,
@@ -258,7 +258,7 @@ interface FirebaseStateContextType {
   setPerimeterState: (state: PerimeterState["state"]) => void;
   setPerimeterOverlay: (overlay: PerimeterOverlay) => void;
   clearPerimeterOverlay: () => void;
-  setPerimeterAdLayout: (layout: PerimeterAdLayout | null) => void;
+  setPerimeterAdLayout: (layout: PerimeterAdLayout | null) => Promise<void>;
   perimeterOverlay: PerimeterOverlay | null;
   perimeterOverlayStatus: PerimeterOverlayStatus | null;
   perimeterAdLayout: PerimeterAdLayout | null;
@@ -642,7 +642,12 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         ref(database, adLayoutPath),
         (snapshot) => {
           const raw: unknown = snapshot.val();
-          setPerimeterAdLayoutState(parsePerimeterAdLayout(raw));
+          setPerimeterAdLayoutState(
+            parsePerimeterAdLayout(raw, {
+              location: listenPrefix,
+              bucket: FIREBASE_STORAGE_BUCKET,
+            }),
+          );
         },
         (error) =>
           console.error(
@@ -1639,9 +1644,9 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   }, [isAuthenticated, listenPrefix]);
 
   const setPerimeterAdLayout = useCallback(
-    (layout: PerimeterAdLayout | null) => {
-      if (!listenPrefix || !isAuthenticated) return;
-      set(
+    (layout: PerimeterAdLayout | null): Promise<void> => {
+      if (!listenPrefix || !isAuthenticated) return Promise.resolve();
+      return set(
         ref(database, `states/${listenPrefix}/perimeter/adLayout`),
         layout,
       ).catch(console.error);

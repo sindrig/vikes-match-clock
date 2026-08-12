@@ -588,40 +588,56 @@ export function parseClubOverrides(
 const MAX_AD_COLUMNS = 20;
 const VALID_AD_VERSION = 1;
 const ALLOWED_AD_BUCKET = "vikes-match-clock-firebase.appspot.com";
-// Control chars and traversal chars
-const AD_UNSAFE_FILENAME_RE = /["%\\/]|[\p{Cc}]/u;
+// Control chars, traversal chars, Windows-invalid chars
+const AD_UNSAFE_FILENAME_RE = /["%\\/:*?<>|]|[\p{Cc}]/u;
+const AD_WINDOWS_DEVICE_RE = /^(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)/i;
 
 function validateAdFileName(name: string): boolean {
   if (!name || name.length > 255) return false;
+  if (name === "." || name === "..") return false;
   if (AD_UNSAFE_FILENAME_RE.test(name)) return false;
+  if (/[. ]$/.test(name)) return false;
+  if (AD_WINDOWS_DEVICE_RE.test(name)) return false;
   return true;
 }
 
-function validateAdSource(source: string): boolean {
+function validateAdSource(
+  source: string,
+  options?: { location?: string; bucket?: string },
+): boolean {
   if (!source) return false;
   if (!source.startsWith("gs://")) return false;
   const bucketAndPath = source.slice(5);
   const slashIdx = bucketAndPath.indexOf("/");
   if (slashIdx < 0) return false;
   const bucketName = bucketAndPath.slice(0, slashIdx);
-  if (bucketName !== ALLOWED_AD_BUCKET) return false;
+  const expectedBucket = options?.bucket ?? ALLOWED_AD_BUCKET;
+  if (bucketName !== expectedBucket) return false;
   const objectPath = bucketAndPath.slice(slashIdx + 1);
   if (!objectPath) return false;
+  if (options?.location) {
+    const prefix = `${options.location}/perimeter/`;
+    if (!objectPath.startsWith(prefix)) return false;
+  }
   return true;
 }
 
-function parseAdLayoutFile(data: unknown): PerimeterAdLayoutFile | undefined {
+function parseAdLayoutFile(
+  data: unknown,
+  options?: { location?: string; bucket?: string },
+): PerimeterAdLayoutFile | undefined {
   if (!data || typeof data !== "object") return undefined;
   const raw = data as Record<string, unknown>;
   const name = typeof raw.name === "string" ? raw.name : "";
   const source = typeof raw.source === "string" ? raw.source : "";
   if (!validateAdFileName(name)) return undefined;
-  if (!validateAdSource(source)) return undefined;
+  if (!validateAdSource(source, options)) return undefined;
   return { name, source };
 }
 
 function parseAdLayoutColumn(
   data: unknown,
+  options?: { location?: string; bucket?: string },
 ): PerimeterAdLayoutColumn | undefined {
   if (!data || typeof data !== "object") return undefined;
   const raw = data as Record<string, unknown>;
@@ -634,7 +650,7 @@ function parseAdLayoutColumn(
   for (const [key, value] of Object.entries(
     filesRaw as Record<string, unknown>,
   )) {
-    const parsed = parseAdLayoutFile(value);
+    const parsed = parseAdLayoutFile(value, options);
     if (!parsed) return undefined;
     if (names.has(parsed.name)) return undefined;
     names.add(parsed.name);
@@ -646,6 +662,7 @@ function parseAdLayoutColumn(
 
 export function parsePerimeterAdLayout(
   data: unknown,
+  options?: { location?: string; bucket?: string },
 ): PerimeterAdLayout | null {
   // null means clear/no layout
   if (data === null || data === undefined) return null;
@@ -661,7 +678,7 @@ export function parsePerimeterAdLayout(
   const columns: PerimeterAdLayoutColumn[] = [];
   const seenIds = new Set<string>();
   for (const entry of columnsRaw) {
-    const column = parseAdLayoutColumn(entry);
+    const column = parseAdLayoutColumn(entry, options);
     if (!column) return null;
     if (seenIds.has(column.id)) return null;
     seenIds.add(column.id);
