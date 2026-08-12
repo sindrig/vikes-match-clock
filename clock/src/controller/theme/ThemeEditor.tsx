@@ -536,6 +536,19 @@ const ThemeEditorPanels = ({
       />
     </Panel>
 
+    <Panel header="Leikmenn" collapsible bordered>
+      <FontField
+        label="Númer"
+        value={effective.playerNumberFontFamily}
+        onChange={(v) => onFieldChange("playerNumberFontFamily", v)}
+      />
+      <FontField
+        label="Nafn"
+        value={effective.playerNameFontFamily}
+        onChange={(v) => onFieldChange("playerNameFontFamily", v)}
+      />
+    </Panel>
+
     <Panel header="Rauð spjöld / Vítaspyrna / Leikhlé" collapsible bordered>
       <ColorField
         label="Rautt spjald"

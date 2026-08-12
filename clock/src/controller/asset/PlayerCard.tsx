@@ -88,9 +88,9 @@ const PlayerCard = (props: Props): React.JSX.Element => {
   } = useView();
   const width = vp.style.width;
 
-  const clockFontFamily =
-    resolveTheme(themePreset, theme, customPresets).clockFontFamily ||
-    DEFAULT_THEME.clockFontFamily;
+  const playerNameFontFamily =
+    resolveTheme(themePreset, theme, customPresets).playerNameFontFamily ||
+    DEFAULT_THEME.playerNameFontFamily;
 
   const fontSizes = useMemo(() => {
     const name = asset.name || "";
@@ -99,16 +99,16 @@ const PlayerCard = (props: Props): React.JSX.Element => {
         name,
         THUMB_VP.width * widthMultiplier,
         Math.floor(width / 14),
-        clockFontFamily,
+        playerNameFontFamily,
       ),
       regular: getMaxFontSize(
         name,
         width * widthMultiplier,
         Math.floor(width / 5),
-        clockFontFamily,
+        playerNameFontFamily,
       ),
     };
-  }, [asset.name, widthMultiplier, width, clockFontFamily]);
+  }, [asset.name, widthMultiplier, width, playerNameFontFamily]);
 
   const nameStyle = {
     fontSize: `${thumbnail ? fontSizes.thumbnail : fontSizes.regular}px`,

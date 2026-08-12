@@ -50,6 +50,10 @@ export const themeToCssVars = (theme: ThemeConfig): Record<string, string> => ({
   "--theme-team-name-color": theme.teamNameColor,
   "--theme-team-name-font-family": theme.teamNameFontFamily,
 
+  // Player number/name
+  "--theme-player-number-font-family": theme.playerNumberFontFamily,
+  "--theme-player-name-font-family": theme.playerNameFontFamily,
+
   // Red cards
   "--theme-red-card-color": theme.redCardColor,
   "--theme-red-card-top": theme.redCardTop,

@@ -8,7 +8,7 @@ vi.mock("../../contexts/FirebaseStateContext", () => ({
 }));
 
 vi.mock("../../hooks/useThemeCssVars", () => ({
-  resolveTheme: () => ({ clockFontFamily: '"Anton", sans-serif' }),
+  resolveTheme: () => ({ playerNameFontFamily: '"Anton", sans-serif' }),
 }));
 
 import { useView } from "../../contexts/FirebaseStateContext";

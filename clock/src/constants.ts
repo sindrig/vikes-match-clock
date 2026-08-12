@@ -168,6 +168,10 @@ export const DEFAULT_THEME: ThemeConfig = {
   teamNameColor: "white",
   teamNameFontFamily: '"Anton", sans-serif',
 
+  // Player number/name
+  playerNumberFontFamily: '"Anton", sans-serif',
+  playerNameFontFamily: '"Anton", sans-serif',
+
   // Red cards
   redCardColor: "#e60000",
   redCardTop: "58%",

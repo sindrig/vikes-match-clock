@@ -171,6 +171,10 @@ export interface ThemeConfig {
   teamNameColor: string;
   teamNameFontFamily: string;
 
+  // Player number/name
+  playerNumberFontFamily: string;
+  playerNameFontFamily: string;
+
   // Red cards
   redCardColor: string;
   redCardTop: string;
