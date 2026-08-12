@@ -245,7 +245,10 @@ base perimeter on/off toggle.
    The copy is **skipped when the remote file already matches** the local
    cached size (verified over SSH and remembered per run), and the GCS object
    generation lookup is cached for 60s, so a repeated goal celebration skips
-   the ~36 MB transfer and reaches "playing" in about a second.
+   the ~36 MB transfer and reaches "playing" in about a second. Remote
+   filenames embed the GCS object generation (e.g. `goal-48-1234567890123.mp4`)
+   so same-size re-uploads are always picked up; previous generation copies are
+   cleaned up best-effort after a successful upload.
 6. Before staging, the target clip slot is cleared first: Resolume holds a
    loaded video file open on Windows, so overwriting it without unloading
    fails with "Access is denied".
@@ -254,7 +257,9 @@ base perimeter on/off toggle.
    auto-advance away from the current column while the goal celebration plays.
    The original autopilot value is persisted to
    `<cache-dir>/overlay-autopilot.json` so a daemon restart during an overlay
-   still restores the correct value on clear. The overlay file is then loaded
+   still restores the correct value on clear. If the freeze fails (e.g. the
+   autopilot target cannot be read or the set fails), the overlay is aborted
+   with an error status. The overlay file is then loaded
    into a single clip slot — the **currently active deck column** — on each
    reserved overlay layer; `PERIMETER_OVERLAY_LAYER_CLIP_COLUMNS` identifies
    each layer's reference slot (the fallback if the composition read fails).
