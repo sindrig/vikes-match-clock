@@ -23,6 +23,8 @@ const MIN_DURATION_MS = 100;
 const ALLOWED_BUCKET = "vikes-match-clock-firebase.appspot.com";
 const ALLOWED_GCS_PREFIX = "gs://";
 const UNSAFE_FILENAME_RE = /["%\\/\x00-\x1f\x7f]/;
+// How long a cached GCS object generation is trusted before re-checking.
+const METADATA_CACHE_TTL_MS = 60_000;
 
 // -- Validation ----------------------------------------------------------------
 
@@ -143,6 +145,11 @@ export class AssetStager {
       keyFilename: config.serviceAccountFile,
     });
     this._validatedRemoteDir = false;
+    // Cache the last-seen GCS object generation per source so repeated
+    // overlay triggers don't pay a metadata round trip every time.
+    this._metadataCache = new Map(); // gcsUrl -> { generation, checkedAt }
+    // remoteName -> generation already confirmed on the Windows host.
+    this._confirmedRemote = new Map();
   }
 
   _parseGcsUrl(url) {
@@ -170,6 +177,59 @@ export class AssetStager {
     return dir;
   }
 
+  // The current GCS object generation, cached for METADATA_CACHE_TTL_MS so
+  // rapid re-triggers avoid the metadata round trip while re-uploads are
+  // still picked up (the generation is re-fetched after the TTL expires).
+  async _getGeneration(parsed) {
+    const key = `${parsed.bucket}/${parsed.object}`;
+    const cached = this._metadataCache.get(key);
+    if (cached && Date.now() - cached.checkedAt < METADATA_CACHE_TTL_MS) {
+      return cached.generation;
+    }
+    const [metadata] = await this.storage
+      .bucket(parsed.bucket)
+      .file(parsed.object)
+      .getMetadata();
+    const generation = String(metadata.generation || "0");
+    this._metadataCache.set(key, { generation, checkedAt: Date.now() });
+    return generation;
+  }
+
+  _sshArgs() {
+    return [
+      "-i",
+      this.config.overlaySshKey,
+      "-o",
+      "StrictHostKeyChecking=accept-new",
+      "-o",
+      "UserKnownHostsFile=/dev/null",
+      "-o",
+      "ConnectTimeout=10",
+      "-o",
+      "ServerAliveInterval=15",
+    ];
+  }
+
+  // Returns the size of the remote file on the Windows host, or null when it
+  // does not exist.
+  async _remoteSize(remoteName) {
+    const moveDir = this.config.overlayRemoteContentDir
+      .replace(/\\/g, "/")
+      .replace(/\/+$/, "")
+      .replace(/\//g, "\\");
+    try {
+      const { stdout } = await execFileAsync("ssh", [
+        ...this._sshArgs(),
+        `${this.config.overlaySshUser}@${this.config.overlaySshHost}`,
+        `@for %I in ("${moveDir}\\${remoteName}") do @echo %~zI`,
+      ]);
+      const size = Number.parseInt(stdout.trim(), 10);
+      return Number.isInteger(size) && size >= 0 ? size : null;
+    } catch {
+      return null;
+    }
+  }
+
   async stageAsset(gcsUrl, remoteName) {
     if (!this._validatedRemoteDir) {
       const expected = path.normalize(this.config.overlayRemoteContentDir);
@@ -185,11 +245,7 @@ export class AssetStager {
     const cacheKey = this._cacheKey(gcsUrl);
     const cacheDir = await this._ensureCacheDir();
 
-    const [metadata] = await this.storage
-      .bucket(parsed.bucket)
-      .file(parsed.object)
-      .getMetadata();
-    const generation = String(metadata.generation || "0");
+    const generation = await this._getGeneration(parsed);
     const ext = path.extname(parsed.object);
     const cachedPath = path.join(cacheDir, `${cacheKey}-${generation}${ext}`);
 
@@ -219,7 +275,18 @@ export class AssetStager {
         .download({ destination: cachedPath });
     }
 
-    await this.copyToWindows(cachedPath, remoteName);
+    // Skip the SCP+move when the remote already holds this generation: a
+    // 36 MB copy per goal is the bulk of the trigger latency. Size match is
+    // the cheap proxy; the confirmed-set makes repeat triggers O(1).
+    if (this._confirmedRemote.get(remoteName) !== generation) {
+      const localSize = (await fs.stat(cachedPath)).size;
+      const remoteSize = await this._remoteSize(remoteName);
+      if (remoteSize !== localSize) {
+        await this.copyToWindows(cachedPath, remoteName);
+      }
+      this._confirmedRemote.set(remoteName, generation);
+    }
+
     return `${this.config.overlayRemoteContentDir.replace(/\\+$/, "")}/${remoteName.replace(/\\/g, "/")}`;
   }
 
@@ -238,20 +305,7 @@ export class AssetStager {
     const moveTmpPath = `${moveDir}\\${remoteName}.part`;
     const moveFinalPath = `${moveDir}\\${remoteName}`;
 
-    const sshArgs = [
-      "-i",
-      this.config.overlaySshKey,
-      "-o",
-      "StrictHostKeyChecking=accept-new",
-      // The service user has no writable home; discard the recorded host key
-      // instead of failing to write ~/.ssh/known_hosts.
-      "-o",
-      "UserKnownHostsFile=/dev/null",
-      "-o",
-      "ConnectTimeout=10",
-      "-o",
-      "ServerAliveInterval=15",
-    ];
+    const sshArgs = this._sshArgs();
 
     await execFileAsync("scp", [
       ...sshArgs,

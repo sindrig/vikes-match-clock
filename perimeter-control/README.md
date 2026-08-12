@@ -239,10 +239,13 @@ base perimeter on/off toggle.
 3. `null` at the overlay path is treated as a clear command.
 4. Assets are downloaded from GCS (`gs://vikes-match-clock-firebase.appspot.com`)
    to a local Linux cache, deduplicated by object generation.
-5. Missing/changed files are SCP-copied to the Windows Resolume host's
-   `C:/Content` directory using a temporary remote filename, then renamed
-   atomically. The rename uses a backslash path because cmd's `move` does not
-   accept forward slashes.
+5. Files are SCP-copied to the Windows Resolume host's `C:/Content` directory
+   using a temporary remote filename, then renamed atomically. The rename
+   uses a backslash path because cmd's `move` does not accept forward slashes.
+   The copy is **skipped when the remote file already matches** the local
+   cached size (verified over SSH and remembered per run), and the GCS object
+   generation lookup is cached for 60s, so a repeated goal celebration skips
+   the ~36 MB transfer and reaches "playing" in about a second.
 6. Before staging, the target clip slot is cleared first: Resolume holds a
    loaded video file open on Windows, so overwriting it without unloading
    fails with "Access is denied".
