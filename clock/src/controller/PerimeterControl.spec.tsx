@@ -1,8 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { createElement } from "react";
+import type { ComponentProps } from "react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import PerimeterControl from "./PerimeterControl";
 import { usePerimeter } from "../contexts/FirebaseStateContext";
 import { useLocalState } from "../contexts/LocalStateContext";
+import { closestCenter } from "@dnd-kit/core";
+import type { CollisionDetection, DragEndEvent } from "@dnd-kit/core";
 
 vi.mock("../contexts/FirebaseStateContext", () => ({
   usePerimeter: vi.fn(),
@@ -20,9 +24,24 @@ vi.mock("../firebase", () => ({
   },
 }));
 
-vi.mock("../asset/queue/dndUtils", () => ({
-  typedCollisionDetection: vi.fn(),
+const dndProps = vi.hoisted(() => ({
+  onDragEnd: null as null | ((event: DragEndEvent) => void),
+  collisionDetection: null as null | CollisionDetection,
 }));
+
+vi.mock("@dnd-kit/core", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@dnd-kit/core")>();
+  return {
+    ...actual,
+    DndContext: (props: ComponentProps<typeof actual.DndContext>) => {
+      dndProps.onDragEnd = props.onDragEnd
+        ? (event: DragEndEvent) => props.onDragEnd?.(event)
+        : null;
+      dndProps.collisionDetection = props.collisionDetection ?? null;
+      return createElement(actual.DndContext, props);
+    },
+  };
+});
 
 const mockedUsePerimeter = vi.mocked(usePerimeter);
 const mockedUseLocalState = vi.mocked(useLocalState);
@@ -57,7 +76,8 @@ const baseAppliedAdLayout = {
   columns: [],
 };
 
-const mockSetPerimeterAdLayout = vi.fn();
+const mockSetPerimeterAdLayout =
+  vi.fn<ReturnType<typeof usePerimeter>["setPerimeterAdLayout"]>();
 
 const createMockPerimeterReturn = (
   overrides: Partial<ReturnType<typeof usePerimeter>> = {},
@@ -519,5 +539,78 @@ describe("PerimeterControl", () => {
 
     expect(await screen.findByText(/Ekki tókst að vista/)).toBeInTheDocument();
     vi.restoreAllMocks();
+  });
+
+  it("uses closestCenter collision detection for raw UUID column ids", () => {
+    mockedUsePerimeter.mockReturnValue(
+      createMockPerimeterReturn({
+        adLayout: {
+          version: 1,
+          revision: "rev-123",
+          columns: [
+            {
+              id: "col-1",
+              files: {
+                "lane-1": { name: "a.mp4", source: "gs://bucket/a.mp4" },
+                "lane-2": { name: "b.mp4", source: "gs://bucket/b.mp4" },
+              },
+            },
+            {
+              id: "col-2",
+              files: {
+                "lane-1": { name: "c.mp4", source: "gs://bucket/c.mp4" },
+                "lane-2": { name: "d.mp4", source: "gs://bucket/d.mp4" },
+              },
+            },
+          ],
+        },
+      }),
+    );
+    render(<PerimeterControl />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Opna" }));
+
+    expect(dndProps.collisionDetection).toBe(closestCenter);
+  });
+
+  it("reorders columns and writes a fresh revision on drag end", async () => {
+    mockedUsePerimeter.mockReturnValue(
+      createMockPerimeterReturn({
+        adLayout: {
+          version: 1,
+          revision: "rev-123",
+          columns: [
+            {
+              id: "col-1",
+              files: {
+                "lane-1": { name: "a.mp4", source: "gs://bucket/a.mp4" },
+                "lane-2": { name: "b.mp4", source: "gs://bucket/b.mp4" },
+              },
+            },
+            {
+              id: "col-2",
+              files: {
+                "lane-1": { name: "c.mp4", source: "gs://bucket/c.mp4" },
+                "lane-2": { name: "d.mp4", source: "gs://bucket/d.mp4" },
+              },
+            },
+          ],
+        },
+      }),
+    );
+    render(<PerimeterControl />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Opna" }));
+
+    expect(dndProps.onDragEnd).not.toBeNull();
+    dndProps.onDragEnd!({ active: { id: "col-2" }, over: { id: "col-1" } });
+
+    await waitFor(() =>
+      expect(mockSetPerimeterAdLayout).toHaveBeenCalledTimes(1),
+    );
+    const layout = mockSetPerimeterAdLayout.mock.calls[0]?.[0];
+    expect(layout).toBeDefined();
+    expect(layout?.revision).not.toBe("rev-123");
+    expect(layout?.columns.map((c) => c.id)).toEqual(["col-2", "col-1"]);
   });
 });

@@ -407,9 +407,11 @@ refused with an `error` status (each ad needs its own deck column).
 - **Delete column**: Red X button with confirmation dialog
   (`Fjarlægja dálk? Skrárnar verða áfram í Firebase Storage.`). Removes only
   the layout reference, never deletes Storage objects.
-- **Reorder columns**: `@dnd-kit` horizontal sortable pattern (reuses
-  `typedCollisionDetection` from queue DnD). Produces one new full-layout
-  revision with stable column UUIDs.
+- **Reorder columns**: `@dnd-kit` horizontal sortable pattern with dnd-kit's
+  `closestCenter` collision detection (column IDs are raw UUIDs, so the
+  queue-specific `typedCollisionDetection` — which only matches `col:`/`item:`
+  IDs — would filter out every perimeter droppable). Produces one new
+  full-layout revision with stable column UUIDs.
 - Writes are serialized (queued) and every mutating control (add/delete/drag)
   is disabled while a write is pending; handlers always compute from the
   latest desired columns, so a rapid second edit can never clobber the first.

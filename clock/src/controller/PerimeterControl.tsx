@@ -15,6 +15,7 @@ import {
   defaultDropAnimationSideEffects,
   DragStartEvent,
   UniqueIdentifier,
+  closestCenter,
 } from "@dnd-kit/core";
 import {
   arrayMove,
@@ -38,7 +39,6 @@ import {
   ListResult,
   FIREBASE_STORAGE_BUCKET,
 } from "../firebase";
-import { typedCollisionDetection } from "./asset/queue/dndUtils";
 import "./PerimeterControl.css";
 
 const STALE_MS = 15 * 60 * 1000;
@@ -591,7 +591,7 @@ const PerimeterControl = () => {
               ) : (
                 <DndContext
                   sensors={sensors}
-                  collisionDetection={typedCollisionDetection}
+                  collisionDetection={closestCenter}
                   onDragStart={handleDragStart}
                   onDragEnd={handleDragEnd}
                 >
