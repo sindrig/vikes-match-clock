@@ -70,6 +70,12 @@ const DEFAULT_OVERLAY_SSH_KEY = "/etc/perimeter-control/overlay-ssh-key";
 const DEFAULT_OVERLAY_REMOTE_CONTENT_DIR = "C:/Content";
 const DEFAULT_OVERLAY_CACHE_DIR = "/var/cache/perimeter-control";
 const DEFAULT_OVERLAY_LAYER_CLIP_COLUMNS = '{"2":1,"4":1}';
+// Named media-pair target folder per overlay layer. Layer "2" is the
+// 48-screen overlay and layer "4" is the 40-screen overlay, so pair files for
+// each layer must live under `perimeter-overlays/{pairId}/48/` and `/40/`
+// respectively. The daemon rejects a pair file whose folder does not match its
+// layer's configured target.
+const DEFAULT_OVERLAY_LAYER_TARGET_FOLDERS = '{"2":"48","4":"40"}';
 
 // Ad-layout defaults. The ad lanes are the base content layers (1-based layer
 // indices) that the deck autopilot cycles; the goal overlay uses the separate
@@ -173,6 +179,43 @@ function parseLayerMap(envValue, fallback) {
   }
 }
 
+// Parse a JSON object whose values are non-empty strings (e.g. overlay layer
+// target folders), merging the validated entries over the provided default so
+// keys the override omits keep their default enforcement. A partial override
+// such as {"2":"48"} must not silently drop the target folder for layer "4":
+// validateGcsSource skips its folder check when a layer has no target folder.
+function parseStringMap(envValue, fallback) {
+  let defaults = {};
+  try {
+    const fallbackParsed = JSON.parse(fallback);
+    if (
+      fallbackParsed &&
+      typeof fallbackParsed === "object" &&
+      !Array.isArray(fallbackParsed)
+    ) {
+      defaults = fallbackParsed;
+    }
+  } catch {
+    // ignore a malformed fallback
+  }
+  const raw = envValue ?? fallback;
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      const map = { ...defaults };
+      for (const [key, val] of Object.entries(parsed)) {
+        if (typeof val === "string" && val.length > 0) {
+          map[String(key)] = val;
+        }
+      }
+      return map;
+    }
+  } catch {
+    // fall through
+  }
+  return defaults;
+}
+
 export function loadConfig(environ = process.env) {
   return {
     databaseURL:
@@ -249,6 +292,10 @@ export function loadConfig(environ = process.env) {
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean),
+    overlayLayerTargetFolders: parseStringMap(
+      environ.PERIMETER_OVERLAY_LAYER_TARGET_FOLDERS,
+      DEFAULT_OVERLAY_LAYER_TARGET_FOLDERS,
+    ),
     // Ad-layout settings. The deck column range is derived from the live
     // composition at runtime; only the lane IDs are configured.
     adLayoutEnabled: environ.PERIMETER_AD_LAYOUT_ENABLED !== "false",

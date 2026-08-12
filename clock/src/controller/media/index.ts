@@ -3,4 +3,5 @@ export const IMAGE_TYPES = {
   largeAds: "largeAds",
   smallAds: "smallAds",
   players: "players",
+  perimeterPairs: "perimeterPairs",
 };

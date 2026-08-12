@@ -9,6 +9,8 @@ import {
   parseClubOverrides,
   parsePerimeterState,
   parsePerimeterPreview,
+  parsePerimeterOverlay,
+  parsePerimeterMediaPairs,
   parsePerimeterAdLayout,
   parsePerimeterAppliedAdLayout,
 } from "./firebaseParsers";
@@ -1900,6 +1902,274 @@ describe("firebaseParsers", () => {
       const result = parsePerimeterAppliedAdLayout(withBadLanes);
       expect(result!.lanes).toHaveLength(1);
       expect(result!.lanes[0]?.id).toBe("1");
+    });
+  });
+
+  describe("parsePerimeterOverlay", () => {
+    const bucket = "vikes-match-clock-firebase.appspot.com";
+    const goalOverlay = {
+      version: 1,
+      id: "goal-1",
+      columns: [
+        {
+          durationMs: 10000,
+          files: {
+            "2": {
+              name: "goal-48.mp4",
+              source: `gs://${bucket}/vikuti/perimeter/goal-48.mp4`,
+            },
+            "4": {
+              name: "goal-40.mp4",
+              source: `gs://${bucket}/vikuti/perimeter/goal-40.mp4`,
+            },
+          },
+        },
+      ],
+    };
+
+    it("accepts legacy home-goal files under {location}/perimeter/", () => {
+      const result = parsePerimeterOverlay(goalOverlay, {
+        location: "vikuti",
+      });
+      expect(result).not.toBeNull();
+      expect(result?.columns[0]?.files["2"]?.name).toBe("goal-48.mp4");
+    });
+
+    it("accepts named media-pair files under {location}/perimeter-overlays/", () => {
+      const pairId = "11111111-1111-4111-8111-111111111111";
+      const overlay = {
+        version: 1,
+        id: "pair-1",
+        columns: [
+          {
+            durationMs: 10000,
+            files: {
+              "2": {
+                name: "48-1-sindri.mp4",
+                source: `gs://${bucket}/vikuti/perimeter-overlays/${pairId}/48/48-1-sindri.mp4`,
+              },
+              "4": {
+                name: "40-1-sindri.png",
+                source: `gs://${bucket}/vikuti/perimeter-overlays/${pairId}/40/40-1-sindri.png`,
+              },
+            },
+          },
+        ],
+      };
+      const result = parsePerimeterOverlay(overlay, { location: "vikuti" });
+      expect(result).not.toBeNull();
+    });
+
+    it("rejects sources outside the two allowed location prefixes", () => {
+      const overlay = {
+        version: 1,
+        id: "bad-1",
+        columns: [
+          {
+            durationMs: 10000,
+            files: {
+              "2": {
+                name: "x.mp4",
+                source: `gs://${bucket}/vikuti/elsewhere/x.mp4`,
+              },
+            },
+          },
+        ],
+      };
+      expect(parsePerimeterOverlay(overlay, { location: "vikuti" })).toBeNull();
+    });
+
+    it("rejects sources from a foreign location", () => {
+      const overlay = {
+        version: 1,
+        id: "bad-1",
+        columns: [
+          {
+            durationMs: 10000,
+            files: {
+              "2": {
+                name: "goal-48.mp4",
+                source: `gs://${bucket}/other/perimeter/goal-48.mp4`,
+              },
+            },
+          },
+        ],
+      };
+      expect(parsePerimeterOverlay(overlay, { location: "vikuti" })).toBeNull();
+    });
+  });
+
+  describe("parsePerimeterMediaPairs", () => {
+    const bucket = "vikes-match-clock-firebase.appspot.com";
+    const location = "vikuti";
+    const pairId = "11111111-1111-4111-8111-111111111111";
+    const validPair = () => ({
+      [pairId]: {
+        name: "Sindri",
+        files: {
+          "2": {
+            name: "48-1-sindri.mp4",
+            source: `gs://${bucket}/${location}/perimeter-overlays/${pairId}/48/48-1-sindri.mp4`,
+          },
+          "4": {
+            name: "40-1-sindri.png",
+            source: `gs://${bucket}/${location}/perimeter-overlays/${pairId}/40/40-1-sindri.png`,
+          },
+        },
+      },
+    });
+
+    it("accepts a valid pair with exact target-specific paths", () => {
+      const result = parsePerimeterMediaPairs(validPair(), {
+        location,
+        bucket,
+      });
+      expect(Object.keys(result)).toHaveLength(1);
+      expect(result[pairId]?.name).toBe("Sindri");
+      expect(result[pairId]?.files["2"]?.name).toBe("48-1-sindri.mp4");
+      expect(result[pairId]?.files["4"]?.name).toBe("40-1-sindri.png");
+    });
+
+    it("returns an empty map for null/undefined/primitive input", () => {
+      expect(parsePerimeterMediaPairs(null)).toEqual({});
+      expect(parsePerimeterMediaPairs(undefined)).toEqual({});
+      expect(parsePerimeterMediaPairs("x")).toEqual({});
+    });
+
+    it("rejects a pair missing a target", () => {
+      const data = validPair();
+      delete (data[pairId] as { files: Record<string, unknown> }).files["4"];
+      const result = parsePerimeterMediaPairs(data, { location, bucket });
+      expect(result).toEqual({});
+    });
+
+    it("rejects a pair with an extra target", () => {
+      const data = validPair();
+      const files = (data[pairId] as { files: Record<string, unknown> }).files;
+      files["5"] = {
+        name: "x.mp4",
+        source: `gs://${bucket}/${location}/perimeter-overlays/${pairId}/48/x.mp4`,
+      };
+      const result = parsePerimeterMediaPairs(data, { location, bucket });
+      expect(result).toEqual({});
+    });
+
+    it("rejects a pair with an invalid (empty/too long) name", () => {
+      const empty = validPair();
+      (empty[pairId] as { name: string }).name = "   ";
+      expect(parsePerimeterMediaPairs(empty, { location, bucket })).toEqual({});
+
+      const long = validPair();
+      (long[pairId] as { name: string }).name = "x".repeat(81);
+      expect(parsePerimeterMediaPairs(long, { location, bucket })).toEqual({});
+    });
+
+    it("rejects an unsafe filename", () => {
+      const data = validPair();
+      (data[pairId] as { files: Record<string, { name: string }> }).files[
+        "2"
+      ].name = "../evil.mp4";
+      expect(parsePerimeterMediaPairs(data, { location, bucket })).toEqual({});
+    });
+
+    it("rejects a wrong bucket", () => {
+      const data = validPair();
+      (data[pairId] as { files: Record<string, { source: string }> }).files[
+        "2"
+      ].source =
+        `gs://wrong.appspot.com/${location}/perimeter-overlays/${pairId}/48/a.mp4`;
+      expect(parsePerimeterMediaPairs(data, { location, bucket })).toEqual({});
+    });
+
+    it("rejects a wrong location", () => {
+      const data = validPair();
+      (data[pairId] as { files: Record<string, { source: string }> }).files[
+        "2"
+      ].source = `gs://${bucket}/other/perimeter-overlays/${pairId}/48/a.mp4`;
+      expect(parsePerimeterMediaPairs(data, { location, bucket })).toEqual({});
+    });
+
+    it("rejects a 48/40 path/layer mismatch", () => {
+      const data = validPair();
+      // Layer "2" must point at the /48/ folder; /40/ is invalid here.
+      (data[pairId] as { files: Record<string, { source: string }> }).files[
+        "2"
+      ].source =
+        `gs://${bucket}/${location}/perimeter-overlays/${pairId}/40/a.mp4`;
+      expect(parsePerimeterMediaPairs(data, { location, bucket })).toEqual({});
+    });
+
+    it("rejects a source whose suffix is not a single filename", () => {
+      const data = validPair();
+      // The daemon splits the object path into exactly pairId/folder/filename;
+      // a nested directory would be rejected there, so the parser must too.
+      (data[pairId] as { files: Record<string, { source: string }> }).files[
+        "2"
+      ].source =
+        `gs://${bucket}/${location}/perimeter-overlays/${pairId}/48/subdir/a.mp4`;
+      expect(parsePerimeterMediaPairs(data, { location, bucket })).toEqual({});
+    });
+
+    it("rejects traversal (..) in the source suffix", () => {
+      const data = validPair();
+      (data[pairId] as { files: Record<string, { source: string }> }).files[
+        "2"
+      ].source =
+        `gs://${bucket}/${location}/perimeter-overlays/${pairId}/48/../40/a.mp4`;
+      expect(parsePerimeterMediaPairs(data, { location, bucket })).toEqual({});
+    });
+
+    it("rejects an invalid pair ID key", () => {
+      const data: Record<string, unknown> = {
+        "not-a-uuid": {
+          name: "Sindri",
+          files: {
+            "2": {
+              name: "48-1-sindri.mp4",
+              source: `gs://${bucket}/${location}/perimeter-overlays/not-a-uuid/48/48-1-sindri.mp4`,
+            },
+            "4": {
+              name: "40-1-sindri.png",
+              source: `gs://${bucket}/${location}/perimeter-overlays/not-a-uuid/40/40-1-sindri.png`,
+            },
+          },
+        },
+      };
+      expect(parsePerimeterMediaPairs(data, { location, bucket })).toEqual({});
+    });
+
+    it("rejects a pair whose source pairId does not match its key", () => {
+      const otherId = "22222222-2222-4222-8222-222222222222";
+      const data = validPair();
+      (data[pairId] as { files: Record<string, { source: string }> }).files[
+        "2"
+      ].source =
+        `gs://${bucket}/${location}/perimeter-overlays/${otherId}/48/a.mp4`;
+      expect(parsePerimeterMediaPairs(data, { location, bucket })).toEqual({});
+    });
+
+    it("drops malformed entries without breaking valid ones", () => {
+      const data = {
+        ...validPair(),
+        broken: { name: "Broken", files: {} },
+        "22222222-2222-4222-8222-222222222222": {
+          name: "Góð",
+          files: {
+            "2": {
+              name: "48-2-good.mp4",
+              source: `gs://${bucket}/${location}/perimeter-overlays/22222222-2222-4222-8222-222222222222/48/48-2-good.mp4`,
+            },
+            "4": {
+              name: "40-2-good.png",
+              source: `gs://${bucket}/${location}/perimeter-overlays/22222222-2222-4222-8222-222222222222/40/40-2-good.png`,
+            },
+          },
+        },
+      };
+      const result = parsePerimeterMediaPairs(data, { location, bucket });
+      expect(Object.keys(result)).toHaveLength(2);
+      expect(result["22222222-2222-4222-8222-222222222222"]?.name).toBe("Góð");
+      expect(result.broken).toBeUndefined();
     });
   });
 });

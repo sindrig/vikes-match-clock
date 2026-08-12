@@ -250,6 +250,94 @@ Write actions are in `FirebaseStateContext.tsx`:
 
 These are exposed via `usePerimeter()` hook.
 
+#### Named Perimeter Media Pairs (Manual Overlay Library)
+
+An operator-curated library of **named overlay pairs** that share the same
+active overlay channel as the home-goal overlay. Each pair binds a required
+name to exactly two files: one for the 48-screen target (layer `"2"`) and one
+for the 40-screen target (layer `"4"`). Files may be images or videos.
+
+**Firebase path**: `states/${listenPrefix}/perimeter/mediaPairs/{pairId}`
+
+```json
+{
+  "name": "Sindri",
+  "files": {
+    "2": {
+      "name": "48-1723392000000-sindri.mp4",
+      "source": "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter-overlays/11111111-1111-4111-8111-111111111111/48/48-1723392000000-sindri.mp4"
+    },
+    "4": {
+      "name": "40-1723392000000-sindri.png",
+      "source": "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter-overlays/11111111-1111-4111-8111-111111111111/40/40-1723392000000-sindri.png"
+    }
+  }
+}
+```
+
+- `pairId` is a UUID generated before upload and used as both the map key and
+  the source-path segment.
+- `name` is required, trimmed, non-empty, and bounded (≤ 80 chars).
+- Each pair has exactly the two targets `"2"` and `"4"`. Layer `"2"` files must
+  live under `{location}/perimeter-overlays/{pairId}/48/`; layer `"4"` files
+  under `.../40/`. A path/layer mismatch is rejected.
+- Filenames are generated and must match the daemon's safe-filename rules; the
+  two targets must have distinct filenames.
+- Sources must use the approved Firebase bucket and the pair's own prefix, and
+  the suffix after the target folder must be exactly one daemon-safe filename
+  (no subdirectories and no `..`), matching the daemon's staging rules.
+
+**Showing** a pair writes a fresh `PerimeterOverlay` to the existing command
+path `states/${listenPrefix}/perimeter/overlay` with a new command `id` and a
+single column (`durationMs: 10000`) holding the pair's two files. Because the
+daemon holds the final column until clear, the pair loops until cleared. The
+overlay channel is single-writer: showing a pair replaces a home-goal overlay
+and a subsequent home goal replaces the pair (last command wins).
+
+**Clearing** is available both in the new "Jaðarefni" media tab ("Hreinsa
+jaðarskjá") and via the existing global "Hreinsa virkt overlay" button. Both
+write `overlay: null`; either clears whichever overlay is active and restores
+the rotating base ad deck.
+
+Types in `types.ts`:
+
+- `PerimeterMediaPair` — name + per-target `PerimeterOverlayFile` map.
+
+Parsing in `firebaseParsers.ts`:
+
+- `parsePerimeterMediaPairs()` — validates the pair library (pair ID, name,
+  exact `"2"`/`"4"` key set, safe distinct filenames, target-specific paths,
+  pair-ID/source consistency, approved bucket + location).
+
+Context in `FirebaseStateContext.tsx`:
+
+- Subscribes to `states/{listenPrefix}/perimeter/mediaPairs` and exposes
+  `mediaPairs` through `usePerimeter()`.
+- `createPerimeterMediaPair(pairId, pair)` — writes the library record (the
+  UI uploads both files first, then writes the record).
+- `deletePerimeterMediaPair(pairId)` — removes only the library record;
+  Firebase Storage assets are left in place.
+
+UI in `controller/media/PerimeterMediaPairs.tsx` (fifth "Jaðarefni" tab):
+
+- Text-only cards (name + both filenames), no thumbnails and no Storage
+  download-URL lookups.
+- `Nýtt jaðarefni` modal: name + required 48/40 file pickers (`image/*,video/*`).
+  Uploads both files (waiting for both to settle), then writes the library
+  record; if an upload or the record write fails, any files that already
+  landed in Storage are best-effort deleted so nothing is orphaned.
+- Green **Sýna** action, red **Fjarlægja** (confirmation), tab-local
+  **Hreinsa jaðarskjá**, and the daemon `overlayStatus` (phase + error).
+
+This system is distinct from the rotating base ad-deck (`adLayout`) and never
+becomes selectable base-ad content. The three perimeter systems are:
+
+| System            | Storage                                          | Command path                           | Layers               |
+| ----------------- | ------------------------------------------------ | -------------------------------------- | -------------------- |
+| Base ad deck      | `{location}/perimeter/`                          | `states/{location}/perimeter/adLayout` | base lanes (1,3)     |
+| Home-goal overlay | `{location}/perimeter/`                          | `states/{location}/perimeter/overlay`  | overlay layers (2,4) |
+| Named media pairs | `{location}/perimeter-overlays/{pairId}/48\|40/` | `states/{location}/perimeter/overlay`  | overlay layers (2,4) |
+
 #### Perimeter Ad Layout (Content Deployer on the Base Layers)
 
 The controller writes a **desired layout** to `states/${listenPrefix}/perimeter/adLayout`,
@@ -267,13 +355,13 @@ manual column selection) keeps working untouched.
 
 **Data ownership**:
 
-| Path                                   | Writer     | Purpose                                            |
-| -------------------------------------- | ---------- | -------------------------------------------------- |
-| `states/{location}/perimeter/adLayout` | Controller | Desired layout command                             |
-| `perimeter/{location}/adLayout`        | Daemon     | Applied layout, lanes, column mapping, previews    |
-| `states/{location}/perimeter/import`   | Controller | One-shot deck import command (`from-resolume`)     |
-| `perimeter/{location}/importStatus`    | Daemon     | Import result (phase, columnsImported, errors)     |
-| `{location}/perimeter/*` in Storage    | Controller | Selectable/uploaded source assets                  |
+| Path                                   | Writer     | Purpose                                         |
+| -------------------------------------- | ---------- | ----------------------------------------------- |
+| `states/{location}/perimeter/adLayout` | Controller | Desired layout command                          |
+| `perimeter/{location}/adLayout`        | Daemon     | Applied layout, lanes, column mapping, previews |
+| `states/{location}/perimeter/import`   | Controller | One-shot deck import command (`from-resolume`)  |
+| `perimeter/{location}/importStatus`    | Daemon     | Import result (phase, columnsImported, errors)  |
+| `{location}/perimeter/*` in Storage    | Controller | Selectable/uploaded source assets               |
 
 The daemon never writes to the desired path, eliminating a self-write
 feedback loop. The single deliberate exception is the deck import command: it
@@ -285,10 +373,10 @@ cannot loop.
 **Layer separation** — the ad layout and the goal overlay use **disjoint
 layers** and never interfere:
 
-| System | Layers | Code |
-|--------|--------|------|
-| Ad layout | base layers (`PERIMETER_AD_LANE_IDS`, default `1,3`) | ad-layout.js |
-| Goal overlay | overlay layers (`PERIMETER_OVERLAY_LAYER_IDS`, default `2,4`) | overlay.js |
+| System       | Layers                                                        | Code         |
+| ------------ | ------------------------------------------------------------- | ------------ |
+| Ad layout    | base layers (`PERIMETER_AD_LANE_IDS`, default `1,3`)          | ad-layout.js |
+| Goal overlay | overlay layers (`PERIMETER_OVERLAY_LAYER_IDS`, default `2,4`) | overlay.js   |
 
 `assertNoSlotConflicts` in `perimeter-control/index.js` rejects any
 overlapping lane configuration at daemon startup.

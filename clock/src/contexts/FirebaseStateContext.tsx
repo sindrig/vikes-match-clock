@@ -16,7 +16,7 @@ import {
   deleteClubOverride as firebaseDeleteClubOverride,
 } from "../firebaseDatabase";
 import { ref, onValue } from "firebase/database";
-import { set } from "firebase/database";
+import { set, remove } from "firebase/database";
 import {
   Match,
   InjuryTimeDisplayMode,
@@ -36,6 +36,7 @@ import {
   PerimeterPreview,
   PerimeterOverlay,
   PerimeterOverlayStatus,
+  PerimeterMediaPair,
   PerimeterAdLayout,
   PerimeterAppliedAdLayout,
 } from "../types";
@@ -52,6 +53,7 @@ import {
   parsePerimeterState,
   parsePerimeterPreview,
   parsePerimeterOverlay,
+  parsePerimeterMediaPairs,
   parsePerimeterAdLayout,
   parsePerimeterAppliedAdLayout,
 } from "./firebaseParsers";
@@ -260,6 +262,12 @@ interface FirebaseStateContextType {
   setPerimeterOverlay: (overlay: PerimeterOverlay) => void;
   clearPerimeterOverlay: () => void;
   setPerimeterAdLayout: (layout: PerimeterAdLayout | null) => Promise<void>;
+  createPerimeterMediaPair: (
+    pairId: string,
+    pair: PerimeterMediaPair,
+  ) => Promise<void>;
+  deletePerimeterMediaPair: (pairId: string) => Promise<void>;
+  mediaPairs: Record<string, PerimeterMediaPair>;
   perimeterOverlay: PerimeterOverlay | null;
   perimeterOverlayStatus: PerimeterOverlayStatus | null;
   perimeterAdLayout: PerimeterAdLayout | null;
@@ -415,6 +423,9 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     useState<PerimeterOverlayStatus | null>(null);
   const [perimeterAdLayout, setPerimeterAdLayoutState] =
     useState<PerimeterAdLayout | null>(null);
+  const [perimeterMediaPairs, setMediaPairs] = useState<
+    Record<string, PerimeterMediaPair>
+  >({});
   const [perimeterAppliedAdLayout, setPerimeterAppliedAdLayout] = useState<
     PerimeterAppliedAdLayout | undefined
   >(undefined);
@@ -439,6 +450,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     setPerimeterPreview(defaultPerimeterPreview);
     setPerimeterPreviewLoaded(false);
     setPerimeterAdLayoutState(null);
+    setMediaPairs({});
     setPerimeterAppliedAdLayout(undefined);
     setPerimeterAppliedAdLayoutLoaded(false);
     setPerimeterAppliedAdLayoutError(null);
@@ -581,6 +593,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
             raw && typeof raw === "object"
               ? parsePerimeterOverlay(
                   (raw as Record<string, unknown>).overlay ?? null,
+                  { location: listenPrefix },
                 )
               : null;
           setOverlay(overlay);
@@ -686,6 +699,26 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         },
       );
 
+      // Named perimeter media pairs: an operator-curated library of overlay
+      // pairs stored under states/{listenPrefix}/perimeter/mediaPairs.
+      const mediaPairsPath = `states/${listenPrefix}/perimeter/mediaPairs`;
+      const unsubMediaPairs = onValue(
+        ref(database, mediaPairsPath),
+        (snapshot) => {
+          setMediaPairs(
+            parsePerimeterMediaPairs(snapshot.val(), {
+              location: listenPrefix,
+              bucket: FIREBASE_STORAGE_BUCKET,
+            }),
+          );
+        },
+        (error) =>
+          console.error(
+            "Firebase perimeter mediaPairs subscription error:",
+            error,
+          ),
+      );
+
       return () => {
         unsubMatch();
         unsubController();
@@ -696,6 +729,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         unsubOverlayStatus();
         unsubAdLayout();
         unsubAppliedAdLayout();
+        unsubMediaPairs();
       };
     }
   }, [listenPrefix]);
@@ -1671,6 +1705,29 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     [isAuthenticated, listenPrefix],
   );
 
+  const createPerimeterMediaPair = useCallback(
+    (pairId: string, pair: PerimeterMediaPair): Promise<void> => {
+      if (!listenPrefix || !isAuthenticated) return Promise.resolve();
+      // Let rejections propagate so the create dialog can surface failures.
+      return set(
+        ref(database, `states/${listenPrefix}/perimeter/mediaPairs/${pairId}`),
+        pair,
+      );
+    },
+    [isAuthenticated, listenPrefix],
+  );
+
+  const deletePerimeterMediaPair = useCallback(
+    (pairId: string): Promise<void> => {
+      if (!listenPrefix || !isAuthenticated) return Promise.resolve();
+      // Removes only the Firebase library record; Storage assets are kept.
+      return remove(
+        ref(database, `states/${listenPrefix}/perimeter/mediaPairs/${pairId}`),
+      );
+    },
+    [isAuthenticated, listenPrefix],
+  );
+
   // Auto-start/stop the perimeter LEDs on view transitions: entering the match
   // view turns the perimeter on, leaving any view for idle turns it off. Only
   // writes when the perimeter is enabled, and only after initial subscriptions
@@ -1779,6 +1836,9 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       perimeterOverlay,
       perimeterOverlayStatus,
       setPerimeterAdLayout,
+      createPerimeterMediaPair,
+      deletePerimeterMediaPair,
+      mediaPairs: perimeterMediaPairs,
       perimeterAdLayout,
       perimeterAppliedAdLayout,
       perimeterAppliedAdLayoutLoaded,
@@ -1857,6 +1917,9 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       perimeterOverlay,
       perimeterOverlayStatus,
       setPerimeterAdLayout,
+      createPerimeterMediaPair,
+      deletePerimeterMediaPair,
+      perimeterMediaPairs,
       perimeterAdLayout,
       perimeterAppliedAdLayout,
       perimeterAppliedAdLayoutLoaded,
@@ -2042,6 +2105,9 @@ export const usePerimeter = () => {
     setPerimeterOverlay,
     clearPerimeterOverlay,
     setPerimeterAdLayout,
+    createPerimeterMediaPair,
+    deletePerimeterMediaPair,
+    mediaPairs,
     perimeterOverlay,
     perimeterOverlayStatus,
     perimeterAdLayout,
@@ -2058,6 +2124,9 @@ export const usePerimeter = () => {
     setPerimeterOverlay,
     clearPerimeterOverlay,
     setPerimeterAdLayout,
+    createPerimeterMediaPair,
+    deletePerimeterMediaPair,
+    mediaPairs,
     overlay: perimeterOverlay,
     overlayStatus: perimeterOverlayStatus,
     adLayout: perimeterAdLayout,

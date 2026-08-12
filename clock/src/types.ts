@@ -338,6 +338,14 @@ export interface PerimeterOverlayStatus {
   error: string | null;
 }
 
+// A named, operator-created pair of perimeter overlay files (one per target).
+// Stored under states/{location}/perimeter/mediaPairs/{pairId}; reused by the
+// single active overlay channel via PerimeterOverlay.
+export interface PerimeterMediaPair {
+  name: string;
+  files: Record<string, PerimeterOverlayFile>;
+}
+
 // -- Perimeter ad layout (Firebase-controlled column-based ads) -------------
 
 // Desired layout written by the controller to states/{location}/perimeter/adLayout

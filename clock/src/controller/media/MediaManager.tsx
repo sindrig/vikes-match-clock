@@ -2,6 +2,7 @@ import React, { useCallback, useState } from "react";
 import { Nav } from "rsuite";
 import UploadManager from "./UploadManager";
 import ImageList from "./ImageList";
+import PerimeterMediaPairs from "./PerimeterMediaPairs";
 import { IMAGE_TYPES } from ".";
 import { useLocalState } from "../../contexts/LocalStateContext";
 import { useController } from "../../contexts/FirebaseStateContext";
@@ -71,29 +72,36 @@ const MediaManager: React.FC = () => {
         <Nav.Item eventKey={IMAGE_TYPES.largeAds}>Augl (stórar)</Nav.Item>
         <Nav.Item eventKey={IMAGE_TYPES.smallAds}>Augl (litlar)</Nav.Item>
         <Nav.Item eventKey={IMAGE_TYPES.players}>Leikmenn</Nav.Item>
+        <Nav.Item eventKey={IMAGE_TYPES.perimeterPairs}>Jaðarefni</Nav.Item>
       </Nav>
-      {!auth.isEmpty && (
-        <UploadManager
-          prefix={`${String(finalTab)}${String(prefix)}`}
-          refresh={refresh}
-        />
-      )}
-      <ImageList
-        prefix={`${String(finalTab)}${String(prefix)}`}
-        appendPrefix={appendPrefix}
-        allowEdit={!auth.isEmpty}
-        ts={ts}
-        onAddAssets={handleAddAssets}
-      />
-      {pendingAssets.length > 0 && (
-        <QueuePicker
-          queues={queues}
-          assets={pendingAssets}
-          onShowNow={handleShowNow}
-          onAddToQueue={handleAddToQueue}
-          onCreateAndAdd={handleCreateAndAdd}
-          onClose={() => setPendingAssets([])}
-        />
+      {tab === IMAGE_TYPES.perimeterPairs ? (
+        <PerimeterMediaPairs />
+      ) : (
+        <>
+          {!auth.isEmpty && (
+            <UploadManager
+              prefix={`${String(finalTab)}${String(prefix)}`}
+              refresh={refresh}
+            />
+          )}
+          <ImageList
+            prefix={`${String(finalTab)}${String(prefix)}`}
+            appendPrefix={appendPrefix}
+            allowEdit={!auth.isEmpty}
+            ts={ts}
+            onAddAssets={handleAddAssets}
+          />
+          {pendingAssets.length > 0 && (
+            <QueuePicker
+              queues={queues}
+              assets={pendingAssets}
+              onShowNow={handleShowNow}
+              onAddToQueue={handleAddToQueue}
+              onCreateAndAdd={handleCreateAndAdd}
+              onClose={() => setPendingAssets([])}
+            />
+          )}
+        </>
       )}
     </div>
   );
