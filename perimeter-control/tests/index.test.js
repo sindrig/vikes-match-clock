@@ -493,7 +493,11 @@ test("ensureDeckAutopilot asserts target, duration type and seconds on on", asyn
   controller.config.overlayCacheDir = cacheDir;
   await fs.writeFile(
     path.join(cacheDir, "autopilot-freeze.json"),
-    JSON.stringify({ id: 111, value: "Play Next Column", owners: ["ad-layout"] }),
+    JSON.stringify({
+      id: 111,
+      value: "Play Next Column",
+      owners: ["ad-layout"],
+    }),
   );
   const calls = mockAutopilotFetch(t);
 
@@ -533,7 +537,10 @@ test("ensureDeckAutopilot skips when the autopilot is already correct", async (t
 
   await controller._ensureDeckAutopilot();
 
-  assert.equal(calls.some((c) => c.method === "PUT"), false);
+  assert.equal(
+    calls.some((c) => c.method === "PUT"),
+    false,
+  );
   controller.shutdown();
 });
 
@@ -565,7 +572,10 @@ test("ensureDeckAutopilot skips when a goal overlay is actively freezing the dec
 
   await controller._ensureDeckAutopilot();
 
-  assert.equal(calls.some((c) => c.method === "PUT"), false);
+  assert.equal(
+    calls.some((c) => c.method === "PUT"),
+    false,
+  );
   controller.shutdown();
 });
 
@@ -595,7 +605,10 @@ test("ensureDeckAutopilot is silent when the composition has no autopilot", asyn
 
   await controller._ensureDeckAutopilot();
 
-  assert.equal(calls.some((c) => c.includes("/parameter/by-id/")), false);
+  assert.equal(
+    calls.some((c) => c.includes("/parameter/by-id/")),
+    false,
+  );
   controller.shutdown();
 });
 
@@ -1054,6 +1067,22 @@ test("loadConfig overlay defaults", () => {
   assert.equal(config.overlayCacheDir, "/var/cache/perimeter-control");
   assert.deepEqual(config.overlayLayerClipColumns, { 2: 1, 4: 1 });
   assert.deepEqual(config.overlayLayerIds, ["2", "4"]);
+  assert.equal(config.overlayTransitionMs, 500);
+  assert.equal(config.overlayTransitionBlend, "Dissolve");
+});
+
+test("loadConfig overlay transition override", () => {
+  const config = loadConfig({
+    PERIMETER_OVERLAY_TRANSITION_SECONDS: "1.25",
+    PERIMETER_OVERLAY_TRANSITION_BLEND: "Alpha",
+  });
+  assert.equal(config.overlayTransitionMs, 1250);
+  assert.equal(config.overlayTransitionBlend, "Alpha");
+});
+
+test("loadConfig overlay transition 0 disables the crossfade", () => {
+  const config = loadConfig({ PERIMETER_OVERLAY_TRANSITION_SECONDS: "0" });
+  assert.equal(config.overlayTransitionMs, 0);
 });
 
 test("loadConfig overlay override", () => {
@@ -1122,12 +1151,8 @@ test("import: attach creates the command, desired, and status refs", () => {
   );
   assert.ok(commandRef, "expected an import command ref");
   assert.equal(commandRef.handlers.has("value"), true);
-  assert.ok(
-    db.refs.some((r) => r.path === controller.config.importStatusPath),
-  );
-  assert.ok(
-    db.refs.some((r) => r.path === controller.config.adLayoutPath),
-  );
+  assert.ok(db.refs.some((r) => r.path === controller.config.importStatusPath));
+  assert.ok(db.refs.some((r) => r.path === controller.config.adLayoutPath));
   controller.shutdown();
   assert.equal(commandRef.handlers.has("value"), false);
 });
@@ -1227,6 +1252,7 @@ test("compositionGrid reads column count, active column and autopilot target", (
     columnCount: 3,
     activeColumn: 2,
     autopilotTarget: { id: 111, value: "Play Next Column", index: 2 },
+    baseContentColumns: [],
   });
 });
 
@@ -1250,12 +1276,85 @@ test("compositionGrid defaults on malformed composition", () => {
     columnCount: 0,
     activeColumn: 1,
     autopilotTarget: null,
+    baseContentColumns: [],
   });
   assert.deepEqual(compositionGrid({ layers: [] }), {
     columnCount: 0,
     activeColumn: 1,
     autopilotTarget: null,
+    baseContentColumns: [],
   });
+});
+
+test("compositionGrid reports base content columns, excluding overlay layers", () => {
+  const grid = compositionGrid(
+    {
+      columns: [
+        { selected: { value: false } },
+        { selected: { value: true } },
+        { selected: { value: false } },
+        { selected: { value: false } },
+      ],
+      layers: [
+        // layer 1: base — has clips in columns 1, 3
+        {
+          clips: [
+            { video: { fileinfo: { path: "C:/a.mp4" } } },
+            {},
+            { video: { fileinfo: { path: "C:/c.mp4" } } },
+            {},
+          ],
+        },
+        // layer 2: overlay — excluded, its clips must not count
+        {
+          clips: [
+            { video: { fileinfo: { path: "C:/overlay.mp4" } } },
+            {},
+            {},
+            {},
+          ],
+        },
+        // layer 3: base — has a clip in column 4
+        {
+          clips: [{}, {}, {}, { filename: "d.mp4" }],
+        },
+      ],
+    },
+    { overlayLayerIds: ["2"] },
+  );
+  assert.deepEqual(grid.baseContentColumns, [1, 3, 4]);
+});
+
+test("ResolumeOverlayClient.getColumnGrid passes overlay layer ids", async (t) => {
+  const calls = [];
+  t.mock.method(globalThis, "fetch", async (url) => {
+    calls.push(url);
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        columns: [
+          { selected: { value: false } },
+          { selected: { value: true } },
+        ],
+        layers: [
+          { clips: [{ video: { fileinfo: { path: "C:/a.mp4" } } }, {}] },
+          { clips: [{}, { video: { fileinfo: { path: "C:/b.mp4" } } }] },
+        ],
+        autopilot: { target: { id: 111, value: "Play Next Column", index: 2 } },
+      }),
+    };
+  });
+  const client = new ResolumeOverlayClient({
+    resolumeBaseUrl: "http://localhost:80/api/v1",
+    requestTimeoutMs: 1_000,
+    overlayLayerIds: ["2"],
+  });
+  const grid = await client.getColumnGrid();
+  assert.equal(calls.length, 1);
+  assert.ok(calls[0].endsWith("/composition"));
+  // Layer 1 is base content (columns 1), layer 2 is the overlay (excluded).
+  assert.deepEqual(grid.baseContentColumns, [1]);
 });
 
 test("ResolumeOverlayClient.getColumnGrid reads the live composition", async (t) => {
@@ -1270,12 +1369,14 @@ test("ResolumeOverlayClient.getColumnGrid reads the live composition", async (t)
   const client = new ResolumeOverlayClient({
     resolumeBaseUrl: "http://localhost:80/api/v1",
     requestTimeoutMs: 1_000,
+    overlayLayerIds: ["2"],
   });
   const grid = await client.getColumnGrid();
   assert.deepEqual(grid, {
     columnCount: 2,
     activeColumn: 2,
     autopilotTarget: { id: 111, value: "Play Next Column", index: 2 },
+    baseContentColumns: [],
   });
 });
 
@@ -1305,6 +1406,57 @@ test("ResolumeOverlayClient.setAutopilot PUTs the value by parameter id", async 
   assert.equal(calls[0].method, "PUT");
   assert.equal(calls[0].url, "http://localhost:80/api/v1/parameter/by-id/111");
   assert.equal(calls[0].body, JSON.stringify({ value: "Off" }));
+});
+
+test("ResolumeOverlayClient.setClipTransition PUTs layer_determined, duration and blend", async (t) => {
+  const calls = [];
+  let readCount = 0;
+  t.mock.method(globalThis, "fetch", async (url, options) => {
+    if (!options.method || options.method === "GET") {
+      readCount += 1;
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          transition: {
+            layer_determined: { id: 11 },
+            duration: { id: 12 },
+            blend_mode: { id: 13 },
+          },
+        }),
+      };
+    }
+    calls.push({ url, method: options.method, body: options.body });
+    return { ok: true, status: 204 };
+  });
+  const client = new ResolumeOverlayClient({
+    resolumeBaseUrl: "http://localhost:80/api/v1",
+    requestTimeoutMs: 1_000,
+  });
+  await client.setClipTransition("2", 1, 0.5, "Dissolve");
+  assert.equal(readCount, 1);
+  assert.equal(calls.length, 3);
+  assert.equal(calls[0].url, "http://localhost:80/api/v1/parameter/by-id/11");
+  assert.equal(calls[0].body, JSON.stringify({ value: false }));
+  assert.equal(calls[1].url, "http://localhost:80/api/v1/parameter/by-id/12");
+  assert.equal(calls[1].body, JSON.stringify({ value: 0.5 }));
+  assert.equal(calls[2].url, "http://localhost:80/api/v1/parameter/by-id/13");
+  assert.equal(calls[2].body, JSON.stringify({ value: "Dissolve" }));
+});
+
+test("ResolumeOverlayClient.setClipTransition rejects bad inputs", async (t) => {
+  const client = new ResolumeOverlayClient({
+    resolumeBaseUrl: "http://localhost:80/api/v1",
+    requestTimeoutMs: 1_000,
+  });
+  await assert.rejects(
+    client.setClipTransition("2", 1, -1, "Dissolve"),
+    /invalid transition seconds/,
+  );
+  await assert.rejects(
+    client.setClipTransition("2", 1, 0.5, ""),
+    /invalid transition blend/,
+  );
 });
 
 test("ResolumeOverlayClient.setClipFit PUTs resize and pins the native canvas", async (t) => {
@@ -1349,11 +1501,14 @@ test("ResolumeOverlayClient.setClipFit PUTs resize and pins the native canvas", 
   // 3840x192 (and re-verified) so the stretch fills the correct region
   // instead of the full 4608x192 layer output.
   const puts = calls.filter((c) => c.method === "PUT");
-  assert.deepEqual(puts.map((c) => c.url), [
-    "http://localhost:80/api/v1/parameter/by-id/4242",
-    "http://localhost:80/api/v1/parameter/by-id/11",
-    "http://localhost:80/api/v1/parameter/by-id/12",
-  ]);
+  assert.deepEqual(
+    puts.map((c) => c.url),
+    [
+      "http://localhost:80/api/v1/parameter/by-id/4242",
+      "http://localhost:80/api/v1/parameter/by-id/11",
+      "http://localhost:80/api/v1/parameter/by-id/12",
+    ],
+  );
   assert.equal(JSON.parse(puts[0].body).value, "Stretch");
   assert.equal(JSON.parse(puts[1].body).value, 3840);
   assert.equal(JSON.parse(puts[2].body).value, 192);
@@ -1373,7 +1528,10 @@ test("ResolumeOverlayClient.setClipFit re-pins a canvas the resize reaction over
           video: {
             width: { id: 11, value: state.width },
             height: { id: 12, value: state.height },
-            resize: { id: 4242, options: ["Fill", "Fit", "Stretch", "Original"] },
+            resize: {
+              id: 4242,
+              options: ["Fill", "Fit", "Stretch", "Original"],
+            },
           },
         }),
       };
@@ -1414,7 +1572,10 @@ test("ResolumeOverlayClient.setClipFit skips canvas pinning when unconfigured", 
           video: {
             width: { id: 11 },
             height: { id: 12 },
-            resize: { id: 4242, options: ["Fill", "Fit", "Stretch", "Original"] },
+            resize: {
+              id: 4242,
+              options: ["Fill", "Fit", "Stretch", "Original"],
+            },
           },
         }),
       };
@@ -1455,10 +1616,7 @@ test("ResolumeOverlayClient.setClipFit rejects missing params and unknown modes"
       },
     }),
   }));
-  await assert.rejects(
-    client.setClipFit("2", 1, "Stretch"),
-    /not available/,
-  );
+  await assert.rejects(client.setClipFit("2", 1, "Stretch"), /not available/);
 });
 
 // -- overlay playback with a frozen deck ------------------------------------------------
@@ -1566,18 +1724,20 @@ test("overlay stage forces the loaded clip to stretch after loading", async () =
 
   // Every loaded overlay slot gets Video → Resize → Stretch so an off-aspect
   // source fills the layer's native canvas edge-to-edge.
-  assert.deepEqual(
-    calls.filter((c) => c[0] === "fit").sort(),
-    [
-      ["fit", "2", 2, "Stretch"],
-      ["fit", "4", 2, "Stretch"],
-    ],
-  );
+  assert.deepEqual(calls.filter((c) => c[0] === "fit").sort(), [
+    ["fit", "2", 2, "Stretch"],
+    ["fit", "4", 2, "Stretch"],
+  ]);
   // The fit is set after the load, on the same slot.
-  const loadIdx = (l, s) => calls.findIndex((c) => c[0] === "load" && c[1] === l && c[2] === s);
-  const fitIdx = (l, s) => calls.findIndex((c) => c[0] === "fit" && c[1] === l && c[2] === s);
+  const loadIdx = (l, s) =>
+    calls.findIndex((c) => c[0] === "load" && c[1] === l && c[2] === s);
+  const fitIdx = (l, s) =>
+    calls.findIndex((c) => c[0] === "fit" && c[1] === l && c[2] === s);
   for (const laneId of ["2", "4"]) {
-    assert.ok(fitIdx(laneId, 2) > loadIdx(laneId, 2), `fit after load on lane ${laneId}`);
+    assert.ok(
+      fitIdx(laneId, 2) > loadIdx(laneId, 2),
+      `fit after load on lane ${laneId}`,
+    );
   }
 });
 
@@ -1605,6 +1765,161 @@ test("overlay trigger falls back to the configured slot when active column is un
     ["2", 1],
     ["4", 1],
   ]);
+});
+
+// -- overlay double-buffered swap ---------------------------------------------------
+
+test("overlay swap loads into a standby column before cutting over", async () => {
+  const controller = await makeOverlayController({
+    PERIMETER_OVERLAY_TRANSITION_SECONDS: "0",
+  });
+  const calls = [];
+  controller._overlayLoaded = true;
+  controller._activeColumn = 2;
+  controller._currentId = "overlay-1";
+  controller.resolume = {
+    getColumnGrid: async () => ({
+      columnCount: 3,
+      activeColumn: 2,
+      autopilotTarget: { id: 111, value: "Play Next Column", index: 2 },
+      baseContentColumns: [1, 2, 3],
+    }),
+    clearClip: async (layerId, slot) => calls.push(["clear", layerId, slot]),
+    loadClip: async (layerId, slot) => calls.push(["load", layerId, slot]),
+    setClipFit: async () => {},
+    setClipTransition: async () => calls.push(["transition"]),
+    connectClip: async (layerId, slot) =>
+      calls.push(["connect", layerId, slot]),
+  };
+  controller.stager.stageAsset = async () => "C:/Content/x.mp4";
+
+  await controller._playColumn(OVERLAY_DOC, 0);
+
+  // The standby column is a base-content column different from the active one
+  // (column 2) — here column 1. The new overlay is loaded there while the old
+  // overlay (column 2) is only cleared AFTER the cutover.
+  assert.deepEqual(calls.filter((c) => c[0] === "load").sort(), [
+    ["load", "2", 1],
+    ["load", "4", 1],
+  ]);
+  assert.deepEqual(calls.filter((c) => c[0] === "connect").sort(), [
+    ["connect", "2", 1],
+    ["connect", "4", 1],
+  ]);
+  // Old column is cleared after the cutover (not before the load).
+  const oldClearIdx = calls.findIndex((c) => c[0] === "clear" && c[2] === 2);
+  const loadIdx = calls.findIndex(
+    (c) => c[0] === "load" && c[1] === "2" && c[2] === 1,
+  );
+  assert.ok(oldClearIdx !== -1, "old column cleared");
+  assert.ok(
+    loadIdx !== -1 && oldClearIdx > loadIdx,
+    "old column cleared after load",
+  );
+  // The overlay now lives in the standby column.
+  assert.equal(controller._activeColumn, 1);
+});
+
+test("overlay swap sets a crossfade transition on the new clip", async () => {
+  const controller = await makeOverlayController({
+    PERIMETER_OVERLAY_TRANSITION_SECONDS: "0.5",
+  });
+  const transitions = [];
+  controller._overlayLoaded = true;
+  controller._activeColumn = 2;
+  controller._currentId = "overlay-1";
+  controller.resolume = {
+    getColumnGrid: async () => ({
+      columnCount: 3,
+      activeColumn: 2,
+      autopilotTarget: { id: 111, value: "Play Next Column", index: 2 },
+      baseContentColumns: [1, 2, 3],
+    }),
+    clearClip: async () => {},
+    loadClip: async () => {},
+    setClipFit: async () => {},
+    setClipTransition: async (layerId, slot, seconds, blend) =>
+      transitions.push([layerId, slot, seconds, blend]),
+    connectClip: async () => {},
+  };
+  controller.stager.stageAsset = async () => "C:/Content/x.mp4";
+
+  await controller._playColumn(OVERLAY_DOC, 0);
+
+  // Both overlay layers get a 0.5s crossfade on the standby slot.
+  assert.deepEqual(transitions.sort(), [
+    ["2", 1, 0.5, "Dissolve"],
+    ["4", 1, 0.5, "Dissolve"],
+  ]);
+});
+
+test("overlay swap falls back to in-place load when no standby column exists", async () => {
+  const controller = await makeOverlayController();
+  const calls = [];
+  controller._overlayLoaded = true;
+  controller._activeColumn = 1;
+  controller._currentId = "overlay-1";
+  controller.resolume = {
+    getColumnGrid: async () => ({
+      columnCount: 1,
+      activeColumn: 1,
+      autopilotTarget: { id: 111, value: "Play Next Column", index: 2 },
+      baseContentColumns: [1],
+    }),
+    clearClip: async (layerId, slot) => calls.push(["clear", layerId, slot]),
+    loadClip: async (layerId, slot) => calls.push(["load", layerId, slot]),
+    setClipFit: async () => {},
+    connectClip: async (layerId, slot) =>
+      calls.push(["connect", layerId, slot]),
+  };
+  controller.stager.stageAsset = async () => "C:/Content/x.mp4";
+
+  await controller._playColumn(OVERLAY_DOC, 0);
+
+  // Single-column deck: no standby — the swap clears + reloads in place.
+  assert.deepEqual(calls.filter((c) => c[0] === "load").sort(), [
+    ["load", "2", 1],
+    ["load", "4", 1],
+  ]);
+  assert.deepEqual(calls.filter((c) => c[0] === "connect").sort(), [
+    ["connect", "2", 1],
+    ["connect", "4", 1],
+  ]);
+});
+
+test("_pickStandbyColumn prefers a base-content column", () => {
+  const controller = new OverlayController(loadConfig({}));
+  assert.equal(
+    controller._pickStandbyColumn(2, {
+      columnCount: 5,
+      baseContentColumns: [3, 4],
+    }),
+    3,
+  );
+  // Excludes the active column even when base content only exists there.
+  assert.equal(
+    controller._pickStandbyColumn(1, {
+      columnCount: 3,
+      baseContentColumns: [1, 2, 3],
+    }),
+    2,
+  );
+  // No base content -> falls back to the next column.
+  assert.equal(
+    controller._pickStandbyColumn(2, {
+      columnCount: 5,
+      baseContentColumns: [],
+    }),
+    1,
+  );
+  // Single column -> no standby.
+  assert.equal(
+    controller._pickStandbyColumn(1, {
+      columnCount: 1,
+      baseContentColumns: [],
+    }),
+    null,
+  );
 });
 
 test("overlay clear unloads the reference and active column slots", async () => {
