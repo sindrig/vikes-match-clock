@@ -203,10 +203,12 @@ column until explicitly cleared.
 - Earlier columns advance after `durationMs`; the final column loops forever.
 - The overlay keeps looping **until cleared even though the base `Efni`
   content auto-advances through its ~20s deck columns** (composition autopilot
-  = "Play Next Column"). The daemon mirrors the overlay file into every clip
-  column of the overlay layers and triggers the copy in the currently active
-  deck column, so the goal celebration survives column transitions. A goal
-  placed only in one column would vanish after the first Efni transition.
+  = "Play Next Column"). The daemon **pauses the deck autopilot** for the
+  duration of the goal celebration (restoring it on clear), loads the overlay
+  file into the currently active deck column, and triggers the clip there — so
+  the goal celebration never vanishes on an Efni transition. A goal placed in
+  a single column without pausing the autopilot would disappear at the first
+  transition.
 - A new `id` replaces/restarts an active sequence.
 - Only files from the approved `gs://vikes-match-clock-firebase.appspot.com`
   bucket are accepted. The daemon copies them only into `C:/Content` on the

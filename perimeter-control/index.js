@@ -185,9 +185,9 @@ export function loadConfig(environ = process.env) {
     overlayRemoteContentDir:
       environ.PERIMETER_OVERLAY_REMOTE_CONTENT_DIR ??
       DEFAULT_OVERLAY_REMOTE_CONTENT_DIR,
-    // Reference clip slot per overlay layer. The daemon mirrors the overlay
-    // file into every clip column of each layer and triggers the clip in the
-    // currently-active deck column, so this value is the fallback slot used
+    // Reference clip slot per overlay layer. The daemon loads the overlay
+    // file into the currently-active deck column (and pauses the deck
+    // autopilot for the overlay), so this value is the fallback slot used
     // only when the live composition cannot be read.
     overlayLayerClipColumns: parseLayerMap(
       environ.PERIMETER_OVERLAY_LAYER_CLIP_COLUMNS,

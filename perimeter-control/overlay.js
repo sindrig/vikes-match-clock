@@ -368,8 +368,34 @@ export class ResolumeOverlayClient {
     }
   }
 
+  async _put(url, body) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this._timeoutMs);
+    try {
+      const response = await fetch(url, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        throw new Error(`Resolume ${url} returned HTTP ${response.status}`);
+      }
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  // Set the value of a composition parameter by its unique id (e.g. the
+  // autopilot target) — the REST API exposes params by id without a path.
+  async setAutopilot(paramId, value) {
+    const base = this._baseUrl();
+    await this._put(`${base}/parameter/by-id/${paramId}`, { value });
+  }
+
   // Deck geometry for overlay playback: total column count, the currently
-  // active column, and per-layer clip slot counts.
+  // active column, and the composition autopilot target (id + value) so the
+  // daemon can pause and restore the auto-advance around a goal overlay.
   async getColumnGrid() {
     const composition = await this._getJson(`${this._baseUrl()}/composition`);
     return compositionGrid(composition);
@@ -422,10 +448,98 @@ export class OverlayController {
     this._currentId = null;
     this._currentColumn = 0;
     this._activeColumn = null;
+    this._autopilotFrozen = false;
     this._columnTimer = null;
     this._stopping = false;
     this._dbRef = null;
     this._statusRef = null;
+  }
+
+  // -- deck autopilot freeze ---------------------------------------------------
+  //
+  // The base content deck auto-advances columns on a ~20s timer (autopilot
+  // "Play Next Column"). An overlay that only exists in one clip column would
+  // vanish on the first transition, and mirroring the file into every column
+  // made the trigger ~13s slower (one `open` per column). Instead the daemon
+  // pauses the composition autopilot for the duration of the overlay so the
+  // deck stays on the current column, and restores the autopilot target on
+  // clear. The original target value is persisted to the cache dir so a
+  // daemon restart during an overlay still restores the correct value.
+
+  _autopilotRestorePath() {
+    return path.join(this.config.overlayCacheDir, "overlay-autopilot.json");
+  }
+
+  async _readAutopilotRestore() {
+    try {
+      const raw = await fs.readFile(this._autopilotRestorePath(), "utf8");
+      const parsed = JSON.parse(raw);
+      return parsed &&
+        typeof parsed.id === "number" &&
+        typeof parsed.value === "string"
+        ? parsed
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async _writeAutopilotRestore(record) {
+    await fs.mkdir(this.config.overlayCacheDir, { recursive: true });
+    await fs.writeFile(
+      this._autopilotRestorePath(),
+      JSON.stringify(record),
+      "utf8",
+    );
+  }
+
+  async _deleteAutopilotRestore() {
+    await fs.unlink(this._autopilotRestorePath()).catch(() => {});
+  }
+
+  async _freezeDeck() {
+    if (this._autopilotFrozen) return;
+    const grid = await this.resolume.getColumnGrid().catch(() => null);
+    const target = grid?.autopilotTarget;
+    if (!target || target.id == null) {
+      console.warn(
+        "Could not read deck autopilot; overlay will not survive column transitions",
+      );
+      return;
+    }
+    // Preserve the ORIGINAL autopilot value across daemon restarts: a prior
+    // freeze (from a crashed run) may already have persisted it, and the live
+    // value would now read "Off".
+    const saved = await this._readAutopilotRestore();
+    if (!saved) {
+      await this._writeAutopilotRestore({
+        id: target.id,
+        value: target.value,
+      }).catch((err) => {
+        console.error(`Failed to persist autopilot restore state: ${err.message}`);
+      });
+    }
+    try {
+      await this.resolume.setAutopilot(target.id, "Off");
+      this._autopilotFrozen = true;
+      console.log("Deck autopilot paused for overlay");
+    } catch (err) {
+      console.error(`Failed to pause deck autopilot: ${err.message}`);
+    }
+  }
+
+  async _unfreezeDeck() {
+    const saved = await this._readAutopilotRestore();
+    if (saved && saved.id != null) {
+      try {
+        await this.resolume.setAutopilot(saved.id, saved.value);
+        console.log("Deck autopilot restored");
+      } catch (err) {
+        console.error(`Failed to restore deck autopilot: ${err.message}`);
+      }
+    }
+    await this._deleteAutopilotRestore();
+    this._autopilotFrozen = false;
   }
 
   _safeError(err) {
@@ -531,7 +645,6 @@ export class OverlayController {
       clearTimeout(this._columnTimer);
       this._columnTimer = null;
     }
-    const grid = await this.resolume.getColumnGrid().catch(() => null);
     for (const layerId of this.config.overlayLayerIds) {
       const clipSlot = this.config.overlayLayerClipColumns[layerId];
       try {
@@ -539,14 +652,11 @@ export class OverlayController {
           // No reserved slot configured — fall back to clearing the whole layer.
           await this.resolume.clearLayer(layerId);
         } else {
-          // Unload every overlay column slot so Resolume releases the file
-          // handle (the overlay clip is mirrored across all deck columns);
+          // Unload the overlay clip so Resolume releases the file handle;
           // otherwise a later re-staging move would be denied.
-          const columnCount = grid?.columnCount
-            ? Math.max(1, grid.columnCount)
-            : 1;
-          for (let c = 1; c <= columnCount; c += 1) {
-            await this.resolume.clearClip(layerId, c);
+          await this.resolume.clearClip(layerId, clipSlot);
+          if (this._activeColumn && this._activeColumn !== clipSlot) {
+            await this.resolume.clearClip(layerId, this._activeColumn);
           }
         }
       } catch (err) {
@@ -555,6 +665,7 @@ export class OverlayController {
         );
       }
     }
+    await this._unfreezeDeck();
     this._publishStatus("playing", -1).catch(() => {});
     console.log("Overlay cleared");
   }
@@ -567,6 +678,9 @@ export class OverlayController {
     this._currentId = doc.id;
     this._currentColumn = 0;
 
+    // Pause the deck autopilot before loading so the base content cannot
+    // advance away from the column the overlay will play in.
+    await this._freezeDeck();
     await this._playColumn(doc, 0);
   }
 
@@ -620,7 +734,6 @@ export class OverlayController {
 
   async _stageAndLoadColumn(col) {
     const grid = await this.resolume.getColumnGrid().catch(() => null);
-    const columnCount = grid?.columnCount ? Math.max(1, grid.columnCount) : 1;
     this._activeColumn =
       grid?.activeColumn && grid.activeColumn >= 1
         ? grid.activeColumn
@@ -632,29 +745,22 @@ export class OverlayController {
       if (clipSlot === undefined) {
         throw new Error(`No clip slot configured for layer ${layerId}`);
       }
-      // Load the file only into slots the layer actually has, bounded by the
-      // number of deck columns. Layer clips always form one slot per column.
-      const layerSlots = grid?.layerClipCounts
-        ? Math.max(1, Math.min(columnCount, grid.layerClipCounts[layerId] || 1))
-        : 1;
+      // The deck is frozen for the duration of the overlay, so a single slot
+      // (the currently active column) is enough — loading one slot per layer
+      // keeps the trigger fast. Falls back to the configured reference slot
+      // when the composition cannot be read.
+      const targetSlot = this._activeColumn ?? clipSlot;
       promises.push(
         (async () => {
-          // Unload every overlay slot on the layer first: Resolume holds a
-          // loaded video file open, so the staging move would fail with
-          // "Access is denied" unless all referencing clips are cleared.
-          for (let c = 1; c <= layerSlots; c += 1) {
-            await this.resolume.clearClip(layerId, c);
-          }
+          // Unload anything still in the slot: Resolume holds the previously
+          // loaded file open, so the staging move would fail with "Access is
+          // denied" unless the clip is cleared first.
+          await this.resolume.clearClip(layerId, targetSlot);
           const winPath = await this.stager.stageAsset(
             fileDef.source,
             fileDef.name,
           );
-          // Mirror the file into every column slot so the overlay survives
-          // deck column transitions (the base content auto-advances on a
-          // timer); the clip in the column the deck lands on is what plays.
-          for (let c = 1; c <= layerSlots; c += 1) {
-            await this.resolume.loadClip(layerId, c, winPath);
-          }
+          await this.resolume.loadClip(layerId, targetSlot, winPath);
         })(),
       );
     }
@@ -672,8 +778,7 @@ export class OverlayController {
       const clipSlot = this.config.overlayLayerClipColumns[layerId];
       if (clipSlot === undefined) continue;
       // Trigger the clip in the column the deck is currently on so the
-      // overlay starts immediately; other columns play automatically when the
-      // deck advances onto them.
+      // overlay starts immediately (the deck is frozen for the overlay).
       promises.push(this.resolume.connectClip(layerId, activeColumn ?? clipSlot));
     }
     await Promise.all(promises);
