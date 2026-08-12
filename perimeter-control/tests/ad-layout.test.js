@@ -416,7 +416,7 @@ test("ResolumeAdClient.setClipTransportDuration rejects missing or invalid durat
   );
 });
 
-test("ResolumeAdClient.setClipFit PUTs the clip's resize param by id", async (t) => {
+test("ResolumeAdClient.setClipFit PUTs resize and pins the native canvas", async (t) => {
   const calls = [];
   t.mock.method(globalThis, "fetch", async (url, options) => {
     calls.push({ url, method: options?.method, body: options?.body });
@@ -426,6 +426,8 @@ test("ResolumeAdClient.setClipFit PUTs the clip's resize param by id", async (t)
         status: 200,
         json: async () => ({
           video: {
+            width: { id: 21 },
+            height: { id: 22 },
             resize: {
               id: 999,
               valuetype: "ParamChoice",
@@ -441,15 +443,25 @@ test("ResolumeAdClient.setClipFit PUTs the clip's resize param by id", async (t)
   const client = new ResolumeAdClient({
     resolumeBaseUrl: "http://localhost:80/api/v1",
     requestTimeoutMs: 1_000,
+    clipCanvases: { 1: "4608x192", 3: "3840x192" },
   });
   await client.setClipFit("3", 4, "Stretch");
   assert.equal(
     calls[0].url,
     "http://localhost:80/api/v1/composition/layers/3/clips/4",
   );
-  assert.equal(calls[1].method, "PUT");
-  assert.equal(calls[1].url, "http://localhost:80/api/v1/parameter/by-id/999");
-  assert.equal(JSON.parse(calls[1].body).value, "Stretch");
+  // resize -> Stretch, then the clip canvas is pinned to the 40-native
+  // 3840x192 so the stretch fills the correct region instead of the full
+  // 4608x192 layer output.
+  const puts = calls.slice(1).filter((c) => c.method === "PUT");
+  assert.deepEqual(puts.map((c) => c.url), [
+    "http://localhost:80/api/v1/parameter/by-id/999",
+    "http://localhost:80/api/v1/parameter/by-id/21",
+    "http://localhost:80/api/v1/parameter/by-id/22",
+  ]);
+  assert.equal(JSON.parse(puts[0].body).value, "Stretch");
+  assert.equal(JSON.parse(puts[1].body).value, 3840);
+  assert.equal(JSON.parse(puts[2].body).value, 192);
 });
 
 test("ResolumeAdClient.setClipFit rejects missing params and unknown modes", async (t) => {
@@ -461,12 +473,13 @@ test("ResolumeAdClient.setClipFit rejects missing params and unknown modes", asy
   const client = new ResolumeAdClient({
     resolumeBaseUrl: "http://localhost:80/api/v1",
     requestTimeoutMs: 1_000,
+    clipCanvases: { 3: "3840x192" },
   });
   await assert.rejects(
-    client.setClipFit("1", 2, "Stretch"),
+    client.setClipFit("3", 2, "Stretch"),
     /no resize parameter/,
   );
-  await assert.rejects(client.setClipFit("1", 2, ""), /invalid clip fit/);
+  await assert.rejects(client.setClipFit("3", 2, ""), /invalid clip fit/);
 
   t.mock.method(globalThis, "fetch", async () => ({
     ok: true,
@@ -476,7 +489,7 @@ test("ResolumeAdClient.setClipFit rejects missing params and unknown modes", asy
     }),
   }));
   await assert.rejects(
-    client.setClipFit("1", 2, "Stretch"),
+    client.setClipFit("3", 2, "Stretch"),
     /not available/,
   );
 });

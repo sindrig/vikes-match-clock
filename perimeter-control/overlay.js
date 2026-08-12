@@ -494,7 +494,8 @@ export class ResolumeOverlayClient {
     const clip = await this._getJson(
       `${base}/composition/layers/${layerId}/clips/${clipSlot}`,
     );
-    const resize = clip?.video?.resize;
+    const video = clip?.video;
+    const resize = video?.resize;
     if (!resize || resize.id == null) {
       throw new Error(`no resize parameter on layer ${layerId} clip ${clipSlot}`);
     }
@@ -504,6 +505,26 @@ export class ResolumeOverlayClient {
       );
     }
     await this._put(`${base}/parameter/by-id/${resize.id}`, { value: mode });
+
+    // Setting a non-Original resize mode makes this Resolume version pin the
+    // clip's canvas to the layer output size (4608x192 for every layer here),
+    // which is wrong for the 40-screen layers whose native canvas is 3840x192 —
+    // the stretch would overflow the LED strip horizontally. Pin the clip
+    // canvas back to the layer's native size (`PERIMETER_CLIP_CANVASES`, e.g.
+    // "3840x192") so the fill lands on the correct region. Native-size media
+    // is unaffected.
+    const canvas = this.config.clipCanvases?.[String(layerId)];
+    if (canvas && video?.width?.id != null && video?.height?.id != null) {
+      const match = /^(\d+)x(\d+)$/.exec(String(canvas));
+      if (match) {
+        await this._put(`${base}/parameter/by-id/${video.width.id}`, {
+          value: Number(match[1]),
+        });
+        await this._put(`${base}/parameter/by-id/${video.height.id}`, {
+          value: Number(match[2]),
+        });
+      }
+    }
   }
 
   async clearClip(layerId, clipSlot) {

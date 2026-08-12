@@ -300,8 +300,13 @@ base perimeter on/off toggle.
     then forced to **fill its layer's native canvas** (`Video → Resize` →
     `Stretch`, set via `PUT /api/v1/parameter/by-id/{id}` on the clip's
     `video.resize` parameter), so a goal video with a non-native aspect ratio
-    can never leave side gaps on the LED strip. Best-effort: retried, failure
-    logged, never fails the trigger.
+    can never leave side gaps on the LED strip. Setting a non-`Original`
+    resize mode makes this Resolume version re-size the clip canvas to the
+    layer output size (4608×192), which would overflow the 40 screens; the
+    daemon therefore also pins the clip canvas back to the layer's native
+    size from `PERIMETER_CLIP_CANVASES` (40 layers → 3840×192, 48 layers →
+    4608×192) so the fill lands on the correct region. Best-effort: retried,
+    failure logged, never fails the trigger.
 8. All paired layers are triggered together by connecting the clip in the
    **currently active deck column** (read from the live composition right
    before triggering). Because the autopilot is paused, the deck stays on
@@ -372,7 +377,8 @@ See `perimeter-control.env.example` for all overlay environment variables:
 `PERIMETER_OVERLAY_GCP_PROJECT`, `PERIMETER_OVERLAY_CACHE_DIR`,
 `PERIMETER_OVERLAY_SSH_HOST/USER/KEY`, `PERIMETER_OVERLAY_REMOTE_CONTENT_DIR`,
 `PERIMETER_OVERLAY_LAYER_IDS`, `PERIMETER_OVERLAY_LAYER_CLIP_COLUMNS`,
-`PERIMETER_OVERLAY_LAYER_TARGET_FOLDERS`, `PERIMETER_CLIP_FIT`.
+`PERIMETER_OVERLAY_LAYER_TARGET_FOLDERS`, `PERIMETER_CLIP_FIT`,
+`PERIMETER_CLIP_CANVASES`.
 
 The SSH key must provide passwordless access to the Windows Resolume host.
 
@@ -445,7 +451,13 @@ overlapping lane configuration at startup.
    native canvas** (`Video → Resize` → `Stretch`, via
    `PUT /api/v1/parameter/by-id/{id}` on the clip's `video.resize` parameter),
    so an ad file with a non-native aspect ratio can never leave side gaps on
-   the LED strip. Best-effort: retried, failure logged, never fails the layout.
+   the LED strip. Setting a non-`Original` resize mode makes this Resolume
+   version re-size the clip canvas to the layer output size (4608×192), which
+   would overflow the 40 screens; the daemon therefore also pins the clip
+   canvas back to the lane's native size from `PERIMETER_CLIP_CANVASES`
+   (40 lanes → 3840×192, 48 lanes → 4608×192) so the fill lands on the
+   correct region. Best-effort: retried, failure logged, never fails the
+   layout.
 7. The daemon publishes the applied status to
    `perimeter/${location}/adLayout` with `phase: "loading"` → `"playing"`.
    The autopilot then cycles the columns; the ads play with no further daemon
@@ -486,7 +498,7 @@ See `perimeter-control.env.example` for all ad-layout environment variables:
 `PERIMETER_AD_LAYOUT_ENABLED`, `PERIMETER_AD_LAYOUT_PATH`,
 `PERIMETER_AD_LAYOUT_STATUS_PATH`, `PERIMETER_AD_LANE_IDS` (default `1,3`),
 `PERIMETER_AD_LAYOUT_BUCKET`, `PERIMETER_AD_MAX_FILE_BYTES`,
-`PERIMETER_CLIP_FIT`.
+`PERIMETER_CLIP_FIT`, `PERIMETER_CLIP_CANVASES`.
 
 The deck column range is derived from the live composition at runtime; there
 is no per-slot configuration. The deck autopilot the ads rely on is asserted

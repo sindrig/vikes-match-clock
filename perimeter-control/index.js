@@ -114,6 +114,16 @@ const DEFAULT_DECK_AUTOPILOT_SECONDS = 20;
 // otherwise leave side gaps on the LED strip).
 const DEFAULT_CLIP_FIT = "Stretch";
 
+// Native content canvas ("WxH") per layer, applied together with
+// PERIMETER_CLIP_FIT. A non-Original resize mode makes this Resolume version
+// pin a clip's canvas to the layer output size (4608x192 for every layer
+// here), which would stretch the 40-screen content (native 3840x192) beyond
+// the LED strip; pinning the clip canvas back to the native size keeps the
+// fill on the correct region. For the Víkin composition: layers 1 (48 skjáir
+// base) and 2 (48 overlay) are 4608x192; layers 3 (40 skjáir base) and 4 (40
+// overlay) are 3840x192.
+const DEFAULT_CLIP_CANVASES = '{"1":"4608x192","2":"4608x192","3":"3840x192","4":"3840x192"}';
+
 // Legacy freeze record written by an earlier daemon build that paused the
 // autopilot for the ad-layout; nothing reads it today, so the "on" self-heal
 // removes it when it restores the autopilot.
@@ -306,6 +316,12 @@ export function loadConfig(environ = process.env) {
     // daemon opens (Stretch by default so off-aspect sources still fill
     // their layer's native canvas edge-to-edge).
     clipFit: (environ.PERIMETER_CLIP_FIT || DEFAULT_CLIP_FIT).trim(),
+    // Native content canvas per layer ("WxH") applied together with clipFit
+    // so the stretch fills the correct region (see DEFAULT_CLIP_CANVASES).
+    clipCanvases: parseStringMap(
+      environ.PERIMETER_CLIP_CANVASES,
+      DEFAULT_CLIP_CANVASES,
+    ),
     // Ad-layout settings. The deck column range is derived from the live
     // composition at runtime; only the lane IDs are configured.
     adLayoutEnabled: environ.PERIMETER_AD_LAYOUT_ENABLED !== "false",

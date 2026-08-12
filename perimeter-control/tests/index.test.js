@@ -51,6 +51,12 @@ test("loadConfig defaults", () => {
   assert.equal(config.deckAutopilotDuration, "Seconds");
   assert.equal(config.deckAutopilotSeconds, 20);
   assert.equal(config.clipFit, "Stretch");
+  assert.deepEqual(config.clipCanvases, {
+    1: "4608x192",
+    2: "4608x192",
+    3: "3840x192",
+    4: "3840x192",
+  });
 });
 
 test("loadConfig overrides", () => {
@@ -74,6 +80,7 @@ test("loadConfig overrides", () => {
     PERIMETER_DECK_AUTOPILOT_DURATION: "Longest Clip",
     PERIMETER_DECK_AUTOPILOT_SECONDS: "15",
     PERIMETER_CLIP_FIT: "Fill",
+    PERIMETER_CLIP_CANVASES: '{"3":"3840x192"}',
   });
   assert.equal(config.databaseURL, "https://example.com");
   assert.equal(config.path, "states/x/perimeter");
@@ -94,6 +101,13 @@ test("loadConfig overrides", () => {
   assert.equal(config.deckAutopilotDuration, "Longest Clip");
   assert.equal(config.deckAutopilotSeconds, 15);
   assert.equal(config.clipFit, "Fill");
+  // A partial override is merged over the default canvas map.
+  assert.deepEqual(config.clipCanvases, {
+    1: "4608x192",
+    2: "4608x192",
+    3: "3840x192",
+    4: "3840x192",
+  });
 });
 
 test("loadConfig invalid numerics fall back to defaults", () => {
@@ -1293,7 +1307,7 @@ test("ResolumeOverlayClient.setAutopilot PUTs the value by parameter id", async 
   assert.equal(calls[0].body, JSON.stringify({ value: "Off" }));
 });
 
-test("ResolumeOverlayClient.setClipFit PUTs the clip's resize param by id", async (t) => {
+test("ResolumeOverlayClient.setClipFit PUTs resize and pins the native canvas", async (t) => {
   const calls = [];
   t.mock.method(globalThis, "fetch", async (url, options) => {
     calls.push({ url, method: options?.method, body: options?.body });
@@ -1303,6 +1317,8 @@ test("ResolumeOverlayClient.setClipFit PUTs the clip's resize param by id", asyn
         status: 200,
         json: async () => ({
           video: {
+            width: { id: 11 },
+            height: { id: 12 },
             resize: {
               id: 4242,
               valuetype: "ParamChoice",
@@ -1318,18 +1334,52 @@ test("ResolumeOverlayClient.setClipFit PUTs the clip's resize param by id", asyn
   const client = new ResolumeOverlayClient({
     resolumeBaseUrl: "http://localhost:80/api/v1",
     requestTimeoutMs: 1_000,
+    clipCanvases: { 2: "4608x192", 4: "3840x192" },
   });
   await client.setClipFit("4", 2, "Stretch");
   assert.equal(
     calls[0].url,
     "http://localhost:80/api/v1/composition/layers/4/clips/2",
   );
-  assert.equal(calls[1].method, "PUT");
-  assert.equal(
-    calls[1].url,
+  // resize -> Stretch, then the clip canvas is pinned to the 40-native
+  // 3840x192 so the stretch fills the correct region instead of the full
+  // 4608x192 layer output.
+  const puts = calls.slice(1).filter((c) => c.method === "PUT");
+  assert.deepEqual(puts.map((c) => c.url), [
     "http://localhost:80/api/v1/parameter/by-id/4242",
-  );
-  assert.equal(JSON.parse(calls[1].body).value, "Stretch");
+    "http://localhost:80/api/v1/parameter/by-id/11",
+    "http://localhost:80/api/v1/parameter/by-id/12",
+  ]);
+  assert.equal(JSON.parse(puts[0].body).value, "Stretch");
+  assert.equal(JSON.parse(puts[1].body).value, 3840);
+  assert.equal(JSON.parse(puts[2].body).value, 192);
+});
+
+test("ResolumeOverlayClient.setClipFit skips canvas pinning when unconfigured", async (t) => {
+  const calls = [];
+  t.mock.method(globalThis, "fetch", async (url, options) => {
+    calls.push({ url, method: options?.method });
+    if (!options?.method || options.method === "GET") {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          video: {
+            width: { id: 11 },
+            height: { id: 12 },
+            resize: { id: 4242, options: ["Fill", "Fit", "Stretch", "Original"] },
+          },
+        }),
+      };
+    }
+    return { ok: true, status: 204 };
+  });
+  const client = new ResolumeOverlayClient({
+    resolumeBaseUrl: "http://localhost:80/api/v1",
+    requestTimeoutMs: 1_000,
+  });
+  await client.setClipFit("2", 1, "Stretch");
+  assert.equal(calls.filter((c) => c.method === "PUT").length, 1);
 });
 
 test("ResolumeOverlayClient.setClipFit rejects missing params and unknown modes", async (t) => {
@@ -1341,6 +1391,7 @@ test("ResolumeOverlayClient.setClipFit rejects missing params and unknown modes"
   const client = new ResolumeOverlayClient({
     resolumeBaseUrl: "http://localhost:80/api/v1",
     requestTimeoutMs: 1_000,
+    clipCanvases: { 2: "4608x192" },
   });
   await assert.rejects(
     client.setClipFit("2", 1, "Stretch"),
