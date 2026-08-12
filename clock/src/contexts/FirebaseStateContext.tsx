@@ -264,6 +264,7 @@ interface FirebaseStateContextType {
   perimeterAdLayout: PerimeterAdLayout | null;
   perimeterAppliedAdLayout: PerimeterAppliedAdLayout | undefined;
   perimeterAppliedAdLayoutLoaded: boolean;
+  perimeterAppliedAdLayoutError: string | null;
 }
 
 const FirebaseStateContext = createContext<FirebaseStateContextType | null>(
@@ -418,6 +419,8 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   >(undefined);
   const [perimeterAppliedAdLayoutLoaded, setPerimeterAppliedAdLayoutLoaded] =
     useState(false);
+  const [perimeterAppliedAdLayoutError, setPerimeterAppliedAdLayoutError] =
+    useState<string | null>(null);
   const [ready, setReady] = useState(!listenPrefix);
 
   const matchRef = useRef(match);
@@ -437,6 +440,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     setPerimeterAdLayoutState(null);
     setPerimeterAppliedAdLayout(undefined);
     setPerimeterAppliedAdLayoutLoaded(false);
+    setPerimeterAppliedAdLayoutError(null);
   }
 
   useEffect(() => {
@@ -660,16 +664,25 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       const unsubAppliedAdLayout = onValue(
         ref(database, appliedAdLayoutPath),
         (snapshot) => {
+          setPerimeterAppliedAdLayoutError(null);
           setPerimeterAppliedAdLayoutLoaded(true);
           setPerimeterAppliedAdLayout(
             parsePerimeterAppliedAdLayout(snapshot.val()),
           );
         },
-        (error) =>
+        (error) => {
           console.error(
             "Firebase perimeter appliedAdLayout subscription error:",
             error,
-          ),
+          );
+          // Mark the initial load complete so the modal does not show an
+          // endless loading spinner; expose the failure so operators can
+          // distinguish a denied/failed subscription from a slow one.
+          setPerimeterAppliedAdLayoutError(
+            "Gat ekki sótt stöðu jaðarskjás (ábending gæti vantað heimildir).",
+          );
+          setPerimeterAppliedAdLayoutLoaded(true);
+        },
       );
 
       return () => {
@@ -1646,10 +1659,13 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   const setPerimeterAdLayout = useCallback(
     (layout: PerimeterAdLayout | null): Promise<void> => {
       if (!listenPrefix || !isAuthenticated) return Promise.resolve();
+      // Let rejections propagate: the controller keeps its editor open and
+      // shows an actionable error instead of silently treating a failed write
+      // as saved.
       return set(
         ref(database, `states/${listenPrefix}/perimeter/adLayout`),
         layout,
-      ).catch(console.error);
+      );
     },
     [isAuthenticated, listenPrefix],
   );
@@ -1765,6 +1781,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       perimeterAdLayout,
       perimeterAppliedAdLayout,
       perimeterAppliedAdLayoutLoaded,
+      perimeterAppliedAdLayoutError,
     }),
     [
       match,
@@ -1842,6 +1859,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       perimeterAdLayout,
       perimeterAppliedAdLayout,
       perimeterAppliedAdLayoutLoaded,
+      perimeterAppliedAdLayoutError,
     ],
   );
 
@@ -2028,6 +2046,7 @@ export const usePerimeter = () => {
     perimeterAdLayout,
     perimeterAppliedAdLayout,
     perimeterAppliedAdLayoutLoaded,
+    perimeterAppliedAdLayoutError,
     getServerTime,
   } = useFirebaseState();
   return {
@@ -2043,6 +2062,7 @@ export const usePerimeter = () => {
     adLayout: perimeterAdLayout,
     appliedAdLayout: perimeterAppliedAdLayout,
     appliedAdLayoutLoaded: perimeterAppliedAdLayoutLoaded,
+    appliedAdLayoutError: perimeterAppliedAdLayoutError,
     getServerTime,
   };
 };

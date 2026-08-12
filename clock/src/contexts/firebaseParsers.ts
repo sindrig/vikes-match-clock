@@ -592,7 +592,7 @@ const ALLOWED_AD_BUCKET = "vikes-match-clock-firebase.appspot.com";
 const AD_UNSAFE_FILENAME_RE = /["%\\/:*?<>|]|[\p{Cc}]/u;
 const AD_WINDOWS_DEVICE_RE = /^(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)/i;
 
-function validateAdFileName(name: string): boolean {
+export function validateAdFileName(name: string): boolean {
   if (!name || name.length > 255) return false;
   if (name === "." || name === "..") return false;
   if (AD_UNSAFE_FILENAME_RE.test(name)) return false;
@@ -646,14 +646,17 @@ function parseAdLayoutColumn(
   const filesRaw = raw.files;
   if (!filesRaw || typeof filesRaw !== "object") return undefined;
   const files: Record<string, PerimeterAdLayoutFile> = {};
-  const names = new Set<string>();
+  // The same filename may be reused across lanes only for the same GCS object
+  // (the daemon stages lane files to a shared remote dir keyed by name).
+  const sourcesByName = new Map<string, string>();
   for (const [key, value] of Object.entries(
     filesRaw as Record<string, unknown>,
   )) {
     const parsed = parseAdLayoutFile(value, options);
     if (!parsed) return undefined;
-    if (names.has(parsed.name)) return undefined;
-    names.add(parsed.name);
+    const existing = sourcesByName.get(parsed.name);
+    if (existing !== undefined && existing !== parsed.source) return undefined;
+    sourcesByName.set(parsed.name, parsed.source);
     files[key] = parsed;
   }
   if (Object.keys(files).length === 0) return undefined;

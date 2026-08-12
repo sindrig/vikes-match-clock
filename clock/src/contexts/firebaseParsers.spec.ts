@@ -1678,6 +1678,54 @@ describe("firebaseParsers", () => {
       };
       expect(parsePerimeterAdLayout(bad)).toBeNull();
     });
+
+    it("accepts the same Storage object reused across lanes", () => {
+      const shared = {
+        ...validLayout,
+        columns: [
+          {
+            id: "col-1",
+            files: {
+              "2": {
+                name: "ad.png",
+                source:
+                  "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/ad.png",
+              },
+              "4": {
+                name: "ad.png",
+                source:
+                  "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/ad.png",
+              },
+            },
+          },
+        ],
+      };
+      expect(parsePerimeterAdLayout(shared)).not.toBeNull();
+    });
+
+    it("returns null when the same filename maps to two different sources", () => {
+      const clash = {
+        ...validLayout,
+        columns: [
+          {
+            id: "col-1",
+            files: {
+              "2": {
+                name: "ad.png",
+                source:
+                  "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/ad.png",
+              },
+              "4": {
+                name: "ad.png",
+                source:
+                  "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/ad-other.png",
+              },
+            },
+          },
+        ],
+      };
+      expect(parsePerimeterAdLayout(clash)).toBeNull();
+    });
   });
 
   describe("parsePerimeterAppliedAdLayout", () => {

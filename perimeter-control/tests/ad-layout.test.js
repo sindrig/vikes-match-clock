@@ -20,11 +20,11 @@ function validLayout() {
       {
         id: "col-1",
         files: {
-          "2": {
+          2: {
             name: "ad-48.png",
             source: `gs://${BUCKET}/${LOCATION}/perimeter/ad-48.png`,
           },
-          "4": {
+          4: {
             name: "ad-40.mp4",
             source: `gs://${BUCKET}/${LOCATION}/perimeter/ad-40.mp4`,
           },
@@ -50,7 +50,15 @@ test("validateFileName rejects traversal and dot entries", () => {
 });
 
 test("validateFileName rejects Windows-reserved characters", () => {
-  for (const name of ["a:b.png", "a?b.png", "a*b.png", 'a"b.png', "a<b.png", "a>b.png", "a|b.png"]) {
+  for (const name of [
+    "a:b.png",
+    "a?b.png",
+    "a*b.png",
+    'a"b.png',
+    "a<b.png",
+    "a>b.png",
+    "a|b.png",
+  ]) {
     assert.equal(validateFileName(name), false, name);
   }
 });
@@ -78,31 +86,50 @@ test("validateFileName rejects control chars, quotes, and oversize names", () =>
 
 test("validateGcsSource accepts an approved bucket object under location prefix", () => {
   assert.equal(
-    validateGcsSource(`gs://${BUCKET}/${LOCATION}/perimeter/ad-48.png`, BUCKET, LOCATION),
+    validateGcsSource(
+      `gs://${BUCKET}/${LOCATION}/perimeter/ad-48.png`,
+      BUCKET,
+      LOCATION,
+    ),
     true,
   );
 });
 
 test("validateGcsSource rejects wrong bucket", () => {
   assert.equal(
-    validateGcsSource("gs://vikes-match-clock-staging.appspot.com/vikuti/perimeter/ad.png", BUCKET, LOCATION),
+    validateGcsSource(
+      "gs://vikes-match-clock-staging.appspot.com/vikuti/perimeter/ad.png",
+      BUCKET,
+      LOCATION,
+    ),
     false,
   );
 });
 
 test("validateGcsSource rejects a source outside the location perimeter prefix", () => {
   assert.equal(
-    validateGcsSource(`gs://${BUCKET}/other/perimeter/ad.png`, BUCKET, LOCATION),
+    validateGcsSource(
+      `gs://${BUCKET}/other/perimeter/ad.png`,
+      BUCKET,
+      LOCATION,
+    ),
     false,
   );
   assert.equal(
-    validateGcsSource(`gs://${BUCKET}/${LOCATION}/other/ad.png`, BUCKET, LOCATION),
+    validateGcsSource(
+      `gs://${BUCKET}/${LOCATION}/other/ad.png`,
+      BUCKET,
+      LOCATION,
+    ),
     false,
   );
 });
 
 test("validateGcsSource rejects non-gs sources and missing paths", () => {
-  assert.equal(validateGcsSource("https://example.com/ad.png", BUCKET, LOCATION), false);
+  assert.equal(
+    validateGcsSource("https://example.com/ad.png", BUCKET, LOCATION),
+    false,
+  );
   assert.equal(validateGcsSource(`gs://${BUCKET}`, BUCKET, LOCATION), false);
   assert.equal(validateGcsSource("", BUCKET, LOCATION), false);
 });
@@ -162,11 +189,11 @@ test("validateAdLayout rejects too many columns", () => {
     columns: Array.from({ length: 21 }, (_, i) => ({
       id: `col-${i}`,
       files: {
-        "2": {
+        2: {
           name: "ad-48.png",
           source: `gs://${BUCKET}/${LOCATION}/perimeter/ad-48.png`,
         },
-        "4": {
+        4: {
           name: "ad-40.png",
           source: `gs://${BUCKET}/${LOCATION}/perimeter/ad-40.png`,
         },
@@ -184,7 +211,7 @@ test("validateAdLayout rejects duplicate column ids", () => {
 
 test("validateAdLayout rejects wrong lane counts and missing required lanes", () => {
   const missingLane = validLayout();
-  missingLane.columns[0].files = { "2": missingLane.columns[0].files["2"] };
+  missingLane.columns[0].files = { 2: missingLane.columns[0].files["2"] };
   assert.equal(
     validateAdLayout(missingLane, LANES, BUCKET, LOCATION).valid,
     false,
@@ -194,7 +221,10 @@ test("validateAdLayout rejects wrong lane counts and missing required lanes", ()
     name: "ad-60.png",
     source: `gs://${BUCKET}/${LOCATION}/perimeter/ad-60.png`,
   };
-  assert.equal(validateAdLayout(extraLane, LANES, BUCKET, LOCATION).valid, false);
+  assert.equal(
+    validateAdLayout(extraLane, LANES, BUCKET, LOCATION).valid,
+    false,
+  );
 });
 
 test("validateAdLayout rejects unsafe filenames and duplicate filenames", () => {
@@ -209,8 +239,30 @@ test("validateAdLayout rejects unsafe filenames and duplicate filenames", () => 
 
 test("validateAdLayout rejects sources outside the location prefix", () => {
   const badSource = validLayout();
-  badSource.columns[0].files["2"].source = `gs://${BUCKET}/other/perimeter/x.png`;
-  assert.equal(validateAdLayout(badSource, LANES, BUCKET, LOCATION).valid, false);
+  badSource.columns[0].files["2"].source =
+    `gs://${BUCKET}/other/perimeter/x.png`;
+  assert.equal(
+    validateAdLayout(badSource, LANES, BUCKET, LOCATION).valid,
+    false,
+  );
+});
+
+test("validateAdLayout allows the same Storage object reused across lanes", () => {
+  const shared = validLayout();
+  shared.columns[0].files["4"] = { ...shared.columns[0].files["2"] };
+  const result = validateAdLayout(shared, LANES, BUCKET, LOCATION);
+  assert.equal(result.valid, true);
+});
+
+test("validateAdLayout rejects the same filename pointing at two different sources", () => {
+  const clash = validLayout();
+  clash.columns[0].files["4"] = {
+    name: clash.columns[0].files["2"].name,
+    source: `gs://${BUCKET}/${LOCATION}/perimeter/other.png`,
+  };
+  const result = validateAdLayout(clash, LANES, BUCKET, LOCATION);
+  assert.equal(result.valid, false);
+  assert.match(result.reason, /two different sources/);
 });
 
 // -- ResolumeAdClient.loadClip ------------------------------------------------
@@ -218,7 +270,11 @@ test("validateAdLayout rejects sources outside the location prefix", () => {
 test("ResolumeAdClient.loadClip sends a file:// URL as a plain-text body", async (t) => {
   const calls = [];
   t.mock.method(globalThis, "fetch", async (url, options) => {
-    calls.push({ url, body: options?.body, contentType: options?.headers?.["Content-Type"] });
+    calls.push({
+      url,
+      body: options?.body,
+      contentType: options?.headers?.["Content-Type"],
+    });
     return { ok: true, status: 200 };
   });
   const client = new ResolumeAdClient({
@@ -238,7 +294,11 @@ test("ResolumeAdClient.loadClip sends a file:// URL as a plain-text body", async
 test("ResolumeAdClient.setTransportDuration sends JSON", async (t) => {
   const calls = [];
   t.mock.method(globalThis, "fetch", async (url, options) => {
-    calls.push({ url, body: options?.body, contentType: options?.headers?.["Content-Type"] });
+    calls.push({
+      url,
+      body: options?.body,
+      contentType: options?.headers?.["Content-Type"],
+    });
     return { ok: true, status: 200 };
   });
   const client = new ResolumeAdClient({
@@ -327,7 +387,7 @@ function makeAdController() {
     thumbnailQuality: 0.7,
     thumbnailMaxBytes: 100_000,
   };
-  return new AdLayoutController(config, ["2", "4"], { "2": 2, "4": 2 });
+  return new AdLayoutController(config, ["2", "4"], { 2: 2, 4: 2 });
 }
 
 async function waitFor(cond, timeoutMs = 500) {
@@ -382,9 +442,7 @@ test("AdLayoutController processes a valid layout and stages before playing", as
   controller.attach(db);
   db.refs[0].emit(validLayout());
 
-  await waitFor(() =>
-    db.refs[1].setCalls.some((s) => s.phase === "playing"),
-  );
+  await waitFor(() => db.refs[1].setCalls.some((s) => s.phase === "playing"));
   const statuses = db.refs[1].setCalls.map((s) => s.phase);
   assert.ok(statuses.includes("staging"));
   assert.ok(statuses.includes("playing"));
@@ -410,9 +468,7 @@ test("AdLayoutController deduplicates identical revisions", async () => {
   const db = new FakeDb();
   controller.attach(db);
   db.refs[0].emit(validLayout());
-  await waitFor(() =>
-    db.refs[1].setCalls.some((s) => s.phase === "playing"),
-  );
+  await waitFor(() => db.refs[1].setCalls.some((s) => s.phase === "playing"));
   const countBefore = db.refs[1].setCalls.length;
   // Re-emit the same revision — must be ignored (no new staging).
   db.refs[0].emit(validLayout());
@@ -421,12 +477,11 @@ test("AdLayoutController deduplicates identical revisions", async () => {
   controller.shutdown();
 });
 
-test("AdLayoutController preserves the last applied layout on a staging error", async () => {
+test("AdLayoutController preserves the previous layout and cycle timer on a staging error", async () => {
   const controller = makeAdController();
   controller._sleep = async () => {};
-  controller.stager.stageAsset = async () => {
-    throw new Error("scp failed");
-  };
+  controller._getColumnDuration = () => 500;
+  controller.stager.stageAsset = async (source, name) => `C:/Content/${name}`;
   controller.resolume.loadClip = async () => {};
   controller.resolume.setClipLoop = async () => {};
   controller.resolume.getClipInfo = async () => ({});
@@ -436,12 +491,103 @@ test("AdLayoutController preserves the last applied layout on a staging error", 
 
   const db = new FakeDb();
   controller.attach(db);
+
+  // Apply the first revision successfully so there is a real applied layout.
   db.refs[0].emit(validLayout());
+  await waitFor(() => db.refs[1].setCalls.some((s) => s.phase === "playing"));
+  const playing = db.refs[1].setCalls.find((s) => s.phase === "playing");
+  assert.equal(playing.columns.length, 1);
+  assert.equal(playing.columns[0].id, "col-1");
+
+  // A newer revision fails during staging.
+  controller.stager.stageAsset = async () => {
+    throw new Error("scp failed");
+  };
+  const newer = { ...validLayout(), revision: "newer-revision" };
+  db.refs[0].emit(newer);
   await waitFor(() =>
-    db.refs[1].setCalls.some((s) => s.phase === "error"),
+    db.refs[1].setCalls.some(
+      (s) => s.phase === "error" && /scp failed/.test(s.error || ""),
+    ),
   );
-  const error = db.refs[1].setCalls.find((s) => s.phase === "error");
-  assert.match(error.error, /scp failed/);
-  assert.deepEqual(error.columns, []);
+  await new Promise((resolve) => setTimeout(resolve, 10));
+
+  const error = db.refs[1].setCalls.find(
+    (s) => s.phase === "error" && /scp failed/.test(s.error || ""),
+  );
+  // The previously applied columns survive the failed replacement...
+  assert.equal(error.columns.length, 1);
+  assert.equal(error.columns[0].id, "col-1");
+  // ...and the previous cycle timer is restored so playback is not frozen.
+  assert.notEqual(controller._columnTimer, null);
+  assert.equal(
+    controller._currentRevision,
+    "9f04a3f8-7c2a-4f1e-8d4b-2a1f3c5d7e9b",
+  );
+  controller.shutdown();
+});
+
+test("AdLayoutController preserves the revision for an empty-columns clear", async () => {
+  const controller = makeAdController();
+  controller.stager.stageAsset = async () => "C:/Content/x.png";
+  controller.resolume.clearClip = async () => {};
+  controller.resolume.loadClip = async () => {};
+  controller.resolume.setClipLoop = async () => {};
+  controller.resolume.getClipInfo = async () => ({});
+  controller.resolume.setTransportDuration = async () => {};
+  controller.resolume.getClipThumbnail = async () => null;
+  controller.resolume.connectClip = async () => {};
+
+  const db = new FakeDb();
+  controller.attach(db);
+
+  const empty = { ...validLayout(), revision: "empty-rev", columns: [] };
+  db.refs[0].emit(empty);
+  await waitFor(() => db.refs[1].setCalls.some((s) => s.phase === "idle"));
+  const idle = db.refs[1].setCalls.find((s) => s.phase === "idle");
+  // The idle status carries the submitted revision, so the controller does not
+  // report this successful clear as permanently pending...
+  assert.equal(idle.revision, "empty-rev");
+  // ...and re-delivery of the same empty revision is deduplicated.
+  const countBefore = db.refs[1].setCalls.length;
+  db.refs[0].emit(empty);
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  assert.equal(db.refs[1].setCalls.length, countBefore);
+  controller.shutdown();
+});
+
+test("AdLayoutController clears only the ad clip slots, not the whole layer", async () => {
+  const controller = makeAdController();
+  controller.resolume.clearLayer = async () => {
+    throw new Error("must not clear the whole layer");
+  };
+  const cleared = [];
+  controller.resolume.clearClip = async (laneId, slot) =>
+    cleared.push([laneId, slot]);
+
+  const db = new FakeDb();
+  controller.attach(db);
+  db.refs[0].emit(null);
+  await waitFor(() => cleared.length >= 2);
+  assert.deepEqual(cleared.sort(), [
+    ["2", 2],
+    ["4", 2],
+  ]);
+  controller.shutdown();
+});
+
+test("AdLayoutController._retryOp aborts when a newer generation supersedes during backoff", async () => {
+  const controller = makeAdController();
+  controller._sleep = async () => {};
+  controller._generation = 1;
+  const run = controller._retryOp(
+    "test op",
+    async () => {
+      throw new Error("boom");
+    },
+    1,
+  );
+  controller._generation = 2;
+  await assert.rejects(run, /superseded/);
   controller.shutdown();
 });

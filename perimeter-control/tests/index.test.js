@@ -6,11 +6,7 @@ import test from "node:test";
 
 import { PNG } from "pngjs";
 
-import {
-  PerimeterController,
-  ResolumeClient,
-  loadConfig,
-} from "../index.js";
+import { PerimeterController, ResolumeClient, loadConfig } from "../index.js";
 import {
   ResolumeCompositionReader,
   collectClipsByColumn,
@@ -141,9 +137,9 @@ test("apply off posts disconnect-all", async (t) => {
 
 test("apply strips trailing slash from base url", async (t) => {
   const calls = mockFetch(t, 200);
-  await makeResolume({ resolumeBaseUrl: "http://localhost:80/api/v1/" }).applyState(
-    "off",
-  );
+  await makeResolume({
+    resolumeBaseUrl: "http://localhost:80/api/v1/",
+  }).applyState("off");
   assert.equal(
     calls[0].url,
     "http://localhost:80/api/v1/composition/disconnect-all",
@@ -297,7 +293,9 @@ test("refresh loop reopens the listener periodically", async () => {
 });
 
 test("refresh disabled starts no timer", () => {
-  const controller = makeController({ PERIMETER_LISTENER_REFRESH_SECONDS: "0" });
+  const controller = makeController({
+    PERIMETER_LISTENER_REFRESH_SECONDS: "0",
+  });
   const db = new FakeDb();
   controller.attach(db);
   controller.startRefreshLoop();
@@ -411,7 +409,9 @@ const COMPOSITION = {
         {
           id: 201,
           name: { value: "Sponsor loop" },
-          video: { fileinfo: { path: "/Users/resolume/Videos/sponsor-loop.mp4" } },
+          video: {
+            fileinfo: { path: "/Users/resolume/Videos/sponsor-loop.mp4" },
+          },
         },
         {
           id: 202,
@@ -485,7 +485,9 @@ test("extractClipFilename handles video, audio, windows paths and plain fields",
     "sound.mp3",
   );
   assert.equal(
-    extractClipFilename({ video: { fileinfo: { path: "C:\\videos\\clip.mov" } } }),
+    extractClipFilename({
+      video: { fileinfo: { path: "C:\\videos\\clip.mov" } },
+    }),
     "clip.mov",
   );
   assert.equal(extractClipFilename({ filename: "plain.mp4" }), "plain.mp4");
@@ -641,12 +643,8 @@ test("collectPreview normalizes columns, clips and thumbnails", async (t) => {
   assert.equal(preview.columns[1].clips[1].filename, "intro.wav");
   assert.equal(preview.columns[1].clips[1].thumbnail, undefined);
 
-  assert.ok(
-    calls.some((url) => url.endsWith("/composition")),
-  );
-  assert.ok(
-    calls.some((url) => url.includes("/clips/1/thumbnail")),
-  );
+  assert.ok(calls.some((url) => url.endsWith("/composition")));
+  assert.ok(calls.some((url) => url.includes("/clips/1/thumbnail")));
 });
 
 test("collectPreview handles a composition without thumbnails", async (t) => {
@@ -805,13 +803,10 @@ test("loadConfig overlay defaults", () => {
   assert.equal(config.overlayStatusPath, "perimeter/vikuti/overlayStatus");
   assert.equal(config.overlaySshHost, "10.182.45.53");
   assert.equal(config.overlaySshUser, "user");
-  assert.equal(
-    config.overlaySshKey,
-    "/etc/perimeter-control/overlay-ssh-key",
-  );
+  assert.equal(config.overlaySshKey, "/etc/perimeter-control/overlay-ssh-key");
   assert.equal(config.overlayRemoteContentDir, "C:/Content");
   assert.equal(config.overlayCacheDir, "/var/cache/perimeter-control");
-  assert.deepEqual(config.overlayLayerClipColumns, { "2": 1, "4": 1 });
+  assert.deepEqual(config.overlayLayerClipColumns, { 2: 1, 4: 1 });
   assert.deepEqual(config.overlayLayerIds, ["2", "4"]);
 });
 
@@ -837,21 +832,21 @@ test("loadConfig overlay override", () => {
   assert.equal(config.overlayRemoteContentDir, "D:/Media");
   assert.equal(config.overlayCacheDir, "/tmp/cache");
   assert.deepEqual(config.overlayLayerIds, ["40"]);
-  assert.deepEqual(config.overlayLayerClipColumns, { "40": 3 });
+  assert.deepEqual(config.overlayLayerClipColumns, { 40: 3 });
 });
 
 test("loadConfig overlay invalid layer-clip JSON falls back to default", () => {
   const config = loadConfig({
     PERIMETER_OVERLAY_LAYER_CLIP_COLUMNS: "not-json",
   });
-  assert.deepEqual(config.overlayLayerClipColumns, { "2": 1, "4": 1 });
+  assert.deepEqual(config.overlayLayerClipColumns, { 2: 1, 4: 1 });
 });
 
 test("loadConfig overlay empty layer-clip JSON falls back to default", () => {
   const config = loadConfig({
     PERIMETER_OVERLAY_LAYER_CLIP_COLUMNS: "{}",
   });
-  assert.deepEqual(config.overlayLayerClipColumns, { "2": 1, "4": 1 });
+  assert.deepEqual(config.overlayLayerClipColumns, { 2: 1, 4: 1 });
 });
 
 // -- overlay validation ---------------------------------------------------------
@@ -867,6 +862,25 @@ test("overlay: null is a clear command", () => {
 test("overlay: disabled does not create overlay controller", () => {
   const controller = makeController({ PERIMETER_OVERLAY_ENABLED: "false" });
   assert.equal(controller._overlayController, null);
+});
+
+test("overlay: ad-layout slot overlap is rejected at construction", () => {
+  const config = loadConfig({
+    PERIMETER_OVERLAY_LAYER_CLIP_COLUMNS: '{"2":2}',
+  });
+  assert.throws(
+    () => new PerimeterController(config),
+    /Overlapping Resolume clip slot configuration/,
+  );
+});
+
+test("overlay: disjoint slot maps construct without error", () => {
+  const config = loadConfig({
+    PERIMETER_OVERLAY_LAYER_CLIP_COLUMNS: '{"2":1}',
+    PERIMETER_AD_LAYER_CLIP_SLOTS: '{"2":2}',
+  });
+  const controller = new PerimeterController(config);
+  assert.notEqual(controller._adLayoutController, null);
 });
 
 test("overlay: attach with overlay enabled creates overlay refs", () => {
@@ -1026,12 +1040,12 @@ const OVERLAY_DOC = {
     {
       durationMs: 10000,
       files: {
-        "2": {
+        2: {
           name: "goal-48.mp4",
           source:
             "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/goal-48.mp4",
         },
-        "4": {
+        4: {
           name: "goal-40.mp4",
           source:
             "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/goal-40.mp4",

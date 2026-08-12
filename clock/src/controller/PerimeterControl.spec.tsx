@@ -76,6 +76,7 @@ const createMockPerimeterReturn = (
     adLayout: null,
     appliedAdLayout: baseAppliedAdLayout,
     appliedAdLayoutLoaded: true,
+    appliedAdLayoutError: null,
     getServerTime: () => Date.now(),
     ...overrides,
   }) as unknown as ReturnType<typeof usePerimeter>;
@@ -278,7 +279,23 @@ describe("PerimeterControl", () => {
     expect(screen.getByText("Virkur dálkur: 2")).toBeInTheDocument();
   });
 
-  it("shows stale warning when preview is old", () => {
+  it("shows stale warning based on the applied ad-layout status timestamp", () => {
+    mockedUsePerimeter.mockReturnValue(
+      createMockPerimeterReturn({
+        appliedAdLayout: {
+          ...baseAppliedAdLayout,
+          updatedAt: Date.now() - 60 * 60 * 1000,
+        },
+      }),
+    );
+    render(<PerimeterControl />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Opna" }));
+
+    expect(screen.getByText(/Staða jaðarskjás er gömul/i)).toBeInTheDocument();
+  });
+
+  it("does not warn when the applied status is fresh", () => {
     mockedUsePerimeter.mockReturnValue(
       createMockPerimeterReturn({
         preview: { updatedAt: Date.now() - 60 * 60 * 1000, columns: [] },
@@ -288,7 +305,9 @@ describe("PerimeterControl", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Opna" }));
 
-    expect(screen.getByText(/Forskoðun er gömul/i)).toBeInTheDocument();
+    expect(
+      screen.queryByText(/Staða jaðarskjás er gömul/i),
+    ).not.toBeInTheDocument();
   });
 
   it("opens add column dialog when clicking add button", () => {
@@ -379,5 +398,143 @@ describe("PerimeterControl", () => {
 
     // Should show the column from adLayout
     expect(screen.getByText("Dálkur 1")).toBeInTheDocument();
+  });
+
+  it("labels the icon-only delete control with an accessible name", () => {
+    mockedUsePerimeter.mockReturnValue(
+      createMockPerimeterReturn({
+        adLayout: {
+          version: 1,
+          revision: "rev-123",
+          columns: [
+            {
+              id: "col-1",
+              files: {
+                "lane-1": {
+                  name: "a.mp4",
+                  source: "gs://bucket/a.mp4",
+                },
+                "lane-2": {
+                  name: "b.mp4",
+                  source: "gs://bucket/b.mp4",
+                },
+              },
+            },
+          ],
+        },
+      }),
+    );
+    render(<PerimeterControl />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Opna" }));
+
+    expect(
+      screen.getByRole("button", { name: "Fjarlægja dálk 1" }),
+    ).toBeInTheDocument();
+  });
+
+  it("disables adding a column at the 20-column limit", () => {
+    const manyColumns = Array.from({ length: 20 }, (_, i) => ({
+      id: `col-${i}`,
+      files: {
+        "lane-1": {
+          name: `a${i}.mp4`,
+          source: `gs://bucket/a${i}.mp4`,
+        },
+        "lane-2": {
+          name: `b${i}.mp4`,
+          source: `gs://bucket/b${i}.mp4`,
+        },
+      },
+    }));
+    mockedUsePerimeter.mockReturnValue(
+      createMockPerimeterReturn({
+        adLayout: { version: 1, revision: "rev-123", columns: manyColumns },
+        appliedAdLayout: { ...baseAppliedAdLayout, columns: [] },
+      }),
+    );
+    render(<PerimeterControl />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Opna" }));
+
+    expect(
+      screen.getByRole("button", { name: /Bæta við dálki/ }),
+    ).toBeDisabled();
+    expect(screen.getByText(/Hámark 20 dálka náð/)).toBeInTheDocument();
+  });
+
+  it("keeps the board visible and shows the error in the status bar", () => {
+    mockedUsePerimeter.mockReturnValue(
+      createMockPerimeterReturn({
+        appliedAdLayout: {
+          ...baseAppliedAdLayout,
+          phase: "error",
+          error: "scp failed",
+        },
+      }),
+    );
+    render(<PerimeterControl />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Opna" }));
+
+    expect(screen.getByText("Villa")).toBeInTheDocument();
+    expect(screen.getByText(/scp failed/)).toBeInTheDocument();
+    // The add control remains available for a corrective revision.
+    expect(screen.getByText("Bæta við dálki")).toBeInTheDocument();
+  });
+
+  it("shows a subscription error instead of an endless loader", () => {
+    mockedUsePerimeter.mockReturnValue(
+      createMockPerimeterReturn({
+        appliedAdLayout: undefined,
+        appliedAdLayoutLoaded: true,
+        appliedAdLayoutError: "Gat ekki sótt stöðu jaðarskjás",
+      }),
+    );
+    render(<PerimeterControl />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Opna" }));
+
+    expect(
+      screen.getByText(/Gat ekki sótt stöðu jaðarskjás/),
+    ).toBeInTheDocument();
+  });
+
+  it("shows a write error and stays open when saving fails", async () => {
+    mockSetPerimeterAdLayout.mockRejectedValueOnce(
+      new Error("permission denied"),
+    );
+    mockedUsePerimeter.mockReturnValue(
+      createMockPerimeterReturn({
+        adLayout: {
+          version: 1,
+          revision: "rev-123",
+          columns: [
+            {
+              id: "col-1",
+              files: {
+                "lane-1": {
+                  name: "a.mp4",
+                  source: "gs://bucket/a.mp4",
+                },
+                "lane-2": {
+                  name: "b.mp4",
+                  source: "gs://bucket/b.mp4",
+                },
+              },
+            },
+          ],
+        },
+      }),
+    );
+    render(<PerimeterControl />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Opna" }));
+
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    fireEvent.click(screen.getByRole("button", { name: "Fjarlægja dálk 1" }));
+
+    expect(await screen.findByText(/Ekki tókst að vista/)).toBeInTheDocument();
+    vi.restoreAllMocks();
   });
 });

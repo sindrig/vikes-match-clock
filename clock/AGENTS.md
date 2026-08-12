@@ -227,6 +227,7 @@ overlay (`states/${listenPrefix}/perimeter/overlay`).
 **Away goals** do not trigger a perimeter overlay — only home goals.
 
 Types are defined in `types.ts`:
+
 - `PerimeterOverlay` — overlay document
 - `PerimeterOverlayColumn` — a column with duration and paired files
 - `PerimeterOverlayFile` — filename + GCS source
@@ -234,10 +235,12 @@ Types are defined in `types.ts`:
 - `PerimeterOverlayPhase` — phase enum
 
 Parsing is in `firebaseParsers.ts`:
+
 - `parsePerimeterOverlay()` — strict validation (version, id, column count,
   duration bounds, paired targets, filename safety, approved bucket only).
 
 Write actions are in `FirebaseStateContext.tsx`:
+
 - `setPerimeterOverlay(overlay)` — writes overlay document
 - `clearPerimeterOverlay()` — writes null to clear
 
@@ -252,11 +255,11 @@ and publishes the **applied layout** to `perimeter/${listenPrefix}/adLayout`.
 
 **Data ownership**:
 
-| Path | Writer | Purpose |
-|---|---|---|
-| `states/{location}/perimeter/adLayout` | Controller | Desired layout command |
-| `perimeter/{location}/adLayout` | Daemon | Applied layout, lanes, status, durations, previews |
-| `{location}/perimeter/*` in Storage | Controller | Selectable/uploaded source assets |
+| Path                                   | Writer     | Purpose                                            |
+| -------------------------------------- | ---------- | -------------------------------------------------- |
+| `states/{location}/perimeter/adLayout` | Controller | Desired layout command                             |
+| `perimeter/{location}/adLayout`        | Daemon     | Applied layout, lanes, status, durations, previews |
+| `{location}/perimeter/*` in Storage    | Controller | Selectable/uploaded source assets                  |
 
 The daemon never writes to the desired path, eliminating a self-write
 feedback loop.
@@ -271,8 +274,14 @@ feedback loop.
     {
       "id": "uuid",
       "files": {
-        "2": { "name": "ad-48.png", "source": "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/ad-48.png" },
-        "4": { "name": "ad-40.mp4", "source": "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/ad-40.mp4" }
+        "2": {
+          "name": "ad-48.png",
+          "source": "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/ad-48.png"
+        },
+        "4": {
+          "name": "ad-40.mp4",
+          "source": "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/ad-40.mp4"
+        }
       }
     }
   ]
@@ -291,19 +300,32 @@ feedback loop.
 
 ```json
 {
-  "lanes": [{ "id": "2", "name": "48 skjair" }, { "id": "4", "name": "40 skjair" }],
+  "lanes": [
+    { "id": "2", "name": "48 skjair" },
+    { "id": "4", "name": "40 skjair" }
+  ],
   "revision": "uuid",
   "phase": "staging|loading|playing|error|idle",
   "activeColumn": 1,
   "error": null,
   "updatedAt": 1723392000000,
-  "columns": [{
-    "id": "uuid",
-    "files": {
-      "2": { "name": "ad-48.png", "thumbnail": "data:image/png;base64,...", "transportDurationMs": 20000 },
-      "4": { "name": "ad-40.mp4", "thumbnail": "data:image/png;base64,...", "transportDurationMs": 15342 }
+  "columns": [
+    {
+      "id": "uuid",
+      "files": {
+        "2": {
+          "name": "ad-48.png",
+          "thumbnail": "data:image/png;base64,...",
+          "transportDurationMs": 20000
+        },
+        "4": {
+          "name": "ad-40.mp4",
+          "thumbnail": "data:image/png;base64,...",
+          "transportDurationMs": 15342
+        }
+      }
     }
-  }]
+  ]
 }
 ```
 
@@ -313,32 +335,53 @@ feedback loop.
   renders lanes dynamically and must not hard-code two lanes.
 - The UI shows the applied layout, not merely the submitted request.
 - `transportDurationMs` is the daemon-resolved duration: exactly 20,000ms
-  for static images (set via Resolume API), Resolume-reported for videos.
+  for static images (set via Resolume API), Resolume-reported for videos
+  (bounded; unusable or extreme values fall back to the 20s static duration).
 - Columns play in order and cycle from the final column back to the first.
-- A newer revision supersedes all pending timers and callbacks.
+- A newer revision supersedes all pending timers and callbacks (generation
+  tracking — a newer snapshot invalidates in-flight staging, retries, and
+  playback immediately).
+- A failed replacement restores the previously applied layout and its cycling
+  timer instead of freezing the perimeter on a stale column.
+- An empty `columns` layout clears only the ad-layout clip slots (never the
+  whole layer) while preserving the submitted revision in the idle status.
+- The same Storage object may be reused across lanes (identical name +
+  source); a filename mapped to two different sources is rejected because
+  staging copies lane files to a shared remote dir keyed by name.
 - On daemon restart, the desired revision is read and restored; no new
   revision is created.
-- The goal overlay protocol remains separate and uses independent clip slots.
+- The goal overlay protocol remains separate and uses independent clip slots;
+  overlapping configured slot maps are rejected at daemon startup.
 
 **UI operations**:
 
 - **Add column**: Dialog with one file selector per lane. Lists existing files
   from `{listenPrefix}/perimeter/` in Storage, permits upload. Saves only when
-  every lane has a selection. Sources are stored as `gs://` URIs.
+  every lane has a selection. Sources are stored as `gs://` URIs. Adding is
+  disabled once the layout reaches 20 columns (the daemon/parser limit).
 - **Delete column**: Red X button with confirmation dialog
   (`Fjarlægja dálk? Skrárnar verða áfram í Firebase Storage.`). Removes only
   the layout reference, never deletes Storage objects.
 - **Reorder columns**: `@dnd-kit` horizontal sortable pattern (reuses
   `typedCollisionDetection` from queue DnD). Produces one new full-layout
   revision with stable column UUIDs.
+- Writes are serialized (queued) and every mutating control (add/delete/drag)
+  is disabled while a write is pending; handlers always compute from the
+  latest desired columns, so a rapid second edit can never clobber the first.
+- A failed Firebase write keeps the board (and the add dialog) open and shows
+  an actionable error in the status bar instead of pretending the revision was
+  saved.
+- Storage listings filter out names that fail the daemon filename rules, and
+  uploads reject such names before they reach Storage.
 
 **Revision comparison**:
 
 If `adLayout.revision !== appliedAdLayout.revision`, the UI shows
-"Uppfærslu beðiğ" (update pending). When they match, it shows "Lifandi" (live)
+"Uppfærslu beðið" (update pending). When they match, it shows "Lifandi" (live)
 with the daemon phase.
 
 Types are defined in `types.ts`:
+
 - `PerimeterAdLayout` — desired layout
 - `PerimeterAdLayoutColumn` — column with per-lane files
 - `PerimeterAdLayoutFile` — filename + `gs://` source
@@ -349,19 +392,27 @@ Types are defined in `types.ts`:
 - `PerimeterAdPhase` — phase enum
 
 Parsing is in `firebaseParsers.ts`:
+
 - `parsePerimeterAdLayout()` — validates desired layout (version, revision,
   column count, lane set enforcement, filename/bucket safety, duplicate IDs)
 - `parsePerimeterAppliedAdLayout()` — validates applied layout (lanes,
   revision, phase, columns, files, durations)
 
 Write actions are in `FirebaseStateContext.tsx`:
+
 - `setPerimeterAdLayout(layout)` — writes complete desired layout to
-  `states/${listenPrefix}/perimeter/adLayout`
+  `states/${listenPrefix}/perimeter/adLayout`. Rejections propagate to the
+  caller (never swallowed), so the controller can surface permission/network
+  failures instead of treating the write as saved.
 
 These are exposed via `usePerimeter()` hook (new fields):
+
 - `adLayout` — desired `PerimeterAdLayout | null`
 - `appliedAdLayout` — applied `PerimeterAppliedAdLayout | undefined`
 - `appliedAdLayoutLoaded` — boolean (subscription delivered)
+- `appliedAdLayoutError` — string | null; set when the applied-status
+  subscription fails (denied/unavailable), so the modal shows a failure
+  instead of an endless loader
 - `setPerimeterAdLayout` — write action
 
 ### The `listenPrefix` System

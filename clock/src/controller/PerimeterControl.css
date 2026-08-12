@@ -405,6 +405,12 @@
   gap: 6px;
 }
 
+.perimeter-preview-modal .perimeter-add-limit {
+  margin-left: 10px;
+  color: var(--rs-text-secondary, #869099);
+  font-size: 13px;
+}
+
 /* Add Dialog */
 .perimeter-add-dialog .rs-modal-body {
   padding: 16px;

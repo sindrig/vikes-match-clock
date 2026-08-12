@@ -2,11 +2,11 @@
 
 ## Data Ownership
 
-| Path | Writer | Purpose |
-|---|---|---|
-| `states/{location}/perimeter/adLayout` | Controller | Desired layout command |
-| `perimeter/{location}/adLayout` | Daemon | Read-only capabilities, applied layout, preview, status, and errors |
-| `{location}/perimeter/*` in Storage | Controller | Selectable/uploaded source assets |
+| Path                                   | Writer     | Purpose                                                             |
+| -------------------------------------- | ---------- | ------------------------------------------------------------------- |
+| `states/{location}/perimeter/adLayout` | Controller | Desired layout command                                              |
+| `perimeter/{location}/adLayout`        | Daemon     | Read-only capabilities, applied layout, preview, status, and errors |
+| `{location}/perimeter/*` in Storage    | Controller | Selectable/uploaded source assets                                   |
 
 The daemon must never write to `states/{location}/perimeter/adLayout`. It
 listens only to that path and publishes exclusively below
@@ -37,6 +37,7 @@ listens only to that path and publishes exclusively below
 ```
 
 Rules:
+
 - `revision` changes for every user edit, including reorder.
 - `columns` is the complete intended order, not an incremental operation log.
 - Each column must have exactly one valid file for every configured lane, and
@@ -89,13 +90,23 @@ Rules:
   from Resolume.
 - If a revision is invalid or fails to stage/load, preserve the last
   successfully applied layout and publish the rejection/error against the
-  new revision.
+  new revision, then resume the previous layout's cycling timer so playback is
+  never frozen on a stale column.
+- An empty `columns` layout is a valid clear: it disconnects only the
+  ad-layout clip slots (never the whole layer, preserving the goal overlay's
+  independent clips) and publishes an `idle` status that keeps the submitted
+  revision, so identical clears are deduplicated and the controller does not
+  report a permanent pending state.
+- The same Storage object may be used on multiple lanes (same filename +
+  source). A filename mapped to two different sources is rejected because the
+  daemon stages lane files to a shared remote directory keyed by filename.
 - The daemon deduplicates by `revision`, not by serialized document identity.
 
 ## Playback Behavior
 
 1. On a valid new revision, cancel the existing timer and invalidate
-   in-flight work using a generation/revision guard.
+   in-flight work using a generation guard; a failed replacement restores the
+   previous revision, its applied columns, and its cycling timer.
 2. Stage all lane files for the first column.
 3. Load each file into that lane's reserved Resolume clip slot.
 4. For static images, set Resolume transport duration to exactly 20,000 ms.
@@ -124,12 +135,18 @@ Rules:
 ## Validation and Safety
 
 Daemon validation must enforce:
+
 - Version, UUID-like revision, bounded column count, and unique column IDs.
 - Exact configured lane set per column.
 - Approved bucket and location-scoped `perimeter/` object path.
 - Safe names and bounded field lengths.
 - Bounded static duration: fixed at 20 seconds by daemon policy.
-- Bounded video duration returned by Resolume before scheduling playback.
+- Bounded video duration returned by Resolume before scheduling playback:
+  non-finite values and durations above 15 minutes are ignored and fall back
+  to the 20s static duration (an unbounded value could stall a column for days
+  or overflow `setTimeout` into ~1ms rapid cycling).
+- The ad-layout and goal-overlay clip slot maps must be disjoint; an overlap
+  is rejected at daemon startup.
 - Timer cancellation before applying a newer revision.
 - No Firebase writes to the desired-layout path.
 - No daemon-controlled filesystem path sourced from Firebase.

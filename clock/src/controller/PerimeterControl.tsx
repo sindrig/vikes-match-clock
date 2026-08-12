@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, Loader, Modal, IconButton, Badge } from "rsuite";
 import CloseIcon from "@rsuite/icons/Close";
 import PlusIcon from "@rsuite/icons/Plus";
@@ -32,6 +32,7 @@ import {
 } from "../types";
 import { usePerimeter } from "../contexts/FirebaseStateContext";
 import { useLocalState } from "../contexts/LocalStateContext";
+import { validateAdFileName } from "../contexts/firebaseParsers";
 import {
   storageHelpers,
   ListResult,
@@ -42,6 +43,7 @@ import "./PerimeterControl.css";
 
 const STALE_MS = 15 * 60 * 1000;
 const MAX_UPLOAD_BYTES = 250 * 1024 * 1024;
+const MAX_AD_COLUMNS = 20;
 
 const PHASE_LABELS: Record<string, string> = {
   staging: "Undirbýr",
@@ -72,6 +74,7 @@ interface SortableColumnProps {
   lanes: { id: string; name: string }[];
   appliedFiles: Record<string, PerimeterAppliedAdFile> | undefined;
   onDelete: (columnId: string) => void;
+  disabled?: boolean;
 }
 
 const SortableColumn = ({
@@ -80,6 +83,7 @@ const SortableColumn = ({
   lanes,
   appliedFiles,
   onDelete,
+  disabled,
 }: SortableColumnProps) => {
   const {
     attributes,
@@ -90,6 +94,7 @@ const SortableColumn = ({
     isDragging,
   } = useSortable({
     id: column.id,
+    disabled,
   });
 
   const style = {
@@ -118,7 +123,9 @@ const SortableColumn = ({
             size="xs"
             appearance="subtle"
             color="red"
+            aria-label={`Fjarlægja dálk ${columnIndex + 1}`}
             onClick={() => onDelete(column.id)}
+            disabled={disabled}
             className="perimeter-delete-btn"
           />
         </div>
@@ -191,7 +198,13 @@ const FilePicker = ({
     setListing(true);
     try {
       const result: ListResult = await storageHelpers.listAll(storagePath);
-      setFiles(result.items.map((item) => ({ name: item.name })));
+      // The daemon and parsers enforce strict filename rules; hide objects
+      // that could never be selected into a valid layout.
+      setFiles(
+        result.items
+          .map((item) => ({ name: item.name }))
+          .filter((f) => validateAdFileName(f.name)),
+      );
     } catch {
       setFiles([]);
     } finally {
@@ -213,6 +226,13 @@ const FilePicker = ({
     }
     if (file.size > MAX_UPLOAD_BYTES) {
       window.alert("Skrá er of stór (max 250 MB)");
+      event.target.value = "";
+      return;
+    }
+    if (!validateAdFileName(file.name)) {
+      window.alert(
+        'Skráarnafn er óleyfilegt fyrir jaðarskjá (bara venjuleg skráarnöfn, ekkert % \\ / : * ? " < > |).',
+      );
       event.target.value = "";
       return;
     }
@@ -276,12 +296,12 @@ const FilePicker = ({
 const PerimeterControl = () => {
   const {
     perimeter,
-    preview,
     getServerTime,
     setPerimeterAdLayout,
     adLayout,
     appliedAdLayout,
     appliedAdLayoutLoaded,
+    appliedAdLayoutError,
   } = usePerimeter();
   const { listenPrefix } = useLocalState();
 
@@ -295,9 +315,10 @@ const PerimeterControl = () => {
     null,
   );
   const [writePending, setWritePending] = useState(false);
+  const [writeError, setWriteError] = useState<string | null>(null);
 
   const lanes = appliedAdLayout?.lanes ?? [];
-  const columns = adLayout?.columns ?? [];
+  const columns = useMemo(() => adLayout?.columns ?? [], [adLayout?.columns]);
   const appliedColumnsMap = useMemo(() => {
     const map: Record<
       string,
@@ -308,6 +329,26 @@ const PerimeterControl = () => {
     }
     return map;
   }, [appliedAdLayout?.columns]);
+
+  // Mutating handlers read the latest desired columns through this ref so a
+  // write that is still settling (the Firebase subscription has not yet caught
+  // up) can never clobber a newer layout computed from stale state.
+  const columnsRef = useRef(columns);
+  useEffect(() => {
+    columnsRef.current = columns;
+  }, [columns]);
+
+  const adLayoutRef = useRef(adLayout);
+  useEffect(() => {
+    adLayoutRef.current = adLayout;
+  }, [adLayout]);
+
+  // Serialize layout writes: each revision is written only after the previous
+  // one settles, preserving last-write-wins ordering.
+  const writeQueueRef = useRef<Promise<boolean>>(Promise.resolve(true));
+  // The revision that was current when the in-flight write began. Mutating
+  // controls stay disabled until the desired subscription moves past it.
+  const beforeRevisionRef = useRef<string | null>(null);
 
   const revisionMismatch =
     adLayout?.revision !== undefined &&
@@ -331,18 +372,38 @@ const PerimeterControl = () => {
     }),
   );
 
-  const writeLayout = async (cols: PerimeterAdLayoutColumn[]) => {
-    setWritePending(true);
-    try {
-      const layout: PerimeterAdLayout = {
-        version: 1,
-        revision: crypto.randomUUID(),
-        columns: cols,
-      };
-      await setPerimeterAdLayout(layout);
-    } finally {
-      setWritePending(false);
-    }
+  const writeLayout = (cols: PerimeterAdLayoutColumn[]): Promise<boolean> => {
+    const run = writeQueueRef.current.then(async () => {
+      beforeRevisionRef.current = adLayoutRef.current?.revision ?? null;
+      setWritePending(true);
+      setWriteError(null);
+      try {
+        const layout: PerimeterAdLayout = {
+          version: 1,
+          revision: crypto.randomUUID(),
+          columns: cols,
+        };
+        await setPerimeterAdLayout(layout);
+        return true;
+      } catch (err) {
+        beforeRevisionRef.current = null;
+        setWriteError(
+          typeof err === "string"
+            ? err
+            : err instanceof Error
+              ? err.message
+              : String(err),
+        );
+        return false;
+      } finally {
+        setWritePending(false);
+      }
+    });
+    writeQueueRef.current = run.then(
+      () => true,
+      () => true,
+    );
+    return run;
   };
 
   const openDialog = () => {
@@ -350,15 +411,25 @@ const PerimeterControl = () => {
     setOpen(true);
     setShowAddDialog(false);
     setAddSelections({});
+    setWriteError(null);
+    beforeRevisionRef.current = null;
   };
+
+  // Controls stay disabled while a write is in flight AND until the desired
+  // subscription confirms it (the Firebase-backed columns have advanced past
+  // the revision that was current when the write started).
+  const writeSettling =
+    beforeRevisionRef.current !== null &&
+    adLayout?.revision === beforeRevisionRef.current;
+  const busy = writePending || writeSettling;
 
   const isStale =
     now > 0 &&
-    preview !== null &&
-    preview.updatedAt !== null &&
-    now - preview.updatedAt > STALE_MS;
+    appliedAdLayout?.updatedAt != null &&
+    now - appliedAdLayout.updatedAt > STALE_MS;
 
   const handleDragStart = (event: DragStartEvent) => {
+    if (busy) return;
     setActiveDragId(event.active.id);
   };
 
@@ -367,11 +438,12 @@ const PerimeterControl = () => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
-    const oldIndex = columns.findIndex((c) => c.id === active.id);
-    const newIndex = columns.findIndex((c) => c.id === over.id);
+    const current = columnsRef.current;
+    const oldIndex = current.findIndex((c) => c.id === active.id);
+    const newIndex = current.findIndex((c) => c.id === over.id);
     if (oldIndex === -1 || newIndex === -1) return;
 
-    const reordered = arrayMove(columns, oldIndex, newIndex);
+    const reordered = arrayMove(current, oldIndex, newIndex);
     void writeLayout(reordered);
   };
 
@@ -383,24 +455,27 @@ const PerimeterControl = () => {
     ) {
       return;
     }
-    const remaining = columns.filter((c) => c.id !== columnId);
+    const remaining = columnsRef.current.filter((c) => c.id !== columnId);
     void writeLayout(remaining);
   };
 
-  const handleAddColumn = () => {
+  const handleAddColumn = async () => {
     const allSelected = lanes.every(
       (lane) => addSelections[lane.id] !== undefined,
     );
     if (!allSelected) return;
+    if (columnsRef.current.length >= MAX_AD_COLUMNS) return;
 
     const newColumn: PerimeterAdLayoutColumn = {
       id: crypto.randomUUID(),
       files: { ...addSelections },
     };
-    const updated = [...columns, newColumn];
-    void writeLayout(updated);
-    setShowAddDialog(false);
-    setAddSelections({});
+    const updated = [...columnsRef.current, newColumn];
+    const ok = await writeLayout(updated);
+    if (ok) {
+      setShowAddDialog(false);
+      setAddSelections({});
+    }
   };
 
   const activeDragColumn = activeDragId
@@ -443,22 +518,24 @@ const PerimeterControl = () => {
               </p>
             </div>
           ) : appliedAdLayout === undefined ? (
-            <div className="perimeter-preview-state">
-              <p className="perimeter-empty-text">
-                Engin forskoðun hefur verið birt enn.
-              </p>
-              <p className="perimeter-hint">
-                Forskoðunin er sjálfkrafa sótt þegar daemoninn ræsir og eftir að
-                jaðarskjárinn er kveiktur.
-              </p>
-            </div>
-          ) : appliedAdLayout.phase === "error" ? (
-            <div className="perimeter-error-state">
-              <div className="perimeter-error-badge">Villa</div>
-              <p className="perimeter-error-message">
-                {appliedAdLayout.error ?? "Óþekkt villa"}
-              </p>
-            </div>
+            appliedAdLayoutError ? (
+              <div className="perimeter-error-state">
+                <div className="perimeter-error-badge">Villa</div>
+                <p className="perimeter-error-message">
+                  {appliedAdLayoutError}
+                </p>
+              </div>
+            ) : (
+              <div className="perimeter-preview-state">
+                <p className="perimeter-empty-text">
+                  Engin forskoðun hefur verið birt enn.
+                </p>
+                <p className="perimeter-hint">
+                  Forskoðunin er sjálfkrafa sótt þegar daemoninn ræsir og eftir
+                  að jaðarskjárinn er kveiktur.
+                </p>
+              </div>
+            )
           ) : (
             <div className="perimeter-layout-board">
               {/* Status Bar */}
@@ -479,6 +556,11 @@ const PerimeterControl = () => {
                     {appliedAdLayout.error}
                   </span>
                 )}
+                {writeError && (
+                  <span className="perimeter-status-error">
+                    Ekki tókst að vista: {writeError}
+                  </span>
+                )}
                 <span className="perimeter-lanes-count">
                   {lanes.length} {lanes.length === 1 ? "röð" : "raðir"}
                 </span>
@@ -494,8 +576,8 @@ const PerimeterControl = () => {
 
               {isStale && (
                 <div className="perimeter-stale">
-                  Forskoðun er gömul (uppfærð kl.{" "}
-                  {formatTimestamp(preview?.updatedAt ?? null)}).
+                  Staða jaðarskjás er gömul (uppfærð kl.{" "}
+                  {formatTimestamp(appliedAdLayout.updatedAt ?? null)}).
                 </div>
               )}
 
@@ -519,6 +601,7 @@ const PerimeterControl = () => {
                       setAddSelections({});
                       setShowAddDialog(true);
                     }}
+                    disabled={busy}
                   >
                     Bæta við dálki
                   </Button>
@@ -545,6 +628,7 @@ const PerimeterControl = () => {
                             lanes={lanes}
                             appliedFiles={appliedCol?.files}
                             onDelete={handleDeleteColumn}
+                            disabled={busy}
                           />
                         );
                       })}
@@ -627,10 +711,15 @@ const PerimeterControl = () => {
                       setAddSelections({});
                       setShowAddDialog(true);
                     }}
-                    disabled={writePending}
+                    disabled={busy || columns.length >= MAX_AD_COLUMNS}
                   >
                     <PlusIcon /> Bæta við dálki
                   </Button>
+                  {columns.length >= MAX_AD_COLUMNS && (
+                    <span className="perimeter-add-limit">
+                      Hámark {MAX_AD_COLUMNS} dálka náð
+                    </span>
+                  )}
                 </div>
               )}
 
@@ -668,9 +757,12 @@ const PerimeterControl = () => {
                 <Modal.Footer>
                   <Button
                     appearance="primary"
-                    onClick={handleAddColumn}
+                    onClick={() => {
+                      void handleAddColumn();
+                    }}
                     disabled={
-                      writePending ||
+                      busy ||
+                      columns.length >= MAX_AD_COLUMNS ||
                       !lanes.every(
                         (lane) => addSelections[lane.id] !== undefined,
                       )
