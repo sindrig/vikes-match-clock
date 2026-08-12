@@ -390,13 +390,13 @@ overlapping lane configuration at startup.
    `columns[]`, each column with one file per configured lane).
 2. The daemon reads the live composition for lane names and the deck column
    count `M`.
-3. `N` layout columns are distributed across the deck's `M` columns
-   (`mapLayoutToDeckColumns`): each layout column owns a contiguous range of
-   `floor(M/N)` deck columns, with `M mod N` extra columns spread over the
-   first ranges.
+3. The `N` layout columns map **1:1** to deck columns (`mapLayoutToDeckColumns`):
+   layout column *i* loads into deck column *i+1*. Surplus deck columns stay
+   empty — the deck autopilot skips empty columns, so the deck cycles only
+   through the `N` ads.
 4. **Clear-then-load**: the daemon empties all ad slots across the deck on the
    ad lanes, then stages each file (GCS → local cache → SCP to the Windows
-   host) and opens it into its mapped deck columns on every lane.
+   host) and opens it into its mapped deck column on every lane.
 5. The daemon publishes the applied status to
    `perimeter/${location}/adLayout` with `phase: "loading"` → `"playing"`.
    The autopilot then cycles the columns; the ads play with no further daemon
@@ -419,9 +419,10 @@ write lost right after a daemon restart self-heals.
   are **2** and **4**.
 - The daemon only uses existing deck columns and clip slots — it never
   creates groups, layers, or columns.
-- A single-layout-column setup loads the ad into every deck column, so a
-  change is a full-content swap; multi-column layouts give each ad a
-  contiguous share of the deck.
+- Each layout column occupies exactly one deck column (1:1); the deck
+  autopilot skips empty columns, so the surplus columns after the last ad are
+  left blank and never shown. A layout with more columns than the deck is
+  refused with an `error` status.
 
 ### Configuration
 

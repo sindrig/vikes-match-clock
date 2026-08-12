@@ -326,20 +326,15 @@ overlapping lane configuration at daemon startup.
   location's `perimeter/` prefix.
 - File names are basename-only; traversal and control characters are rejected.
 
-**Column mapping** — the daemon reads the deck column count `M` from the live
-composition and distributes the `N` layout columns across contiguous ranges:
+**Column mapping** — each layout column maps **1:1** to a deck column: layout
+column *i* (0-based) loads into deck column *i+1*. Surplus deck columns stay
+empty; the deck autopilot skips empty columns, so the deck cycles only through
+the `N` ads (never a blank column). A layout with more columns than the deck is
+refused with an `error` status (each ad needs its own deck column).
 
-```
-base      = floor(M / N)
-remainder = M mod N
-layout column i (0-based) covers deck columns
-  [ i*base + min(i, remainder) + 1 .. i*base + min(i, remainder) + base + (i < remainder ? 1 : 0) ]
-```
-
-- 3 layout columns on a 15-column deck → columns 1–5, 6–10, 11–15
-  (~100s per ad at a 20s autopilot).
-- 1 layout column → all 15 columns.
-- Each ad file is loaded into its mapped deck columns on **every** configured
+- 12 layout columns → deck columns 1–12 (trailing columns left empty).
+- 1 layout column → deck column 1.
+- Each ad file is loaded into its own deck column on **every** configured
   lane. The autopilot then cycles them naturally.
 
 **Applied layout schema** (`perimeter/${listenPrefix}/adLayout`, daemon-published):

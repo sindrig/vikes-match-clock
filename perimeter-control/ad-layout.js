@@ -6,9 +6,9 @@
  * columns on the configured base layers. The composition's existing autopilot
  * owns all column cycling and transport — this controller never calls connect,
  * disconnect, loop, or transport endpoints. It only opens files into clip
- * slots and clears them. A layout column is distributed across a contiguous
- * range of deck columns (see mapLayoutToDeckColumns); the autopilot then
- * cycles through them exactly as it cycles the Efni content.
+ * slots and clears them. Each layout column maps 1:1 to a deck column (see
+ * mapLayoutToDeckColumns); the autopilot cycles the non-empty columns exactly
+ * as it cycles the Efni content, skipping empty trailing columns.
  */
 
 import { createHash } from "node:crypto";
@@ -194,34 +194,22 @@ export function validateAdLayout(
   return { valid: true, clear: false, revision, columns: raw.columns };
 }
 
-// Distribute N layout columns across M deck columns. Each layout column is
-// loaded into a contiguous range of 1-based deck column indices. The base
-// share is floor(M/N); the remainder (M mod N) is distributed one extra deck
-// column to each of the first `M mod N` layout columns.
+// Map each layout column to exactly ONE deck column (1:1): layout column i
+// (0-based) lives in deck column i+1. The deck autopilot skips empty deck
+// columns, so loading one ad per column and leaving the surplus columns blank
+// is correct — the deck cycles only through the N ads, never a blank column.
+// Layout columns beyond the deck column count map to `[]` (the caller reports
+// this as an error since the layout does not fit the deck).
 //
-//   mapLayoutToDeckColumns(3, 15) -> [[1..5], [6..10], [11..15]]
-//   mapLayoutToDeckColumns(1, 15) -> [[1..15]]
-//   mapLayoutToDeckColumns(0, 15) -> []
-//   mapLayoutToDeckColumns(5, 7)  -> [[1,2], [3,4], [5], [6], [7]]
+//   mapLayoutToDeckColumns(12, 17) -> [[1], [2], ..., [12]]
+//   mapLayoutToDeckColumns(0, 15)  -> []
+//   mapLayoutToDeckColumns(4, 3)   -> [[1], [2], [3], []]
 export function mapLayoutToDeckColumns(layoutColumnCount, deckColumnCount) {
   if (!Number.isInteger(layoutColumnCount) || layoutColumnCount <= 0) return [];
   if (!Number.isInteger(deckColumnCount) || deckColumnCount <= 0) return [];
-  const base = Math.floor(deckColumnCount / layoutColumnCount);
-  const remainder = deckColumnCount % layoutColumnCount;
-  const ranges = [];
-  let start = 1;
-  for (let i = 0; i < layoutColumnCount; i += 1) {
-    const length = base + (i < remainder ? 1 : 0);
-    if (length <= 0) {
-      ranges.push([]);
-      continue;
-    }
-    const range = [];
-    for (let j = 0; j < length; j += 1) range.push(start + j);
-    ranges.push(range);
-    start += length;
-  }
-  return ranges;
+  return Array.from({ length: layoutColumnCount }, (_, i) =>
+    i < deckColumnCount ? [i + 1] : [],
+  );
 }
 
 // -- Asset Stager (reuses GCS + SCP pattern from overlay.js) ------------------
@@ -731,6 +719,19 @@ export class AdLayoutController {
     }
     this._currentRevision = revision;
     const { lanes, columnCount } = await this._discoverComposition();
+    if (columns.length > columnCount) {
+      // The layout maps 1:1 to deck columns; it cannot fit on a deck with
+      // fewer columns. Refuse the load rather than silently dropping ads.
+      console.error(
+        `Ad layout does not fit: ${columns.length} columns but the deck has ${columnCount}`,
+      );
+      await this._publishStatus(
+        "error",
+        `Layout does not fit: ${columns.length} columns but the deck has ${columnCount} deck columns`,
+        lanes,
+      );
+      return;
+    }
     await this._publishStatus("loading", null, lanes);
 
     try {

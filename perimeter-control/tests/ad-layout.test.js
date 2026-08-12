@@ -269,28 +269,29 @@ test("validateAdLayout rejects the same filename pointing at two different sourc
 
 // -- mapLayoutToDeckColumns ---------------------------------------------------
 
-test("mapLayoutToDeckColumns distributes N layout columns across M deck columns", () => {
-  assert.deepEqual(mapLayoutToDeckColumns(3, 15), [
-    [1, 2, 3, 4, 5],
-    [6, 7, 8, 9, 10],
-    [11, 12, 13, 14, 15],
-  ]);
-});
-
-test("mapLayoutToDeckColumns single layout column covers every deck column", () => {
-  assert.deepEqual(mapLayoutToDeckColumns(1, 15), [
-    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
-  ]);
-});
-
-test("mapLayoutToDeckColumns distributes the remainder across the first columns", () => {
-  assert.deepEqual(mapLayoutToDeckColumns(5, 7), [
-    [1, 2],
-    [3, 4],
+test("mapLayoutToDeckColumns maps each layout column to one deck column", () => {
+  assert.deepEqual(mapLayoutToDeckColumns(12, 17), [
+    [1],
+    [2],
+    [3],
+    [4],
     [5],
     [6],
     [7],
+    [8],
+    [9],
+    [10],
+    [11],
+    [12],
   ]);
+});
+
+test("mapLayoutToDeckColumns single layout column occupies deck column 1 only", () => {
+  assert.deepEqual(mapLayoutToDeckColumns(1, 15), [[1]]);
+});
+
+test("mapLayoutToDeckColumns ignores surplus deck columns", () => {
+  assert.deepEqual(mapLayoutToDeckColumns(5, 7), [[1], [2], [3], [4], [5]]);
 });
 
 test("mapLayoutToDeckColumns one column per layout column when counts match", () => {
@@ -550,7 +551,7 @@ test("AdLayoutController publishes an error status for an invalid layout", async
   controller.shutdown();
 });
 
-test("AdLayoutController loads a valid layout into mapped deck columns", async () => {
+test("AdLayoutController loads a valid layout into a single deck column", async () => {
   const controller = makeAdController();
   const calls = instrumentResolume(controller);
 
@@ -563,17 +564,21 @@ test("AdLayoutController loads a valid layout into mapped deck columns", async (
   assert.ok(statuses.includes("loading"));
   assert.ok(statuses.includes("playing"));
 
-  // Single layout column with a 15-column deck: the ad file is loaded into
-  // every deck column on both lanes.
+  // Single layout column: the ad is loaded into deck column 1 only on both
+  // lanes. Surplus deck columns stay empty (the autopilot skips them).
   for (const laneId of ["1", "3"]) {
-    for (let slot = 1; slot <= 15; slot += 1) {
-      assert.ok(
-        calls.includes(
-          `load:${laneId}:${slot}:C:/Content/${laneId === "1" ? "ad-48.png" : "ad-40.mp4"}`,
-        ),
-        `missing load on lane ${laneId} slot ${slot}`,
-      );
-    }
+    assert.ok(
+      calls.includes(
+        `load:${laneId}:1:C:/Content/${laneId === "1" ? "ad-48.png" : "ad-40.mp4"}`,
+      ),
+      `missing load on lane ${laneId} slot 1`,
+    );
+    assert.ok(
+      !calls.includes(
+        `load:${laneId}:2:C:/Content/${laneId === "1" ? "ad-48.png" : "ad-40.mp4"}`,
+      ),
+      `unexpected load beyond slot 1 on lane ${laneId}`,
+    );
   }
   // The deck is cleared before loading (clear-then-load).
   assert.ok(calls.some((c) => c.startsWith("clear:1:")));
@@ -585,16 +590,13 @@ test("AdLayoutController loads a valid layout into mapped deck columns", async (
   assert.equal(playing.lanes[1].name, "40 skjáir");
   assert.equal(playing.columns.length, 1);
   assert.equal(playing.columns[0].id, "col-1");
-  assert.deepEqual(
-    playing.columns[0].deckColumns,
-    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
-  );
+  assert.deepEqual(playing.columns[0].deckColumns, [1]);
   assert.equal(playing.columns[0].files["1"].name, "ad-48.png");
   assert.equal(playing.columns[0].files["3"].name, "ad-40.mp4");
   controller.shutdown();
 });
 
-test("AdLayoutController distributes multiple layout columns across the deck", async () => {
+test("AdLayoutController maps each layout column to its own deck column", async () => {
   const controller = makeAdController();
   const calls = instrumentResolume(controller);
 
@@ -652,18 +654,50 @@ test("AdLayoutController distributes multiple layout columns across the deck", a
   const playing = db.refs[1].setCalls.find((s) => s.phase === "playing");
   assert.deepEqual(
     playing.columns.map((c) => c.deckColumns),
-    [
-      [1, 2, 3, 4, 5],
-      [6, 7, 8, 9, 10],
-      [11, 12, 13, 14, 15],
-    ],
+    [[1], [2], [3]],
   );
-  // Each ad file lands in exactly its own 5-column range on lane 1.
+  // Each ad lands in exactly its own deck column on lane 1.
   assert.ok(calls.includes("load:1:1:C:/Content/a-48.png"));
-  assert.ok(calls.includes("load:1:5:C:/Content/a-48.png"));
-  assert.ok(!calls.includes("load:1:6:C:/Content/a-48.png"));
-  assert.ok(calls.includes("load:1:6:C:/Content/b-48.png"));
-  assert.ok(calls.includes("load:1:11:C:/Content/c-48.png"));
+  assert.ok(!calls.includes("load:1:2:C:/Content/a-48.png"));
+  assert.ok(calls.includes("load:1:2:C:/Content/b-48.png"));
+  assert.ok(calls.includes("load:1:3:C:/Content/c-48.png"));
+  controller.shutdown();
+});
+
+test("AdLayoutController refuses a layout that does not fit the deck", async () => {
+  const controller = makeAdController();
+  const calls = instrumentResolume(controller);
+
+  // 16 layout columns on the mock 15-column deck cannot fit 1:1.
+  const layout = {
+    ...validLayout(),
+    revision: "too-big",
+    columns: Array.from({ length: 16 }, (_, i) => ({
+      id: `col-${i}`,
+      files: {
+        1: {
+          name: `a-${i}-48.png`,
+          source: `gs://${BUCKET}/${LOCATION}/perimeter/a-${i}-48.png`,
+        },
+        3: {
+          name: `a-${i}-40.png`,
+          source: `gs://${BUCKET}/${LOCATION}/perimeter/a-${i}-40.png`,
+        },
+      },
+    })),
+  };
+
+  const db = new FakeDb();
+  controller.attach(db);
+  db.refs[0].emit(layout);
+  await waitFor(() =>
+    db.refs[1].setCalls.some(
+      (s) => s.phase === "error" && /does not fit/.test(s.error || ""),
+    ),
+  );
+  // Nothing was loaded or cleared.
+  assert.equal(calls.some((c) => c.startsWith("load:")), false);
+  assert.equal(calls.some((c) => c.startsWith("clear:")), false);
   controller.shutdown();
 });
 
