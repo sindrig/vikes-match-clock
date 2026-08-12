@@ -799,7 +799,7 @@ All properties are CSS value strings. Grouped by display area:
 | Logos       | `logoTop`, `logoHeight`, `logoWidth`, `homeLogoScale`, `awayLogoScale`                                                                                                                                                                         | `--theme-logo-*`, `--theme-home-logo-scale`, `--theme-away-logo-scale` |
 | Injury time | `injuryTimeColor`, `injuryTimeFontSize`, `injuryTimeStroke`, `injuryTimeTop`, `injuryTimeLeft`                                                                                                                                                 | `--theme-injury-*`                                                     |
 | Team names  | `teamNameColor`, `teamNameFontFamily`                                                                                                                                                                                                          | `--theme-team-name-*`                                                  |
-| Player assets | `playerNumberFontFamily`, `playerNameFontFamily`                                                                                                                                                                                            | `--theme-player-number-font-family`, `--theme-player-name-font-family` |
+| Player assets | `playerNumberColor`, `playerNameColor`, `playerNumberFontFamily`, `playerNameFontFamily`                                                                                                                                            | `--theme-player-number-color`, `--theme-player-name-color`, `--theme-player-number-font-family`, `--theme-player-name-font-family` |
 | Red cards   | `redCardColor`                                                                                                                                                                                                                                 | `--theme-red-card-color`                                               |
 | Penalties   | `penaltyBg`, `penaltyColor`, `penaltyBorder`                                                                                                                                                                                                   | `--theme-penalty-*`                                                    |
 | Timeouts    | `timeoutColor`                                                                                                                                                                                                                                 | `--theme-timeout-color`                                                |
@@ -864,9 +864,10 @@ All properties are CSS value strings. Grouped by display area:
 New `ThemeConfig` keys are picked up automatically: every preset spreads
 `DEFAULT_THEME`, and `parseTheme()` in `firebaseParsers.ts` iterates
 `DEFAULT_THEME` keys (falling back to the default for absent Firebase
-values). This is how `playerNumberFontFamily` and `playerNameFontFamily`
-were added — they control the font families of the player number/name
-assets (`Asset.css`, auto-fit measurement in `PlayerCard.tsx`).
+values). This is how `playerNumberColor`/`playerNameColor` and
+`playerNumberFontFamily`/`playerNameFontFamily` were added — they control
+the color and font family of the player number/name assets (`Asset.css`,
+auto-fit measurement in `PlayerCard.tsx`).
 
 #### Background Image
 
