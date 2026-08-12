@@ -16,6 +16,14 @@ import type {
   PerimeterOverlay,
   PerimeterOverlayColumn,
   PerimeterOverlayFile,
+  PerimeterAdLayout,
+  PerimeterAdLayoutColumn,
+  PerimeterAdLayoutFile,
+  PerimeterAppliedAdLayout,
+  PerimeterAppliedAdColumn,
+  PerimeterAppliedAdFile,
+  PerimeterAdLane,
+  PerimeterAdPhase,
 } from "../types";
 import { Sports, DEFAULT_THEME } from "../constants";
 
@@ -573,4 +581,191 @@ export function parseClubOverrides(
   }
 
   return result;
+}
+
+// -- Perimeter ad layout parsers ----------------------------------------------
+
+const MAX_AD_COLUMNS = 20;
+const VALID_AD_VERSION = 1;
+const ALLOWED_AD_BUCKET = "vikes-match-clock-firebase.appspot.com";
+// Control chars, traversal chars, Windows-invalid chars
+const AD_UNSAFE_FILENAME_RE = /["%\\/:*?<>|]|[\p{Cc}]/u;
+const AD_WINDOWS_DEVICE_RE = /^(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)/i;
+
+export function validateAdFileName(name: string): boolean {
+  if (!name || name.length > 255) return false;
+  if (name === "." || name === "..") return false;
+  if (AD_UNSAFE_FILENAME_RE.test(name)) return false;
+  if (/[. ]$/.test(name)) return false;
+  if (AD_WINDOWS_DEVICE_RE.test(name)) return false;
+  return true;
+}
+
+function validateAdSource(
+  source: string,
+  options?: { location?: string; bucket?: string },
+): boolean {
+  if (!source) return false;
+  if (!source.startsWith("gs://")) return false;
+  const bucketAndPath = source.slice(5);
+  const slashIdx = bucketAndPath.indexOf("/");
+  if (slashIdx < 0) return false;
+  const bucketName = bucketAndPath.slice(0, slashIdx);
+  const expectedBucket = options?.bucket ?? ALLOWED_AD_BUCKET;
+  if (bucketName !== expectedBucket) return false;
+  const objectPath = bucketAndPath.slice(slashIdx + 1);
+  if (!objectPath) return false;
+  if (options?.location) {
+    const prefix = `${options.location}/perimeter/`;
+    if (!objectPath.startsWith(prefix)) return false;
+  }
+  return true;
+}
+
+function parseAdLayoutFile(
+  data: unknown,
+  options?: { location?: string; bucket?: string },
+): PerimeterAdLayoutFile | undefined {
+  if (!data || typeof data !== "object") return undefined;
+  const raw = data as Record<string, unknown>;
+  const name = typeof raw.name === "string" ? raw.name : "";
+  const source = typeof raw.source === "string" ? raw.source : "";
+  if (!validateAdFileName(name)) return undefined;
+  if (!validateAdSource(source, options)) return undefined;
+  return { name, source };
+}
+
+function parseAdLayoutColumn(
+  data: unknown,
+  options?: { location?: string; bucket?: string },
+): PerimeterAdLayoutColumn | undefined {
+  if (!data || typeof data !== "object") return undefined;
+  const raw = data as Record<string, unknown>;
+  const id = typeof raw.id === "string" ? raw.id : "";
+  if (!id) return undefined;
+  const filesRaw = raw.files;
+  if (!filesRaw || typeof filesRaw !== "object") return undefined;
+  const files: Record<string, PerimeterAdLayoutFile> = {};
+  // The same filename may be reused across lanes only for the same GCS object
+  // (the daemon stages lane files to a shared remote dir keyed by name).
+  const sourcesByName = new Map<string, string>();
+  for (const [key, value] of Object.entries(
+    filesRaw as Record<string, unknown>,
+  )) {
+    const parsed = parseAdLayoutFile(value, options);
+    if (!parsed) return undefined;
+    const existing = sourcesByName.get(parsed.name);
+    if (existing !== undefined && existing !== parsed.source) return undefined;
+    sourcesByName.set(parsed.name, parsed.source);
+    files[key] = parsed;
+  }
+  if (Object.keys(files).length === 0) return undefined;
+  return { id, files };
+}
+
+export function parsePerimeterAdLayout(
+  data: unknown,
+  options?: { location?: string; bucket?: string },
+): PerimeterAdLayout | null {
+  // null means clear/no layout
+  if (data === null || data === undefined) return null;
+  if (!data || typeof data !== "object") return null;
+  const raw = data as Record<string, unknown>;
+  const version = typeof raw.version === "number" ? raw.version : 0;
+  if (version !== VALID_AD_VERSION) return null;
+  const revision = typeof raw.revision === "string" ? raw.revision : "";
+  if (!revision) return null;
+  const columnsRaw = raw.columns;
+  if (!Array.isArray(columnsRaw)) return null;
+  if (columnsRaw.length > MAX_AD_COLUMNS) return null;
+  const columns: PerimeterAdLayoutColumn[] = [];
+  const seenIds = new Set<string>();
+  for (const entry of columnsRaw) {
+    const column = parseAdLayoutColumn(entry, options);
+    if (!column) return null;
+    if (seenIds.has(column.id)) return null;
+    seenIds.add(column.id);
+    columns.push(column);
+  }
+  return { version, revision, columns };
+}
+
+// Parse the daemon-published applied layout
+function parseAppliedAdFile(data: unknown): PerimeterAppliedAdFile | undefined {
+  if (!data || typeof data !== "object") return undefined;
+  const raw = data as Record<string, unknown>;
+  const name = typeof raw.name === "string" ? raw.name : "";
+  if (!validateAdFileName(name)) return undefined;
+  const thumbnail =
+    typeof raw.thumbnail === "string" ? raw.thumbnail : undefined;
+  const transportDurationMs =
+    typeof raw.transportDurationMs === "number" ? raw.transportDurationMs : 0;
+  if (transportDurationMs <= 0) return undefined;
+  return { name, thumbnail, transportDurationMs };
+}
+
+function parseAppliedAdColumn(
+  data: unknown,
+): PerimeterAppliedAdColumn | undefined {
+  if (!data || typeof data !== "object") return undefined;
+  const raw = data as Record<string, unknown>;
+  const id = typeof raw.id === "string" ? raw.id : "";
+  if (!id) return undefined;
+  const filesRaw = raw.files;
+  if (!filesRaw || typeof filesRaw !== "object") return undefined;
+  const files: Record<string, PerimeterAppliedAdFile> = {};
+  for (const [key, value] of Object.entries(
+    filesRaw as Record<string, unknown>,
+  )) {
+    const parsed = parseAppliedAdFile(value);
+    if (!parsed) return undefined;
+    files[key] = parsed;
+  }
+  if (Object.keys(files).length === 0) return undefined;
+  return { id, files };
+}
+
+export function parsePerimeterAppliedAdLayout(
+  data: unknown,
+): PerimeterAppliedAdLayout | undefined {
+  if (!data || typeof data !== "object") return undefined;
+  const raw = data as Record<string, unknown>;
+
+  // Parse lanes
+  const lanes: PerimeterAdLane[] = [];
+  if (Array.isArray(raw.lanes)) {
+    for (const entry of raw.lanes) {
+      if (!entry || typeof entry !== "object") continue;
+      const lane = entry as Record<string, unknown>;
+      const id = typeof lane.id === "string" ? lane.id : "";
+      const name = typeof lane.name === "string" ? lane.name : "";
+      if (id && name) lanes.push({ id, name });
+    }
+  }
+
+  const revision = typeof raw.revision === "string" ? raw.revision : "";
+  const phase: PerimeterAdPhase = [
+    "staging",
+    "loading",
+    "playing",
+    "error",
+    "idle",
+  ].includes(raw.phase as string)
+    ? (raw.phase as PerimeterAdPhase)
+    : "idle";
+  const activeColumn =
+    typeof raw.activeColumn === "number" ? raw.activeColumn : 0;
+  const error = typeof raw.error === "string" ? raw.error : null;
+  const updatedAt =
+    typeof raw.updatedAt === "number" ? raw.updatedAt : Date.now();
+
+  const columns: PerimeterAppliedAdColumn[] = [];
+  if (Array.isArray(raw.columns)) {
+    for (const entry of raw.columns) {
+      const column = parseAppliedAdColumn(entry);
+      if (column) columns.push(column);
+    }
+  }
+
+  return { lanes, revision, phase, activeColumn, error, updatedAt, columns };
 }

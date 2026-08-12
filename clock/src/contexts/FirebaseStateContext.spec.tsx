@@ -22,6 +22,7 @@ vi.mock("../firebaseDatabase", () => ({
 
 vi.mock("../firebase", () => ({
   database: {},
+  FIREBASE_STORAGE_BUCKET: "vikes-match-clock-firebase.appspot.com",
 }));
 
 vi.mock("firebase/database", () => ({

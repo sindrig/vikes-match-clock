@@ -9,6 +9,8 @@ import {
   parseClubOverrides,
   parsePerimeterState,
   parsePerimeterPreview,
+  parsePerimeterAdLayout,
+  parsePerimeterAppliedAdLayout,
 } from "./firebaseParsers";
 import { Sports, DEFAULT_HALFSTOPS, DEFAULT_THEME } from "../constants";
 import type {
@@ -1437,6 +1439,440 @@ describe("firebaseParsers", () => {
       });
       expect(result!.columns[0].id).toBeNull();
       expect(result!.columns[0].clips[0].id).toBeNull();
+    });
+  });
+
+  describe("parsePerimeterAdLayout", () => {
+    const validLayout = {
+      version: 1,
+      revision: "abc-123",
+      columns: [
+        {
+          id: "col-1",
+          files: {
+            "2": {
+              name: "ad-48.png",
+              source:
+                "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/ad-48.png",
+            },
+          },
+        },
+      ],
+    };
+
+    it("parses a valid layout", () => {
+      const result = parsePerimeterAdLayout(validLayout);
+      expect(result).not.toBeNull();
+      expect(result!.version).toBe(1);
+      expect(result!.revision).toBe("abc-123");
+      expect(result!.columns).toHaveLength(1);
+      expect(result!.columns[0]?.id).toBe("col-1");
+    });
+
+    it("returns null for null input", () => {
+      expect(parsePerimeterAdLayout(null)).toBeNull();
+    });
+
+    it("returns null for undefined input", () => {
+      expect(parsePerimeterAdLayout(undefined)).toBeNull();
+    });
+
+    it("returns null for wrong version", () => {
+      expect(parsePerimeterAdLayout({ ...validLayout, version: 2 })).toBeNull();
+      expect(parsePerimeterAdLayout({ ...validLayout, version: 0 })).toBeNull();
+    });
+
+    it("returns null for missing revision", () => {
+      expect(
+        parsePerimeterAdLayout({ ...validLayout, revision: "" }),
+      ).toBeNull();
+      expect(
+        parsePerimeterAdLayout({ ...validLayout, revision: 123 }),
+      ).toBeNull();
+    });
+
+    it("returns null when columns exceed 20", () => {
+      const manyColumns = Array.from({ length: 21 }, (_, i) => ({
+        id: `col-${i}`,
+        files: {
+          "2": {
+            name: "ad.png",
+            source:
+              "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/ad.png",
+          },
+        },
+      }));
+      expect(
+        parsePerimeterAdLayout({ ...validLayout, columns: manyColumns }),
+      ).toBeNull();
+    });
+
+    it("returns null for duplicate column ids", () => {
+      const dupeColumns = [
+        {
+          id: "same-id",
+          files: {
+            "2": {
+              name: "a.png",
+              source:
+                "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/a.png",
+            },
+          },
+        },
+        {
+          id: "same-id",
+          files: {
+            "2": {
+              name: "b.png",
+              source:
+                "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/b.png",
+            },
+          },
+        },
+      ];
+      expect(
+        parsePerimeterAdLayout({ ...validLayout, columns: dupeColumns }),
+      ).toBeNull();
+    });
+
+    it("returns null for invalid filename '..'", () => {
+      const bad = {
+        ...validLayout,
+        columns: [
+          {
+            id: "col-1",
+            files: {
+              "2": {
+                name: "..",
+                source:
+                  "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/..",
+              },
+            },
+          },
+        ],
+      };
+      expect(parsePerimeterAdLayout(bad)).toBeNull();
+    });
+
+    it("returns null for filename with colon (Windows-invalid)", () => {
+      const bad = {
+        ...validLayout,
+        columns: [
+          {
+            id: "col-1",
+            files: {
+              "2": {
+                name: "a:b.png",
+                source:
+                  "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/a:b.png",
+              },
+            },
+          },
+        ],
+      };
+      expect(parsePerimeterAdLayout(bad)).toBeNull();
+    });
+
+    it("returns null for source with wrong bucket", () => {
+      const bad = {
+        ...validLayout,
+        columns: [
+          {
+            id: "col-1",
+            files: {
+              "2": {
+                name: "ad.png",
+                source: "gs://wrong-bucket.appspot.com/vikuti/perimeter/ad.png",
+              },
+            },
+          },
+        ],
+      };
+      expect(parsePerimeterAdLayout(bad)).toBeNull();
+    });
+
+    it("returns null when source is not under location prefix", () => {
+      const bad = {
+        ...validLayout,
+        columns: [
+          {
+            id: "col-1",
+            files: {
+              "2": {
+                name: "ad.png",
+                source:
+                  "gs://vikes-match-clock-firebase.appspot.com/other-location/perimeter/ad.png",
+              },
+            },
+          },
+        ],
+      };
+      expect(parsePerimeterAdLayout(bad, { location: "vikuti" })).toBeNull();
+    });
+
+    it("accepts valid source under location prefix", () => {
+      const result = parsePerimeterAdLayout(validLayout, {
+        location: "vikuti",
+      });
+      expect(result).not.toBeNull();
+      expect(result!.columns).toHaveLength(1);
+    });
+
+    it("accepts a custom bucket override", () => {
+      const stagingLayout = {
+        ...validLayout,
+        columns: [
+          {
+            id: "col-1",
+            files: {
+              "2": {
+                name: "ad.png",
+                source:
+                  "gs://vikes-match-clock-staging.appspot.com/vikuti/perimeter/ad.png",
+              },
+            },
+          },
+        ],
+      };
+      const result = parsePerimeterAdLayout(stagingLayout, {
+        location: "vikuti",
+        bucket: "vikes-match-clock-staging.appspot.com",
+      });
+      expect(result).not.toBeNull();
+    });
+
+    it("returns null for Windows reserved device name", () => {
+      const bad = {
+        ...validLayout,
+        columns: [
+          {
+            id: "col-1",
+            files: {
+              "2": {
+                name: "CON",
+                source:
+                  "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/CON",
+              },
+            },
+          },
+        ],
+      };
+      expect(parsePerimeterAdLayout(bad)).toBeNull();
+    });
+
+    it("returns null for trailing dot in filename", () => {
+      const bad = {
+        ...validLayout,
+        columns: [
+          {
+            id: "col-1",
+            files: {
+              "2": {
+                name: "ad.png.",
+                source:
+                  "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/ad.png.",
+              },
+            },
+          },
+        ],
+      };
+      expect(parsePerimeterAdLayout(bad)).toBeNull();
+    });
+
+    it("accepts the same Storage object reused across lanes", () => {
+      const shared = {
+        ...validLayout,
+        columns: [
+          {
+            id: "col-1",
+            files: {
+              "2": {
+                name: "ad.png",
+                source:
+                  "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/ad.png",
+              },
+              "4": {
+                name: "ad.png",
+                source:
+                  "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/ad.png",
+              },
+            },
+          },
+        ],
+      };
+      expect(parsePerimeterAdLayout(shared)).not.toBeNull();
+    });
+
+    it("returns null when the same filename maps to two different sources", () => {
+      const clash = {
+        ...validLayout,
+        columns: [
+          {
+            id: "col-1",
+            files: {
+              "2": {
+                name: "ad.png",
+                source:
+                  "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/ad.png",
+              },
+              "4": {
+                name: "ad.png",
+                source:
+                  "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/ad-other.png",
+              },
+            },
+          },
+        ],
+      };
+      expect(parsePerimeterAdLayout(clash)).toBeNull();
+    });
+  });
+
+  describe("parsePerimeterAppliedAdLayout", () => {
+    const validApplied = {
+      lanes: [
+        { id: "2", name: "48 skjair" },
+        { id: "4", name: "40 skjair" },
+      ],
+      revision: "rev-abc",
+      phase: "playing",
+      activeColumn: 1,
+      error: null,
+      updatedAt: 1723392000000,
+      columns: [
+        {
+          id: "col-1",
+          files: {
+            "2": {
+              name: "ad-48.png",
+              thumbnail: "data:image/png;base64,abc",
+              transportDurationMs: 20000,
+            },
+            "4": {
+              name: "ad-40.mp4",
+              transportDurationMs: 15342,
+            },
+          },
+        },
+      ],
+    };
+
+    it("parses a valid applied layout", () => {
+      const result = parsePerimeterAppliedAdLayout(validApplied);
+      expect(result).toBeDefined();
+      expect(result!.revision).toBe("rev-abc");
+      expect(result!.phase).toBe("playing");
+      expect(result!.activeColumn).toBe(1);
+      expect(result!.lanes).toHaveLength(2);
+      expect(result!.columns).toHaveLength(1);
+    });
+
+    it("returns undefined for non-object input", () => {
+      expect(parsePerimeterAppliedAdLayout(null)).toBeUndefined();
+      expect(parsePerimeterAppliedAdLayout("string")).toBeUndefined();
+      expect(parsePerimeterAppliedAdLayout(123)).toBeUndefined();
+    });
+
+    it("defaults invalid phase to idle", () => {
+      const result = parsePerimeterAppliedAdLayout({
+        ...validApplied,
+        phase: "invalid-phase",
+      });
+      expect(result!.phase).toBe("idle");
+    });
+
+    it("defaults missing phase to idle", () => {
+      const noPhase = { ...validApplied };
+      delete (noPhase as Record<string, unknown>).phase;
+      const result = parsePerimeterAppliedAdLayout(noPhase);
+      expect(result!.phase).toBe("idle");
+    });
+
+    it("uses Date.now() when updatedAt is missing", () => {
+      const noTimestamp = { ...validApplied };
+      delete (noTimestamp as Record<string, unknown>).updatedAt;
+      const before = Date.now();
+      const result = parsePerimeterAppliedAdLayout(noTimestamp);
+      const after = Date.now();
+      expect(result!.updatedAt).toBeGreaterThanOrEqual(before);
+      expect(result!.updatedAt).toBeLessThanOrEqual(after);
+    });
+
+    it("drops columns with files that have transportDurationMs <= 0", () => {
+      const badApplied = {
+        ...validApplied,
+        columns: [
+          {
+            id: "col-bad",
+            files: {
+              "2": {
+                name: "bad.png",
+                transportDurationMs: 0,
+              },
+            },
+          },
+        ],
+      };
+      const result = parsePerimeterAppliedAdLayout(badApplied);
+      expect(result!.columns).toHaveLength(0);
+    });
+
+    it("drops columns with files that have negative transportDurationMs", () => {
+      const badApplied = {
+        ...validApplied,
+        columns: [
+          {
+            id: "col-bad",
+            files: {
+              "2": {
+                name: "bad.png",
+                transportDurationMs: -100,
+              },
+            },
+          },
+        ],
+      };
+      const result = parsePerimeterAppliedAdLayout(badApplied);
+      expect(result!.columns).toHaveLength(0);
+    });
+
+    it("drops columns with invalid filenames", () => {
+      const badApplied = {
+        ...validApplied,
+        columns: [
+          {
+            id: "col-bad",
+            files: {
+              "2": {
+                name: "..",
+                transportDurationMs: 20000,
+              },
+            },
+          },
+        ],
+      };
+      const result = parsePerimeterAppliedAdLayout(badApplied);
+      expect(result!.columns).toHaveLength(0);
+    });
+
+    it("preserves lanes with valid id and name", () => {
+      const result = parsePerimeterAppliedAdLayout(validApplied);
+      expect(result!.lanes[0]).toEqual({ id: "2", name: "48 skjair" });
+    });
+
+    it("drops lanes with missing id or name", () => {
+      const withBadLanes = {
+        ...validApplied,
+        lanes: [
+          { id: "2", name: "Good" },
+          { id: "", name: "No Id" },
+          { id: "4", name: "" },
+          null,
+        ],
+      };
+      const result = parsePerimeterAppliedAdLayout(withBadLanes);
+      expect(result!.lanes).toHaveLength(1);
+      expect(result!.lanes[0]?.id).toBe("2");
     });
   });
 });

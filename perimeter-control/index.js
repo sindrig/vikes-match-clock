@@ -39,10 +39,12 @@ import { cert, initializeApp } from "firebase-admin/app";
 import { getDatabase, ServerValue } from "firebase-admin/database";
 import { ResolumeCompositionReader } from "./resolume-preview.js";
 import { OverlayController } from "./overlay.js";
+import { AdLayoutController } from "./ad-layout.js";
 
 export const VALID_STATES = new Set(["on", "off"]);
 
-const DEFAULT_DATABASE_URL = "https://vikes-match-clock-firebase.firebaseio.com";
+const DEFAULT_DATABASE_URL =
+  "https://vikes-match-clock-firebase.firebaseio.com";
 const DEFAULT_FIREBASE_PATH = "states/vikuti/perimeter/state";
 const DEFAULT_SERVICE_ACCOUNT_FILE =
   "/etc/perimeter-control/perimeter-service-account.json";
@@ -63,11 +65,18 @@ const DEFAULT_OVERLAY_BASE_PATH = "states/vikuti/perimeter/overlay";
 const DEFAULT_OVERLAY_STATUS_PATH = "perimeter/vikuti/overlayStatus";
 const DEFAULT_OVERLAY_SSH_HOST = "10.182.45.53";
 const DEFAULT_OVERLAY_SSH_USER = "user";
-const DEFAULT_OVERLAY_SSH_KEY =
-  "/etc/perimeter-control/overlay-ssh-key";
+const DEFAULT_OVERLAY_SSH_KEY = "/etc/perimeter-control/overlay-ssh-key";
 const DEFAULT_OVERLAY_REMOTE_CONTENT_DIR = "C:/Content";
 const DEFAULT_OVERLAY_CACHE_DIR = "/var/cache/perimeter-control";
 const DEFAULT_OVERLAY_LAYER_CLIP_COLUMNS = '{"2":1,"4":1}';
+
+// Ad-layout defaults
+const DEFAULT_AD_LAYOUT_PATH = "states/vikuti/perimeter/adLayout";
+const DEFAULT_AD_LAYOUT_STATUS_PATH = "perimeter/vikuti/adLayout";
+const DEFAULT_AD_LAYER_CLIP_SLOTS = '{"2":2,"4":2}';
+const DEFAULT_AD_LANE_IDS = "2,4";
+const DEFAULT_AD_LAYOUT_BUCKET = "vikes-match-clock-firebase.appspot.com";
+const DEFAULT_AD_MAX_FILE_BYTES = 250 * 1024 * 1024;
 
 const RESOLUME_OFF_PATH = "/composition/disconnect-all";
 const RESOLUME_ON_PATH = "/composition/columns/{column}/connect";
@@ -90,6 +99,32 @@ function nonNegativeMs(value, fallback) {
 function quality(value, fallback) {
   const n = Number(value);
   return Number.isFinite(n) ? Math.min(1, Math.max(0.1, n)) : fallback;
+}
+
+// Reject configurations where the goal overlay and ad-layout controllers would
+// drive the same Resolume clip slot on the same layer. Both controllers use
+// their configured slot maps as the fallback/reserved slot per layer, so an
+// overlap lets each replace or clear the other's clip despite the documented
+// slot-isolation guarantee.
+function assertNoSlotConflicts(config) {
+  if (!config.overlayEnabled || !config.adLayoutEnabled) return;
+  const conflicts = [];
+  for (const [layer, overlaySlot] of Object.entries(
+    config.overlayLayerClipColumns,
+  )) {
+    const adSlot = config.adLayerClipSlots[layer];
+    if (adSlot !== undefined && adSlot === overlaySlot) {
+      conflicts.push(`layer ${layer} slot ${adSlot}`);
+    }
+  }
+  if (conflicts.length > 0) {
+    throw new Error(
+      "Overlapping Resolume clip slot configuration: the ad-layout and " +
+        `goal-overlay controllers both use ${conflicts.join(", ")}. ` +
+        "Configure disjoint PERIMETER_AD_LAYER_CLIP_SLOTS and " +
+        "PERIMETER_OVERLAY_LAYER_CLIP_COLUMNS.",
+    );
+  }
 }
 
 function parseLayerMap(envValue, fallback) {
@@ -168,8 +203,7 @@ export function loadConfig(environ = process.env) {
     ),
     // Overlay settings
     overlayEnabled: environ.PERIMETER_OVERLAY_ENABLED !== "false",
-    overlayPath:
-      environ.PERIMETER_OVERLAY_PATH ?? DEFAULT_OVERLAY_BASE_PATH,
+    overlayPath: environ.PERIMETER_OVERLAY_PATH ?? DEFAULT_OVERLAY_BASE_PATH,
     overlayStatusPath:
       environ.PERIMETER_OVERLAY_STATUS_PATH ?? DEFAULT_OVERLAY_STATUS_PATH,
     overlayProjectId:
@@ -180,8 +214,7 @@ export function loadConfig(environ = process.env) {
       environ.PERIMETER_OVERLAY_SSH_HOST ?? DEFAULT_OVERLAY_SSH_HOST,
     overlaySshUser:
       environ.PERIMETER_OVERLAY_SSH_USER ?? DEFAULT_OVERLAY_SSH_USER,
-    overlaySshKey:
-      environ.PERIMETER_OVERLAY_SSH_KEY ?? DEFAULT_OVERLAY_SSH_KEY,
+    overlaySshKey: environ.PERIMETER_OVERLAY_SSH_KEY ?? DEFAULT_OVERLAY_SSH_KEY,
     overlayRemoteContentDir:
       environ.PERIMETER_OVERLAY_REMOTE_CONTENT_DIR ??
       DEFAULT_OVERLAY_REMOTE_CONTENT_DIR,
@@ -197,6 +230,25 @@ export function loadConfig(environ = process.env) {
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean),
+    // Ad-layout settings
+    adLayoutEnabled: environ.PERIMETER_AD_LAYOUT_ENABLED !== "false",
+    adLayoutPath: environ.PERIMETER_AD_LAYOUT_PATH ?? DEFAULT_AD_LAYOUT_PATH,
+    adLayoutStatusPath:
+      environ.PERIMETER_AD_LAYOUT_STATUS_PATH ?? DEFAULT_AD_LAYOUT_STATUS_PATH,
+    adLayerClipSlots: parseLayerMap(
+      environ.PERIMETER_AD_LAYER_CLIP_SLOTS,
+      DEFAULT_AD_LAYER_CLIP_SLOTS,
+    ),
+    adLaneIds: (environ.PERIMETER_AD_LANE_IDS ?? DEFAULT_AD_LANE_IDS)
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
+    adLayoutBucket:
+      environ.PERIMETER_AD_LAYOUT_BUCKET ?? DEFAULT_AD_LAYOUT_BUCKET,
+    adMaxFileBytes: positiveInt(
+      environ.PERIMETER_AD_MAX_FILE_BYTES,
+      DEFAULT_AD_MAX_FILE_BYTES,
+    ),
   };
 }
 
@@ -253,6 +305,7 @@ class Notifier {
 
 export class PerimeterController {
   constructor(config) {
+    assertNoSlotConflicts(config);
     this.config = config;
     this.resolume = new ResolumeClient(config);
     this.previewReader = new ResolumeCompositionReader(config);
@@ -267,6 +320,14 @@ export class PerimeterController {
     if (config.overlayEnabled) {
       this._overlayController = new OverlayController(config);
     }
+    this._adLayoutController = null;
+    if (config.adLayoutEnabled) {
+      this._adLayoutController = new AdLayoutController(
+        config,
+        config.adLaneIds,
+        config.adLayerClipSlots,
+      );
+    }
   }
 
   // -- state --------------------------------------------------------------
@@ -277,7 +338,9 @@ export class PerimeterController {
 
   onDesiredState(state) {
     if (typeof state !== "string" || !VALID_STATES.has(state)) {
-      console.warn(`Ignoring invalid perimeter state: ${JSON.stringify(state)}`);
+      console.warn(
+        `Ignoring invalid perimeter state: ${JSON.stringify(state)}`,
+      );
       return;
     }
     if (state === this._lastSeen) return;
@@ -300,10 +363,18 @@ export class PerimeterController {
     this._ref.on("value", this._handleSnapshot);
     this._previewRef = db.ref(this.config.previewPath);
     console.log(`Listening on Firebase path: ${this.config.path}`);
-    console.log(`Publishing preview to Firebase path: ${this.config.previewPath}`);
+    console.log(
+      `Publishing preview to Firebase path: ${this.config.previewPath}`,
+    );
     if (this._overlayController) {
       this._overlayController.attach(db);
       console.log(`Overlay control listening on: ${this.config.overlayPath}`);
+    }
+    if (this._adLayoutController) {
+      this._adLayoutController.attach(db);
+      console.log(
+        `Ad-layout control listening on: ${this.config.adLayoutPath}`,
+      );
     }
   }
 
@@ -449,6 +520,9 @@ export class PerimeterController {
     if (this._overlayController) {
       this._overlayController.shutdown();
     }
+    if (this._adLayoutController) {
+      this._adLayoutController.shutdown();
+    }
     this._notifier.notify();
   }
 }
@@ -482,6 +556,9 @@ function main() {
   process.on("SIGINT", shutdown);
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (
+  process.argv[1] &&
+  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
   main();
 }

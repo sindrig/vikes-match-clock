@@ -336,6 +336,62 @@ export interface PerimeterOverlayStatus {
   error: string | null;
 }
 
+// -- Perimeter ad layout (Firebase-controlled column-based ads) -------------
+
+// Desired layout written by the controller to states/{location}/perimeter/adLayout
+export interface PerimeterAdLayoutFile {
+  name: string;
+  source: string; // gs:// URI
+}
+
+export interface PerimeterAdLayoutColumn {
+  id: string; // uuid
+  files: Record<string, PerimeterAdLayoutFile>;
+}
+
+export interface PerimeterAdLayout {
+  version: number;
+  revision: string; // uuid, changes for every edit including reorder
+  columns: PerimeterAdLayoutColumn[];
+}
+
+// Daemon-published lane metadata
+export interface PerimeterAdLane {
+  id: string;
+  name: string;
+}
+
+// Applied file with daemon-resolved duration and thumbnail
+export interface PerimeterAppliedAdFile {
+  name: string;
+  thumbnail?: string; // base64 data URL
+  transportDurationMs: number;
+}
+
+// Applied column with daemon-resolved files
+export interface PerimeterAppliedAdColumn {
+  id: string; // uuid matching desired column
+  files: Record<string, PerimeterAppliedAdFile>;
+}
+
+export type PerimeterAdPhase =
+  | "staging"
+  | "loading"
+  | "playing"
+  | "error"
+  | "idle";
+
+// Daemon-published applied layout at perimeter/{location}/adLayout
+export interface PerimeterAppliedAdLayout {
+  lanes: PerimeterAdLane[];
+  revision: string; // matching the applied desired revision
+  phase: PerimeterAdPhase;
+  activeColumn: number; // 1-based, 0 when idle
+  error: string | null;
+  updatedAt: number; // Firebase server timestamp
+  columns: PerimeterAppliedAdColumn[];
+}
+
 // Root state type
 export interface RootState {
   match: Match;

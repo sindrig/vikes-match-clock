@@ -86,6 +86,8 @@ if (isTest) {
   connectStorageEmulator(storage, "127.0.0.1", 9199);
 }
 
+export const FIREBASE_STORAGE_BUCKET = fbConfig.storageBucket;
+
 const storageHelpers = {
   ref: (path: string): StorageReference => storageRef(storage, path),
   uploadBytes: (
