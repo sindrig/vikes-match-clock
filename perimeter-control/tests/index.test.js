@@ -1724,6 +1724,16 @@ test("loadConfig exposes default overlay layer target folders", () => {
   assert.deepEqual(config.overlayLayerTargetFolders, { 2: "48", 4: "40" });
 });
 
+test("loadConfig partial target-folder overrides keep defaults for missing layers", () => {
+  // A partial map must merge over the defaults so an omitted layer still has
+  // a target folder to enforce (otherwise validateGcsSource skips the folder
+  // check for that layer).
+  const config = loadConfig({
+    PERIMETER_OVERLAY_LAYER_TARGET_FOLDERS: '{"2":"50"}',
+  });
+  assert.deepEqual(config.overlayLayerTargetFolders, { 2: "50", 4: "40" });
+});
+
 // -- overlay sshArgs known-hosts -------------------------------------------------
 
 test("_sshArgs uses a persistent known-hosts file in the cache dir", () => {

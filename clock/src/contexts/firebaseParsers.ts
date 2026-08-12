@@ -614,7 +614,15 @@ function validateMediaPairSource(
 ): boolean {
   const prefix = `gs://${options.bucket}/${options.location}/perimeter-overlays/${pairId}/${targetFolder}/`;
   if (!source.startsWith(prefix)) return false;
-  return source.length > prefix.length;
+  const filename = source.slice(prefix.length);
+  // The suffix must be exactly one daemon-safe filename: a single path
+  // segment with no traversal and no `..`, matching the daemon's
+  // SAFE_FILENAME_RE so every parsed pair is stageable (the daemon rejects
+  // subdirectories and `..` anywhere in the object path).
+  if (!filename || filename.length > 255) return false;
+  if (filename.includes("/") || filename.includes("..")) return false;
+  if (!MEDIA_PAIR_FILENAME_RE.test(filename)) return false;
+  return true;
 }
 
 export function parsePerimeterMediaPairs(

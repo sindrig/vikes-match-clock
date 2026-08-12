@@ -106,10 +106,10 @@ const PerimeterMediaPairs: React.FC = () => {
     const pairId = crypto.randomUUID();
     const stamp = Date.now();
     const files: Record<string, PerimeterOverlayFile> = {};
-    const uploads: Array<Promise<unknown>> = [];
+    const uploadedPaths: string[] = [];
 
     try {
-      for (const target of TARGETS) {
+      const uploadPromises = TARGETS.map((target) => {
         const file = target.key === "2" ? file48 : file40;
         const ext = safeExtension(file.name);
         const generatedName = `${target.folder}-${stamp}-${slugify(trimmedName)}${ext}`;
@@ -118,16 +118,28 @@ const PerimeterMediaPairs: React.FC = () => {
           name: generatedName,
           source: `gs://${FIREBASE_STORAGE_BUCKET}/${storagePath}`,
         };
-        uploads.push(
-          storageHelpers.uploadBytes(storagePath, file, {
+        return storageHelpers
+          .uploadBytes(storagePath, file, {
             cacheControl: "public, max-age=604800",
-          }),
-        );
-      }
+          })
+          .then(() => {
+            // Track every upload that actually landed so a later failure can
+            // clean it up instead of orphaning multi-hundred-MB files.
+            uploadedPaths.push(storagePath);
+          });
+      });
 
-      // Upload both files before writing the library record so a failed
-      // upload never leaves a half-uploaded pair in the library.
-      await Promise.all(uploads);
+      // Wait for both uploads to settle before writing the library record so
+      // a failed upload never leaves a half-uploaded pair in the library and
+      // the set of successful uploads is known before cleanup runs.
+      const uploadResults = await Promise.allSettled(uploadPromises);
+      const failedUpload = uploadResults.find(
+        (result): result is PromiseRejectedResult =>
+          result.status === "rejected",
+      );
+      if (failedUpload) {
+        throw failedUpload.reason;
+      }
       await createPerimeterMediaPair(pairId, {
         name: trimmedName,
         files,
@@ -138,6 +150,12 @@ const PerimeterMediaPairs: React.FC = () => {
       setFile48(null);
       setFile40(null);
     } catch (err) {
+      // Best-effort delete of the uploads that already landed in Storage so a
+      // failed create never leaves unreachable files behind (a retry uploads
+      // again under a fresh pair ID).
+      await Promise.allSettled(
+        uploadedPaths.map((path) => storageHelpers.deleteObject(path)),
+      );
       setError(
         err instanceof Error
           ? err.message
@@ -278,8 +296,11 @@ const PerimeterMediaPairs: React.FC = () => {
         <Modal.Body>
           <div className="media-pair-form">
             <div className="media-pair-field">
-              <label className="media-pair-label">Nafn</label>
+              <label className="media-pair-label" htmlFor="media-pair-name">
+                Nafn
+              </label>
               <input
+                id="media-pair-name"
                 className="media-pair-input"
                 value={name}
                 maxLength={MAX_NAME_LENGTH}
@@ -289,15 +310,19 @@ const PerimeterMediaPairs: React.FC = () => {
             </div>
             {TARGETS.map((target) => {
               const file = target.key === "2" ? file48 : file40;
+              const labelId = `media-pair-target-${target.key}-label`;
               const onPick = (picked: File | null) =>
                 target.key === "2" ? setFile48(picked) : setFile40(picked);
               return (
                 <div className="media-pair-field" key={target.key}>
-                  <label className="media-pair-label">{target.label}</label>
+                  <label className="media-pair-label" id={labelId}>
+                    {target.label}
+                  </label>
                   <label className="media-pair-picker">
                     {file ? file.name : "Velja skrá"}
                     <input
                       type="file"
+                      aria-labelledby={labelId}
                       accept="image/*,video/*"
                       disabled={uploading}
                       onChange={(e) => {

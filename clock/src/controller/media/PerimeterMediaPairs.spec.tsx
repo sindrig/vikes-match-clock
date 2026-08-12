@@ -223,4 +223,61 @@ describe("PerimeterMediaPairs", () => {
     );
     expect(mockCreatePair).not.toHaveBeenCalled();
   });
+
+  it("cleans up a successful upload when its sibling upload fails", async () => {
+    // First upload (48 skjáir) fails; the second (40 skjáir) already landed
+    // and must be removed so it is not orphaned in Storage.
+    mockedUpload.mockRejectedValueOnce(new Error("upload failed"));
+    render(<PerimeterMediaPairs />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Nýtt jaðarefni" }));
+    fireEvent.change(screen.getByPlaceholderText("t.d. Sindri"), {
+      target: { value: "Sindri" },
+    });
+    const fileInputs = document.querySelectorAll('input[type="file"]');
+    fireEvent.change(fileInputs[0] as Element, {
+      target: { files: [new File(["v"], "48.mp4", { type: "video/mp4" })] },
+    });
+    fireEvent.change(fileInputs[1] as Element, {
+      target: { files: [new File(["i"], "40.png", { type: "image/png" })] },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Vista" }));
+
+    await waitFor(() =>
+      expect(screen.getByText(/upload failed/)).toBeInTheDocument(),
+    );
+    expect(mockedDelete).toHaveBeenCalledTimes(1);
+    const deleted = mockedDelete.mock.calls[0]?.[0] as string;
+    expect(deleted).toMatch(
+      /\/perimeter-overlays\/[0-9a-f-]+\/40\/40-\d+-sindri\.png$/,
+    );
+  });
+
+  it("cleans up both uploaded files when the library record write fails", async () => {
+    mockCreatePair.mockRejectedValueOnce(new Error("write failed"));
+    render(<PerimeterMediaPairs />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Nýtt jaðarefni" }));
+    fireEvent.change(screen.getByPlaceholderText("t.d. Sindri"), {
+      target: { value: "Sindri" },
+    });
+    const fileInputs = document.querySelectorAll('input[type="file"]');
+    fireEvent.change(fileInputs[0] as Element, {
+      target: { files: [new File(["v"], "48.mp4", { type: "video/mp4" })] },
+    });
+    fireEvent.change(fileInputs[1] as Element, {
+      target: { files: [new File(["i"], "40.png", { type: "image/png" })] },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Vista" }));
+
+    await waitFor(() =>
+      expect(screen.getByText(/write failed/)).toBeInTheDocument(),
+    );
+    expect(mockedUpload).toHaveBeenCalledTimes(2);
+    // Both uploads landed but the record write failed: both must be removed so
+    // a retry under a fresh pair ID never orphans them.
+    expect(mockedDelete).toHaveBeenCalledTimes(2);
+  });
 });

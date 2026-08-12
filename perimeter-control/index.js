@@ -162,31 +162,40 @@ function parseLayerMap(envValue, fallback) {
 }
 
 // Parse a JSON object whose values are non-empty strings (e.g. overlay layer
-// target folders), falling back to the provided default on any malformed input.
+// target folders), merging the validated entries over the provided default so
+// keys the override omits keep their default enforcement. A partial override
+// such as {"2":"48"} must not silently drop the target folder for layer "4":
+// validateGcsSource skips its folder check when a layer has no target folder.
 function parseStringMap(envValue, fallback) {
+  let defaults = {};
+  try {
+    const fallbackParsed = JSON.parse(fallback);
+    if (
+      fallbackParsed &&
+      typeof fallbackParsed === "object" &&
+      !Array.isArray(fallbackParsed)
+    ) {
+      defaults = fallbackParsed;
+    }
+  } catch {
+    // ignore a malformed fallback
+  }
   const raw = envValue ?? fallback;
   try {
     const parsed = JSON.parse(raw);
     if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-      const map = {};
+      const map = { ...defaults };
       for (const [key, val] of Object.entries(parsed)) {
         if (typeof val === "string" && val.length > 0) {
           map[String(key)] = val;
         }
       }
-      if (Object.keys(map).length > 0) return map;
+      return map;
     }
   } catch {
     // fall through
   }
-  try {
-    const fallbackParsed = JSON.parse(fallback);
-    return fallbackParsed && typeof fallbackParsed === "object"
-      ? fallbackParsed
-      : {};
-  } catch {
-    return {};
-  }
+  return defaults;
 }
 
 export function loadConfig(environ = process.env) {

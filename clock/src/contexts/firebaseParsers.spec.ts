@@ -2063,6 +2063,26 @@ describe("firebaseParsers", () => {
       expect(parsePerimeterMediaPairs(data, { location, bucket })).toEqual({});
     });
 
+    it("rejects a source whose suffix is not a single filename", () => {
+      const data = validPair();
+      // The daemon splits the object path into exactly pairId/folder/filename;
+      // a nested directory would be rejected there, so the parser must too.
+      (data[pairId] as { files: Record<string, { source: string }> }).files[
+        "2"
+      ].source =
+        `gs://${bucket}/${location}/perimeter-overlays/${pairId}/48/subdir/a.mp4`;
+      expect(parsePerimeterMediaPairs(data, { location, bucket })).toEqual({});
+    });
+
+    it("rejects traversal (..) in the source suffix", () => {
+      const data = validPair();
+      (data[pairId] as { files: Record<string, { source: string }> }).files[
+        "2"
+      ].source =
+        `gs://${bucket}/${location}/perimeter-overlays/${pairId}/48/../40/a.mp4`;
+      expect(parsePerimeterMediaPairs(data, { location, bucket })).toEqual({});
+    });
+
     it("rejects an invalid pair ID key", () => {
       const data: Record<string, unknown> = {
         "not-a-uuid": {

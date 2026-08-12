@@ -76,7 +76,7 @@
 .media-pairs-empty {
   padding: 24px 16px;
   text-align: center;
-  color: #999;
+  color: #666;
   font-size: 13px;
 }
 
@@ -165,8 +165,26 @@
   border-color: #aaa;
 }
 
+/* Visually hide the native file input without removing it from the keyboard
+   focus order: pair creation must be reachable by keyboard alone. The picker
+   label forwards clicks and Enter/Space to the input, and the focus ring is
+   drawn on the picker itself via :focus-within. */
 .media-pair-picker input[type="file"] {
-  display: none;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.media-pair-picker:focus-within {
+  outline: 2px solid #1976d2;
+  outline-offset: 2px;
+  border-color: #1976d2;
 }
 
 .media-pair-uploading {

@@ -358,7 +358,9 @@ approved `vikes-match-clock-firebase.appspot.com` bucket:
    The target folder must match the layer's configured target folder: layer
    `"2"` → `48`, layer `"4"` → `40`
    (`PERIMETER_OVERLAY_LAYER_TARGET_FOLDERS`, default
-   `{"2":"48","4":"40"}`). Any other object path — a foreign location, an
+   `{"2":"48","4":"40"}`). A partial override of this map is merged over the
+   default, so a layer omitted from the override keeps its default folder and
+   stays enforced. Any other object path — a foreign location, an
    arbitrary `perimeter-overlays` path, a traversal (`..`), or a
    target/layer mismatch — is rejected.
 
