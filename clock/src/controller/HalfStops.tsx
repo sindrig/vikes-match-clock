@@ -1,10 +1,17 @@
 import React from "react";
 import { HALFSTOPS } from "../constants";
+import { InjuryTimeDisplayMode } from "../types";
 import { useMatch } from "../contexts/FirebaseStateContext";
+
+const DISPLAY_MODES: { value: InjuryTimeDisplayMode; label: string }[] = [
+  { value: "stop", label: "Stoppa við lok" },
+  { value: "full", label: "Mínútur og sekúndur" },
+  { value: "minutes", label: "Aðeins mínútur" },
+];
 
 const HalfStops = () => {
   const { match, updateHalfLength, setHalfStops } = useMatch();
-  const { halfStops, matchType, showInjuryTime } = match;
+  const { halfStops, matchType, injuryTimeDisplayMode } = match;
 
   const autoHalfStops: Record<number, number[]> = HALFSTOPS[matchType] || {};
   return (
@@ -17,7 +24,7 @@ const HalfStops = () => {
               const numericKey = parseInt(value, 10);
               const stops = autoHalfStops[numericKey];
               if (stops) {
-                setHalfStops(stops, showInjuryTime || false);
+                setHalfStops(stops, injuryTimeDisplayMode);
               }
             }
           }}
@@ -43,15 +50,19 @@ const HalfStops = () => {
         ))}
       </div>
       <label>
-        Sýna uppbótartíma{" "}
-        <input
-          type="checkbox"
-          value="showInjuryTime"
-          checked={showInjuryTime || false}
-          onChange={() => {
-            setHalfStops(halfStops, !showInjuryTime);
-          }}
-        />
+        Uppbótartími{" "}
+        <select
+          value={injuryTimeDisplayMode}
+          onChange={({ target: { value } }) =>
+            setHalfStops(halfStops, value as InjuryTimeDisplayMode)
+          }
+        >
+          {DISPLAY_MODES.map(({ value: mode, label }) => (
+            <option value={mode} key={mode}>
+              {label}
+            </option>
+          ))}
+        </select>
       </label>
     </React.Fragment>
   );

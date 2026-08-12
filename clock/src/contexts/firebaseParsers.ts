@@ -1,5 +1,6 @@
 import type {
   Match,
+  InjuryTimeDisplayMode,
   ControllerState,
   ViewState,
   ThemeConfig,
@@ -190,11 +191,28 @@ export function parseMatch(data: unknown, defaultMatch: Match): Match | null {
       typeof raw.halftimeCountdown === "boolean"
         ? raw.halftimeCountdown
         : defaultMatch.halftimeCountdown,
-    showInjuryTime:
-      typeof raw.showInjuryTime === "boolean"
-        ? raw.showInjuryTime
-        : defaultMatch.showInjuryTime,
+    injuryTimeDisplayMode: parseInjuryTimeDisplayMode(raw, defaultMatch),
   };
+}
+
+const INJURY_TIME_DISPLAY_MODES = ["stop", "full", "minutes"] as const;
+
+function parseInjuryTimeDisplayMode(
+  raw: Record<string, unknown>,
+  defaultMatch: Match,
+): InjuryTimeDisplayMode {
+  if (
+    typeof raw.injuryTimeDisplayMode === "string" &&
+    (INJURY_TIME_DISPLAY_MODES as readonly string[]).includes(
+      raw.injuryTimeDisplayMode,
+    )
+  ) {
+    return raw.injuryTimeDisplayMode as InjuryTimeDisplayMode;
+  }
+  if (typeof raw.showInjuryTime === "boolean") {
+    return raw.showInjuryTime ? "full" : "stop";
+  }
+  return defaultMatch.injuryTimeDisplayMode;
 }
 
 export function parseController(

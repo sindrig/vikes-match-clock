@@ -174,7 +174,7 @@ const MatchActions = () => {
                 </Button>
               )
             : !match.started &&
-              match.showInjuryTime && (
+              match.injuryTimeDisplayMode !== "stop" && (
                 <Button
                   color="blue"
                   appearance="primary"

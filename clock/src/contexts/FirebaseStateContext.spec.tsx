@@ -446,7 +446,7 @@ describe("FirebaseStateContext", () => {
       expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
     });
 
-    it("setHalfStops updates halfStops and showInjuryTime", () => {
+    it("setHalfStops updates halfStops and injuryTimeDisplayMode", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
@@ -462,12 +462,15 @@ describe("FirebaseStateContext", () => {
         </FirebaseStateProvider>,
       );
       act(() => {
-        matchApi!.setHalfStops([30, 60], true);
+        matchApi!.setHalfStops([30, 60], "minutes");
       });
       expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
         "test-location",
         "match",
-        expect.objectContaining({ halfStops: [30, 60] }),
+        expect.objectContaining({
+          halfStops: [30, 60],
+          injuryTimeDisplayMode: "minutes",
+        }),
       );
     });
 

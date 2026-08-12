@@ -220,6 +220,7 @@ const defaultMatch = {
   buzzer: false as const,
   countdown: false,
   halftimeCountdown: false,
+  injuryTimeDisplayMode: "full",
   ksiMatchId: 12345,
 };
 

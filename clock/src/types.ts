@@ -7,6 +7,8 @@ export interface TwoMinPenalty {
   penaltyLength: number;
 }
 
+export type InjuryTimeDisplayMode = "stop" | "full" | "minutes";
+
 // Match type
 export interface Match {
   homeScore: number;
@@ -32,7 +34,7 @@ export interface Match {
   buzzer: number | false;
   countdown: boolean;
   halftimeCountdown: boolean;
-  showInjuryTime?: boolean;
+  injuryTimeDisplayMode: InjuryTimeDisplayMode;
 }
 
 // Player type
