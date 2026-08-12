@@ -23,7 +23,7 @@ const MAX_DURATION_MS = 120_000;
 const MIN_DURATION_MS = 100;
 const ALLOWED_BUCKET = "vikes-match-clock-firebase.appspot.com";
 const ALLOWED_GCS_PREFIX = "gs://";
-const UNSAFE_FILENAME_RE = /["%\\/\x00-\x1f\x7f]/;
+const SAFE_FILENAME_RE = /^[A-Za-z0-9._ -]+$/;
 // How long a cached GCS object generation is trusted before re-checking.
 const METADATA_CACHE_TTL_MS = 60_000;
 
@@ -31,7 +31,7 @@ const METADATA_CACHE_TTL_MS = 60_000;
 
 function validateFileName(name) {
   if (!name || typeof name !== "string") return false;
-  if (UNSAFE_FILENAME_RE.test(name)) return false;
+  if (!SAFE_FILENAME_RE.test(name)) return false;
   if (name.length > 255) return false;
   const base = path.basename(name);
   if (!base || base !== name) return false;
@@ -51,7 +51,7 @@ function validateGcsSource(source) {
   return true;
 }
 
-function validateOverlayDoc(data, configuredLayerIds) {
+export function validateOverlayDoc(data, configuredLayerIds) {
   if (data === null || data === undefined) return { valid: true, clear: true };
   if (!data || typeof data !== "object") {
     return { valid: false, reason: "not an object" };
@@ -151,6 +151,9 @@ export class AssetStager {
     this._metadataCache = new Map(); // gcsUrl -> { generation, checkedAt }
     // remoteName -> generation already confirmed on the Windows host.
     this._confirmedRemote = new Map();
+    // Track the last generation-suffixed remote name per base filename so we
+    // can clean up the previous copy after a re-upload.
+    this._remoteNameByBase = new Map(); // baseName -> last remote name
   }
 
   _parseGcsUrl(url) {
@@ -203,7 +206,7 @@ export class AssetStager {
       "-o",
       "StrictHostKeyChecking=accept-new",
       "-o",
-      "UserKnownHostsFile=/dev/null",
+      `UserKnownHostsFile=${path.join(this.config.overlayCacheDir, "known_hosts")}`,
       "-o",
       "ConnectTimeout=10",
       "-o",
@@ -250,6 +253,12 @@ export class AssetStager {
     const ext = path.extname(parsed.object);
     const cachedPath = path.join(cacheDir, `${cacheKey}-${generation}${ext}`);
 
+    // Embed the GCS generation in the remote filename so same-size re-uploads
+    // are still picked up (size-match alone would skip the copy).
+    const baseName = path.basename(remoteName, path.extname(remoteName));
+    const remoteExt = path.extname(remoteName);
+    const generationRemoteName = `${baseName}-${generation}${remoteExt}`;
+
     let alreadyCached = false;
     try {
       await fs.access(cachedPath);
@@ -277,18 +286,34 @@ export class AssetStager {
     }
 
     // Skip the SCP+move when the remote already holds this generation: a
-    // 36 MB copy per goal is the bulk of the trigger latency. Size match is
-    // the cheap proxy; the confirmed-set makes repeat triggers O(1).
-    if (this._confirmedRemote.get(remoteName) !== generation) {
+    // 36 MB copy per goal is the bulk of the trigger latency. The
+    // generation-suffixed name makes the confirmed-set check exact.
+    if (this._confirmedRemote.get(generationRemoteName) !== generation) {
       const localSize = (await fs.stat(cachedPath)).size;
-      const remoteSize = await this._remoteSize(remoteName);
+      const remoteSize = await this._remoteSize(generationRemoteName);
       if (remoteSize !== localSize) {
-        await this.copyToWindows(cachedPath, remoteName);
+        await this.copyToWindows(cachedPath, generationRemoteName);
       }
-      this._confirmedRemote.set(remoteName, generation);
+      this._confirmedRemote.set(generationRemoteName, generation);
+
+      // Best-effort delete the previous generation's remote file for the same
+      // base name so stale copies don't accumulate on the Windows host.
+      const prevRemote = this._remoteNameByBase.get(baseName);
+      if (prevRemote && prevRemote !== generationRemoteName) {
+        const moveDir = this.config.overlayRemoteContentDir
+          .replace(/\\/g, "/")
+          .replace(/\/+$/, "")
+          .replace(/\//g, "\\");
+        execFileAsync("ssh", [
+          ...this._sshArgs(),
+          `${this.config.overlaySshUser}@${this.config.overlaySshHost}`,
+          `del /F /Q "${moveDir}\\${prevRemote}"`,
+        ]).catch(() => {});
+      }
+      this._remoteNameByBase.set(baseName, generationRemoteName);
     }
 
-    return `${this.config.overlayRemoteContentDir.replace(/\\+$/, "")}/${remoteName.replace(/\\/g, "/")}`;
+    return `${this.config.overlayRemoteContentDir.replace(/\\+$/, "")}/${generationRemoteName.replace(/\\/g, "/")}`;
   }
 
   async copyToWindows(localPath, remoteName) {
@@ -404,6 +429,8 @@ export class ResolumeOverlayClient {
   async loadClip(layerId, clipSlot, filePath) {
     const base = this._baseUrl();
     // Resolume's clip `open` takes a `file:///` URL as a plain-text body.
+    // Safety of the path is guaranteed by validateFileName which rejects
+    // characters that would break or truncate a URL (#, ?, &, +, etc.).
     const fileUrl = `file:///${filePath.replace(/\\/g, "/")}`;
     await this._post(
       `${base}/composition/layers/${layerId}/clips/${clipSlot}/open`,
@@ -453,6 +480,9 @@ export class OverlayController {
     this._stopping = false;
     this._dbRef = null;
     this._statusRef = null;
+    // Promise queue serializing concurrent overlay commands so a clear
+    // cannot race an in-flight overlay start.
+    this._processing = Promise.resolve();
   }
 
   // -- deck autopilot freeze ---------------------------------------------------
@@ -499,13 +529,12 @@ export class OverlayController {
 
   async _freezeDeck() {
     if (this._autopilotFrozen) return;
-    const grid = await this.resolume.getColumnGrid().catch(() => null);
+    const grid = await this.resolume.getColumnGrid();
     const target = grid?.autopilotTarget;
     if (!target || target.id == null) {
-      console.warn(
-        "Could not read deck autopilot; overlay will not survive column transitions",
+      throw new Error(
+        "Could not read deck autopilot target; overlay cannot proceed",
       );
-      return;
     }
     // Preserve the ORIGINAL autopilot value across daemon restarts: a prior
     // freeze (from a crashed run) may already have persisted it, and the live
@@ -515,17 +544,11 @@ export class OverlayController {
       await this._writeAutopilotRestore({
         id: target.id,
         value: target.value,
-      }).catch((err) => {
-        console.error(`Failed to persist autopilot restore state: ${err.message}`);
       });
     }
-    try {
-      await this.resolume.setAutopilot(target.id, "Off");
-      this._autopilotFrozen = true;
-      console.log("Deck autopilot paused for overlay");
-    } catch (err) {
-      console.error(`Failed to pause deck autopilot: ${err.message}`);
-    }
+    await this.resolume.setAutopilot(target.id, "Off");
+    this._autopilotFrozen = true;
+    console.log("Deck autopilot paused for overlay");
   }
 
   async _unfreezeDeck() {
@@ -598,12 +621,14 @@ export class OverlayController {
     // on("value") fires immediately with the current snapshot, so it handles
     // restart reconciliation naturally — no separate _reconcile needed.
     this._dbRef.on("value", (snapshot) => {
-      this._handleSnapshot(snapshot.val());
+      this._processing = this._processing.then(() =>
+        this._handleSnapshot(snapshot.val()),
+      );
     });
     console.log(`Overlay control listening on: ${this.config.overlayPath}`);
   }
 
-  _handleSnapshot(data) {
+  async _handleSnapshot(data) {
     const result = validateOverlayDoc(data, this.config.overlayLayerIds);
     if (!result.valid) {
       const reason = result.reason || "unknown";
@@ -613,13 +638,13 @@ export class OverlayController {
     }
     if (result.clear) {
       console.log("Overlay clear command received");
-      this._handleClear();
+      await this._handleClear();
       return;
     }
     const doc = result.doc;
     if (doc.id === this._currentId) return;
     console.log(`New overlay command: ${doc.id}`);
-    this._startOverlay(doc);
+    await this._startOverlay(doc);
   }
 
   async _publishError(errorText) {
@@ -680,7 +705,15 @@ export class OverlayController {
 
     // Pause the deck autopilot before loading so the base content cannot
     // advance away from the column the overlay will play in.
-    await this._freezeDeck();
+    try {
+      await this._freezeDeck();
+    } catch (err) {
+      console.error(`Failed to freeze deck autopilot: ${err.message}`);
+      await this._publishStatus("error", 0, err);
+      // Reset _currentId so a re-trigger of the same doc proceeds.
+      this._currentId = null;
+      return;
+    }
     await this._playColumn(doc, 0);
   }
 
@@ -697,10 +730,20 @@ export class OverlayController {
     this._currentColumn = colIdx;
     const isFinal = colIdx === doc.columns.length - 1;
 
+    // Read the active column ONCE so _stageAndLoadColumn and _triggerColumn
+    // agree on the same slot (prevents the trigger connecting an empty slot
+    // if the active column changes between the two reads).
+    const grid = await this.resolume.getColumnGrid().catch(() => null);
+    const activeColumn =
+      grid?.activeColumn && grid.activeColumn >= 1
+        ? grid.activeColumn
+        : undefined;
+    this._activeColumn = activeColumn;
+
     try {
       await this._publishStatus("downloading", colIdx);
       await this._retryOp(`stage column ${colIdx}`, () =>
-        this._stageAndLoadColumn(col),
+        this._stageAndLoadColumn(col, activeColumn),
       );
     } catch (err) {
       console.error(`Failed to stage/load column ${colIdx}: ${err.message}`);
@@ -711,7 +754,7 @@ export class OverlayController {
     try {
       await this._publishStatus("loading", colIdx);
       await this._retryOp(`trigger column ${colIdx}`, () =>
-        this._triggerColumn(col),
+        this._triggerColumn(col, activeColumn),
       );
     } catch (err) {
       console.error(`Failed to trigger column ${colIdx}: ${err.message}`);
@@ -732,13 +775,7 @@ export class OverlayController {
     }, col.durationMs);
   }
 
-  async _stageAndLoadColumn(col) {
-    const grid = await this.resolume.getColumnGrid().catch(() => null);
-    this._activeColumn =
-      grid?.activeColumn && grid.activeColumn >= 1
-        ? grid.activeColumn
-        : undefined;
-
+  async _stageAndLoadColumn(col, activeColumn) {
     const promises = [];
     for (const [layerId, fileDef] of Object.entries(col.files)) {
       const clipSlot = this.config.overlayLayerClipColumns[layerId];
@@ -749,7 +786,7 @@ export class OverlayController {
       // (the currently active column) is enough — loading one slot per layer
       // keeps the trigger fast. Falls back to the configured reference slot
       // when the composition cannot be read.
-      const targetSlot = this._activeColumn ?? clipSlot;
+      const targetSlot = activeColumn ?? clipSlot;
       promises.push(
         (async () => {
           // Unload anything still in the slot: Resolume holds the previously
@@ -767,12 +804,7 @@ export class OverlayController {
     await Promise.all(promises);
   }
 
-  async _triggerColumn(col) {
-    const grid = await this.resolume.getColumnGrid().catch(() => null);
-    const activeColumn =
-      grid?.activeColumn && grid.activeColumn >= 1
-        ? grid.activeColumn
-        : this._activeColumn;
+  async _triggerColumn(col, activeColumn) {
     const promises = [];
     for (const [layerId] of Object.entries(col.files)) {
       const clipSlot = this.config.overlayLayerClipColumns[layerId];

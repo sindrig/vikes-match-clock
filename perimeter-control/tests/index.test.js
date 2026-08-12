@@ -15,7 +15,12 @@ import {
   parseColumns,
   reencodeThumbnail,
 } from "../resolume-preview.js";
-import { OverlayController, ResolumeOverlayClient } from "../overlay.js";
+import {
+  AssetStager,
+  OverlayController,
+  ResolumeOverlayClient,
+  validateOverlayDoc,
+} from "../overlay.js";
 
 // -- config ---------------------------------------------------------------
 
@@ -1065,16 +1070,14 @@ test("overlay stage loads the file into the currently active column only", async
   const controller = await makeOverlayController();
   const calls = [];
   controller.resolume = {
-    getColumnGrid: async () => GRID(2),
     clearClip: async (layerId, slot) => calls.push(["clear", layerId, slot]),
     loadClip: async (layerId, slot) => calls.push(["load", layerId, slot]),
     connectClip: async () => {},
   };
   controller.stager.stageAsset = async () => "C:/Content/goal-48.mp4";
 
-  await controller._stageAndLoadColumn(OVERLAY_DOC.columns[0]);
+  await controller._stageAndLoadColumn(OVERLAY_DOC.columns[0], 2);
 
-  assert.equal(controller._activeColumn, 2);
   // One slot per layer: the active column (deck is frozen during the overlay).
   // Layers run in parallel, so compare order-insensitively.
   assert.deepEqual(calls.sort(), [
@@ -1085,22 +1088,18 @@ test("overlay stage loads the file into the currently active column only", async
   ]);
 });
 
-test("overlay stage falls back to the reference slot when the grid cannot be read", async () => {
+test("overlay stage falls back to the reference slot when active column is unknown", async () => {
   const controller = await makeOverlayController();
   const calls = [];
   controller.resolume = {
-    getColumnGrid: async () => {
-      throw new Error("down");
-    },
     clearClip: async (layerId, slot) => calls.push(["clear", layerId, slot]),
     loadClip: async (layerId, slot) => calls.push(["load", layerId, slot]),
     connectClip: async () => {},
   };
   controller.stager.stageAsset = async () => "C:/Content/x.mp4";
-  await controller._stageAndLoadColumn(OVERLAY_DOC.columns[0]);
-  assert.equal(controller._activeColumn, undefined);
-  // Falls back to the configured reference slot when the composition cannot
-  // be read (layers run in parallel, so compare order-insensitively).
+  await controller._stageAndLoadColumn(OVERLAY_DOC.columns[0], undefined);
+  // Falls back to the configured reference slot when the active column is
+  // unknown (layers run in parallel, so compare order-insensitively).
   assert.deepEqual(calls.sort(), [
     ["clear", "2", 1],
     ["clear", "4", 1],
@@ -1113,26 +1112,22 @@ test("overlay trigger connects the clip in the currently active column", async (
   const controller = await makeOverlayController();
   const connects = [];
   controller.resolume = {
-    getColumnGrid: async () => GRID(2),
     connectClip: async (layerId, slot) => connects.push([layerId, slot]),
   };
-  await controller._triggerColumn(OVERLAY_DOC.columns[0]);
+  await controller._triggerColumn(OVERLAY_DOC.columns[0], 2);
   assert.deepEqual(connects, [
     ["2", 2],
     ["4", 2],
   ]);
 });
 
-test("overlay trigger falls back to the configured slot when the grid cannot be read", async () => {
+test("overlay trigger falls back to the configured slot when active column is unknown", async () => {
   const controller = await makeOverlayController();
   const connects = [];
   controller.resolume = {
-    getColumnGrid: async () => {
-      throw new Error("down");
-    },
     connectClip: async (layerId, slot) => connects.push([layerId, slot]),
   };
-  await controller._triggerColumn(OVERLAY_DOC.columns[0]);
+  await controller._triggerColumn(OVERLAY_DOC.columns[0], undefined);
   assert.deepEqual(connects, [
     ["2", 1],
     ["4", 1],
@@ -1258,6 +1253,283 @@ test("overlay clear without a freeze does not touch the autopilot", async () => 
   };
   await controller._handleClear();
   assert.equal(puts, 0);
+});
+
+// -- overlay freeze failure aborts -----------------------------------------------
+
+test("overlay freeze failure aborts and publishes error status", async () => {
+  const cacheDir = await makeTmpCache();
+  const controller = await makeOverlayController({}, cacheDir);
+  const statusUpdates = [];
+  controller.resolume = {
+    getColumnGrid: async () => ({
+      columnCount: 3,
+      activeColumn: 1,
+      // No autopilotTarget — simulates a grid read that lacks the target.
+      autopilotTarget: null,
+    }),
+    setAutopilot: async () => {},
+    clearClip: async () => {},
+    loadClip: async () => {},
+    connectClip: async () => {},
+    _statusRef: null,
+  };
+  controller.stager.stageAsset = async () => "C:/Content/x.mp4";
+  controller._statusRef = {
+    set: async (val) => statusUpdates.push(val),
+  };
+
+  await controller._startOverlay(OVERLAY_DOC);
+
+  // _currentId should be reset so a re-trigger with the same doc proceeds.
+  assert.equal(controller._currentId, null);
+  assert.equal(controller._autopilotFrozen, false);
+  // Status should have been set to error.
+  const errorStatus = statusUpdates.find((s) => s.phase === "error");
+  assert.ok(errorStatus, "expected an error status update");
+  assert.equal(errorStatus.activeColumn, 0);
+  assert.ok(errorStatus.error.includes("autopilot"));
+});
+
+test("overlay freeze failure allows re-trigger of same doc id", async () => {
+  const cacheDir = await makeTmpCache();
+  const controller = await makeOverlayController({}, cacheDir);
+  let gridCalls = 0;
+  controller.resolume = {
+    getColumnGrid: async () => {
+      gridCalls += 1;
+      if (gridCalls === 1) {
+        // First call: no autopilot target → freeze fails.
+        return { columnCount: 3, activeColumn: 1, autopilotTarget: null };
+      }
+      // Second call: valid autopilot target → freeze succeeds.
+      return GRID(1);
+    },
+    setAutopilot: async () => {},
+    clearClip: async () => {},
+    loadClip: async () => {},
+    connectClip: async () => {},
+  };
+  controller.stager.stageAsset = async () => "C:/Content/x.mp4";
+  controller._statusRef = { set: async () => {} };
+
+  // First attempt fails.
+  await controller._startOverlay(OVERLAY_DOC);
+  assert.equal(controller._currentId, null);
+
+  // Second attempt with the same doc proceeds (not swallowed by the id guard).
+  await controller._startOverlay(OVERLAY_DOC);
+  assert.equal(controller._currentId, "overlay-1");
+  assert.equal(controller._autopilotFrozen, true);
+});
+
+// -- overlay serialization -------------------------------------------------------
+
+test("overlay serialization: clear after start is handled sequentially", async () => {
+  const cacheDir = await makeTmpCache();
+  const controller = await makeOverlayController({}, cacheDir);
+  const calls = [];
+  controller.resolume = {
+    getColumnGrid: async () => GRID(1),
+    setAutopilot: async (id, value) => calls.push(["autopilot", id, value]),
+    clearClip: async (layerId, slot) => calls.push(["clear", layerId, slot]),
+    clearLayer: async () => {},
+    loadClip: async () => {},
+    connectClip: async () => {},
+  };
+  controller.stager.stageAsset = async () => "C:/Content/x.mp4";
+
+  const db = new FakeDb();
+  controller.attach(db);
+  const overlayRef = db.refs.find((r) => r.path === controller.config.overlayPath);
+
+  // Fire a start followed immediately by a clear (synchronous).
+  overlayRef.emit(OVERLAY_DOC);
+  overlayRef.emit(null);
+
+  // Wait for the processing queue to drain.
+  await controller._processing;
+
+  // Autopilot should be paused then restored (not stuck Off).
+  assert.ok(calls.some((c) => c[0] === "autopilot" && c[2] === "Off"));
+  assert.ok(calls.some((c) => c[0] === "autopilot" && c[2] === "Play Next Column"));
+  // The clear should have unloaded clips.
+  assert.ok(calls.some((c) => c[0] === "clear"));
+  // _currentId should be null after the clear.
+  assert.equal(controller._currentId, null);
+});
+
+// -- overlay generation-suffixed remote name -------------------------------------
+
+test("stageAsset returns a generation-suffixed path and skips re-copy for same generation", async () => {
+  const cacheDir = await makeTmpCache();
+  const stager = new AssetStager({
+    overlayCacheDir: cacheDir,
+    overlayRemoteContentDir: "C:\\Content",
+    overlaySshKey: "/tmp/key",
+    overlaySshHost: "10.0.0.1",
+    overlaySshUser: "user",
+    overlayProjectId: "test",
+    serviceAccountFile: "/tmp/sa.json",
+  });
+
+  // Stub out the real GCS/SSH calls.
+  stager._getGeneration = async () => "1234567890123";
+  stager._remoteSize = async () => null; // file does not exist remotely
+  const copyCalls = [];
+  stager.copyToWindows = async (local, remote) => {
+    copyCalls.push(remote);
+    return `C:\\Content\\${remote}`;
+  };
+
+  // Write a dummy cached file so the stat works.
+  const cacheSubdir = path.join(cacheDir, "overlay-cache");
+  await fs.mkdir(cacheSubdir, { recursive: true });
+  const cacheKey = stager._cacheKey(
+    "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/goal-48.mp4",
+  );
+  await fs.writeFile(path.join(cacheSubdir, `${cacheKey}-1234567890123.mp4`), "data");
+
+  const result = await stager.stageAsset(
+    "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/goal-48.mp4",
+    "goal-48.mp4",
+  );
+
+  assert.ok(result.endsWith("-1234567890123.mp4"), `expected generation suffix, got ${result}`);
+  assert.equal(copyCalls.length, 1);
+  assert.equal(copyCalls[0], "goal-48-1234567890123.mp4");
+
+  // Second call with the same generation should skip the copy.
+  copyCalls.length = 0;
+  stager._remoteSize = async () => 4; // matches local "data" size
+  const result2 = await stager.stageAsset(
+    "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/goal-48.mp4",
+    "goal-48.mp4",
+  );
+  assert.equal(copyCalls.length, 0);
+  assert.ok(result2.endsWith("-1234567890123.mp4"));
+});
+
+// -- overlay filename validation -------------------------------------------------
+
+test("validateOverlayDoc rejects filenames with #, ?, &", () => {
+  const doc = {
+    version: 1,
+    id: "test-1",
+    columns: [
+      {
+        durationMs: 1000,
+        files: {
+          "2": {
+            name: "goal#48.mp4",
+            source:
+              "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/goal.mp4",
+          },
+        },
+      },
+    ],
+  };
+  // Pass empty layer IDs so validation reaches the filename check.
+  const result = validateOverlayDoc(doc, []);
+  assert.equal(result.valid, false);
+  assert.ok(result.reason.includes("invalid filename"));
+});
+
+test("validateOverlayDoc rejects filenames with ?", () => {
+  const doc = {
+    version: 1,
+    id: "test-1",
+    columns: [
+      {
+        durationMs: 1000,
+        files: {
+          "2": {
+            name: "goal?.mp4",
+            source:
+              "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/goal.mp4",
+          },
+        },
+      },
+    ],
+  };
+  const result = validateOverlayDoc(doc, []);
+  assert.equal(result.valid, false);
+  assert.ok(result.reason.includes("invalid filename"));
+});
+
+test("validateOverlayDoc rejects filenames with &", () => {
+  const doc = {
+    version: 1,
+    id: "test-1",
+    columns: [
+      {
+        durationMs: 1000,
+        files: {
+          "2": {
+            name: "goal&48.mp4",
+            source:
+              "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/goal.mp4",
+          },
+        },
+      },
+    ],
+  };
+  const result = validateOverlayDoc(doc, []);
+  assert.equal(result.valid, false);
+  assert.ok(result.reason.includes("invalid filename"));
+});
+
+test("validateOverlayDoc accepts filenames with spaces", () => {
+  const doc = {
+    version: 1,
+    id: "test-1",
+    columns: [
+      {
+        durationMs: 1000,
+        files: {
+          "2": {
+            name: "goal 48.mp4",
+            source:
+              "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/goal.mp4",
+          },
+        },
+      },
+    ],
+  };
+  const result = validateOverlayDoc(doc, []);
+  assert.equal(result.valid, true);
+});
+
+// -- overlay sshArgs known-hosts -------------------------------------------------
+
+test("_sshArgs uses a persistent known-hosts file in the cache dir", () => {
+  const cacheDir = "/var/cache/perimeter-control";
+  const stager = new AssetStager({
+    overlayCacheDir: cacheDir,
+    overlayRemoteContentDir: "C:\\Content",
+    overlaySshKey: "/tmp/key",
+    overlaySshHost: "10.0.0.1",
+    overlaySshUser: "user",
+    overlayProjectId: "test",
+    serviceAccountFile: "/tmp/sa.json",
+  });
+  const args = stager._sshArgs();
+  const knownHostsArg = args.find(
+    (a) => typeof a === "string" && a.startsWith("UserKnownHostsFile="),
+  );
+  assert.ok(knownHostsArg, "expected UserKnownHostsFile arg");
+  assert.ok(
+    knownHostsArg.includes("known_hosts"),
+    `expected persistent known_hosts path, got ${knownHostsArg}`,
+  );
+  assert.ok(
+    !knownHostsArg.includes("/dev/null"),
+    "should not use /dev/null for known-hosts",
+  );
+  assert.ok(
+    knownHostsArg.includes(cacheDir),
+    `expected path under cache dir, got ${knownHostsArg}`,
+  );
 });
 
 // -- helpers --------------------------------------------------------------------------
