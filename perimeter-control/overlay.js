@@ -231,14 +231,22 @@ export class AssetStager {
     const winDir = this.config.overlayRemoteContentDir
       .replace(/\\/g, "/")
       .replace(/\/+$/, "");
-    const finalPath = `${winDir}/${remoteName}`;
-    const tmpPath = `${winDir}/${remoteName}.part`;
+    // scp accepts forward slashes; cmd's `move` does not, so the move command
+    // uses a backslash version of the same path.
+    const scpPath = `${winDir}/${remoteName}.part`;
+    const moveDir = winDir.replace(/\//g, "\\");
+    const moveTmpPath = `${moveDir}\\${remoteName}.part`;
+    const moveFinalPath = `${moveDir}\\${remoteName}`;
 
     const sshArgs = [
       "-i",
       this.config.overlaySshKey,
       "-o",
       "StrictHostKeyChecking=accept-new",
+      // The service user has no writable home; discard the recorded host key
+      // instead of failing to write ~/.ssh/known_hosts.
+      "-o",
+      "UserKnownHostsFile=/dev/null",
       "-o",
       "ConnectTimeout=10",
       "-o",
@@ -248,16 +256,16 @@ export class AssetStager {
     await execFileAsync("scp", [
       ...sshArgs,
       localPath,
-      `${this.config.overlaySshUser}@${this.config.overlaySshHost}:${tmpPath}`,
+      `${this.config.overlaySshUser}@${this.config.overlaySshHost}:${scpPath}`,
     ]);
 
     await execFileAsync("ssh", [
       ...sshArgs,
       `${this.config.overlaySshUser}@${this.config.overlaySshHost}`,
-      `move /Y "${tmpPath}" "${finalPath}"`,
+      `move /Y "${moveTmpPath}" "${moveFinalPath}"`,
     ]);
 
-    return finalPath;
+    return moveFinalPath;
   }
 }
 
@@ -278,9 +286,9 @@ export class ResolumeOverlayClient {
     const timer = setTimeout(() => controller.abort(), this._timeoutMs);
     try {
       const opts = { method: "POST", signal: controller.signal };
-      if (body) {
-        opts.headers = { "Content-Type": "application/json" };
-        opts.body = JSON.stringify(body);
+      if (body !== null) {
+        opts.headers = { "Content-Type": "text/plain" };
+        opts.body = String(body);
       }
       const response = await fetch(url, opts);
       if (!response.ok) {
@@ -293,9 +301,11 @@ export class ResolumeOverlayClient {
 
   async loadClip(layerId, clipSlot, filePath) {
     const base = this._baseUrl();
+    // Resolume's clip `open` takes a `file:///` URL as a plain-text body.
+    const fileUrl = `file:///${filePath.replace(/\\/g, "/")}`;
     await this._post(
       `${base}/composition/layers/${layerId}/clips/${clipSlot}/open`,
-      { filename: filePath },
+      encodeURI(fileUrl),
     );
   }
 
@@ -306,27 +316,18 @@ export class ResolumeOverlayClient {
     );
   }
 
+  async clearClip(layerId, clipSlot) {
+    const base = this._baseUrl();
+    await this._post(
+      `${base}/composition/layers/${layerId}/clips/${clipSlot}/clear`,
+    );
+  }
+
   async clearLayer(layerId) {
     const base = this._baseUrl();
     await this._post(
       `${base}/composition/layers/${layerId}/clear`,
     );
-  }
-
-  async setClipLoop(layerId, clipId, loop) {
-    const base = this._baseUrl();
-    const url = loop
-      ? `${base}/composition/layers/${layerId}/clips/${clipId}/transport/loop-on`
-      : `${base}/composition/layers/${layerId}/clips/${clipId}/transport/loop-off`;
-    await this._post(url);
-  }
-
-  async setClipPause(layerId, clipId, pause) {
-    const base = this._baseUrl();
-    const url = pause
-      ? `${base}/composition/layers/${layerId}/clips/${clipId}/transport/pause`
-      : `${base}/composition/layers/${layerId}/clips/${clipId}/transport/play`;
-    await this._post(url);
   }
 }
 
@@ -454,8 +455,16 @@ export class OverlayController {
       this._columnTimer = null;
     }
     for (const layerId of this.config.overlayLayerIds) {
+      const clipSlot = this.config.overlayLayerClipColumns[layerId];
       try {
-        await this.resolume.clearLayer(layerId);
+        if (clipSlot === undefined) {
+          // No reserved slot configured — fall back to clearing the whole layer.
+          await this.resolume.clearLayer(layerId);
+        } else {
+          // Unload the clip content so Resolume releases the file handle;
+          // otherwise a later re-staging move would be denied.
+          await this.resolume.clearClip(layerId, clipSlot);
+        }
       } catch (err) {
         console.error(
           `Failed to clear overlay layer ${layerId}: ${err.message}`,
@@ -493,7 +502,7 @@ export class OverlayController {
     try {
       await this._publishStatus("downloading", colIdx);
       await this._retryOp(`stage column ${colIdx}`, () =>
-        this._stageAndLoadColumn(col, isFinal),
+        this._stageAndLoadColumn(col),
       );
     } catch (err) {
       console.error(`Failed to stage/load column ${colIdx}: ${err.message}`);
@@ -504,7 +513,7 @@ export class OverlayController {
     try {
       await this._publishStatus("loading", colIdx);
       await this._retryOp(`trigger column ${colIdx}`, () =>
-        this._triggerColumn(col, isFinal),
+        this._triggerColumn(col),
       );
     } catch (err) {
       console.error(`Failed to trigger column ${colIdx}: ${err.message}`);
@@ -525,7 +534,7 @@ export class OverlayController {
     }, col.durationMs);
   }
 
-  async _stageAndLoadColumn(col, isFinal) {
+  async _stageAndLoadColumn(col) {
     const promises = [];
     for (const [layerId, fileDef] of Object.entries(col.files)) {
       const clipSlot = this.config.overlayLayerClipColumns[layerId];
@@ -534,13 +543,15 @@ export class OverlayController {
       }
       promises.push(
         (async () => {
+          // Unload anything still in the slot: Resolume holds the previously
+          // loaded file open, so the staging move would fail with "Access is
+          // denied" unless the clip is cleared first.
+          await this.resolume.clearClip(layerId, clipSlot);
           const winPath = await this.stager.stageAsset(
             fileDef.source,
             fileDef.name,
           );
           await this.resolume.loadClip(layerId, clipSlot, winPath);
-          // Set loop state before triggering
-          await this.resolume.setClipLoop(layerId, clipSlot, isFinal);
         })(),
       );
     }

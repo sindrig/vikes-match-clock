@@ -241,15 +241,23 @@ base perimeter on/off toggle.
    to a local Linux cache, deduplicated by object generation.
 5. Missing/changed files are SCP-copied to the Windows Resolume host's
    `C:/Content` directory using a temporary remote filename, then renamed
-   atomically.
-6. Clips are loaded into reserved Resolume clip slots (configured by
-   `PERIMETER_OVERLAY_LAYER_CLIP_COLUMNS`).
-7. All paired layers are triggered together.
-8. Sequential columns advance after their configured `durationMs`.
-9. The final column loops until the overlay is explicitly cleared.
-10. Clearing disconnects only the overlay layers (never the base content layers
-    or the full deck).
-11. On daemon restart, the overlay controller reconciles the active overlay
+   atomically. The rename uses a backslash path because cmd's `move` does not
+   accept forward slashes.
+6. Before staging, the target clip slot is cleared first: Resolume holds a
+   loaded video file open on Windows, so overwriting it without unloading
+   fails with "Access is denied".
+7. Clips are loaded into reserved Resolume clip slots (configured by
+   `PERIMETER_OVERLAY_LAYER_CLIP_COLUMNS`). Resolume's clip `open` takes a
+   `file:///` URL (e.g. `file:///C:/Content/goal-48.mp4`) as a plain-text
+   body. Playback loops via the clip transport's default `Loop` playmode, so
+   no separate loop endpoints are needed (this Resolume REST version exposes
+   no clip transport endpoints).
+8. All paired layers are triggered together.
+9. Sequential columns advance after their configured `durationMs`.
+10. The final column loops until the overlay is explicitly cleared.
+11. Clearing unloads the overlay clip slots (releasing the file handles) —
+    never the base content layers or the full deck.
+12. On daemon restart, the overlay controller reconciles the active overlay
     document and restores playback.
 
 ### Resolume composition requirements
