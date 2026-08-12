@@ -160,7 +160,11 @@ exponential backoff, superseded by any newer Firebase value. It also publishes
 the **preview snapshot** above to `perimeter/vikuti` once at startup and after
 each successful `on` (non-blocking, never delaying the on/off retry behavior);
 a failed Resolume query or an oversized payload leaves the last published
-snapshot intact. All Resolume-version-specific parsing is isolated in
+snapshot intact. The snapshot is written with `update()` (not `set()`) so the
+sibling status paths `perimeter/{location}/adLayout` and
+`perimeter/{location}/overlayStatus` are preserved — a `set()` on the preview
+path would replace the whole subtree and silently delete them. All
+Resolume-version-specific parsing is isolated in
 `resolume-preview.js`; see `perimeter-control/README.md` for installation and
 operation.
 

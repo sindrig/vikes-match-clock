@@ -226,6 +226,7 @@ class FakeRef {
     this.onCalls = 0;
     this.offCalls = 0;
     this.setCalls = [];
+    this.updateCalls = [];
   }
 
   on(event, callback) {
@@ -245,6 +246,11 @@ class FakeRef {
 
   set(value) {
     this.setCalls.push(value);
+    return Promise.resolve();
+  }
+
+  update(value) {
+    this.updateCalls.push(value);
     return Promise.resolve();
   }
 }
@@ -700,6 +706,25 @@ test("collectPreview rejects a failed composition read", async (t) => {
 
 // -- preview publication -----------------------------------------------------------
 
+test("preview publication updates the path instead of replacing the subtree", async () => {
+  const controller = makeController();
+  const db = new FakeDb();
+  controller.attach(db);
+  controller.previewReader.collectPreview = async () => ({
+    columns: [{ id: 1, name: "Column 1", clips: [] }],
+  });
+
+  await controller.refreshPreview();
+
+  // The preview path (`perimeter/vikuti`) is the parent of the ad-layout
+  // applied status and the overlay status. A `set` would delete those sibling
+  // documents, hiding the ad-layout preview from the controller UI after every
+  // preview publish; only `update` preserves them.
+  assert.equal(db.refs[1].setCalls.length, 0);
+  assert.equal(db.refs[1].updateCalls.length, 1);
+  controller.shutdown();
+});
+
 test("startPreview publishes the snapshot to the preview path", async () => {
   const controller = makeController();
   const db = new FakeDb();
@@ -709,9 +734,9 @@ test("startPreview publishes the snapshot to the preview path", async () => {
   });
 
   controller.startPreview();
-  await waitFor(() => db.refs[1].setCalls.length >= 1);
+  await waitFor(() => db.refs[1].updateCalls.length >= 1);
 
-  const snapshot = db.refs[1].setCalls[0];
+  const snapshot = db.refs[1].updateCalls[0];
   assert.ok(snapshot.updatedAt);
   assert.equal(snapshot.columns.length, 1);
   assert.equal(snapshot.columns[0].name, "Column 1");
@@ -730,9 +755,9 @@ test("publishes preview after a successful on", async () => {
   controller.startApplicator();
 
   controller.onDesiredState("on");
-  await waitFor(() => db.refs[1].setCalls.length >= 1);
+  await waitFor(() => db.refs[1].updateCalls.length >= 1);
 
-  assert.equal(db.refs[1].setCalls.length, 1);
+  assert.equal(db.refs[1].updateCalls.length, 1);
   controller.shutdown();
 });
 
@@ -756,9 +781,9 @@ test("concurrent refreshPreview calls are serialized", async () => {
   release();
   await Promise.all([first, second]);
 
-  assert.equal(db.refs[1].setCalls.length, 2);
-  assert.equal(db.refs[1].setCalls[0].columns[0].name, "Column 1");
-  assert.equal(db.refs[1].setCalls[1].columns[0].name, "Column 2");
+  assert.equal(db.refs[1].updateCalls.length, 2);
+  assert.equal(db.refs[1].updateCalls[0].columns[0].name, "Column 1");
+  assert.equal(db.refs[1].updateCalls[1].columns[0].name, "Column 2");
   controller.shutdown();
 });
 
@@ -774,7 +799,7 @@ test("failed query keeps the last snapshot and does not throw", async () => {
       throw new Error("Resolume down");
     };
     await controller.refreshPreview();
-    assert.equal(db.refs[1].setCalls.length, 0);
+    assert.equal(db.refs[1].updateCalls.length, 0);
     assert.equal(errors.length, 1);
     assert.match(String(errors[0][0]), /Failed to refresh perimeter preview/);
   } finally {
@@ -797,7 +822,7 @@ test("oversized payload is rejected without publishing", async () => {
     ],
   });
   await controller.refreshPreview();
-  assert.equal(db.refs[1].setCalls.length, 0);
+  assert.equal(db.refs[1].updateCalls.length, 0);
   controller.shutdown();
 });
 
@@ -812,7 +837,7 @@ test("preview disabled skips publication", async () => {
   };
   await controller.refreshPreview();
   assert.equal(read, false);
-  assert.equal(db.refs[1].setCalls.length, 0);
+  assert.equal(db.refs[1].updateCalls.length, 0);
   controller.shutdown();
 });
 

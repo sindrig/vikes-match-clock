@@ -486,7 +486,12 @@ export class PerimeterController {
   async _doRefreshPreview() {
     try {
       const snapshot = await this._buildPreviewSnapshot();
-      await this._previewRef.set(snapshot);
+      // `update` (not `set`): the preview path is the parent of the ad-layout
+      // applied status (`perimeter/{location}/adLayout`) and the overlay
+      // status (`.../overlayStatus`). A `set` here replaces the whole subtree
+      // and would silently delete those sibling status documents on every
+      // startup and after every `on`, hiding them from the controller UI.
+      await this._previewRef.update(snapshot);
       console.log("Published perimeter preview snapshot");
     } catch (err) {
       console.error(

@@ -161,7 +161,10 @@ is:
 - `updatedAt` is a **Firebase server timestamp**.
 - The snapshot is refreshed **once at startup and after each successful `on`**.
   There is no manual refresh; the refresh never delays or changes the on/off
-  command retry behavior.
+  command retry behavior. The snapshot is written with `update()` (not `set()`)
+  so the sibling status paths `perimeter/{location}/adLayout` and
+  `perimeter/{location}/overlayStatus` are preserved — a `set()` on the preview
+  path would replace the whole subtree and silently delete them.
 - The composition is read through the Resolume HTTP API
   (`GET /api/v1/composition` for columns and the layer→column clip grid,
   `GET /api/v1/composition/layers/{layer}/clips/{column}/thumbnail` for the
