@@ -691,6 +691,38 @@ When a team side has no players loaded, `TeamAssetController.tsx` shows a **"Bú
 
 **Note**: Unresolved player placeholders from the API (no name match) display as `#number` and are still saved.
 
+#### Shared Home-Team Player Actions & Match-View Quick Actions
+
+Home-team substitution, player-card, and man-of-the-match operations are shared
+between the Lið tab and a match-view shortcut box so both use the same
+Firebase-backed behavior.
+
+**Shared hook** (`controller/asset/team/useHomeTeamQuickActions.ts`):
+
+- Owns the team-action modal state machine (`subOff` → `subOn`, `playerCard`,
+  `motm`) and exposes `openSubModal(side)`, `openPlayerCardModal()`,
+  `openMOTMModal()`, `handleModalSelect(player)`, `closeModal()`, plus the
+  `showPlayerCard(player, teamKey)` and `showMOTM(player, teamKey)` operations.
+- The substitution flow preserves the established sequence: on-pitch
+  (`show: true`) players for the outgoing step, eligible off-pitch players
+  (`!show && number != null`) for the incoming step, `editPlayer` roster status
+  updates, trimming of last names on the generated assets, `Skiptingar` queue
+  creation/append/activation, and the home-team reveal background on assets.
+- Player-card and man-of-the-match pass the complete home roster (including
+  substituted-off players) to `TeamPlayerSelectionModal`.
+
+**Consumers**:
+
+- `TeamAssetController.tsx` (Lið tab) uses the hook for both its home and away
+  substitution modal and the list-click `Birta leikmann` / `Birta mann
+  leiksins` actions. The goal-scorer modal remains local to the controller.
+- `HomeTeamQuickActions.tsx` (`controller/HomeTeamQuickActions.tsx`) renders a
+  **`Heimalið aðgerðir`** box in the match view below `MatchCountdownDisplay`
+  (`App.tsx`, gated on `showMatchControls`). It provides `Skipting`, `Birta
+  leikmann`, and `Maður leiksins` shortcuts scoped to the home team and is
+  hidden entirely when the home roster has no players. Styling lives in
+  `Controller.css` (`.home-team-quick-actions*`).
+
 #### Tab ↔ assetView Sync Gotcha
 
 `Controller.tsx` has three tabs: **Biðröð** (queue), **Lið** (teams), **Myndefni** (media). The first two map to Firebase's `controller.assetView` (`ASSET_VIEWS.assets` / `ASSET_VIEWS.teams`), but **Myndefni has no corresponding `assetView`** — it's purely local tab state.

@@ -24,6 +24,16 @@ vi.mock("./controller/Controller", () => ({
 vi.mock("./controller/MatchActions", () => ({
   default: () => <div data-testid="match-actions">MatchActions</div>,
 }));
+vi.mock("./controller/MatchCountdownDisplay", () => ({
+  default: () => (
+    <div data-testid="match-countdown-display">MatchCountdownDisplay</div>
+  ),
+}));
+vi.mock("./controller/HomeTeamQuickActions", () => ({
+  default: () => (
+    <div data-testid="home-team-quick-actions">HomeTeamQuickActions</div>
+  ),
+}));
 vi.mock("./controller/RefreshHandler", () => ({
   default: () => <div data-testid="refresh-handler">RefreshHandler</div>,
 }));
@@ -381,6 +391,33 @@ describe("App", () => {
       render(<App />);
 
       expect(screen.getByTestId("match-actions")).toBeInTheDocument();
+    });
+
+    it("renders home-team quick actions below the match controls in match view", () => {
+      setupState3(VIEWS.match);
+      render(<App />);
+
+      const quickActions = screen.getByTestId("home-team-quick-actions");
+      expect(quickActions).toBeInTheDocument();
+      const countdown = screen.getByTestId("match-countdown-display");
+      const matchActions = screen.getByTestId("match-actions");
+      expect(
+        matchActions.compareDocumentPosition(quickActions) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(
+        countdown.compareDocumentPosition(quickActions) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+
+    it("does not render home-team quick actions in idle view", () => {
+      setupState3(VIEWS.idle);
+      render(<App />);
+
+      expect(
+        screen.queryByTestId("home-team-quick-actions"),
+      ).not.toBeInTheDocument();
     });
 
     it("still renders controller tabs in idle view", () => {
