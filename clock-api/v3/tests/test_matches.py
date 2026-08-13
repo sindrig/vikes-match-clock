@@ -533,6 +533,43 @@ async def test_resolve_roster_success(ksi_client):
 
 @pytest.mark.asyncio
 @respx.mock
+async def test_resolve_roster_orders_goalkeeper_first_then_numeric(ksi_client):
+    respx.get(f"{BASE_URL}/api/live/team/1/matches/paginated/past/0").mock(
+        return_value=Response(
+            200, json={"result": PAST_MATCHES_DATA, "size": 2}
+        )
+    )
+    respx.get(f"{BASE_URL}/api/live/match/101/lineups").mock(
+        return_value=Response(200, json=LINEUPS_101)
+    )
+    respx.get(f"{BASE_URL}/api/live/match/102/lineups").mock(
+        return_value=Response(200, json=LINEUPS_102)
+    )
+
+    result = await ksi_client.resolve_roster(
+        starters=[13, 11, 12, 10, 9, 8, 7, 6, 5, 4, 3],
+        substitutes=[2],
+    )
+
+    assert [p.shirtNumber for p in result.players] == [
+        13,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        2,
+    ]
+    assert [p.startingLineup for p in result.players] == [True] * 11 + [False]
+
+
+@pytest.mark.asyncio
+@respx.mock
 async def test_resolve_roster_upstream_error(ksi_client):
     respx.get(f"{BASE_URL}/api/live/team/1/matches/paginated/past/0").mock(
         return_value=Response(500, text="Internal Server Error")
