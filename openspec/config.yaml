@@ -1,0 +1,64 @@
+schema: spec-driven
+
+# Project context (optional)
+# This is shown to AI when creating artifacts.
+# Add your tech stack, conventions, style guides, domain knowledge, etc.
+context: |
+  Domain: Víkingur football stadium match-clock system. The clock/ app provides
+  both public stadium displays and an authenticated match-control interface.
+
+  Frontend: clock/ is a React + TypeScript application, managed with pnpm.
+  Follow the existing component and CSS patterns; format with Prettier (2
+  spaces, semicolons, double quotes) and retain strict TypeScript types. Use
+  Vitest and Testing Library for unit/component tests where behavior changes.
+
+  Firebase: Firebase Realtime Database is the authoritative source for all
+  shared match, controller, view, and perimeter state. Read state through
+  Firebase subscriptions in FirebaseStateContext; actions write to Firebase and
+  wait for the subscription to update React state. Do not introduce optimistic
+  local updates, hydration guards, or a second synced state store. Validate
+  snapshot data with firebaseParsers.ts. Authenticated clients write; anonymous
+  clients are read-only. Multiple controllers use last-write-wins semantics.
+  Keep data ownership clear: controller writes desired state under
+  states/${listenPrefix}; daemon/service status is published elsewhere and is
+  read-only to clients.
+
+  API: clock-api/v3 is Python 3.12 FastAPI deployed as one AWS Lambda behind
+  API Gateway through Lambda Web Adapter and uvicorn. Use Pydantic v2 models,
+  FastAPI Depends dependency injection, async httpx services, and cached SSM
+  parameter lookups for secrets. Test with pytest, TestClient dependency
+  overrides, and respx for HTTP. Format with Black at 79 columns and skip
+  string normalization. Regenerate OpenAPI and frontend API types when an API
+  contract changes.
+
+  Infrastructure: infra/ is modular Terraform for AWS S3/CloudFront, API
+  Gateway, Lambda, Route53, ACM, and IAM. Environments are prod/ and staging/;
+  Terraform state is remote in S3. GitHub Actions deploys via OIDC, never static
+  AWS credentials. Consider prod/staging impact, preserve state resources, and
+  plan Terraform changes before apply.
+
+  Deployment: pushes to master deploy production. Pull requests with the
+  sandbox-deploy label deploy staging. Avoid committing credentials, generated
+  screenshots, or environment-specific secrets.
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always include a "Non-goals" section
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
+
+# Per-operation guidance (optional)
+# Add advisory guidance for how apply and archive work should be conducted.
+# This is separate from artifact rules above.
+# Example:
+#   operations:
+#     apply:
+#       guidance:
+#         - Keep test summaries concise
+#     archive:
+#       guidance:
+#         - Summarize the archive outcome before finishing
