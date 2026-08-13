@@ -11,7 +11,9 @@ import {
 
 interface OwnProps {
   teamName: "homeTeam" | "awayTeam";
-  selectPlayer?: ((player: Player, teamName: string) => void) | null;
+  selectPlayer?:
+    | ((player: Player, teamName: "homeTeam" | "awayTeam") => void)
+    | null;
 }
 
 const Team = ({ teamName, selectPlayer }: OwnProps): React.JSX.Element => {

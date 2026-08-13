@@ -14,6 +14,7 @@ import { firebaseAuth } from "./firebaseAuth";
 import Controller from "./controller/Controller";
 import MatchActions from "./controller/MatchActions";
 import MatchCountdownDisplay from "./controller/MatchCountdownDisplay";
+import HomeTeamQuickActions from "./controller/HomeTeamQuickActions";
 import RefreshHandler from "./controller/RefreshHandler";
 import AssetComponent, { useDeferredAsset } from "./controller/asset/Asset";
 import PlaybackBar from "./controller/asset/queue/PlaybackBar";
@@ -393,6 +394,7 @@ function App() {
             <SubstitutionInfo />
             {showMatchControls && <MatchActions />}
             {showMatchControls && <MatchCountdownDisplay />}
+            {showMatchControls && <HomeTeamQuickActions />}
           </div>
           <div className="controller-controls">
             <Controller />
