@@ -95,6 +95,11 @@ const DEFAULT_IMPORT_STATUS_PATH = "perimeter/vikuti/importStatus";
 const RESOLUME_OFF_PATH = "/composition/disconnect-all";
 const RESOLUME_ON_PATH = "/composition/columns/{column}/connect";
 
+// The composition transport state the off action asserts after disconnecting
+// all clips, so Resolume's universal autopilot stops playing. Confirmed against
+// Arena 7.26.2 (play_state options: Play, Pause, Stop).
+const RESOLUME_TRANSPORT_STOP_VALUE = "Stop";
+
 // The deck autopilot value the base content relies on to cycle its columns
 // (and with them the ads the ad-layout controller deploys). The "on" state
 // asserts this value, overriding any stale leftover, so the deck can never
@@ -364,18 +369,29 @@ export class ResolumeClient {
 
   async applyState(state) {
     const base = this.config.resolumeBaseUrl.replace(/\/+$/, "");
-    let url;
     if (state === "on") {
-      url = `${base}${RESOLUME_ON_PATH.replace(
-        "{column}",
-        this.config.resolumeColumn,
-      )}`;
-    } else if (state === "off") {
-      url = `${base}${RESOLUME_OFF_PATH}`;
-    } else {
-      throw new Error(`unknown perimeter state: ${JSON.stringify(state)}`);
+      await this._request(
+        `${base}${RESOLUME_ON_PATH.replace(
+          "{column}",
+          this.config.resolumeColumn,
+        )}`,
+        { method: "POST" },
+      );
+      return;
     }
+    if (state === "off") {
+      // Disconnect all clips, then stop the composition transport. Disconnecting
+      // leaves Resolume's universal transport "playing", which the UI still shows
+      // as running; stopping it makes the off state complete. The two steps are
+      // atomic for retry purposes: any failure fails the off state as a whole.
+      await this._request(`${base}${RESOLUME_OFF_PATH}`, { method: "POST" });
+      await this._stopTransport(base);
+      return;
+    }
+    throw new Error(`unknown perimeter state: ${JSON.stringify(state)}`);
+  }
 
+  async _request(url, { method, body }) {
     const controller = new AbortController();
     const timer = setTimeout(
       () => controller.abort(),
@@ -383,15 +399,41 @@ export class ResolumeClient {
     );
     try {
       const response = await fetch(url, {
-        method: "POST",
+        method,
+        headers:
+          body !== undefined
+            ? { "Content-Type": "application/json" }
+            : undefined,
+        body: body !== undefined ? JSON.stringify(body) : undefined,
         signal: controller.signal,
       });
       if (!response.ok) {
         throw new Error(`Resolume ${url} returned HTTP ${response.status}`);
       }
+      return response;
     } finally {
       clearTimeout(timer);
     }
+  }
+
+  // Set the composition transport to "Stop" via the live tempocontroller
+  // play_state parameter. The value is read from the composition so a Resolume
+  // version that spells the option differently keeps working; a missing or
+  // malformed play_state is treated as a failure so the off state is retried.
+  async _stopTransport(base) {
+    const composition = await this._request(`${base}/composition`, {
+      method: "GET",
+    }).then((response) => response.json());
+    const playState = composition?.tempocontroller?.play_state;
+    if (!playState || playState.id == null) {
+      throw new Error(
+        "Resolume composition has no tempocontroller.play_state to stop",
+      );
+    }
+    await this._request(`${base}/parameter/by-id/${playState.id}`, {
+      method: "PUT",
+      body: { value: RESOLUME_TRANSPORT_STOP_VALUE },
+    });
   }
 }
 

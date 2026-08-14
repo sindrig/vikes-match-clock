@@ -147,6 +147,49 @@ function makeResolume(overrides = {}) {
   });
 }
 
+// Mock the Resolume API for the off path: a disconnect-all POST, a composition
+// GET returning a live tempocontroller.play_state, and the parameter PUT that
+// stops the transport. `composition` overrides the GET body; `respond` can
+// short-circuit any request (returning undefined falls through to the defaults).
+function mockOffFetch(
+  t,
+  { playStateId = 1786467668178, composition, respond } = {},
+) {
+  const calls = [];
+  t.mock.method(globalThis, "fetch", async (url, options) => {
+    const method = options?.method ?? "GET";
+    calls.push({
+      url,
+      method,
+      body: options?.body ? JSON.parse(options.body) : undefined,
+    });
+    if (typeof respond === "function") {
+      const custom = respond(url, method);
+      if (custom) return custom;
+    }
+    if (method === "GET" && url.endsWith("/composition")) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () =>
+          composition ?? {
+            tempocontroller: {
+              play_state: {
+                id: playStateId,
+                valuetype: "ParamChoice",
+                value: "Play",
+                index: 0,
+                options: ["Play", "Pause", "Stop"],
+              },
+            },
+          },
+      };
+    }
+    return { ok: true, status: 204 };
+  });
+  return calls;
+}
+
 test("apply on posts column connect", async (t) => {
   const calls = mockFetch(t, 200);
   await makeResolume().applyState("on");
@@ -155,19 +198,31 @@ test("apply on posts column connect", async (t) => {
     "http://localhost:80/api/v1/composition/columns/1/connect",
   );
   assert.equal(calls[0].method, "POST");
+  assert.equal(calls.length, 1);
 });
 
-test("apply off posts disconnect-all", async (t) => {
-  const calls = mockFetch(t, 200);
+test("apply off disconnects all then stops the composition transport", async (t) => {
+  const calls = mockOffFetch(t);
   await makeResolume().applyState("off");
-  assert.equal(
-    calls[0].url,
-    "http://localhost:80/api/v1/composition/disconnect-all",
+  assert.deepEqual(
+    calls.map((c) => [c.url, c.method]),
+    [
+      ["http://localhost:80/api/v1/composition/disconnect-all", "POST"],
+      ["http://localhost:80/api/v1/composition", "GET"],
+      ["http://localhost:80/api/v1/parameter/by-id/1786467668178", "PUT"],
+    ],
   );
+  assert.equal(calls[2].body.value, "Stop");
 });
 
-test("apply strips trailing slash from base url", async (t) => {
-  const calls = mockFetch(t, 200);
+test("apply off uses the live play_state id", async (t) => {
+  const calls = mockOffFetch(t, { playStateId: 42 });
+  await makeResolume().applyState("off");
+  assert.equal(calls[2].url, "http://localhost:80/api/v1/parameter/by-id/42");
+});
+
+test("apply off strips trailing slash from base url", async (t) => {
+  const calls = mockOffFetch(t);
   await makeResolume({
     resolumeBaseUrl: "http://localhost:80/api/v1/",
   }).applyState("off");
@@ -175,6 +230,31 @@ test("apply strips trailing slash from base url", async (t) => {
     calls[0].url,
     "http://localhost:80/api/v1/composition/disconnect-all",
   );
+});
+
+test("apply off raises when the composition has no play_state", async (t) => {
+  const calls = mockOffFetch(t, { composition: {} });
+  await assert.rejects(
+    makeResolume().applyState("off"),
+    /no tempocontroller\.play_state to stop/,
+  );
+  // The disconnect was sent, but the missing transport fails the whole off.
+  assert.equal(
+    calls[0].url,
+    "http://localhost:80/api/v1/composition/disconnect-all",
+  );
+  assert.equal(
+    calls.some((c) => c.method === "PUT"),
+    false,
+  );
+});
+
+test("apply off raises when the transport stop fails", async (t) => {
+  mockOffFetch(t, {
+    respond: (url, method) =>
+      method === "PUT" ? { ok: false, status: 500 } : undefined,
+  });
+  await assert.rejects(makeResolume().applyState("off"), /HTTP 500/);
 });
 
 test("apply raises on non-2xx", async (t) => {

@@ -14,8 +14,12 @@ The daemon is a long-lived Node.js process:
    `"on"` and `"off"` are valid. Missing, `null`, malformed or unknown values
    trigger **no** Resolume request and produce a warning log.
 3. Applies the desired state to Resolume over its HTTP API:
-   - `off` → `POST /api/v1/composition/disconnect-all` (Resolume's global
-     Stop — stops **all** content controlled by this Resolume instance).
+   - `off` → `POST /api/v1/composition/disconnect-all` (disconnects **all**
+     content controlled by this Resolume instance), then stops the composition
+     transport (`GET /api/v1/composition`, `PUT /api/v1/parameter/by-id/<play_state>`
+     with `{"value":"Stop"}`) so Resolume's universal autopilot no longer
+     keeps "playing". Both steps must succeed for the off state to be applied;
+     a failure of either is retried as a whole.
    - `on` → `POST /api/v1/composition/columns/1/connect` (starts column 1,
      which drives both perimeter outputs), then **asserts the deck autopilot**
      to `PERIMETER_DECK_AUTOPILOT` (default `Play Next Column`) — see
@@ -42,8 +46,10 @@ re-applied, so the periodic reconnect causes no spurious Resolume calls.
 ## Scope
 
 This version controls **column 1** and uses the **global `disconnect-all`**
-endpoint. `disconnect-all` intentionally stops every Resolume-accessible
-output on the dedicated composition, not only column 1.
+endpoint. `disconnect-all` intentionally disconnects every Resolume-accessible
+output on the dedicated composition, not only column 1, and the off action then
+stops the composition transport so the UI no longer reports the composition as
+playing.
 
 ## Deck autopilot self-heal
 
