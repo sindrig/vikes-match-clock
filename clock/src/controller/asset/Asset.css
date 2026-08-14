@@ -72,6 +72,7 @@ div.asset-player-icon.player-card-no-image img {
 
 span.asset-player-name {
   font-family: var(--theme-player-name-font-family, "Anton", sans-serif);
+  color: var(--theme-player-name-color, white);
   font-size: 30px;
   bottom: 5%;
   left: 5%;
@@ -87,6 +88,7 @@ span.asset-player-name {
 
 span.asset-player-number {
   font-family: var(--theme-player-number-font-family, "Anton", sans-serif);
+  color: var(--theme-player-number-color, white);
   font-size: 350%;
   top: 20px;
   left: 20px;

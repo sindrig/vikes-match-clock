@@ -169,6 +169,8 @@ export const DEFAULT_THEME: ThemeConfig = {
   teamNameFontFamily: '"Anton", sans-serif',
 
   // Player number/name
+  playerNumberColor: "white",
+  playerNameColor: "white",
   playerNumberFontFamily: '"Anton", sans-serif',
   playerNameFontFamily: '"Anton", sans-serif',
 

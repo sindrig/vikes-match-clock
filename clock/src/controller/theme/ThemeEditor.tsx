@@ -537,13 +537,25 @@ const ThemeEditorPanels = ({
     </Panel>
 
     <Panel header="Leikmenn" collapsible bordered>
+      <ColorField
+        label="Númer litur"
+        value={effective.playerNumberColor}
+        defaultValue={DEFAULT_THEME.playerNumberColor}
+        onChange={(v) => onFieldChange("playerNumberColor", v)}
+      />
       <FontField
-        label="Númer"
+        label="Númer letur"
         value={effective.playerNumberFontFamily}
         onChange={(v) => onFieldChange("playerNumberFontFamily", v)}
       />
+      <ColorField
+        label="Nafn litur"
+        value={effective.playerNameColor}
+        defaultValue={DEFAULT_THEME.playerNameColor}
+        onChange={(v) => onFieldChange("playerNameColor", v)}
+      />
       <FontField
-        label="Nafn"
+        label="Nafn letur"
         value={effective.playerNameFontFamily}
         onChange={(v) => onFieldChange("playerNameFontFamily", v)}
       />

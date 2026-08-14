@@ -172,6 +172,8 @@ export interface ThemeConfig {
   teamNameFontFamily: string;
 
   // Player number/name
+  playerNumberColor: string;
+  playerNameColor: string;
   playerNumberFontFamily: string;
   playerNameFontFamily: string;
 

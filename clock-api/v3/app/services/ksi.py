@@ -103,8 +103,14 @@ class KsiClient:
                 if num is not None and num not in seen:
                     seen[num] = player
 
+        goalkeeper = starters[0]
+        ordered_numbers = [
+            goalkeeper,
+            *sorted(starters[1:]),
+            *sorted(substitutes),
+        ]
         players: list[TeamPlayer] = []
-        for number in starters + substitutes:
+        for number in ordered_numbers:
             starting = number in starters
             if number in seen:
                 found = seen[number]
