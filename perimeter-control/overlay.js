@@ -997,9 +997,12 @@ export class OverlayController {
     ) {
       if (this.config.overlayTransitionMs > 0) {
         await this._sleep(this.config.overlayTransitionMs + 200);
+        if (this._stopping || this._currentId !== doc.id) return;
       }
+      if (this._stopping || this._currentId !== doc.id) return;
       await this._clearOverlaySlot(activeColumn);
     }
+    if (this._stopping || this._currentId !== doc.id) return;
     this._standbyColumn = null;
     this._activeColumn = targetSlot;
     this._overlayLoaded = true;
