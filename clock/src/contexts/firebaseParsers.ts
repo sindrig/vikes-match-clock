@@ -26,6 +26,8 @@ import type {
   PerimeterAppliedAdFile,
   PerimeterAdLane,
   PerimeterAdPhase,
+  AuditEvent,
+  AuditStateArea,
 } from "../types";
 import { Sports, DEFAULT_THEME } from "../constants";
 
@@ -713,6 +715,56 @@ export function parsePerimeterMediaPairs(
   }
 
   return result;
+}
+
+const AUDIT_STATE_AREAS: AuditStateArea[] = [
+  "match",
+  "controller",
+  "view",
+  "perimeter",
+  "clubOverrides",
+];
+
+// Strict parse of a single audit record. Any malformed or partial event is
+// dropped so the inspection view never renders untrusted data.
+export function parseAuditEvent(data: unknown): AuditEvent | null {
+  if (!data || typeof data !== "object") return null;
+  const raw = data as Record<string, unknown>;
+  if (typeof raw.timestamp !== "number") return null;
+  if (typeof raw.uid !== "string" || raw.uid.length === 0) return null;
+  if (typeof raw.sessionId !== "string") return null;
+  if (typeof raw.action !== "string") return null;
+  if (!AUDIT_STATE_AREAS.includes(raw.stateArea as AuditStateArea)) return null;
+  if (
+    !raw.changes ||
+    typeof raw.changes !== "object" ||
+    Array.isArray(raw.changes)
+  ) {
+    return null;
+  }
+  return {
+    timestamp: raw.timestamp,
+    uid: raw.uid,
+    sessionId: raw.sessionId,
+    action: raw.action,
+    stateArea: raw.stateArea as AuditStateArea,
+    changes: raw.changes as Record<string, unknown>,
+  };
+}
+
+// Parses an audit/{location} collection snapshot into an array, attaching each
+// event's Firebase key as its id. Events that fail parseAuditEvent are skipped.
+export function parseAuditEvents(data: unknown): AuditEvent[] {
+  if (!data || typeof data !== "object") return [];
+  const raw = data as Record<string, unknown>;
+  const events: AuditEvent[] = [];
+  for (const [key, value] of Object.entries(raw)) {
+    const parsed = parseAuditEvent(value);
+    if (parsed) {
+      events.push({ ...parsed, id: key });
+    }
+  }
+  return events;
 }
 
 export function parseClubOverrides(

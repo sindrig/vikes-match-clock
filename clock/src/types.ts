@@ -403,6 +403,32 @@ export interface PerimeterAppliedAdLayout {
   columns: PerimeterAppliedAdColumn[];
 }
 
+// -- Audit trail --------------------------------------------------------------
+
+// Shared state subtrees that can carry an audit record when an authenticated
+// client mutates them. Perimeter and clubOverride writes are folded into the
+// same `perimeter`/`clubOverrides` areas with their changed sub-paths.
+export type AuditStateArea =
+  | "match"
+  | "controller"
+  | "view"
+  | "perimeter"
+  | "clubOverrides";
+
+// An immutable, append-only record of a single authenticated mutation. Stored
+// under audit/{location}/{eventId}; `changes` is the exact update-path map
+// that was sent to Firebase (including `null` deletions). `id` is the Firebase
+// event key, attached when a collection is read back.
+export interface AuditEvent {
+  id?: string;
+  timestamp: number;
+  uid: string;
+  sessionId: string;
+  action: string;
+  stateArea: AuditStateArea;
+  changes: Record<string, unknown>;
+}
+
 // Root state type
 export interface RootState {
   match: Match;

@@ -4,6 +4,8 @@ import {
   saveClubOverride,
   deleteClubOverride,
   generateClubOverrideId,
+  writeAuditedState,
+  AuditEventPayload,
 } from "./firebaseDatabase";
 import type { ClubOverride } from "./types";
 
@@ -15,6 +17,7 @@ vi.mock("firebase/database", () => ({
   set: vi.fn() as Mock,
   onValue: vi.fn(),
   off: vi.fn(),
+  serverTimestamp: vi.fn(() => 1700000000000),
   DatabaseReference: {},
 }));
 
@@ -30,161 +33,221 @@ vi.mock("./firebase", () => ({
   storage: {},
 }));
 
-describe("firebaseDatabase write helpers", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+const audit: AuditEventPayload = {
+  uid: "uid-123",
+  sessionId: "session-abc",
+  action: "clubOverrides.save",
+  stateArea: "clubOverrides",
+};
 
-  describe("saveClubOverride", () => {
-    it("saves club override to correct Firebase path", async () => {
-      const { update } = await import("firebase/database");
-      const prefix = "vikinni";
-      const id = "test-uuid-123";
-      const override: ClubOverride = {
-        name: "Víkingur R",
-        clubId: "2492",
-        logoUrl: "https://example.com/logo.png",
-        isOverride: true,
-      };
+const getUpdates = async (): Promise<Record<string, unknown>> => {
+  const database = await import("firebase/database");
+  const update = database.update as Mock;
+  const call = update.mock.calls[0];
+  return call[1] as Record<string, unknown>;
+};
 
-      await saveClubOverride(prefix, id, override);
+const getAuditPaths = (updates: Record<string, unknown>): string[] =>
+  Object.keys(updates).filter((key) => key.startsWith("audit/"));
 
-      expect(update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          path: "states/vikinni/clubOverrides/test-uuid-123",
-        }),
-        override,
-      );
-    });
+beforeEach(() => {
+  vi.clearAllMocks();
+});
 
-    it("constructs correct path with different prefix", async () => {
-      const { update } = await import("firebase/database");
-      const prefix = "hasteinsvollur";
-      const id = "another-uuid";
-      const override: ClubOverride = {
-        name: "Test Club",
-        clubId: "999",
-        logoUrl: "https://example.com/test.png",
-        isOverride: false,
-      };
+describe("writeAuditedState", () => {
+  it("writes state paths and an audit event in one root-level update", async () => {
+    const database = await import("firebase/database");
+    const update = database.update as Mock;
 
-      await saveClubOverride(prefix, id, override);
+    await writeAuditedState(
+      "vikuti",
+      "match",
+      { homeScore: 1 },
+      {
+        uid: "uid-1",
+        sessionId: "session-1",
+        action: "match.add-goal",
+        stateArea: "match",
+      },
+    );
 
-      expect(update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          path: "states/hasteinsvollur/clubOverrides/another-uuid",
-        }),
-        override,
-      );
-    });
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(update).toHaveBeenCalledWith(expect.any(Object), expect.any(Object));
 
-    it("writes all override properties correctly", async () => {
-      const database = await import("firebase/database");
-      const update = database.update as Mock;
-      const override: ClubOverride = {
-        name: "Custom Club",
-        clubId: "-1",
-        logoUrl: "https://storage.example.com/custom-logo.png",
-        isOverride: false,
-      };
+    const updates = update.mock.calls[0][1] as Record<string, unknown>;
+    expect(updates["states/vikuti/match"]).toEqual({ homeScore: 1 });
 
-      await saveClubOverride("test", "id1", override);
-
-      const callArgs = update.mock.calls[0];
-      expect(callArgs[1]).toEqual(override);
+    const auditPaths = Object.keys(updates).filter((key) =>
+      key.startsWith("audit/vikuti/"),
+    );
+    expect(auditPaths).toHaveLength(1);
+    expect(updates[auditPaths[0]]).toEqual({
+      timestamp: 1700000000000,
+      uid: "uid-1",
+      sessionId: "session-1",
+      action: "match.add-goal",
+      stateArea: "match",
+      changes: { homeScore: 1 },
     });
   });
 
-  describe("deleteClubOverride", () => {
-    it("removes from both RTDB and Storage", async () => {
-      const { remove } = await import("firebase/database");
-      const { storageHelpers } = await import("./firebase");
+  it("records null deletions in the changes map", async () => {
+    const database = await import("firebase/database");
+    const update = database.update as Mock;
 
-      const prefix = "vikinni";
-      const id = "uuid-to-delete";
+    await writeAuditedState(
+      "vikuti",
+      "perimeter",
+      { overlay: null },
+      {
+        uid: "uid-1",
+        sessionId: "session-1",
+        action: "perimeter.clear-overlay",
+        stateArea: "perimeter",
+      },
+    );
 
-      await deleteClubOverride(prefix, id);
+    const updates = update.mock.calls[0][1] as Record<string, unknown>;
+    expect(updates["states/vikuti/perimeter"]).toEqual({ overlay: null });
+    const auditPaths = getAuditPaths(updates);
+    const event = updates[auditPaths[0]] as Record<string, unknown>;
+    expect(event.changes).toEqual({ overlay: null });
+  });
 
-      // Check RTDB deletion
-      expect(remove).toHaveBeenCalledWith(
-        expect.objectContaining({
-          path: "states/vikinni/clubOverrides/uuid-to-delete",
-        }),
-      );
+  it("writes nested media-pair paths with deletions for removals", async () => {
+    const database = await import("firebase/database");
+    const update = database.update as Mock;
 
-      // Check Storage deletion
-      expect(storageHelpers.deleteObject).toHaveBeenCalledWith(
-        "vikinni/club-logos/uuid-to-delete",
-      );
+    await writeAuditedState(
+      "vikuti",
+      "perimeter",
+      {
+        "mediaPairs/11111111-1111-4111-8111-111111111111": null,
+      },
+      {
+        uid: "uid-1",
+        sessionId: "session-1",
+        action: "perimeter.delete-media-pair",
+        stateArea: "perimeter",
+      },
+    );
+
+    const updates = update.mock.calls[0][1] as Record<string, unknown>;
+    expect(updates["states/vikuti/perimeter"]).toEqual({
+      "mediaPairs/11111111-1111-4111-8111-111111111111": null,
+    });
+  });
+});
+
+describe("saveClubOverride", () => {
+  it("writes the override and audit event atomically", async () => {
+    const prefix = "vikinni";
+    const id = "test-uuid-123";
+    const override: ClubOverride = {
+      name: "Víkingur R",
+      clubId: "2492",
+      logoUrl: "https://example.com/logo.png",
+      isOverride: true,
+    };
+
+    await saveClubOverride(prefix, id, override, audit);
+
+    const updates = await getUpdates();
+    expect(updates[`states/${prefix}/clubOverrides`]).toEqual({
+      [id]: override,
     });
 
-    it("constructs correct RTDB path", async () => {
-      const { remove } = await import("firebase/database");
+    const auditPaths = getAuditPaths(updates);
+    expect(auditPaths).toHaveLength(1);
+    expect(auditPaths[0]).toMatch(new RegExp(`^audit/${prefix}/`));
+  });
 
-      await deleteClubOverride("staging", "test-id-456");
+  it("constructs correct path with different prefix", async () => {
+    const prefix = "hasteinsvollur";
+    const id = "another-uuid";
+    const override: ClubOverride = {
+      name: "Test Club",
+      clubId: "999",
+      logoUrl: "https://example.com/test.png",
+      isOverride: false,
+    };
 
-      expect(remove).toHaveBeenCalledWith(
-        expect.objectContaining({
-          path: "states/staging/clubOverrides/test-id-456",
-        }),
-      );
-    });
+    await saveClubOverride(prefix, id, override, audit);
 
-    it("constructs correct Storage path", async () => {
-      const { storageHelpers } = await import("./firebase");
-
-      await deleteClubOverride("production", "logo-xyz");
-
-      expect(storageHelpers.deleteObject).toHaveBeenCalledWith(
-        "production/club-logos/logo-xyz",
-      );
-    });
-
-    it("handles deletion with special characters in ID", async () => {
-      const { remove } = await import("firebase/database");
-      const { storageHelpers } = await import("./firebase");
-
-      await deleteClubOverride("test", "uuid-with-dashes-123");
-
-      expect(remove).toHaveBeenCalledWith(
-        expect.objectContaining({
-          path: "states/test/clubOverrides/uuid-with-dashes-123",
-        }),
-      );
-
-      expect(storageHelpers.deleteObject).toHaveBeenCalledWith(
-        "test/club-logos/uuid-with-dashes-123",
-      );
+    const updates = await getUpdates();
+    expect(updates[`states/${prefix}/clubOverrides`]).toEqual({
+      [id]: override,
     });
   });
 
-  describe("generateClubOverrideId", () => {
-    it("returns a string", () => {
-      const id = generateClubOverrideId();
-      expect(typeof id).toBe("string");
+  it("writes all override properties correctly", async () => {
+    const override: ClubOverride = {
+      name: "Custom Club",
+      clubId: "-1",
+      logoUrl: "https://storage.example.com/custom-logo.png",
+      isOverride: false,
+    };
+
+    await saveClubOverride("test", "id1", override, audit);
+
+    const updates = await getUpdates();
+    expect(updates["states/test/clubOverrides"]).toEqual({
+      id1: override,
+    });
+  });
+});
+
+describe("deleteClubOverride", () => {
+  it("removes from both RTDB and Storage", async () => {
+    const prefix = "vikinni";
+    const id = "uuid-to-delete";
+
+    await deleteClubOverride(prefix, id, {
+      uid: "uid-123",
+      sessionId: "session-abc",
+      action: "clubOverrides.delete",
+      stateArea: "clubOverrides",
     });
 
-    it("generates valid UUID v4 format", () => {
-      const id = generateClubOverrideId();
-      // UUID v4 format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
-      const uuidRegex =
-        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-      expect(id).toMatch(uuidRegex);
+    const updates = await getUpdates();
+    expect(updates[`states/${prefix}/clubOverrides`]).toEqual({
+      [id]: null,
     });
+    expect(getAuditPaths(updates)).toHaveLength(1);
 
-    it("generates unique IDs", () => {
-      const id1 = generateClubOverrideId();
-      const id2 = generateClubOverrideId();
-      expect(id1).not.toBe(id2);
-    });
+    const { storageHelpers } = await import("./firebase");
+    expect(storageHelpers.deleteObject).toHaveBeenCalledWith(
+      `${prefix}/club-logos/${id}`,
+    );
+  });
 
-    it("generates multiple valid UUIDs", () => {
-      const ids = Array.from({ length: 10 }, () => generateClubOverrideId());
-      const uuidRegex =
-        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-      ids.forEach((id) => {
-        expect(id).toMatch(uuidRegex);
-      });
-    });
+  it("constructs correct Storage path", async () => {
+    await deleteClubOverride("production", "logo-xyz", audit);
+
+    const { storageHelpers } = await import("./firebase");
+    expect(storageHelpers.deleteObject).toHaveBeenCalledWith(
+      "production/club-logos/logo-xyz",
+    );
+  });
+});
+
+describe("generateClubOverrideId", () => {
+  it("returns a string", () => {
+    const id = generateClubOverrideId();
+    expect(typeof id).toBe("string");
+  });
+
+  it("generates valid UUID v4 format", () => {
+    const id = generateClubOverrideId();
+    // UUID v4 format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    expect(id).toMatch(uuidRegex);
+  });
+
+  it("generates unique IDs", () => {
+    const id1 = generateClubOverrideId();
+    const id2 = generateClubOverrideId();
+    expect(id1).not.toBe(id2);
   });
 });

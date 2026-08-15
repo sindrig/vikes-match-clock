@@ -7,7 +7,7 @@ import PauseIcon from "@rsuite/icons/PauseRound";
 import HistoryIcon from "@rsuite/icons/History";
 import TimeIcon from "@rsuite/icons/Time";
 import PenaltiesManipulationBox from "./PenaltiesManipulationBox";
-import { Sports, DEFAULT_HALFSTOPS } from "../constants";
+import { Sports } from "../constants";
 import RedCardManipulation from "./RedCardManipulation";
 import { Match } from "../types";
 import {
@@ -113,6 +113,7 @@ const MatchActions = () => {
     updateMatch,
     pauseMatch,
     startMatch,
+    resetMatch,
     matchTimeout,
     removeTimeout,
     countdown,
@@ -192,22 +193,7 @@ const MatchActions = () => {
             size="xs"
             color="red"
             appearance="primary"
-            onClick={() =>
-              window.confirm("Ertu alveg viss?") &&
-              updateMatch({
-                started: 0,
-                timeElapsed: 0,
-                home2min: [],
-                away2min: [],
-                timeout: 0,
-                homeTimeouts: 0,
-                awayTimeouts: 0,
-                buzzer: false,
-                countdown: false,
-                halftimeCountdown: false,
-                halfStops: DEFAULT_HALFSTOPS[match.matchType],
-              })
-            }
+            onClick={() => window.confirm("Ertu alveg viss?") && resetMatch()}
             disabled={isMatchResetDisabled(match)}
           >
             <HistoryIcon /> Reset

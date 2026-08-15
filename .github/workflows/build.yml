@@ -120,6 +120,12 @@ jobs:
           }
           echo "All Firebase emulators are ready"
 
+      - name: Run Firebase Realtime Database rules tests
+        working-directory: ./functions
+        env:
+          RUN_RULES_TESTS: "true"
+        run: npm exec vitest run src/__tests__/audit-rules.test.ts
+
       - name: Start Vite dev server
         working-directory: ./clock
         run: |

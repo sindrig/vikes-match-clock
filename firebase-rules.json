@@ -27,6 +27,15 @@
         ".read": true
       }
     },
+    "audit": {
+      "$location": {
+        ".read": "root.child('auth').child(auth.uid).child($location).val() == true",
+        "$eventId": {
+          ".write": "!data.exists() && newData.exists() && root.child('auth').child(auth.uid).child($location).val() == true",
+          ".validate": "newData.hasChildren(['timestamp', 'uid', 'sessionId', 'action', 'stateArea', 'changes']) && newData.child('uid').val() == auth.uid && newData.child('timestamp').isNumber() && newData.child('sessionId').isString() && newData.child('action').isString() && newData.child('stateArea').val() in ['match', 'controller', 'view', 'perimeter', 'clubOverrides'] && newData.child('changes').val() != null"
+        }
+      }
+    },
     "perimeter": {
       "$location": {
         ".read": "root.child('auth').child(auth.uid).child($location).val() == true",

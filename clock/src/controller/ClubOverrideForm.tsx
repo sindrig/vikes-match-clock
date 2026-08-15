@@ -7,8 +7,10 @@ import { storageHelpers } from "../firebase";
 import {
   saveClubOverride as firebaseSaveClubOverride,
   generateClubOverrideId,
+  type AuditEventPayload,
 } from "../firebaseDatabase";
-import { useRemoteSettings } from "../contexts/LocalStateContext";
+import { useRemoteSettings, useAuth } from "../contexts/LocalStateContext";
+import { getOrCreateSessionId } from "../lib/sessionId";
 import type { ClubOverride } from "../types";
 
 const FILE_TYPES = ["SVG", "PNG", "JPG", "JPEG", "WEBP"];
@@ -44,6 +46,7 @@ const ClubOverrideForm = ({
   editOverride,
 }: ClubOverrideFormProps) => {
   const { listenPrefix } = useRemoteSettings();
+  const { uid } = useAuth();
 
   const isEditMode = editOverride !== undefined;
   const isLocked = editOverride?.override.isOverride ?? false;
@@ -98,6 +101,13 @@ const ClubOverrideForm = ({
 
     setIsLoading(true);
     try {
+      const audit: AuditEventPayload = {
+        uid: uid ?? "",
+        sessionId: getOrCreateSessionId(),
+        action: isEditMode ? "clubOverrides.update" : "clubOverrides.create",
+        stateArea: "clubOverrides",
+      };
+
       if (isEditMode && editOverride) {
         const id = editOverride.id;
         let logoUrl = editOverride.override.logoUrl;
@@ -117,7 +127,7 @@ const ClubOverrideForm = ({
           logoUrl,
           isOverride: editOverride.override.isOverride,
         };
-        await firebaseSaveClubOverride(listenPrefix, id, clubOverride);
+        await firebaseSaveClubOverride(listenPrefix, id, clubOverride, audit);
       } else {
         if (!logoFile) return;
         const compressed = await compressIfNeeded(logoFile);
@@ -134,7 +144,7 @@ const ClubOverrideForm = ({
           logoUrl,
           isOverride: createMode === "bundled",
         };
-        await firebaseSaveClubOverride(listenPrefix, id, clubOverride);
+        await firebaseSaveClubOverride(listenPrefix, id, clubOverride, audit);
       }
 
       handleClose();
@@ -152,6 +162,7 @@ const ClubOverrideForm = ({
     name,
     clubId,
     createMode,
+    uid,
     handleClose,
   ]);
 

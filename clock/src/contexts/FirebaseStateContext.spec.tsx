@@ -1,7 +1,7 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, act } from "@testing-library/react";
-import { onValue, ref, set, remove } from "firebase/database";
+import { onValue, ref } from "firebase/database";
 import {
   FirebaseStateProvider,
   useMatch,
@@ -16,7 +16,7 @@ import { firebaseDatabase } from "../firebaseDatabase";
 
 vi.mock("../firebaseDatabase", () => ({
   firebaseDatabase: {
-    syncState: vi.fn().mockResolvedValue(undefined),
+    writeAudited: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
@@ -140,7 +140,7 @@ describe("FirebaseStateContext", () => {
         matchApi!.addGoal("home");
       });
 
-      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
+      expect(firebaseDatabase.writeAudited).not.toHaveBeenCalled();
     });
 
     it("blocks controller updates when listenPrefix is empty", () => {
@@ -167,7 +167,7 @@ describe("FirebaseStateContext", () => {
         controllerApi!.selectView("scoreboard");
       });
 
-      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
+      expect(firebaseDatabase.writeAudited).not.toHaveBeenCalled();
     });
   });
 
@@ -195,10 +195,11 @@ describe("FirebaseStateContext", () => {
         matchApi!.addGoal("home");
       });
 
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({ homeScore: 1 }),
+        expect.anything(),
       );
     });
 
@@ -229,23 +230,26 @@ describe("FirebaseStateContext", () => {
         matchApi!.addGoal("away");
       });
 
-      expect(firebaseDatabase.syncState).toHaveBeenNthCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenNthCalledWith(
         1,
         "test-location",
         "match",
         expect.objectContaining({ homeScore: 1 }),
+        expect.anything(),
       );
-      expect(firebaseDatabase.syncState).toHaveBeenNthCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenNthCalledWith(
         2,
         "test-location",
         "match",
         expect.objectContaining({ homeScore: 2 }),
+        expect.anything(),
       );
-      expect(firebaseDatabase.syncState).toHaveBeenNthCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenNthCalledWith(
         3,
         "test-location",
         "match",
         expect.objectContaining({ awayScore: 1 }),
+        expect.anything(),
       );
     });
 
@@ -270,10 +274,11 @@ describe("FirebaseStateContext", () => {
         controllerApi!.selectView("scoreboard");
       });
 
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({ view: "scoreboard" }),
+        expect.anything(),
       );
     });
   });
@@ -322,12 +327,13 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.startMatch();
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({
           started: expect.any(Number) as unknown,
         }),
+        expect.anything(),
       );
     });
 
@@ -349,7 +355,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.pauseMatch();
       });
-      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
+      expect(firebaseDatabase.writeAudited).not.toHaveBeenCalled();
     });
 
     it("addGoal increments homeScore", () => {
@@ -370,10 +376,11 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.addGoal("home");
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({ homeScore: 1 }),
+        expect.anything(),
       );
     });
 
@@ -395,10 +402,11 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.addGoal("away");
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({ awayScore: 1 }),
+        expect.anything(),
       );
     });
 
@@ -420,10 +428,11 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.buzz(true);
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({ buzzer: expect.any(Number) as unknown }),
+        expect.anything(),
       );
     });
 
@@ -445,7 +454,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.buzz(false);
       });
-      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
+      expect(firebaseDatabase.writeAudited).not.toHaveBeenCalled();
     });
 
     it("setHalfStops updates halfStops and injuryTimeDisplayMode", () => {
@@ -466,13 +475,14 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.setHalfStops([30, 60], "minutes");
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({
           halfStops: [30, 60],
           injuryTimeDisplayMode: "minutes",
         }),
+        expect.anything(),
       );
     });
 
@@ -494,13 +504,14 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.matchTimeout("home");
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({
           timeout: expect.any(Number) as unknown,
           homeTimeouts: 1,
         }),
+        expect.anything(),
       );
     });
 
@@ -522,7 +533,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.removeTimeout();
       });
-      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
+      expect(firebaseDatabase.writeAudited).not.toHaveBeenCalled();
     });
 
     it("updateRedCards sets home and away red cards", () => {
@@ -543,10 +554,11 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateRedCards(2, 1);
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({ homeRedCards: 2, awayRedCards: 1 }),
+        expect.anything(),
       );
     });
 
@@ -568,7 +580,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.addPenalty("home", "pen-1", 120);
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({
@@ -576,6 +588,7 @@ describe("FirebaseStateContext", () => {
             expect.objectContaining({ key: "pen-1", penaltyLength: 120 }),
           ]) as unknown,
         }),
+        expect.anything(),
       );
     });
 
@@ -603,10 +616,11 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.removePenalty("pen-1");
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({ home2min: [] }),
+        expect.anything(),
       );
     });
   });
@@ -630,10 +644,11 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.selectAssetView("teams");
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({ assetView: "teams" }),
+        expect.anything(),
       );
     });
 
@@ -655,10 +670,11 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.setPlaying(true);
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({ playing: true }),
+        expect.anything(),
       );
     });
 
@@ -681,7 +697,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.renderAsset(asset as unknown as Asset);
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({
@@ -689,6 +705,7 @@ describe("FirebaseStateContext", () => {
             asset,
           }) as unknown,
         }),
+        expect.anything(),
       );
     });
 
@@ -710,7 +727,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.renderAsset(null);
       });
-      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
+      expect(firebaseDatabase.writeAudited).not.toHaveBeenCalled();
     });
 
     it("selectTab updates tab", () => {
@@ -731,10 +748,11 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.selectTab("settings");
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({ tab: "settings" }),
+        expect.anything(),
       );
     });
 
@@ -756,12 +774,13 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.remoteRefresh();
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({
           refreshToken: expect.any(String) as unknown,
         }),
+        expect.anything(),
       );
     });
 
@@ -783,10 +802,11 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.clearRoster();
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({ roster: { home: [], away: [] } }),
+        expect.anything(),
       );
     });
   });
@@ -810,10 +830,11 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateMatch({ homeTeam: "Valur" });
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "match",
         { homeTeam: "Valur", homeTeamId: 2058, ksiMatchId: null },
+        expect.anything(),
       );
     });
 
@@ -835,10 +856,11 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateMatch({ awayTeam: "KR" });
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "match",
         { awayTeam: "KR", awayTeamId: 2145, ksiMatchId: null },
+        expect.anything(),
       );
     });
 
@@ -860,10 +882,11 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateMatch({ awayTeam: "Unknown FC" });
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "match",
         { awayTeam: "Unknown FC", awayTeamId: 0, ksiMatchId: null },
+        expect.anything(),
       );
     });
 
@@ -885,10 +908,11 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateMatch({ homeTeam: "Víkingur R." });
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "match",
         { homeTeam: "Víkingur R", homeTeamId: 2492, ksiMatchId: null },
+        expect.anything(),
       );
     });
 
@@ -932,10 +956,11 @@ describe("FirebaseStateContext", () => {
         matchApi!.updateMatch({ homeTeam: "Kjánaprik" });
       });
 
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "match",
         { homeTeam: "Kjánaprik", homeTeamId: -1, ksiMatchId: null },
+        expect.anything(),
       );
     });
 
@@ -979,10 +1004,11 @@ describe("FirebaseStateContext", () => {
         matchApi!.updateMatch({ awayTeam: "Kjánaprik." });
       });
 
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "match",
         { awayTeam: "Kjánaprik", awayTeamId: -1, ksiMatchId: null },
+        expect.anything(),
       );
     });
 
@@ -1004,10 +1030,11 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateMatch({ awayTeam: "" });
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "match",
         { awayTeam: "", awayTeamId: 0, ksiMatchId: null },
+        expect.anything(),
       );
     });
 
@@ -1029,10 +1056,11 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateMatch({ injuryTime: NaN });
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "match",
         { injuryTime: 0 },
+        expect.anything(),
       );
     });
 
@@ -1056,10 +1084,11 @@ describe("FirebaseStateContext", () => {
           matchType: "basketball" as unknown as Sports,
         });
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "match",
         { matchType: Sports.Football },
+        expect.anything(),
       );
     });
 
@@ -1081,13 +1110,14 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateMatch({ matchType: Sports.Handball });
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "match",
         {
           matchType: Sports.Handball,
           halfStops: DEFAULT_HALFSTOPS[Sports.Handball],
         },
+        expect.anything(),
       );
     });
 
@@ -1113,13 +1143,14 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateMatch({ started: Date.now() });
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({
           started: expect.any(Number) as unknown,
           buzzer: false,
         }),
+        expect.anything(),
       );
     });
 
@@ -1141,7 +1172,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateMatch({ homeTeam: "Valur" });
       });
-      const call = vi.mocked(firebaseDatabase.syncState).mock.calls[0]!;
+      const call = vi.mocked(firebaseDatabase.writeAudited).mock.calls[0]!;
       expect(Object.keys(call[2])).toEqual(
         expect.arrayContaining(["homeTeam", "homeTeamId"]),
       );
@@ -1166,7 +1197,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateMatch({ awayTeam: "KR" });
       });
-      const call = vi.mocked(firebaseDatabase.syncState).mock.calls[0]!;
+      const call = vi.mocked(firebaseDatabase.writeAudited).mock.calls[0]!;
       expect(Object.keys(call[2])).toEqual(
         expect.arrayContaining(["awayTeam", "awayTeamId"]),
       );
@@ -1191,7 +1222,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateMatch({ matchType: Sports.Handball });
       });
-      const call = vi.mocked(firebaseDatabase.syncState).mock.calls[0]!;
+      const call = vi.mocked(firebaseDatabase.writeAudited).mock.calls[0]!;
       expect(call[2]).toEqual({
         matchType: Sports.Handball,
         halfStops: DEFAULT_HALFSTOPS[Sports.Handball],
@@ -1216,7 +1247,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateMatch({ injuryTime: NaN });
       });
-      const call = vi.mocked(firebaseDatabase.syncState).mock.calls[0]!;
+      const call = vi.mocked(firebaseDatabase.writeAudited).mock.calls[0]!;
       expect(call[2]).toEqual({ injuryTime: 0 });
     });
 
@@ -1238,10 +1269,11 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateMatch({ homeTeam: "Valur" });
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({ ksiMatchId: null }),
+        expect.anything(),
       );
     });
 
@@ -1263,10 +1295,11 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateMatch({ awayTeam: "KR" });
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({ ksiMatchId: null }),
+        expect.anything(),
       );
     });
 
@@ -1288,7 +1321,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateMatch({ homeTeam: "Valur", ksiMatchId: 12345 });
       });
-      const call = vi.mocked(firebaseDatabase.syncState).mock.calls[0]!;
+      const call = vi.mocked(firebaseDatabase.writeAudited).mock.calls[0]!;
       expect(call[2].ksiMatchId).toBe(12345);
     });
 
@@ -1310,7 +1343,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateMatch({ homeScore: 5 });
       });
-      const call = vi.mocked(firebaseDatabase.syncState).mock.calls[0]!;
+      const call = vi.mocked(firebaseDatabase.writeAudited).mock.calls[0]!;
       expect(call[2].ksiMatchId).toBeUndefined();
     });
 
@@ -1332,10 +1365,11 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateMatch({ ksiMatchId: 99999 });
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({ ksiMatchId: 99999 }),
+        expect.anything(),
       );
     });
   });
@@ -1363,7 +1397,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.pauseMatch(true);
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({
@@ -1371,6 +1405,7 @@ describe("FirebaseStateContext", () => {
           timeElapsed: 45 * 60 * 1000,
           halfStops: [90, 105, 120],
         }),
+        expect.anything(),
       );
     });
 
@@ -1396,12 +1431,13 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.pauseMatch();
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({
           started: 0,
         }),
+        expect.anything(),
       );
     });
   });
@@ -1425,7 +1461,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.countdown();
       });
-      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
+      expect(firebaseDatabase.writeAudited).not.toHaveBeenCalled();
     });
 
     it("does not change state when matchStartTime is invalid format", () => {
@@ -1450,7 +1486,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.countdown();
       });
-      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
+      expect(firebaseDatabase.writeAudited).not.toHaveBeenCalled();
     });
 
     it("sets started and countdown=true for valid matchStartTime", () => {
@@ -1475,13 +1511,14 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.countdown();
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({
           started: expect.any(Number) as unknown,
           countdown: true,
         }),
+        expect.anything(),
       );
     });
   });
@@ -1509,10 +1546,11 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.removeAssetAfterTimeout();
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({ currentAsset: null }),
+        expect.anything(),
       );
     });
 
@@ -1535,7 +1573,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.removeAssetAfterTimeout();
       });
-      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
+      expect(firebaseDatabase.writeAudited).not.toHaveBeenCalled();
     });
   });
 
@@ -1574,7 +1612,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         api.editPlayer("home", 0, { name: "Updated Player" });
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({
@@ -1584,6 +1622,7 @@ describe("FirebaseStateContext", () => {
             ]) as unknown,
           }) as unknown,
         }),
+        expect.anything(),
       );
     });
 
@@ -1605,7 +1644,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.editPlayer("home", 0, { name: "Test" });
       });
-      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
+      expect(firebaseDatabase.writeAudited).not.toHaveBeenCalled();
     });
 
     it("editPlayer does nothing for invalid player index", () => {
@@ -1613,7 +1652,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         api.editPlayer("home", 99, { name: "Ghost" });
       });
-      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
+      expect(firebaseDatabase.writeAudited).not.toHaveBeenCalled();
     });
 
     it("deletePlayer removes player at index", () => {
@@ -1621,7 +1660,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         api.deletePlayer("home", 0);
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({
@@ -1629,6 +1668,7 @@ describe("FirebaseStateContext", () => {
             home: [expect.objectContaining({ name: "Player B", number: "7" })],
           }) as unknown,
         }),
+        expect.anything(),
       );
     });
 
@@ -1637,7 +1677,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         api.addPlayer("home");
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({
@@ -1652,6 +1692,7 @@ describe("FirebaseStateContext", () => {
             ]) as unknown,
           }) as unknown,
         }),
+        expect.anything(),
       );
     });
   });
@@ -1680,10 +1721,11 @@ describe("FirebaseStateContext", () => {
       act(() => {
         viewApi!.setViewPort(newVp);
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "view",
         expect.objectContaining({ vp: newVp }),
+        expect.anything(),
       );
     });
 
@@ -1705,10 +1747,11 @@ describe("FirebaseStateContext", () => {
       act(() => {
         viewApi!.setBackground("Svart");
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "view",
         expect.objectContaining({ background: "Svart" }),
+        expect.anything(),
       );
     });
 
@@ -1730,12 +1773,13 @@ describe("FirebaseStateContext", () => {
       act(() => {
         viewApi!.setIdleImage("https://example.com/logo.png");
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "view",
         expect.objectContaining({
           idleImage: "https://example.com/logo.png",
         }),
+        expect.anything(),
       );
     });
 
@@ -1757,10 +1801,11 @@ describe("FirebaseStateContext", () => {
       act(() => {
         viewApi!.updateView({ background: "Ekkert" });
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "view",
         expect.objectContaining({ background: "Ekkert" }),
+        expect.anything(),
       );
     });
   });
@@ -1788,7 +1833,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.addToPenalty("pen-1", 60);
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({
@@ -1796,6 +1841,7 @@ describe("FirebaseStateContext", () => {
             expect.objectContaining({ key: "pen-1", penaltyLength: 180 }),
           ]) as unknown,
         }),
+        expect.anything(),
       );
     });
 
@@ -1817,10 +1863,11 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateHalfLength(45, "50");
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({ halfStops: [50, 90, 105, 120] }),
+        expect.anything(),
       );
     });
 
@@ -1842,7 +1889,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateHalfLength(45, "abc");
       });
-      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
+      expect(firebaseDatabase.writeAudited).not.toHaveBeenCalled();
     });
 
     it("updateHalfLength treats empty string as 0", () => {
@@ -1863,10 +1910,11 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateHalfLength(45, "");
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({ halfStops: [0, 90, 105, 120] }),
+        expect.anything(),
       );
     });
 
@@ -1888,7 +1936,7 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.updateHalfLength(45, "-5");
       });
-      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
+      expect(firebaseDatabase.writeAudited).not.toHaveBeenCalled();
     });
 
     it("matchTimeout caps at 4 timeouts", () => {
@@ -1914,13 +1962,14 @@ describe("FirebaseStateContext", () => {
       // The 4th call sets awayTimeouts from 3→4 (the cap).
       // The 5th call keeps awayTimeouts at 4 (unchanged), so the diff
       // optimization excludes it — only `timeout` is sent.
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({ awayTimeouts: 4 }),
+        expect.anything(),
       );
       // Verify the value never exceeds 4
-      const allCalls = vi.mocked(firebaseDatabase.syncState).mock.calls;
+      const allCalls = vi.mocked(firebaseDatabase.writeAudited).mock.calls;
       const allAwayTimeouts = allCalls
         .filter(([, section]) => section === "match")
         .map(([, , data]) => data.awayTimeouts)
@@ -1952,12 +2001,13 @@ describe("FirebaseStateContext", () => {
       act(() => {
         controllerApi!.setRoster(roster);
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "controller",
         expect.objectContaining({
           roster,
         }),
+        expect.anything(),
       );
     });
   });
@@ -2043,7 +2093,7 @@ describe("FirebaseStateContext", () => {
         matchApi!.startMatch();
       });
       // Verify set was called with a timestamp close to Date.now()
-      const call = vi.mocked(firebaseDatabase.syncState).mock.calls[0]!;
+      const call = vi.mocked(firebaseDatabase.writeAudited).mock.calls[0]!;
       const writtenMatch = call[2];
       expect(writtenMatch.started).toBeGreaterThan(Date.now() - 100);
       expect(writtenMatch.started).toBeLessThan(Date.now() + 100);
@@ -2071,14 +2121,15 @@ describe("FirebaseStateContext", () => {
       act(() => {
         matchApi!.pauseMatch();
       });
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({
           started: 0,
         }),
+        expect.anything(),
       );
-      const pauseCall = vi.mocked(firebaseDatabase.syncState).mock.calls[0]!;
+      const pauseCall = vi.mocked(firebaseDatabase.writeAudited).mock.calls[0]!;
       const pauseData = pauseCall[2];
       // timeElapsed is computed via getServerTime() - started, ~0ms in tests.
       // The diff optimization may skip it if it stays at 0 (the default),
@@ -2223,10 +2274,11 @@ describe("FirebaseStateContext", () => {
         perimeterApi!.setPerimeterState("on");
       });
 
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "vikuti",
         "perimeter",
         { state: "on" },
+        expect.anything(),
       );
     });
 
@@ -2237,7 +2289,7 @@ describe("FirebaseStateContext", () => {
         perimeterApi!.setPerimeterState("on");
       });
 
-      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
+      expect(firebaseDatabase.writeAudited).not.toHaveBeenCalled();
     });
 
     it("blocks setPerimeterState when listenPrefix is empty", () => {
@@ -2247,7 +2299,7 @@ describe("FirebaseStateContext", () => {
         perimeterApi!.setPerimeterState("off");
       });
 
-      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
+      expect(firebaseDatabase.writeAudited).not.toHaveBeenCalled();
     });
 
     it("auto-turns the perimeter on when transitioning idle to match", () => {
@@ -2258,10 +2310,11 @@ describe("FirebaseStateContext", () => {
 
       setView(VIEWS.match);
 
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "vikuti",
         "perimeter",
         { state: "on" },
+        expect.anything(),
       );
     });
 
@@ -2274,10 +2327,11 @@ describe("FirebaseStateContext", () => {
       setView(VIEWS.match);
       setView(VIEWS.idle);
 
-      expect(firebaseDatabase.syncState).toHaveBeenLastCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenLastCalledWith(
         "vikuti",
         "perimeter",
         { state: "off" },
+        expect.anything(),
       );
     });
 
@@ -2290,10 +2344,11 @@ describe("FirebaseStateContext", () => {
       setView(VIEWS.control);
       setView(VIEWS.idle);
 
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "vikuti",
         "perimeter",
         { state: "off" },
+        expect.anything(),
       );
     });
 
@@ -2306,7 +2361,7 @@ describe("FirebaseStateContext", () => {
       setView(VIEWS.match);
       setView(VIEWS.idle);
 
-      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
+      expect(firebaseDatabase.writeAudited).not.toHaveBeenCalled();
     });
 
     it("leaves the perimeter unchanged for unrelated view transitions", () => {
@@ -2319,11 +2374,12 @@ describe("FirebaseStateContext", () => {
       setView(VIEWS.control);
       setView(VIEWS.match);
 
-      expect(firebaseDatabase.syncState).toHaveBeenCalledTimes(1);
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledTimes(1);
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "vikuti",
         "perimeter",
         { state: "on" },
+        expect.anything(),
       );
     });
 
@@ -2333,7 +2389,7 @@ describe("FirebaseStateContext", () => {
         VIEWS.match,
       );
 
-      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
+      expect(firebaseDatabase.writeAudited).not.toHaveBeenCalled();
     });
 
     it("does not auto-toggle the perimeter for an unauthenticated display", () => {
@@ -2346,7 +2402,7 @@ describe("FirebaseStateContext", () => {
       setView(VIEWS.match);
       setView(VIEWS.idle);
 
-      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
+      expect(firebaseDatabase.writeAudited).not.toHaveBeenCalled();
     });
 
     it("writes only once when switching to the same view twice", () => {
@@ -2358,11 +2414,12 @@ describe("FirebaseStateContext", () => {
       setView(VIEWS.match);
       setView(VIEWS.match);
 
-      expect(firebaseDatabase.syncState).toHaveBeenCalledTimes(1);
-      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledTimes(1);
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "vikuti",
         "perimeter",
         { state: "on" },
+        expect.anything(),
       );
     });
 
@@ -2401,7 +2458,7 @@ describe("FirebaseStateContext", () => {
         </FirebaseStateProvider>,
       );
 
-      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
+      expect(firebaseDatabase.writeAudited).not.toHaveBeenCalled();
     });
 
     it("subscribes to the daemon preview path and parses the snapshot", () => {
@@ -2512,9 +2569,13 @@ describe("FirebaseStateContext", () => {
         await perimeterApi!.createPerimeterMediaPair(pairId, pair);
       });
 
-      expect(set).toHaveBeenCalledWith(
-        `states/vikuti/perimeter/mediaPairs/${pairId}`,
-        pair,
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
+        "vikuti",
+        "perimeter",
+        expect.objectContaining({
+          [`mediaPairs/${pairId}`]: pair,
+        }),
+        expect.anything(),
       );
     });
 
@@ -2525,10 +2586,15 @@ describe("FirebaseStateContext", () => {
         await perimeterApi!.deletePerimeterMediaPair(pairId);
       });
 
-      expect(remove).toHaveBeenCalledWith(
-        `states/vikuti/perimeter/mediaPairs/${pairId}`,
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
+        "vikuti",
+        "perimeter",
+        expect.objectContaining({
+          [`mediaPairs/${pairId}`]: null,
+        }),
+        expect.anything(),
       );
-      expect(set).not.toHaveBeenCalled();
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledTimes(1);
     });
 
     it("blocks createPerimeterMediaPair when not authenticated", async () => {
@@ -2538,7 +2604,7 @@ describe("FirebaseStateContext", () => {
         await perimeterApi!.createPerimeterMediaPair(pairId, pair);
       });
 
-      expect(set).not.toHaveBeenCalled();
+      expect(firebaseDatabase.writeAudited).not.toHaveBeenCalled();
     });
 
     it("blocks deletePerimeterMediaPair when listenPrefix is empty", async () => {
@@ -2548,7 +2614,7 @@ describe("FirebaseStateContext", () => {
         await perimeterApi!.deletePerimeterMediaPair(pairId);
       });
 
-      expect(remove).not.toHaveBeenCalled();
+      expect(firebaseDatabase.writeAudited).not.toHaveBeenCalled();
     });
   });
 });
