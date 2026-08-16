@@ -117,7 +117,7 @@ const MatchActions = () => {
     removeTimeout,
     countdown,
     startHalftimeCountdown,
-    stopHalftimeCountdown,
+    startNextPeriod,
   } = useMatch();
 
   const [showTimeDialog, setShowTimeDialog] = useState(false);
@@ -128,13 +128,13 @@ const MatchActions = () => {
         <div className="match-actions-clock-primary">
           {match.halftimeCountdown ? (
             <Button
-              color="orange"
+              color="blue"
               appearance="primary"
               size="sm"
-              onClick={stopHalftimeCountdown}
+              onClick={startNextPeriod}
               block
             >
-              <PauseIcon /> Stöðva niðurtalningu
+              <PlayIcon /> Byrja næsta hálfleik
             </Button>
           ) : match.started ? (
             <Button

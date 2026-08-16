@@ -8,9 +8,16 @@ interface ClockProps {
 }
 
 const Clock: React.FC<ClockProps> = ({ className }) => {
-  const { match, pauseMatch, buzz, getServerTime } = useMatch();
-  const { started, halfStops, timeElapsed, injuryTimeDisplayMode, countdown } =
-    match;
+  const { match, pauseMatch, startNextPeriod, buzz, getServerTime } =
+    useMatch();
+  const {
+    started,
+    halfStops,
+    timeElapsed,
+    injuryTimeDisplayMode,
+    countdown,
+    halftimeCountdown,
+  } = match;
 
   const halfStop = halfStops[0];
 
@@ -58,7 +65,11 @@ const Clock: React.FC<ClockProps> = ({ className }) => {
         seconds = 0;
         if (!hasFiredCountdownEnd.current) {
           hasFiredCountdownEnd.current = true;
-          pauseMatch();
+          if (halftimeCountdown) {
+            startNextPeriod();
+          } else {
+            pauseMatch();
+          }
         }
       }
     }
@@ -68,9 +79,11 @@ const Clock: React.FC<ClockProps> = ({ className }) => {
     halfStop,
     timeElapsed,
     pauseMatch,
+    startNextPeriod,
     buzz,
     injuryTimeDisplayMode,
     countdown,
+    halftimeCountdown,
     getServerTime,
   ]);
 

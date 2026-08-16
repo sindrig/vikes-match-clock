@@ -189,7 +189,7 @@ interface FirebaseStateContextType {
   buzz: (on: boolean) => void;
   countdown: () => void;
   startHalftimeCountdown: () => void;
-  stopHalftimeCountdown: () => void;
+  startNextPeriod: () => void;
   updateRedCards: (home: number, away: number) => void;
   getServerTime: () => number;
 
@@ -390,6 +390,24 @@ export function maybeAutoDeleteQueue(
   }
 
   return newState;
+}
+
+function applyHalfStopShift(match: Match): Match {
+  const next = { ...match };
+  next.timeElapsed = (next.halfStops[0] ?? 0) * 60 * 1000;
+  if (next.halfStops.length > 1) {
+    next.halfStops = next.halfStops.slice(1);
+  }
+  return next;
+}
+
+export function computeNextPeriodStart(prev: Match, serverTime: number): Match {
+  const shifted = applyHalfStopShift({
+    ...prev,
+    countdown: false,
+    halftimeCountdown: false,
+  });
+  return { ...shifted, started: serverTime };
 }
 
 interface FirebaseStateProviderProps {
@@ -929,18 +947,16 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         const newState: Match = { ...prev, started: 0 };
         if (prev.halftimeCountdown) {
           // Cancelling or completing halftime countdown — advance to next half
-          newState.countdown = false;
-          newState.halftimeCountdown = false;
-          newState.timeElapsed = (newState.halfStops[0] ?? 0) * 60 * 1000;
-          if (newState.halfStops.length > 1) {
-            newState.halfStops = newState.halfStops.slice(1);
-          }
-        } else if (isHalfEnd) {
-          newState.timeElapsed = (newState.halfStops[0] ?? 0) * 60 * 1000;
-          if (newState.halfStops.length > 1) {
-            newState.halfStops = newState.halfStops.slice(1);
-          }
-        } else if (prev.started && !prev.countdown) {
+          return applyHalfStopShift({
+            ...newState,
+            countdown: false,
+            halftimeCountdown: false,
+          });
+        }
+        if (isHalfEnd) {
+          return applyHalfStopShift(newState);
+        }
+        if (prev.started && !prev.countdown) {
           newState.timeElapsed =
             prev.timeElapsed + Math.floor(getServerTime() - prev.started);
         }
@@ -1112,21 +1128,9 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     }));
   }, [applyMatchUpdate, getServerTime]);
 
-  const stopHalftimeCountdown = useCallback(() => {
-    applyMatchUpdate((prev) => {
-      const newState: Match = {
-        ...prev,
-        started: 0,
-        countdown: false,
-        halftimeCountdown: false,
-      };
-      newState.timeElapsed = (newState.halfStops[0] ?? 0) * 60 * 1000;
-      if (newState.halfStops.length > 1) {
-        newState.halfStops = newState.halfStops.slice(1);
-      }
-      return newState;
-    });
-  }, [applyMatchUpdate]);
+  const startNextPeriod = useCallback(() => {
+    applyMatchUpdate((prev) => computeNextPeriodStart(prev, getServerTime()));
+  }, [applyMatchUpdate, getServerTime]);
 
   const updateRedCards = useCallback(
     (home: number, away: number) => {
@@ -1787,7 +1791,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       buzz,
       countdown,
       startHalftimeCountdown,
-      stopHalftimeCountdown,
+      startNextPeriod,
       updateRedCards,
       getServerTime,
       updateController,
@@ -1868,7 +1872,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       buzz,
       countdown,
       startHalftimeCountdown,
-      stopHalftimeCountdown,
+      startNextPeriod,
       updateRedCards,
       getServerTime,
       updateController,
@@ -1961,7 +1965,7 @@ export const useMatch = () => {
     buzz,
     countdown,
     startHalftimeCountdown,
-    stopHalftimeCountdown,
+    startNextPeriod,
     updateRedCards,
     getServerTime,
   } = useFirebaseState();
@@ -1981,7 +1985,7 @@ export const useMatch = () => {
     buzz,
     countdown,
     startHalftimeCountdown,
-    stopHalftimeCountdown,
+    startNextPeriod,
     updateRedCards,
     getServerTime,
   };
