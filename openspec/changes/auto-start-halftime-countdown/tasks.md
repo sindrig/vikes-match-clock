@@ -13,5 +13,5 @@
 ## 3. Verification And Delivery
 
 - [x] 3.1 Run formatter, targeted tests, lint, and the relevant frontend test suite.
-- [ ] 3.2 Create a pull request for the completed change and apply the `sandbox-deploy` label.
+- [x] 3.2 Create a pull request for the completed change and apply the `sandbox-deploy` label.
 - [ ] 3.3 Verify pre-match countdown, natural halftime expiry, and manual early next-half start in the staging deployment before merge.
