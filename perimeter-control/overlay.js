@@ -144,13 +144,22 @@ export function validateOverlayDoc(data, configuredLayerIds, options = {}) {
     for (const key of fileKeys) {
       const f = col.files[key];
       if (typeof f !== "object" || !f) {
-        return { valid: false, reason: `column ${ci} file ${key} is not an object` };
+        return {
+          valid: false,
+          reason: `column ${ci} file ${key} is not an object`,
+        };
       }
       if (!validateFileName(f.name)) {
-        return { valid: false, reason: `column ${ci} file ${key} invalid filename` };
+        return {
+          valid: false,
+          reason: `column ${ci} file ${key} invalid filename`,
+        };
       }
       if (names.has(f.name)) {
-        return { valid: false, reason: `column ${ci} duplicate filename ${f.name}` };
+        return {
+          valid: false,
+          reason: `column ${ci} duplicate filename ${f.name}`,
+        };
       }
       names.add(f.name);
       if (
@@ -159,7 +168,10 @@ export function validateOverlayDoc(data, configuredLayerIds, options = {}) {
           targetFolder: targetFolders[key],
         })
       ) {
-        return { valid: false, reason: `column ${ci} file ${key} invalid source` };
+        return {
+          valid: false,
+          reason: `column ${ci} file ${key} invalid source`,
+        };
       }
     }
   }
@@ -302,7 +314,10 @@ export class AssetStager {
       try {
         const entries = await fs.readdir(cacheDir);
         for (const entry of entries) {
-          if (entry.startsWith(cacheKey) && entry !== path.basename(cachedPath)) {
+          if (
+            entry.startsWith(cacheKey) &&
+            entry !== path.basename(cachedPath)
+          ) {
             await fs.unlink(path.join(cacheDir, entry)).catch(() => {});
           }
         }
@@ -450,11 +465,15 @@ export class ResolumeOverlayClient {
   }
 
   // Deck geometry for overlay playback: total column count, the currently
-  // active column, and the composition autopilot target (id + value) so the
-  // daemon can pause and restore the auto-advance around a goal overlay.
+  // active column, the composition autopilot target (id + value) so the
+  // daemon can pause and restore the auto-advance around a goal overlay, and
+  // the columns that carry base content (used to pick a standby slot for a
+  // double-buffered overlay swap).
   async getColumnGrid() {
     const composition = await this._getJson(`${this._baseUrl()}/composition`);
-    return compositionGrid(composition);
+    return compositionGrid(composition, {
+      overlayLayerIds: this.config.overlayLayerIds,
+    });
   }
 
   async loadClip(layerId, clipSlot, filePath) {
@@ -497,7 +516,9 @@ export class ResolumeOverlayClient {
     const video = clip?.video;
     const resize = video?.resize;
     if (!resize || resize.id == null) {
-      throw new Error(`no resize parameter on layer ${layerId} clip ${clipSlot}`);
+      throw new Error(
+        `no resize parameter on layer ${layerId} clip ${clipSlot}`,
+      );
     }
     if (!Array.isArray(resize.options) || !resize.options.includes(mode)) {
       throw new Error(
@@ -549,11 +570,51 @@ export class ResolumeOverlayClient {
     );
   }
 
+  // Set the clip's transition so it crossfades in over the previously
+  // connected clip of the same layer. Resolume exposes this as the clip's
+  // `transition` node (layer_determined + duration + blend_mode); the daemon
+  // reads the clip back to find the parameter ids and disables layer
+  // inheritance so the per-clip settings apply. Used to soften an overlay swap
+  // into a dissolve instead of a hard cut.
+  async setClipTransition(layerId, clipSlot, seconds, blendMode) {
+    if (!(seconds >= 0) || typeof seconds !== "number") {
+      throw new Error(`invalid transition seconds ${JSON.stringify(seconds)}`);
+    }
+    if (!blendMode || typeof blendMode !== "string") {
+      throw new Error(`invalid transition blend ${JSON.stringify(blendMode)}`);
+    }
+    const base = this._baseUrl();
+    const clip = await this._getJson(
+      `${base}/composition/layers/${layerId}/clips/${clipSlot}`,
+    );
+    const transition = clip?.transition;
+    if (
+      !transition ||
+      transition.layer_determined?.id == null ||
+      transition.duration?.id == null ||
+      transition.blend_mode?.id == null
+    ) {
+      throw new Error(
+        `no transition params on layer ${layerId} clip ${clipSlot}`,
+      );
+    }
+    await this._put(
+      `${base}/parameter/by-id/${transition.layer_determined.id}`,
+      {
+        value: false,
+      },
+    );
+    await this._put(`${base}/parameter/by-id/${transition.duration.id}`, {
+      value: seconds,
+    });
+    await this._put(`${base}/parameter/by-id/${transition.blend_mode.id}`, {
+      value: blendMode,
+    });
+  }
+
   async clearLayer(layerId) {
     const base = this._baseUrl();
-    await this._post(
-      `${base}/composition/layers/${layerId}/clear`,
-    );
+    await this._post(`${base}/composition/layers/${layerId}/clear`);
   }
 }
 
@@ -572,6 +633,17 @@ export class OverlayController {
     this._currentId = null;
     this._currentColumn = 0;
     this._activeColumn = null;
+    // True once an overlay clip is loaded and connected. The first load (or a
+    // restart reconciliation) loads straight into the active column; every
+    // later play — an overlay swap or the next column of a multi-column
+    // overlay — double-buffers through a standby column so the old clip keeps
+    // playing until the new one is connected (no gap where the base content
+    // shows through).
+    this._overlayLoaded = false;
+    // The standby deck column most recently used for a double-buffered swap;
+    // kept so a clear can also unload a standby clip that never cut over (e.g.
+    // when a swap failed after staging).
+    this._standbyColumn = null;
     this._autopilotFrozen = false;
     this._columnTimer = null;
     this._stopping = false;
@@ -708,7 +780,9 @@ export class OverlayController {
       } catch (err) {
         const isLast = attempt === OVERLAY_MAX_RETRIES - 1;
         if (isLast) {
-          console.error(`${description} failed after ${OVERLAY_MAX_RETRIES} attempts: ${err.message}`);
+          console.error(
+            `${description} failed after ${OVERLAY_MAX_RETRIES} attempts: ${err.message}`,
+          );
           throw err;
         }
         console.warn(
@@ -802,6 +876,16 @@ export class OverlayController {
           if (this._activeColumn && this._activeColumn !== clipSlot) {
             await this.resolume.clearClip(layerId, this._activeColumn);
           }
+          // A double-buffered swap that failed after staging may leave a clip
+          // loaded in the standby column — unload it too so no overlay-layer
+          // slot lingers loaded.
+          if (
+            this._standbyColumn &&
+            this._standbyColumn !== clipSlot &&
+            this._standbyColumn !== this._activeColumn
+          ) {
+            await this.resolume.clearClip(layerId, this._standbyColumn);
+          }
         }
       } catch (err) {
         console.error(
@@ -810,6 +894,8 @@ export class OverlayController {
       }
     }
     await this._unfreezeDeck();
+    this._overlayLoaded = false;
+    this._standbyColumn = null;
     this._publishStatus("playing", -1).catch(() => {});
     console.log("Overlay cleared");
   }
@@ -859,10 +945,29 @@ export class OverlayController {
         : undefined;
     this._activeColumn = activeColumn;
 
+    // When an overlay is already playing — a swap to a different overlay doc,
+    // or advancing to the next column of the same multi-column overlay —
+    // double-buffer: stage and load the new clip into a standby column while
+    // the old clip keeps playing, then cut over once the new clip is ready.
+    // This eliminates the gap where the old overlay is cleared but the new one
+    // is still downloading/loading (the base ad would show through). The very
+    // first load (or a restart reconciliation) has nothing playing, so it uses
+    // the active column directly as before.
+    const isSwap = this._overlayLoaded;
+    const standbyColumn = isSwap
+      ? this._pickStandbyColumn(activeColumn, grid)
+      : null;
+    const targetSlot = standbyColumn ?? activeColumn;
+    this._standbyColumn = standbyColumn;
+
     try {
       await this._publishStatus("downloading", colIdx);
       await this._retryOp(`stage column ${colIdx}`, () =>
-        this._stageAndLoadColumn(col, activeColumn),
+        this._stageAndLoadColumn(
+          col,
+          targetSlot,
+          standbyColumn !== null && standbyColumn !== activeColumn,
+        ),
       );
     } catch (err) {
       console.error(`Failed to stage/load column ${colIdx}: ${err.message}`);
@@ -873,13 +978,34 @@ export class OverlayController {
     try {
       await this._publishStatus("loading", colIdx);
       await this._retryOp(`trigger column ${colIdx}`, () =>
-        this._triggerColumn(col, activeColumn),
+        this._triggerColumn(col, targetSlot),
       );
     } catch (err) {
       console.error(`Failed to trigger column ${colIdx}: ${err.message}`);
       await this._publishStatus("error", colIdx, err);
       return;
     }
+
+    // The new clip is now connected (crossfading in if configured). Give the
+    // transition time to finish before releasing the old clip's file handle so
+    // the fade is not cut short, then unload the old slot (Resolume holds the
+    // file open; a later re-staging move would otherwise be denied).
+    if (
+      standbyColumn !== null &&
+      activeColumn &&
+      standbyColumn !== activeColumn
+    ) {
+      if (this.config.overlayTransitionMs > 0) {
+        await this._sleep(this.config.overlayTransitionMs + 200);
+        if (this._stopping || this._currentId !== doc.id) return;
+      }
+      if (this._stopping || this._currentId !== doc.id) return;
+      await this._clearOverlaySlot(activeColumn);
+    }
+    if (this._stopping || this._currentId !== doc.id) return;
+    this._standbyColumn = null;
+    this._activeColumn = targetSlot;
+    this._overlayLoaded = true;
 
     await this._publishStatus("playing", colIdx);
 
@@ -892,6 +1018,38 @@ export class OverlayController {
       this._columnTimer = null;
       this._playColumn(doc, colIdx + 1);
     }, col.durationMs);
+  }
+
+  // Pick a standby deck column for a double-buffered swap: a column different
+  // from the one the old overlay plays in, preferring a column with base
+  // content so the deck resumes on content after the overlay clears. Returns
+  // null when no spare column exists (single-column deck).
+  _pickStandbyColumn(activeColumn, grid) {
+    const columnCount = grid?.columnCount || 0;
+    if (columnCount < 2 || !activeColumn || activeColumn < 1) return null;
+    const base = Array.isArray(grid?.baseContentColumns)
+      ? grid.baseContentColumns
+      : [];
+    const preferred = base.find((c) => c !== activeColumn);
+    if (preferred !== undefined) return preferred;
+    for (let c = 1; c <= columnCount; c += 1) {
+      if (c !== activeColumn) return c;
+    }
+    return null;
+  }
+
+  // Best-effort unload of an overlay clip slot across every overlay layer
+  // (releases the file handle Resolume holds open). Failures are logged only.
+  async _clearOverlaySlot(slot) {
+    for (const layerId of this.config.overlayLayerIds) {
+      try {
+        await this.resolume.clearClip(layerId, slot);
+      } catch (err) {
+        console.error(
+          `Failed to clear overlay slot ${slot} on layer ${layerId}: ${err.message}`,
+        );
+      }
+    }
   }
 
   // Force the loaded overlay clip to fill its canvas (Video → Resize →
@@ -916,7 +1074,7 @@ export class OverlayController {
     }
   }
 
-  async _stageAndLoadColumn(col, activeColumn) {
+  async _stageAndLoadColumn(col, targetSlot, crossfade = false) {
     const promises = [];
     for (const [layerId, fileDef] of Object.entries(col.files)) {
       const clipSlot = this.config.overlayLayerClipColumns[layerId];
@@ -924,36 +1082,67 @@ export class OverlayController {
         throw new Error(`No clip slot configured for layer ${layerId}`);
       }
       // The deck is frozen for the duration of the overlay, so a single slot
-      // (the currently active column) is enough — loading one slot per layer
-      // keeps the trigger fast. Falls back to the configured reference slot
-      // when the composition cannot be read.
-      const targetSlot = activeColumn ?? clipSlot;
+      // (the currently active column, or a standby column during a swap) is
+      // enough — loading one slot per layer keeps the trigger fast. Falls back
+      // to the configured reference slot when the composition cannot be read.
+      const slot = targetSlot ?? clipSlot;
       promises.push(
         (async () => {
           // Unload anything still in the slot: Resolume holds the previously
           // loaded file open, so the staging move would fail with "Access is
-          // denied" unless the clip is cleared first.
-          await this.resolume.clearClip(layerId, targetSlot);
+          // denied" unless the clip is cleared first. On a swap the target is
+          // the standby column — not the column the old overlay is playing
+          // in — so clearing it never interrupts the current overlay.
+          await this.resolume.clearClip(layerId, slot);
           const winPath = await this.stager.stageAsset(
             fileDef.source,
             fileDef.name,
           );
-          await this.resolume.loadClip(layerId, targetSlot, winPath);
-          await this._setClipFitBestEffort(layerId, targetSlot);
+          await this.resolume.loadClip(layerId, slot, winPath);
+          await this._setClipFitBestEffort(layerId, slot);
+          if (crossfade) {
+            await this._setClipTransitionBestEffort(layerId, slot);
+          }
         })(),
       );
     }
     await Promise.all(promises);
   }
 
-  async _triggerColumn(col, activeColumn) {
+  // Best-effort set a crossfade transition on a freshly loaded overlay clip so
+  // that when it becomes connected it dissolves in over the previous overlay
+  // instead of a hard cut. A failure is logged and swallowed — the double
+  // buffer still swaps without a gap, it just cuts instead of crossfading.
+  async _setClipTransitionBestEffort(layerId, clipSlot) {
+    const seconds = this.config.overlayTransitionMs / 1000;
+    if (!(seconds > 0)) return;
+    try {
+      await this._retryOp(
+        `set clip transition on layer ${layerId} slot ${clipSlot}`,
+        () =>
+          this.resolume.setClipTransition(
+            layerId,
+            clipSlot,
+            seconds,
+            this.config.overlayTransitionBlend || "Dissolve",
+          ),
+      );
+    } catch (err) {
+      console.error(
+        `Failed to set clip transition on layer ${layerId} slot ${clipSlot}: ${err.message}`,
+      );
+    }
+  }
+
+  async _triggerColumn(col, targetSlot) {
     const promises = [];
     for (const [layerId] of Object.entries(col.files)) {
       const clipSlot = this.config.overlayLayerClipColumns[layerId];
       if (clipSlot === undefined) continue;
-      // Trigger the clip in the column the deck is currently on so the
-      // overlay starts immediately (the deck is frozen for the overlay).
-      promises.push(this.resolume.connectClip(layerId, activeColumn ?? clipSlot));
+      // Trigger the clip in the column the deck is on (the standby column
+      // during a swap) so the overlay starts immediately (the deck is frozen
+      // for the overlay).
+      promises.push(this.resolume.connectClip(layerId, targetSlot ?? clipSlot));
     }
     await Promise.all(promises);
   }

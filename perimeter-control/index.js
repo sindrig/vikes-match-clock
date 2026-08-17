@@ -76,6 +76,14 @@ const DEFAULT_OVERLAY_LAYER_CLIP_COLUMNS = '{"2":1,"4":1}';
 // respectively. The daemon rejects a pair file whose folder does not match its
 // layer's configured target.
 const DEFAULT_OVERLAY_LAYER_TARGET_FOLDERS = '{"2":"48","4":"40"}';
+// Crossfade used when one overlay is swapped for another while playing. The
+// daemon double-buffers the swap (loads the new overlay into a standby deck
+// column while the old one keeps playing, then connects it and clears the old
+// slot), so setting a clip transition here makes the cutover crossfade instead
+// of a hard cut. "0" disables the crossfade (still a seamless double-buffered
+// swap, just an instant cut).
+const DEFAULT_OVERLAY_TRANSITION_SECONDS = "0.5";
+const DEFAULT_OVERLAY_TRANSITION_BLEND = "Dissolve";
 
 // Ad-layout defaults. The ad lanes are the base content layers (1-based layer
 // indices) that the deck autopilot cycles; the goal overlay uses the separate
@@ -127,7 +135,8 @@ const DEFAULT_CLIP_FIT = "Stretch";
 // fill on the correct region. For the Víkin composition: layers 1 (48 skjáir
 // base) and 2 (48 overlay) are 4608x192; layers 3 (40 skjáir base) and 4 (40
 // overlay) are 3840x192.
-const DEFAULT_CLIP_CANVASES = '{"1":"4608x192","2":"4608x192","3":"3840x192","4":"3840x192"}';
+const DEFAULT_CLIP_CANVASES =
+  '{"1":"4608x192","2":"4608x192","3":"3840x192","4":"3840x192"}';
 
 // Legacy freeze record written by an earlier daemon build that paused the
 // autopilot for the ad-layout; nothing reads it today, so the "on" self-heal
@@ -327,6 +336,16 @@ export function loadConfig(environ = process.env) {
       environ.PERIMETER_CLIP_CANVASES,
       DEFAULT_CLIP_CANVASES,
     ),
+    // Crossfade applied when one overlay is swapped for another while playing.
+    // 0 disables it (still a seamless double-buffered swap, just a hard cut).
+    overlayTransitionMs: nonNegativeMs(
+      environ.PERIMETER_OVERLAY_TRANSITION_SECONDS,
+      Number(DEFAULT_OVERLAY_TRANSITION_SECONDS) * 1000,
+    ),
+    overlayTransitionBlend: (
+      environ.PERIMETER_OVERLAY_TRANSITION_BLEND ||
+      DEFAULT_OVERLAY_TRANSITION_BLEND
+    ).trim(),
     // Ad-layout settings. The deck column range is derived from the live
     // composition at runtime; only the lane IDs are configured.
     adLayoutEnabled: environ.PERIMETER_AD_LAYOUT_ENABLED !== "false",
