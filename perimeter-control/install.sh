@@ -67,6 +67,7 @@ install -o root -g root -m 0644 "$SCRIPT_DIR/overlay.js" "$APP_DIR/overlay.js"
 install -o root -g root -m 0644 "$SCRIPT_DIR/ad-layout.js" "$APP_DIR/ad-layout.js"
 install -o root -g root -m 0644 "$SCRIPT_DIR/resolume-import.js" "$APP_DIR/resolume-import.js"
 install -o root -g root -m 0644 "$SCRIPT_DIR/brightness.js" "$APP_DIR/brightness.js"
+install -o root -g root -m 0644 "$SCRIPT_DIR/vnnox.js" "$APP_DIR/vnnox.js"
 install -o root -g root -m 0644 "$SCRIPT_DIR/package.json" "$APP_DIR/package.json"
 install -o root -g root -m 0644 "$SCRIPT_DIR/package-lock.json" "$APP_DIR/package-lock.json"
 
