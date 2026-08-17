@@ -754,7 +754,7 @@ describe("PerimeterControl", () => {
       openModal();
 
       expect(
-        within(getBrightnessSection()).getByText("Beitt"),
+        within(getBrightnessSection()).getByText("Vistað"),
       ).toBeInTheDocument();
       expect(
         within(getBrightnessSection()).getByText("Staðfest: 60%"),

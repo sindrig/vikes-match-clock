@@ -54,7 +54,7 @@ const PHASE_LABELS: Record<string, string> = {
 
 const BRIGHTNESS_PHASE_LABELS: Record<string, string> = {
   pending: "Í bið",
-  applied: "Beitt",
+  applied: "Vistað",
   failed: "Villa",
 };
 

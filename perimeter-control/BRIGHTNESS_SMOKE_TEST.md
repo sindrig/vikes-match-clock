@@ -54,7 +54,7 @@ perimeter screen GUID must ever be written.
 ## 4. Verify published status and Vnnox readback
 
 - [ ] In the controller UI the brightness section shows the daemon phase
-      `Beitt` and `Staðfest: <pct>%`.
+      `Vistað` and `Staðfest: <pct>%`.
 - [ ] Independently confirm the hardware: read the perimeter screen brightness
       via the UCenter `normal-screen` API (same call the daemon makes) and
       confirm `ratio * 100 / ratioScale` matches the requested percentage
@@ -67,7 +67,7 @@ perimeter screen GUID must ever be written.
 - [ ] Re-issue the **snapshot percentage from step 2** through the controller
       and confirm it verifies `applied` with the original value.
 - [ ] Confirm the Vnnox readback returns the original snapshot percentage.
-- [ ] Confirm the controller UI shows `Beitt` / `Staðfest: <original>%`.
+- [ ] Confirm the controller UI shows `Vistað` / `Staðfest: <original>%`.
 
 ## 6. Failure-path checks (optional but recommended)
 
