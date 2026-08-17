@@ -2439,6 +2439,127 @@ describe("FirebaseStateContext", () => {
     });
   });
 
+  describe("perimeter brightness", () => {
+    function renderBrightness(
+      listenPrefix: string,
+      isAuthenticated: boolean,
+      brightnessData: unknown = null,
+      statusData: unknown = null,
+    ): ReturnType<typeof usePerimeter> | null {
+      vi.mocked(onValue).mockImplementation((reference, callback) => {
+        const path = String(reference);
+        if (path.endsWith("/perimeter/brightness")) {
+          callback({ val: () => brightnessData } as never);
+        } else if (path.endsWith("/brightnessStatus")) {
+          callback({ val: () => statusData } as never);
+        } else {
+          callback({ val: () => null } as never);
+        }
+        return vi.fn();
+      });
+
+      let perimeterApi: ReturnType<typeof usePerimeter> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix={listenPrefix}
+          isAuthenticated={isAuthenticated}
+          screenKey={null}
+        >
+          <TestPerimeterConsumer
+            onMount={(api) => {
+              perimeterApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      return perimeterApi;
+    }
+
+    it("parses the requested brightness from the subscription", () => {
+      const perimeterApi = renderBrightness("vikuti", true, 42, null);
+      expect(perimeterApi).not.toBeNull();
+      expect(perimeterApi!.brightness).toBe(42);
+    });
+
+    it("defaults the requested brightness to null when absent", () => {
+      const perimeterApi = renderBrightness("vikuti", true, null, null);
+      expect(perimeterApi!.brightness).toBeNull();
+    });
+
+    it("rejects an out-of-range brightness as null (no optimistic value)", () => {
+      const perimeterApi = renderBrightness("vikuti", true, 150, null);
+      expect(perimeterApi!.brightness).toBeNull();
+    });
+
+    it("parses the daemon-published brightness status", () => {
+      const status = {
+        requestedPercent: 50,
+        appliedPercent: 50,
+        phase: "applied",
+        error: null,
+        updatedAt: 1723392000000,
+      };
+      const perimeterApi = renderBrightness("vikuti", true, 50, status);
+      expect(perimeterApi!.brightnessStatus).toEqual(status);
+    });
+
+    it("rejects a malformed brightness status as null", () => {
+      const perimeterApi = renderBrightness("vikuti", true, 50, {
+        requestedPercent: 50,
+        phase: "playing",
+        updatedAt: 1723392000000,
+      });
+      expect(perimeterApi!.brightnessStatus).toBeNull();
+    });
+
+    it("setPerimeterBrightness writes the percentage when authenticated", async () => {
+      const perimeterApi = renderBrightness("vikuti", true);
+
+      await act(async () => {
+        await perimeterApi!.setPerimeterBrightness(42);
+      });
+
+      expect(set).toHaveBeenCalledWith(
+        "states/vikuti/perimeter/brightness",
+        42,
+      );
+    });
+
+    it("blocks setPerimeterBrightness when not authenticated", async () => {
+      const perimeterApi = renderBrightness("vikuti", false);
+
+      await act(async () => {
+        await perimeterApi!.setPerimeterBrightness(50);
+      });
+
+      expect(set).not.toHaveBeenCalled();
+    });
+
+    it("blocks setPerimeterBrightness when listenPrefix is empty", async () => {
+      const perimeterApi = renderBrightness("", true);
+
+      await act(async () => {
+        await perimeterApi!.setPerimeterBrightness(50);
+      });
+
+      expect(set).not.toHaveBeenCalled();
+    });
+
+    it("rejects an invalid percentage without writing", async () => {
+      const warn = vi
+        .spyOn(console, "warn")
+        .mockImplementation(() => undefined);
+      const perimeterApi = renderBrightness("vikuti", true);
+
+      await act(async () => {
+        await perimeterApi!.setPerimeterBrightness(150);
+      });
+
+      expect(set).not.toHaveBeenCalled();
+      warn.mockRestore();
+    });
+  });
+
   describe("perimeter media pairs", () => {
     const pairId = "11111111-1111-4111-8111-111111111111";
     const pair = {

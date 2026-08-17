@@ -558,6 +558,55 @@ These are exposed via `usePerimeter()` hook (new fields):
   instead of an endless loader
 - `setPerimeterAdLayout` — write action
 
+#### Perimeter Brightness (Vnnox LED brightness)
+
+Operators can set the brightness of the perimeter LED screen through the same
+`Jaðarskjár` modal. The **controller writes the desired state**, the daemon
+applies it to the Vnnox/UCenter-controlled screen, verifies the result, and
+publishes the **daemon-owned outcome** — the controller never talks to Vnnox
+directly and never treats a Firebase write confirmation as a hardware result.
+
+**Data ownership:**
+
+| Path                                        | Writer     | Purpose                                                        |
+| ------------------------------------------- | ---------- | -------------------------------------------------------------- |
+| `states/{location}/perimeter/brightness`    | Controller | Requested brightness as a whole integer percentage (0–100)     |
+| `perimeter/{location}/brightnessStatus`     | Daemon     | `requestedPercent`, `appliedPercent`, `phase`, `error`, `updatedAt` |
+
+- The requested value is a bare integer percentage. `null`/missing means "no
+  command" and is inert; the daemon ignores anything that is not a whole
+  percentage from 0 through 100.
+- `brightnessStatus.phase` is `pending` (before hardware I/O), `applied` (the
+  daemon verified the screen read within a small integer tolerance), or
+  `failed` (with a safe error description). `appliedPercent` is present only
+  after verification.
+- The status path lives under `perimeter/{location}`, which the database rules
+  make client-read-only; only the daemon's service account writes it.
+
+**Context integration** (`usePerimeter()`):
+
+- `brightness` — `number | null`; the Firebase-synchronized requested
+  percentage (strictly parsed, so malformed values are `null`).
+- `brightnessStatus` — `PerimeterBrightnessStatus | null`; daemon-published
+  status (strictly parsed — an unknown phase or malformed value rejects the
+  whole document).
+- `setPerimeterBrightness(percent)` — authenticated write of the requested
+  percentage to `states/{listenPrefix}/perimeter/brightness`. Rejects
+  non-integer or out-of-range values locally without writing.
+
+**Operator behavior** (`PerimeterControl.tsx`):
+
+- The `Bjartleiki jaðarskjás` section renders above the ad-layout board and is
+  gated by the same `perimeter.enabled` feature flag (the whole modal is hidden
+  when disabled).
+- It shows the Firebase-synchronized requested value, the daemon phase, the
+  verified applied value, and any safe failure message.
+- Submitting is an explicit `Beita` action; the input is client-validated to a
+  whole percentage from 0 through 100 before any write. The `Beita` button is
+  disabled while a submission is pending (until the `brightness` subscription
+  reflects the submitted value) and while the daemon reports `pending` — there
+  are **no optimistic local updates**.
+
 ### The `listenPrefix` System
 
 The `listenPrefix` (e.g., `"vikinni"`, `"hasteinsvollur"`) determines which Firebase path the instance subscribes to:

@@ -536,6 +536,71 @@ desired `adLayout` path is a deliberate one-shot exception to the "daemon never
 writes the desired path" rule — it cannot self-loop because it only reacts to
 the separate import command path.
 
+## Perimeter brightness (Vnnox/UCenter LED brightness)
+
+The daemon can set and verify the **brightness of the perimeter LED screen**
+through the Nova Vnnox/UCenter service (`vnnox-brightness.md` documents the
+protocol and its safety assessment). It is **disabled unless explicitly
+enabled** — a missing command, missing configuration, or a disabled feature
+never touches a live screen.
+
+### Command and status
+
+| Path                                     | Writer     | Purpose                                              |
+| ---------------------------------------- | ---------- | ---------------------------------------------------- |
+| `states/{location}/perimeter/brightness` | Controller | Requested brightness, an integer 0–100 (or absent)   |
+| `perimeter/{location}/brightnessStatus`  | Daemon     | `requestedPercent`, `appliedPercent`, `phase`, `error`, server timestamp |
+
+- The command value is the requested **whole percentage** (0–100). `null` /
+  missing / non-integer / out-of-range values are inert — a missing command
+  must never affect a live screen.
+- The status phase is `pending` (before hardware I/O), `applied` (the screen
+  read verified the request within tolerance), or `failed` (with a safe error
+  description); `appliedPercent` is present only when a value was verified.
+- The status is daemon-owned and client-read-only; the database rules already
+  deny client writes under `perimeter/{location}`.
+
+### How it works
+
+For each valid request the daemon:
+
+1. publishes `pending`,
+2. **snapshots** the current perimeter screen brightness and reads the
+   cabinet metadata for diagnosis,
+3. logs in to Vnnox (per-device token) and **writes the converted fraction
+   only to the configured perimeter screen GUID** (`guidList` has exactly one
+   entry) — the MVR screen is never targeted,
+4. **polls the screen read** until it matches the request within an integer
+   percentage tolerance, then publishes `applied`,
+5. on any failure after the write has started, **best-effort restores the
+   snapshot** (writing the exact pre-write ratio/ratioScale back to the same
+   screen) before publishing `failed`; restore failures are logged and
+   appended to the safe error text.
+
+Requests are processed **one at a time** by a serialized worker that keeps the
+newest pending request. A newer request supersedes an older one before a write
+has started; once a write has started the sequence is irreversible and finishes
+(verifies or restores) before the newer request is picked up. Pre-write
+transient failures retry with bounded exponential backoff.
+
+### Configuration
+
+See `perimeter-control.env.example` for the full list of environment
+variables, including `PERIMETER_BRIGHTNESS_ENABLED`, `PERIMETER_BRIGHTNESS_PATH`,
+`PERIMETER_BRIGHTNESS_STATUS_PATH`, `PERIMETER_VNNOX_*` (base URL, device
+`ip`/`port`/`protocol`, serial, project ID, **perimeter screen GUID**, username,
+password source, timeout), and the retry/verification knobs.
+
+Required to enable: `PERIMETER_BRIGHTNESS_ENABLED=true` plus a device serial
+(`PERIMETER_VNNOX_SN`) and the **perimeter screen GUID**
+(`PERIMETER_VNNOX_PERIMETER_GUID`) — there is deliberately no default for the
+GUID, so a name-based or all-screen selection is impossible. If the feature is
+enabled but configuration is incomplete, requests fail with a
+configuration-caused status instead of touching hardware. The Vnnox password
+is never committed: `PERIMETER_VNNOX_PASSWORD_SOURCE=env` reads
+`PERIMETER_VNNOX_PASSWORD`, `=file` reads the first line of
+`PERIMETER_VNNOX_PASSWORD_FILE` on the gateway.
+
 ## Tests
 
 ```bash

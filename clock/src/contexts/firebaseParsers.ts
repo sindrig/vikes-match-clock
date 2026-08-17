@@ -26,6 +26,8 @@ import type {
   PerimeterAppliedAdFile,
   PerimeterAdLane,
   PerimeterAdPhase,
+  PerimeterBrightnessStatus,
+  PerimeterBrightnessPhase,
 } from "../types";
 import { Sports, DEFAULT_THEME } from "../constants";
 
@@ -932,4 +934,62 @@ export function parsePerimeterAppliedAdLayout(
   }
 
   return { lanes, revision, phase, error, updatedAt, columns };
+}
+
+// -- Perimeter brightness (Vnnox LED brightness) -----------------------------
+
+const VALID_BRIGHTNESS_PHASES: PerimeterBrightnessPhase[] = [
+  "pending",
+  "applied",
+  "failed",
+];
+
+// Parse the controller's requested brightness at
+// states/{location}/perimeter/brightness. Only a whole integer percentage in
+// the inclusive 0..100 range is valid; anything else (missing, null,
+// non-integer, out of range) parses to null and is inert in the UI.
+export function parsePerimeterBrightness(data: unknown): number | null {
+  if (data === null || data === undefined) return null;
+  if (typeof data !== "number") return null;
+  if (!Number.isInteger(data)) return null;
+  if (data < 0 || data > 100) return null;
+  return data;
+}
+
+// Strict parse of the daemon-published brightness status at
+// perimeter/{location}/brightnessStatus. Malformed phases or values reject the
+// whole document (null) so the UI never trusts a partial status.
+export function parsePerimeterBrightnessStatus(
+  data: unknown,
+): PerimeterBrightnessStatus | null {
+  if (!data || typeof data !== "object") return null;
+  const raw = data as Record<string, unknown>;
+
+  if (
+    !VALID_BRIGHTNESS_PHASES.includes(raw.phase as PerimeterBrightnessPhase)
+  ) {
+    return null;
+  }
+
+  const requestedPercent = parsePerimeterBrightness(raw.requestedPercent);
+  if (requestedPercent === null) return null;
+
+  let appliedPercent: number | null = null;
+  if (raw.appliedPercent !== null && raw.appliedPercent !== undefined) {
+    const parsedApplied = parsePerimeterBrightness(raw.appliedPercent);
+    if (parsedApplied === null) return null;
+    appliedPercent = parsedApplied;
+  }
+
+  const error = typeof raw.error === "string" ? raw.error : null;
+  const updatedAt = typeof raw.updatedAt === "number" ? raw.updatedAt : null;
+  if (updatedAt === null) return null;
+
+  return {
+    requestedPercent,
+    appliedPercent,
+    phase: raw.phase as PerimeterBrightnessPhase,
+    error,
+    updatedAt,
+  };
 }

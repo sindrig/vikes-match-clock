@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Button, Loader, Modal, IconButton, Badge } from "rsuite";
+import { Button, Loader, Modal, IconButton, Badge, InputNumber } from "rsuite";
 import CloseIcon from "@rsuite/icons/Close";
 import PlusIcon from "@rsuite/icons/Plus";
 import DragIcon from "@rsuite/icons/Dragable";
@@ -50,6 +50,12 @@ const PHASE_LABELS: Record<string, string> = {
   playing: "Spilar",
   error: "Villa",
   idle: "Í bið",
+};
+
+const BRIGHTNESS_PHASE_LABELS: Record<string, string> = {
+  pending: "Í bið",
+  applied: "Beitt",
+  failed: "Villa",
 };
 
 const formatTimestamp = (updatedAt: number | null): string => {
@@ -280,6 +286,96 @@ const FilePicker = ({
   );
 };
 
+const BrightnessSection = () => {
+  const { brightness, brightnessStatus, setPerimeterBrightness } =
+    usePerimeter();
+  // Local edit draft as a number (null = empty/cleared input). Firebase is
+  // the only source of the displayed requested value; the draft only feeds
+  // the apply action and client-side validation.
+  const [draft, setDraft] = useState<number | null>(null);
+  // The submitted percentage whose write is still settling. A write settles
+  // only once the brightness subscription reflects the submitted value (no
+  // optimistic local state); a rejected write clears it so the UI is not
+  // stuck disabled forever.
+  const [submittedValue, setSubmittedValue] = useState<number | null>(null);
+
+  const valid =
+    draft !== null && Number.isInteger(draft) && draft >= 0 && draft <= 100;
+
+  const handleApply = () => {
+    if (!valid || submittedValue !== null) return;
+    setSubmittedValue(draft);
+    setPerimeterBrightness(draft).catch(() => setSubmittedValue(null));
+  };
+
+  const phase = brightnessStatus?.phase;
+  const settling = submittedValue !== null && brightness !== submittedValue;
+  const busy = settling || phase === "pending";
+
+  return (
+    <div className="perimeter-brightness">
+      <div className="perimeter-brightness-header">
+        <span className="perimeter-brightness-title">
+          Bjartleiki jaðarskjás
+        </span>
+        {brightnessStatus && (
+          <Badge
+            content={BRIGHTNESS_PHASE_LABELS[phase ?? ""] ?? phase}
+            className={`perimeter-phase-badge phase-${phase}`}
+          />
+        )}
+      </div>
+      <div className="perimeter-brightness-controls">
+        <InputNumber
+          size="sm"
+          step={1}
+          value={draft ?? brightness ?? 0}
+          onChange={(val) => {
+            const next = typeof val === "number" ? val : Number(val);
+            setDraft(Number.isNaN(next) ? null : next);
+          }}
+          disabled={busy}
+        />
+        <Button
+          size="sm"
+          appearance="primary"
+          onClick={handleApply}
+          disabled={!valid || busy}
+        >
+          Beita
+        </Button>
+      </div>
+      {draft !== null && !valid && (
+        <div className="perimeter-brightness-invalid">
+          Heiltala á milli 0 og 100 er leyfileg.
+        </div>
+      )}
+      <div className="perimeter-brightness-status">
+        {brightness !== null && (
+          <span className="perimeter-brightness-requested">
+            Óskað: {brightness}%
+          </span>
+        )}
+        {brightnessStatus?.appliedPercent !== null &&
+          brightnessStatus?.appliedPercent !== undefined && (
+            <span className="perimeter-brightness-applied">
+              Staðfest: {brightnessStatus.appliedPercent}%
+            </span>
+          )}
+        {brightnessStatus?.error && (
+          <span className="perimeter-brightness-invalid">
+            {brightnessStatus.error}
+          </span>
+        )}
+      </div>
+      <p className="perimeter-hint">
+        Stillingin er send í gegnum Firebase og beitt af jaðartölvunni (Vnnox) á
+        jaðarskjáinn.
+      </p>
+    </div>
+  );
+};
+
 const PerimeterControl = () => {
   const {
     perimeter,
@@ -496,6 +592,7 @@ const PerimeterControl = () => {
           <Modal.Title>Jaðarskjár — Umsýsla auglýsinga</Modal.Title>
         </Modal.Header>
         <Modal.Body>
+          <BrightnessSection />
           {!appliedAdLayoutLoaded ? (
             <div className="perimeter-preview-state">
               <Loader content="Sæki forskoðun..." />

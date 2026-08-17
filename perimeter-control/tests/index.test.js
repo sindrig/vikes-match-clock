@@ -57,6 +57,25 @@ test("loadConfig defaults", () => {
     3: "3840x192",
     4: "3840x192",
   });
+  // Brightness (Vnnox) defaults: disabled unless explicitly enabled.
+  assert.equal(config.brightnessEnabled, false);
+  assert.equal(config.brightnessPath, "states/vikuti/perimeter/brightness");
+  assert.equal(
+    config.brightnessStatusPath,
+    "perimeter/vikuti/brightnessStatus",
+  );
+  assert.equal(config.vnnoxBaseUrl, "http://localhost:81");
+  assert.equal(config.vnnoxIp, "10.182.45.40");
+  assert.equal(config.vnnoxPort, "8088");
+  assert.equal(config.vnnoxProtocol, "http");
+  assert.equal(config.vnnoxProjectId, "defaultProject-vx");
+  assert.equal(config.vnnoxUsername, "admin");
+  assert.equal(config.vnnoxPasswordSource, "env");
+  assert.equal(config.vnnoxTimeoutMs, 10_000);
+  assert.equal(config.brightnessMaxRetries, 3);
+  assert.equal(config.brightnessVerifyAttempts, 6);
+  assert.equal(config.brightnessVerifyTolerance, 1);
+  assert.equal(config.brightnessVerifyIntervalMs, 1_000);
 });
 
 test("loadConfig overrides", () => {
@@ -81,6 +100,24 @@ test("loadConfig overrides", () => {
     PERIMETER_DECK_AUTOPILOT_SECONDS: "15",
     PERIMETER_CLIP_FIT: "Fill",
     PERIMETER_CLIP_CANVASES: '{"3":"3840x192"}',
+    PERIMETER_BRIGHTNESS_ENABLED: "true",
+    PERIMETER_BRIGHTNESS_PATH: "states/x/perimeter/brightness",
+    PERIMETER_BRIGHTNESS_STATUS_PATH: "perimeter/x/brightnessStatus",
+    PERIMETER_VNNOX_BASE_URL: "http://127.0.0.1:81",
+    PERIMETER_VNNOX_IP: "10.0.0.1",
+    PERIMETER_VNNOX_PORT: "9999",
+    PERIMETER_VNNOX_PROTOCOL: "https",
+    PERIMETER_VNNOX_SN: "SN123",
+    PERIMETER_VNNOX_PROJECT_ID: "proj-x",
+    PERIMETER_VNNOX_PERIMETER_GUID: "abc-guid",
+    PERIMETER_VNNOX_USERNAME: "operator",
+    PERIMETER_VNNOX_PASSWORD_SOURCE: "file",
+    PERIMETER_VNNOX_PASSWORD_FILE: "/run/vnnox-pass",
+    PERIMETER_VNNOX_TIMEOUT: "4",
+    PERIMETER_BRIGHTNESS_MAX_RETRIES: "5",
+    PERIMETER_BRIGHTNESS_VERIFY_ATTEMPTS: "10",
+    PERIMETER_BRIGHTNESS_VERIFY_TOLERANCE: "2",
+    PERIMETER_BRIGHTNESS_VERIFY_INTERVAL_SECONDS: "0.5",
   });
   assert.equal(config.databaseURL, "https://example.com");
   assert.equal(config.path, "states/x/perimeter");
@@ -108,6 +145,24 @@ test("loadConfig overrides", () => {
     3: "3840x192",
     4: "3840x192",
   });
+  assert.equal(config.brightnessEnabled, true);
+  assert.equal(config.brightnessPath, "states/x/perimeter/brightness");
+  assert.equal(config.brightnessStatusPath, "perimeter/x/brightnessStatus");
+  assert.equal(config.vnnoxBaseUrl, "http://127.0.0.1:81");
+  assert.equal(config.vnnoxIp, "10.0.0.1");
+  assert.equal(config.vnnoxPort, "9999");
+  assert.equal(config.vnnoxProtocol, "https");
+  assert.equal(config.vnnoxSerial, "SN123");
+  assert.equal(config.vnnoxProjectId, "proj-x");
+  assert.equal(config.vnnoxPerimeterGuid, "abc-guid");
+  assert.equal(config.vnnoxUsername, "operator");
+  assert.equal(config.vnnoxPasswordSource, "file");
+  assert.equal(config.vnnoxPasswordFile, "/run/vnnox-pass");
+  assert.equal(config.vnnoxTimeoutMs, 4_000);
+  assert.equal(config.brightnessMaxRetries, 5);
+  assert.equal(config.brightnessVerifyAttempts, 10);
+  assert.equal(config.brightnessVerifyTolerance, 2);
+  assert.equal(config.brightnessVerifyIntervalMs, 500);
 });
 
 test("loadConfig invalid numerics fall back to defaults", () => {

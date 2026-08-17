@@ -13,6 +13,8 @@ import {
   parsePerimeterMediaPairs,
   parsePerimeterAdLayout,
   parsePerimeterAppliedAdLayout,
+  parsePerimeterBrightness,
+  parsePerimeterBrightnessStatus,
 } from "./firebaseParsers";
 import { Sports, DEFAULT_HALFSTOPS, DEFAULT_THEME } from "../constants";
 import type {
@@ -2170,6 +2172,122 @@ describe("firebaseParsers", () => {
       expect(Object.keys(result)).toHaveLength(2);
       expect(result["22222222-2222-4222-8222-222222222222"]?.name).toBe("Góð");
       expect(result.broken).toBeUndefined();
+    });
+  });
+
+  describe("parsePerimeterBrightness", () => {
+    it("accepts whole percentages from 0 through 100", () => {
+      expect(parsePerimeterBrightness(0)).toBe(0);
+      expect(parsePerimeterBrightness(50)).toBe(50);
+      expect(parsePerimeterBrightness(100)).toBe(100);
+    });
+
+    it("treats missing/null as no command", () => {
+      expect(parsePerimeterBrightness(null)).toBeNull();
+      expect(parsePerimeterBrightness(undefined)).toBeNull();
+    });
+
+    it("rejects malformed or out-of-range values", () => {
+      expect(parsePerimeterBrightness(-1)).toBeNull();
+      expect(parsePerimeterBrightness(101)).toBeNull();
+      expect(parsePerimeterBrightness(4.5)).toBeNull();
+      expect(parsePerimeterBrightness("50")).toBeNull();
+      expect(parsePerimeterBrightness({})).toBeNull();
+      expect(parsePerimeterBrightness(Number.NaN)).toBeNull();
+      expect(parsePerimeterBrightness(Number.POSITIVE_INFINITY)).toBeNull();
+    });
+  });
+
+  describe("parsePerimeterBrightnessStatus", () => {
+    it("parses a valid applied status", () => {
+      const result = parsePerimeterBrightnessStatus({
+        requestedPercent: 50,
+        appliedPercent: 50,
+        phase: "applied",
+        error: null,
+        updatedAt: 1723392000000,
+      });
+      expect(result).toEqual({
+        requestedPercent: 50,
+        appliedPercent: 50,
+        phase: "applied",
+        error: null,
+        updatedAt: 1723392000000,
+      });
+    });
+
+    it("parses a valid pending status without an applied value", () => {
+      const result = parsePerimeterBrightnessStatus({
+        requestedPercent: 50,
+        phase: "pending",
+        error: null,
+        updatedAt: 1723392000000,
+      });
+      expect(result).toEqual({
+        requestedPercent: 50,
+        appliedPercent: null,
+        phase: "pending",
+        error: null,
+        updatedAt: 1723392000000,
+      });
+    });
+
+    it("accepts a failed status with an error message", () => {
+      const result = parsePerimeterBrightnessStatus({
+        requestedPercent: 50,
+        phase: "failed",
+        error: "Vnnox unreachable",
+        updatedAt: 1723392000000,
+      });
+      expect(result?.phase).toBe("failed");
+      expect(result?.error).toBe("Vnnox unreachable");
+    });
+
+    it("rejects malformed or unknown phases", () => {
+      expect(
+        parsePerimeterBrightnessStatus({
+          requestedPercent: 50,
+          phase: "playing",
+          updatedAt: 1723392000000,
+        }),
+      ).toBeNull();
+      expect(
+        parsePerimeterBrightnessStatus({
+          requestedPercent: 50,
+          phase: 42,
+          updatedAt: 1723392000000,
+        }),
+      ).toBeNull();
+    });
+
+    it("rejects invalid requested or applied percentages", () => {
+      expect(
+        parsePerimeterBrightnessStatus({
+          requestedPercent: 101,
+          phase: "applied",
+          updatedAt: 1723392000000,
+        }),
+      ).toBeNull();
+      expect(
+        parsePerimeterBrightnessStatus({
+          requestedPercent: 50,
+          appliedPercent: 4.5,
+          phase: "applied",
+          updatedAt: 1723392000000,
+        }),
+      ).toBeNull();
+    });
+
+    it("rejects a status with no timestamp or a non-object payload", () => {
+      expect(
+        parsePerimeterBrightnessStatus({
+          requestedPercent: 50,
+          phase: "applied",
+          error: null,
+        }),
+      ).toBeNull();
+      expect(parsePerimeterBrightnessStatus(null)).toBeNull();
+      expect(parsePerimeterBrightnessStatus("x")).toBeNull();
     });
   });
 });

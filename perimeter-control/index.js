@@ -41,6 +41,7 @@ import { ResolumeCompositionReader } from "./resolume-preview.js";
 import { OverlayController } from "./overlay.js";
 import { AdLayoutController } from "./ad-layout.js";
 import { ResolumeImportController } from "./resolume-import.js";
+import { BrightnessController } from "./brightness.js";
 
 export const VALID_STATES = new Set(["on", "off"]);
 
@@ -99,6 +100,24 @@ const DEFAULT_AD_MAX_FILE_BYTES = 250 * 1024 * 1024;
 // Import defaults
 const DEFAULT_IMPORT_PATH = "states/vikuti/perimeter/import";
 const DEFAULT_IMPORT_STATUS_PATH = "perimeter/vikuti/importStatus";
+
+// Brightness (Vnnox) defaults. Vnnox brightness handling is OFF unless
+// explicitly enabled with PERIMETER_BRIGHTNESS_ENABLED=true — absent
+// commands and missing configuration must stay inert.
+const DEFAULT_BRIGHTNESS_PATH = "states/vikuti/perimeter/brightness";
+const DEFAULT_BRIGHTNESS_STATUS_PATH = "perimeter/vikuti/brightnessStatus";
+const DEFAULT_VNNOX_BASE_URL = "http://localhost:81";
+const DEFAULT_VNNOX_IP = "10.182.45.40";
+const DEFAULT_VNNOX_PORT = "8088";
+const DEFAULT_VNNOX_PROTOCOL = "http";
+const DEFAULT_VNNOX_PROJECT_ID = "defaultProject-vx";
+const DEFAULT_VNNOX_USERNAME = "admin";
+const DEFAULT_VNNOX_PASSWORD_SOURCE = "env";
+const DEFAULT_VNNOX_TIMEOUT_MS = 10_000;
+const DEFAULT_BRIGHTNESS_MAX_RETRIES = 3;
+const DEFAULT_BRIGHTNESS_VERIFY_ATTEMPTS = 6;
+const DEFAULT_BRIGHTNESS_VERIFY_TOLERANCE = 1;
+const DEFAULT_BRIGHTNESS_VERIFY_INTERVAL_MS = 1_000;
 
 const RESOLUME_OFF_PATH = "/composition/disconnect-all";
 const RESOLUME_ON_PATH = "/composition/columns/{column}/connect";
@@ -378,6 +397,47 @@ export function loadConfig(environ = process.env) {
     importPath: environ.PERIMETER_IMPORT_PATH ?? DEFAULT_IMPORT_PATH,
     importStatusPath:
       environ.PERIMETER_IMPORT_STATUS_PATH ?? DEFAULT_IMPORT_STATUS_PATH,
+    // Brightness (Vnnox) settings. Enabled ONLY when explicitly set to
+    // "true"; all other values keep brightness handling off.
+    brightnessEnabled: environ.PERIMETER_BRIGHTNESS_ENABLED === "true",
+    brightnessPath:
+      environ.PERIMETER_BRIGHTNESS_PATH ?? DEFAULT_BRIGHTNESS_PATH,
+    brightnessStatusPath:
+      environ.PERIMETER_BRIGHTNESS_STATUS_PATH ??
+      DEFAULT_BRIGHTNESS_STATUS_PATH,
+    vnnoxBaseUrl: environ.PERIMETER_VNNOX_BASE_URL ?? DEFAULT_VNNOX_BASE_URL,
+    vnnoxIp: environ.PERIMETER_VNNOX_IP ?? DEFAULT_VNNOX_IP,
+    vnnoxPort: environ.PERIMETER_VNNOX_PORT ?? DEFAULT_VNNOX_PORT,
+    vnnoxProtocol: environ.PERIMETER_VNNOX_PROTOCOL ?? DEFAULT_VNNOX_PROTOCOL,
+    vnnoxSerial: environ.PERIMETER_VNNOX_SN ?? null,
+    vnnoxProjectId:
+      environ.PERIMETER_VNNOX_PROJECT_ID ?? DEFAULT_VNNOX_PROJECT_ID,
+    vnnoxPerimeterGuid: environ.PERIMETER_VNNOX_PERIMETER_GUID ?? null,
+    vnnoxUsername: environ.PERIMETER_VNNOX_USERNAME ?? DEFAULT_VNNOX_USERNAME,
+    vnnoxPasswordSource:
+      environ.PERIMETER_VNNOX_PASSWORD_SOURCE ?? DEFAULT_VNNOX_PASSWORD_SOURCE,
+    vnnoxPassword: environ.PERIMETER_VNNOX_PASSWORD ?? null,
+    vnnoxPasswordFile: environ.PERIMETER_VNNOX_PASSWORD_FILE ?? null,
+    vnnoxTimeoutMs: positiveMs(
+      environ.PERIMETER_VNNOX_TIMEOUT,
+      DEFAULT_VNNOX_TIMEOUT_MS,
+    ),
+    brightnessMaxRetries: positiveInt(
+      environ.PERIMETER_BRIGHTNESS_MAX_RETRIES,
+      DEFAULT_BRIGHTNESS_MAX_RETRIES,
+    ),
+    brightnessVerifyAttempts: positiveInt(
+      environ.PERIMETER_BRIGHTNESS_VERIFY_ATTEMPTS,
+      DEFAULT_BRIGHTNESS_VERIFY_ATTEMPTS,
+    ),
+    brightnessVerifyTolerance: positiveInt(
+      environ.PERIMETER_BRIGHTNESS_VERIFY_TOLERANCE,
+      DEFAULT_BRIGHTNESS_VERIFY_TOLERANCE,
+    ),
+    brightnessVerifyIntervalMs: positiveMs(
+      environ.PERIMETER_BRIGHTNESS_VERIFY_INTERVAL_SECONDS,
+      DEFAULT_BRIGHTNESS_VERIFY_INTERVAL_MS,
+    ),
   };
 }
 
@@ -497,6 +557,10 @@ export class PerimeterController {
     if (config.importEnabled) {
       this._importController = new ResolumeImportController(config);
     }
+    this._brightnessController = null;
+    if (config.brightnessEnabled) {
+      this._brightnessController = new BrightnessController(config);
+    }
   }
 
   // -- state --------------------------------------------------------------
@@ -549,6 +613,12 @@ export class PerimeterController {
       this._importController.attach(db);
       console.log(`Import control listening on: ${this.config.importPath}`);
     }
+    if (this._brightnessController) {
+      this._brightnessController.attach(db);
+      console.log(
+        `Brightness control listening on: ${this.config.brightnessPath}`,
+      );
+    }
   }
 
   _reopenListener() {
@@ -561,6 +631,9 @@ export class PerimeterController {
     if (this._adLayoutController) {
       void this._adLayoutController.republishStatus();
     }
+    if (this._brightnessController) {
+      void this._brightnessController.republishStatus();
+    }
     console.log("Refreshed Firebase listener");
   }
 
@@ -568,6 +641,12 @@ export class PerimeterController {
 
   startApplicator() {
     this._applicatorPromise = this._applicatorLoop();
+  }
+
+  startBrightness() {
+    if (this._brightnessController) {
+      this._brightnessController.startWorker();
+    }
   }
 
   async _applicatorLoop() {
@@ -807,6 +886,9 @@ export class PerimeterController {
     if (this._importController) {
       this._importController.shutdown();
     }
+    if (this._brightnessController) {
+      this._brightnessController.shutdown();
+    }
     this._notifier.notify();
   }
 }
@@ -828,6 +910,7 @@ function main() {
   const controller = new PerimeterController(config);
   controller.attach(getDatabase(app));
   controller.startApplicator();
+  controller.startBrightness();
   controller.startRefreshLoop();
   controller.startPreview();
 

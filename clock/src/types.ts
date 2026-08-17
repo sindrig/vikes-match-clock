@@ -403,6 +403,24 @@ export interface PerimeterAppliedAdLayout {
   columns: PerimeterAppliedAdColumn[];
 }
 
+// -- Perimeter brightness (Vnnox LED brightness) -----------------------------
+
+// The controller's requested brightness is stored as a whole integer
+// percentage (0..100) at states/{location}/perimeter/brightness. Absent
+// (null) means "no command" and is inert; the parsed value is a bare number.
+
+export type PerimeterBrightnessPhase = "pending" | "applied" | "failed";
+
+// Daemon-published brightness status at perimeter/{location}/brightnessStatus.
+// `appliedPercent` is present only after the daemon verified the screen read.
+export interface PerimeterBrightnessStatus {
+  requestedPercent: number;
+  appliedPercent: number | null;
+  phase: PerimeterBrightnessPhase;
+  error: string | null;
+  updatedAt: number; // Firebase server timestamp
+}
+
 // Root state type
 export interface RootState {
   match: Match;
