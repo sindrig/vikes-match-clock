@@ -13,15 +13,24 @@
  *     inert — a missing command must never touch a live screen.
  *   * One valid request is processed at a time by a serialized worker that
  *     retains the newest pending request. A newer request supersedes an older
- *     one before a write has started; once a write has started the sequence is
- *     irreversible and completes (verifies or restores) before the newer
- *     request is picked up.
+ *     one before a write has started; once the daemon has dispatched the
+ *     scoped write call the sequence is irreversible and completes (verifies
+ *     or restores) before the newer request is picked up — even a write call
+ *     that *throws* (timeout, malformed response, etc.) may have already
+ *     reached the hardware, so it is never retried and always routes through
+ *     verification/restoration instead.
  *   * The daemon snapshots the current perimeter brightness before every
  *     write, writes only the configured screen GUID, then polls the screen
  *     read until it matches the request within a small integer tolerance.
+ *     Only the snapshot stage retries transient failures; the write
+ *     dispatch itself is the irreversible boundary.
  *   * On a started-write failure (write error or verification mismatch) the
  *     daemon best-effort restores the snapshot before publishing `failed`;
  *     restore failures are logged and appended to the safe error text.
+ *   * A `pending` status write is a hardware precondition: if Firebase
+ *     rejects it the command is aborted before any hardware I/O (terminal
+ *     `applied`/`failed` status write failures are logged and rely on
+ *     refresh-based republishing instead).
  *   * Vnnox handling is disabled unless PERIMETER_BRIGHTNESS_ENABLED=true and
  *     the required configuration is present; otherwise requests fail with a
  *     configuration-caused error instead of touching hardware.
@@ -170,8 +179,8 @@ export class BrightnessController {
   }
 
   // Process one request from snapshot through write and verification. Any
-  // terminal failure after the write has started triggers a best-effort
-  // restore of the pre-write snapshot.
+  // terminal failure after the write has been dispatched triggers a
+  // best-effort restore of the pre-write snapshot.
   async _handleRequest(target) {
     if (!this.config.brightnessEnabled) {
       console.log(`Brightness disabled; ignoring command ${target}%`);
@@ -186,15 +195,26 @@ export class BrightnessController {
       );
       return;
     }
-    await this._publishStatus("pending", target, null);
+    // Persisting the `pending` status is a hardware precondition: if
+    // Firebase rejects the write we cannot reliably reach an operator with
+    // the eventual outcome, so refuse to touch the screen at all rather than
+    // silently dispatching a command nobody can observe.
+    const pendingPersisted = await this._publishStatus("pending", target, null);
+    if (!pendingPersisted) {
+      console.error(
+        `Aborting brightness command ${target}%: pending status could not be persisted; refusing hardware I/O`,
+      );
+      return;
+    }
 
     let snapshot = null;
     let backoff = this.config.initialBackoffMs;
     let backoffIteration = 0;
-    let writeStarted = false;
 
-    // Pre-write phase: snapshot + scoped write, retrying transient failures.
-    // A newer command supersedes the current one before the irreversible write.
+    // Snapshot-only retry phase. A newer command supersedes the current one
+    // before the irreversible write dispatch. Only snapshot failures are
+    // retried here — once writeBrightness is invoked below, the sequence is
+    // irreversible and never re-enters this loop.
     while (!this._stopping) {
       if (this._supersededBy(target)) {
         console.log(
@@ -204,14 +224,11 @@ export class BrightnessController {
       }
       try {
         snapshot = await this._snapshotBrightness();
-        console.log(`Brightness: writing ${target}% to perimeter screen`);
-        await this.client.writeBrightness(target);
-        writeStarted = true;
         break;
       } catch (err) {
         if (this._supersededBy(target)) {
           console.log(
-            `Brightness ${target}% superseded by ${this._requested}% during retry`,
+            `Brightness ${target}% superseded by ${this._requested}% during snapshot retry`,
           );
           return;
         }
@@ -220,41 +237,53 @@ export class BrightnessController {
           await this._publishStatus(
             "failed",
             target,
-            `Brightness write failed: ${this._safeError(err)}`,
+            `Brightness snapshot failed: ${this._safeError(err)}`,
           );
           return;
         }
         console.warn(
-          `Brightness write attempt failed (${backoffIteration + 1}): ${err.message} — retrying in ${backoff}ms`,
+          `Brightness snapshot attempt failed (${backoffIteration + 1}): ${err.message} — retrying in ${backoff}ms`,
         );
         await this._sleep(backoff);
         backoff = Math.min(backoff * 2, this.config.maxBackoffMs);
         backoffIteration += 1;
       }
     }
+    if (this._stopping) return;
 
-    // Irreversible stage: the write has started. Verify (polling the screen
-    // read within tolerance); on any failure restore the snapshot first.
+    // Irreversible stage: the write is about to be dispatched. `writeStarted`
+    // is set before the call resolves (or even throws) because a write call
+    // that throws — a timeout, a dropped connection, a malformed response —
+    // may still have reached the hardware; treating it as retryable could
+    // send a second, conflicting write on top of one the device already
+    // applied. From here on, any failure (write or verification) always
+    // routes through best-effort restoration; this stage never checks
+    // `_stopping` or supersession so an in-flight write always completes.
+    const writeStarted = true;
+    let errorText;
     try {
+      console.log(`Brightness: writing ${target}% to perimeter screen`);
+      await this.client.writeBrightness(target);
       await this._verifyBrightness(target);
       console.log(`Brightness ${target}% applied and verified`);
       await this._publishStatus("applied", target, null, target);
+      return;
     } catch (err) {
-      let errorText = `Brightness ${target}% failed: ${this._safeError(err)}`;
-      try {
-        if (writeStarted && snapshot) {
-          await this.client.restoreBrightness(snapshot);
-          errorText += "; prior snapshot restored";
-          console.log(`Brightness snapshot restored after failure`);
-        }
-      } catch (restoreErr) {
-        errorText += `; snapshot restore failed: ${this._safeError(restoreErr)}`;
-        console.error(
-          `Brightness restore failed after ${target}% failure: ${restoreErr.message}`,
-        );
-      }
-      await this._publishStatus("failed", target, errorText);
+      errorText = `Brightness ${target}% failed: ${this._safeError(err)}`;
     }
+    try {
+      if (writeStarted && snapshot) {
+        await this.client.restoreBrightness(snapshot);
+        errorText += "; prior snapshot restored";
+        console.log(`Brightness snapshot restored after failure`);
+      }
+    } catch (restoreErr) {
+      errorText += `; snapshot restore failed: ${this._safeError(restoreErr)}`;
+      console.error(
+        `Brightness restore failed after ${target}% failure: ${restoreErr.message}`,
+      );
+    }
+    await this._publishStatus("failed", target, errorText);
   }
 
   // Read the current perimeter screen brightness plus cabinet metadata for
@@ -317,11 +346,15 @@ export class BrightnessController {
 
   // -- status ------------------------------------------------------------------
 
+  // Publishes the status document and returns whether Firebase accepted the
+  // write. Callers that treat persistence as a hardware precondition (the
+  // `pending` phase) must check the return value; terminal phases are
+  // best-effort and rely on `republishStatus` to self-heal a lost write.
   async _publishStatus(phase, requestedPercent, error, appliedPercent) {
-    if (!this._statusRef) return;
+    if (!this._statusRef) return false;
     if (!BRIGHTNESS_PHASES.has(phase)) {
       console.error(`Refusing to publish unknown brightness phase: ${phase}`);
-      return;
+      return false;
     }
     const payload = {
       requestedPercent,
@@ -335,8 +368,10 @@ export class BrightnessController {
     this._lastStatus = { ...payload };
     try {
       await this._statusRef.set(payload);
+      return true;
     } catch (err) {
       console.error(`Failed to publish brightness status: ${err.message}`);
+      return false;
     }
   }
 
@@ -360,11 +395,16 @@ export class BrightnessController {
 
   // -- shutdown -----------------------------------------------------------------
 
+  // Stops accepting new commands and returns the worker's promise so callers
+  // can await graceful drain. A command already past the write-dispatch
+  // boundary is never interrupted — it always finishes verifying or
+  // restoring before the worker loop observes `_stopping` and exits.
   shutdown() {
     this._stopping = true;
     if (this._commandRef) {
       this._commandRef.off("value");
     }
     this._notifier.notify();
+    return this._workerPromise;
   }
 }

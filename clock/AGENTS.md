@@ -423,7 +423,7 @@ overlapping lane configuration at daemon startup.
 - File names are basename-only; traversal and control characters are rejected.
 
 **Column mapping** — each layout column maps **1:1** to a deck column: layout
-column *i* (0-based) loads into deck column *i+1*. Surplus deck columns stay
+column _i_ (0-based) loads into deck column _i+1_. Surplus deck columns stay
 empty; the deck autopilot skips empty columns, so the deck cycles only through
 the `N` ads (never a blank column). A layout with more columns than the deck is
 refused with an `error` status (each ad needs its own deck column).
@@ -568,10 +568,10 @@ directly and never treats a Firebase write confirmation as a hardware result.
 
 **Data ownership:**
 
-| Path                                        | Writer     | Purpose                                                        |
-| ------------------------------------------- | ---------- | -------------------------------------------------------------- |
-| `states/{location}/perimeter/brightness`    | Controller | Requested brightness as a whole integer percentage (0–100)     |
-| `perimeter/{location}/brightnessStatus`     | Daemon     | `requestedPercent`, `appliedPercent`, `phase`, `error`, `updatedAt` |
+| Path                                     | Writer     | Purpose                                                             |
+| ---------------------------------------- | ---------- | ------------------------------------------------------------------- |
+| `states/{location}/perimeter/brightness` | Controller | Requested brightness as a whole integer percentage (0–100)          |
+| `perimeter/{location}/brightnessStatus`  | Daemon     | `requestedPercent`, `appliedPercent`, `phase`, `error`, `updatedAt` |
 
 - The requested value is a bare integer percentage. `null`/missing means "no
   command" and is inert; the daemon ignores anything that is not a whole
@@ -579,7 +579,13 @@ directly and never treats a Firebase write confirmation as a hardware result.
 - `brightnessStatus.phase` is `pending` (before hardware I/O), `applied` (the
   daemon verified the screen read within a small integer tolerance), or
   `failed` (with a safe error description). `appliedPercent` is present only
-  after verification.
+  after verification. `requestedPercent` is `null` only for a `failed` status
+  caused by configuration (e.g. Vnnox enabled but misconfigured at daemon
+  startup, published before any command was ever requested) — every other
+  status, including a command-caused `failed`, always carries the requested
+  percentage. `parsePerimeterBrightnessStatus()` enforces this: a `null`
+  `requestedPercent` on `pending`/`applied` is malformed and rejects the whole
+  document.
 - The status path lives under `perimeter/{location}`, which the database rules
   make client-read-only; only the daemon's service account writes it.
 
@@ -605,7 +611,18 @@ directly and never treats a Firebase write confirmation as a hardware result.
   whole percentage from 0 through 100 before any write. The `Beita` button is
   disabled while a submission is pending (until the `brightness` subscription
   reflects the submitted value) and while the daemon reports `pending` — there
-  are **no optimistic local updates**.
+  are **no optimistic local updates**. A `useEffect` clears the pending
+  submission once the `brightness` subscription confirms it, so `Beita`
+  re-enables for the next request instead of staying permanently disabled
+  after the first submission.
+- The input tracks three local draft states: untouched (`null`, displays the
+  synced `brightness` value), explicitly cleared (`""`, displays blank — kept
+  distinct from "untouched" so clearing the field never silently reverts to
+  showing the last synced value), and an in-progress numeric edit. A cleared
+  or non-integer/out-of-range draft is invalid and blocks `Beita`, so an
+  emptied input can never be accidentally submitted as 0%.
+- The input carries an accessible label (`aria-label="Bjartleiki jaðarskjás"`)
+  matching the section title.
 
 ### The `listenPrefix` System
 
@@ -772,11 +789,11 @@ Firebase-backed behavior.
 
 - `TeamAssetController.tsx` (Lið tab) uses the hook for both its home and away
   substitution modal and the list-click `Birta leikmann` / `Birta mann
-  leiksins` actions. The goal-scorer modal remains local to the controller.
+leiksins` actions. The goal-scorer modal remains local to the controller.
 - `HomeTeamQuickActions.tsx` (`controller/HomeTeamQuickActions.tsx`) renders a
   **`Heimalið aðgerðir`** box in the match view below `MatchCountdownDisplay`
   (`App.tsx`, gated on `showMatchControls`). It provides `Skipting`, `Birta
-  leikmann`, and `Maður leiksins` shortcuts scoped to the home team and is
+leikmann`, and `Maður leiksins` shortcuts scoped to the home team and is
   hidden entirely when the home roster has no players. Styling lives in
   `Controller.css` (`.home-team-quick-actions*`).
 
@@ -843,10 +860,10 @@ The legacy boolean `showInjuryTime` was replaced by the typed
 `injuryTimeDisplayMode` field on `Match`. The mode applies after **every**
 half-stop (not just the final one), matching the old behavior.
 
-| Mode      | Behavior at half-stop                                          |
-| --------- | -------------------------------------------------------------- |
-| `stop`    | Pause, force seconds to `00`, buzz once (legacy `false`).      |
-| `full`    | Continue counting elapsed minutes and seconds (legacy `true`). |
+| Mode      | Behavior at half-stop                                                          |
+| --------- | ------------------------------------------------------------------------------ |
+| `stop`    | Pause, force seconds to `00`, buzz once (legacy `false`).                      |
+| `full`    | Continue counting elapsed minutes and seconds (legacy `true`).                 |
 | `minutes` | Continue counting, but render whole minutes with `:00` seconds (e.g. `91:00`). |
 
 **Migration**: `firebaseParsers.ts` derives the mode from a legacy
@@ -881,20 +898,20 @@ The display is styled via **CSS Custom Properties** (CSS variables) applied on t
 
 All properties are CSS value strings. Grouped by display area:
 
-| Group       | Properties                                                                                                                                                                                                                                     | CSS Variables                                                          |
-| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| Score boxes | `scoreBoxBg`, `scoreBoxColor`, `scoreBoxBorder`, `scoreBoxFontSize`, `scoreBoxFontFamily`, `scoreBoxStroke`, `scoreTop`, `scoreHeight`, `scoreWidth`                                                                                           | `--theme-score-*`                                                      |
-| Clock       | `clockBg`, `clockColor`, `clockBorder`, `clockFontSizeMin`, `clockFontSizeMax`, `clockFontFamily`, `clockStroke`, `clockTop`, `clockLeft`, `clockWidth`, `clockHeight`                                                                         | `--theme-clock-*`                                                      |
-| Logos       | `logoTop`, `logoHeight`, `logoWidth`, `homeLogoScale`, `awayLogoScale`                                                                                                                                                                         | `--theme-logo-*`, `--theme-home-logo-scale`, `--theme-away-logo-scale` |
-| Injury time | `injuryTimeColor`, `injuryTimeFontSize`, `injuryTimeStroke`, `injuryTimeTop`, `injuryTimeLeft`                                                                                                                                                 | `--theme-injury-*`                                                     |
-| Team names  | `teamNameColor`, `teamNameFontFamily`                                                                                                                                                                                                          | `--theme-team-name-*`                                                  |
-| Player assets | `playerNumberColor`, `playerNameColor`, `playerNumberFontFamily`, `playerNameFontFamily`                                                                                                                                            | `--theme-player-number-color`, `--theme-player-name-color`, `--theme-player-number-font-family`, `--theme-player-name-font-family` |
-| Red cards   | `redCardColor`                                                                                                                                                                                                                                 | `--theme-red-card-color`                                               |
-| Penalties   | `penaltyBg`, `penaltyColor`, `penaltyBorder`                                                                                                                                                                                                   | `--theme-penalty-*`                                                    |
-| Timeouts    | `timeoutColor`                                                                                                                                                                                                                                 | `--theme-timeout-color`                                                |
-| Ad image    | `adTop`, `adLeft`, `adWidth`, `adHeight`                                                                                                                                                                                                       | `--theme-ad-*`                                                         |
-| Background  | `backgroundImage`                                                                                                                                                                                                                              | `--theme-background-image` (conditional)                               |
-| Idle screen | `idleTextColor`, `idleTextFontSize`, `idleLogoTop`, `idleLogoLeft`, `idleLogoWidth`, `idleTextTop`, `idleLogoHeight`, `idleClockTop`, `idleClockLeft`, `idleTempTop`, `idleTempLeft`, `idleAdTop`, `idleAdLeft`, `idleAdWidth`, `idleAdHeight` | `--theme-idle-*`                                                       |
+| Group         | Properties                                                                                                                                                                                                                                     | CSS Variables                                                                                                                      |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Score boxes   | `scoreBoxBg`, `scoreBoxColor`, `scoreBoxBorder`, `scoreBoxFontSize`, `scoreBoxFontFamily`, `scoreBoxStroke`, `scoreTop`, `scoreHeight`, `scoreWidth`                                                                                           | `--theme-score-*`                                                                                                                  |
+| Clock         | `clockBg`, `clockColor`, `clockBorder`, `clockFontSizeMin`, `clockFontSizeMax`, `clockFontFamily`, `clockStroke`, `clockTop`, `clockLeft`, `clockWidth`, `clockHeight`                                                                         | `--theme-clock-*`                                                                                                                  |
+| Logos         | `logoTop`, `logoHeight`, `logoWidth`, `homeLogoScale`, `awayLogoScale`                                                                                                                                                                         | `--theme-logo-*`, `--theme-home-logo-scale`, `--theme-away-logo-scale`                                                             |
+| Injury time   | `injuryTimeColor`, `injuryTimeFontSize`, `injuryTimeStroke`, `injuryTimeTop`, `injuryTimeLeft`                                                                                                                                                 | `--theme-injury-*`                                                                                                                 |
+| Team names    | `teamNameColor`, `teamNameFontFamily`                                                                                                                                                                                                          | `--theme-team-name-*`                                                                                                              |
+| Player assets | `playerNumberColor`, `playerNameColor`, `playerNumberFontFamily`, `playerNameFontFamily`                                                                                                                                                       | `--theme-player-number-color`, `--theme-player-name-color`, `--theme-player-number-font-family`, `--theme-player-name-font-family` |
+| Red cards     | `redCardColor`                                                                                                                                                                                                                                 | `--theme-red-card-color`                                                                                                           |
+| Penalties     | `penaltyBg`, `penaltyColor`, `penaltyBorder`                                                                                                                                                                                                   | `--theme-penalty-*`                                                                                                                |
+| Timeouts      | `timeoutColor`                                                                                                                                                                                                                                 | `--theme-timeout-color`                                                                                                            |
+| Ad image      | `adTop`, `adLeft`, `adWidth`, `adHeight`                                                                                                                                                                                                       | `--theme-ad-*`                                                                                                                     |
+| Background    | `backgroundImage`                                                                                                                                                                                                                              | `--theme-background-image` (conditional)                                                                                           |
+| Idle screen   | `idleTextColor`, `idleTextFontSize`, `idleLogoTop`, `idleLogoLeft`, `idleLogoWidth`, `idleTextTop`, `idleLogoHeight`, `idleClockTop`, `idleClockLeft`, `idleTempTop`, `idleTempLeft`, `idleAdTop`, `idleAdLeft`, `idleAdWidth`, `idleAdHeight` | `--theme-idle-*`                                                                                                                   |
 
 #### Preset Themes
 

@@ -1188,6 +1188,25 @@ test("shutdown detaches the listener and stops the applicator", async () => {
   await controller._applicatorPromise;
 });
 
+test("shutdown returns a promise that awaits the brightness controller's drain", async () => {
+  const controller = makeController({
+    PERIMETER_BRIGHTNESS_ENABLED: "true",
+    PERIMETER_VNNOX_PERIMETER_GUID: "guid-1",
+    PERIMETER_VNNOX_SN: "sn-1",
+    PERIMETER_VNNOX_PASSWORD: "secret",
+  });
+  const db = new FakeDb();
+  controller.attach(db);
+  controller.startApplicator();
+  controller.startBrightness();
+  const result = controller.shutdown();
+  assert.ok(
+    result && typeof result.then === "function",
+    "shutdown() returns a promise",
+  );
+  await result;
+});
+
 // -- overlay config ---------------------------------------------------------------
 
 test("loadConfig overlay defaults", () => {

@@ -2289,5 +2289,48 @@ describe("firebaseParsers", () => {
       expect(parsePerimeterBrightnessStatus(null)).toBeNull();
       expect(parsePerimeterBrightnessStatus("x")).toBeNull();
     });
+
+    it("accepts a request-less failed status caused by configuration", () => {
+      const result = parsePerimeterBrightnessStatus({
+        requestedPercent: null,
+        phase: "failed",
+        error: "Brightness not configured: Vnnox vnnoxSerial is not configured",
+        updatedAt: 1723392000000,
+      });
+      expect(result).toEqual({
+        requestedPercent: null,
+        appliedPercent: null,
+        phase: "failed",
+        error: "Brightness not configured: Vnnox vnnoxSerial is not configured",
+        updatedAt: 1723392000000,
+      });
+    });
+
+    it("accepts a request-less failed status with requestedPercent missing entirely", () => {
+      const result = parsePerimeterBrightnessStatus({
+        phase: "failed",
+        error: "Brightness not configured",
+        updatedAt: 1723392000000,
+      });
+      expect(result?.requestedPercent).toBeNull();
+    });
+
+    it("rejects a null requestedPercent on pending or applied phases", () => {
+      expect(
+        parsePerimeterBrightnessStatus({
+          requestedPercent: null,
+          phase: "pending",
+          updatedAt: 1723392000000,
+        }),
+      ).toBeNull();
+      expect(
+        parsePerimeterBrightnessStatus({
+          requestedPercent: null,
+          phase: "applied",
+          appliedPercent: 50,
+          updatedAt: 1723392000000,
+        }),
+      ).toBeNull();
+    });
   });
 });

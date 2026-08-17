@@ -959,6 +959,11 @@ export function parsePerimeterBrightness(data: unknown): number | null {
 // Strict parse of the daemon-published brightness status at
 // perimeter/{location}/brightnessStatus. Malformed phases or values reject the
 // whole document (null) so the UI never trusts a partial status.
+// `requestedPercent` may be `null`, but ONLY for a `failed` status —
+// configuration failures (e.g. Vnnox misconfigured at startup) are published
+// before any command was ever requested, so there is no percentage to show. A
+// `null` requestedPercent on `pending`/`applied` is malformed and rejects the
+// document, since those phases always correspond to an actual command.
 export function parsePerimeterBrightnessStatus(
   data: unknown,
 ): PerimeterBrightnessStatus | null {
@@ -970,9 +975,17 @@ export function parsePerimeterBrightnessStatus(
   ) {
     return null;
   }
+  const phase = raw.phase as PerimeterBrightnessPhase;
 
-  const requestedPercent = parsePerimeterBrightness(raw.requestedPercent);
-  if (requestedPercent === null) return null;
+  let requestedPercent: number | null = null;
+  if (raw.requestedPercent !== null && raw.requestedPercent !== undefined) {
+    requestedPercent = parsePerimeterBrightness(raw.requestedPercent);
+    if (requestedPercent === null) return null;
+  } else if (phase !== "failed") {
+    // Only a `failed` status may omit requestedPercent (configuration
+    // failure); a missing value on pending/applied is malformed.
+    return null;
+  }
 
   let appliedPercent: number | null = null;
   if (raw.appliedPercent !== null && raw.appliedPercent !== undefined) {
@@ -988,7 +1001,7 @@ export function parsePerimeterBrightnessStatus(
   return {
     requestedPercent,
     appliedPercent,
-    phase: raw.phase as PerimeterBrightnessPhase,
+    phase,
     error,
     updatedAt,
   };

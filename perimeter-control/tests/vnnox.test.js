@@ -210,6 +210,54 @@ test("login resolves the password from a file source", async (t) => {
   );
 });
 
+test("login reads only the first password-file line, tolerating trailing blank lines", async (t) => {
+  const calls = mockVnnox(t);
+  const client = new VnnoxClient(
+    makeConfig({
+      vnnoxPasswordSource: "file",
+      vnnoxPassword: null,
+      vnnoxPasswordFile: "./tests/fixtures/vnnox-password-trailing-blank.txt",
+    }),
+  );
+  await client.login();
+  assert.equal(
+    calls[0].body.password,
+    Buffer.from("s3cret", "utf8").toString("base64"),
+  );
+});
+
+test("login ignores content on lines after the first", async (t) => {
+  const calls = mockVnnox(t);
+  const client = new VnnoxClient(
+    makeConfig({
+      vnnoxPasswordSource: "file",
+      vnnoxPassword: null,
+      vnnoxPasswordFile: "./tests/fixtures/vnnox-password-extra-content.txt",
+    }),
+  );
+  await client.login();
+  assert.equal(
+    calls[0].body.password,
+    Buffer.from("s3cret", "utf8").toString("base64"),
+  );
+});
+
+test("login handles CRLF line endings in the password file", async (t) => {
+  const calls = mockVnnox(t);
+  const client = new VnnoxClient(
+    makeConfig({
+      vnnoxPasswordSource: "file",
+      vnnoxPassword: null,
+      vnnoxPasswordFile: "./tests/fixtures/vnnox-password-crlf.txt",
+    }),
+  );
+  await client.login();
+  assert.equal(
+    calls[0].body.password,
+    Buffer.from("s3cret", "utf8").toString("base64"),
+  );
+});
+
 test("login throws when the response has no token", async (t) => {
   mockVnnox(t, (req) => {
     if (req.url.endsWith("/system/auth/login")) {
@@ -351,9 +399,13 @@ test("writeBrightness rejects invalid percentages before any request", async (t)
   assert.equal(calls.length, 0);
 });
 
-test("restoreBrightness writes the exact snapshot ratio and ratioScale", async (t) => {
+test("restoreBrightness converts the read-scaled snapshot to a write-scale fraction", async (t) => {
   const calls = mockVnnox(t);
   const client = new VnnoxClient(makeConfig());
+  // A 4.5% snapshot as returned by normalizeBrightness (ratio=450,
+  // ratioScale=10000) must be restored as the write endpoint expects: a 0--1
+  // fraction with ratioScale: 1. Writing ratio:450 with ratioScale:10000
+  // as-is would target 45000% (clamped/undefined behavior), not 4.5%.
   await client.restoreBrightness({
     ratio: 450,
     ratioScale: 10000,
@@ -365,8 +417,8 @@ test("restoreBrightness writes the exact snapshot ratio and ratioScale", async (
   );
   assert.deepEqual(write.body.brightness, {
     nitType: 0,
-    ratioScale: 10000,
-    ratio: 450,
+    ratioScale: 1,
+    ratio: 0.045,
     nit: 0,
   });
   assert.deepEqual(write.body.guidList, [PERIMETER_GUID]);

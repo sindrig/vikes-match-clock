@@ -413,8 +413,12 @@ export type PerimeterBrightnessPhase = "pending" | "applied" | "failed";
 
 // Daemon-published brightness status at perimeter/{location}/brightnessStatus.
 // `appliedPercent` is present only after the daemon verified the screen read.
+// `requestedPercent` is `null` only for a configuration-caused `failed`
+// status published before any command was ever requested (e.g. on daemon
+// startup when Vnnox is enabled but misconfigured); every other status
+// (including a command-caused `failed`) always carries the requested value.
 export interface PerimeterBrightnessStatus {
-  requestedPercent: number;
+  requestedPercent: number | null;
   appliedPercent: number | null;
   phase: PerimeterBrightnessPhase;
   error: string | null;

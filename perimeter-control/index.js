@@ -118,6 +118,9 @@ const DEFAULT_BRIGHTNESS_MAX_RETRIES = 3;
 const DEFAULT_BRIGHTNESS_VERIFY_ATTEMPTS = 6;
 const DEFAULT_BRIGHTNESS_VERIFY_TOLERANCE = 1;
 const DEFAULT_BRIGHTNESS_VERIFY_INTERVAL_MS = 1_000;
+// Grace period for the process signal handler to await an in-flight
+// brightness write's verify/restore before exiting (see `main()`).
+const SHUTDOWN_GRACE_MS = 30_000;
 
 const RESOLUME_OFF_PATH = "/composition/disconnect-all";
 const RESOLUME_ON_PATH = "/composition/columns/{column}/connect";
@@ -868,6 +871,10 @@ export class PerimeterController {
 
   // -- shutdown -----------------------------------------------------------------
 
+  // Returns a promise that resolves once every sub-controller has drained.
+  // Callers (the process signal handler) can race this against a grace
+  // period so an in-flight brightness write still gets to verify/restore
+  // before the process exits, without hanging forever on a stuck worker.
   shutdown() {
     this._stopping = true;
     if (this._refreshTimer !== null) {
@@ -886,10 +893,11 @@ export class PerimeterController {
     if (this._importController) {
       this._importController.shutdown();
     }
-    if (this._brightnessController) {
-      this._brightnessController.shutdown();
-    }
     this._notifier.notify();
+    if (this._brightnessController) {
+      return Promise.resolve(this._brightnessController.shutdown());
+    }
+    return Promise.resolve();
   }
 }
 
@@ -914,13 +922,30 @@ function main() {
   controller.startRefreshLoop();
   controller.startPreview();
 
-  const shutdown = () => {
-    console.log("Shutting down");
-    controller.shutdown();
-    process.exit(0);
+  // Waits up to SHUTDOWN_GRACE_MS for graceful drain (letting an in-flight
+  // brightness write verify or restore) before forcing the process to exit.
+  // Idempotent: a second/third signal (e.g. an impatient double Ctrl-C) is a
+  // no-op instead of re-entering shutdown or racing a second exit.
+  let shuttingDown = false;
+  const shutdown = (signal) => {
+    if (shuttingDown) {
+      console.log(`Received ${signal} again while shutting down; ignoring`);
+      return;
+    }
+    shuttingDown = true;
+    console.log(`Shutting down (${signal})`);
+    const drained = Promise.resolve(controller.shutdown()).catch((err) => {
+      console.error(`Error during shutdown: ${err.message}`);
+    });
+    const timeout = new Promise((resolve) => {
+      setTimeout(resolve, SHUTDOWN_GRACE_MS);
+    });
+    Promise.race([drained, timeout]).then(() => {
+      process.exit(0);
+    });
   };
-  process.on("SIGTERM", shutdown);
-  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
 }
 
 if (

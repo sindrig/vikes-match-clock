@@ -289,10 +289,13 @@ const FilePicker = ({
 const BrightnessSection = () => {
   const { brightness, brightnessStatus, setPerimeterBrightness } =
     usePerimeter();
-  // Local edit draft as a number (null = empty/cleared input). Firebase is
-  // the only source of the displayed requested value; the draft only feeds
-  // the apply action and client-side validation.
-  const [draft, setDraft] = useState<number | null>(null);
+  // Local edit draft: `null` means "untouched" (display the synced Firebase
+  // value), `""` means the user explicitly cleared the input (display
+  // blank, distinct from "untouched" so clearing never silently reverts to
+  // showing the synced value again), and a number is an in-progress edit.
+  // Firebase is the only source of the displayed *requested* value; the
+  // draft only feeds the apply action and client-side validation.
+  const [draft, setDraft] = useState<number | "" | null>(null);
   // The submitted percentage whose write is still settling. A write settles
   // only once the brightness subscription reflects the submitted value (no
   // optimistic local state); a rejected write clears it so the UI is not
@@ -300,17 +303,25 @@ const BrightnessSection = () => {
   const [submittedValue, setSubmittedValue] = useState<number | null>(null);
 
   const valid =
-    draft !== null && Number.isInteger(draft) && draft >= 0 && draft <= 100;
+    typeof draft === "number" &&
+    Number.isInteger(draft) &&
+    draft >= 0 &&
+    draft <= 100;
+
+  const phase = brightnessStatus?.phase;
+  // A write has settled once the brightness subscription reflects the
+  // submitted value; `busy` (not a raw `submittedValue !== null` check) is
+  // what gates further submissions, so a later Beita click is never
+  // permanently blocked by a stale submission once it settles — no effect
+  // needed to reset submittedValue back to null.
+  const settling = submittedValue !== null && brightness !== submittedValue;
+  const busy = settling || phase === "pending";
 
   const handleApply = () => {
-    if (!valid || submittedValue !== null) return;
+    if (typeof draft !== "number" || !valid || busy) return;
     setSubmittedValue(draft);
     setPerimeterBrightness(draft).catch(() => setSubmittedValue(null));
   };
-
-  const phase = brightnessStatus?.phase;
-  const settling = submittedValue !== null && brightness !== submittedValue;
-  const busy = settling || phase === "pending";
 
   return (
     <div className="perimeter-brightness">
@@ -329,8 +340,16 @@ const BrightnessSection = () => {
         <InputNumber
           size="sm"
           step={1}
-          value={draft ?? brightness ?? 0}
+          aria-label="Bjartleiki jaðarskjás"
+          // An absent brightness stays blank rather than defaulting to 0 —
+          // defaulting would make a cleared/unset input look like a valid 0%
+          // value and risk an accidental full-dim submission.
+          value={draft === null ? (brightness ?? "") : draft}
           onChange={(val) => {
+            if (val === "" || val === null || val === undefined) {
+              setDraft("");
+              return;
+            }
             const next = typeof val === "number" ? val : Number(val);
             setDraft(Number.isNaN(next) ? null : next);
           }}

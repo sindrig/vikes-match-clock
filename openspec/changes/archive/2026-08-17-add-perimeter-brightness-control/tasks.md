@@ -30,4 +30,5 @@
 
 - [x] 5.1 Run the perimeter-control test suite and clock unit/component test suite; run formatting and lint checks for touched projects.
 - [x] 5.2 Validate the OpenSpec change with `openspec validate add-perimeter-brightness-control --strict`.
-- [x] 5.3 Prepare and follow a gateway smoke-test checklist: confirm configured GUID, snapshot the current brightness, perform one low-risk change, verify published status and Vnnox readback, then confirm rollback by reapplying the snapshot percentage.
+- [x] 5.3 Prepare a gateway smoke-test checklist: confirm the configured GUID, plan a snapshot-before-write for the current brightness, define one low-risk test change, and define how to verify the published status, the Vnnox readback, and rollback (reapplying an integer snapshot through the controller; restoring a fractional snapshot directly through Vnnox/UCenter).
+- [ ] 5.4 Execute the gateway smoke-test checklist from 5.3 against the real Vnnox/UCenter gateway: confirm the configured GUID, snapshot the current brightness, perform one low-risk change, verify the published status and Vnnox readback, then confirm rollback (via the controller for an integer snapshot, or directly through Vnnox/UCenter for a fractional one).

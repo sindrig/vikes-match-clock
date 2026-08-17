@@ -157,7 +157,11 @@ export class VnnoxClient {
         );
       }
       const raw = await readFile(this.config.vnnoxPasswordFile, "utf8");
-      return raw.replace(/\r?\n$/, "");
+      // Read exactly the first line, handling both LF and CRLF and tolerating
+      // trailing blank lines or additional content after it (e.g. comments,
+      // a second secret, or stray whitespace some editors append).
+      const firstLine = raw.split(/\r\n|\r|\n/, 1)[0] ?? "";
+      return firstLine;
     }
     throw new Error(`unknown Vnnox password source: ${JSON.stringify(source)}`);
   }
@@ -330,16 +334,22 @@ export class VnnoxClient {
     return this._writeTarget({ nitType: 0, ratioScale: 1, ratio, nit: 0 });
   }
 
-  // Best-effort restore: write the exact snapshot ratio/ratioScale back so the
-  // restored value is bit-for-bit the pre-write value, never a rounded one.
+  // Best-effort restore: the write endpoint always expects a 0--1 fraction
+  // with `ratioScale: 1` (see the module doc comment), while a snapshot holds
+  // the *read*-scaled ratio/ratioScale from `normalizeBrightness`. Sending the
+  // snapshot's raw read-scaled ratio straight through — as a previous version
+  // of this method did — silently mis-targets the write scale and can leave
+  // the screen far brighter/dimmer than the pre-write value. Convert to the
+  // write-scale fraction here so the restored value is bit-for-bit equal to
+  // the pre-write ratio, just re-expressed at `ratioScale: 1`.
   async restoreBrightness(snapshot) {
     if (!snapshot || typeof snapshot !== "object") {
       throw new Error("no brightness snapshot to restore");
     }
     return this._writeTarget({
       nitType: snapshot.nitType ?? 0,
-      ratioScale: snapshot.ratioScale,
-      ratio: snapshot.ratio,
+      ratioScale: 1,
+      ratio: snapshot.ratio / snapshot.ratioScale,
       nit: snapshot.nit ?? 0,
     });
   }
