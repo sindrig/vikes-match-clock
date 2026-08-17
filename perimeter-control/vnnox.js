@@ -95,6 +95,26 @@ function findByGuid(node, targetGuid) {
   return null;
 }
 
+// The node matched by `guid` does not always carry the brightness itself.
+// Some UCenter versions put the guid on the device entry with the brightness
+// under `screenInfo.adjustment` (the flat mock shape), while the live device
+// nests a guid-bearing `screenInfo` under a `deviceList[]` group node whose own
+// `guid` repeats the screen guid and whose brightness sits one level deeper.
+// Descend recursively so the brightness is found wherever the UCenter version
+// places it, never guessing at the exact nesting.
+function findScreenBrightness(node) {
+  if (node === null || typeof node !== "object") return null;
+  const viaScreenInfo = node?.screenInfo?.adjustment?.brightness;
+  if (viaScreenInfo && typeof viaScreenInfo === "object") return viaScreenInfo;
+  const direct = node?.adjustment?.brightness;
+  if (direct && typeof direct === "object") return direct;
+  for (const value of Object.values(node)) {
+    const found = findScreenBrightness(value);
+    if (found) return found;
+  }
+  return null;
+}
+
 export class VnnoxClient {
   constructor(config) {
     this.config = config;
@@ -269,7 +289,7 @@ export class VnnoxClient {
     const push = (node) => {
       if (node === null || typeof node !== "object") return;
       if (typeof node.guid === "string" && !seen.has(node.guid)) {
-        const brightness = node?.screenInfo?.adjustment?.brightness;
+        const brightness = findScreenBrightness(node);
         screens.push({
           guid: node.guid,
           name: typeof node.name === "string" ? node.name : null,
@@ -311,7 +331,7 @@ export class VnnoxClient {
         `Vnnox perimeter screen GUID not found in device screens: ${guid}`,
       );
     }
-    return normalizeBrightness(target?.screenInfo?.adjustment?.brightness);
+    return normalizeBrightness(findScreenBrightness(target));
   }
 
   // Read cabinet-level metadata for diagnostics (cabinet count and uniformity

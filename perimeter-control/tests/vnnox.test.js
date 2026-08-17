@@ -66,10 +66,13 @@ function mockVnnox(t, respond) {
           list: [
             {
               name: "System 1",
+              guid: MVR_GUID,
               deviceList: [
                 {
-                  guid: MVR_GUID,
+                  sn: "26126A000018386",
                   screenInfo: {
+                    screenId: 1,
+                    guid: MVR_GUID,
                     adjustment: { brightness: { ratio: 0, ratioScale: 0 } },
                   },
                 },
@@ -77,10 +80,13 @@ function mockVnnox(t, respond) {
             },
             {
               name: "Perimeter Knattspyrna",
+              guid: PERIMETER_GUID,
               deviceList: [
                 {
-                  guid: PERIMETER_GUID,
+                  sn: "26126A000018457",
                   screenInfo: {
+                    screenId: 2,
+                    guid: PERIMETER_GUID,
                     adjustment: {
                       brightness: { ratio: 450, ratioScale: 10000 },
                     },
@@ -368,6 +374,47 @@ test("readScreens lists every discovered screen with its guid", async (t) => {
   assert.equal(screens.length, 2);
   assert.ok(screens.some((s) => s.guid === PERIMETER_GUID));
   assert.ok(screens.some((s) => s.guid === MVR_GUID));
+});
+
+test("readScreens reports the brightness for the nested real-device shape", async (t) => {
+  mockVnnox(t);
+  const client = new VnnoxClient(makeConfig());
+  const screens = await client.readScreens();
+  const perimeter = screens.find((s) => s.guid === PERIMETER_GUID);
+  const mvr = screens.find((s) => s.guid === MVR_GUID);
+  assert.deepEqual(perimeter.brightness, { ratio: 450, ratioScale: 10000 });
+  assert.deepEqual(mvr.brightness, { ratio: 0, ratioScale: 0 });
+});
+
+test("readScreenBrightness still works for the flat deviceList shape", async (t) => {
+  mockVnnox(t, (req) => {
+    if (req.url.includes("/ucenter/screen/normal-screen")) {
+      return jsonResponse({
+        code: 0,
+        data: {
+          list: [
+            {
+              name: "Perimeter Knattspyrna",
+              deviceList: [
+                {
+                  guid: PERIMETER_GUID,
+                  screenInfo: {
+                    adjustment: {
+                      brightness: { ratio: 450, ratioScale: 10000 },
+                    },
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      });
+    }
+    return undefined;
+  });
+  const client = new VnnoxClient(makeConfig());
+  const read = await client.readScreenBrightness();
+  assert.equal(read.percent, 4.5);
 });
 
 // -- brightness write ---------------------------------------------------------
