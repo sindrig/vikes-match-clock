@@ -1,7 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createElement } from "react";
 import type { ComponentProps } from "react";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import PerimeterControl from "./PerimeterControl";
 import { usePerimeter } from "../contexts/FirebaseStateContext";
 import { useLocalState } from "../contexts/LocalStateContext";
@@ -96,6 +102,9 @@ const createMockPerimeterReturn = (
     appliedAdLayout: baseAppliedAdLayout,
     appliedAdLayoutLoaded: true,
     appliedAdLayoutError: null,
+    brightness: null,
+    brightnessStatus: null,
+    setPerimeterBrightness: vi.fn().mockResolvedValue(undefined),
     getServerTime: () => Date.now(),
     ...overrides,
   }) as unknown as ReturnType<typeof usePerimeter>;
@@ -612,5 +621,249 @@ describe("PerimeterControl", () => {
     expect(layout).toBeDefined();
     expect(layout?.revision).not.toBe("rev-123");
     expect(layout?.columns.map((c) => c.id)).toEqual(["col-2", "col-1"]);
+  });
+
+  describe("BrightnessSection", () => {
+    const openModal = () => {
+      render(<PerimeterControl />);
+      fireEvent.click(screen.getByRole("button", { name: "Opna" }));
+    };
+
+    const getBrightnessInput = () => {
+      const modal = document.querySelector(".perimeter-preview-modal");
+      expect(modal).not.toBeNull();
+      const input = modal!.querySelector(
+        ".perimeter-brightness-controls input",
+      );
+      expect(input).not.toBeNull();
+      return input as HTMLInputElement;
+    };
+
+    const getBrightnessSection = () => {
+      const section = document.querySelector(".perimeter-brightness");
+      expect(section).not.toBeNull();
+      return section as HTMLElement;
+    };
+
+    const getApplyButton = () => screen.getByRole("button", { name: "Beita" });
+
+    it("submits a valid percentage to setPerimeterBrightness", () => {
+      const setBrightness = vi
+        .fn<ReturnType<typeof usePerimeter>["setPerimeterBrightness"]>()
+        .mockResolvedValue(undefined);
+      mockedUsePerimeter.mockReturnValue(
+        createMockPerimeterReturn({ setPerimeterBrightness: setBrightness }),
+      );
+      openModal();
+
+      const input = getBrightnessInput();
+      fireEvent.change(input, { target: { value: "60" } });
+      fireEvent.click(getApplyButton());
+
+      expect(setBrightness).toHaveBeenCalledWith(60);
+    });
+
+    it("rejects an out-of-range percentage without submitting", () => {
+      const setBrightness = vi.fn().mockResolvedValue(undefined);
+      mockedUsePerimeter.mockReturnValue(
+        createMockPerimeterReturn({ setPerimeterBrightness: setBrightness }),
+      );
+      openModal();
+
+      const input = getBrightnessInput();
+      fireEvent.change(input, { target: { value: "150" } });
+
+      expect(
+        screen.getByText("Heiltala á milli 0 og 100 er leyfileg."),
+      ).toBeInTheDocument();
+      expect(getApplyButton()).toBeDisabled();
+      fireEvent.click(getApplyButton());
+      expect(setBrightness).not.toHaveBeenCalled();
+    });
+
+    it("rejects a non-integer value without submitting", () => {
+      const setBrightness = vi.fn().mockResolvedValue(undefined);
+      mockedUsePerimeter.mockReturnValue(
+        createMockPerimeterReturn({ setPerimeterBrightness: setBrightness }),
+      );
+      openModal();
+
+      const input = getBrightnessInput();
+      fireEvent.change(input, { target: { value: "4.5" } });
+
+      expect(
+        screen.getByText("Heiltala á milli 0 og 100 er leyfileg."),
+      ).toBeInTheDocument();
+      expect(getApplyButton()).toBeDisabled();
+      fireEvent.click(getApplyButton());
+      expect(setBrightness).not.toHaveBeenCalled();
+    });
+
+    it("rejects a negative value without submitting", () => {
+      const setBrightness = vi.fn().mockResolvedValue(undefined);
+      mockedUsePerimeter.mockReturnValue(
+        createMockPerimeterReturn({ setPerimeterBrightness: setBrightness }),
+      );
+      openModal();
+
+      const input = getBrightnessInput();
+      fireEvent.change(input, { target: { value: "-5" } });
+
+      expect(
+        screen.getByText("Heiltala á milli 0 og 100 er leyfileg."),
+      ).toBeInTheDocument();
+      expect(getApplyButton()).toBeDisabled();
+      fireEvent.click(getApplyButton());
+      expect(setBrightness).not.toHaveBeenCalled();
+    });
+
+    it("disables the apply button while a write is pending", () => {
+      mockedUsePerimeter.mockReturnValue(
+        createMockPerimeterReturn({
+          brightness: 60,
+          brightnessStatus: {
+            requestedPercent: 60,
+            appliedPercent: null,
+            phase: "pending",
+            error: null,
+            updatedAt: Date.now(),
+          },
+        }),
+      );
+      openModal();
+
+      expect(
+        within(getBrightnessSection()).getByText("Í bið"),
+      ).toBeInTheDocument();
+      expect(getApplyButton()).toBeDisabled();
+    });
+
+    it("renders the applied phase and verified value", () => {
+      mockedUsePerimeter.mockReturnValue(
+        createMockPerimeterReturn({
+          brightness: 60,
+          brightnessStatus: {
+            requestedPercent: 60,
+            appliedPercent: 60,
+            phase: "applied",
+            error: null,
+            updatedAt: Date.now(),
+          },
+        }),
+      );
+      openModal();
+
+      expect(
+        within(getBrightnessSection()).getByText("Beitt"),
+      ).toBeInTheDocument();
+      expect(
+        within(getBrightnessSection()).getByText("Staðfest: 60%"),
+      ).toBeInTheDocument();
+    });
+
+    it("renders a failed phase with the safe error message", () => {
+      mockedUsePerimeter.mockReturnValue(
+        createMockPerimeterReturn({
+          brightness: 60,
+          brightnessStatus: {
+            requestedPercent: 60,
+            appliedPercent: null,
+            phase: "failed",
+            error: "Vnnox ekki tiltækt",
+            updatedAt: Date.now(),
+          },
+        }),
+      );
+      openModal();
+
+      expect(
+        within(getBrightnessSection()).getByText("Villa"),
+      ).toBeInTheDocument();
+      expect(
+        within(getBrightnessSection()).getByText("Vnnox ekki tiltækt"),
+      ).toBeInTheDocument();
+    });
+
+    it("shows the Firebase-synchronized requested value", () => {
+      mockedUsePerimeter.mockReturnValue(
+        createMockPerimeterReturn({ brightness: 42 }),
+      );
+      openModal();
+
+      expect(screen.getByText("Óskað: 42%")).toBeInTheDocument();
+      expect(getBrightnessInput().value).toBe("42");
+    });
+
+    it("exposes the input as an accessible control named after the section", () => {
+      mockedUsePerimeter.mockReturnValue(createMockPerimeterReturn());
+      openModal();
+
+      expect(
+        screen.getByRole("textbox", { name: "Bjartleiki jaðarskjás" }),
+      ).toBeInTheDocument();
+    });
+
+    it("shows a blank input rather than 0 when no brightness is set", () => {
+      mockedUsePerimeter.mockReturnValue(
+        createMockPerimeterReturn({ brightness: null }),
+      );
+      openModal();
+
+      expect(getBrightnessInput().value).toBe("");
+    });
+
+    it("treats a cleared input as invalid rather than defaulting to 0", () => {
+      const setBrightness = vi.fn().mockResolvedValue(undefined);
+      mockedUsePerimeter.mockReturnValue(
+        createMockPerimeterReturn({
+          brightness: 42,
+          setPerimeterBrightness: setBrightness,
+        }),
+      );
+      openModal();
+
+      const input = getBrightnessInput();
+      fireEvent.change(input, { target: { value: "" } });
+
+      expect(input.value).toBe("");
+      expect(getApplyButton()).toBeDisabled();
+      fireEvent.click(getApplyButton());
+      expect(setBrightness).not.toHaveBeenCalled();
+    });
+
+    it("allows re-submission once the brightness subscription confirms the prior submission", () => {
+      const setBrightness = vi.fn().mockResolvedValue(undefined);
+      mockedUsePerimeter.mockReturnValue(
+        createMockPerimeterReturn({
+          brightness: 40,
+          setPerimeterBrightness: setBrightness,
+        }),
+      );
+      const { rerender } = render(<PerimeterControl />);
+      fireEvent.click(screen.getByRole("button", { name: "Opna" }));
+
+      let input = getBrightnessInput();
+      fireEvent.change(input, { target: { value: "60" } });
+      fireEvent.click(getApplyButton());
+      expect(setBrightness).toHaveBeenCalledWith(60);
+      // Apply is disabled while the submission is settling.
+      expect(getApplyButton()).toBeDisabled();
+
+      // The Firebase subscription now reflects the submitted value — the
+      // component must clear its pending-submission state and re-enable
+      // Beita for a subsequent request.
+      mockedUsePerimeter.mockReturnValue(
+        createMockPerimeterReturn({
+          brightness: 60,
+          setPerimeterBrightness: setBrightness,
+        }),
+      );
+      rerender(<PerimeterControl />);
+
+      input = getBrightnessInput();
+      fireEvent.change(input, { target: { value: "70" } });
+      fireEvent.click(getApplyButton());
+      expect(setBrightness).toHaveBeenCalledWith(70);
+    });
   });
 });

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Button, Loader, Modal, IconButton, Badge } from "rsuite";
+import { Button, Loader, Modal, IconButton, Badge, InputNumber } from "rsuite";
 import CloseIcon from "@rsuite/icons/Close";
 import PlusIcon from "@rsuite/icons/Plus";
 import DragIcon from "@rsuite/icons/Dragable";
@@ -50,6 +50,12 @@ const PHASE_LABELS: Record<string, string> = {
   playing: "Spilar",
   error: "Villa",
   idle: "Í bið",
+};
+
+const BRIGHTNESS_PHASE_LABELS: Record<string, string> = {
+  pending: "Í bið",
+  applied: "Beitt",
+  failed: "Villa",
 };
 
 const formatTimestamp = (updatedAt: number | null): string => {
@@ -280,6 +286,115 @@ const FilePicker = ({
   );
 };
 
+const BrightnessSection = () => {
+  const { brightness, brightnessStatus, setPerimeterBrightness } =
+    usePerimeter();
+  // Local edit draft: `null` means "untouched" (display the synced Firebase
+  // value), `""` means the user explicitly cleared the input (display
+  // blank, distinct from "untouched" so clearing never silently reverts to
+  // showing the synced value again), and a number is an in-progress edit.
+  // Firebase is the only source of the displayed *requested* value; the
+  // draft only feeds the apply action and client-side validation.
+  const [draft, setDraft] = useState<number | "" | null>(null);
+  // The submitted percentage whose write is still settling. A write settles
+  // only once the brightness subscription reflects the submitted value (no
+  // optimistic local state); a rejected write clears it so the UI is not
+  // stuck disabled forever.
+  const [submittedValue, setSubmittedValue] = useState<number | null>(null);
+
+  const valid =
+    typeof draft === "number" &&
+    Number.isInteger(draft) &&
+    draft >= 0 &&
+    draft <= 100;
+
+  const phase = brightnessStatus?.phase;
+  // A write has settled once the brightness subscription reflects the
+  // submitted value; `busy` (not a raw `submittedValue !== null` check) is
+  // what gates further submissions, so a later Beita click is never
+  // permanently blocked by a stale submission once it settles — no effect
+  // needed to reset submittedValue back to null.
+  const settling = submittedValue !== null && brightness !== submittedValue;
+  const busy = settling || phase === "pending";
+
+  const handleApply = () => {
+    if (typeof draft !== "number" || !valid || busy) return;
+    setSubmittedValue(draft);
+    setPerimeterBrightness(draft).catch(() => setSubmittedValue(null));
+  };
+
+  return (
+    <div className="perimeter-brightness">
+      <div className="perimeter-brightness-header">
+        <span className="perimeter-brightness-title">
+          Bjartleiki jaðarskjás
+        </span>
+        {brightnessStatus && (
+          <Badge
+            content={BRIGHTNESS_PHASE_LABELS[phase ?? ""] ?? phase}
+            className={`perimeter-phase-badge phase-${phase}`}
+          />
+        )}
+      </div>
+      <div className="perimeter-brightness-controls">
+        <InputNumber
+          size="sm"
+          step={1}
+          aria-label="Bjartleiki jaðarskjás"
+          // An absent brightness stays blank rather than defaulting to 0 —
+          // defaulting would make a cleared/unset input look like a valid 0%
+          // value and risk an accidental full-dim submission.
+          value={draft === null ? (brightness ?? "") : draft}
+          onChange={(val) => {
+            if (val === "" || val === null || val === undefined) {
+              setDraft("");
+              return;
+            }
+            const next = typeof val === "number" ? val : Number(val);
+            setDraft(Number.isNaN(next) ? null : next);
+          }}
+          disabled={busy}
+        />
+        <Button
+          size="sm"
+          appearance="primary"
+          onClick={handleApply}
+          disabled={!valid || busy}
+        >
+          Beita
+        </Button>
+      </div>
+      {draft !== null && !valid && (
+        <div className="perimeter-brightness-invalid">
+          Heiltala á milli 0 og 100 er leyfileg.
+        </div>
+      )}
+      <div className="perimeter-brightness-status">
+        {brightness !== null && (
+          <span className="perimeter-brightness-requested">
+            Óskað: {brightness}%
+          </span>
+        )}
+        {brightnessStatus?.appliedPercent !== null &&
+          brightnessStatus?.appliedPercent !== undefined && (
+            <span className="perimeter-brightness-applied">
+              Staðfest: {brightnessStatus.appliedPercent}%
+            </span>
+          )}
+        {brightnessStatus?.error && (
+          <span className="perimeter-brightness-invalid">
+            {brightnessStatus.error}
+          </span>
+        )}
+      </div>
+      <p className="perimeter-hint">
+        Stillingin er send í gegnum Firebase og beitt af jaðartölvunni (Vnnox) á
+        jaðarskjáinn.
+      </p>
+    </div>
+  );
+};
+
 const PerimeterControl = () => {
   const {
     perimeter,
@@ -496,6 +611,7 @@ const PerimeterControl = () => {
           <Modal.Title>Jaðarskjár — Umsýsla auglýsinga</Modal.Title>
         </Modal.Header>
         <Modal.Body>
+          <BrightnessSection />
           {!appliedAdLayoutLoaded ? (
             <div className="perimeter-preview-state">
               <Loader content="Sæki forskoðun..." />

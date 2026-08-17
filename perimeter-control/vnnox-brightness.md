@@ -20,10 +20,10 @@ executed.
   - **"System 1"** → `10.182.45.50:8088`, G4A, SN `26126A000018386`.
 - Screens on the perimeter device (from
   `GET /unico/v1/ucenter/screen/normal-screen?projectId=defaultProject-vx`
-  + `sn` header):
-  - **Perimeter** screen, guid `75f3072e-4940-4682-a91c-44edf697b1ca`,
+  - `sn` header):
+  * **Perimeter** screen, guid `75f3072e-4940-4682-a91c-44edf697b1ca`,
     screenId 2.
-  - **MVR** screen, guid `7a794be7-95b2-42d2-8f8b-2b0b5397b480`, screenId 1.
+  * **MVR** screen, guid `7a794be7-95b2-42d2-8f8b-2b0b5397b480`, screenId 1.
 
 ## Auth
 
@@ -44,6 +44,7 @@ body: {"username":"admin","password":"<base64 of 123456>"}
 on all subsequent calls.
 
 Notes:
+
 - Direct login to the device (`10.182.45.40:8088/unico/v1/system/auth/login`)
   also works with the same body.
 - Each device has its own token (login is per `ip` header); `System 1` at
@@ -142,6 +143,21 @@ body: {
 **Safe pattern to implement later:** login → snapshot (`cabinet/info-v2` +
 `normal-screen`) → convert pct→ratio → write to the whitelisted perimeter
 GUID → poll/verify → restore from snapshot on any failure.
+
+**Rollback:** a snapshot is read-scaled (`ratio` scaled by `ratioScale`, e.g.
+`{ratio: 450, ratioScale: 10000}` for 4.5%), which is almost never an exact
+whole integer percentage. The daemon's own `restoreBrightness()` converts the
+snapshot to the write-scale fraction (`ratio / ratioScale`, `ratioScale: 1`)
+and writes it back bit-for-bit — this is the only supported rollback path and
+is exactly what the daemon already does automatically on a failed write. Do
+**not** attempt to "reapply the snapshot percentage" by hand through the
+`states/{location}/perimeter/brightness` command path: that path only accepts
+whole integer percentages (see `parseBrightnessCommand`), so a fractional
+snapshot (e.g. the 4.5% above) cannot be represented and rounding it would not
+restore the exact pre-write value. A manual rollback of a _whole-percentage_
+snapshot may go through the controller/command path; a manual rollback of a
+_fractional_ snapshot must go through Vnnox/UCenter directly (the toolbar
+slider or the raw `cabinet/brightness` write documented above).
 
 ## Operational gotchas
 
