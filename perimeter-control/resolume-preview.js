@@ -46,8 +46,10 @@ export function extractClipFilename(clip) {
   const direct = typeof clip.filename === "string" ? clip.filename : undefined;
   const video = clip.video?.fileinfo?.path;
   const audio = clip.audio?.fileinfo?.path;
-  const candidate = direct ?? (typeof video === "string" ? video : undefined)
-    ?? (typeof audio === "string" ? audio : undefined);
+  const candidate =
+    direct ??
+    (typeof video === "string" ? video : undefined) ??
+    (typeof audio === "string" ? audio : undefined);
   if (!candidate) return undefined;
   const basename = path.posix.basename(candidate.replace(/\\/g, "/"));
   return basename || undefined;
@@ -61,9 +63,10 @@ export function extractClipSourcePath(clip) {
   const video = clip.video?.fileinfo?.path;
   const audio = clip.audio?.fileinfo?.path;
   const direct = typeof clip.filename === "string" ? clip.filename : undefined;
-  const candidate = (typeof video === "string" ? video : undefined)
-    ?? (typeof audio === "string" ? audio : undefined)
-    ?? direct;
+  const candidate =
+    (typeof video === "string" ? video : undefined) ??
+    (typeof audio === "string" ? audio : undefined) ??
+    direct;
   return candidate || undefined;
 }
 
@@ -87,11 +90,14 @@ export function parseColumns(composition) {
 }
 
 // Deck geometry used by the overlay controller: the total number of deck
-// columns, the currently active (selected) column, and the composition's
+// columns, the currently active (selected) column, the composition's
 // autopilot target parameter (id + current value) so the daemon can pause and
-// restore the auto-advance around a goal overlay. Returns conservative
-// defaults when the tree is missing or malformed.
-export function compositionGrid(composition) {
+// restore the auto-advance around a goal overlay, and the columns that carry
+// base content (used to pick a standby slot for a double-buffered overlay
+// swap). `options.overlayLayerIds` excludes the overlay layers from the base
+// content check so the goal clip itself never counts as content. Returns
+// conservative defaults when the tree is missing or malformed.
+export function compositionGrid(composition, options = {}) {
   const rawColumns = Array.isArray(composition?.columns)
     ? composition.columns
     : [];
@@ -110,7 +116,35 @@ export function compositionGrid(composition) {
     target && typeof target === "object"
       ? { id: target.id, value: target.value, index: target.index }
       : null;
-  return { columnCount: rawColumns.length, activeColumn, autopilotTarget };
+
+  const overlayLayerIds = new Set(
+    Array.isArray(options.overlayLayerIds)
+      ? options.overlayLayerIds.map(String)
+      : [],
+  );
+  const baseContentColumns = [];
+  const layers = Array.isArray(composition?.layers) ? composition.layers : [];
+  layers.forEach((layer, layerIndex) => {
+    if (overlayLayerIds.has(String(layerIndex + 1))) return;
+    const clips =
+      layer && typeof layer === "object" && Array.isArray(layer.clips)
+        ? layer.clips
+        : [];
+    clips.forEach((clip, clipIndex) => {
+      if (!clip || typeof clip !== "object") return;
+      if (extractClipFilename(clip) === undefined) return;
+      const column = clipIndex + 1;
+      if (!baseContentColumns.includes(column)) baseContentColumns.push(column);
+    });
+  });
+  baseContentColumns.sort((a, b) => a - b);
+
+  return {
+    columnCount: rawColumns.length,
+    activeColumn,
+    autopilotTarget,
+    baseContentColumns,
+  };
 }
 
 // Collect every non-empty clip, keyed by 1-based column position. Each entry
@@ -237,7 +271,9 @@ export class ResolumeCompositionReader {
       if (!response.ok) return null;
       return Buffer.from(await response.arrayBuffer());
     } catch (err) {
-      console.error(`Failed to fetch Resolume thumbnail ${url}: ${err.message}`);
+      console.error(
+        `Failed to fetch Resolume thumbnail ${url}: ${err.message}`,
+      );
       return null;
     } finally {
       clearTimeout(timer);

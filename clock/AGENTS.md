@@ -286,7 +286,15 @@ column until explicitly cleared.
   the goal celebration never vanishes on an Efni transition. A goal placed in
   a single column without pausing the autopilot would disappear at the first
   transition.
-- A new `id` replaces/restarts an active sequence.
+- A new `id` replaces/restarts an active sequence. Replacing one overlay with
+  another (a new `id` while one is playing) is **double-buffered**: the daemon
+  loads the new overlay into a standby deck column while the old one keeps
+  playing, then connects the standby column and clears the old slot — so the
+  swap never shows the base ads in between. A clip crossfade (default 0.5s
+  Dissolve, `PERIMETER_OVERLAY_TRANSITION_SECONDS`/`_BLEND`) softens the
+  cutover. Because the standby column is connected, the deck ends up on that
+  column after the swap; the ads simply resume from there once the overlay
+  clears.
 - Only files from the approved `gs://vikes-match-clock-firebase.appspot.com`
   bucket are accepted. The daemon copies them only into `C:/Content` on the
   Windows Resolume host.

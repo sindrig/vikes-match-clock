@@ -12,6 +12,14 @@ const TEST_EMAIL = `e2e-test-${WORKER_ID}@test.com`;
 const TEST_PASSWORD = "testpassword123";
 const EMAIL_PREFIX = TEST_EMAIL.split("@")[0];
 
+// The Firebase RTDB emulator enforces firebase-rules.json security rules even
+// on plain REST calls with no auth token. Test helpers seed data as a trusted
+// harness, not as any particular signed-in user, so they must use the
+// emulator's documented rules-bypass token. Without this header, seeding
+// writes below fail silently (responses aren't checked) and tests relying on
+// that seeded data hang/timeout instead of failing fast.
+const OWNER_HEADERS = { Authorization: "Bearer owner" };
+
 export class FakeClock {
   constructor(private currentTime: Date) {}
   get time() {
@@ -28,15 +36,18 @@ async function clearEmulatorData(): Promise<void> {
   try {
     await apiContext.delete(
       `http://127.0.0.1:9000/states/${TEST_LISTEN_PREFIX}.json?ns=vikes-match-clock-test`,
+      { headers: OWNER_HEADERS },
     );
     await apiContext.delete(
       `http://127.0.0.1:9000/states/${EMAIL_PREFIX}.json?ns=vikes-match-clock-test`,
+      { headers: OWNER_HEADERS },
     );
 
     // Create initial locations data that persists across test runs
     await apiContext.put(
       `http://127.0.0.1:9000/locations/${TEST_LISTEN_PREFIX}.json?ns=vikes-match-clock-test`,
       {
+        headers: OWNER_HEADERS,
         data: {
           label: `Test Location ${WORKER_ID}`,
           screens: [
@@ -52,6 +63,7 @@ async function clearEmulatorData(): Promise<void> {
     await apiContext.put(
       `http://127.0.0.1:9000/states/${TEST_LISTEN_PREFIX}.json?ns=vikes-match-clock-test`,
       {
+        headers: OWNER_HEADERS,
         data: {
           match: {
             homeScore: 0,
@@ -168,6 +180,7 @@ export async function loginWithEmulatorUser(page: Page): Promise<void> {
     await apiContext.put(
       `http://127.0.0.1:9000/auth/${realUID}/${TEST_LISTEN_PREFIX}.json?ns=vikes-match-clock-test`,
       {
+        headers: OWNER_HEADERS,
         data: true,
       },
     );
@@ -212,7 +225,7 @@ export async function seedAdmins(uid: string, isAdmin = true): Promise<void> {
   try {
     await apiContext.put(
       `http://127.0.0.1:9000/admins/${uid}.json?ns=vikes-match-clock-test`,
-      { data: isAdmin },
+      { headers: OWNER_HEADERS, data: isAdmin },
     );
   } finally {
     await apiContext.dispose();
@@ -234,7 +247,7 @@ export async function seedInvitations(
   try {
     await apiContext.put(
       `http://127.0.0.1:9000/invitations.json?ns=vikes-match-clock-test`,
-      { data: invitations },
+      { headers: OWNER_HEADERS, data: invitations },
     );
   } finally {
     await apiContext.dispose();
