@@ -369,8 +369,13 @@ describe("PerimeterControl", () => {
     fireEvent.click(screen.getByRole("button", { name: "Opna" }));
     fireEvent.click(screen.getByText("Bæta við dálki"));
 
-    // Save button should be disabled initially (no lanes selected)
-    const saveBtn = screen.getByRole("button", { name: "Vista" });
+    // Save button should be disabled initially (no lanes selected). Scope to
+    // the add-column dialog — the brightness section has its own Vista button.
+    const addDialog = document.querySelector(".perimeter-add-dialog");
+    expect(addDialog).not.toBeNull();
+    const saveBtn = within(addDialog as HTMLElement).getByRole("button", {
+      name: "Vista",
+    });
     expect(saveBtn).toBeDisabled();
   });
 
