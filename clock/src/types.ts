@@ -429,6 +429,28 @@ export interface AuditEvent {
   changes: Record<string, unknown>;
 }
 
+// -- Perimeter brightness (Vnnox LED brightness) -----------------------------
+
+// The controller's requested brightness is stored as a whole integer
+// percentage (0..100) at states/{location}/perimeter/brightness. Absent
+// (null) means "no command" and is inert; the parsed value is a bare number.
+
+export type PerimeterBrightnessPhase = "pending" | "applied" | "failed";
+
+// Daemon-published brightness status at perimeter/{location}/brightnessStatus.
+// `appliedPercent` is present only after the daemon verified the screen read.
+// `requestedPercent` is `null` only for a configuration-caused `failed`
+// status published before any command was ever requested (e.g. on daemon
+// startup when Vnnox is enabled but misconfigured); every other status
+// (including a command-caused `failed`) always carries the requested value.
+export interface PerimeterBrightnessStatus {
+  requestedPercent: number | null;
+  appliedPercent: number | null;
+  phase: PerimeterBrightnessPhase;
+  error: string | null;
+  updatedAt: number; // Firebase server timestamp
+}
+
 // Root state type
 export interface RootState {
   match: Match;

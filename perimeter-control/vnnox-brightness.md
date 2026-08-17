@@ -20,10 +20,10 @@ executed.
   - **"System 1"** → `10.182.45.50:8088`, G4A, SN `26126A000018386`.
 - Screens on the perimeter device (from
   `GET /unico/v1/ucenter/screen/normal-screen?projectId=defaultProject-vx`
-  + `sn` header):
-  - **Perimeter** screen, guid `75f3072e-4940-4682-a91c-44edf697b1ca`,
+  - `sn` header):
+  * **Perimeter** screen, guid `75f3072e-4940-4682-a91c-44edf697b1ca`,
     screenId 2.
-  - **MVR** screen, guid `7a794be7-95b2-42d2-8f8b-2b0b5397b480`, screenId 1.
+  * **MVR** screen, guid `7a794be7-95b2-42d2-8f8b-2b0b5397b480`, screenId 1.
 
 ## Auth
 
@@ -44,6 +44,7 @@ body: {"username":"admin","password":"<base64 of 123456>"}
 on all subsequent calls.
 
 Notes:
+
 - Direct login to the device (`10.182.45.40:8088/unico/v1/system/auth/login`)
   also works with the same body.
 - Each device has its own token (login is per `ip` header); `System 1` at
@@ -85,7 +86,7 @@ headers: Authorization: <token>
 `brightnessOverdrive`, `peakBrightness`, `colorTemperature`, `gamma`,
 `displayMode`, `testPattern`, etc.
 
-## Brightness write (NOT executed — reconstructed from the UI bundle)
+## Brightness write (reconstructed from the UI bundle + verified live)
 
 Both the toolbar slider and the engineering/correction panel call the same
 endpoint; only the `guidList` scope differs.
@@ -99,8 +100,8 @@ headers: Authorization: <token>
 body: {
   "brightness": {
     "nitType": 0,
-    "ratioScale": 1,
-    "ratio": 0.045,     // fraction 0..1  (pct / 100)
+    "ratioScale": 10000,
+    "ratio": 3000,      // integer, same 10000 scale as reads (30% → 3000)
     "nit": 0
   },
   "list": [],                            // empty = all cabinets on the screen
@@ -108,15 +109,23 @@ body: {
 }
 ```
 
+**Scale is NOT asymmetric — writes take the same integer 10000 scale as reads.**
+An earlier draft of this doc claimed writes take a `0--1` fraction with
+`ratioScale: 1`; that was wrong. This device's firmware **rejects a
+fractional float** — `ratio: 0.3` fails with
+`{"code":500,"data":{"Field":"brightness.ratio","Value":"number 0.3"}}`. The
+write endpoint's `ratio` field is an integer (read-scale, 10000). Verified live:
+`ratio 3000 / ratioScale 10000` writes 30% and the readback confirms it.
+
 ## Safety assessment
 
 **Deterministic: yes, with one serious footgun.**
 
 - Writes are a well-defined JSON RPC; same input → same output (idempotent).
-- **Scale mismatch**: writes take `ratio` as a **fraction 0–1**
-  (`ratioScale: 1`), reads return a **10000-scaled int** (`ratio: 450`).
-  Copying a read value straight into a write without `/100` would be
-  ~10000× too bright. Always convert: `writeRatio = brightnessPct / 100`.
+- **Scale**: writes and reads both use the **integer 10000 scale**
+  (`ratio: 3000, ratioScale: 10000` = 30%). Never send a fractional float
+  (`ratio: 0.3`) — the device rejects it with code 500. Percent
+  × 100 = ratio at this scale.
 - Snapshot-before-write is easy: read `cabinet/info-v2` (and/or
   `normal-screen`) first, then restore on failure.
 
@@ -142,6 +151,21 @@ body: {
 **Safe pattern to implement later:** login → snapshot (`cabinet/info-v2` +
 `normal-screen`) → convert pct→ratio → write to the whitelisted perimeter
 GUID → poll/verify → restore from snapshot on any failure.
+
+**Rollback:** a snapshot is read-scaled (`ratio` scaled by `ratioScale`, e.g.
+`{ratio: 450, ratioScale: 10000}` for 4.5%), which is almost never an exact
+whole integer percentage. The daemon's own `restoreBrightness()` re-applies
+the snapshot bit-for-bit at its read scale (which is the same scale the write
+endpoint accepts) — this is the only supported rollback path and is exactly
+what the daemon already does automatically on a failed write. Do
+**not** attempt to "reapply the snapshot percentage" by hand through the
+`states/{location}/perimeter/brightness` command path: that path only accepts
+whole integer percentages (see `parseBrightnessCommand`), so a fractional
+snapshot (e.g. the 4.5% above) cannot be represented and rounding it would not
+restore the exact pre-write value. A manual rollback of a _whole-percentage_
+snapshot may go through the controller/command path; a manual rollback of a
+_fractional_ snapshot must go through Vnnox/UCenter directly (the toolbar
+slider or the raw `cabinet/brightness` write documented above).
 
 ## Operational gotchas
 

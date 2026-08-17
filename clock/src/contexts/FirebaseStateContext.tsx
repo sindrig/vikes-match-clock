@@ -9,7 +9,7 @@ import React, {
   useMemo,
 } from "react";
 import { database, storageHelpers, FIREBASE_STORAGE_BUCKET } from "../firebase";
-import { ref, onValue } from "firebase/database";
+import { ref, onValue, set } from "firebase/database";
 import {
   Match,
   InjuryTimeDisplayMode,
@@ -33,6 +33,7 @@ import {
   PerimeterAdLayout,
   PerimeterAppliedAdLayout,
   AuditStateArea,
+  PerimeterBrightnessStatus,
 } from "../types";
 import {
   firebaseDatabase,
@@ -58,6 +59,8 @@ import {
   parsePerimeterMediaPairs,
   parsePerimeterAdLayout,
   parsePerimeterAppliedAdLayout,
+  parsePerimeterBrightness,
+  parsePerimeterBrightnessStatus,
 } from "./firebaseParsers";
 
 const HALFTIME_DURATION_MS = 15 * 60 * 1000;
@@ -277,6 +280,9 @@ interface FirebaseStateContextType {
   perimeterAppliedAdLayout: PerimeterAppliedAdLayout | undefined;
   perimeterAppliedAdLayoutLoaded: boolean;
   perimeterAppliedAdLayoutError: string | null;
+  perimeterBrightness: number | null;
+  perimeterBrightnessStatus: PerimeterBrightnessStatus | null;
+  setPerimeterBrightness: (percent: number) => Promise<void>;
 }
 
 const FirebaseStateContext = createContext<FirebaseStateContextType | null>(
@@ -441,6 +447,11 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     useState(false);
   const [perimeterAppliedAdLayoutError, setPerimeterAppliedAdLayoutError] =
     useState<string | null>(null);
+  const [perimeterBrightness, setPerimeterBrightnessState] = useState<
+    number | null
+  >(null);
+  const [perimeterBrightnessStatus, setPerimeterBrightnessStatus] =
+    useState<PerimeterBrightnessStatus | null>(null);
   const [ready, setReady] = useState(!listenPrefix);
 
   const matchRef = useRef(match);
@@ -744,6 +755,38 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
           ),
       );
 
+      // Perimeter brightness (Vnnox): the controller's requested integer
+      // percentage under states/{location}/perimeter/brightness and the
+      // daemon-published status under perimeter/{location}/brightnessStatus.
+      // The status is daemon-owned and deliberately NOT part of readiness.
+      const brightnessPath = `states/${listenPrefix}/perimeter/brightness`;
+      const unsubBrightness = onValue(
+        ref(database, brightnessPath),
+        (snapshot) => {
+          setPerimeterBrightnessState(parsePerimeterBrightness(snapshot.val()));
+        },
+        (error) =>
+          console.error(
+            "Firebase perimeter brightness subscription error:",
+            error,
+          ),
+      );
+
+      const brightnessStatusPath = `perimeter/${listenPrefix}/brightnessStatus`;
+      const unsubBrightnessStatus = onValue(
+        ref(database, brightnessStatusPath),
+        (snapshot) => {
+          setPerimeterBrightnessStatus(
+            parsePerimeterBrightnessStatus(snapshot.val()),
+          );
+        },
+        (error) =>
+          console.error(
+            "Firebase perimeter brightnessStatus subscription error:",
+            error,
+          ),
+      );
+
       return () => {
         unsubMatch();
         unsubController();
@@ -755,6 +798,8 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         unsubAdLayout();
         unsubAppliedAdLayout();
         unsubMediaPairs();
+        unsubBrightness();
+        unsubBrightnessStatus();
       };
     }
   }, [listenPrefix]);
@@ -1845,6 +1890,24 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     [makeAudit, listenPrefix],
   );
 
+  const setPerimeterBrightness = useCallback(
+    (percent: number): Promise<void> => {
+      if (!listenPrefix || !isAuthenticated) return Promise.resolve();
+      if (!Number.isInteger(percent) || percent < 0 || percent > 100) {
+        console.warn(`Ignoring invalid brightness request: ${percent}`);
+        return Promise.resolve();
+      }
+      // Let rejections propagate so the controller can clear its pending
+      // state when a write fails instead of waiting forever on the
+      // subscription (no optimistic local state).
+      return set(
+        ref(database, `states/${listenPrefix}/perimeter/brightness`),
+        percent,
+      );
+    },
+    [isAuthenticated, listenPrefix],
+  );
+
   const createPerimeterMediaPair = useCallback(
     (pairId: string, pair: PerimeterMediaPair): Promise<void> => {
       const audit = makeAudit("perimeter", "perimeter.create-media-pair");
@@ -1991,6 +2054,9 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       perimeterAppliedAdLayout,
       perimeterAppliedAdLayoutLoaded,
       perimeterAppliedAdLayoutError,
+      perimeterBrightness,
+      perimeterBrightnessStatus,
+      setPerimeterBrightness,
     }),
     [
       match,
@@ -2073,6 +2139,9 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       perimeterAppliedAdLayout,
       perimeterAppliedAdLayoutLoaded,
       perimeterAppliedAdLayoutError,
+      perimeterBrightness,
+      perimeterBrightnessStatus,
+      setPerimeterBrightness,
     ],
   );
 
@@ -2265,6 +2334,9 @@ export const usePerimeter = () => {
     perimeterAppliedAdLayout,
     perimeterAppliedAdLayoutLoaded,
     perimeterAppliedAdLayoutError,
+    perimeterBrightness,
+    perimeterBrightnessStatus,
+    setPerimeterBrightness,
     getServerTime,
   } = useFirebaseState();
   return {
@@ -2284,6 +2356,9 @@ export const usePerimeter = () => {
     appliedAdLayout: perimeterAppliedAdLayout,
     appliedAdLayoutLoaded: perimeterAppliedAdLayoutLoaded,
     appliedAdLayoutError: perimeterAppliedAdLayoutError,
+    brightness: perimeterBrightness,
+    brightnessStatus: perimeterBrightnessStatus,
+    setPerimeterBrightness,
     getServerTime,
   };
 };

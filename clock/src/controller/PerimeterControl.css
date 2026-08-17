@@ -514,3 +514,66 @@
     flex-basis: min(240px, calc(100vw - 48px));
   }
 }
+
+/* Brightness control (Vnnox LED brightness) */
+.perimeter-preview-modal .perimeter-brightness {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  background: #f7f9fb;
+  border: 1px solid #e0e3e7;
+  border-radius: 6px;
+}
+
+.perimeter-preview-modal .perimeter-brightness-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.perimeter-preview-modal .perimeter-brightness-title {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.perimeter-preview-modal .perimeter-brightness-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.perimeter-preview-modal .perimeter-brightness-controls .rs-input-number {
+  width: 120px;
+}
+
+.perimeter-preview-modal .perimeter-brightness-status {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.perimeter-preview-modal .perimeter-brightness-requested,
+.perimeter-preview-modal .perimeter-brightness-applied {
+  font-weight: 600;
+}
+
+.perimeter-preview-modal .perimeter-brightness-invalid {
+  color: #d32f2f;
+  font-size: 12px;
+}
+
+.perimeter-preview-modal .phase-pending::before {
+  background: #ffa726;
+}
+
+.perimeter-preview-modal .phase-applied::before {
+  background: #66bb6a;
+}
+
+.perimeter-preview-modal .phase-failed::before {
+  background: #ef5350;
+}
