@@ -9,7 +9,7 @@ import {
   loginWithEmulatorUser,
   startClock,
   startHalftimeCountdown,
-  stopHalftimeCountdown,
+  startNextPeriodEarly,
 } from "./fixtures/test-helpers";
 
 test.describe("Halftime Countdown", () => {
@@ -41,7 +41,9 @@ test.describe("Halftime Countdown", () => {
     return fakeClock;
   }
 
-  test("countdown reaches 00:00 and clock shows 45:00", async ({ page }) => {
+  test("countdown reaches 00:00 and clock auto-starts next half", async ({
+    page,
+  }) => {
     const fakeClock = await playToHalftime(page);
 
     await startHalftimeCountdown(page);
@@ -60,12 +62,12 @@ test.describe("Halftime Countdown", () => {
     // Advance past the end of the countdown
     await fakeClock.advance(page, ONE_MINUTE);
 
-    // Clock should auto-stop and show 45:00
-    await expect(page.getByText("Byrja")).toBeVisible({ timeout: 5000 });
-    await expect(page.locator(".matchclock")).toHaveText("45:00");
+    // Clock should auto-start the next half from 45:00 (no "Byrja" wait)
+    await expect(page.getByText("Pása")).toBeVisible({ timeout: 5000 });
+    await expect(page.locator(".matchclock")).toContainText(/45:0\d/);
   });
 
-  test("Stöðva niðurtalningu stops countdown and shows 45:00", async ({
+  test("Byrja næsta hálfleik starts the next half early and shows 45:00 running", async ({
     page,
   }) => {
     const fakeClock = await playToHalftime(page);
@@ -76,15 +78,14 @@ test.describe("Halftime Countdown", () => {
     await fakeClock.advance(page, ONE_MINUTE * 5 + SECOND);
     await expect(page.locator(".matchclock")).toContainText(/09:5\d/);
 
-    // Stop the countdown manually
-    await stopHalftimeCountdown(page);
+    // Start the next half manually, before the countdown finishes
+    await startNextPeriodEarly(page);
 
-    // Clock should show 45:00 and be stopped
-    await expect(page.locator(".matchclock")).toHaveText("45:00");
-    await expect(page.getByText("Byrja")).toBeVisible();
+    // Clock should show 45:00 and be running (not paused)
+    await expect(page.locator(".matchclock")).toContainText(/45:0\d/);
+    await expect(page.getByText("Pása")).toBeVisible();
 
-    // Starting the clock should continue from 45:00
-    await startClock(page);
+    // Clock should continue counting from 45:00
     await fakeClock.advance(page, ONE_MINUTE * 5);
     await expect(page.locator(".matchclock")).toContainText(/50:0\d/);
   });
