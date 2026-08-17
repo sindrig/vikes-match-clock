@@ -40,6 +40,13 @@ export function isMatchResetDisabled(match: Match): boolean {
   );
 }
 
+export function isHalftimeTransitionEligible(match: Match): boolean {
+  if (match.started) return false;
+  const currentBoundaryMs = (match.halfStops[0] ?? Infinity) * 60 * 1000;
+  if (match.timeElapsed < currentBoundaryMs) return false;
+  return match.halfStops.length > 1;
+}
+
 export function teamToStateKey(team: "home" | "away"): "home2min" | "away2min" {
   if (team === "home") {
     return "home2min";

@@ -1486,6 +1486,163 @@ describe("FirebaseStateContext", () => {
     });
   });
 
+  describe("halftime countdown transitions", () => {
+    const renderHalftimeApi = () => {
+      let matchApi: ReturnType<typeof useMatch> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+          screenKey={null}
+        >
+          <TestMatchConsumer
+            onMount={(api) => {
+              matchApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      return matchApi!;
+    };
+
+    it("starts a halftime countdown at a paused eligible period boundary", () => {
+      const matchApi = renderHalftimeApi();
+      act(() => {
+        matchApi.updateMatch({
+          started: 0,
+          timeElapsed: 45 * 60 * 1000,
+          halfStops: [45, 90],
+        });
+      });
+      vi.clearAllMocks();
+      act(() => {
+        matchApi.startHalftimeCountdown();
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "match",
+        expect.objectContaining({
+          started: expect.any(Number) as unknown,
+          timeElapsed: 0,
+          countdown: true,
+          halftimeCountdown: true,
+        }),
+      );
+    });
+
+    it("starts a halftime countdown during injury time", () => {
+      const matchApi = renderHalftimeApi();
+      act(() => {
+        matchApi.updateMatch({
+          started: 0,
+          timeElapsed: (46 * 60 + 30) * 1000,
+          halfStops: [45, 90],
+        });
+      });
+      vi.clearAllMocks();
+      act(() => {
+        matchApi.startHalftimeCountdown();
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "match",
+        expect.objectContaining({ halftimeCountdown: true }),
+      );
+    });
+
+    it("rejects a stale/direct halftime countdown after completion without a Firebase write", () => {
+      const matchApi = renderHalftimeApi();
+      act(() => {
+        matchApi.updateMatch({
+          started: 0,
+          timeElapsed: 45 * 60 * 1000,
+          halfStops: [90],
+        });
+      });
+      vi.clearAllMocks();
+      act(() => {
+        matchApi.startHalftimeCountdown();
+      });
+      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
+    });
+
+    it("rejects a halftime countdown at the final period boundary without a Firebase write", () => {
+      const matchApi = renderHalftimeApi();
+      act(() => {
+        matchApi.updateMatch({
+          started: 0,
+          timeElapsed: 90 * 60 * 1000,
+          halfStops: [90],
+        });
+      });
+      vi.clearAllMocks();
+      act(() => {
+        matchApi.startHalftimeCountdown();
+      });
+      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
+    });
+
+    it("rejects a halftime countdown while the clock is running without a Firebase write", () => {
+      const matchApi = renderHalftimeApi();
+      act(() => {
+        matchApi.updateMatch({
+          started: 5_000_000,
+          timeElapsed: 45 * 60 * 1000,
+          halfStops: [45, 90],
+        });
+      });
+      vi.clearAllMocks();
+      act(() => {
+        matchApi.startHalftimeCountdown();
+      });
+      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
+    });
+
+    it("rejects a halftime countdown below the current period boundary without a Firebase write", () => {
+      const matchApi = renderHalftimeApi();
+      act(() => {
+        matchApi.updateMatch({
+          started: 0,
+          timeElapsed: 30 * 60 * 1000,
+          halfStops: [45, 90],
+        });
+      });
+      vi.clearAllMocks();
+      act(() => {
+        matchApi.startHalftimeCountdown();
+      });
+      expect(firebaseDatabase.syncState).not.toHaveBeenCalled();
+    });
+
+    it("leaves the match paused at the completed boundary on halftime countdown expiry", () => {
+      const matchApi = renderHalftimeApi();
+      act(() => {
+        matchApi.updateMatch({
+          started: 1_234_567_890,
+          timeElapsed: 0,
+          countdown: true,
+          halftimeCountdown: true,
+          halfStops: [45, 90],
+        });
+      });
+      vi.clearAllMocks();
+      act(() => {
+        matchApi.pauseMatch();
+      });
+      expect(firebaseDatabase.syncState).toHaveBeenCalledWith(
+        "test-location",
+        "match",
+        expect.objectContaining({
+          started: 0,
+          countdown: false,
+          halftimeCountdown: false,
+          timeElapsed: 45 * 60 * 1000,
+          halfStops: [90],
+        }),
+      );
+    });
+  });
+
   describe("removeAssetAfterTimeout", () => {
     it("clears currentAsset when autoPlay is off", () => {
       let controllerApi: ReturnType<typeof useController> | null = null;
