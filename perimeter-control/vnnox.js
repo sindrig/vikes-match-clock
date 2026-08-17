@@ -11,9 +11,10 @@
  * every later call along with the same device headers (`sn` for screen reads).
  *
  * Scales are asymmetric: reads return an integer scaled by `ratioScale`
- * (`ratio / ratioScale`), while writes take a 0--1 fraction with
- * `ratioScale: 1`. Every write is scoped with exactly the configured perimeter
- * screen GUID so no other screen (e.g. the MVR screen) is ever targeted.
+ * (`ratio / ratioScale`), and writes take the same integer 10000 scale
+ * (a `ratioScale: 1` fraction is rejected by the device with code 500). Every
+ * write is scoped with exactly the configured perimeter screen GUID so no
+ * other screen (e.g. the MVR screen) is ever targeted.
  */
 
 import { readFile } from "node:fs/promises";
@@ -34,17 +35,18 @@ export function parseBrightnessCommand(data) {
   return data;
 }
 
-// Convert a whole percentage (0..100) to the Vnnox write fraction.
-// The write endpoint expects `ratio` as a 0--1 fraction with `ratioScale: 1`;
-// copying a 10000-scaled read value straight into a write would be ~10000x
-// too bright, so this conversion is the single tested boundary for writers.
-export function percentToFraction(percent) {
+// Convert a whole percentage (0..100) to the Vnnox write ratio. The write
+// endpoint rejects fractional floats (`brightness.ratio` as `0.3` fails with a
+// code 500) — it expects an integer ratio at the same 10000 scale the read
+// path returns (30% → 3000). Because a percentage is a whole integer,
+// `percent * 100` is exact.
+export function percentToRatio(percent) {
   if (!Number.isInteger(percent) || percent < 0 || percent > 100) {
     throw new Error(
       `invalid brightness percentage: ${JSON.stringify(percent)}`,
     );
   }
-  return percent / 100;
+  return percent * 100;
 }
 
 // Normalize a raw Vnnox brightness object into { percent, ratio, ratioScale,
@@ -350,26 +352,23 @@ export class VnnoxClient {
   // perimeter screen GUID with an empty cabinet list (all cabinets on that
   // screen), as the UCenter UI does.
   async writeBrightness(percent) {
-    const ratio = percentToFraction(percent);
-    return this._writeTarget({ nitType: 0, ratioScale: 1, ratio, nit: 0 });
+    const ratio = percentToRatio(percent);
+    return this._writeTarget({ nitType: 0, ratioScale: 10000, ratio, nit: 0 });
   }
 
-  // Best-effort restore: the write endpoint always expects a 0--1 fraction
-  // with `ratioScale: 1` (see the module doc comment), while a snapshot holds
-  // the *read*-scaled ratio/ratioScale from `normalizeBrightness`. Sending the
-  // snapshot's raw read-scaled ratio straight through — as a previous version
-  // of this method did — silently mis-targets the write scale and can leave
-  // the screen far brighter/dimmer than the pre-write value. Convert to the
-  // write-scale fraction here so the restored value is bit-for-bit equal to
-  // the pre-write ratio, just re-expressed at `ratioScale: 1`.
+  // Best-effort restore: the write endpoint expects the same integer 10000
+  // scale the read path returns (a `0--1` fraction with `ratioScale: 1` is
+  // rejected by the device with a code 500 on `brightness.ratio`). A snapshot
+  // holds the read-scaled ratio/ratioScale from `normalizeBrightness`, so the
+  // restore is a bit-for-bit re-application of the pre-write value.
   async restoreBrightness(snapshot) {
     if (!snapshot || typeof snapshot !== "object") {
       throw new Error("no brightness snapshot to restore");
     }
     return this._writeTarget({
       nitType: snapshot.nitType ?? 0,
-      ratioScale: 1,
-      ratio: snapshot.ratio / snapshot.ratioScale,
+      ratioScale: snapshot.ratioScale,
+      ratio: snapshot.ratio,
       nit: snapshot.nit ?? 0,
     });
   }

@@ -5,7 +5,7 @@ import {
   AUTH_ERROR_CODES,
   normalizeBrightness,
   parseBrightnessCommand,
-  percentToFraction,
+  percentToRatio,
   VnnoxClient,
 } from "../vnnox.js";
 import { validateBrightnessConfig } from "../brightness.js";
@@ -148,17 +148,17 @@ test("parseBrightnessCommand rejects malformed or out-of-range values", () => {
 
 // -- scale conversions --------------------------------------------------------
 
-test("percentToFraction converts a percentage to the 0..1 write scale", () => {
-  assert.equal(percentToFraction(0), 0);
-  assert.equal(percentToFraction(4), 0.04);
-  assert.equal(percentToFraction(50), 0.5);
-  assert.equal(percentToFraction(100), 1);
+test("percentToRatio converts a percentage to the integer 10000 write scale", () => {
+  assert.equal(percentToRatio(0), 0);
+  assert.equal(percentToRatio(4), 400);
+  assert.equal(percentToRatio(50), 5000);
+  assert.equal(percentToRatio(100), 10000);
 });
 
-test("percentToFraction rejects values outside 0..100 or non-integers", () => {
-  assert.throws(() => percentToFraction(-1), /invalid brightness percentage/);
-  assert.throws(() => percentToFraction(101), /invalid brightness percentage/);
-  assert.throws(() => percentToFraction(4.5), /invalid brightness percentage/);
+test("percentToRatio rejects values outside 0..100 or non-integers", () => {
+  assert.throws(() => percentToRatio(-1), /invalid brightness percentage/);
+  assert.throws(() => percentToRatio(101), /invalid brightness percentage/);
+  assert.throws(() => percentToRatio(4.5), /invalid brightness percentage/);
 });
 
 test("normalizeBrightness converts a 10000-scaled read to a percentage", () => {
@@ -419,7 +419,7 @@ test("readScreenBrightness still works for the flat deviceList shape", async (t)
 
 // -- brightness write ---------------------------------------------------------
 
-test("writeBrightness issues a fraction write scoped to exactly one guid", async (t) => {
+test("writeBrightness issues a 10000-scale integer write scoped to exactly one guid", async (t) => {
   const calls = mockVnnox(t);
   const client = new VnnoxClient(makeConfig());
   await client.writeBrightness(4);
@@ -428,7 +428,7 @@ test("writeBrightness issues a fraction write scoped to exactly one guid", async
   );
   assert.equal(write.method, "POST");
   assert.deepEqual(write.body, {
-    brightness: { nitType: 0, ratioScale: 1, ratio: 0.04, nit: 0 },
+    brightness: { nitType: 0, ratioScale: 10000, ratio: 400, nit: 0 },
     list: [],
     guidList: [PERIMETER_GUID],
   });
@@ -446,13 +446,12 @@ test("writeBrightness rejects invalid percentages before any request", async (t)
   assert.equal(calls.length, 0);
 });
 
-test("restoreBrightness converts the read-scaled snapshot to a write-scale fraction", async (t) => {
+test("restoreBrightness re-applies the read-scaled snapshot bit-for-bit", async (t) => {
   const calls = mockVnnox(t);
   const client = new VnnoxClient(makeConfig());
   // A 4.5% snapshot as returned by normalizeBrightness (ratio=450,
-  // ratioScale=10000) must be restored as the write endpoint expects: a 0--1
-  // fraction with ratioScale: 1. Writing ratio:450 with ratioScale:10000
-  // as-is would target 45000% (clamped/undefined behavior), not 4.5%.
+  // ratioScale=10000) is restored exactly as-is: the write endpoint accepts
+  // the same integer 10000 scale the read path returns.
   await client.restoreBrightness({
     ratio: 450,
     ratioScale: 10000,
@@ -464,8 +463,8 @@ test("restoreBrightness converts the read-scaled snapshot to a write-scale fract
   );
   assert.deepEqual(write.body.brightness, {
     nitType: 0,
-    ratioScale: 1,
-    ratio: 0.045,
+    ratioScale: 10000,
+    ratio: 450,
     nit: 0,
   });
   assert.deepEqual(write.body.guidList, [PERIMETER_GUID]);

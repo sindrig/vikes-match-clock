@@ -86,7 +86,7 @@ headers: Authorization: <token>
 `brightnessOverdrive`, `peakBrightness`, `colorTemperature`, `gamma`,
 `displayMode`, `testPattern`, etc.
 
-## Brightness write (NOT executed — reconstructed from the UI bundle)
+## Brightness write (reconstructed from the UI bundle + verified live)
 
 Both the toolbar slider and the engineering/correction panel call the same
 endpoint; only the `guidList` scope differs.
@@ -100,8 +100,8 @@ headers: Authorization: <token>
 body: {
   "brightness": {
     "nitType": 0,
-    "ratioScale": 1,
-    "ratio": 0.045,     // fraction 0..1  (pct / 100)
+    "ratioScale": 10000,
+    "ratio": 3000,      // integer, same 10000 scale as reads (30% → 3000)
     "nit": 0
   },
   "list": [],                            // empty = all cabinets on the screen
@@ -109,15 +109,23 @@ body: {
 }
 ```
 
+**Scale is NOT asymmetric — writes take the same integer 10000 scale as reads.**
+An earlier draft of this doc claimed writes take a `0--1` fraction with
+`ratioScale: 1`; that was wrong. This device's firmware **rejects a
+fractional float** — `ratio: 0.3` fails with
+`{"code":500,"data":{"Field":"brightness.ratio","Value":"number 0.3"}}`. The
+write endpoint's `ratio` field is an integer (read-scale, 10000). Verified live:
+`ratio 3000 / ratioScale 10000` writes 30% and the readback confirms it.
+
 ## Safety assessment
 
 **Deterministic: yes, with one serious footgun.**
 
 - Writes are a well-defined JSON RPC; same input → same output (idempotent).
-- **Scale mismatch**: writes take `ratio` as a **fraction 0–1**
-  (`ratioScale: 1`), reads return a **10000-scaled int** (`ratio: 450`).
-  Copying a read value straight into a write without `/100` would be
-  ~10000× too bright. Always convert: `writeRatio = brightnessPct / 100`.
+- **Scale**: writes and reads both use the **integer 10000 scale**
+  (`ratio: 3000, ratioScale: 10000` = 30%). Never send a fractional float
+  (`ratio: 0.3`) — the device rejects it with code 500. Percent
+  × 100 = ratio at this scale.
 - Snapshot-before-write is easy: read `cabinet/info-v2` (and/or
   `normal-screen`) first, then restore on failure.
 
@@ -146,10 +154,10 @@ GUID → poll/verify → restore from snapshot on any failure.
 
 **Rollback:** a snapshot is read-scaled (`ratio` scaled by `ratioScale`, e.g.
 `{ratio: 450, ratioScale: 10000}` for 4.5%), which is almost never an exact
-whole integer percentage. The daemon's own `restoreBrightness()` converts the
-snapshot to the write-scale fraction (`ratio / ratioScale`, `ratioScale: 1`)
-and writes it back bit-for-bit — this is the only supported rollback path and
-is exactly what the daemon already does automatically on a failed write. Do
+whole integer percentage. The daemon's own `restoreBrightness()` re-applies
+the snapshot bit-for-bit at its read scale (which is the same scale the write
+endpoint accepts) — this is the only supported rollback path and is exactly
+what the daemon already does automatically on a failed write. Do
 **not** attempt to "reapply the snapshot percentage" by hand through the
 `states/{location}/perimeter/brightness` command path: that path only accepts
 whole integer percentages (see `parseBrightnessCommand`), so a fractional
