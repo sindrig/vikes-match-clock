@@ -645,7 +645,7 @@ describe("PerimeterControl", () => {
       return section as HTMLElement;
     };
 
-    const getApplyButton = () => screen.getByRole("button", { name: "Beita" });
+    const getApplyButton = () => screen.getByRole("button", { name: "Vista" });
 
     it("submits a valid percentage to setPerimeterBrightness", () => {
       const setBrightness = vi
@@ -851,7 +851,7 @@ describe("PerimeterControl", () => {
 
       // The Firebase subscription now reflects the submitted value — the
       // component must clear its pending-submission state and re-enable
-      // Beita for a subsequent request.
+      // Vista for a subsequent request.
       mockedUsePerimeter.mockReturnValue(
         createMockPerimeterReturn({
           brightness: 60,

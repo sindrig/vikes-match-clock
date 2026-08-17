@@ -311,7 +311,7 @@ const BrightnessSection = () => {
   const phase = brightnessStatus?.phase;
   // A write has settled once the brightness subscription reflects the
   // submitted value; `busy` (not a raw `submittedValue !== null` check) is
-  // what gates further submissions, so a later Beita click is never
+  // what gates further submissions, so a later Vista click is never
   // permanently blocked by a stale submission once it settles — no effect
   // needed to reset submittedValue back to null.
   const settling = submittedValue !== null && brightness !== submittedValue;
@@ -361,7 +361,7 @@ const BrightnessSection = () => {
           onClick={handleApply}
           disabled={!valid || busy}
         >
-          Beita
+          Vista
         </Button>
       </div>
       {draft !== null && !valid && (

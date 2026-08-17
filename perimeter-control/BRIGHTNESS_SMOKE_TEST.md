@@ -38,8 +38,8 @@ perimeter screen GUID must ever be written.
 
 - [ ] In the controller (`Jaðarskjár` → `Bjartleiki jaðarskjás`), enter a
       **low-risk** whole percentage (e.g. one step away from the current
-      value, staying well within a visible-but-safe range) and click `Beita`.
-- [ ] Confirm the `Beita` button disables immediately (no duplicate
+      value, staying well within a visible-but-safe range) and click `Vista`.
+- [ ] Confirm the `Vista` button disables immediately (no duplicate
       submission while the write is pending) and re-enables once the
       subscription reflects the submitted value.
 - [ ] In the daemon logs confirm the sequence:

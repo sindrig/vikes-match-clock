@@ -607,19 +607,19 @@ directly and never treats a Firebase write confirmation as a hardware result.
   when disabled).
 - It shows the Firebase-synchronized requested value, the daemon phase, the
   verified applied value, and any safe failure message.
-- Submitting is an explicit `Beita` action; the input is client-validated to a
-  whole percentage from 0 through 100 before any write. The `Beita` button is
+- Submitting is an explicit `Vista` action; the input is client-validated to a
+  whole percentage from 0 through 100 before any write. The `Vista` button is
   disabled while a submission is pending (until the `brightness` subscription
   reflects the submitted value) and while the daemon reports `pending` — there
   are **no optimistic local updates**. A `useEffect` clears the pending
-  submission once the `brightness` subscription confirms it, so `Beita`
+  submission once the `brightness` subscription confirms it, so `Vista`
   re-enables for the next request instead of staying permanently disabled
   after the first submission.
 - The input tracks three local draft states: untouched (`null`, displays the
   synced `brightness` value), explicitly cleared (`""`, displays blank — kept
   distinct from "untouched" so clearing the field never silently reverts to
   showing the last synced value), and an in-progress numeric edit. A cleared
-  or non-integer/out-of-range draft is invalid and blocks `Beita`, so an
+  or non-integer/out-of-range draft is invalid and blocks `Vista`, so an
   emptied input can never be accidentally submitted as 0%.
 - The input carries an accessible label (`aria-label="Bjartleiki jaðarskjás"`)
   matching the section title.
