@@ -64,12 +64,10 @@ test.describe("Basic navigation", () => {
     await page.getByText("Pása").click();
     await expect(page.getByText("Hefja niðurtalningu")).toHaveCount(0);
     await nextHalf(page);
-    await fakeClock.advance(page, ONE_MINUTE);
-    await expect(page.locator(".matchclock")).toHaveText("45:00");
+    await expect(page.locator(".matchclock")).toContainText(/45:0\d/);
     await page.getByRole("button", { name: "Stillingar" }).click();
     await expect(page.locator(".halfstops-input")).toHaveCount(3);
     await closeSettings(page);
-    await startClock(page);
     await fakeClock.advance(page, ONE_MINUTE);
     await adjustTime(page, "+5m");
     await fakeClock.advance(page, ONE_MINUTE);

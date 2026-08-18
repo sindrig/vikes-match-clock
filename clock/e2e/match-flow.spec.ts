@@ -72,7 +72,6 @@ test.describe("Match Flow - Complete Match Simulation", () => {
     await page.getByRole("button", { name: "Stillingar" }).click();
     await expect(page.locator(".halfstops-input")).toHaveCount(3);
     await closeSettings(page);
-    await startClock(page);
 
     await fakeClock.advance(page, ONE_MINUTE * 15);
     await expect(page.locator(".matchclock")).toContainText(/60:0\d/);
@@ -143,7 +142,6 @@ test.describe("Match Flow - Complete Match Simulation", () => {
     await page.getByText("Pása").click();
     await nextHalf(page);
 
-    await startClock(page);
     await fakeClock.advance(page, ONE_MINUTE * 10);
     await expect(page.locator(".matchclock")).toContainText(/40:0\d/);
 
