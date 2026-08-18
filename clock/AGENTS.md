@@ -875,7 +875,13 @@ next write.
 
 **Controller**: `HalfStops.tsx` renders a three-option selector and calls
 `setHalfStops(halfStops, mode)`. `MatchActions.tsx` shows the
-"Næsti hálfleikur" button whenever the mode is not `stop`.
+"Næsti hálfleikur" button only for a paused, eligible match — the elapsed
+time has reached the current first remaining period boundary (including
+injury time) and a later period boundary remains — and the mode is not
+`stop`. The `startHalftimeCountdown()` action in `FirebaseStateContext.tsx`
+re-validates the same paused/boundary/remaining-boundary invariant before
+writing, so stale or direct requests from other controllers are rejected
+without a state change.
 
 ### 5. Global Shortcuts (`src/hooks/useGlobalShortcuts.ts`)
 
