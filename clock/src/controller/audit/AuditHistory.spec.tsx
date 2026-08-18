@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import AuditHistoryModal from "./AuditHistory";
 import type { AuditHistoryState } from "./useAuditHistory";
 
@@ -41,6 +41,18 @@ const olderEvent = {
   changes: { started: 1690000000000 },
 };
 
+const baseState = (
+  overrides: Partial<AuditHistoryState> = {},
+): AuditHistoryState => ({
+  events: [],
+  loading: false,
+  error: null,
+  hasOlder: false,
+  loadingOlder: false,
+  loadOlder: vi.fn(),
+  ...overrides,
+});
+
 const renderModal = () =>
   render(<AuditHistoryModal open={true} onClose={() => undefined} />);
 
@@ -49,12 +61,10 @@ describe("AuditHistoryModal", () => {
     mockUseAuditHistory.mockReset();
   });
 
-  it("renders newest events first with the reset event's details", () => {
-    mockUseAuditHistory.mockReturnValue({
-      events: [resetEvent, olderEvent],
-      loading: false,
-      error: null,
-    });
+  it("renders newest events first in a table with the reset event's details", () => {
+    mockUseAuditHistory.mockReturnValue(
+      baseState({ events: [resetEvent, olderEvent] }),
+    );
 
     renderModal();
 
@@ -74,14 +84,17 @@ describe("AuditHistoryModal", () => {
     expect(screen.getByText(/operator-1/)).toBeTruthy();
     expect(screen.getAllByText(/session-/).length).toBeGreaterThan(0);
     expect(screen.getByText(/homeScore, awayScore, started/)).toBeTruthy();
+
+    // Table exposes the fixed metadata columns.
+    ["Tími", "Notandi", "Vefsetur", "Aðgerð", "Svið", "Breytt"].forEach(
+      (header) => {
+        expect(screen.getByRole("columnheader", { name: header })).toBeTruthy();
+      },
+    );
   });
 
   it("shows an explicit empty state when there are no records", () => {
-    mockUseAuditHistory.mockReturnValue({
-      events: [],
-      loading: false,
-      error: null,
-    });
+    mockUseAuditHistory.mockReturnValue(baseState({ events: [] }));
 
     renderModal();
 
@@ -89,11 +102,12 @@ describe("AuditHistoryModal", () => {
   });
 
   it("shows a permission error state when the read fails", () => {
-    mockUseAuditHistory.mockReturnValue({
-      events: [],
-      loading: false,
-      error: "Gat ekki sótt breytingasögu (heimild gæti vantað).",
-    });
+    mockUseAuditHistory.mockReturnValue(
+      baseState({
+        events: [],
+        error: "Gat ekki sótt breytingasögu (heimild gæti vantað).",
+      }),
+    );
 
     renderModal();
 
@@ -103,14 +117,47 @@ describe("AuditHistoryModal", () => {
   });
 
   it("shows a loading state while the subscription is pending", () => {
-    mockUseAuditHistory.mockReturnValue({
-      events: [],
-      loading: true,
-      error: null,
-    });
+    mockUseAuditHistory.mockReturnValue(
+      baseState({ events: [], loading: true }),
+    );
 
     renderModal();
 
     expect(screen.getByText(/Hleð breytingasögu/)).toBeTruthy();
+  });
+
+  it("loads older events when the control is clicked", () => {
+    const loadOlder = vi.fn();
+    mockUseAuditHistory.mockReturnValue(
+      baseState({ events: [resetEvent], hasOlder: true, loadOlder }),
+    );
+
+    renderModal();
+
+    const button = screen.getByRole("button", { name: "Sýna eldri atvik" });
+    fireEvent.click(button);
+    expect(loadOlder).toHaveBeenCalledTimes(1);
+  });
+
+  it("reflects an in-progress older request", () => {
+    mockUseAuditHistory.mockReturnValue(
+      baseState({ events: [resetEvent], hasOlder: true, loadingOlder: true }),
+    );
+
+    renderModal();
+
+    const button = screen.getByRole("button", { name: "Sæki eldri atvik..." });
+    expect(button).toBeTruthy();
+    expect(button).toHaveProperty("disabled", true);
+  });
+
+  it("does not offer the older control once history is exhausted", () => {
+    mockUseAuditHistory.mockReturnValue(
+      baseState({ events: [resetEvent], hasOlder: false }),
+    );
+
+    renderModal();
+
+    expect(screen.queryByRole("button", { name: /eldri atvik/ })).toBeNull();
   });
 });

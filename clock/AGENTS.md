@@ -123,10 +123,23 @@ accepted because the same authorized user can already change that state.
 
 **Inspection** — `controller/audit/useAuditHistory.ts` subscribes to the
 venue's recent events with a bounded `orderByChild("timestamp")` +
-`limitToLast(50)` query, newest first, only while the modal is open.
-`controller/audit/AuditHistory.tsx` renders the `Breytingasaga` modal (opened
-from a settings row in `Controller.tsx`) with loading, permission-error, and
-empty states. It never offers mutation controls.
+`limitToLast(RECENT_EVENT_LIMIT)` (50) query, newest first, only while the
+modal is open. It keeps the live newest batch separate from explicitly loaded
+older batches and merges them newest first, deduplicating by Firebase event id.
+A "load older" request uses **keyset pagination**: the oldest visible event's
+timestamp becomes an inclusive `endAt` cursor with the same `limitToLast`
+bound; the cursor record (plus any same-timestamp peer still in the visible
+list) is removed by id after the fetch so it is neither duplicated nor
+skipped, and the remaining validated batch is appended. The hook exposes
+`hasOlder` (a short returned batch means history is exhausted), `loadingOlder`
+(an in-progress request), and `loadOlder()`; pagination is reset whenever the
+active venue changes or the modal closes. `controller/audit/AuditHistory.tsx`
+renders the `Breytingasaga` modal (opened from a settings row in
+`Controller.tsx`) as a semantic table with fixed columns for time, user id,
+browser-session id, action, state area, and changed fields (horizontally
+scrollable on narrow screens), a "Sýna eldri atvik" control that reflects an
+in-progress request and is absent once history is exhausted, plus loading,
+permission-error, and empty states. It never offers mutation controls.
 
 **Retention** — events are kept 90 days from their server timestamp. The
 scheduled trusted job `cleanupAuditLog` in `functions/src/cleanupAuditLog.ts`

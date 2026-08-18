@@ -1,5 +1,5 @@
-import { Modal, Loader } from "rsuite";
-import { useAuditHistory, RECENT_EVENT_LIMIT } from "./useAuditHistory";
+import { Button, Modal, Loader } from "rsuite";
+import { useAuditHistory } from "./useAuditHistory";
 import { useLocalState } from "../../contexts/LocalStateContext";
 import type { AuditEvent } from "../../types";
 import "./AuditHistory.css";
@@ -81,29 +81,6 @@ const formatSessionId = (sessionId: string): string =>
 const formatChangedPaths = (changes: Record<string, unknown>): string =>
   Object.keys(changes).join(", ");
 
-const AuditEventRow = ({ event }: { event: AuditEvent }) => (
-  <div className="audit-event">
-    <div className="audit-event-head">
-      <span className="audit-event-time">
-        {formatTimestamp(event.timestamp)}
-      </span>
-      <span className="audit-event-action">{actionLabel(event.action)}</span>
-    </div>
-    <div className="audit-event-meta">
-      <span className="audit-event-meta-item">
-        Notandi: <code>{event.uid}</code>
-      </span>
-      <span className="audit-event-meta-item">
-        Vefsetur: <code>{formatSessionId(event.sessionId)}</code>
-      </span>
-      <span className="audit-event-meta-item">Svið: {event.stateArea}</span>
-    </div>
-    <div className="audit-event-changes">
-      Breytt: {formatChangedPaths(event.changes)}
-    </div>
-  </div>
-);
-
 interface AuditHistoryModalProps {
   open: boolean;
   onClose: () => void;
@@ -111,7 +88,8 @@ interface AuditHistoryModalProps {
 
 const AuditHistoryModal = ({ open, onClose }: AuditHistoryModalProps) => {
   const { listenPrefix } = useLocalState();
-  const { events, loading, error } = useAuditHistory(listenPrefix, open);
+  const { events, loading, error, hasOlder, loadingOlder, loadOlder } =
+    useAuditHistory(listenPrefix, open);
 
   return (
     <Modal
@@ -142,17 +120,62 @@ const AuditHistoryModal = ({ open, onClose }: AuditHistoryModalProps) => {
         {!loading && !error && events.length > 0 ? (
           <>
             <div className="audit-count">
-              Síðustu {Math.min(events.length, RECENT_EVENT_LIMIT)} atvik,
-              nýjust fyrst.
+              Sýnd {events.length} atvik, nýjust fyrst.
             </div>
-            <div className="audit-list">
-              {events.map((event) => (
-                <AuditEventRow
-                  key={event.id ?? `${event.timestamp}-${event.uid}`}
-                  event={event}
-                />
-              ))}
+            <div className="audit-table-wrap">
+              <table className="audit-table">
+                <colgroup>
+                  <col className="audit-col-time" />
+                  <col className="audit-col-uid" />
+                  <col className="audit-col-session" />
+                  <col className="audit-col-action" />
+                  <col className="audit-col-area" />
+                  <col className="audit-col-changes" />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th scope="col">Tími</th>
+                    <th scope="col">Notandi</th>
+                    <th scope="col">Vefsetur</th>
+                    <th scope="col">Aðgerð</th>
+                    <th scope="col">Svið</th>
+                    <th scope="col">Breytt</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {events.map((event: AuditEvent) => (
+                    <tr key={event.id ?? `${event.timestamp}-${event.uid}`}>
+                      <td className="audit-table-time">
+                        {formatTimestamp(event.timestamp)}
+                      </td>
+                      <td>
+                        <code>{event.uid}</code>
+                      </td>
+                      <td>
+                        <code>{formatSessionId(event.sessionId)}</code>
+                      </td>
+                      <td>{actionLabel(event.action)}</td>
+                      <td>{event.stateArea}</td>
+                      <td className="audit-table-changes">
+                        {formatChangedPaths(event.changes)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
+            {hasOlder ? (
+              <div className="audit-older">
+                <Button
+                  appearance="ghost"
+                  size="sm"
+                  disabled={loadingOlder}
+                  onClick={() => loadOlder()}
+                >
+                  {loadingOlder ? "Sæki eldri atvik..." : "Sýna eldri atvik"}
+                </Button>
+              </div>
+            ) : null}
           </>
         ) : null}
       </Modal.Body>
