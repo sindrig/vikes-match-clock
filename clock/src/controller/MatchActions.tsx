@@ -14,6 +14,7 @@ import {
   roundMillisToSeconds,
   formatTimeUnit,
   isMatchResetDisabled,
+  isHalftimeTransitionEligible,
 } from "../utils/matchUtils";
 import { useMatch } from "../contexts/FirebaseStateContext";
 
@@ -175,6 +176,7 @@ const MatchActions = () => {
                 </Button>
               )
             : !match.started &&
+              isHalftimeTransitionEligible(match) &&
               match.injuryTimeDisplayMode !== "stop" && (
                 <Button
                   color="blue"

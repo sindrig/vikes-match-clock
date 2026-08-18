@@ -45,6 +45,7 @@ import {
 import { getOrCreateSessionId } from "../lib/sessionId";
 import { Sports, DEFAULT_HALFSTOPS, VIEWS } from "../constants";
 import { msUntilMatchStart } from "../utils/timeUtils";
+import { isHalftimeTransitionEligible } from "../utils/matchUtils";
 import clubIds from "../club-ids";
 import assetTypes from "../controller/asset/AssetTypes";
 import {
@@ -1220,16 +1221,16 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   }, [applyMatchUpdate, getServerTime]);
 
   const startHalftimeCountdown = useCallback(() => {
-    applyMatchUpdate(
-      (prev) => ({
+    applyMatchUpdate((prev) => {
+      if (!isHalftimeTransitionEligible(prev)) return prev;
+      return {
         ...prev,
         timeElapsed: 0,
         started: getServerTime() + HALFTIME_DURATION_MS,
         countdown: true,
         halftimeCountdown: true,
-      }),
-      "match.start-halftime-countdown",
-    );
+      };
+    }, "match.start-halftime-countdown");
   }, [applyMatchUpdate, getServerTime]);
 
   const stopHalftimeCountdown = useCallback(() => {
