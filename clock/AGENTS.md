@@ -119,7 +119,11 @@ venue authorization; event creation requires the same authorization, all
 required fields with correct types, and `newData.child('uid').val() ==
 auth.uid` (denies impersonation). Updates and deletes are denied (append-only).
 Rules cannot prove an event was paired with a sibling state write, which is
-accepted because the same authorized user can already change that state.
+accepted because the same authorized user can already change that state. The
+location rule declares `.indexOn: ["timestamp"]` so the bounded
+`orderByChild("timestamp")` inspection queries (newest batch and the
+keyset-cursor older-batch request) are served without "Index not defined"
+errors.
 
 **Inspection** — `controller/audit/useAuditHistory.ts` subscribes to the
 venue's recent events with a bounded `orderByChild("timestamp")` +

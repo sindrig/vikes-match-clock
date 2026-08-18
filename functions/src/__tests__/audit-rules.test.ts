@@ -124,6 +124,39 @@ describeRules("Firebase audit rules", () => {
     expect(snap.val()).not.toBeNull();
   });
 
+  it("supports bounded timestamp queries on audit history", async () => {
+    // Documents the two query shapes the inspection hook runs. The RTDB
+    // emulator does NOT enforce the ".indexOn" requirement (the query passes
+    // even without it), so the index presence is asserted separately in the
+    // always-run index test below.
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const updates: Record<string, unknown> = {};
+      for (let i = 0; i < 3; i += 1) {
+        updates[`indexed-event-${i}`] = {
+          ...validEvent,
+          timestamp: 1700000000000 + i,
+        };
+      }
+      await ctx.database().ref(`audit/${LOCATION}`).update(updates);
+    });
+    const db = env.authenticatedContext(UID).database();
+    const historyRef = db.ref(`audit/${LOCATION}`);
+    // Newest batch: the live subscription query.
+    const newest = await assertSucceeds(
+      historyRef.orderByChild("timestamp").limitToLast(2).once("value"),
+    );
+    expect(newest.val()).not.toBeNull();
+    // Older batch: the keyset-cursor query used by "Sýna eldri atvik".
+    const older = await assertSucceeds(
+      historyRef
+        .orderByChild("timestamp")
+        .endAt(1700000000000)
+        .limitToLast(2)
+        .once("value"),
+    );
+    expect(older.val()).not.toBeNull();
+  });
+
   it("commits a state mutation and its audit event atomically", async () => {
     const db = env.authenticatedContext(UID).database();
     const updates: Record<string, unknown> = {
@@ -145,5 +178,18 @@ describeRules("Firebase audit rules", () => {
     const score = await db.ref(`states/${LOCATION}/match/homeScore`).once("value");
     // The mutation must not be observable without its audit record.
     expect(score.val()).not.toBe(2);
+  });
+});
+
+// The inspection hook runs orderByChild("timestamp") bounded queries on
+// audit/{location}; real Realtime Database rejects those without an
+// ".indexOn" rule ("Index not defined"). The emulator does not enforce this,
+// so assert the declaration structurally. This test always runs.
+describe("Firebase audit rules timestamp index", () => {
+  it("declares a timestamp index on audit locations", () => {
+    const parsed = JSON.parse(rules) as {
+      rules: { audit: { $location: { ".indexOn"?: string[] } } };
+    };
+    expect(parsed.rules.audit.$location[".indexOn"]).toContain("timestamp");
   });
 });
