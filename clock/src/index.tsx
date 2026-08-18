@@ -21,6 +21,7 @@ function AppWithProviders() {
       listenPrefix={listenPrefix}
       isAuthenticated={isAuthenticated}
       screenKey={screenKey}
+      uid={auth.uid}
     >
       <App />
     </FirebaseStateProvider>

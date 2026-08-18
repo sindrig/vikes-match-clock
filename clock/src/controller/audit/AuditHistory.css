@@ -1,0 +1,97 @@
+.audit-history-modal .audit-count {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 8px;
+}
+
+.audit-history-modal .audit-loading {
+  min-height: 120px;
+}
+
+.audit-history-modal .audit-error {
+  padding: 12px;
+  border: 1px solid #e6b4b4;
+  background: #fff1f1;
+  border-radius: 4px;
+  color: #b54444;
+}
+
+.audit-history-modal .audit-empty {
+  padding: 24px 12px;
+  text-align: center;
+  color: #888;
+}
+
+.audit-history-modal .audit-table-wrap {
+  overflow-x: auto;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.audit-history-modal .audit-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 12px;
+}
+
+.audit-history-modal .audit-table th,
+.audit-history-modal .audit-table td {
+  padding: 6px 8px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid #eee;
+  overflow-wrap: break-word;
+}
+
+.audit-history-modal .audit-table thead th {
+  background: #fafafa;
+  font-weight: 600;
+  color: #444;
+  border-bottom: 2px solid #ddd;
+}
+
+.audit-history-modal .audit-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.audit-history-modal .audit-table .audit-col-time {
+  width: 150px;
+}
+
+.audit-history-modal .audit-table .audit-col-uid {
+  width: 140px;
+}
+
+.audit-history-modal .audit-table .audit-col-session {
+  width: 90px;
+}
+
+.audit-history-modal .audit-table .audit-col-action {
+  width: 170px;
+}
+
+.audit-history-modal .audit-table .audit-col-area {
+  width: 90px;
+}
+
+.audit-history-modal .audit-table td code {
+  background: #f0f0f0;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 11px;
+}
+
+.audit-history-modal .audit-table .audit-table-time {
+  color: #666;
+}
+
+.audit-history-modal .audit-table .audit-table-changes {
+  color: #333;
+}
+
+.audit-history-modal .audit-older {
+  margin-top: 12px;
+  text-align: center;
+}

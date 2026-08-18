@@ -48,6 +48,7 @@ import MediaManager from "./media/MediaManager";
 import RefreshHandler from "./RefreshHandler";
 import AssetController from "./asset/AssetController";
 import PerimeterControl from "./PerimeterControl";
+import AuditHistoryModal from "./audit/AuditHistory";
 import "rsuite/dist/rsuite.min.css";
 import "./Controller.css";
 import {
@@ -101,6 +102,7 @@ const Controller = () => {
   const [themeOpen, setThemeOpen] = useState(false);
   const [overrideListOpen, setOverrideListOpen] = useState(false);
   const [goalGifOpen, setGoalGifOpen] = useState(false);
+  const [auditOpen, setAuditOpen] = useState(false);
 
   const isAuthenticated = auth.isLoaded && !auth.isEmpty;
 
@@ -387,6 +389,21 @@ const Controller = () => {
               Opna
             </Button>
           </div>
+          <div className="theme-trigger-row">
+            <div className="theme-trigger-info">
+              <span className="theme-trigger-label">Breytingasaga</span>
+            </div>
+            <Button
+              size="sm"
+              appearance="primary"
+              onClick={() => {
+                setSettingsOpen(false);
+                setAuditOpen(true);
+              }}
+            >
+              Opna
+            </Button>
+          </div>
           <div className="page-actions control-item withborder">
             <Button
               color="red"
@@ -414,6 +431,7 @@ const Controller = () => {
         open={goalGifOpen}
         onClose={() => setGoalGifOpen(false)}
       />
+      <AuditHistoryModal open={auditOpen} onClose={() => setAuditOpen(false)} />
     </div>
   );
 };

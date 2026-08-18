@@ -55,6 +55,102 @@ Multiple controllers can connect to the same `listenPrefix` simultaneously:
 - Uses **last-write-wins** semantics (no conflict resolution)
 - For production use, coordinate with your team to avoid simultaneous edits
 
+### Firebase Audit Trail (Breytingasaga)
+
+Every authenticated client mutation of shared match, controller, view,
+perimeter, or club-override state is recorded as an immutable, attributable
+audit event so operators can reconstruct an incident after the fact.
+
+**Data model** — events live under `audit/{location}/{eventId}` (outside
+`states/`), one per mutation:
+
+```json
+{
+  "timestamp": 1723392000000,
+  "uid": "auth-uid",
+  "sessionId": "uuid",
+  "action": "match.start",
+  "stateArea": "match",
+  "changes": "{\"started\":1723392000000}"
+}
+```
+
+- `changes` is the exact update-path map sent to Firebase (including `null`
+  deletions), enough to reconstruct the command. It is stored as a **JSON
+  string** because Realtime Database prunes null children on write: an object
+  like `{ "overlay": null }` would collapse to an empty node, truncating the
+  deletion record (and failing the `changes != null` rules validation).
+  `writeAuditedState()` serializes it; `parseAuditEvent()` decodes it back.
+- `timestamp` is a Firebase `serverTimestamp()`; never trust a device clock.
+- `stateArea` is one of `match | controller | view | perimeter |
+  clubOverrides`.
+
+**Atomicity** — state mutation and audit record are committed in **one root
+`update()`** by `writeAuditedState()` in `firebaseDatabase.ts` (also exposed as
+`firebaseDatabase.writeAudited`). Either both land or neither does: a failed
+write creates no event and no state change. Diff keys (which include nested
+paths like `queues/{id}`) are expanded into full leaf paths in the update map:
+an `update()` value object cannot contain keys with `/`, so writing the diff as
+a whole node value would be rejected or clobber sibling state.
+
+**Write routing** — all writes flow through `writeAudited`:
+
+- `applyMatchUpdate`/`applyControllerUpdate`/`applyViewUpdate` take a stable
+  action string (e.g. `match.start`, `match.pause`, `match.reset`,
+  `controller.select-view`, `view.set-theme`).
+- `updateMatch` uses `match.update`; a dedicated `resetMatch()` context action
+  emits `match.reset` (used by the Reset button in `MatchActions.tsx`).
+- Perimeter actions use `perimeter.set-state`, `perimeter.set-overlay`,
+  `perimeter.clear-overlay`, `perimeter.set-ad-layout`,
+  `perimeter.create-media-pair`, `perimeter.delete-media-pair`.
+- Club overrides use `clubOverrides.create|update|save|delete` (both the
+  context actions and `ClubOverrideForm.tsx`, which builds its own audit
+  payload).
+
+**Identity** — `FirebaseStateProvider` accepts a `uid` prop (passed from
+`index.tsx` as `auth.uid`) for the accountable operator. `getOrCreateSessionId()`
+in `lib/sessionId.ts` returns one opaque UUID per browser session, stored in
+`sessionStorage` (regenerated per session, survives reloads, never an identity
+substitute). `makeAudit()` builds the payload and skips the write entirely when
+the provider cannot write.
+
+**Firebase rules** (`firebase-rules.json`) — `audit/{location}` reads require
+venue authorization; event creation requires the same authorization, all
+required fields with correct types, and `newData.child('uid').val() ==
+auth.uid` (denies impersonation). Updates and deletes are denied (append-only).
+Rules cannot prove an event was paired with a sibling state write, which is
+accepted because the same authorized user can already change that state. The
+location rule declares `.indexOn: ["timestamp"]` so the bounded
+`orderByChild("timestamp")` inspection queries (newest batch and the
+keyset-cursor older-batch request) are served without "Index not defined"
+errors.
+
+**Inspection** — `controller/audit/useAuditHistory.ts` subscribes to the
+venue's recent events with a bounded `orderByChild("timestamp")` +
+`limitToLast(RECENT_EVENT_LIMIT)` (50) query, newest first, only while the
+modal is open. It keeps the live newest batch separate from explicitly loaded
+older batches and merges them newest first, deduplicating by Firebase event id.
+A "load older" request uses **keyset pagination**: the oldest visible event's
+timestamp becomes an inclusive `endAt` cursor with the same `limitToLast`
+bound; the cursor record (plus any same-timestamp peer still in the visible
+list) is removed by id after the fetch so it is neither duplicated nor
+skipped, and the remaining validated batch is appended. The hook exposes
+`hasOlder` (a short returned batch means history is exhausted), `loadingOlder`
+(an in-progress request), and `loadOlder()`; pagination is reset whenever the
+active venue changes or the modal closes. `controller/audit/AuditHistory.tsx`
+renders the `Breytingasaga` modal (opened from a settings row in
+`Controller.tsx`) as a semantic table with fixed columns for time, user id,
+browser-session id, action, state area, and changed fields (horizontally
+scrollable on narrow screens), a "Sýna eldri atvik" control that reflects an
+in-progress request and is absent once history is exhausted, plus loading,
+permission-error, and empty states. It never offers mutation controls.
+
+**Retention** — events are kept 90 days from their server timestamp. The
+scheduled trusted job `cleanupAuditLog` in `functions/src/cleanupAuditLog.ts`
+runs daily, paginates `audit/{location}` in bounded batches, and deletes only
+records strictly older than 90 days (a record exactly at the boundary is
+retained).
+
 ### Perimeter Control
 
 The perimeter LED screens at the Víkin stadium are driven by a dedicated

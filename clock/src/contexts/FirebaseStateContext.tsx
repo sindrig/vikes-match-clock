@@ -9,14 +9,7 @@ import React, {
   useMemo,
 } from "react";
 import { database, storageHelpers, FIREBASE_STORAGE_BUCKET } from "../firebase";
-import {
-  firebaseDatabase,
-  generateClubOverrideId,
-  saveClubOverride as firebaseSaveClubOverride,
-  deleteClubOverride as firebaseDeleteClubOverride,
-} from "../firebaseDatabase";
-import { ref, onValue } from "firebase/database";
-import { set, remove } from "firebase/database";
+import { ref, onValue, set } from "firebase/database";
 import {
   Match,
   InjuryTimeDisplayMode,
@@ -39,8 +32,17 @@ import {
   PerimeterMediaPair,
   PerimeterAdLayout,
   PerimeterAppliedAdLayout,
+  AuditStateArea,
   PerimeterBrightnessStatus,
 } from "../types";
+import {
+  firebaseDatabase,
+  generateClubOverrideId,
+  saveClubOverride as firebaseSaveClubOverride,
+  deleteClubOverride as firebaseDeleteClubOverride,
+  AuditEventPayload,
+} from "../firebaseDatabase";
+import { getOrCreateSessionId } from "../lib/sessionId";
 import { Sports, DEFAULT_HALFSTOPS, VIEWS } from "../constants";
 import { msUntilMatchStart } from "../utils/timeUtils";
 import { isHalftimeTransitionEligible } from "../utils/matchUtils";
@@ -178,6 +180,7 @@ interface FirebaseStateContextType {
   updateMatch: (updates: Partial<Match>) => void;
   startMatch: () => void;
   pauseMatch: (isHalfEnd?: boolean) => void;
+  resetMatch: () => void;
   addGoal: (team: "home" | "away") => void;
   addPenalty: (
     team: "home" | "away",
@@ -404,6 +407,10 @@ interface FirebaseStateProviderProps {
   listenPrefix: string;
   isAuthenticated: boolean;
   screenKey: string | null;
+  // Authenticated operator identity (Firebase Auth UID) used for audit events.
+  // Required in production whenever isAuthenticated is true; absent only in
+  // tests/development where firebaseDatabase is mocked.
+  uid?: string;
 }
 
 export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
@@ -411,6 +418,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   listenPrefix,
   isAuthenticated,
   screenKey,
+  uid,
 }) => {
   const [match, setMatch] = useState<Match>(defaultMatch);
   const [controller, setController] =
@@ -480,6 +488,23 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   useEffect(() => {
     clubOverridesRef.current = clubOverrides;
   }, [clubOverrides]);
+
+  // Builds the identity payload for an audited mutation, or null when the
+  // provider is not in a position to write (unauthenticated or no venue).
+  // Every successful authenticated mutation MUST carry an audit record, so
+  // callers skip the write entirely when this returns null.
+  const makeAudit = useCallback(
+    (stateArea: AuditStateArea, action: string): AuditEventPayload | null => {
+      if (!listenPrefix || !isAuthenticated) return null;
+      return {
+        uid: uid ?? "",
+        sessionId: getOrCreateSessionId(),
+        action,
+        stateArea,
+      };
+    },
+    [isAuthenticated, listenPrefix, uid],
+  );
 
   useEffect(() => {
     const locationsRef = ref(database, "locations");
@@ -781,7 +806,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   }, [listenPrefix]);
 
   const applyMatchUpdate = useCallback(
-    (getNewState: (prev: Match) => Match) => {
+    (getNewState: (prev: Match) => Match, action: string) => {
       if (!listenPrefix) return;
 
       const prev = matchRef.current;
@@ -801,17 +826,23 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         }
 
         if (Object.keys(diff).length > 0) {
-          firebaseDatabase
-            .syncState(listenPrefix, "match", diff)
-            .catch(console.error);
+          const audit = makeAudit("match", action);
+          if (audit) {
+            firebaseDatabase
+              .writeAudited(listenPrefix, "match", diff, audit)
+              .catch(console.error);
+          }
         }
       }
     },
-    [isAuthenticated, listenPrefix],
+    [isAuthenticated, listenPrefix, makeAudit],
   );
 
   const applyControllerUpdate = useCallback(
-    (getNewState: (prev: ControllerState) => ControllerState) => {
+    (
+      getNewState: (prev: ControllerState) => ControllerState,
+      action: string,
+    ) => {
       if (!listenPrefix) return;
 
       const prev = controllerRef.current;
@@ -822,17 +853,20 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         const diff = computeControllerDiff(prev, newState);
 
         if (Object.keys(diff).length > 0) {
-          firebaseDatabase
-            .syncState(listenPrefix, "controller", diff)
-            .catch(console.error);
+          const audit = makeAudit("controller", action);
+          if (audit) {
+            firebaseDatabase
+              .writeAudited(listenPrefix, "controller", diff, audit)
+              .catch(console.error);
+          }
         }
       }
     },
-    [isAuthenticated, listenPrefix],
+    [isAuthenticated, listenPrefix, makeAudit],
   );
 
   const applyViewUpdate = useCallback(
-    (getNewState: (prev: ViewState) => ViewState) => {
+    (getNewState: (prev: ViewState) => ViewState, action: string) => {
       if (!listenPrefix) return;
 
       const prev = viewRef.current;
@@ -858,13 +892,16 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         }
 
         if (Object.keys(diff).length > 0) {
-          firebaseDatabase
-            .syncState(listenPrefix, "view", diff)
-            .catch(console.error);
+          const audit = makeAudit("view", action);
+          if (audit) {
+            firebaseDatabase
+              .writeAudited(listenPrefix, "view", diff, audit)
+              .catch(console.error);
+          }
         }
       }
     },
-    [isAuthenticated, listenPrefix],
+    [isAuthenticated, listenPrefix, makeAudit],
   );
 
   const updateMatch = useCallback(
@@ -948,11 +985,14 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
       matchRef.current = newState;
 
-      firebaseDatabase
-        .syncState(listenPrefix, "match", partialData)
-        .catch(console.error);
+      const audit = makeAudit("match", "match.update");
+      if (audit) {
+        firebaseDatabase
+          .writeAudited(listenPrefix, "match", partialData, audit)
+          .catch(console.error);
+      }
     },
-    [isAuthenticated, listenPrefix],
+    [isAuthenticated, listenPrefix, makeAudit],
   );
 
   const getServerTime = useCallback(
@@ -961,12 +1001,15 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   );
 
   const startMatch = useCallback(() => {
-    applyMatchUpdate((prev) => ({
-      ...prev,
-      started: getServerTime(),
-      countdown: false,
-      halftimeCountdown: false,
-    }));
+    applyMatchUpdate(
+      (prev) => ({
+        ...prev,
+        started: getServerTime(),
+        countdown: false,
+        halftimeCountdown: false,
+      }),
+      "match.start",
+    );
   }, [applyMatchUpdate, getServerTime]);
 
   const pauseMatch = useCallback(
@@ -991,10 +1034,30 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
             prev.timeElapsed + Math.floor(getServerTime() - prev.started);
         }
         return newState;
-      });
+      }, "match.pause");
     },
     [applyMatchUpdate, getServerTime],
   );
+
+  const resetMatch = useCallback(() => {
+    applyMatchUpdate(
+      (prev) => ({
+        ...prev,
+        started: 0,
+        timeElapsed: 0,
+        home2min: [],
+        away2min: [],
+        timeout: 0,
+        homeTimeouts: 0,
+        awayTimeouts: 0,
+        buzzer: false,
+        countdown: false,
+        halftimeCountdown: false,
+        halfStops: DEFAULT_HALFSTOPS[prev.matchType],
+      }),
+      "match.reset",
+    );
+  }, [applyMatchUpdate]);
 
   const addGoal = useCallback(
     (team: "home" | "away") => {
@@ -1002,7 +1065,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         const scoreKeys = { home: "homeScore", away: "awayScore" } as const;
         const key = scoreKeys[team];
         return { ...prev, [key]: prev[key] + 1 };
-      });
+      }, "match.add-goal");
     },
     [applyMatchUpdate],
   );
@@ -1019,7 +1082,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
           penaltyLength,
         });
         return { ...prev, [stateKey]: collection };
-      });
+      }, "match.add-penalty");
     },
     [applyMatchUpdate],
   );
@@ -1038,7 +1101,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
             away2min: prev.away2min.filter((t) => t.key !== key),
           }),
         };
-      });
+      }, "match.remove-penalty");
     },
     [applyMatchUpdate],
   );
@@ -1057,7 +1120,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
           ...(homeHasKey && { home2min: prev.home2min.map(mapFn) }),
           ...(awayHasKey && { away2min: prev.away2min.map(mapFn) }),
         };
-      });
+      }, "match.add-to-penalty");
     },
     [applyMatchUpdate],
   );
@@ -1075,18 +1138,21 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
             v === currentValue ? newValueParsed : v,
           ),
         };
-      });
+      }, "match.update-half-length");
     },
     [applyMatchUpdate],
   );
 
   const setHalfStops = useCallback(
     (halfStops: number[], mode: InjuryTimeDisplayMode) => {
-      applyMatchUpdate((prev) => ({
-        ...prev,
-        halfStops,
-        injuryTimeDisplayMode: mode,
-      }));
+      applyMatchUpdate(
+        (prev) => ({
+          ...prev,
+          halfStops,
+          injuryTimeDisplayMode: mode,
+        }),
+        "match.set-half-stops",
+      );
     },
     [applyMatchUpdate],
   );
@@ -1104,21 +1170,27 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
           timeout: getServerTime(),
           [stateKey]: Math.min(prev[stateKey] + 1, 4),
         };
-      });
+      }, "match.timeout");
     },
     [applyMatchUpdate, getServerTime],
   );
 
   const removeTimeout = useCallback(() => {
-    applyMatchUpdate((prev) => ({ ...prev, timeout: 0 }));
+    applyMatchUpdate(
+      (prev) => ({ ...prev, timeout: 0 }),
+      "match.remove-timeout",
+    );
   }, [applyMatchUpdate]);
 
   const buzz = useCallback(
     (on: boolean) => {
-      applyMatchUpdate((prev) => ({
-        ...prev,
-        buzzer: on ? getServerTime() : false,
-      }));
+      applyMatchUpdate(
+        (prev) => ({
+          ...prev,
+          buzzer: on ? getServerTime() : false,
+        }),
+        "match.buzz",
+      );
     },
     [applyMatchUpdate, getServerTime],
   );
@@ -1145,7 +1217,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         started: getServerTime() + duration,
         countdown: true,
       };
-    });
+    }, "match.countdown");
   }, [applyMatchUpdate, getServerTime]);
 
   const startHalftimeCountdown = useCallback(() => {
@@ -1158,7 +1230,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         countdown: true,
         halftimeCountdown: true,
       };
-    });
+    }, "match.start-halftime-countdown");
   }, [applyMatchUpdate, getServerTime]);
 
   const stopHalftimeCountdown = useCallback(() => {
@@ -1174,40 +1246,52 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         newState.halfStops = newState.halfStops.slice(1);
       }
       return newState;
-    });
+    }, "match.stop-halftime-countdown");
   }, [applyMatchUpdate]);
 
   const updateRedCards = useCallback(
     (home: number, away: number) => {
-      applyMatchUpdate((prev) => ({
-        ...prev,
-        homeRedCards: home,
-        awayRedCards: away,
-      }));
+      applyMatchUpdate(
+        (prev) => ({
+          ...prev,
+          homeRedCards: home,
+          awayRedCards: away,
+        }),
+        "match.update-red-cards",
+      );
     },
     [applyMatchUpdate],
   );
 
   const updateController = useCallback(
     (updates: Partial<ControllerState>) => {
-      applyControllerUpdate((prev) => ({
-        ...prev,
-        ...updates,
-      }));
+      applyControllerUpdate(
+        (prev) => ({
+          ...prev,
+          ...updates,
+        }),
+        "controller.update",
+      );
     },
     [applyControllerUpdate],
   );
 
   const selectView = useCallback(
     (view: string) => {
-      applyControllerUpdate((prev) => ({ ...prev, view }));
+      applyControllerUpdate(
+        (prev) => ({ ...prev, view }),
+        "controller.select-view",
+      );
     },
     [applyControllerUpdate],
   );
 
   const selectAssetView = useCallback(
     (assetView: string) => {
-      applyControllerUpdate((prev) => ({ ...prev, assetView }));
+      applyControllerUpdate(
+        (prev) => ({ ...prev, assetView }),
+        "controller.select-asset-view",
+      );
     },
     [applyControllerUpdate],
   );
@@ -1233,7 +1317,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
           ...prev,
           queues: { ...prev.queues, [queueId]: newQueue },
         };
-      });
+      }, "controller.create-queue");
       return queueId;
     },
     [applyControllerUpdate],
@@ -1253,7 +1337,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
           playing: isActive ? false : prev.playing,
           currentAsset: isActive ? null : prev.currentAsset,
         };
-      });
+      }, "controller.delete-queue");
     },
     [applyControllerUpdate],
   );
@@ -1267,7 +1351,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
           ...prev,
           queues: { ...prev.queues, [queueId]: { ...queue, name } },
         };
-      });
+      }, "controller.rename-queue");
     },
     [applyControllerUpdate],
   );
@@ -1298,15 +1382,16 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         });
 
         return { ...prev, queues };
-      });
+      }, "controller.reorder-queues");
     },
     [applyControllerUpdate],
   );
 
   const addItemsToQueue = useCallback(
     (queueId: string, assets: Asset[]) => {
-      applyControllerUpdate((prev) =>
-        getStateWithAddedItems(prev, queueId, assets),
+      applyControllerUpdate(
+        (prev) => getStateWithAddedItems(prev, queueId, assets),
+        "controller.add-items-to-queue",
       );
     },
     [applyControllerUpdate],
@@ -1338,7 +1423,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
             [queueId]: { ...queue, items: updatedItems },
           },
         };
-      });
+      }, "controller.remove-item-from-queue");
     },
     [applyControllerUpdate],
   );
@@ -1378,7 +1463,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
             [queueId]: { ...queue, items: dedupedItems },
           },
         };
-      });
+      }, "controller.reorder-items-in-queue");
     },
     [applyControllerUpdate],
   );
@@ -1404,7 +1489,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
           return maybeAutoDeleteQueue(nextState, queueId);
         }
         return nextState;
-      });
+      }, "controller.update-queue-settings");
     },
     [applyControllerUpdate],
   );
@@ -1416,40 +1501,52 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
           ...prev,
           activeQueueId: queueId,
         });
-      });
+      }, "controller.play-queue");
     },
     [applyControllerUpdate],
   );
 
   const activateQueue = useCallback(
     (queueId: string) => {
-      applyControllerUpdate((prev) => ({
-        ...prev,
-        activeQueueId: queueId,
-      }));
+      applyControllerUpdate(
+        (prev) => ({
+          ...prev,
+          activeQueueId: queueId,
+        }),
+        "controller.activate-queue",
+      );
     },
     [applyControllerUpdate],
   );
 
   const stopPlaying = useCallback(() => {
-    applyControllerUpdate((prev) => ({ ...prev, playing: false }));
+    applyControllerUpdate(
+      (prev) => ({ ...prev, playing: false }),
+      "controller.stop-playing",
+    );
   }, [applyControllerUpdate]);
 
   const setPlaying = useCallback(
     (playing: boolean) => {
-      applyControllerUpdate((prev) => ({ ...prev, playing }));
+      applyControllerUpdate(
+        (prev) => ({ ...prev, playing }),
+        "controller.set-playing",
+      );
     },
     [applyControllerUpdate],
   );
 
   const renderAsset = useCallback(
     (asset: Asset | null) => {
-      applyControllerUpdate((prev) => ({
-        ...prev,
-        currentAsset: asset ? { asset, time: null } : null,
-        activeQueueId: null,
-        playing: false,
-      }));
+      applyControllerUpdate(
+        (prev) => ({
+          ...prev,
+          currentAsset: asset ? { asset, time: null } : null,
+          activeQueueId: null,
+          playing: false,
+        }),
+        "controller.render-asset",
+      );
     },
     [applyControllerUpdate],
   );
@@ -1462,7 +1559,10 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   );
 
   const showNextAsset = useCallback(() => {
-    applyControllerUpdate((prev) => getStateShowingNextAsset(prev));
+    applyControllerUpdate(
+      (prev) => getStateShowingNextAsset(prev),
+      "controller.show-next-asset",
+    );
   }, [applyControllerUpdate]);
 
   const removeAssetAfterTimeout = useCallback(() => {
@@ -1480,22 +1580,28 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         return prev;
       }
       return { ...prev, currentAsset: null };
-    });
+    }, "controller.remove-asset-after-timeout");
   }, [applyControllerUpdate]);
 
   const remoteRefresh = useCallback(() => {
-    applyControllerUpdate((prev) => ({
-      ...prev,
-      refreshToken: (Math.random() + 1).toString(36).substring(2),
-    }));
+    applyControllerUpdate(
+      (prev) => ({
+        ...prev,
+        refreshToken: (Math.random() + 1).toString(36).substring(2),
+      }),
+      "controller.remote-refresh",
+    );
   }, [applyControllerUpdate]);
 
   const setRoster = useCallback(
     (roster: Roster) => {
-      applyControllerUpdate((prev) => ({
-        ...prev,
-        roster,
-      }));
+      applyControllerUpdate(
+        (prev) => ({
+          ...prev,
+          roster,
+        }),
+        "controller.set-roster",
+      );
     },
     [applyControllerUpdate],
   );
@@ -1510,7 +1616,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
           ...updatedPlayer,
         };
         return { ...prev, roster };
-      });
+      }, "controller.edit-player");
     },
     [applyControllerUpdate],
   );
@@ -1522,7 +1628,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         if (!roster[side]) return prev;
         roster[side] = roster[side].filter((_: Player, i: number) => i !== idx);
         return { ...prev, roster };
-      });
+      }, "controller.delete-player");
     },
     [applyControllerUpdate],
   );
@@ -1540,70 +1646,88 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         });
         roster[side] = players;
         return { ...prev, roster };
-      });
+      }, "controller.add-player");
     },
     [applyControllerUpdate],
   );
 
   const clearRoster = useCallback(() => {
-    applyControllerUpdate((prev) => ({
-      ...prev,
-      roster: { home: [], away: [] },
-    }));
+    applyControllerUpdate(
+      (prev) => ({
+        ...prev,
+        roster: { home: [], away: [] },
+      }),
+      "controller.clear-roster",
+    );
   }, [applyControllerUpdate]);
 
   const selectTab = useCallback(
     (tab: string) => {
-      applyControllerUpdate((prev) => ({ ...prev, tab }));
+      applyControllerUpdate(
+        (prev) => ({ ...prev, tab }),
+        "controller.select-tab",
+      );
     },
     [applyControllerUpdate],
   );
 
   const updateView = useCallback(
     (updates: Partial<ViewState>) => {
-      applyViewUpdate((prev) => ({ ...prev, ...updates }));
+      applyViewUpdate((prev) => ({ ...prev, ...updates }), "view.update");
     },
     [applyViewUpdate],
   );
 
   const setViewPort = useCallback(
     (vp: ViewPort) => {
-      applyViewUpdate((prev) => ({ ...prev, vp }));
+      applyViewUpdate((prev) => ({ ...prev, vp }), "view.set-viewport");
     },
     [applyViewUpdate],
   );
 
   const setBackground = useCallback(
     (background: string) => {
-      applyViewUpdate((prev) => ({ ...prev, background }));
+      applyViewUpdate(
+        (prev) => ({ ...prev, background }),
+        "view.set-background",
+      );
     },
     [applyViewUpdate],
   );
 
   const setIdleImage = useCallback(
     (idleImage: string) => {
-      applyViewUpdate((prev) => ({ ...prev, idleImage }));
+      applyViewUpdate(
+        (prev) => ({ ...prev, idleImage }),
+        "view.set-idle-image",
+      );
     },
     [applyViewUpdate],
   );
 
   const setIdleAd = useCallback(
     (idleAd: string | null) => {
-      applyViewUpdate((prev) => ({ ...prev, idleAd }));
+      applyViewUpdate((prev) => ({ ...prev, idleAd }), "view.set-idle-ad");
     },
     [applyViewUpdate],
   );
 
   const setBlackoutStart = useCallback(
     (blackoutStart: string | undefined) => {
-      applyViewUpdate((prev) => ({ ...prev, blackoutStart }));
+      applyViewUpdate(
+        (prev) => ({ ...prev, blackoutStart }),
+        "view.set-blackout-start",
+      );
     },
     [applyViewUpdate],
   );
 
   const setBlackoutEnd = useCallback(
     (blackoutEnd: string | undefined) => {
-      applyViewUpdate((prev) => ({ ...prev, blackoutEnd }));
+      applyViewUpdate(
+        (prev) => ({ ...prev, blackoutEnd }),
+        "view.set-blackout-end",
+      );
     },
     [applyViewUpdate],
   );
@@ -1616,21 +1740,27 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       showGoalscorerName?: boolean;
       showGoalscorerNumber?: boolean;
     }) => {
-      applyViewUpdate((prev) => ({ ...prev, ...settings }));
+      applyViewUpdate(
+        (prev) => ({ ...prev, ...settings }),
+        "view.set-goal-gif-settings",
+      );
     },
     [applyViewUpdate],
   );
 
   const setTheme = useCallback(
     (theme: ThemeConfig | undefined) => {
-      applyViewUpdate((prev) => ({ ...prev, theme }));
+      applyViewUpdate((prev) => ({ ...prev, theme }), "view.set-theme");
     },
     [applyViewUpdate],
   );
 
   const setThemePreset = useCallback(
     (preset: string | undefined) => {
-      applyViewUpdate((prev) => ({ ...prev, themePreset: preset }));
+      applyViewUpdate(
+        (prev) => ({ ...prev, themePreset: preset }),
+        "view.set-theme-preset",
+      );
     },
     [applyViewUpdate],
   );
@@ -1643,7 +1773,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
           ...prev,
           customPresets: { ...existing, [id]: preset },
         };
-      });
+      }, "view.save-custom-preset");
     },
     [applyViewUpdate],
   );
@@ -1658,14 +1788,15 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         const newCustomPresets =
           Object.keys(updated).length > 0 ? updated : undefined;
         return { ...prev, customPresets: newCustomPresets };
-      });
+      }, "view.delete-custom-preset");
     },
     [applyViewUpdate],
   );
 
   const saveClubOverride = useCallback(
     async (override: Omit<ClubOverride, "logoUrl"> & { logoFile: File }) => {
-      if (!listenPrefix || !isAuthenticated) return;
+      const audit = makeAudit("clubOverrides", "clubOverrides.save");
+      if (!audit) return;
 
       try {
         const id = generateClubOverrideId();
@@ -1685,73 +1816,79 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
           isOverride: override.isOverride,
         };
 
-        // Write to RTDB
-        await firebaseSaveClubOverride(listenPrefix, id, clubOverride);
+        // Write to RTDB (atomic with its audit record)
+        await firebaseSaveClubOverride(listenPrefix, id, clubOverride, audit);
       } catch (error) {
         console.error("Error saving club override:", error);
         throw error;
       }
     },
-    [listenPrefix, isAuthenticated],
+    [listenPrefix, makeAudit],
   );
 
   const deleteClubOverride = useCallback(
     async (id: string) => {
-      if (!listenPrefix || !isAuthenticated) return;
+      const audit = makeAudit("clubOverrides", "clubOverrides.delete");
+      if (!audit) return;
 
       try {
-        await firebaseDeleteClubOverride(listenPrefix, id);
+        await firebaseDeleteClubOverride(listenPrefix, id, audit);
       } catch (error) {
         console.error("Error deleting club override:", error);
         throw error;
       }
     },
-    [listenPrefix, isAuthenticated],
+    [listenPrefix, makeAudit],
   );
 
   const setPerimeterState = useCallback(
     (state: PerimeterState["state"]) => {
-      if (!listenPrefix || !isAuthenticated) return;
+      const audit = makeAudit("perimeter", "perimeter.set-state");
+      if (!audit) return;
 
       firebaseDatabase
-        .syncState(listenPrefix, "perimeter", { state })
+        .writeAudited(listenPrefix, "perimeter", { state }, audit)
         .catch(console.error);
     },
-    [isAuthenticated, listenPrefix],
+    [makeAudit, listenPrefix],
   );
 
   const setPerimeterOverlay = useCallback(
     (overlay: PerimeterOverlay) => {
-      if (!listenPrefix || !isAuthenticated) return;
+      const audit = makeAudit("perimeter", "perimeter.set-overlay");
+      if (!audit) return;
 
-      set(
-        ref(database, `states/${listenPrefix}/perimeter/overlay`),
-        overlay,
-      ).catch(console.error);
+      firebaseDatabase
+        .writeAudited(listenPrefix, "perimeter", { overlay }, audit)
+        .catch(console.error);
     },
-    [isAuthenticated, listenPrefix],
+    [makeAudit, listenPrefix],
   );
 
   const clearPerimeterOverlay = useCallback(() => {
-    if (!listenPrefix || !isAuthenticated) return;
+    const audit = makeAudit("perimeter", "perimeter.clear-overlay");
+    if (!audit) return;
 
-    set(ref(database, `states/${listenPrefix}/perimeter/overlay`), null).catch(
-      console.error,
-    );
-  }, [isAuthenticated, listenPrefix]);
+    firebaseDatabase
+      .writeAudited(listenPrefix, "perimeter", { overlay: null }, audit)
+      .catch(console.error);
+  }, [makeAudit, listenPrefix]);
 
   const setPerimeterAdLayout = useCallback(
     (layout: PerimeterAdLayout | null): Promise<void> => {
-      if (!listenPrefix || !isAuthenticated) return Promise.resolve();
+      const audit = makeAudit("perimeter", "perimeter.set-ad-layout");
+      if (!audit) return Promise.resolve();
       // Let rejections propagate: the controller keeps its editor open and
       // shows an actionable error instead of silently treating a failed write
       // as saved.
-      return set(
-        ref(database, `states/${listenPrefix}/perimeter/adLayout`),
-        layout,
+      return firebaseDatabase.writeAudited(
+        listenPrefix,
+        "perimeter",
+        { adLayout: layout },
+        audit,
       );
     },
-    [isAuthenticated, listenPrefix],
+    [makeAudit, listenPrefix],
   );
 
   const setPerimeterBrightness = useCallback(
@@ -1774,25 +1911,32 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   const createPerimeterMediaPair = useCallback(
     (pairId: string, pair: PerimeterMediaPair): Promise<void> => {
-      if (!listenPrefix || !isAuthenticated) return Promise.resolve();
+      const audit = makeAudit("perimeter", "perimeter.create-media-pair");
+      if (!audit) return Promise.resolve();
       // Let rejections propagate so the create dialog can surface failures.
-      return set(
-        ref(database, `states/${listenPrefix}/perimeter/mediaPairs/${pairId}`),
-        pair,
+      return firebaseDatabase.writeAudited(
+        listenPrefix,
+        "perimeter",
+        { [`mediaPairs/${pairId}`]: pair },
+        audit,
       );
     },
-    [isAuthenticated, listenPrefix],
+    [makeAudit, listenPrefix],
   );
 
   const deletePerimeterMediaPair = useCallback(
     (pairId: string): Promise<void> => {
-      if (!listenPrefix || !isAuthenticated) return Promise.resolve();
+      const audit = makeAudit("perimeter", "perimeter.delete-media-pair");
+      if (!audit) return Promise.resolve();
       // Removes only the Firebase library record; Storage assets are kept.
-      return remove(
-        ref(database, `states/${listenPrefix}/perimeter/mediaPairs/${pairId}`),
+      return firebaseDatabase.writeAudited(
+        listenPrefix,
+        "perimeter",
+        { [`mediaPairs/${pairId}`]: null },
+        audit,
       );
     },
-    [isAuthenticated, listenPrefix],
+    [makeAudit, listenPrefix],
   );
 
   // Auto-start/stop the perimeter LEDs on view transitions: entering the match
@@ -1843,6 +1987,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       updateMatch,
       startMatch,
       pauseMatch,
+      resetMatch,
       addGoal,
       addPenalty,
       removePenalty,
@@ -1927,6 +2072,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       updateMatch,
       startMatch,
       pauseMatch,
+      resetMatch,
       addGoal,
       addPenalty,
       removePenalty,
@@ -2023,6 +2169,7 @@ export const useMatch = () => {
     updateMatch,
     startMatch,
     pauseMatch,
+    resetMatch,
     addGoal,
     addPenalty,
     removePenalty,
@@ -2043,6 +2190,7 @@ export const useMatch = () => {
     updateMatch,
     startMatch,
     pauseMatch,
+    resetMatch,
     addGoal,
     addPenalty,
     removePenalty,

@@ -242,7 +242,7 @@ export class BrightnessController {
           return;
         }
         console.warn(
-          `Brightness snapshot attempt failed (${backoffIteration + 1}): ${err.message} — retrying in ${backoff}ms`,
+          `Brightness snapshot attempt failed (${backoffIteration + 1}) — retrying in ${backoff}ms`,
         );
         await this._sleep(backoff);
         backoff = Math.min(backoff * 2, this.config.maxBackoffMs);
@@ -280,7 +280,7 @@ export class BrightnessController {
     } catch (restoreErr) {
       errorText += `; snapshot restore failed: ${this._safeError(restoreErr)}`;
       console.error(
-        `Brightness restore failed after ${target}% failure: ${restoreErr.message}`,
+        `Brightness restore failed after ${target}% failure`,
       );
     }
     await this._publishStatus("failed", target, errorText);
@@ -295,7 +295,7 @@ export class BrightnessController {
       cabinets = await this.client.readCabinets();
     } catch (err) {
       console.warn(
-        `Vnnox cabinet metadata unavailable (continuing with screen snapshot): ${err.message}`,
+        "Vnnox cabinet metadata unavailable (continuing with screen snapshot)",
       );
     }
     if (cabinets.length > 0) {
