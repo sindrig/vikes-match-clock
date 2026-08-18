@@ -43,15 +43,19 @@ inside `states/{location}`. Each event has a schema such as:
   sessionId: string,
   action: string,
   stateArea: "match" | "controller" | "view" | "perimeter" | "clubOverrides",
-  changes: Record<string, unknown>
+  changes: Record<string, unknown> // serialized as a JSON string on disk
 }
 ```
 
 The location is supplied by the path, avoiding duplicated or untrusted venue
 data. `changes` records the exact update-path map sent to Firebase, including
 `null` deletions, which is sufficient to reconstruct the command without
-duplicating the entire pre-existing state. A server timestamp avoids relying
-on a device clock.
+duplicating the entire pre-existing state. On disk `changes` is a **JSON
+string** (written by `writeAuditedState`, decoded by `parseAuditEvent`):
+Realtime Database prunes null children during an update, so storing the map as
+an object would collapse `{ overlay: null }` to an empty node, truncating the
+deletion record and failing the rules' `changes != null` validation. A server
+timestamp avoids relying on a device clock.
 
 Alternative considered: write a full before/after state snapshot. Rejected
 because large controller queues and media configurations would inflate every

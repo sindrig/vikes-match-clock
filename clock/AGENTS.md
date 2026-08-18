@@ -71,12 +71,16 @@ audit event so operators can reconstruct an incident after the fact.
   "sessionId": "uuid",
   "action": "match.start",
   "stateArea": "match",
-  "changes": { "started": 1723392000000 }
+  "changes": "{\"started\":1723392000000}"
 }
 ```
 
 - `changes` is the exact update-path map sent to Firebase (including `null`
-  deletions), enough to reconstruct the command.
+  deletions), enough to reconstruct the command. It is stored as a **JSON
+  string** because Realtime Database prunes null children on write: an object
+  like `{ "overlay": null }` would collapse to an empty node, truncating the
+  deletion record (and failing the `changes != null` rules validation).
+  `writeAuditedState()` serializes it; `parseAuditEvent()` decodes it back.
 - `timestamp` is a Firebase `serverTimestamp()`; never trust a device clock.
 - `stateArea` is one of `match | controller | view | perimeter |
   clubOverrides`.
@@ -84,7 +88,10 @@ audit event so operators can reconstruct an incident after the fact.
 **Atomicity** — state mutation and audit record are committed in **one root
 `update()`** by `writeAuditedState()` in `firebaseDatabase.ts` (also exposed as
 `firebaseDatabase.writeAudited`). Either both land or neither does: a failed
-write creates no event and no state change.
+write creates no event and no state change. Diff keys (which include nested
+paths like `queues/{id}`) are expanded into full leaf paths in the update map:
+an `update()` value object cannot contain keys with `/`, so writing the diff as
+a whole node value would be rejected or clobber sibling state.
 
 **Write routing** — all writes flow through `writeAudited`:
 

@@ -63,6 +63,22 @@ describe("parseAuditEvent", () => {
     };
     expect(parseAuditEvent(event)).toEqual(event);
   });
+
+  it("accepts changes serialized as a JSON string", () => {
+    const changes = { overlay: null, homeScore: 1 };
+    const event = { ...validEvent, changes: JSON.stringify(changes) };
+    expect(parseAuditEvent(event)).toEqual({ ...validEvent, changes });
+  });
+
+  it("rejects malformed serialized changes", () => {
+    expect(parseAuditEvent({ ...validEvent, changes: "{" })).toBeNull();
+    expect(
+      parseAuditEvent({ ...validEvent, changes: JSON.stringify("str") }),
+    ).toBeNull();
+    expect(
+      parseAuditEvent({ ...validEvent, changes: JSON.stringify([1]) }),
+    ).toBeNull();
+  });
 });
 
 describe("parseAuditEvents", () => {

@@ -47,8 +47,40 @@ const getUpdates = async (): Promise<Record<string, unknown>> => {
   return call[1] as Record<string, unknown>;
 };
 
-const getAuditPaths = (updates: Record<string, unknown>): string[] =>
-  Object.keys(updates).filter((key) => key.startsWith("audit/"));
+const getAuditPaths = (
+  updates: Record<string, unknown>,
+  prefix: string,
+): string[] => Object.keys(updates).filter((key) => key.startsWith(prefix));
+
+// Rebuilds an audit event object from the flattened leaf paths written by
+// writeAuditedState, e.g. audit/vikuti/<eventId>/changes -> event. The
+// `changes` leaf is a JSON string and is decoded back to an object.
+const getAuditEvent = (
+  updates: Record<string, unknown>,
+  prefix: string,
+): Record<string, unknown> => {
+  const event: Record<string, unknown> = {};
+  for (const key of getAuditPaths(updates, prefix)) {
+    const suffix = key.slice(prefix.length + 1);
+    const slash = suffix.indexOf("/");
+    const field = slash < 0 ? suffix : suffix.slice(slash + 1);
+    const firstSlash = field.indexOf("/");
+    if (firstSlash < 0) {
+      const value = updates[key];
+      event[field] =
+        field === "changes" && typeof value === "string"
+          ? (JSON.parse(value) as Record<string, unknown>)
+          : value;
+      continue;
+    }
+    const group = field.slice(0, firstSlash);
+    const sub = field.slice(firstSlash + 1);
+    const node = (event[group] as Record<string, unknown> | undefined) ?? {};
+    node[sub] = updates[key];
+    event[group] = node;
+  }
+  return event;
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -75,13 +107,10 @@ describe("writeAuditedState", () => {
     expect(update).toHaveBeenCalledWith(expect.any(Object), expect.any(Object));
 
     const updates = update.mock.calls[0][1] as Record<string, unknown>;
-    expect(updates["states/vikuti/match"]).toEqual({ homeScore: 1 });
+    expect(updates["states/vikuti/match/homeScore"]).toEqual(1);
 
-    const auditPaths = Object.keys(updates).filter((key) =>
-      key.startsWith("audit/vikuti/"),
-    );
-    expect(auditPaths).toHaveLength(1);
-    expect(updates[auditPaths[0]]).toEqual({
+    const event = getAuditEvent(updates, "audit/vikuti");
+    expect(event).toEqual({
       timestamp: 1700000000000,
       uid: "uid-1",
       sessionId: "session-1",
@@ -108,10 +137,16 @@ describe("writeAuditedState", () => {
     );
 
     const updates = update.mock.calls[0][1] as Record<string, unknown>;
-    expect(updates["states/vikuti/perimeter"]).toEqual({ overlay: null });
-    const auditPaths = getAuditPaths(updates);
-    const event = updates[auditPaths[0]] as Record<string, unknown>;
-    expect(event.changes).toEqual({ overlay: null });
+    expect(updates["states/vikuti/perimeter/overlay"]).toEqual(null);
+    const event = getAuditEvent(updates, "audit/vikuti");
+    expect(event).toEqual({
+      timestamp: 1700000000000,
+      uid: "uid-1",
+      sessionId: "session-1",
+      action: "perimeter.clear-overlay",
+      stateArea: "perimeter",
+      changes: { overlay: null },
+    });
   });
 
   it("writes nested media-pair paths with deletions for removals", async () => {
@@ -133,8 +168,21 @@ describe("writeAuditedState", () => {
     );
 
     const updates = update.mock.calls[0][1] as Record<string, unknown>;
-    expect(updates["states/vikuti/perimeter"]).toEqual({
-      "mediaPairs/11111111-1111-4111-8111-111111111111": null,
+    expect(
+      updates[
+        "states/vikuti/perimeter/mediaPairs/11111111-1111-4111-8111-111111111111"
+      ],
+    ).toEqual(null);
+    const event = getAuditEvent(updates, "audit/vikuti");
+    expect(event).toEqual({
+      timestamp: 1700000000000,
+      uid: "uid-1",
+      sessionId: "session-1",
+      action: "perimeter.delete-media-pair",
+      stateArea: "perimeter",
+      changes: {
+        "mediaPairs/11111111-1111-4111-8111-111111111111": null,
+      },
     });
   });
 });
@@ -153,13 +201,8 @@ describe("saveClubOverride", () => {
     await saveClubOverride(prefix, id, override, audit);
 
     const updates = await getUpdates();
-    expect(updates[`states/${prefix}/clubOverrides`]).toEqual({
-      [id]: override,
-    });
-
-    const auditPaths = getAuditPaths(updates);
-    expect(auditPaths).toHaveLength(1);
-    expect(auditPaths[0]).toMatch(new RegExp(`^audit/${prefix}/`));
+    expect(updates[`states/${prefix}/clubOverrides/${id}`]).toEqual(override);
+    expect(getAuditPaths(updates, `audit/${prefix}`)).toHaveLength(6);
   });
 
   it("constructs correct path with different prefix", async () => {
@@ -175,9 +218,7 @@ describe("saveClubOverride", () => {
     await saveClubOverride(prefix, id, override, audit);
 
     const updates = await getUpdates();
-    expect(updates[`states/${prefix}/clubOverrides`]).toEqual({
-      [id]: override,
-    });
+    expect(updates[`states/${prefix}/clubOverrides/${id}`]).toEqual(override);
   });
 
   it("writes all override properties correctly", async () => {
@@ -191,9 +232,7 @@ describe("saveClubOverride", () => {
     await saveClubOverride("test", "id1", override, audit);
 
     const updates = await getUpdates();
-    expect(updates["states/test/clubOverrides"]).toEqual({
-      id1: override,
-    });
+    expect(updates["states/test/clubOverrides/id1"]).toEqual(override);
   });
 });
 
@@ -210,10 +249,8 @@ describe("deleteClubOverride", () => {
     });
 
     const updates = await getUpdates();
-    expect(updates[`states/${prefix}/clubOverrides`]).toEqual({
-      [id]: null,
-    });
-    expect(getAuditPaths(updates)).toHaveLength(1);
+    expect(updates[`states/${prefix}/clubOverrides/${id}`]).toEqual(null);
+    expect(getAuditPaths(updates, `audit/${prefix}`)).toHaveLength(6);
 
     const { storageHelpers } = await import("./firebase");
     expect(storageHelpers.deleteObject).toHaveBeenCalledWith(

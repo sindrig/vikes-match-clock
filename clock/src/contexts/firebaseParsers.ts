@@ -728,7 +728,9 @@ const AUDIT_STATE_AREAS: AuditStateArea[] = [
 ];
 
 // Strict parse of a single audit record. Any malformed or partial event is
-// dropped so the inspection view never renders untrusted data.
+// dropped so the inspection view never renders untrusted data. `changes` is
+// stored as a JSON string (see writeAuditedState) but legacy object-shaped
+// snapshots are accepted too.
 export function parseAuditEvent(data: unknown): AuditEvent | null {
   if (!data || typeof data !== "object") return null;
   const raw = data as Record<string, unknown>;
@@ -737,21 +739,33 @@ export function parseAuditEvent(data: unknown): AuditEvent | null {
   if (typeof raw.sessionId !== "string") return null;
   if (typeof raw.action !== "string") return null;
   if (!AUDIT_STATE_AREAS.includes(raw.stateArea as AuditStateArea)) return null;
-  if (
-    !raw.changes ||
-    typeof raw.changes !== "object" ||
-    Array.isArray(raw.changes)
-  ) {
-    return null;
-  }
+  const changes = parseAuditChanges(raw.changes);
+  if (!changes) return null;
   return {
     timestamp: raw.timestamp,
     uid: raw.uid,
     sessionId: raw.sessionId,
     action: raw.action,
     stateArea: raw.stateArea as AuditStateArea,
-    changes: raw.changes as Record<string, unknown>,
+    changes,
   };
+}
+
+function parseAuditChanges(data: unknown): Record<string, unknown> | null {
+  if (data === null || data === undefined) return null;
+  if (typeof data === "string") {
+    try {
+      const parsed: unknown = JSON.parse(data);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        return null;
+      }
+      return parsed as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  }
+  if (typeof data !== "object" || Array.isArray(data)) return null;
+  return data as Record<string, unknown>;
 }
 
 // Parses an audit/{location} collection snapshot into an array, attaching each
