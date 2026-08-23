@@ -412,6 +412,31 @@ export function maybeAutoDeleteQueue(
   return newState;
 }
 
+/**
+ * Compute a stable primitive signature of the eligible home roster players.
+ *
+ * Eligibility mirrors requestGoalScorerPreparation: a player needs both a
+ * valid id and a shirt number. The serialized entries produce a primitive
+ * value so React's Object.is comparison prevents spurious effect triggers
+ * when the roster array reference changes but its eligible content is
+ * identical.
+ */
+export function computeEligibleRosterSignature(
+  home: Player[] | undefined,
+): string {
+  const entries = (home ?? [])
+    .filter(
+      (p) =>
+        p.id !== undefined &&
+        p.id !== null &&
+        String(p.id).trim() !== "" &&
+        p.number !== undefined &&
+        p.number !== null,
+    )
+    .map((p) => `${String(p.id)}:${p.name ?? ""}:${String(p.number)}`);
+  return entries.length > 0 ? JSON.stringify(entries) : "";
+}
+
 interface FirebaseStateProviderProps {
   children: ReactNode;
   listenPrefix: string;
@@ -2061,18 +2086,17 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   // gains eligible players (match selection or match-report roster loading).
   // This runs in the background and never blocks the roster from becoming
   // available: the request write and callable fire-and-forget.
-  const homeRosterSummary = useMemo(() => {
-    const home = controller.roster.home ?? [];
-    const entries = home.map((p) =>
-      p.id !== undefined && p.id !== null && String(p.id).trim() !== ""
-        ? `${String(p.id)}:${p.name ?? ""}:${String(p.number ?? "")}`
-        : "",
-    );
-    return {
-      signature: JSON.stringify(entries),
-      hasEligible: entries.some((entry) => entry.length > 0),
-    };
-  }, [controller.roster.home]);
+  //
+  // The signature is a primitive string so that React's Object.is
+  // comparison prevents spurious effect triggers when the roster array
+  // reference changes but its eligible content is identical (common in
+  // Firebase-driven re-renders).  Eligibility mirrors
+  // requestGoalScorerPreparation: a player needs both a valid id and a
+  // shirt number.
+  const eligibleRosterSignature = useMemo(
+    () => computeEligibleRosterSignature(controller.roster.home),
+    [controller.roster.home],
+  );
   // Boolean (not the geometry object) so a daemon re-publish of unchanged
   // geometry does not re-trigger a preparation request on every refresh.
   const hasOverlayGeometry = useMemo(
@@ -2088,13 +2112,13 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       !isAuthenticated ||
       !perimeter.enabled ||
       !hasOverlayGeometry ||
-      !homeRosterSummary.hasEligible
+      eligibleRosterSignature.length === 0
     ) {
       return;
     }
     void requestGoalScorerPreparation();
   }, [
-    homeRosterSummary,
+    eligibleRosterSignature,
     ready,
     isAuthenticated,
     perimeter.enabled,

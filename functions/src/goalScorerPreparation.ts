@@ -21,7 +21,7 @@ const PLAYER_ID_RE = /^[A-Za-z0-9._-]+$/;
 const UNSAFE_FILENAME_RE = /[^A-Za-z0-9._ -]/g;
 // Render version embedded in output filenames so a future renderer change
 // produces new deterministic files instead of stale-cached ones.
-const RENDER_VERSION = "v1";
+const RENDER_VERSION = "v2";
 // A player whose name renders wider than this (in height units) is truncated.
 const MAX_NAME_WIDTH_MULTIPLIER = 3;
 // Per-target gap between portrait, number, and name (height units).
@@ -306,7 +306,7 @@ export async function renderBand(
       width: unitWidth,
       height: unitHeight,
       channels: 4,
-      background: { r: 0, g: 0, b: 0, alpha: 0 },
+      background: { r: 0, g: 0, b: 0, alpha: 1 },
     },
   })
     .composite(overlays)
@@ -331,7 +331,7 @@ export async function renderBand(
       width,
       height,
       channels: 4,
-      background: { r: 0, g: 0, b: 0, alpha: 0 },
+      background: { r: 0, g: 0, b: 0, alpha: 1 },
     },
   })
     .composite(tiled)

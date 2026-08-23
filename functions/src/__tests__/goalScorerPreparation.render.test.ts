@@ -88,6 +88,42 @@ describe("renderBand", () => {
     expect(meta.height).toBe(192);
   });
 
+  it("produces an opaque black background so ads cannot show through", async () => {
+    const source = await sharp({
+      create: {
+        width: 4,
+        height: 4,
+        channels: 3,
+        background: { r: 200, g: 30, b: 30 },
+      },
+    })
+      .png()
+      .toBuffer();
+    const band = await renderBand(source, {
+      width: 920,
+      height: 192,
+      number: 7,
+      name: "Jón",
+    });
+    const { data, info } = await sharp(band)
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    const { width: w, height: h, channels: ch } = info;
+
+    // Sample a pixel near the right edge of the band — well past the
+    // portrait/text content — which should be plain background.
+    const rightEdgeX = w - 2;
+    const midY = Math.floor(h / 2);
+    const offset = (midY * w + rightEdgeX) * ch;
+    const r = data[offset];
+    const g = data[offset + 1];
+    const b = data[offset + 2];
+    const alpha = data[offset + 3];
+
+    expect({ r, g, b, alpha }).toEqual({ r: 0, g: 0, b: 0, alpha: 255 });
+  });
+
   it("handles a tiny source without failing", async () => {
     const source = await sharp({
       create: {
