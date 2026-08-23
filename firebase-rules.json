@@ -27,7 +27,7 @@
         ".read": true,
         "perimeter": {
           "goalScorerPreparation": {
-            ".validate": "newData.val() == null || (newData.hasChildren(['jobId', 'players']) && newData.child('jobId').isString() && newData.child('players').isObject())"
+            ".validate": "newData.val() == null || (newData.hasChildren(['jobId', 'players']) && newData.child('jobId').isString() && newData.child('players').hasChildren())"
           }
         }
       }
