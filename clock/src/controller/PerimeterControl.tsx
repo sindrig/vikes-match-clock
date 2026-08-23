@@ -34,6 +34,7 @@ import {
 import { usePerimeter } from "../contexts/FirebaseStateContext";
 import { useLocalState } from "../contexts/LocalStateContext";
 import { validateAdFileName } from "../contexts/firebaseParsers";
+import GoalScorerPreparation from "./GoalScorerPreparation";
 import {
   storageHelpers,
   ListResult,
@@ -612,6 +613,7 @@ const PerimeterControl = () => {
         </Modal.Header>
         <Modal.Body>
           <BrightnessSection />
+          <GoalScorerPreparation />
           {!appliedAdLayoutLoaded ? (
             <div className="perimeter-preview-state">
               <Loader content="Sæki forskoðun..." />

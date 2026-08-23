@@ -83,7 +83,7 @@ audit event so operators can reconstruct an incident after the fact.
   `writeAuditedState()` serializes it; `parseAuditEvent()` decodes it back.
 - `timestamp` is a Firebase `serverTimestamp()`; never trust a device clock.
 - `stateArea` is one of `match | controller | view | perimeter |
-  clubOverrides`.
+clubOverrides`.
 
 **Atomicity** — state mutation and audit record are committed in **one root
 `update()`** by `writeAuditedState()` in `firebaseDatabase.ts` (also exposed as
@@ -719,6 +719,131 @@ directly and never treats a Firebase write confirmation as a hardware result.
   emptied input can never be accidentally submitted as 0%.
 - The input carries an accessible label (`aria-label="Bjartleiki jaðarskjás"`)
   matching the section title.
+
+#### Goal-Scorer Perimeter Media Preparation
+
+Before a home goal happens, the controller prepares player-specific repeating
+perimeter media for every eligible home player so scorer selection can
+attribute the goal reliably during live play. A Firebase Cloud Function
+renders static PNG bands (see `functions/src/goalScorerPreparation.ts`) using
+the daemon-published overlay geometry; the controller never renders media and
+never infers readiness from Storage listings.
+
+**Data ownership:**
+
+| Path                                                         | Writer     | Purpose                                                            |
+| ------------------------------------------------------------ | ---------- | ------------------------------------------------------------------ |
+| `states/{location}/perimeter/goalScorerPreparation`          | Controller | Desired preparation request (jobId + home-player snapshot)         |
+| `perimeter/{location}/goalScorerPreparation`                 | Function   | Job progress + per-player ready/fallback/unavailable/failed result |
+| `perimeter/{location}/overlayGeometry`                       | Daemon     | Configured overlay target geometry (native sizes, revision)        |
+| `{location}/players/{playerId}-fagn.png` in Storage          | Operator   | Personalized celebration image (personal source)                   |
+| `{location}/crest.png` in Storage                            | Operator   | Standard club crest (fallback source)                              |
+| `{location}/perimeter-overlays/{jobId}/{48\|40}/` in Storage | Function   | Deterministic rendered PNG output                                  |
+
+**Request schema** (`states/{location}/perimeter/goalScorerPreparation`):
+
+```json
+{
+  "jobId": "uuid",
+  "players": [{ "id": "123", "name": "Jón", "number": 7 }]
+}
+```
+
+- `jobId` is a UUID; it scopes the output storage folder and keys the
+  service-owned status (stale jobs cannot overwrite a newer request).
+- `players` is a snapshot of the home roster at request time, so the job is
+  tied to the requested roster rather than a later mutation.
+- The RTDB rules validate the request shape (jobId string + players object);
+  only authenticated controllers with location access may write it.
+
+**Status schema** (`perimeter/{location}/goalScorerPreparation`):
+
+```json
+{
+  "jobId": "uuid",
+  "phase": "preparing|ready|failed",
+  "readyCount": 2,
+  "fallbackCount": 1,
+  "unavailableCount": 0,
+  "failedCount": 0,
+  "total": 3,
+  "updatedAt": 1723392000000,
+  "error": null,
+  "players": {
+    "123": {
+      "status": "ready|fallback|preparing|unavailable|failed",
+      "error": null,
+      "files": {
+        "2": { "name": "123-<geomRev>-v1-48.png", "source": "gs://..." },
+        "4": { "name": "123-<geomRev>-v1-40.png", "source": "gs://..." }
+      }
+    }
+  }
+}
+```
+
+- `ready` = personalized celebration image; `fallback` = crest-backed. Both
+  carry the two `PerimeterOverlayFile` sources (one per overlay layer) usable
+  directly as an overlay column.
+- `unavailable` = player had no valid identifier; `failed` = a rendering or
+  storage error (safe error text only).
+- `phase: "ready"` means the job completed; per-player failures still show in
+  the counts. `phase: "failed"` means the job itself could not run (e.g. no
+  published geometry).
+
+**Rendering:** the function renders one native-size repeating PNG band per
+configured overlay target. The band repeats `[portrait-or-crest | number |
+name | gap]` across the target width. Source resolution: try
+`{location}/players/{playerId}-fagn.png`, else `{location}/crest.png`. Output
+lives under `{location}/perimeter-overlays/{jobId}/{48|40}/` (the
+daemon-validated media-pair family) so it is directly playable by the existing
+overlay command. Filenames are `{playerId}-{geometryRevision}-v1-{targetFolder}.png`
+(deterministic and geometry-scoped). The `v1` render version changes if the
+renderer layout changes, forcing fresh files. Both the uploaded objects and the
+returned `gs://` source URLs use the function's **active storage bucket**
+(`admin.storage().bucket().name`), so staging output is never advertised under
+the production bucket.
+
+**Controller behavior:**
+
+- `FirebaseStateContext.tsx` subscribes to the geometry and status paths and
+  exposes them through `usePerimeter()` as `overlayGeometry` and
+  `goalScorerPreparationStatus`, plus `requestGoalScorerPreparation()`.
+- Preparation is requested in the background whenever the home roster gains
+  eligible players (match selection or match-report roster loading). The write
+  and the `prepareGoalScorerMedia` callable run fire-and-forget and never block
+  the roster from becoming available. The request is gated on the venue having
+  opted into the perimeter (`states/{location}/perimeter` `enabled: true`) AND
+  a daemon having published overlay geometry (`perimeter/{location}/overlayGeometry`
+  present) — a venue without either would only produce a job that must fail, so
+  no request is issued for it. The explicit "Endurtaka undirbúning" retry below
+  bypasses the gate.
+- `GoalScorerPreparation.tsx` (rendered inside the `Jaðarskjár` modal) lists
+  each home player's celebration-image source and prepared-media outcome with
+  counts and an explicit "Endurtaka undirbúning" retry action.
+- On scorer selection, `GoalScorerDialog.tsx` keeps the generic home-goal
+  overlay until the selected player's preparation result is `ready`/`fallback`;
+  only then does it replace the generic overlay with the player's prepared
+  target pair. The dialog shows a per-player readiness label so the operator
+  knows which players can be attributed. The generic overlay stays when the
+  player is preparing/unavailable/failed.
+- The existing clear action (`Hreinsa virkt overlay`) writes `overlay: null`,
+  clearing both the main-screen reveal and the player perimeter pair and
+  restoring the rotating perimeter content.
+
+**Daemon geometry** (`perimeter/{location}/overlayGeometry`): the daemon
+publishes validated overlay target geometry derived from its configured layer
+IDs, target folders, and clip canvases, with a `revision` hash. The
+preparation function reads this before rendering and fails safely when it is
+absent or malformed instead of guessing sizes. Each daemon instance publishes
+beneath its own venue's `perimeter/{location}/overlayGeometry` (configurable
+via `PERIMETER_OVERLAY_GEOMETRY_PATH`), so a venue with no geometry has no
+daemon and is skipped by preparation. See `perimeter-control/geometry.js`.
+
+The overlay parsers (`parsePerimeterOverlay`, `parsePerimeterMediaPairs`,
+`parsePerimeterAdLayout`) are scoped to the active environment's storage bucket
+(`FIREBASE_STORAGE_BUCKET`), so a source from another environment's bucket is
+rejected for the active deployment.
 
 ### The `listenPrefix` System
 

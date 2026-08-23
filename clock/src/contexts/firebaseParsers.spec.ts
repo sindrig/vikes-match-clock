@@ -15,6 +15,8 @@ import {
   parsePerimeterAppliedAdLayout,
   parsePerimeterBrightness,
   parsePerimeterBrightnessStatus,
+  parsePerimeterOverlayGeometry,
+  parseGoalScorerPreparationStatus,
 } from "./firebaseParsers";
 import { Sports, DEFAULT_HALFSTOPS, DEFAULT_THEME } from "../constants";
 import type {
@@ -1999,6 +2001,59 @@ describe("firebaseParsers", () => {
       };
       expect(parsePerimeterOverlay(overlay, { location: "vikuti" })).toBeNull();
     });
+
+    it("accepts sources from the active environment bucket", () => {
+      const overlay = {
+        version: 1,
+        id: "staging-1",
+        columns: [
+          {
+            durationMs: 10000,
+            files: {
+              "2": {
+                name: "goal-48.mp4",
+                source:
+                  "gs://vikes-match-clock-staging.appspot.com/vikuti/perimeter/goal-48.mp4",
+              },
+              "4": {
+                name: "goal-40.mp4",
+                source:
+                  "gs://vikes-match-clock-staging.appspot.com/vikuti/perimeter/goal-40.mp4",
+              },
+            },
+          },
+        ],
+      };
+      const result = parsePerimeterOverlay(overlay, {
+        location: "vikuti",
+        bucket: "vikes-match-clock-staging.appspot.com",
+      });
+      expect(result).not.toBeNull();
+    });
+
+    it("rejects a cross-environment bucket for the active environment", () => {
+      const overlay = {
+        version: 1,
+        id: "prod-1",
+        columns: [
+          {
+            durationMs: 10000,
+            files: {
+              "2": {
+                name: "goal-48.mp4",
+                source: `gs://${bucket}/vikuti/perimeter/goal-48.mp4`,
+              },
+            },
+          },
+        ],
+      };
+      expect(
+        parsePerimeterOverlay(overlay, {
+          location: "vikuti",
+          bucket: "vikes-match-clock-staging.appspot.com",
+        }),
+      ).toBeNull();
+    });
   });
 
   describe("parsePerimeterMediaPairs", () => {
@@ -2332,5 +2387,246 @@ describe("firebaseParsers", () => {
         }),
       ).toBeNull();
     });
+  });
+});
+
+describe("parsePerimeterOverlayGeometry", () => {
+  const validGeometry = {
+    revision: "abc123",
+    updatedAt: 1723392000000,
+    targets: [
+      {
+        layerId: "2",
+        label: "48 skjáir",
+        targetFolder: "48",
+        width: 4608,
+        height: 192,
+      },
+      {
+        layerId: "4",
+        label: "40 skjáir",
+        targetFolder: "40",
+        width: 3840,
+        height: 192,
+      },
+    ],
+  };
+
+  it("parses valid daemon-published geometry", () => {
+    expect(parsePerimeterOverlayGeometry(validGeometry)).toEqual(validGeometry);
+  });
+
+  it("rejects an absent/missing geometry document", () => {
+    expect(parsePerimeterOverlayGeometry(null)).toBeNull();
+    expect(parsePerimeterOverlayGeometry(undefined)).toBeNull();
+    expect(parsePerimeterOverlayGeometry("nope")).toBeNull();
+  });
+
+  it("rejects malformed top-level documents", () => {
+    expect(parsePerimeterOverlayGeometry({})).toBeNull();
+    expect(
+      parsePerimeterOverlayGeometry({
+        revision: "",
+        updatedAt: 1,
+        targets: [],
+      }),
+    ).toBeNull();
+    expect(
+      parsePerimeterOverlayGeometry({
+        revision: "r",
+        updatedAt: "x",
+        targets: [],
+      }),
+    ).toBeNull();
+    expect(
+      parsePerimeterOverlayGeometry({
+        revision: "r",
+        updatedAt: 1,
+        targets: {},
+      }),
+    ).toBeNull();
+  });
+
+  it("drops malformed targets but keeps the rest", () => {
+    const result = parsePerimeterOverlayGeometry({
+      ...validGeometry,
+      targets: [
+        validGeometry.targets[0],
+        { layerId: "", label: "x", targetFolder: "48", width: 1, height: 1 },
+        {
+          layerId: "4",
+          label: "40 skjáir",
+          targetFolder: "40",
+          width: 0,
+          height: 192,
+        },
+        { layerId: "9", label: "x", targetFolder: "48" },
+      ],
+    });
+    expect(result?.targets).toEqual([validGeometry.targets[0]]);
+  });
+
+  it("returns an empty targets list for a document with no valid targets", () => {
+    const result = parsePerimeterOverlayGeometry({
+      ...validGeometry,
+      targets: [{ layerId: "9", label: "x", targetFolder: "48" }],
+    });
+    expect(result?.targets).toEqual([]);
+    expect(result?.revision).toBe("abc123");
+  });
+
+  it("reflects changed geometry (different revision and targets)", () => {
+    const changed = {
+      revision: "def456",
+      updatedAt: 1723392001000,
+      targets: [
+        {
+          layerId: "2",
+          label: "48 skjáir",
+          targetFolder: "48",
+          width: 5120,
+          height: 192,
+        },
+      ],
+    };
+    const parsed = parsePerimeterOverlayGeometry(changed);
+    expect(parsed?.revision).toBe("def456");
+    expect(parsed?.targets[0].width).toBe(5120);
+  });
+});
+
+describe("parseGoalScorerPreparationStatus", () => {
+  const bucket = "vikes-match-clock-firebase.appspot.com";
+  const status = {
+    jobId: "job-1",
+    phase: "ready",
+    readyCount: 1,
+    fallbackCount: 1,
+    unavailableCount: 0,
+    failedCount: 0,
+    total: 2,
+    updatedAt: 1723392000000,
+    error: null,
+    players: {
+      "10": {
+        status: "ready",
+        error: null,
+        files: {
+          "2": {
+            name: "10-ready-48.png",
+            source: `gs://${bucket}/vikuti/perimeter-overlays/prep/job-1/10/2.png`,
+          },
+          "4": {
+            name: "10-ready-40.png",
+            source: `gs://${bucket}/vikuti/perimeter-overlays/prep/job-1/10/4.png`,
+          },
+        },
+      },
+      "7": {
+        status: "fallback",
+        error: null,
+        files: {
+          "2": {
+            name: "7-fallback-48.png",
+            source: `gs://${bucket}/vikuti/perimeter-overlays/prep/job-1/7/2.png`,
+          },
+          "4": {
+            name: "7-fallback-40.png",
+            source: `gs://${bucket}/vikuti/perimeter-overlays/prep/job-1/7/4.png`,
+          },
+        },
+      },
+    },
+  };
+
+  it("parses a valid ready/fallback status", () => {
+    const result = parseGoalScorerPreparationStatus(status, {
+      location: "vikuti",
+      bucket,
+    });
+    expect(result).not.toBeNull();
+    expect(result?.jobId).toBe("job-1");
+    expect(result?.phase).toBe("ready");
+    expect(result?.players["10"].status).toBe("ready");
+    expect(result?.players["10"].files?.["2"].name).toBe("10-ready-48.png");
+    expect(result?.players["7"].status).toBe("fallback");
+  });
+
+  it("rejects absent/missing status", () => {
+    expect(parseGoalScorerPreparationStatus(null)).toBeNull();
+    expect(parseGoalScorerPreparationStatus(undefined)).toBeNull();
+    expect(parseGoalScorerPreparationStatus("nope")).toBeNull();
+  });
+
+  it("rejects malformed top-level status", () => {
+    expect(parseGoalScorerPreparationStatus({})).toBeNull();
+    expect(
+      parseGoalScorerPreparationStatus({ ...status, jobId: "" }),
+    ).toBeNull();
+    expect(
+      parseGoalScorerPreparationStatus({ ...status, phase: "bogus" }),
+    ).toBeNull();
+    expect(
+      parseGoalScorerPreparationStatus({ ...status, updatedAt: "x" }),
+    ).toBeNull();
+  });
+
+  it("drops a ready player whose files are malformed", () => {
+    const malformed = {
+      ...status,
+      players: {
+        "10": {
+          status: "ready",
+          error: null,
+          files: {
+            "2": { name: "x.png", source: "gs://not-the-bucket/x.png" },
+          },
+        },
+      },
+    };
+    const result = parseGoalScorerPreparationStatus(malformed, {
+      location: "vikuti",
+      bucket,
+    });
+    expect(result?.players["10"]).toBeUndefined();
+  });
+
+  it("drops a player with an unknown status", () => {
+    const result = parseGoalScorerPreparationStatus(
+      {
+        ...status,
+        players: { "10": { status: "bogus", error: null } },
+      },
+      { location: "vikuti", bucket },
+    );
+    expect(result?.players).toEqual({});
+  });
+
+  it("parses preparing/unavailable/failed players without files", () => {
+    const preparing = {
+      jobId: "job-2",
+      phase: "preparing",
+      readyCount: 0,
+      fallbackCount: 0,
+      unavailableCount: 1,
+      failedCount: 1,
+      total: 3,
+      updatedAt: 1723392000000,
+      error: null,
+      players: {
+        "1": { status: "preparing", error: null },
+        "2": { status: "unavailable", error: "no id" },
+        "3": { status: "failed", error: "render error" },
+      },
+    };
+    const result = parseGoalScorerPreparationStatus(preparing, {
+      location: "vikuti",
+      bucket,
+    });
+    expect(result?.phase).toBe("preparing");
+    expect(result?.players["1"].status).toBe("preparing");
+    expect(result?.players["2"].status).toBe("unavailable");
+    expect(result?.players["3"].status).toBe("failed");
+    expect(result?.players["3"].files).toBeUndefined();
   });
 });

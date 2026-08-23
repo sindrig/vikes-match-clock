@@ -9,6 +9,8 @@ import React, {
   useMemo,
 } from "react";
 import { database, storageHelpers, FIREBASE_STORAGE_BUCKET } from "../firebase";
+import { httpsCallable } from "firebase/functions";
+import { functions } from "../firebase";
 import { ref, onValue, set } from "firebase/database";
 import {
   Match,
@@ -34,6 +36,9 @@ import {
   PerimeterAppliedAdLayout,
   AuditStateArea,
   PerimeterBrightnessStatus,
+  PerimeterOverlayGeometry,
+  GoalScorerPreparationStatus,
+  GoalScorerPreparationRequest,
 } from "../types";
 import {
   firebaseDatabase,
@@ -62,6 +67,8 @@ import {
   parsePerimeterAppliedAdLayout,
   parsePerimeterBrightness,
   parsePerimeterBrightnessStatus,
+  parsePerimeterOverlayGeometry,
+  parseGoalScorerPreparationStatus,
 } from "./firebaseParsers";
 
 const HALFTIME_DURATION_MS = 15 * 60 * 1000;
@@ -284,6 +291,9 @@ interface FirebaseStateContextType {
   perimeterBrightness: number | null;
   perimeterBrightnessStatus: PerimeterBrightnessStatus | null;
   setPerimeterBrightness: (percent: number) => Promise<void>;
+  overlayGeometry: PerimeterOverlayGeometry | null;
+  goalScorerPreparationStatus: GoalScorerPreparationStatus | null;
+  requestGoalScorerPreparation: () => Promise<void>;
 }
 
 const FirebaseStateContext = createContext<FirebaseStateContextType | null>(
@@ -453,6 +463,10 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   >(null);
   const [perimeterBrightnessStatus, setPerimeterBrightnessStatus] =
     useState<PerimeterBrightnessStatus | null>(null);
+  const [overlayGeometry, setOverlayGeometry] =
+    useState<PerimeterOverlayGeometry | null>(null);
+  const [goalScorerPreparationStatus, setGoalScorerPreparationStatus] =
+    useState<GoalScorerPreparationStatus | null>(null);
   const [ready, setReady] = useState(!listenPrefix);
 
   const matchRef = useRef(match);
@@ -474,6 +488,8 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     setPerimeterAppliedAdLayout(undefined);
     setPerimeterAppliedAdLayoutLoaded(false);
     setPerimeterAppliedAdLayoutError(null);
+    setOverlayGeometry(null);
+    setGoalScorerPreparationStatus(null);
   }
 
   useEffect(() => {
@@ -630,7 +646,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
             raw && typeof raw === "object"
               ? parsePerimeterOverlay(
                   (raw as Record<string, unknown>).overlay ?? null,
-                  { location: listenPrefix },
+                  { location: listenPrefix, bucket: FIREBASE_STORAGE_BUCKET },
                 )
               : null;
           setOverlay(overlay);
@@ -788,6 +804,40 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
           ),
       );
 
+      // Daemon-published overlay target geometry and the service-owned
+      // goal-scorer preparation status. Both are read-only to clients and
+      // deliberately NOT part of readiness.
+      const overlayGeometryPath = `perimeter/${listenPrefix}/overlayGeometry`;
+      const unsubOverlayGeometry = onValue(
+        ref(database, overlayGeometryPath),
+        (snapshot) => {
+          setOverlayGeometry(parsePerimeterOverlayGeometry(snapshot.val()));
+        },
+        (error) =>
+          console.error(
+            "Firebase perimeter overlayGeometry subscription error:",
+            error,
+          ),
+      );
+
+      const goalScorerPreparationPath = `perimeter/${listenPrefix}/goalScorerPreparation`;
+      const unsubGoalScorerPreparation = onValue(
+        ref(database, goalScorerPreparationPath),
+        (snapshot) => {
+          setGoalScorerPreparationStatus(
+            parseGoalScorerPreparationStatus(snapshot.val(), {
+              location: listenPrefix,
+              bucket: FIREBASE_STORAGE_BUCKET,
+            }),
+          );
+        },
+        (error) =>
+          console.error(
+            "Firebase perimeter goalScorerPreparation subscription error:",
+            error,
+          ),
+      );
+
       return () => {
         unsubMatch();
         unsubController();
@@ -801,6 +851,8 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         unsubMediaPairs();
         unsubBrightness();
         unsubBrightnessStatus();
+        unsubOverlayGeometry();
+        unsubGoalScorerPreparation();
       };
     }
   }, [listenPrefix]);
@@ -1909,6 +1961,45 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     [isAuthenticated, listenPrefix],
   );
 
+  // Request background perimeter goal-scorer media preparation for the current
+  // home roster. The controller writes the authoritative request (validated by
+  // the RTDB rules) so the service-owned status stays tied to this roster, then
+  // triggers the authenticated Cloud Function which performs the actual work.
+  const requestGoalScorerPreparation = useCallback(async (): Promise<void> => {
+    if (!listenPrefix || !isAuthenticated) return;
+    const home = controllerRef.current?.roster?.home ?? [];
+    const players = home
+      .filter(
+        (p) =>
+          p.id !== undefined && p.id !== null && String(p.id).trim() !== "",
+      )
+      .map((p) => ({
+        id: String(p.id),
+        name: p.name ?? "",
+        number: p.number,
+      }));
+    if (players.length === 0) return;
+
+    const request: GoalScorerPreparationRequest = {
+      jobId: crypto.randomUUID(),
+      players,
+    };
+    try {
+      await set(
+        ref(database, `states/${listenPrefix}/perimeter/goalScorerPreparation`),
+        request,
+      );
+      const callable = httpsCallable(functions, "prepareGoalScorerMedia");
+      await callable({
+        location: listenPrefix,
+        jobId: request.jobId,
+        players,
+      });
+    } catch (error) {
+      console.error("Failed to request goal-scorer media preparation:", error);
+    }
+  }, [isAuthenticated, listenPrefix]);
+
   const createPerimeterMediaPair = useCallback(
     (pairId: string, pair: PerimeterMediaPair): Promise<void> => {
       const audit = makeAudit("perimeter", "perimeter.create-media-pair");
@@ -1959,6 +2050,51 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       setPerimeterState("off");
     }
   }, [ready, controller.view, perimeter.enabled, setPerimeterState]);
+
+  // Request goal-scorer perimeter media preparation whenever the home roster
+  // gains eligible players (match selection or match-report roster loading).
+  // This runs in the background and never blocks the roster from becoming
+  // available: the request write and callable fire-and-forget.
+  const homeRosterSummary = useMemo(() => {
+    const home = controller.roster.home ?? [];
+    const entries = home.map((p) =>
+      p.id !== undefined && p.id !== null && String(p.id).trim() !== ""
+        ? `${String(p.id)}:${p.name ?? ""}:${String(p.number ?? "")}`
+        : "",
+    );
+    return {
+      signature: JSON.stringify(entries),
+      hasEligible: entries.some((entry) => entry.length > 0),
+    };
+  }, [controller.roster.home]);
+  // Boolean (not the geometry object) so a daemon re-publish of unchanged
+  // geometry does not re-trigger a preparation request on every refresh.
+  const hasOverlayGeometry = useMemo(
+    () => overlayGeometry !== null,
+    [overlayGeometry],
+  );
+  useEffect(() => {
+    // Preparation needs a venue that has opted into the perimeter AND a
+    // daemon that has published overlay geometry; a venue without either
+    // would only produce a job that must fail, so no request is issued.
+    if (
+      !ready ||
+      !isAuthenticated ||
+      !perimeter.enabled ||
+      !hasOverlayGeometry ||
+      !homeRosterSummary.hasEligible
+    ) {
+      return;
+    }
+    void requestGoalScorerPreparation();
+  }, [
+    homeRosterSummary,
+    ready,
+    isAuthenticated,
+    perimeter.enabled,
+    hasOverlayGeometry,
+    requestGoalScorerPreparation,
+  ]);
 
   // Resolve viewport from live Firebase locations data by screenKey.
   // When admin changes screen dimensions, listeners updates and this recomputes.
@@ -2058,6 +2194,9 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       perimeterBrightness,
       perimeterBrightnessStatus,
       setPerimeterBrightness,
+      overlayGeometry,
+      goalScorerPreparationStatus,
+      requestGoalScorerPreparation,
     }),
     [
       match,
@@ -2143,6 +2282,9 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       perimeterBrightness,
       perimeterBrightnessStatus,
       setPerimeterBrightness,
+      overlayGeometry,
+      goalScorerPreparationStatus,
+      requestGoalScorerPreparation,
     ],
   );
 
@@ -2338,6 +2480,9 @@ export const usePerimeter = () => {
     perimeterBrightness,
     perimeterBrightnessStatus,
     setPerimeterBrightness,
+    overlayGeometry,
+    goalScorerPreparationStatus,
+    requestGoalScorerPreparation,
     getServerTime,
   } = useFirebaseState();
   return {
@@ -2360,6 +2505,9 @@ export const usePerimeter = () => {
     brightness: perimeterBrightness,
     brightnessStatus: perimeterBrightnessStatus,
     setPerimeterBrightness,
+    overlayGeometry,
+    goalScorerPreparationStatus,
+    requestGoalScorerPreparation,
     getServerTime,
   };
 };

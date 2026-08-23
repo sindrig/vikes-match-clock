@@ -436,11 +436,48 @@ test("attach listens on the configured path and sets up the preview ref", () => 
   });
   const db = new FakeDb();
   controller.attach(db);
-  assert.equal(db.refs.length, 2);
+  assert.equal(db.refs.length, 3);
   assert.equal(db.refs[0].path, controller.config.path);
   assert.equal(db.refs[0].handlers.has("value"), true);
   assert.equal(db.refs[1].path, controller.config.previewPath);
   assert.equal(db.refs[1].handlers.has("value"), false);
+  assert.equal(db.refs[2].path, controller.config.overlayGeometryPath);
+  assert.equal(db.refs[2].handlers.has("value"), false);
+});
+
+test("attach publishes the overlay geometry to the geometry path", async () => {
+  const controller = makeController({
+    PERIMETER_OVERLAY_ENABLED: "false",
+    PERIMETER_AD_LAYOUT_ENABLED: "false",
+    PERIMETER_IMPORT_ENABLED: "false",
+  });
+  const db = new FakeDb();
+  controller.attach(db);
+  const geometryRef = db.refs[2];
+  await waitFor(() => geometryRef.setCalls.length >= 1);
+  assert.equal(geometryRef.setCalls.length, 1);
+  const published = geometryRef.setCalls[0];
+  assert.equal(published.targets.length, 2);
+  assert.equal(published.targets[0].layerId, "2");
+  assert.equal(published.targets[0].width, 4608);
+  assert.equal(published.targets[1].layerId, "4");
+  assert.equal(published.targets[1].width, 3840);
+  assert.ok(published.revision.length > 0);
+});
+
+test("reopen re-publishes the overlay geometry as a safety net", async () => {
+  const controller = makeController({
+    PERIMETER_OVERLAY_ENABLED: "false",
+    PERIMETER_AD_LAYOUT_ENABLED: "false",
+    PERIMETER_IMPORT_ENABLED: "false",
+  });
+  const db = new FakeDb();
+  controller.attach(db);
+  const geometryRef = db.refs[2];
+  await waitFor(() => geometryRef.setCalls.length >= 1);
+  controller._reopenListener();
+  await waitFor(() => geometryRef.setCalls.length >= 2);
+  assert.equal(geometryRef.setCalls.length, 2);
 });
 
 test("reopen re-syncs the listener", () => {
@@ -1214,6 +1251,8 @@ test("loadConfig overlay defaults", () => {
   assert.equal(config.overlayEnabled, true);
   assert.equal(config.overlayPath, "states/vikuti/perimeter/overlay");
   assert.equal(config.overlayStatusPath, "perimeter/vikuti/overlayStatus");
+  assert.equal(config.overlayGeometryPath, "perimeter/vikuti/overlayGeometry");
+  assert.equal(config.overlayBucket, "vikes-match-clock-firebase.appspot.com");
   assert.equal(config.overlaySshHost, "10.182.45.53");
   assert.equal(config.overlaySshUser, "user");
   assert.equal(config.overlaySshKey, "/etc/perimeter-control/overlay-ssh-key");
@@ -1244,6 +1283,8 @@ test("loadConfig overlay override", () => {
     PERIMETER_OVERLAY_ENABLED: "false",
     PERIMETER_OVERLAY_PATH: "states/foo/perimeter/overlay",
     PERIMETER_OVERLAY_STATUS_PATH: "perimeter/foo/overlayStatus",
+    PERIMETER_OVERLAY_GEOMETRY_PATH: "perimeter/foo/overlayGeometry",
+    PERIMETER_OVERLAY_BUCKET: "vikes-match-clock-staging.appspot.com",
     PERIMETER_OVERLAY_SSH_HOST: "10.0.0.1",
     PERIMETER_OVERLAY_SSH_USER: "resolume",
     PERIMETER_OVERLAY_SSH_KEY: "/tmp/key",
@@ -1255,6 +1296,8 @@ test("loadConfig overlay override", () => {
   assert.equal(config.overlayEnabled, false);
   assert.equal(config.overlayPath, "states/foo/perimeter/overlay");
   assert.equal(config.overlayStatusPath, "perimeter/foo/overlayStatus");
+  assert.equal(config.overlayGeometryPath, "perimeter/foo/overlayGeometry");
+  assert.equal(config.overlayBucket, "vikes-match-clock-staging.appspot.com");
   assert.equal(config.overlaySshHost, "10.0.0.1");
   assert.equal(config.overlaySshUser, "resolume");
   assert.equal(config.overlaySshKey, "/tmp/key");
@@ -1262,6 +1305,16 @@ test("loadConfig overlay override", () => {
   assert.equal(config.overlayCacheDir, "/tmp/cache");
   assert.deepEqual(config.overlayLayerIds, ["40"]);
   assert.deepEqual(config.overlayLayerClipColumns, { 40: 3 });
+});
+
+test("loadConfig overlay geometry path is location-aware for a non-vikuti venue", () => {
+  const config = loadConfig({
+    PERIMETER_OVERLAY_GEOMETRY_PATH: "perimeter/hasteinsvollur/overlayGeometry",
+  });
+  assert.equal(
+    config.overlayGeometryPath,
+    "perimeter/hasteinsvollur/overlayGeometry",
+  );
 });
 
 test("loadConfig overlay invalid layer-clip JSON falls back to default", () => {
@@ -1360,20 +1413,20 @@ test("overlay: attach with overlay enabled creates overlay refs", () => {
   });
   const db = new FakeDb();
   controller.attach(db);
-  // 2 base refs + 2 overlay refs = 4
-  assert.equal(db.refs.length, 4);
-  assert.equal(db.refs[2].path, controller.config.overlayPath);
-  assert.equal(db.refs[2].handlers.has("value"), true);
-  assert.equal(db.refs[3].path, controller.config.overlayStatusPath);
+  // 3 base refs (state, preview, geometry) + 2 overlay refs = 5
+  assert.equal(db.refs.length, 5);
+  assert.equal(db.refs[3].path, controller.config.overlayPath);
+  assert.equal(db.refs[3].handlers.has("value"), true);
+  assert.equal(db.refs[4].path, controller.config.overlayStatusPath);
 });
 
 test("overlay: shutdown cleans up overlay", () => {
   const controller = makeController({ PERIMETER_OVERLAY_ENABLED: "true" });
   const db = new FakeDb();
   controller.attach(db);
-  assert.equal(db.refs[2].offCalls, 0);
+  assert.equal(db.refs[3].offCalls, 0);
   controller.shutdown();
-  assert.equal(db.refs[2].offCalls, 1);
+  assert.equal(db.refs[3].offCalls, 1);
   assert.equal(controller._overlayController._stopping, true);
 });
 
@@ -2535,6 +2588,33 @@ test("validateOverlayDoc rejects a wrong bucket", () => {
   const result = validateOverlayDoc(doc, ["2", "4"], {
     location: "vikuti",
     targetFolders: TARGET_FOLDERS,
+  });
+  assert.equal(result.valid, false);
+});
+
+test("validateOverlayDoc accepts sources from a configured bucket", () => {
+  const doc = pairOverlayDoc(
+    `gs://vikes-match-clock-staging.appspot.com/vikuti/perimeter-overlays/${PAIR_ID}/48/48-1-a.mp4`,
+    `gs://vikes-match-clock-staging.appspot.com/vikuti/perimeter-overlays/${PAIR_ID}/40/40-1-b.png`,
+  );
+  const result = validateOverlayDoc(doc, ["2", "4"], {
+    location: "vikuti",
+    targetFolders: TARGET_FOLDERS,
+    bucket: "vikes-match-clock-staging.appspot.com",
+  });
+  assert.equal(result.valid, true);
+});
+
+test("validateOverlayDoc rejects a cross-environment bucket under a configured bucket", () => {
+  // The daemon is configured for staging, so production sources are rejected.
+  const doc = pairOverlayDoc(
+    `gs://${BUCKET}/vikuti/perimeter-overlays/${PAIR_ID}/48/48-1-a.mp4`,
+    `gs://${BUCKET}/vikuti/perimeter-overlays/${PAIR_ID}/40/40-1-b.png`,
+  );
+  const result = validateOverlayDoc(doc, ["2", "4"], {
+    location: "vikuti",
+    targetFolders: TARGET_FOLDERS,
+    bucket: "vikes-match-clock-staging.appspot.com",
   });
   assert.equal(result.valid, false);
 });

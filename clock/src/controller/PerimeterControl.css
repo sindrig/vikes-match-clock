@@ -577,3 +577,115 @@
 .perimeter-preview-modal .phase-failed::before {
   background: #ef5350;
 }
+
+/* ── Goal scorer preparation status ── */
+
+.perimeter-preview-modal .goal-scorer-preparation {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  background: #fafafa;
+  margin-bottom: 12px;
+}
+
+.perimeter-preview-modal .goal-scorer-preparation-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.perimeter-preview-modal .goal-scorer-preparation-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 12px;
+  color: #555;
+}
+
+.perimeter-preview-modal .goal-scorer-player-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.perimeter-preview-modal .goal-scorer-player {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 13px;
+  background: #fff;
+  border: 1px solid #eee;
+}
+
+.perimeter-preview-modal .goal-scorer-player-identity {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.perimeter-preview-modal .goal-scorer-player-number {
+  flex: 0 0 28px;
+  font-weight: 700;
+  color: #444;
+  text-align: center;
+}
+
+.perimeter-preview-modal .goal-scorer-player-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.perimeter-preview-modal .goal-scorer-player-status {
+  flex: 0 0 auto;
+  font-size: 12px;
+  color: #444;
+}
+
+.perimeter-preview-modal .goal-scorer-player-error {
+  flex: 0 0 auto;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: #d9534f;
+}
+
+.perimeter-preview-modal .goal-scorer-status-ready {
+  border-left: 3px solid #52c41a;
+}
+
+.perimeter-preview-modal .goal-scorer-status-fallback {
+  border-left: 3px solid #faad14;
+}
+
+.perimeter-preview-modal .goal-scorer-status-failed {
+  border-left: 3px solid #d9534f;
+}
+
+.perimeter-preview-modal .goal-scorer-status-unavailable {
+  border-left: 3px solid #aaa;
+  color: #888;
+}
+
+.perimeter-preview-modal .goal-scorer-status-preparing {
+  border-left: 3px solid #1675e0;
+}
+
+.perimeter-preview-modal .goal-scorer-preparation-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
