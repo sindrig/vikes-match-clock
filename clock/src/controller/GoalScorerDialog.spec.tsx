@@ -4,6 +4,7 @@ import GoalScorerDialog from "./GoalScorerDialog";
 import { useController, usePerimeter } from "../contexts/FirebaseStateContext";
 import { useRemoteSettings } from "../contexts/LocalStateContext";
 import { getPlayerAssetObject } from "./asset/team/assetHelpers";
+import { preloadMedia } from "../utils/matchUtils";
 
 vi.mock("../contexts/FirebaseStateContext", () => ({
   useController: vi.fn(),
@@ -26,6 +27,7 @@ const mockedUseController = vi.mocked(useController);
 const mockedUsePerimeter = vi.mocked(usePerimeter);
 const mockedUseRemoteSettings = vi.mocked(useRemoteSettings);
 const mockedGetPlayerAssetObject = vi.mocked(getPlayerAssetObject);
+const mockedPreloadMedia = vi.mocked(preloadMedia);
 
 const renderAsset = vi.fn();
 const setPerimeterOverlay = vi.fn();
@@ -134,6 +136,24 @@ describe("GoalScorerDialog", () => {
       ),
     );
     expect(renderAsset).toHaveBeenCalled();
+  });
+
+  it("does not wait for the goal background before rendering the player", async () => {
+    let resolveBackground: (() => void) | undefined;
+    mockedPreloadMedia.mockReturnValue(
+      new Promise<void>((resolve) => {
+        resolveBackground = resolve;
+      }),
+    );
+    renderDialog({ goalGif2: "https://example.com/goal.mp4" });
+
+    fireEvent.click(screen.getByText("Jón"));
+
+    await waitFor(() => expect(renderAsset).toHaveBeenCalled());
+    expect(mockedPreloadMedia).toHaveBeenCalledWith(
+      "https://example.com/goal.mp4",
+    );
+    resolveBackground?.();
   });
 
   it("uses the crest fallback pair when the player's media is fallback", async () => {

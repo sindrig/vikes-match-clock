@@ -38,42 +38,41 @@ const GoalScorerDialog = ({
 
   const selectPlayer = useCallback(
     (player: Player) => {
-      // Retain the main-screen player reveal (existing behavior).
-      const bgReady = goalGif2 ? preloadMedia(goalGif2) : Promise.resolve();
-      void Promise.all([
-        getPlayerAssetObject({
-          player,
-          teamName,
-          preferExt: "fagn",
-          listenPrefix,
-        }),
-        bgReady,
-      ]).then(([asset]) => {
+      // Warm the goal background without making its load time delay the live
+      // player reveal. Large videos can take several seconds to buffer.
+      if (goalGif2) void preloadMedia(goalGif2);
+
+      const result =
+        player.id !== undefined && player.id !== null
+          ? goalScorerPreparationStatus?.players[String(player.id)]
+          : undefined;
+      const perimeterFiles =
+        result &&
+        (result.status === "ready" || result.status === "fallback") &&
+        result.files?.["2"] &&
+        result.files["4"]
+          ? result.files
+          : undefined;
+
+      void getPlayerAssetObject({
+        player,
+        teamName,
+        preferExt: "fagn",
+        listenPrefix,
+      }).then((asset) => {
         if (asset) {
           const goalAsset = goalGif2
             ? { ...asset, background: goalGif2, isGoalCelebration: true }
             : { ...asset, isGoalCelebration: true };
           renderAsset(goalAsset);
         }
-      });
 
-      // Replace the generic perimeter overlay ONLY when the selected player's
-      // current preparation result supplies a ready or fallback target pair.
-      // When media is preparing, unavailable, or failed the generic overlay
-      // stays active (the operator sees the readiness in the dialog and the
-      // perimeter status view).
-      const result =
-        player.id !== undefined && player.id !== null
-          ? goalScorerPreparationStatus?.players[String(player.id)]
-          : undefined;
-      if (
-        result &&
-        (result.status === "ready" || result.status === "fallback") &&
-        result.files?.["2"] &&
-        result.files["4"]
-      ) {
-        setPerimeterOverlay(buildScorerOverlay(result.files));
-      }
+        // Submit the main-screen command before the perimeter command, so the
+        // large display does not trail the LED overlay.
+        if (perimeterFiles) {
+          setPerimeterOverlay(buildScorerOverlay(perimeterFiles));
+        }
+      });
 
       onClose();
     },
