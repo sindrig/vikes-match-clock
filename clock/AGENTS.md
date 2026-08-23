@@ -948,8 +948,10 @@ The old "Birta strax" / "Setja í biðröð" radio buttons in MediaManager were 
 
 #### Media Library Layout
 
-`MediaManager` is a full-width flex row and `controller/media/ImageList.css`
-stretches its grid across that row (up to five 170px-wide cards).
+`MediaManager` is a full-width flex row and `.controller .image-list` uses a
+specificity-matching CSS grid override (up to five 170px-wide cards). This is
+required because `.controller .control-item` otherwise forces it into a column
+flex layout.
 Media cards use 132px-high `object-fit: contain` thumbnails and truncate long
 filenames, so original upload dimensions cannot expand the controller view.
 
