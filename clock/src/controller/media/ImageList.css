@@ -1,5 +1,6 @@
 .asset-image {
   min-width: 0;
+  max-width: 100%;
   padding: 8px;
   cursor: pointer;
 }
@@ -24,6 +25,8 @@
 }
 
 .asset-folder {
+  min-width: 0;
+  max-width: 100%;
   padding: 10px;
   cursor: pointer;
 }
@@ -31,7 +34,7 @@
   padding-left: 5px;
 }
 
-.controller .image-list {
+.controller .control-item.image-list {
   box-sizing: border-box;
   align-self: stretch;
   width: 100%;

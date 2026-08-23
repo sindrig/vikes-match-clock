@@ -4,7 +4,9 @@
     "playwright": {
       "type": "local",
       "command": [
-        "playwright-mcp",
+        "npx",
+        "-y",
+        "@playwright/mcp",
         "--headless",
         "--browser",
         "chromium",
