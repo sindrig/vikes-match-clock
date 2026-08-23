@@ -518,6 +518,7 @@ export interface GoalScorerPreparationPlayerResult {
 // Storage listings.
 export interface GoalScorerPreparationStatus {
   jobId: string;
+  rosterSignature?: string;
   phase: GoalScorerPreparationPhase;
   readyCount: number;
   fallbackCount: number;

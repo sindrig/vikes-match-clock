@@ -105,6 +105,17 @@ function parsePlayers(value: unknown): PreparationPlayer[] {
   return players;
 }
 
+function rosterSignature(players: PreparationPlayer[]): string {
+  return JSON.stringify(
+    players
+      .filter((player) => player.id && player.number !== undefined)
+      .map(
+        (player) =>
+          `${player.id}:${player.name}:${String(player.number)}`,
+      ),
+  );
+}
+
 export function sanitizeFilename(value: string): string {
   const cleaned = value.replace(UNSAFE_FILENAME_RE, "_").trim();
   return cleaned.length > 0 ? cleaned : "player";
@@ -409,6 +420,7 @@ async function isCurrentJob(location: string, jobId: string): Promise<boolean> {
 async function publishStatus(
   location: string,
   jobId: string,
+  requestRosterSignature: string,
   phase: "preparing" | "ready" | "failed",
   players: Record<string, PlayerResult>,
   total: number,
@@ -418,6 +430,7 @@ async function publishStatus(
   const { counts } = summarize(players, total);
   await db.ref(statusPath(location)).set({
     jobId,
+    rosterSignature: requestRosterSignature,
     phase,
     readyCount: counts.ready,
     fallbackCount: counts.fallback,
@@ -445,6 +458,7 @@ const handlePrepareGoalScorerMedia = onCall(async (request) => {
   const location = assertLocation(data.location);
   const jobId = assertJobId(data.jobId);
   const players = parsePlayers(data.players);
+  const requestRosterSignature = rosterSignature(players);
 
   await assertLocationAccess(callerUid, location);
   await assertCurrentJob(requestPath(location), jobId);
@@ -457,7 +471,15 @@ const handlePrepareGoalScorerMedia = onCall(async (request) => {
     const error =
       "No valid overlay target geometry published; the perimeter daemon " +
       "must be online and configured before media preparation.";
-    await publishStatus(location, jobId, "failed", {}, players.length, error);
+    await publishStatus(
+      location,
+      jobId,
+      requestRosterSignature,
+      "failed",
+      {},
+      players.length,
+      error,
+    );
     return { started: false, reason: "no-geometry" };
   }
 
@@ -484,6 +506,7 @@ const handlePrepareGoalScorerMedia = onCall(async (request) => {
     !(await publishStatus(
       location,
       jobId,
+      requestRosterSignature,
       "preparing",
       playerResults,
       players.length,
@@ -554,6 +577,7 @@ const handlePrepareGoalScorerMedia = onCall(async (request) => {
       !(await publishStatus(
         location,
         jobId,
+        requestRosterSignature,
         "preparing",
         playerResults,
         players.length,
@@ -567,6 +591,7 @@ const handlePrepareGoalScorerMedia = onCall(async (request) => {
   await publishStatus(
     location,
     jobId,
+    requestRosterSignature,
     "ready",
     playerResults,
     players.length,

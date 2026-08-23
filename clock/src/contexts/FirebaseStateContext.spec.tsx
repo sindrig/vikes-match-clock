@@ -101,7 +101,6 @@ const TestPerimeterConsumer = ({
 describe("FirebaseStateContext", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-
     vi.mocked(ref).mockImplementation((_, path) => path as never);
 
     vi.mocked(onValue).mockImplementation((reference, callback) => {
@@ -2909,6 +2908,7 @@ describe("FirebaseStateContext", () => {
 describe("goal scorer preparation", () => {
   const statusDoc = {
     jobId: "job-1",
+    rosterSignature: '["10:Jón:7"]',
     phase: "ready",
     readyCount: 1,
     fallbackCount: 0,
@@ -2964,6 +2964,7 @@ describe("goal scorer preparation", () => {
       isAuthenticated = true,
       geometry = geometryDoc,
     } = options;
+    let perimeterApi: ReturnType<typeof usePerimeter> | null = null;
     vi.mocked(onValue).mockImplementation((reference, callback) => {
       const path = String(reference);
       if (path.endsWith("/goalScorerPreparation")) {
@@ -2976,7 +2977,6 @@ describe("goal scorer preparation", () => {
       return vi.fn();
     });
 
-    let perimeterApi: ReturnType<typeof usePerimeter> | null = null;
     render(
       <FirebaseStateProvider
         listenPrefix={listenPrefix}

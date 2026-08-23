@@ -39,6 +39,7 @@ import {
   PerimeterOverlayGeometry,
   GoalScorerPreparationStatus,
   GoalScorerPreparationRequest,
+  GoalScorerPreparationRequestPlayer,
 } from "../types";
 import {
   firebaseDatabase,
@@ -293,7 +294,7 @@ interface FirebaseStateContextType {
   setPerimeterBrightness: (percent: number) => Promise<void>;
   overlayGeometry: PerimeterOverlayGeometry | null;
   goalScorerPreparationStatus: GoalScorerPreparationStatus | null;
-  requestGoalScorerPreparation: () => Promise<void>;
+  requestGoalScorerPreparation: (force?: boolean) => Promise<void>;
 }
 
 const FirebaseStateContext = createContext<FirebaseStateContextType | null>(
@@ -424,7 +425,7 @@ export function maybeAutoDeleteQueue(
 export function computeEligibleRosterSignature(
   home: Player[] | undefined,
 ): string {
-  const entries = (home ?? [])
+  const players = (home ?? [])
     .filter(
       (p) =>
         p.id !== undefined &&
@@ -433,7 +434,20 @@ export function computeEligibleRosterSignature(
         p.number !== undefined &&
         p.number !== null,
     )
-    .map((p) => `${String(p.id)}:${p.name ?? ""}:${String(p.number)}`);
+    .map((p) => ({
+      id: String(p.id),
+      name: p.name ?? "",
+      number: p.number,
+    }));
+  return computeGoalScorerPreparationSignature(players);
+}
+
+function computeGoalScorerPreparationSignature(
+  players: GoalScorerPreparationRequestPlayer[],
+): string {
+  const entries = players.map(
+    (player) => `${player.id}:${player.name}:${String(player.number)}`,
+  );
   return entries.length > 0 ? JSON.stringify(entries) : "";
 }
 
@@ -492,6 +506,10 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     useState<PerimeterOverlayGeometry | null>(null);
   const [goalScorerPreparationStatus, setGoalScorerPreparationStatus] =
     useState<GoalScorerPreparationStatus | null>(null);
+  const [
+    goalScorerPreparationStatusLoaded,
+    setGoalScorerPreparationStatusLoaded,
+  ] = useState(false);
   const [ready, setReady] = useState(!listenPrefix);
 
   const matchRef = useRef(match);
@@ -515,6 +533,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     setPerimeterAppliedAdLayoutError(null);
     setOverlayGeometry(null);
     setGoalScorerPreparationStatus(null);
+    setGoalScorerPreparationStatusLoaded(false);
   }
 
   useEffect(() => {
@@ -855,6 +874,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
               bucket: FIREBASE_STORAGE_BUCKET,
             }),
           );
+          setGoalScorerPreparationStatusLoaded(true);
         },
         (error) =>
           console.error(
@@ -2103,6 +2123,8 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     () => overlayGeometry !== null,
     [overlayGeometry],
   );
+  const hasPreparedEligibleRoster =
+    goalScorerPreparationStatus?.rosterSignature === eligibleRosterSignature;
   useEffect(() => {
     // Preparation needs a venue that has opted into the perimeter AND a
     // daemon that has published overlay geometry; a venue without either
@@ -2112,17 +2134,27 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       !isAuthenticated ||
       !perimeter.enabled ||
       !hasOverlayGeometry ||
+      !goalScorerPreparationStatusLoaded ||
+      hasPreparedEligibleRoster ||
       eligibleRosterSignature.length === 0
     ) {
       return;
     }
-    void requestGoalScorerPreparation();
+    // The perimeter subscription can make the provider ready just before the
+    // goal-scorer status update reaches React. Deferring one turn lets that
+    // status cancel this request when the roster is already prepared.
+    const timeout = window.setTimeout(() => {
+      void requestGoalScorerPreparation();
+    }, 0);
+    return () => window.clearTimeout(timeout);
   }, [
     eligibleRosterSignature,
     ready,
     isAuthenticated,
     perimeter.enabled,
     hasOverlayGeometry,
+    goalScorerPreparationStatusLoaded,
+    hasPreparedEligibleRoster,
     requestGoalScorerPreparation,
   ]);
 

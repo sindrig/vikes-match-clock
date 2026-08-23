@@ -1198,6 +1198,8 @@ export function parseGoalScorerPreparationStatus(
 
   const jobId = typeof raw.jobId === "string" ? raw.jobId : "";
   if (!jobId) return null;
+  const rosterSignature =
+    typeof raw.rosterSignature === "string" ? raw.rosterSignature : undefined;
   const phase = raw.phase as GoalScorerPreparationPhase;
   if (
     typeof phase !== "string" ||
@@ -1223,6 +1225,7 @@ export function parseGoalScorerPreparationStatus(
 
   return {
     jobId,
+    ...(rosterSignature ? { rosterSignature } : {}),
     phase,
     readyCount: positiveCount(raw.readyCount),
     fallbackCount: positiveCount(raw.fallbackCount),

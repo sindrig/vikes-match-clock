@@ -815,7 +815,10 @@ the production bucket.
   reach the endpoint; the inner callable still requires Firebase Auth and
   verifies the caller can access the location.
 - Preparation is requested in the background whenever the home roster gains
-  eligible players (match selection or match-report roster loading). A player
+  eligible players (match selection or match-report roster loading). The
+  controller waits for the service-owned preparation status and skips it when
+  its roster signature is unchanged, so a refresh or scorer selection never
+  starts another job. A player
   is eligible only when they have both a non-empty `id` and a shirt `number`;
   players without a number are skipped because Firebase rejects `undefined`
   values and the rendered band cannot attribute an unnumbered player. The
