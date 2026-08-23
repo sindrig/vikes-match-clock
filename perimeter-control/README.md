@@ -140,6 +140,7 @@ Edit `/etc/perimeter-control/perimeter-control.env`:
 | `PERIMETER_THUMBNAIL_QUALITY`        | `0.7`                                                   | JPEG quality (0.1–1.0) for thumbnails                             |
 | `PERIMETER_THUMBNAIL_MAX_BYTES`      | `100000`                                                | Per-thumbnail cap in published data-URL chars (larger is omitted) |
 | `PERIMETER_PREVIEW_MAX_BYTES`        | `8000000`                                               | Whole-snapshot byte cap (larger is rejected)                      |
+| `PERIMETER_OVERLAY_GEOMETRY_PATH`    | `perimeter/vikuti/overlayGeometry`                      | Path of the published overlay target geometry                     |
 
 After changing the environment file:
 
@@ -214,6 +215,34 @@ is:
   the writable `states/` subtree, and is denied to clients by the database
   rules (see `firebase-rules.json`). The service account writes it through the
   Admin SDK.
+
+## Overlay target geometry
+
+The daemon publishes the configured overlay target geometry to
+`PERIMETER_OVERLAY_GEOMETRY_PATH` (`perimeter/vikuti/overlayGeometry`) so a
+media renderer can produce output that matches the configured Resolume layout
+instead of duplicating frontend dimensions.
+
+```json
+{
+  "revision": "<sha256 of layerIds+targetFolders+canvases>",
+  "updatedAt": 1723392000000,
+  "targets": [
+    { "layerId": "2", "label": "48 skjáir", "targetFolder": "48", "width": 4608, "height": 192 },
+    { "layerId": "4", "label": "40 skjáir", "targetFolder": "40", "width": 3840, "height": 192 }
+  ]
+}
+```
+
+- Geometry is derived by `geometry.js` from `PERIMETER_OVERLAY_LAYER_IDS`,
+  `PERIMETER_OVERLAY_LAYER_TARGET_FOLDERS`, and `PERIMETER_CLIP_CANVASES`.
+- Only layers with both a valid native canvas (`WxH`) and a configured target
+  folder are published. `revision` is a hash of the whole configuration, so any
+  Resolume layout change produces a new revision that a renderer can key its
+  output to.
+- The geometry is published once at startup and re-published on the listener
+  refresh as a safety net. It lives under `perimeter/{location}` and is
+  read-only to clients.
 
 ## Behavior on failure
 

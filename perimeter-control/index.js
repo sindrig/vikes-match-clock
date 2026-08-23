@@ -38,6 +38,7 @@ import { fileURLToPath } from "node:url";
 import { cert, initializeApp } from "firebase-admin/app";
 import { getDatabase, ServerValue } from "firebase-admin/database";
 import { ResolumeCompositionReader } from "./resolume-preview.js";
+import { buildOverlayGeometry } from "./geometry.js";
 import { OverlayController } from "./overlay.js";
 import { AdLayoutController } from "./ad-layout.js";
 import { ResolumeImportController } from "./resolume-import.js";
@@ -65,6 +66,10 @@ const DEFAULT_PREVIEW_MAX_BYTES = 8_000_000;
 // Overlay defaults
 const DEFAULT_OVERLAY_BASE_PATH = "states/vikuti/perimeter/overlay";
 const DEFAULT_OVERLAY_STATUS_PATH = "perimeter/vikuti/overlayStatus";
+// Daemon-owned overlay target geometry (read-only for clients). The
+// preparation function reads the published targets to render media that
+// matches the configured Resolume layout.
+const DEFAULT_OVERLAY_GEOMETRY_PATH = "perimeter/vikuti/overlayGeometry";
 const DEFAULT_OVERLAY_SSH_HOST = "10.182.45.53";
 const DEFAULT_OVERLAY_SSH_USER = "user";
 const DEFAULT_OVERLAY_SSH_KEY = "/etc/perimeter-control/overlay-ssh-key";
@@ -320,6 +325,8 @@ export function loadConfig(environ = process.env) {
     overlayPath: environ.PERIMETER_OVERLAY_PATH ?? DEFAULT_OVERLAY_BASE_PATH,
     overlayStatusPath:
       environ.PERIMETER_OVERLAY_STATUS_PATH ?? DEFAULT_OVERLAY_STATUS_PATH,
+    overlayGeometryPath:
+      environ.PERIMETER_OVERLAY_GEOMETRY_PATH ?? DEFAULT_OVERLAY_GEOMETRY_PATH,
     overlayProjectId:
       environ.PERIMETER_OVERLAY_GCP_PROJECT ?? "vikes-match-clock-firebase",
     overlayCacheDir:
@@ -544,6 +551,7 @@ export class PerimeterController {
     this._notifier = new Notifier();
     this._ref = null;
     this._previewRef = null;
+    this._geometryRef = null;
     this._refreshTimer = null;
     this._overlayController = null;
     if (config.overlayEnabled) {
@@ -598,10 +606,17 @@ export class PerimeterController {
     this._ref = db.ref(this.config.path);
     this._ref.on("value", this._handleSnapshot);
     this._previewRef = db.ref(this.config.previewPath);
+    this._geometryRef = db.ref(this.config.overlayGeometryPath);
     console.log(`Listening on Firebase path: ${this.config.path}`);
     console.log(
       `Publishing preview to Firebase path: ${this.config.previewPath}`,
     );
+    console.log(
+      `Publishing overlay geometry to Firebase path: ${this.config.overlayGeometryPath}`,
+    );
+    // Publish the overlay target geometry once at startup (the configuration
+    // is static for the lifetime of the process).
+    void this.publishGeometry();
     if (this._overlayController) {
       this._overlayController.attach(db);
       console.log(`Overlay control listening on: ${this.config.overlayPath}`);
@@ -637,6 +652,9 @@ export class PerimeterController {
     if (this._brightnessController) {
       void this._brightnessController.republishStatus();
     }
+    // Re-publish the overlay geometry as a safety net (same rationale as the
+    // ad-layout status re-publish above).
+    void this.publishGeometry();
     console.log("Refreshed Firebase listener");
   }
 
@@ -854,6 +872,27 @@ export class PerimeterController {
   // Publish the snapshot once at startup, without blocking the daemon.
   startPreview() {
     void this.refreshPreview();
+  }
+
+  // Publish the daemon-owned overlay target geometry to
+  // `perimeter/{location}/overlayGeometry`. The geometry is derived from the
+  // static daemon configuration; a write lost right after startup is
+  // re-published on the listener refresh as a safety net. Never throws.
+  async publishGeometry() {
+    if (!this._geometryRef) return;
+    try {
+      const geometry = buildOverlayGeometry(this.config);
+      await this._geometryRef.set({
+        revision: geometry.revision,
+        updatedAt: ServerValue.TIMESTAMP,
+        targets: geometry.targets,
+      });
+      console.log(
+        `Published overlay geometry (${geometry.targets.length} targets, revision ${geometry.revision})`,
+      );
+    } catch (err) {
+      console.error(`Failed to publish overlay geometry: ${err.message}`);
+    }
   }
 
   // -- refresh ----------------------------------------------------------------

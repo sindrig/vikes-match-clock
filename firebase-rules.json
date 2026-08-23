@@ -24,7 +24,12 @@
     "states": {
       "$location": {
         ".write": "root.child('auth').child(auth.uid).child($location).val() == true",
-        ".read": true
+        ".read": true,
+        "perimeter": {
+          "goalScorerPreparation": {
+            ".validate": "newData.val() == null || (newData.hasChildren(['jobId', 'players']) && newData.child('jobId').isString() && newData.child('players').isObject())"
+          }
+        }
       }
     },
     "audit": {

@@ -9,13 +9,14 @@ import {
   within,
 } from "@testing-library/react";
 import PerimeterControl from "./PerimeterControl";
-import { usePerimeter } from "../contexts/FirebaseStateContext";
+import { usePerimeter, useController } from "../contexts/FirebaseStateContext";
 import { useLocalState } from "../contexts/LocalStateContext";
 import { closestCenter } from "@dnd-kit/core";
 import type { CollisionDetection, DragEndEvent } from "@dnd-kit/core";
 
 vi.mock("../contexts/FirebaseStateContext", () => ({
   usePerimeter: vi.fn(),
+  useController: vi.fn(),
 }));
 
 vi.mock("../contexts/LocalStateContext", () => ({
@@ -51,6 +52,7 @@ vi.mock("@dnd-kit/core", async (importOriginal) => {
 
 const mockedUsePerimeter = vi.mocked(usePerimeter);
 const mockedUseLocalState = vi.mocked(useLocalState);
+const mockedUseController = vi.mocked(useController);
 
 const basePreview = {
   updatedAt: Date.now(),
@@ -131,6 +133,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockedUsePerimeter.mockReturnValue(createMockPerimeterReturn());
   mockedUseLocalState.mockReturnValue(createMockLocalState());
+  mockedUseController.mockReturnValue({
+    controller: { roster: { home: [], away: [] } },
+  } as unknown as ReturnType<typeof useController>);
 });
 
 describe("PerimeterControl", () => {

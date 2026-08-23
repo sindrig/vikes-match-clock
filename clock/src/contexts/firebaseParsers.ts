@@ -30,6 +30,12 @@ import type {
   AuditStateArea,
   PerimeterBrightnessStatus,
   PerimeterBrightnessPhase,
+  PerimeterOverlayTarget,
+  PerimeterOverlayGeometry,
+  GoalScorerPreparationStatus,
+  GoalScorerPreparationPhase,
+  GoalScorerPlayerStatus,
+  GoalScorerPreparationPlayerResult,
 } from "../types";
 import { Sports, DEFAULT_THEME } from "../constants";
 
@@ -1070,5 +1076,161 @@ export function parsePerimeterBrightnessStatus(
     phase,
     error,
     updatedAt,
+  };
+}
+
+// -- Perimeter overlay target geometry ---------------------------------------
+
+// Strict parse of the daemon-published overlay target geometry at
+// `perimeter/{location}/overlayGeometry`. A missing revision, a non-numeric
+// updatedAt, or a non-array targets list rejects the whole document (null).
+// Individual malformed targets are dropped so a single bad layer never voids
+// the geometry of the others; the daemon only publishes fully validated
+// targets, so an empty targets list means no usable overlay targets.
+export function parsePerimeterOverlayGeometry(
+  data: unknown,
+): PerimeterOverlayGeometry | null {
+  if (!data || typeof data !== "object") return null;
+  const raw = data as Record<string, unknown>;
+
+  const revision = typeof raw.revision === "string" ? raw.revision : "";
+  if (!revision) return null;
+  const updatedAt = typeof raw.updatedAt === "number" ? raw.updatedAt : null;
+  if (updatedAt === null) return null;
+  if (!Array.isArray(raw.targets)) return null;
+
+  const targets: PerimeterOverlayTarget[] = [];
+  for (const entry of raw.targets) {
+    if (!entry || typeof entry !== "object") continue;
+    const target = entry as Record<string, unknown>;
+    const layerId = typeof target.layerId === "string" ? target.layerId : "";
+    const label = typeof target.label === "string" ? target.label : "";
+    const targetFolder =
+      typeof target.targetFolder === "string" ? target.targetFolder : "";
+    const width =
+      typeof target.width === "number" && Number.isInteger(target.width)
+        ? target.width
+        : 0;
+    const height =
+      typeof target.height === "number" && Number.isInteger(target.height)
+        ? target.height
+        : 0;
+    if (!layerId || !label || !targetFolder || width <= 0 || height <= 0) {
+      continue;
+    }
+    targets.push({ layerId, label, targetFolder, width, height });
+  }
+
+  return { revision, updatedAt, targets };
+}
+
+// -- Goal-scorer perimeter media preparation ---------------------------------
+
+const VALID_GOAL_SCORER_PREPARATION_PHASES: GoalScorerPreparationPhase[] = [
+  "preparing",
+  "ready",
+  "failed",
+];
+const VALID_GOAL_SCORER_PLAYER_STATUSES: GoalScorerPlayerStatus[] = [
+  "preparing",
+  "ready",
+  "fallback",
+  "unavailable",
+  "failed",
+];
+
+function positiveCount(value: unknown): number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0
+    ? value
+    : 0;
+}
+
+function parseGoalScorerPlayerResult(
+  data: unknown,
+  options?: { location?: string; bucket?: string },
+): GoalScorerPreparationPlayerResult | undefined {
+  if (!data || typeof data !== "object") return undefined;
+  const raw = data as Record<string, unknown>;
+  const status = raw.status as GoalScorerPlayerStatus;
+  if (
+    typeof status !== "string" ||
+    !VALID_GOAL_SCORER_PLAYER_STATUSES.includes(status)
+  ) {
+    return undefined;
+  }
+  const error = typeof raw.error === "string" ? raw.error : null;
+
+  let files: Record<string, PerimeterOverlayFile> | undefined;
+  if (raw.files !== null && raw.files !== undefined) {
+    if (typeof raw.files !== "object") return undefined;
+    const filesRaw = raw.files as Record<string, unknown>;
+    const parsedFiles: Record<string, PerimeterOverlayFile> = {};
+    for (const [key, value] of Object.entries(filesRaw)) {
+      const parsed = parseOverlayFile(value, options);
+      if (!parsed) return undefined;
+      parsedFiles[key] = parsed;
+    }
+    if (Object.keys(parsedFiles).length > 0) files = parsedFiles;
+  }
+
+  // A ready/fallback result must carry usable media sources.
+  if (
+    (status === "ready" || status === "fallback") &&
+    (files === undefined || Object.keys(files).length === 0)
+  ) {
+    return undefined;
+  }
+
+  return { status, error, files };
+}
+
+// Strict parse of the daemon-owned preparation status at
+// `perimeter/{location}/goalScorerPreparation`. Malformed per-player entries
+// are dropped so one bad player never voids the whole status; a malformed
+// top-level shape (missing jobId, unknown phase, non-numeric updatedAt)
+// rejects the document (null).
+export function parseGoalScorerPreparationStatus(
+  data: unknown,
+  options?: { location?: string; bucket?: string },
+): GoalScorerPreparationStatus | null {
+  if (!data || typeof data !== "object") return null;
+  const raw = data as Record<string, unknown>;
+
+  const jobId = typeof raw.jobId === "string" ? raw.jobId : "";
+  if (!jobId) return null;
+  const phase = raw.phase as GoalScorerPreparationPhase;
+  if (
+    typeof phase !== "string" ||
+    !VALID_GOAL_SCORER_PREPARATION_PHASES.includes(phase)
+  ) {
+    return null;
+  }
+  const updatedAt = typeof raw.updatedAt === "number" ? raw.updatedAt : null;
+  if (updatedAt === null) return null;
+  const error = typeof raw.error === "string" ? raw.error : null;
+
+  const players: Record<string, GoalScorerPreparationPlayerResult> = {};
+  const playersRaw = raw.players;
+  if (playersRaw && typeof playersRaw === "object") {
+    for (const [playerId, value] of Object.entries(
+      playersRaw as Record<string, unknown>,
+    )) {
+      if (!playerId) continue;
+      const parsed = parseGoalScorerPlayerResult(value, options);
+      if (parsed) players[playerId] = parsed;
+    }
+  }
+
+  return {
+    jobId,
+    phase,
+    readyCount: positiveCount(raw.readyCount),
+    fallbackCount: positiveCount(raw.fallbackCount),
+    unavailableCount: positiveCount(raw.unavailableCount),
+    failedCount: positiveCount(raw.failedCount),
+    total: positiveCount(raw.total),
+    updatedAt,
+    error,
+    players,
   };
 }

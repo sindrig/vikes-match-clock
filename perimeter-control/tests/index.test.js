@@ -436,11 +436,48 @@ test("attach listens on the configured path and sets up the preview ref", () => 
   });
   const db = new FakeDb();
   controller.attach(db);
-  assert.equal(db.refs.length, 2);
+  assert.equal(db.refs.length, 3);
   assert.equal(db.refs[0].path, controller.config.path);
   assert.equal(db.refs[0].handlers.has("value"), true);
   assert.equal(db.refs[1].path, controller.config.previewPath);
   assert.equal(db.refs[1].handlers.has("value"), false);
+  assert.equal(db.refs[2].path, controller.config.overlayGeometryPath);
+  assert.equal(db.refs[2].handlers.has("value"), false);
+});
+
+test("attach publishes the overlay geometry to the geometry path", async () => {
+  const controller = makeController({
+    PERIMETER_OVERLAY_ENABLED: "false",
+    PERIMETER_AD_LAYOUT_ENABLED: "false",
+    PERIMETER_IMPORT_ENABLED: "false",
+  });
+  const db = new FakeDb();
+  controller.attach(db);
+  const geometryRef = db.refs[2];
+  await waitFor(() => geometryRef.setCalls.length >= 1);
+  assert.equal(geometryRef.setCalls.length, 1);
+  const published = geometryRef.setCalls[0];
+  assert.equal(published.targets.length, 2);
+  assert.equal(published.targets[0].layerId, "2");
+  assert.equal(published.targets[0].width, 4608);
+  assert.equal(published.targets[1].layerId, "4");
+  assert.equal(published.targets[1].width, 3840);
+  assert.ok(published.revision.length > 0);
+});
+
+test("reopen re-publishes the overlay geometry as a safety net", async () => {
+  const controller = makeController({
+    PERIMETER_OVERLAY_ENABLED: "false",
+    PERIMETER_AD_LAYOUT_ENABLED: "false",
+    PERIMETER_IMPORT_ENABLED: "false",
+  });
+  const db = new FakeDb();
+  controller.attach(db);
+  const geometryRef = db.refs[2];
+  await waitFor(() => geometryRef.setCalls.length >= 1);
+  controller._reopenListener();
+  await waitFor(() => geometryRef.setCalls.length >= 2);
+  assert.equal(geometryRef.setCalls.length, 2);
 });
 
 test("reopen re-syncs the listener", () => {
@@ -1360,20 +1397,20 @@ test("overlay: attach with overlay enabled creates overlay refs", () => {
   });
   const db = new FakeDb();
   controller.attach(db);
-  // 2 base refs + 2 overlay refs = 4
-  assert.equal(db.refs.length, 4);
-  assert.equal(db.refs[2].path, controller.config.overlayPath);
-  assert.equal(db.refs[2].handlers.has("value"), true);
-  assert.equal(db.refs[3].path, controller.config.overlayStatusPath);
+  // 3 base refs (state, preview, geometry) + 2 overlay refs = 5
+  assert.equal(db.refs.length, 5);
+  assert.equal(db.refs[3].path, controller.config.overlayPath);
+  assert.equal(db.refs[3].handlers.has("value"), true);
+  assert.equal(db.refs[4].path, controller.config.overlayStatusPath);
 });
 
 test("overlay: shutdown cleans up overlay", () => {
   const controller = makeController({ PERIMETER_OVERLAY_ENABLED: "true" });
   const db = new FakeDb();
   controller.attach(db);
-  assert.equal(db.refs[2].offCalls, 0);
+  assert.equal(db.refs[3].offCalls, 0);
   controller.shutdown();
-  assert.equal(db.refs[2].offCalls, 1);
+  assert.equal(db.refs[3].offCalls, 1);
   assert.equal(controller._overlayController._stopping, true);
 });
 
