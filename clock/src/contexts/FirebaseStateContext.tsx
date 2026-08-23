@@ -1971,7 +1971,13 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     const players = home
       .filter(
         (p) =>
-          p.id !== undefined && p.id !== null && String(p.id).trim() !== "",
+          p.id !== undefined &&
+          p.id !== null &&
+          String(p.id).trim() !== "" &&
+          // Firebase rejects `undefined` values, so players without a shirt
+          // number cannot be included in the request.
+          p.number !== undefined &&
+          p.number !== null,
       )
       .map((p) => ({
         id: String(p.id),

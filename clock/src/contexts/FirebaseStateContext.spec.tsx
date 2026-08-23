@@ -3086,6 +3086,62 @@ describe("goal scorer preparation", () => {
     );
   });
 
+  it("skips home players without a shirt number when requesting preparation", async () => {
+    vi.mocked(set).mockClear();
+    vi.mocked(onValue).mockImplementation((reference, callback) => {
+      const path = String(reference);
+      if (path.endsWith("/controller")) {
+        callback({
+          val: () => ({
+            queues: {},
+            activeQueueId: null,
+            playing: false,
+            view: "idle",
+            roster: {
+              home: [
+                { id: 10, name: "Jón", number: 7, show: true, role: "FW" },
+                { id: 11, name: "Anna", show: true, role: "MF" },
+              ],
+              away: [],
+            },
+          }),
+        } as never);
+      } else if (path.endsWith("/perimeter")) {
+        callback({ val: () => ({ enabled: true, state: "off" }) } as never);
+      } else if (path.endsWith("/overlayGeometry")) {
+        callback({ val: () => geometryDoc } as never);
+      } else {
+        callback({ val: () => null } as never);
+      }
+      return vi.fn();
+    });
+
+    render(
+      <FirebaseStateProvider
+        listenPrefix="vikuti"
+        isAuthenticated={true}
+        screenKey={null}
+      >
+        <TestControllerConsumer onMount={() => undefined} />
+      </FirebaseStateProvider>,
+    );
+
+    await waitFor(() => {
+      const requestWrite = vi
+        .mocked(set)
+        .mock.calls.find(
+          ([path]) =>
+            String(path) === "states/vikuti/perimeter/goalScorerPreparation",
+        );
+      expect(requestWrite).toBeDefined();
+      const request = requestWrite![1] as {
+        jobId: string;
+        players: Array<{ id: string }>;
+      };
+      expect(request.players).toEqual([{ id: "10", name: "Jón", number: 7 }]);
+    });
+  });
+
   it("does not request preparation when no geometry is published", async () => {
     vi.mocked(set).mockClear();
     vi.mocked(onValue).mockImplementation((reference, callback) => {

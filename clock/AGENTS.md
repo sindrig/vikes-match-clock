@@ -810,10 +810,14 @@ the production bucket.
   exposes them through `usePerimeter()` as `overlayGeometry` and
   `goalScorerPreparationStatus`, plus `requestGoalScorerPreparation()`.
 - Preparation is requested in the background whenever the home roster gains
-  eligible players (match selection or match-report roster loading). The write
-  and the `prepareGoalScorerMedia` callable run fire-and-forget and never block
-  the roster from becoming available. The request is gated on the venue having
-  opted into the perimeter (`states/{location}/perimeter` `enabled: true`) AND
+  eligible players (match selection or match-report roster loading). A player
+  is eligible only when they have both a non-empty `id` and a shirt `number`;
+  players without a number are skipped because Firebase rejects `undefined`
+  values and the rendered band cannot attribute an unnumbered player. The
+  write and the `prepareGoalScorerMedia` callable run fire-and-forget and never
+  block the roster from becoming available. The request is gated on the venue
+  having opted into the perimeter (`states/{location}/perimeter` `enabled: true`)
+  AND
   a daemon having published overlay geometry (`perimeter/{location}/overlayGeometry`
   present) — a venue without either would only produce a job that must fail, so
   no request is issued for it. The explicit "Endurtaka undirbúning" retry below
