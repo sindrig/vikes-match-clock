@@ -64,7 +64,7 @@ const GoalScorerPreparation = () => {
 
   const handleRetry = useCallback(() => {
     setRequesting(true);
-    requestGoalScorerPreparation()
+    requestGoalScorerPreparation(true)
       .catch(() => undefined)
       .finally(() => setRequesting(false));
   }, [requestGoalScorerPreparation]);

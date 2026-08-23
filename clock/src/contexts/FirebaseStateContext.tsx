@@ -507,8 +507,12 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   const [goalScorerPreparationStatus, setGoalScorerPreparationStatus] =
     useState<GoalScorerPreparationStatus | null>(null);
   const [
-    goalScorerPreparationStatusLoaded,
-    setGoalScorerPreparationStatusLoaded,
+    goalScorerPreparationRequestSignature,
+    setGoalScorerPreparationRequestSignature,
+  ] = useState<string | null>(null);
+  const [
+    goalScorerPreparationRequestLoaded,
+    setGoalScorerPreparationRequestLoaded,
   ] = useState(false);
   const [ready, setReady] = useState(!listenPrefix);
 
@@ -533,7 +537,8 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     setPerimeterAppliedAdLayoutError(null);
     setOverlayGeometry(null);
     setGoalScorerPreparationStatus(null);
-    setGoalScorerPreparationStatusLoaded(false);
+    setGoalScorerPreparationRequestSignature(null);
+    setGoalScorerPreparationRequestLoaded(false);
   }
 
   useEffect(() => {
@@ -874,11 +879,29 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
               bucket: FIREBASE_STORAGE_BUCKET,
             }),
           );
-          setGoalScorerPreparationStatusLoaded(true);
         },
         (error) =>
           console.error(
             "Firebase perimeter goalScorerPreparation subscription error:",
+            error,
+          ),
+      );
+
+      const goalScorerPreparationRequestPath = `states/${listenPrefix}/perimeter/goalScorerPreparation`;
+      const unsubGoalScorerPreparationRequest = onValue(
+        ref(database, goalScorerPreparationRequestPath),
+        (snapshot) => {
+          const request = snapshot.val() as Record<string, unknown> | null;
+          setGoalScorerPreparationRequestSignature(
+            typeof request?.rosterSignature === "string"
+              ? request.rosterSignature
+              : null,
+          );
+          setGoalScorerPreparationRequestLoaded(true);
+        },
+        (error) =>
+          console.error(
+            "Firebase perimeter goalScorerPreparation request subscription error:",
             error,
           ),
       );
@@ -898,6 +921,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         unsubBrightnessStatus();
         unsubOverlayGeometry();
         unsubGoalScorerPreparation();
+        unsubGoalScorerPreparationRequest();
       };
     }
   }, [listenPrefix]);
@@ -2010,46 +2034,62 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   // home roster. The controller writes the authoritative request (validated by
   // the RTDB rules) so the service-owned status stays tied to this roster, then
   // triggers the authenticated Cloud Function which performs the actual work.
-  const requestGoalScorerPreparation = useCallback(async (): Promise<void> => {
-    if (!listenPrefix || !isAuthenticated) return;
-    const home = controllerRef.current?.roster?.home ?? [];
-    const players = home
-      .filter(
-        (p) =>
-          p.id !== undefined &&
-          p.id !== null &&
-          String(p.id).trim() !== "" &&
-          // Firebase rejects `undefined` values, so players without a shirt
-          // number cannot be included in the request.
-          p.number !== undefined &&
-          p.number !== null,
-      )
-      .map((p) => ({
-        id: String(p.id),
-        name: p.name ?? "",
-        number: p.number,
-      }));
-    if (players.length === 0) return;
+  const requestGoalScorerPreparation = useCallback(
+    async (force = false): Promise<void> => {
+      if (!listenPrefix || !isAuthenticated) return;
+      const home = controllerRef.current?.roster?.home ?? [];
+      const players = home
+        .filter(
+          (p) =>
+            p.id !== undefined &&
+            p.id !== null &&
+            String(p.id).trim() !== "" &&
+            // Firebase rejects `undefined` values, so players without a shirt
+            // number cannot be included in the request.
+            p.number !== undefined &&
+            p.number !== null,
+        )
+        .map((p) => ({
+          id: String(p.id),
+          name: p.name ?? "",
+          number: p.number,
+        }));
+      if (players.length === 0) return;
 
-    const request: GoalScorerPreparationRequest = {
-      jobId: crypto.randomUUID(),
-      players,
-    };
-    try {
-      await set(
-        ref(database, `states/${listenPrefix}/perimeter/goalScorerPreparation`),
-        request,
-      );
-      const callable = httpsCallable(functions, "prepareGoalScorerMedia");
-      await callable({
-        location: listenPrefix,
-        jobId: request.jobId,
+      const rosterSignature = computeGoalScorerPreparationSignature(players);
+      if (!force && rosterSignature === goalScorerPreparationRequestSignature) {
+        return;
+      }
+
+      const request: GoalScorerPreparationRequest = {
+        jobId: crypto.randomUUID(),
+        rosterSignature,
         players,
-      });
-    } catch (error) {
-      console.error("Failed to request goal-scorer media preparation:", error);
-    }
-  }, [isAuthenticated, listenPrefix]);
+      };
+      try {
+        await set(
+          ref(
+            database,
+            `states/${listenPrefix}/perimeter/goalScorerPreparation`,
+          ),
+          request,
+        );
+        const callable = httpsCallable(functions, "prepareGoalScorerMedia");
+        await callable({
+          location: listenPrefix,
+          jobId: request.jobId,
+          rosterSignature,
+          players,
+        });
+      } catch (error) {
+        console.error(
+          "Failed to request goal-scorer media preparation:",
+          error,
+        );
+      }
+    },
+    [isAuthenticated, listenPrefix, goalScorerPreparationRequestSignature],
+  );
 
   const createPerimeterMediaPair = useCallback(
     (pairId: string, pair: PerimeterMediaPair): Promise<void> => {
@@ -2123,8 +2163,6 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     () => overlayGeometry !== null,
     [overlayGeometry],
   );
-  const hasPreparedEligibleRoster =
-    goalScorerPreparationStatus?.rosterSignature === eligibleRosterSignature;
   useEffect(() => {
     // Preparation needs a venue that has opted into the perimeter AND a
     // daemon that has published overlay geometry; a venue without either
@@ -2134,27 +2172,21 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       !isAuthenticated ||
       !perimeter.enabled ||
       !hasOverlayGeometry ||
-      !goalScorerPreparationStatusLoaded ||
-      hasPreparedEligibleRoster ||
+      !goalScorerPreparationRequestLoaded ||
+      goalScorerPreparationRequestSignature === eligibleRosterSignature ||
       eligibleRosterSignature.length === 0
     ) {
       return;
     }
-    // The perimeter subscription can make the provider ready just before the
-    // goal-scorer status update reaches React. Deferring one turn lets that
-    // status cancel this request when the roster is already prepared.
-    const timeout = window.setTimeout(() => {
-      void requestGoalScorerPreparation();
-    }, 0);
-    return () => window.clearTimeout(timeout);
+    void requestGoalScorerPreparation();
   }, [
     eligibleRosterSignature,
     ready,
     isAuthenticated,
     perimeter.enabled,
     hasOverlayGeometry,
-    goalScorerPreparationStatusLoaded,
-    hasPreparedEligibleRoster,
+    goalScorerPreparationRequestLoaded,
+    goalScorerPreparationRequestSignature,
     requestGoalScorerPreparation,
   ]);
 

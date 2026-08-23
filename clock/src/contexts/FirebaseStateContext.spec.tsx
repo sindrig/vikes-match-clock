@@ -3074,9 +3074,11 @@ describe("goal scorer preparation", () => {
       expect(requestWrite).toBeDefined();
       const request = requestWrite![1] as {
         jobId: string;
+        rosterSignature: string;
         players: Array<{ id: string }>;
       };
       expect(request.jobId).toBeTruthy();
+      expect(request.rosterSignature).toBe('["10:Jón:7"]');
       expect(request.players).toEqual([{ id: "10", name: "Jón", number: 7 }]);
     });
 
@@ -3136,8 +3138,10 @@ describe("goal scorer preparation", () => {
       expect(requestWrite).toBeDefined();
       const request = requestWrite![1] as {
         jobId: string;
+        rosterSignature: string;
         players: Array<{ id: string }>;
       };
+      expect(request.rosterSignature).toBe('["10:Jón:7"]');
       expect(request.players).toEqual([{ id: "10", name: "Jón", number: 7 }]);
     });
   });

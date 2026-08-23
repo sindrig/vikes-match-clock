@@ -487,6 +487,7 @@ export interface GoalScorerPreparationRequestPlayer {
 
 export interface GoalScorerPreparationRequest {
   jobId: string;
+  rosterSignature: string;
   players: GoalScorerPreparationRequestPlayer[];
 }
 

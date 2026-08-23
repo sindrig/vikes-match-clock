@@ -458,7 +458,10 @@ const handlePrepareGoalScorerMedia = onCall(async (request) => {
   const location = assertLocation(data.location);
   const jobId = assertJobId(data.jobId);
   const players = parsePlayers(data.players);
-  const requestRosterSignature = rosterSignature(players);
+  const requestRosterSignature =
+    typeof data.rosterSignature === "string"
+      ? data.rosterSignature
+      : rosterSignature(players);
 
   await assertLocationAccess(callerUid, location);
   await assertCurrentJob(requestPath(location), jobId);
