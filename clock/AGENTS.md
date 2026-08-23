@@ -942,6 +942,12 @@ Special case: **0 queues** → auto-creates "Biðröð 1" and adds the item (no 
 
 The old "Birta strax" / "Setja í biðröð" radio buttons in MediaManager were removed. `ImageList` no longer has a `displayNow` prop — it always calls `onAddAssets`, which opens QueuePicker.
 
+#### Media Library Layout
+
+`controller/media/ImageList.css` renders folders and media as responsive grids.
+Media cards use 132px-high `object-fit: contain` thumbnails and truncate long
+filenames, so original upload dimensions cannot expand the controller view.
+
 #### Drag-and-Drop Collision Detection
 
 `@dnd-kit`'s default `closestCenter` collision detection doesn't work correctly with nested `SortableContext`s (queue columns containing sortable items). When dragging a column, `closestCenter` may match item droppables inside other columns instead of adjacent column droppables.
