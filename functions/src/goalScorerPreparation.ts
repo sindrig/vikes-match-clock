@@ -1,4 +1,4 @@
-import { onCall } from "firebase-functions/v2/https";
+import { onCall, onRequest } from "firebase-functions/v2/https";
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import { ServerValue } from "firebase-admin/database";
@@ -429,9 +429,7 @@ async function publishStatus(
 
 // -- Callable -----------------------------------------------------------------
 
-// Browser callable requests need an unauthenticated CORS preflight. The handler
-// still requires Firebase Auth and verifies the caller's location access.
-export const prepareGoalScorerMedia = onCall({ invoker: "public" }, async (request) => {
+const handlePrepareGoalScorerMedia = onCall(async (request) => {
   if (!request.auth) {
     throw new functions.https.HttpsError(
       "unauthenticated",
@@ -572,6 +570,14 @@ export const prepareGoalScorerMedia = onCall({ invoker: "public" }, async (reque
   );
   return { started: true };
 });
+
+// `onCall` does not emit its invoker setting in the Firebase deployment
+// manifest. Wrapping the callable protocol in `onRequest` makes Cloud Run
+// public for CORS preflight while retaining callable auth and authorization.
+export const prepareGoalScorerMedia = onRequest(
+  { invoker: "public" },
+  handlePrepareGoalScorerMedia,
+);
 
 function geometryRevision(geometryData: unknown): string {
   const raw = geometryData as Record<string, unknown> | null;

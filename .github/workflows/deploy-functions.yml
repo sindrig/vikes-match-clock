@@ -19,7 +19,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Install function dependencies
         working-directory: ./functions
@@ -41,6 +41,6 @@ jobs:
           firebase_token: ${{ secrets.FIREBASE_TOKEN }}
 
       - name: Deploy Cloud Functions
-        run: firebase deploy --only functions -P ${{ inputs.firebase_project }} --token $FIREBASE_TOKEN
+        run: firebase deploy --only functions --force -P ${{ inputs.firebase_project }} --token $FIREBASE_TOKEN
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}

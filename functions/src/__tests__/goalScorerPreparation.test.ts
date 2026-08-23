@@ -70,6 +70,7 @@ let sharedOnCallHandler:
     }) => Promise<unknown>)
   | undefined;
 let onCallOptions: Record<string, unknown> | undefined;
+let onRequestOptions: Record<string, unknown> | undefined;
 
 // --- Mock firebase-functions ---
 vi.mock("firebase-functions", () => {
@@ -130,6 +131,16 @@ vi.mock("firebase-functions/v2/https", () => {
     },
     get __onCallHandler() {
       return sharedOnCallHandler;
+    },
+    onRequest: (
+      options: Record<string, unknown>,
+      handler: (request: {
+        data: unknown;
+        auth?: { uid: string; token?: { email?: string } };
+      }) => Promise<unknown>,
+    ) => {
+      onRequestOptions = options;
+      return handler;
     },
   };
 });
@@ -226,7 +237,8 @@ beforeEach(async () => {
 
 describe("prepareGoalScorerMedia", () => {
   it("allows public invocation so browser CORS preflight reaches the callable", async () => {
-    expect(onCallOptions).toEqual({ invoker: "public" });
+    expect(onCallOptions).toBeUndefined();
+    expect(onRequestOptions).toEqual({ invoker: "public" });
   });
 
   it("rejects an unauthenticated caller", async () => {
