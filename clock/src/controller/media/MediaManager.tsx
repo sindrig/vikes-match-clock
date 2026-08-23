@@ -66,7 +66,7 @@ const MediaManager: React.FC = () => {
   );
 
   return (
-    <div className="control-item withborder">
+    <div className="control-item withborder media-manager">
       <Nav appearance="tabs" onSelect={selectTab} activeKey={tab}>
         <Nav.Item eventKey={IMAGE_TYPES.images}>Myndir</Nav.Item>
         <Nav.Item eventKey={IMAGE_TYPES.largeAds}>Augl (stórar)</Nav.Item>

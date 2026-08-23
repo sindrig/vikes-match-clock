@@ -948,7 +948,8 @@ The old "Birta strax" / "Setja í biðröð" radio buttons in MediaManager were 
 
 #### Media Library Layout
 
-`controller/media/ImageList.css` renders folders and media as responsive grids.
+`MediaManager` fills the controller width and `controller/media/ImageList.css`
+renders folders and media as responsive grids (up to five 170px-wide cards).
 Media cards use 132px-high `object-fit: contain` thumbnails and truncate long
 filenames, so original upload dimensions cannot expand the controller view.
 

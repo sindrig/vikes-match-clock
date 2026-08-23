@@ -99,6 +99,10 @@ div.stdbuttons > button:hover {
   width: 100%;
 }
 
+.controller .media-manager {
+  width: 100%;
+}
+
 .controller .clear-overlay {
   width: 100%;
   margin-bottom: 4px;
