@@ -809,6 +809,9 @@ the production bucket.
 - `FirebaseStateContext.tsx` subscribes to the geometry and status paths and
   exposes them through `usePerimeter()` as `overlayGeometry` and
   `goalScorerPreparationStatus`, plus `requestGoalScorerPreparation()`.
+- `prepareGoalScorerMedia` is a public Cloud Run invoker only so browser CORS
+  preflight requests can reach the callable endpoint. Its handler still
+  requires Firebase Auth and verifies the caller can access the location.
 - Preparation is requested in the background whenever the home roster gains
   eligible players (match selection or match-report roster loading). A player
   is eligible only when they have both a non-empty `id` and a shirt `number`;

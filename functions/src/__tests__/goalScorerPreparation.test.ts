@@ -69,6 +69,7 @@ let sharedOnCallHandler:
       auth?: { uid: string; token?: { email?: string } };
     }) => Promise<unknown>)
   | undefined;
+let onCallOptions: Record<string, unknown> | undefined;
 
 // --- Mock firebase-functions ---
 vi.mock("firebase-functions", () => {
@@ -93,11 +94,23 @@ vi.mock("firebase-functions", () => {
 vi.mock("firebase-functions/v2/https", () => {
   return {
     onCall: (
-      handler: (request: {
+      optionsOrHandler:
+        | Record<string, unknown>
+        | ((request: {
+            data: unknown;
+            auth?: { uid: string; token?: { email?: string } };
+          }) => Promise<unknown>),
+      maybeHandler?: (request: {
         data: unknown;
         auth?: { uid: string; token?: { email?: string } };
       }) => Promise<unknown>,
     ) => {
+      onCallOptions =
+        typeof optionsOrHandler === "function" ? undefined : optionsOrHandler;
+      const handler =
+        typeof optionsOrHandler === "function"
+          ? optionsOrHandler
+          : maybeHandler!;
       const wrappedHandler = (
         dataOrRequest: unknown,
         context?: { auth?: { uid: string; token?: { email?: string } } },
@@ -212,6 +225,10 @@ beforeEach(async () => {
 });
 
 describe("prepareGoalScorerMedia", () => {
+  it("allows public invocation so browser CORS preflight reaches the callable", async () => {
+    expect(onCallOptions).toEqual({ invoker: "public" });
+  });
+
   it("rejects an unauthenticated caller", async () => {
     await expect(
       handler({ location: "vikuti", jobId: "job-1", players: [] }, {}),

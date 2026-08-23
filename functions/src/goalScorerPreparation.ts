@@ -429,7 +429,9 @@ async function publishStatus(
 
 // -- Callable -----------------------------------------------------------------
 
-export const prepareGoalScorerMedia = onCall(async (request) => {
+// Browser callable requests need an unauthenticated CORS preflight. The handler
+// still requires Firebase Auth and verifies the caller's location access.
+export const prepareGoalScorerMedia = onCall({ invoker: "public" }, async (request) => {
   if (!request.auth) {
     throw new functions.https.HttpsError(
       "unauthenticated",
