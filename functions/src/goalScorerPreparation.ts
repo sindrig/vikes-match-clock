@@ -362,7 +362,11 @@ function buildPlayerResult(
   error: string | null,
   files?: Record<string, OverlayFile>,
 ): PlayerResult {
-  return { status, error: error ? error.slice(0, 500) : null, files };
+  return {
+    status,
+    error: error ? error.slice(0, 500) : null,
+    ...(files ? { files } : {}),
+  };
 }
 
 function summarize(

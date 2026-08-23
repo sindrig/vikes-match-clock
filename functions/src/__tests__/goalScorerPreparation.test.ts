@@ -445,6 +445,10 @@ describe("prepareGoalScorerMedia", () => {
     const { doc } = lastStatusWrite();
     expect(doc.phase).toBe("ready");
     expect(doc.unavailableCount).toBe(1);
+    const player = (doc.players as Record<string, Record<string, unknown>>)[
+      "unavailable-0"
+    ];
+    expect(player.files).toBeUndefined();
     expect(mockSave).not.toHaveBeenCalled();
   });
 
