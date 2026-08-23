@@ -14,7 +14,6 @@ const bucket = admin.storage().bucket();
 
 // -- Constants ----------------------------------------------------------------
 
-const DEFAULT_STORAGE_BUCKET = "vikes-match-clock-firebase.appspot.com";
 const LOCATION_RE = /^[a-z0-9-]+$/i;
 const JOB_ID_RE = /^[A-Za-z0-9_-]+$/;
 const PLAYER_ID_RE = /^[A-Za-z0-9._-]+$/;
@@ -136,7 +135,9 @@ function crestPath(location: string): string {
 // Deterministic output storage paths. Files live under the daemon-validated
 // `{location}/perimeter-overlays/{pairId}/{48|40}/` family (pairId = jobId) so
 // the prepared media is directly playable by the existing overlay command. The
-// filename is scoped by player, geometry revision, and render version.
+// filename is scoped by player, geometry revision, and render version. Emitted
+// `gs://` sources always reference the function's active storage bucket so the
+// returned URLs match where the objects were actually uploaded.
 function outputPaths(location: string, jobId: string, playerId: string) {
   const folder = `${location}/perimeter-overlays/${jobId}`;
   return {
@@ -144,7 +145,7 @@ function outputPaths(location: string, jobId: string, playerId: string) {
     file: (targetFolder: string, revision: string) =>
       `${sanitizeFilename(playerId)}-${revision}-${RENDER_VERSION}-${targetFolder}.png`,
     source: (targetFolder: string, filename: string) =>
-      `gs://${DEFAULT_STORAGE_BUCKET}/${folder}/${targetFolder}/${filename}`,
+      `gs://${bucket.name}/${folder}/${targetFolder}/${filename}`,
   };
 }
 

@@ -646,7 +646,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
             raw && typeof raw === "object"
               ? parsePerimeterOverlay(
                   (raw as Record<string, unknown>).overlay ?? null,
-                  { location: listenPrefix },
+                  { location: listenPrefix, bucket: FIREBASE_STORAGE_BUCKET },
                 )
               : null;
           setOverlay(overlay);
@@ -2067,10 +2067,34 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       hasEligible: entries.some((entry) => entry.length > 0),
     };
   }, [controller.roster.home]);
+  // Boolean (not the geometry object) so a daemon re-publish of unchanged
+  // geometry does not re-trigger a preparation request on every refresh.
+  const hasOverlayGeometry = useMemo(
+    () => overlayGeometry !== null,
+    [overlayGeometry],
+  );
   useEffect(() => {
-    if (!ready || !isAuthenticated || !homeRosterSummary.hasEligible) return;
+    // Preparation needs a venue that has opted into the perimeter AND a
+    // daemon that has published overlay geometry; a venue without either
+    // would only produce a job that must fail, so no request is issued.
+    if (
+      !ready ||
+      !isAuthenticated ||
+      !perimeter.enabled ||
+      !hasOverlayGeometry ||
+      !homeRosterSummary.hasEligible
+    ) {
+      return;
+    }
     void requestGoalScorerPreparation();
-  }, [homeRosterSummary, ready, isAuthenticated, requestGoalScorerPreparation]);
+  }, [
+    homeRosterSummary,
+    ready,
+    isAuthenticated,
+    perimeter.enabled,
+    hasOverlayGeometry,
+    requestGoalScorerPreparation,
+  ]);
 
   // Resolve viewport from live Firebase locations data by screenKey.
   // When admin changes screen dimensions, listeners updates and this recomputes.

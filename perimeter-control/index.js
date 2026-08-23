@@ -75,6 +75,10 @@ const DEFAULT_OVERLAY_SSH_USER = "user";
 const DEFAULT_OVERLAY_SSH_KEY = "/etc/perimeter-control/overlay-ssh-key";
 const DEFAULT_OVERLAY_REMOTE_CONTENT_DIR = "C:/Content";
 const DEFAULT_OVERLAY_CACHE_DIR = "/var/cache/perimeter-control";
+// Approved overlay source bucket. Defaults to production for the current
+// Resolume host; a non-production deployment must point this at the bucket
+// where its prepared overlay media actually lives.
+const DEFAULT_OVERLAY_BUCKET = "vikes-match-clock-firebase.appspot.com";
 const DEFAULT_OVERLAY_LAYER_CLIP_COLUMNS = '{"2":1,"4":1}';
 // Named media-pair target folder per overlay layer. Layer "2" is the
 // 48-screen overlay and layer "4" is the 40-screen overlay, so pair files for
@@ -339,6 +343,8 @@ export function loadConfig(environ = process.env) {
     overlayRemoteContentDir:
       environ.PERIMETER_OVERLAY_REMOTE_CONTENT_DIR ??
       DEFAULT_OVERLAY_REMOTE_CONTENT_DIR,
+    // Approved overlay source bucket (see DEFAULT_OVERLAY_BUCKET).
+    overlayBucket: environ.PERIMETER_OVERLAY_BUCKET ?? DEFAULT_OVERLAY_BUCKET,
     // Reference clip slot per overlay layer. The daemon loads the overlay
     // file into the currently-active deck column (and pauses the deck
     // autopilot for the overlay), so this value is the fallback slot used

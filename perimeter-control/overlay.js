@@ -21,6 +21,9 @@ const VALID_OVERLAY_VERSIONS = new Set([1]);
 const MAX_OVERLAY_COLUMNS = 20;
 const MAX_DURATION_MS = 120_000;
 const MIN_DURATION_MS = 100;
+// Approved overlay source bucket. The default targets production (the current
+// Resolume host's Firebase project); a non-production deployment must override
+// PERIMETER_OVERLAY_BUCKET so validation matches where prepared media lives.
 const ALLOWED_BUCKET = "vikes-match-clock-firebase.appspot.com";
 const ALLOWED_GCS_PREFIX = "gs://";
 const SAFE_FILENAME_RE = /^[A-Za-z0-9._ -]+$/;
@@ -45,7 +48,8 @@ function validateGcsSource(source, options = {}) {
   const slashIdx = bucketAndPath.indexOf("/");
   if (slashIdx < 0) return false;
   const bucketName = bucketAndPath.slice(0, slashIdx);
-  if (bucketName !== ALLOWED_BUCKET) return false;
+  const allowedBucket = options.bucket ?? ALLOWED_BUCKET;
+  if (bucketName !== allowedBucket) return false;
   const objectPath = bucketAndPath.slice(slashIdx + 1);
   if (!objectPath) return false;
   // Reject traversal and control characters in the object path.
@@ -166,6 +170,7 @@ export function validateOverlayDoc(data, configuredLayerIds, options = {}) {
         !validateGcsSource(f.source, {
           location,
           targetFolder: targetFolders[key],
+          bucket: options.bucket,
         })
       ) {
         return {
@@ -822,6 +827,7 @@ export class OverlayController {
     const result = validateOverlayDoc(data, this.config.overlayLayerIds, {
       location: this._locationFromPath(),
       targetFolders: this.config.overlayLayerTargetFolders,
+      bucket: this.config.overlayBucket,
     });
     if (!result.valid) {
       const reason = result.reason || "unknown";

@@ -2001,6 +2001,59 @@ describe("firebaseParsers", () => {
       };
       expect(parsePerimeterOverlay(overlay, { location: "vikuti" })).toBeNull();
     });
+
+    it("accepts sources from the active environment bucket", () => {
+      const overlay = {
+        version: 1,
+        id: "staging-1",
+        columns: [
+          {
+            durationMs: 10000,
+            files: {
+              "2": {
+                name: "goal-48.mp4",
+                source:
+                  "gs://vikes-match-clock-staging.appspot.com/vikuti/perimeter/goal-48.mp4",
+              },
+              "4": {
+                name: "goal-40.mp4",
+                source:
+                  "gs://vikes-match-clock-staging.appspot.com/vikuti/perimeter/goal-40.mp4",
+              },
+            },
+          },
+        ],
+      };
+      const result = parsePerimeterOverlay(overlay, {
+        location: "vikuti",
+        bucket: "vikes-match-clock-staging.appspot.com",
+      });
+      expect(result).not.toBeNull();
+    });
+
+    it("rejects a cross-environment bucket for the active environment", () => {
+      const overlay = {
+        version: 1,
+        id: "prod-1",
+        columns: [
+          {
+            durationMs: 10000,
+            files: {
+              "2": {
+                name: "goal-48.mp4",
+                source: `gs://${bucket}/vikuti/perimeter/goal-48.mp4`,
+              },
+            },
+          },
+        ],
+      };
+      expect(
+        parsePerimeterOverlay(overlay, {
+          location: "vikuti",
+          bucket: "vikes-match-clock-staging.appspot.com",
+        }),
+      ).toBeNull();
+    });
   });
 
   describe("parsePerimeterMediaPairs", () => {

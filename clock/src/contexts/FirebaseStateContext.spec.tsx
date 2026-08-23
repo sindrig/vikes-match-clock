@@ -3044,6 +3044,10 @@ describe("goal scorer preparation", () => {
             },
           }),
         } as never);
+      } else if (path.endsWith("/perimeter")) {
+        callback({ val: () => ({ enabled: true, state: "off" }) } as never);
+      } else if (path.endsWith("/overlayGeometry")) {
+        callback({ val: () => geometryDoc } as never);
       } else {
         callback({ val: () => null } as never);
       }
@@ -3080,6 +3084,108 @@ describe("goal scorer preparation", () => {
       expect.anything(),
       "prepareGoalScorerMedia",
     );
+  });
+
+  it("does not request preparation when no geometry is published", async () => {
+    vi.mocked(set).mockClear();
+    vi.mocked(onValue).mockImplementation((reference, callback) => {
+      const path = String(reference);
+      if (path.endsWith("/controller")) {
+        callback({
+          val: () => ({
+            queues: {},
+            activeQueueId: null,
+            playing: false,
+            view: "idle",
+            roster: {
+              home: [
+                { id: 10, name: "Jón", number: 7, show: true, role: "FW" },
+              ],
+              away: [],
+            },
+          }),
+        } as never);
+      } else if (path.endsWith("/perimeter")) {
+        callback({ val: () => ({ enabled: true, state: "off" }) } as never);
+      } else {
+        callback({ val: () => null } as never);
+      }
+      return vi.fn();
+    });
+
+    render(
+      <FirebaseStateProvider
+        listenPrefix="vikuti"
+        isAuthenticated={true}
+        screenKey={null}
+      >
+        <TestControllerConsumer onMount={() => undefined} />
+      </FirebaseStateProvider>,
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(
+      vi
+        .mocked(set)
+        .mock.calls.some(
+          ([path]) =>
+            String(path) === "states/vikuti/perimeter/goalScorerPreparation",
+        ),
+    ).toBe(false);
+  });
+
+  it("does not request preparation when the perimeter is disabled", async () => {
+    vi.mocked(set).mockClear();
+    vi.mocked(onValue).mockImplementation((reference, callback) => {
+      const path = String(reference);
+      if (path.endsWith("/controller")) {
+        callback({
+          val: () => ({
+            queues: {},
+            activeQueueId: null,
+            playing: false,
+            view: "idle",
+            roster: {
+              home: [
+                { id: 10, name: "Jón", number: 7, show: true, role: "FW" },
+              ],
+              away: [],
+            },
+          }),
+        } as never);
+      } else if (path.endsWith("/perimeter")) {
+        callback({ val: () => ({ enabled: false, state: "off" }) } as never);
+      } else if (path.endsWith("/overlayGeometry")) {
+        callback({ val: () => geometryDoc } as never);
+      } else {
+        callback({ val: () => null } as never);
+      }
+      return vi.fn();
+    });
+
+    render(
+      <FirebaseStateProvider
+        listenPrefix="vikuti"
+        isAuthenticated={true}
+        screenKey={null}
+      >
+        <TestControllerConsumer onMount={() => undefined} />
+      </FirebaseStateProvider>,
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(
+      vi
+        .mocked(set)
+        .mock.calls.some(
+          ([path]) =>
+            String(path) === "states/vikuti/perimeter/goalScorerPreparation",
+        ),
+    ).toBe(false);
   });
 
   it("does not request preparation when the home roster has no valid player ids", async () => {

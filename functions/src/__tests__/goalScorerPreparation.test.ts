@@ -11,6 +11,11 @@ const mockSave = vi.fn();
 const mockExists = vi.fn();
 const mockDownload = vi.fn();
 
+// The active storage bucket the module reads `bucket.name` from when building
+// emitted source URLs. Mutated by tests to simulate a non-production
+// deployment (e.g. staging).
+const mockBucketState = { name: "vikes-match-clock-firebase.appspot.com" };
+
 vi.mock("firebase-admin", () => {
   const mockDb = {
     ref: (...args: unknown[]) => {
@@ -41,7 +46,14 @@ vi.mock("firebase-admin", () => {
     apps: [],
     initializeApp: vi.fn(),
     database: mockDatabase,
-    storage: vi.fn(() => ({ bucket: vi.fn(() => ({ file: bucketFile })) })),
+    storage: vi.fn(() => ({
+      bucket: vi.fn(() => ({
+        get name() {
+          return mockBucketState.name;
+        },
+        file: bucketFile,
+      })),
+    })),
   };
   return {
     __esModule: true,
@@ -170,6 +182,7 @@ function lastStatusWrite(): { path: string; doc: Record<string, unknown> } {
 beforeEach(async () => {
   vi.clearAllMocks();
   requestReadCount = 0;
+  mockBucketState.name = "vikes-match-clock-firebase.appspot.com";
 
   if (!handler) {
     await import("../goalScorerPreparation");
@@ -333,6 +346,40 @@ describe("prepareGoalScorerMedia", () => {
     expect(files["2"].source).toContain(
       "gs://vikes-match-clock-firebase.appspot.com/",
     );
+  });
+
+  it("emits sources from the active storage bucket", async () => {
+    mockBucketState.name = "vikes-match-clock-staging.appspot.com";
+    const result = await handler(
+      {
+        location: "vikuti",
+        jobId: "job-123",
+        players: [{ id: "10", name: "Jón", number: 7 }],
+      },
+      controllerContext(),
+    );
+    expect(result).toEqual({ started: true });
+
+    // Objects were uploaded to the active bucket...
+    const saves = mockSave.mock.calls.map(([path]) => String(path));
+    expect(saves).toHaveLength(2);
+    expect(saves[0]).toContain("vikuti/perimeter-overlays/job-123/48/");
+    expect(saves[1]).toContain("vikuti/perimeter-overlays/job-123/40/");
+
+    // ...and the returned source URLs reference that same bucket.
+    const { doc } = lastStatusWrite();
+    const player = (doc.players as Record<string, Record<string, unknown>>)[
+      "10"
+    ];
+    expect(player.status).toBe("ready");
+    const files = player.files as Record<string, { source: string }>;
+    expect(files["2"].source).toContain(
+      "gs://vikes-match-clock-staging.appspot.com/",
+    );
+    expect(files["4"].source).toContain(
+      "gs://vikes-match-clock-staging.appspot.com/",
+    );
+    expect(files["2"].source).toContain("/perimeter-overlays/job-123/48/");
   });
 
   it("uses the crest fallback when the celebration image is absent", async () => {

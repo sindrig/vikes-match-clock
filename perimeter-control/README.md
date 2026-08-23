@@ -141,6 +141,7 @@ Edit `/etc/perimeter-control/perimeter-control.env`:
 | `PERIMETER_THUMBNAIL_MAX_BYTES`      | `100000`                                                | Per-thumbnail cap in published data-URL chars (larger is omitted) |
 | `PERIMETER_PREVIEW_MAX_BYTES`        | `8000000`                                               | Whole-snapshot byte cap (larger is rejected)                      |
 | `PERIMETER_OVERLAY_GEOMETRY_PATH`    | `perimeter/vikuti/overlayGeometry`                      | Path of the published overlay target geometry                     |
+| `PERIMETER_OVERLAY_BUCKET`           | `vikes-match-clock-firebase.appspot.com`                | Approved overlay source bucket                                    |
 
 After changing the environment file:
 
@@ -228,8 +229,20 @@ instead of duplicating frontend dimensions.
   "revision": "<sha256 of layerIds+targetFolders+canvases>",
   "updatedAt": 1723392000000,
   "targets": [
-    { "layerId": "2", "label": "48 skjáir", "targetFolder": "48", "width": 4608, "height": 192 },
-    { "layerId": "4", "label": "40 skjáir", "targetFolder": "40", "width": 3840, "height": 192 }
+    {
+      "layerId": "2",
+      "label": "48 skjáir",
+      "targetFolder": "48",
+      "width": 4608,
+      "height": 192
+    },
+    {
+      "layerId": "4",
+      "label": "40 skjáir",
+      "targetFolder": "40",
+      "width": 3840,
+      "height": 192
+    }
   ]
 }
 ```
@@ -243,6 +256,12 @@ instead of duplicating frontend dimensions.
 - The geometry is published once at startup and re-published on the listener
   refresh as a safety net. It lives under `perimeter/{location}` and is
   read-only to clients.
+- **Per-venue**: a daemon instance must publish geometry beneath its own
+  `perimeter/{location}/overlayGeometry` — set `PERIMETER_OVERLAY_GEOMETRY_PATH`
+  together with the other location-specific paths (`PERIMETER_FIREBASE_PATH`,
+  `PERIMETER_PREVIEW_PATH`, `PERIMETER_OVERLAY_PATH`, ...). A venue without a
+  published geometry document has no daemon, so the clock controller skips
+  media preparation for it (a job issued there would only fail).
 
 ## Behavior on failure
 
@@ -329,19 +348,19 @@ base perimeter on/off toggle.
    each layer's reference slot (the fallback if the composition read fails).
    Loading one slot per layer keeps the trigger fast (~1-2s). Resolume's clip
    `open` takes a `file:///` URL (e.g. `file:///C:/Content/goal-48.mp4`) as a
-    plain-text body. Playback loops via the clip transport's default `Loop`
-    playmode, so no separate loop endpoints are needed (this Resolume REST
-    version exposes no clip transport endpoints). Each loaded overlay clip is
-    then forced to **fill its layer's native canvas** (`Video → Resize` →
-    `Stretch`, set via `PUT /api/v1/parameter/by-id/{id}` on the clip's
-    `video.resize` parameter), so a goal video with a non-native aspect ratio
-    can never leave side gaps on the LED strip. Setting a non-`Original`
-    resize mode makes this Resolume version re-size the clip canvas to the
-    layer output size (4608×192), which would overflow the 40 screens; the
-    daemon therefore also pins the clip canvas back to the layer's native
-    size from `PERIMETER_CLIP_CANVASES` (40 layers → 3840×192, 48 layers →
-    4608×192) so the fill lands on the correct region. Best-effort: retried,
-    failure logged, never fails the trigger.
+   plain-text body. Playback loops via the clip transport's default `Loop`
+   playmode, so no separate loop endpoints are needed (this Resolume REST
+   version exposes no clip transport endpoints). Each loaded overlay clip is
+   then forced to **fill its layer's native canvas** (`Video → Resize` →
+   `Stretch`, set via `PUT /api/v1/parameter/by-id/{id}` on the clip's
+   `video.resize` parameter), so a goal video with a non-native aspect ratio
+   can never leave side gaps on the LED strip. Setting a non-`Original`
+   resize mode makes this Resolume version re-size the clip canvas to the
+   layer output size (4608×192), which would overflow the 40 screens; the
+   daemon therefore also pins the clip canvas back to the layer's native
+   size from `PERIMETER_CLIP_CANVASES` (40 layers → 3840×192, 48 layers →
+   4608×192) so the fill lands on the correct region. Best-effort: retried,
+   failure logged, never fails the trigger.
 8. All paired layers are triggered together by connecting the clip in the
    **currently active deck column** (read from the live composition right
    before triggering). Because the autopilot is paused, the deck stays on
@@ -409,6 +428,7 @@ Clients have read-only access to this path; only the daemon writes to it.
 
 See `perimeter-control.env.example` for all overlay environment variables:
 `PERIMETER_OVERLAY_ENABLED`, `PERIMETER_OVERLAY_PATH`, `PERIMETER_OVERLAY_STATUS_PATH`,
+`PERIMETER_OVERLAY_GEOMETRY_PATH`, `PERIMETER_OVERLAY_BUCKET`,
 `PERIMETER_OVERLAY_GCP_PROJECT`, `PERIMETER_OVERLAY_CACHE_DIR`,
 `PERIMETER_OVERLAY_SSH_HOST/USER/KEY`, `PERIMETER_OVERLAY_REMOTE_CONTENT_DIR`,
 `PERIMETER_OVERLAY_LAYER_IDS`, `PERIMETER_OVERLAY_LAYER_CLIP_COLUMNS`,
@@ -420,7 +440,8 @@ The SSH key must provide passwordless access to the Windows Resolume host.
 ### Accepted GCS source paths (goal + named pairs)
 
 The overlay controller accepts exactly two source families, both in the
-approved `vikes-match-clock-firebase.appspot.com` bucket:
+approved overlay bucket (`PERIMETER_OVERLAY_BUCKET`, default
+`vikes-match-clock-firebase.appspot.com`):
 
 1. **Legacy home-goal files** — `gs://{bucket}/{location}/perimeter/{filename}`
    (e.g. `goal-48.mp4`, `goal-40.mp4`). The location is derived from the
@@ -470,7 +491,7 @@ overlapping lane configuration at startup.
 2. The daemon reads the live composition for lane names and the deck column
    count `M`.
 3. The `N` layout columns map **1:1** to deck columns (`mapLayoutToDeckColumns`):
-   layout column *i* loads into deck column *i+1*. Surplus deck columns stay
+   layout column _i_ loads into deck column _i+1_. Surplus deck columns stay
    empty — the deck autopilot skips empty columns, so the deck cycles only
    through the `N` ads.
 4. **Clear-then-load**: the daemon empties all ad slots across the deck on the
@@ -575,9 +596,9 @@ never touches a live screen.
 
 ### Command and status
 
-| Path                                     | Writer     | Purpose                                              |
-| ---------------------------------------- | ---------- | ---------------------------------------------------- |
-| `states/{location}/perimeter/brightness` | Controller | Requested brightness, an integer 0–100 (or absent)   |
+| Path                                     | Writer     | Purpose                                                                  |
+| ---------------------------------------- | ---------- | ------------------------------------------------------------------------ |
+| `states/{location}/perimeter/brightness` | Controller | Requested brightness, an integer 0–100 (or absent)                       |
 | `perimeter/{location}/brightnessStatus`  | Daemon     | `requestedPercent`, `appliedPercent`, `phase`, `error`, server timestamp |
 
 - The command value is the requested **whole percentage** (0–100). `null` /
