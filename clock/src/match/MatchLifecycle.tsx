@@ -165,7 +165,11 @@ const MatchLifecycle = () => {
   // timeout still being active. Warning and expiry thresholds are derived from
   // the same remaining-time calculation as TimeoutClock (which displays one
   // extra second, `+1000`): warn once the displayed time reaches 00:10
-  // (remaining <= 10000) and clear/buzz once it reaches 00:00 (remaining <= 0).
+  // (10000 >= remaining > 0) and clear/buzz once it reaches 00:00
+  // (remaining <= 0). The warning is suppressed once the timeout has already
+  // expired, so a transition retried after resync (when the timeout may have
+  // run out while ineligible) fires only the expiry buzz, never a stale
+  // warning followed by an expiry buzz.
   useEffect(() => {
     if (!timeout) {
       firedTimeout.current = null;
@@ -175,7 +179,11 @@ const MatchLifecycle = () => {
     }
     if (!writeEligible) return;
     const remaining = TIMEOUT_LENGTH - (getServerTime() - timeout) + 1000;
-    if (firedTimeoutWarning.current !== timeout && remaining <= 10000) {
+    if (
+      firedTimeoutWarning.current !== timeout &&
+      remaining <= 10000 &&
+      remaining > 0
+    ) {
       firedTimeoutWarning.current = timeout;
       buzz(true);
     }
@@ -200,6 +208,9 @@ const MatchLifecycle = () => {
   ]);
 
   // Penalty expiry, conditional on the exact penalty record still existing.
+  // The penalty is removed when the remaining time reaches zero (`remaining <=
+  // 0`), aligning authoritative removal with the render-only TwoMinClock,
+  // which clamps its display to 00:00 once the penalty mathematically expires.
   useEffect(() => {
     if (!writeEligible) return;
     for (const penalty of [...(home2min ?? []), ...(away2min ?? [])]) {
@@ -211,7 +222,7 @@ const MatchLifecycle = () => {
         : timeElapsed;
       const remaining =
         penalty.penaltyLength - (elapsed - penalty.atTimeElapsed);
-      if (remaining < 0) {
+      if (remaining <= 0) {
         inFlightPenalties.current.add(id);
         void removePenaltyIfCurrent({
           key: penalty.key,

@@ -53,7 +53,7 @@ Alternative considered: unit-test only by injecting stale objects. Rejected beca
 
 ### 2. Rendering components are read-only
 
-`Clock`, `TimeoutClock`, `TwoMinClock`, and `Asset` will no longer call shared-state mutation functions solely from interval, timeout, media-end, mount, or resume callbacks. They may derive and display zero/expired state locally.
+`Clock`, `TimeoutClock`, `TwoMinClock`, and `Asset` will no longer call shared-state mutation functions solely from interval, timeout, mount, or resume callbacks. They may derive and display zero/expired state locally. The single permitted renderer-initiated input is `Asset`'s natural media-end event (video/YouTube end), which submits a generation-conditional `completeAssetIfCurrent` observation whose `activeQueueId`/`playing` preconditions come from the rendered controller's live values — never a blind mutation; the CAS precondition rejects it if authoritative state changed.
 
 Automatic shared progression will be moved to a lifecycle coordinator/action layer outside rendering. The coordinator does not own the clock. It observes due transitions and submits a command containing the generation it observed.
 

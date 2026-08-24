@@ -63,11 +63,17 @@ obsolete timer-derived commands. The following rules are mandatory:
 **1. Rendering components are read-only.** `Clock`, `TimeoutClock`,
 `TwoMinClock`, and `Asset` may derive and display expired/zero state locally
 but MUST NOT call shared-state mutation functions from interval, timeout,
-media-end, mount, resume, or `visibilitychange` callbacks. Automatic
-progression (countdown completion, half-stops, timeout/penalty expiry, timed
-asset completion) is routed through the `MatchLifecycle` coordinator
-(`src/match/MatchLifecycle.tsx`) — mounted once in `App.tsx` — which submits
-generation-conditional actions.
+mount, resume, or `visibilitychange` callbacks — those effects never
+correspond to an authoritative change. Automatic progression (countdown
+completion, half-stops, timeout/penalty expiry, timed asset completion) is
+routed through the `MatchLifecycle` coordinator (`src/match/MatchLifecycle.tsx`)
+— mounted once in `App.tsx` — which submits generation-conditional actions.
+
+The single permitted renderer-initiated input is `Asset`'s **natural media-end
+event** (video / YouTube `onEnded`): a stale renderer must not clear a newer
+asset, so it is not a blind mutation. It submits the generation-conditional
+`completeAssetIfCurrent` observation described in rule 3, and the CAS
+precondition rejects it unless the current asset/queue still matches.
 
 **2. Freshness barrier.** An authenticated client is only write-eligible while
 it has confirmed current Firebase state. `FirebaseStateContext` tracks

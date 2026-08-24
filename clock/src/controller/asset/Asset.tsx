@@ -176,7 +176,12 @@ const AssetComponent = (props: AssetProps) => {
   // Passive rendering: mounting, resuming, or a locally elapsed timer must
   // never mutate shared state. Automatic asset expiry is routed through the
   // MatchLifecycle coordinator (completeAssetIfCurrent), which is
-  // generation-conditional and freshness-gated. This component only renders.
+  // generation-conditional and freshness-gated. This component only renders,
+  // with one exception: a natural media-end event (video / YouTube) submits a
+  // conditional completion observation below. That is a renderer-initiated
+  // input, but not a blind mutation — the CAS precondition re-validates the
+  // current asset identity AND queue against authoritative state, so a stale
+  // renderer cannot clear a newer asset.
 
   // For media with a natural end event (video / YouTube), notify completion
   // through the conditional action. The action verifies the current asset

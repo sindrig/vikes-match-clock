@@ -655,7 +655,11 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   // A freshly loaded client that stays visible/online is eligible. This also
   // covers venues that never transitioned through an explicit resume epoch.
-  const writeEligible = writeFreshness === "ready";
+  // Eligibility is additionally gated on authentication: only authenticated
+  // controllers may ever become write-eligible, so unauthenticated displays
+  // never appear capable of mutating shared state (and MatchLifecycle never
+  // attempts conditional transitions for them).
+  const writeEligible = isAuthenticated && writeFreshness === "ready";
 
   useEffect(() => {
     matchRef.current = match;

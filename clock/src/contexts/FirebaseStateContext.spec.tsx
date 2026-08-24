@@ -9,6 +9,7 @@ import {
   useController,
   useView,
   usePerimeter,
+  useFirebaseState,
 } from "./FirebaseStateContext";
 import { Asset, Roster, ViewPort } from "../types";
 import { Sports, DEFAULT_HALFSTOPS, VIEWS } from "../constants";
@@ -102,6 +103,18 @@ const TestPerimeterConsumer = ({
       State: {perimeterApi.perimeter.state}
     </div>
   );
+};
+
+const TestFirebaseStateConsumer = ({
+  onMount,
+}: {
+  onMount: (api: ReturnType<typeof useFirebaseState>) => void;
+}) => {
+  const api = useFirebaseState();
+  React.useEffect(() => {
+    onMount(api);
+  }, [api, onMount]);
+  return <div data-testid="firebase-state-consumer" />;
 };
 
 describe("FirebaseStateContext", () => {
@@ -228,6 +241,52 @@ describe("FirebaseStateContext", () => {
         expect.objectContaining({ homeScore: 1 }),
         expect.anything(),
       );
+    });
+
+    it("becomes write-eligible once subscriptions deliver for an authenticated client", async () => {
+      let api: ReturnType<typeof useFirebaseState> | null = null;
+
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+          screenKey={null}
+        >
+          <TestFirebaseStateConsumer
+            onMount={(value) => {
+              api = value;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+
+      await waitFor(() => {
+        expect(api?.writeEligible).toBe(true);
+      });
+      expect(api?.writeFreshness).toBe("ready");
+    });
+
+    it("keeps an unauthenticated client write-ineligible even after subscriptions deliver", async () => {
+      let api: ReturnType<typeof useFirebaseState> | null = null;
+
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={false}
+          screenKey={null}
+        >
+          <TestFirebaseStateConsumer
+            onMount={(value) => {
+              api = value;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+
+      await waitFor(() => {
+        expect(api?.writeFreshness).toBe("ready");
+      });
+      expect(api?.writeEligible).toBe(false);
     });
 
     it("allows rapid sequential goal additions (updates ref immediately)", () => {

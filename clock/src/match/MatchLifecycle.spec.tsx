@@ -253,6 +253,33 @@ describe("MatchLifecycle", () => {
       advanceTicks();
       expect(h.fns.removePenaltyIfCurrent).toHaveBeenCalledTimes(1);
     });
+
+    it("removes a penalty the moment its remaining time reaches zero", () => {
+      const now = Date.now();
+      vi.setSystemTime(now);
+      const h = setup({
+        match: makeMatch({
+          started: now,
+          home2min: [{ key: "p1", atTimeElapsed: 0, penaltyLength: 1000 }],
+        }),
+      });
+      // Mount: 0ms elapsed → remaining 1000ms. Still shown, not removed.
+      expect(h.fns.removePenaltyIfCurrent).not.toHaveBeenCalled();
+
+      // 900ms elapsed: remaining 100ms > 0 → still shown.
+      advanceTicks(9);
+      expect(h.fns.removePenaltyIfCurrent).not.toHaveBeenCalled();
+
+      // Exactly at penaltyLength elapsed: remaining = 0 → removed (aligned
+      // with TwoMinClock clamping its display to 00:00 at this boundary).
+      advanceTicks(1);
+      expect(h.fns.removePenaltyIfCurrent).toHaveBeenCalledTimes(1);
+      expect(h.fns.removePenaltyIfCurrent).toHaveBeenCalledWith({
+        key: "p1",
+        atTimeElapsed: 0,
+        penaltyLength: 1000,
+      });
+    });
   });
 
   describe("timeout expiry alignment", () => {
@@ -315,6 +342,33 @@ describe("MatchLifecycle", () => {
       h.set({ writeEligible: true });
       h.rerender();
       expect(h.fns.removeTimeoutIfCurrent).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not warn after the timeout has already expired while ineligible", async () => {
+      const now = Date.now();
+      vi.setSystemTime(now);
+      const h = setup({
+        match: makeMatch({ timeout: now }),
+        writeEligible: false,
+      });
+
+      // The timeout runs all the way out while the client is ineligible, so
+      // no warning or expiry is fired yet.
+      act(() => {
+        vi.advanceTimersByTime(TIMEOUT_LENGTH + 5000);
+      });
+      expect(h.fns.buzz).not.toHaveBeenCalled();
+      expect(h.fns.removeTimeoutIfCurrent).not.toHaveBeenCalled();
+
+      // Once eligible, the already-expired timeout is cleared and buzzed, but
+      // the 10s warning must NOT also fire (the timeout is past 00:10).
+      h.set({ writeEligible: true });
+      h.rerender();
+      expect(h.fns.removeTimeoutIfCurrent).toHaveBeenCalledTimes(1);
+
+      await flushPromises();
+      expect(h.fns.buzz).toHaveBeenCalledTimes(1);
+      expect(h.fns.buzz).toHaveBeenCalledWith(true);
     });
   });
 
