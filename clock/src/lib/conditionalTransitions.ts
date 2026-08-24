@@ -111,7 +111,6 @@ export function timedAssetCompletionPrecondition(
 // countdown advances to the next period (paused at the boundary).
 export function countdownCompletionTransition(observed: {
   halftimeCountdown: boolean;
-  halfStops: number[];
 }): (prev: Match) => Match {
   return (prev) => {
     const next: Match = {

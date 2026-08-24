@@ -232,7 +232,6 @@ interface FirebaseStateContextType {
   stopHalftimeCountdown: () => void;
   completeCountdownIfCurrent: (
     observed: CountdownCompletionObservation,
-    observedHalfStops: number[],
   ) => Promise<boolean>;
   applyHalfStopIfCurrent: (observed: HalfStopObservation) => Promise<boolean>;
   removeTimeoutIfCurrent: (
@@ -1678,15 +1677,11 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   // Countdown completion (pre-match or halftime), conditional on the exact
   // observed countdown generation still being authoritative.
   const completeCountdownIfCurrent = useCallback(
-    (
-      observed: CountdownCompletionObservation,
-      observedHalfStops: number[],
-    ): Promise<boolean> =>
+    (observed: CountdownCompletionObservation): Promise<boolean> =>
       applyMatchConditionalTransition(
         countdownCompletionPrecondition(observed),
         countdownCompletionTransition({
           halftimeCountdown: observed.halftimeCountdown,
-          halfStops: observedHalfStops,
         }),
         "match.complete-countdown",
       ),

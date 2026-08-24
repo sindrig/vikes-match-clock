@@ -98,10 +98,11 @@ const MatchLifecycle = () => {
     if (!writeEligible) return;
     if (getServerTime() >= started) {
       inFlightCountdown.current = generation;
-      void completeCountdownIfCurrent(
-        { started, countdown, halftimeCountdown },
-        halfStops,
-      ).then((committed) => {
+      void completeCountdownIfCurrent({
+        started,
+        countdown,
+        halftimeCountdown,
+      }).then((committed) => {
         inFlightCountdown.current = null;
         if (committed) firedCountdown.current = generation;
       });
@@ -110,7 +111,6 @@ const MatchLifecycle = () => {
     countdown,
     started,
     halftimeCountdown,
-    halfStops,
     getServerTime,
     completeCountdownIfCurrent,
     writeEligible,

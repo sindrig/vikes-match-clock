@@ -3482,10 +3482,7 @@ describe("goal scorer preparation", () => {
 
       // First controller completes the countdown.
       await act(async () => {
-        const committed = await matchApi!.completeCountdownIfCurrent(
-          observed,
-          [45, 90],
-        );
+        const committed = await matchApi!.completeCountdownIfCurrent(observed);
         expect(committed).toBe(true);
       });
       expect(vi.mocked(firebaseDatabase.writeAuditOnly)).toHaveBeenCalledTimes(
@@ -3498,10 +3495,7 @@ describe("goal scorer preparation", () => {
       // A second controller observing the same (now-obsolete) generation is
       // rejected atomically and writes no second audit.
       await act(async () => {
-        const committed = await matchApi!.completeCountdownIfCurrent(
-          observed,
-          [45, 90],
-        );
+        const committed = await matchApi!.completeCountdownIfCurrent(observed);
         expect(committed).toBe(false);
       });
       expect(vi.mocked(firebaseDatabase.writeAuditOnly)).toHaveBeenCalledTimes(
@@ -3587,10 +3581,7 @@ describe("goal scorer preparation", () => {
       };
 
       await act(async () => {
-        const committed = await matchApi!.completeCountdownIfCurrent(
-          observed,
-          [45, 90],
-        );
+        const committed = await matchApi!.completeCountdownIfCurrent(observed);
         expect(committed).toBe(false);
       });
       expect(vi.mocked(firebaseDatabase.writeAuditOnly)).not.toHaveBeenCalled();

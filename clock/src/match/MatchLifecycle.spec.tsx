@@ -144,14 +144,11 @@ describe("MatchLifecycle", () => {
       h.set({ writeEligible: true });
       h.rerender();
       expect(h.fns.completeCountdownIfCurrent).toHaveBeenCalledTimes(1);
-      expect(h.fns.completeCountdownIfCurrent).toHaveBeenCalledWith(
-        {
-          started: now - 1000,
-          countdown: true,
-          halftimeCountdown: false,
-        },
-        [45, 90, 105, 120],
-      );
+      expect(h.fns.completeCountdownIfCurrent).toHaveBeenCalledWith({
+        started: now - 1000,
+        countdown: true,
+        halftimeCountdown: false,
+      });
 
       await flushPromises();
       advanceTicks();

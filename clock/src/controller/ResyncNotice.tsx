@@ -21,7 +21,9 @@ const ResyncNotice = () => {
 
   return (
     <div className="resync-notice" role="status" aria-live="polite">
-      <span className="resync-notice-icon">⚠</span>
+      <span className="resync-notice-icon" aria-hidden="true">
+        ⚠
+      </span>
       <span>{label}</span>
     </div>
   );

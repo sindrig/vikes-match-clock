@@ -99,7 +99,6 @@ describe("countdownCompletionPrecondition", () => {
     };
     const after = countdownCompletionTransition({
       halftimeCountdown: false,
-      halfStops: before.halfStops,
     })(before);
     // ...so a retry of the same observation is now obsolete.
     expect(countdownCompletionPrecondition(observed)(after)).toBe(false);
@@ -116,7 +115,6 @@ describe("countdownCompletionTransition", () => {
     };
     const after = countdownCompletionTransition({
       halftimeCountdown: false,
-      halfStops: before.halfStops,
     })(before);
     expect(after.started).toBe(0);
     expect(after.countdown).toBe(false);
@@ -133,7 +131,6 @@ describe("countdownCompletionTransition", () => {
     };
     const after = countdownCompletionTransition({
       halftimeCountdown: true,
-      halfStops: before.halfStops,
     })(before);
     expect(after.started).toBe(0);
     expect(after.countdown).toBe(false);
