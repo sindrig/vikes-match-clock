@@ -260,7 +260,7 @@ const MatchLifecycle = () => {
       assetDueTime.current = null;
       return;
     }
-    const generation = `${currentAsset.asset.key}:${currentAsset.time}:${controller.activeQueueId}:${controller.playing}`;
+    const generation = `${currentAsset.asset.key}:${currentAsset.time}:${controller.activeQueueId}`;
     if (assetGeneration.current !== generation) {
       assetGeneration.current = generation;
       assetDueTime.current = getServerTime() + currentAsset.time * 1000;
@@ -270,6 +270,10 @@ const MatchLifecycle = () => {
     if (firedAsset.current === generation) return;
     if (inFlightAsset.current === generation) return;
     if (!writeEligible) return;
+    // A stopped autoplay queue intentionally does not advance. Defer the
+    // completion until playback resumes instead of retrying an aborting
+    // transaction on every lifecycle tick.
+    if (controller.activeQueueId && !controller.playing) return;
     if (getServerTime() >= (assetDueTime.current ?? Infinity)) {
       inFlightAsset.current = generation;
       void completeAssetIfCurrent({

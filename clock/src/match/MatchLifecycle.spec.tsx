@@ -370,6 +370,28 @@ describe("MatchLifecycle", () => {
   });
 
   describe("timed asset completion", () => {
+    it("defers completion while an autoplay queue is stopped", () => {
+      const now = Date.now();
+      vi.setSystemTime(now);
+      const currentAsset = {
+        asset: { key: "a1", type: "image", url: "https://example.com/a.png" },
+        time: 5,
+      };
+      const h = setup({
+        match: makeMatch(),
+        currentAsset,
+        activeQueueId: "q1",
+        playing: false,
+      });
+
+      advanceTicks(60);
+      expect(h.fns.completeAssetIfCurrent).not.toHaveBeenCalled();
+
+      h.set({ playing: true });
+      h.rerender();
+      expect(h.fns.completeAssetIfCurrent).toHaveBeenCalledTimes(1);
+    });
+
     it("completes a due asset after eligibility returns without restarting its timer", async () => {
       const now = Date.now();
       vi.setSystemTime(now);
