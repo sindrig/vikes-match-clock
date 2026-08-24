@@ -41,6 +41,11 @@ const GEN_A_COUNTDOWN_MS = 15 * ONE_MINUTE;
 const GEN_B_ELAPSED_MS = 38 * ONE_MINUTE + 32 * 1000;
 
 test.describe("Stale session mutation safety", () => {
+  // These tests drive a full login, a fake clock, and a real Firebase
+  // emulator reconnection after going offline. On CI (slower runners) the
+  // default 30s test timeout is flaky, so give them headroom.
+  test.describe.configure({ timeout: 60000 });
+
   test.beforeAll(async () => {
     await ensureEmulatorUser();
   });
