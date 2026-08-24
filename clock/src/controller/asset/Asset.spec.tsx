@@ -64,21 +64,19 @@ vi.mock("react-youtube", () => ({
 }));
 
 import { useController, useView } from "../../contexts/FirebaseStateContext";
-import { useAuth } from "../../contexts/LocalStateContext";
 
 const mockedUseController = vi.mocked(useController);
 const mockedUseView = vi.mocked(useView);
-const mockedUseAuth = vi.mocked(useAuth);
 
 describe("AssetComponent", () => {
-  const mockRemoveAssetAfterTimeout = vi.fn();
+  const mockCompleteAssetIfCurrent = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
 
     // Default mock implementations
     mockedUseController.mockReturnValue({
-      removeAssetAfterTimeout: mockRemoveAssetAfterTimeout,
+      completeAssetIfCurrent: mockCompleteAssetIfCurrent,
     } as unknown as ReturnType<typeof useController>);
 
     mockedUseView.mockReturnValue({
@@ -90,11 +88,6 @@ describe("AssetComponent", () => {
         },
       },
     } as unknown as ReturnType<typeof useView>);
-
-    mockedUseAuth.mockReturnValue({
-      isEmpty: false,
-      isLoaded: true,
-    } as unknown as ReturnType<typeof useAuth>);
   });
 
   describe("Null/Empty Asset", () => {
@@ -421,7 +414,7 @@ describe("AssetComponent", () => {
     });
   });
 
-  describe("Auto-remove timeout logic", () => {
+  describe("Passive rendering (auto-expiry)", () => {
     beforeEach(() => {
       vi.useFakeTimers();
     });
@@ -430,7 +423,7 @@ describe("AssetComponent", () => {
       vi.useRealTimers();
     });
 
-    it("sets timeout for IMAGE type when time is provided", () => {
+    it("does NOT mutate shared state when a timed IMAGE local timer elapses", () => {
       const asset = {
         type: assetTypes.IMAGE,
         key: "test-key",
@@ -439,14 +432,13 @@ describe("AssetComponent", () => {
 
       render(<AssetComponent asset={asset} time={5} />);
 
-      expect(mockRemoveAssetAfterTimeout).not.toHaveBeenCalled();
-
       vi.advanceTimersByTime(5000);
 
-      expect(mockRemoveAssetAfterTimeout).toHaveBeenCalledTimes(1);
+      // Rendering is passive: the Asset component never issues a mutation.
+      expect(mockCompleteAssetIfCurrent).not.toHaveBeenCalled();
     });
 
-    it("does not set timeout for URL type (manual remove)", () => {
+    it("renders URL assets without mutating state", () => {
       const asset = {
         type: assetTypes.URL,
         key: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
@@ -456,10 +448,10 @@ describe("AssetComponent", () => {
 
       vi.advanceTimersByTime(5000);
 
-      expect(mockRemoveAssetAfterTimeout).not.toHaveBeenCalled();
+      expect(mockCompleteAssetIfCurrent).not.toHaveBeenCalled();
     });
 
-    it("does not set timeout for VIDEO type (manual remove)", () => {
+    it("renders VIDEO assets without mutating state on a plain render", () => {
       const asset = {
         type: assetTypes.VIDEO,
         key: "video.mp4",
@@ -469,10 +461,10 @@ describe("AssetComponent", () => {
 
       vi.advanceTimersByTime(5000);
 
-      expect(mockRemoveAssetAfterTimeout).not.toHaveBeenCalled();
+      expect(mockCompleteAssetIfCurrent).not.toHaveBeenCalled();
     });
 
-    it("does not set timeout when thumbnail mode is active", () => {
+    it("renders thumbnails without mutating state", () => {
       const asset = {
         type: assetTypes.IMAGE,
         key: "test-key",
@@ -483,45 +475,7 @@ describe("AssetComponent", () => {
 
       vi.advanceTimersByTime(5000);
 
-      expect(mockRemoveAssetAfterTimeout).not.toHaveBeenCalled();
-    });
-
-    it("blocks timeout when auth.isEmpty=true", () => {
-      mockedUseAuth.mockReturnValue({
-        isEmpty: true,
-        isLoaded: true,
-      } as unknown as ReturnType<typeof useAuth>);
-
-      const asset = {
-        type: assetTypes.IMAGE,
-        key: "test-key",
-        url: "https://example.com/image.jpg",
-      };
-
-      render(<AssetComponent asset={asset} time={5} />);
-
-      vi.advanceTimersByTime(5000);
-
-      expect(mockRemoveAssetAfterTimeout).not.toHaveBeenCalled();
-    });
-
-    it("allows timeout when auth.isEmpty=false", () => {
-      mockedUseAuth.mockReturnValue({
-        isEmpty: false,
-        isLoaded: true,
-      } as unknown as ReturnType<typeof useAuth>);
-
-      const asset = {
-        type: assetTypes.IMAGE,
-        key: "test-key",
-        url: "https://example.com/image.jpg",
-      };
-
-      render(<AssetComponent asset={asset} time={5} />);
-
-      vi.advanceTimersByTime(5000);
-
-      expect(mockRemoveAssetAfterTimeout).toHaveBeenCalledTimes(1);
+      expect(mockCompleteAssetIfCurrent).not.toHaveBeenCalled();
     });
   });
 });

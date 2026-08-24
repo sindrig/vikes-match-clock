@@ -1,0 +1,24 @@
+Verification results (task 5.2)
+
+Vitest: 50 files, 1106 tests passed (includes new conditionalTransitions.spec.ts
+25 tests, FirebaseStateContext conditional-transition convergence tests, and
+updated render-only Clock/TimeoutClock/TwoMinClock/Asset specs).
+
+Playwright E2E against Firebase emulators (auth+database started locally):
+  stale-session.spec.ts       2/2 passed (the Phase-1 regression, now green)
+  halftime-countdown.spec.ts  2/2 passed
+  match-flow.spec.ts          6/6 passed
+  basic-navigation.spec.ts    3/3 passed (previously flaky)
+  penalties.spec.ts           6/6 passed
+  assets/admin/disconnect/...  passed
+  Total: 45 passed, 3 failed.
+
+The 3 failures (admin.spec "create invitation", image-upload.spec x2) require
+the storage and functions emulators, which were NOT started in this local run
+(only auth+database). CI starts all four emulators
+(--only auth,database,storage,functions). These tests do not exercise the
+stale-session safety paths and are unrelated to this change.
+
+Formatting: prettier check passed.
+Linting: eslint src exit 0.
+Production build: tsc -p tsconfig.build.json --noEmit clean; vite build OK.

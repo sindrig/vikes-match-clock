@@ -63,6 +63,30 @@ export function writeAuditedState(
   return update(ref(database), updates);
 }
 
+// Writes ONLY the audit record for a command whose state mutation was already
+// committed atomically elsewhere (e.g. a Firebase transaction that performed
+// compare-and-set on the state subtree). Keeps exactly one audit event per
+// successful command. A failed audit write is surfaced to the caller so it can
+// be logged rather than silently dropping accountability.
+export function writeAuditOnly(
+  listenPrefix: string,
+  stateArea: AuditStateArea,
+  diff: Record<string, unknown>,
+  audit: AuditEventPayload,
+): Promise<void> {
+  const eventId = crypto.randomUUID();
+  const auditBase = `audit/${listenPrefix}/${eventId}`;
+  const updates: Record<string, unknown> = {
+    [`${auditBase}/timestamp`]: serverTimestamp(),
+    [`${auditBase}/uid`]: audit.uid,
+    [`${auditBase}/sessionId`]: audit.sessionId,
+    [`${auditBase}/action`]: audit.action,
+    [`${auditBase}/stateArea`]: stateArea,
+    [`${auditBase}/changes`]: JSON.stringify(diff),
+  };
+  return update(ref(database), updates);
+}
+
 export const firebaseDatabase = {
   ref: (path: string): DatabaseReference => ref(database, path),
 
@@ -94,6 +118,7 @@ export const firebaseDatabase = {
     update(ref(database, `states/${listenPrefix}/${stateType}`), data),
 
   writeAudited: writeAuditedState,
+  writeAuditOnly,
 };
 
 export const saveClubOverride = async (

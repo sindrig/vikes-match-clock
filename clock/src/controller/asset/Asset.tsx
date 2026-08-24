@@ -10,7 +10,6 @@ import assetTypes from "./AssetTypes";
 import "./Asset.css";
 import VideoPlayer from "./VideoPlayer";
 import { useController, useView } from "../../contexts/FirebaseStateContext";
-import { useAuth } from "../../contexts/LocalStateContext";
 import { useClubLogo } from "../../hooks/useClubLogo";
 import { isVideoUrl } from "../../utils/matchUtils";
 import { CurrentAsset } from "../../types";
@@ -168,26 +167,28 @@ type AssetProps = OwnProps;
 
 const AssetComponent = (props: AssetProps) => {
   const { asset, thumbnail, time } = props;
-  const { removeAssetAfterTimeout } = useController();
+  const { completeAssetIfCurrent } = useController();
   const {
     view: { vp },
   } = useView();
-  const auth = useAuth();
   const teamLogoUrl = useClubLogo(asset?.teamName || "");
 
-  useEffect(() => {
-    if (auth.isEmpty) {
-      return;
-    }
-    const typesWithoutManualRemove = [assetTypes.URL, assetTypes.VIDEO];
-    const typeNeedsManualRemove =
-      asset && !typesWithoutManualRemove.includes(asset.type);
+  // Passive rendering: mounting, resuming, or a locally elapsed timer must
+  // never mutate shared state. Automatic asset expiry is routed through the
+  // MatchLifecycle coordinator (completeAssetIfCurrent), which is
+  // generation-conditional and freshness-gated. This component only renders.
 
-    if (time && !thumbnail && typeNeedsManualRemove) {
-      const timeout = setTimeout(removeAssetAfterTimeout, time * 1000);
-      return () => clearTimeout(timeout);
-    }
-  }, [time, thumbnail, removeAssetAfterTimeout, asset, auth.isEmpty]);
+  // For media with a natural end event (video / YouTube), notify completion
+  // through the conditional action. The action verifies the current asset
+  // identity still matches, so a stale renderer cannot clear a newer asset.
+  const handleMediaEnded = () => {
+    void completeAssetIfCurrent({
+      assetKey: asset?.key ?? "",
+      time: time ?? null,
+      activeQueueId: null,
+      playing: false,
+    });
+  };
 
   const getPlayerAsset = ({
     asset: playerAsset,
@@ -304,11 +305,7 @@ const AssetComponent = (props: AssetProps) => {
         }
         return (
           <div style={{ backgroundColor: "#000000" }}>
-            <YouTube
-              videoId={videoId}
-              opts={opts}
-              onEnd={removeAssetAfterTimeout}
-            />
+            <YouTube videoId={videoId} opts={opts} onEnd={handleMediaEnded} />
           </div>
         );
       }
@@ -354,7 +351,7 @@ const AssetComponent = (props: AssetProps) => {
       return (
         <VideoPlayer
           asset={asset}
-          onEnded={removeAssetAfterTimeout}
+          onEnded={handleMediaEnded}
           thumbnail={thumbnail}
         />
       );

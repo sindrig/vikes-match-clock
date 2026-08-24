@@ -11,38 +11,49 @@ import { Sports } from "../constants";
 import RedCardManipulation from "./RedCardManipulation";
 import { Match } from "../types";
 import {
-  roundMillisToSeconds,
   formatTimeUnit,
   isMatchResetDisabled,
   isHalftimeTransitionEligible,
 } from "../utils/matchUtils";
-import { useMatch } from "../contexts/FirebaseStateContext";
+import { useMatch, useFirebaseState } from "../contexts/FirebaseStateContext";
+
+// Backward corrections at or above this magnitude require explicit operator
+// confirmation before they are applied.
+const BACKWARD_CORRECTION_CONFIRM_THRESHOLD_MS = 60 * 1000;
 
 const ClockManipulationButton = ({
   seconds,
   match,
-  updateMatch,
+  adjustMatchTime,
   direction,
 }: {
   seconds: number;
   match: Match;
-  updateMatch: (update: Partial<Match>) => void;
+  adjustMatchTime: (deltaMs: number) => void;
   direction: "add" | "subtract";
 }) => {
   const { value, unit } = formatTimeUnit(seconds);
   const multiplier = direction === "add" ? 1 : -1;
   const prefix = direction === "add" ? "+" : "-";
+  const deltaMs = seconds * 1000 * multiplier;
   return (
     <button
       type="button"
       className="time-adjust-btn"
-      onClick={() =>
-        updateMatch({
-          timeElapsed:
-            roundMillisToSeconds(match.timeElapsed) +
-            seconds * 1000 * multiplier,
-        })
-      }
+      onClick={() => {
+        // Substantial backward time corrections are destructive: require an
+        // explicit confirmation so an accidental tap cannot rewind the clock.
+        if (
+          deltaMs < 0 &&
+          -deltaMs >= BACKWARD_CORRECTION_CONFIRM_THRESHOLD_MS
+        ) {
+          const confirmed = window.confirm(
+            `Ertu viss um að leiðrétta tímann aftur um ${value}${unit}?`,
+          );
+          if (!confirmed) return;
+        }
+        adjustMatchTime(deltaMs);
+      }}
       disabled={!!match.timeout}
     >
       {prefix}
@@ -56,12 +67,12 @@ const TimeControlDialog = ({
   open,
   onClose,
   match,
-  updateMatch,
+  adjustMatchTime,
 }: {
   open: boolean;
   onClose: () => void;
   match: Match;
-  updateMatch: (update: Partial<Match>) => void;
+  adjustMatchTime: (deltaMs: number) => void;
 }) => {
   const timeSteps = [1, 5, 60, 60 * 5];
   return (
@@ -83,13 +94,13 @@ const TimeControlDialog = ({
                   <ClockManipulationButton
                     seconds={seconds}
                     match={match}
-                    updateMatch={updateMatch}
+                    adjustMatchTime={adjustMatchTime}
                     direction="add"
                   />
                   <ClockManipulationButton
                     seconds={seconds}
                     match={match}
-                    updateMatch={updateMatch}
+                    adjustMatchTime={adjustMatchTime}
                     direction="subtract"
                   />
                 </ButtonGroup>
@@ -112,6 +123,7 @@ const MatchActions = () => {
   const {
     match,
     updateMatch,
+    adjustMatchTime,
     pauseMatch,
     startMatch,
     resetMatch,
@@ -121,6 +133,7 @@ const MatchActions = () => {
     startHalftimeCountdown,
     stopHalftimeCountdown,
   } = useMatch();
+  const { writeEligible } = useFirebaseState();
 
   const [showTimeDialog, setShowTimeDialog] = useState(false);
 
@@ -134,6 +147,7 @@ const MatchActions = () => {
               appearance="primary"
               size="sm"
               onClick={stopHalftimeCountdown}
+              disabled={!writeEligible}
               block
             >
               <PauseIcon /> Stöðva niðurtalningu
@@ -144,7 +158,7 @@ const MatchActions = () => {
               appearance="primary"
               size="sm"
               onClick={() => pauseMatch()}
-              disabled={!!match.timeout}
+              disabled={!!match.timeout || !writeEligible}
               block
             >
               <PauseIcon /> Pása
@@ -155,7 +169,7 @@ const MatchActions = () => {
               appearance="primary"
               size="sm"
               onClick={startMatch}
-              disabled={!!match.timeout}
+              disabled={!!match.timeout || !writeEligible}
               block
             >
               <PlayIcon /> Byrja
@@ -169,7 +183,7 @@ const MatchActions = () => {
                   appearance="primary"
                   size="sm"
                   onClick={countdown}
-                  disabled={!!match.timeout}
+                  disabled={!!match.timeout || !writeEligible}
                   block
                 >
                   Hefja niðurtalningu
@@ -183,7 +197,7 @@ const MatchActions = () => {
                   appearance="primary"
                   size="sm"
                   onClick={startHalftimeCountdown}
-                  disabled={!!match.timeout}
+                  disabled={!!match.timeout || !writeEligible}
                   block
                 >
                   Næsti hálfleikur
@@ -248,7 +262,7 @@ const MatchActions = () => {
         open={showTimeDialog}
         onClose={() => setShowTimeDialog(false)}
         match={match}
-        updateMatch={updateMatch}
+        adjustMatchTime={adjustMatchTime}
       />
     </div>
   );

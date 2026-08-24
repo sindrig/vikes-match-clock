@@ -35,27 +35,24 @@ describe("TimeoutClock", () => {
     vi.useRealTimers();
   });
 
+  const mockMatch = (timeout: number) =>
+    mockedUseMatch.mockReturnValue({
+      match: { timeout },
+      removeTimeout: vi.fn(),
+      buzz: vi.fn(),
+      getServerTime: makeGetServerTime(),
+    } as unknown as ReturnType<typeof useMatch>);
+
   describe("rendering", () => {
     it("renders null when no timeout is active", () => {
-      mockedUseMatch.mockReturnValue({
-        match: { timeout: 0 },
-        removeTimeout: vi.fn(),
-        buzz: vi.fn(),
-        getServerTime: makeGetServerTime(),
-      } as unknown as ReturnType<typeof useMatch>);
-
+      mockMatch(0);
       render(<TimeoutClock className="timeout-clock" />);
 
       expect(screen.getByText("null")).toBeInTheDocument();
     });
 
     it("renders with the provided className", () => {
-      mockedUseMatch.mockReturnValue({
-        match: { timeout: Date.now() },
-        removeTimeout: vi.fn(),
-        buzz: vi.fn(),
-        getServerTime: makeGetServerTime(),
-      } as unknown as ReturnType<typeof useMatch>);
+      mockMatch(Date.now());
 
       const { container } = render(
         <TimeoutClock className="custom-timeout-clock" />,
@@ -70,13 +67,7 @@ describe("TimeoutClock", () => {
       const now = Date.now();
       vi.setSystemTime(now);
 
-      mockedUseMatch.mockReturnValue({
-        match: { timeout: now },
-        removeTimeout: vi.fn(),
-        buzz: vi.fn(),
-        getServerTime: makeGetServerTime(),
-      } as unknown as ReturnType<typeof useMatch>);
-
+      mockMatch(now);
       render(<TimeoutClock className="timeout-clock" />);
 
       expect(screen.getByText("01:01")).toBeInTheDocument();
@@ -88,15 +79,7 @@ describe("TimeoutClock", () => {
       const startTime = Date.now();
       vi.setSystemTime(startTime);
 
-      const removeTimeout = vi.fn();
-      const buzz = vi.fn();
-
-      mockedUseMatch.mockReturnValue({
-        match: { timeout: startTime },
-        removeTimeout,
-        buzz,
-        getServerTime: makeGetServerTime(),
-      } as unknown as ReturnType<typeof useMatch>);
+      mockMatch(startTime);
 
       const { rerender } = render(<TimeoutClock className="timeout-clock" />);
 
@@ -112,15 +95,7 @@ describe("TimeoutClock", () => {
       const startTime = Date.now();
       vi.setSystemTime(startTime);
 
-      const removeTimeout = vi.fn();
-      const buzz = vi.fn();
-
-      mockedUseMatch.mockReturnValue({
-        match: { timeout: startTime },
-        removeTimeout,
-        buzz,
-        getServerTime: makeGetServerTime(),
-      } as unknown as ReturnType<typeof useMatch>);
+      mockMatch(startTime);
 
       const { rerender } = render(<TimeoutClock className="timeout-clock" />);
 
@@ -136,237 +111,12 @@ describe("TimeoutClock", () => {
     });
   });
 
-  describe("buzzer trigger", () => {
-    it("triggers buzz when 10 seconds remain (warning)", () => {
-      const startTime = Date.now();
-      vi.setSystemTime(startTime);
-
-      const removeTimeout = vi.fn();
-      const buzz = vi.fn();
-
-      mockedUseMatch.mockReturnValue({
-        match: { timeout: startTime },
-        removeTimeout,
-        buzz,
-        getServerTime: makeGetServerTime(),
-      } as unknown as ReturnType<typeof useMatch>);
-
-      const { rerender } = render(<TimeoutClock className="timeout-clock" />);
-
-      expect(buzz).not.toHaveBeenCalled();
-
-      vi.advanceTimersByTime(51000);
-      rerender(<TimeoutClock className="timeout-clock" />);
-
-      expect(buzz).toHaveBeenCalledWith(true);
-      expect(buzz).toHaveBeenCalledTimes(1);
-    });
-
-    it("does not trigger warning buzz multiple times", () => {
-      const startTime = Date.now();
-      vi.setSystemTime(startTime);
-
-      const removeTimeout = vi.fn();
-      const buzz = vi.fn();
-
-      mockedUseMatch.mockReturnValue({
-        match: { timeout: startTime },
-        removeTimeout,
-        buzz,
-        getServerTime: makeGetServerTime(),
-      } as unknown as ReturnType<typeof useMatch>);
-
-      const { rerender } = render(<TimeoutClock className="timeout-clock" />);
-
-      vi.advanceTimersByTime(51000);
-      rerender(<TimeoutClock className="timeout-clock" />);
-      expect(buzz).toHaveBeenCalledTimes(1);
-
-      vi.advanceTimersByTime(1000);
-      rerender(<TimeoutClock className="timeout-clock" />);
-      expect(buzz).toHaveBeenCalledTimes(1);
-
-      vi.advanceTimersByTime(1000);
-      rerender(<TimeoutClock className="timeout-clock" />);
-      expect(buzz).toHaveBeenCalledTimes(1);
-    });
-
-    it("triggers buzz when timer expires", () => {
-      const startTime = Date.now();
-      vi.setSystemTime(startTime);
-
-      const removeTimeout = vi.fn();
-      const buzz = vi.fn();
-
-      mockedUseMatch.mockReturnValue({
-        match: { timeout: startTime },
-        removeTimeout,
-        buzz,
-        getServerTime: makeGetServerTime(),
-      } as unknown as ReturnType<typeof useMatch>);
-
-      const { rerender } = render(<TimeoutClock className="timeout-clock" />);
-
-      vi.advanceTimersByTime(TIMEOUT_LENGTH + 1000);
-      rerender(<TimeoutClock className="timeout-clock" />);
-
-      expect(buzz).toHaveBeenCalledWith(true);
-    });
-  });
-
-  describe("timer expiry", () => {
-    it("calls removeTimeout when timer reaches zero", () => {
-      const startTime = Date.now();
-      vi.setSystemTime(startTime);
-
-      const removeTimeout = vi.fn();
-      const buzz = vi.fn();
-
-      mockedUseMatch.mockReturnValue({
-        match: { timeout: startTime },
-        removeTimeout,
-        buzz,
-        getServerTime: makeGetServerTime(),
-      } as unknown as ReturnType<typeof useMatch>);
-
-      const { rerender } = render(<TimeoutClock className="timeout-clock" />);
-
-      expect(removeTimeout).not.toHaveBeenCalled();
-
-      vi.advanceTimersByTime(TIMEOUT_LENGTH + 1000);
-      rerender(<TimeoutClock className="timeout-clock" />);
-
-      vi.advanceTimersByTime(10);
-      rerender(<TimeoutClock className="timeout-clock" />);
-
-      expect(removeTimeout).toHaveBeenCalledTimes(1);
-    });
-
-    it("delays removeTimeout by 10ms to allow state update", () => {
-      const startTime = Date.now();
-      vi.setSystemTime(startTime);
-
-      const removeTimeout = vi.fn();
-      const buzz = vi.fn();
-
-      mockedUseMatch.mockReturnValue({
-        match: { timeout: startTime },
-        removeTimeout,
-        buzz,
-        getServerTime: makeGetServerTime(),
-      } as unknown as ReturnType<typeof useMatch>);
-
-      const { rerender } = render(<TimeoutClock className="timeout-clock" />);
-
-      vi.advanceTimersByTime(TIMEOUT_LENGTH + 1000);
-      rerender(<TimeoutClock className="timeout-clock" />);
-
-      expect(removeTimeout).not.toHaveBeenCalled();
-
-      vi.advanceTimersByTime(5);
-      expect(removeTimeout).not.toHaveBeenCalled();
-
-      vi.advanceTimersByTime(5);
-      rerender(<TimeoutClock className="timeout-clock" />);
-      expect(removeTimeout).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe("timeout change detection", () => {
-    it("resets warningPlayed when timeout changes", () => {
-      const startTime1 = Date.now();
-      vi.setSystemTime(startTime1);
-
-      const removeTimeout = vi.fn();
-      const buzz = vi.fn();
-
-      mockedUseMatch.mockReturnValue({
-        match: { timeout: startTime1 },
-        removeTimeout,
-        buzz,
-        getServerTime: makeGetServerTime(),
-      } as unknown as ReturnType<typeof useMatch>);
-
-      const { rerender } = render(<TimeoutClock className="timeout-clock" />);
-
-      vi.advanceTimersByTime(51000);
-      rerender(<TimeoutClock className="timeout-clock" />);
-
-      expect(buzz).toHaveBeenCalledTimes(1);
-
-      const startTime2 = Date.now();
-      mockedUseMatch.mockReturnValue({
-        match: { timeout: startTime2 },
-        removeTimeout,
-        buzz,
-        getServerTime: makeGetServerTime(),
-      } as unknown as ReturnType<typeof useMatch>);
-
-      rerender(<TimeoutClock className="timeout-clock" />);
-
-      vi.advanceTimersByTime(51000);
-      rerender(<TimeoutClock className="timeout-clock" />);
-
-      expect(buzz).toHaveBeenCalledTimes(2);
-    });
-
-    it("resets warningPlayed when timeout is removed and restarted", () => {
-      const startTime = Date.now();
-      vi.setSystemTime(startTime);
-
-      const removeTimeout = vi.fn();
-      const buzz = vi.fn();
-
-      mockedUseMatch.mockReturnValue({
-        match: { timeout: startTime },
-        removeTimeout,
-        buzz,
-        getServerTime: makeGetServerTime(),
-      } as unknown as ReturnType<typeof useMatch>);
-
-      const { rerender } = render(<TimeoutClock className="timeout-clock" />);
-
-      vi.advanceTimersByTime(51000);
-      rerender(<TimeoutClock className="timeout-clock" />);
-      expect(buzz).toHaveBeenCalledTimes(1);
-
-      mockedUseMatch.mockReturnValue({
-        match: { timeout: 0 },
-        removeTimeout,
-        buzz,
-        getServerTime: makeGetServerTime(),
-      } as unknown as ReturnType<typeof useMatch>);
-
-      rerender(<TimeoutClock className="timeout-clock" />);
-
-      const newStartTime = Date.now();
-      mockedUseMatch.mockReturnValue({
-        match: { timeout: newStartTime },
-        removeTimeout,
-        buzz,
-        getServerTime: makeGetServerTime(),
-      } as unknown as ReturnType<typeof useMatch>);
-
-      rerender(<TimeoutClock className="timeout-clock" />);
-
-      vi.advanceTimersByTime(51000);
-      rerender(<TimeoutClock className="timeout-clock" />);
-
-      expect(buzz).toHaveBeenCalledTimes(2);
-    });
-  });
-
   describe("time formatting", () => {
     it("formats time as MM:SS", () => {
       const startTime = Date.now();
       vi.setSystemTime(startTime);
 
-      mockedUseMatch.mockReturnValue({
-        match: { timeout: startTime },
-        removeTimeout: vi.fn(),
-        buzz: vi.fn(),
-        getServerTime: makeGetServerTime(),
-      } as unknown as ReturnType<typeof useMatch>);
+      mockMatch(startTime);
 
       render(<TimeoutClock className="timeout-clock" />);
 
@@ -374,14 +124,16 @@ describe("TimeoutClock", () => {
       expect(timeDisplay).toBeInTheDocument();
     });
 
-    it("shows 00:00 when timer has expired", () => {
+    it("shows 00:00 when timer has expired (render-only, no mutation)", () => {
       const startTime = Date.now();
       vi.setSystemTime(startTime);
 
+      const removeTimeout = vi.fn();
+      const buzz = vi.fn();
       mockedUseMatch.mockReturnValue({
         match: { timeout: startTime },
-        removeTimeout: vi.fn(),
-        buzz: vi.fn(),
+        removeTimeout,
+        buzz,
         getServerTime: makeGetServerTime(),
       } as unknown as ReturnType<typeof useMatch>);
 
@@ -391,6 +143,10 @@ describe("TimeoutClock", () => {
       rerender(<TimeoutClock className="timeout-clock" />);
 
       expect(screen.getByText("00:00")).toBeInTheDocument();
+      // Timeout expiry is handled by the MatchLifecycle coordinator through a
+      // conditional, freshness-gated action — never by the renderer.
+      expect(removeTimeout).not.toHaveBeenCalled();
+      expect(buzz).not.toHaveBeenCalled();
     });
   });
 });

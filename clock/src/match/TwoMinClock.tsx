@@ -8,12 +8,15 @@ interface TwoMinClockProps {
   uniqueKey: string;
 }
 
+// Render-only penalty countdown clock. Penalty expiry is handled by the
+// MatchLifecycle coordinator through a generation-conditional, freshness-gated
+// action; this component only displays the remaining time.
 const TwoMinClock: React.FC<TwoMinClockProps> = ({
   atTimeElapsed,
   penaltyLength,
   uniqueKey,
 }) => {
-  const { match, removePenalty, getServerTime } = useMatch();
+  const { match, getServerTime } = useMatch();
   const { started, timeElapsed } = match;
   const [time, setTime] = useState<string | null>(null);
 
@@ -26,21 +29,9 @@ const TwoMinClock: React.FC<TwoMinClockProps> = ({
     if (started) {
       milliSecondsElapsed += getServerTime() - started;
     }
-    const milliSecondsLeft = penaltyLength - milliSecondsElapsed;
-    if (milliSecondsLeft < 0) {
-      removePenalty(uniqueKey);
-    } else {
-      setTime(formatMillisAsTime(milliSecondsLeft));
-    }
-  }, [
-    started,
-    timeElapsed,
-    atTimeElapsed,
-    penaltyLength,
-    removePenalty,
-    uniqueKey,
-    getServerTime,
-  ]);
+    const milliSecondsLeft = Math.max(penaltyLength - milliSecondsElapsed, 0);
+    setTime(formatMillisAsTime(milliSecondsLeft));
+  }, [started, timeElapsed, atTimeElapsed, penaltyLength, getServerTime]);
 
   useEffect(() => {
     const interval = setInterval(updateTime, 100);
@@ -48,7 +39,11 @@ const TwoMinClock: React.FC<TwoMinClockProps> = ({
   }, [updateTime]);
 
   const displayedTime = time || formatMillisAsTime(penaltyLength);
-  return <div className="penalty">{displayedTime}</div>;
+  return (
+    <div className="penalty" data-penalty-key={uniqueKey}>
+      {displayedTime}
+    </div>
+  );
 };
 
 export default TwoMinClock;

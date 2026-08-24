@@ -1,7 +1,7 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, act, waitFor } from "@testing-library/react";
-import { onValue, ref, set } from "firebase/database";
+import { onValue, ref, set, runTransaction } from "firebase/database";
 import { httpsCallable } from "firebase/functions";
 import {
   FirebaseStateProvider,
@@ -18,6 +18,7 @@ import { firebaseDatabase } from "../firebaseDatabase";
 vi.mock("../firebaseDatabase", () => ({
   firebaseDatabase: {
     writeAudited: vi.fn().mockResolvedValue(undefined),
+    writeAuditOnly: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
@@ -36,7 +37,12 @@ vi.mock("firebase/database", () => ({
   onValue: vi.fn(() => vi.fn()),
   set: vi.fn(() => Promise.resolve()),
   remove: vi.fn(() => Promise.resolve()),
+  runTransaction: vi.fn(),
 }));
+
+// In-memory authoritative database used to emulate compare-and-set
+// transactions for the conditional-transition tests.
+const mockDbState = new Map<string, unknown>();
 
 const TestMatchConsumer = ({
   onMount,
@@ -101,22 +107,38 @@ const TestPerimeterConsumer = ({
 describe("FirebaseStateContext", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockDbState.clear();
     vi.mocked(ref).mockImplementation((_, path) => path as never);
 
     vi.mocked(onValue).mockImplementation((reference, callback) => {
       const path = String(reference);
+      const state = mockDbState.get(path) ?? null;
 
       if (path.includes("clubOverrides")) {
         callback({
-          val: () => null,
+          val: () => state,
         } as never);
       } else {
         callback({
-          val: () => null,
+          val: () => state,
         } as never);
       }
 
       return vi.fn();
+    });
+
+    // Emulate a compare-and-set transaction against the in-memory
+    // authoritative state. Returning `undefined` from the update function
+    // aborts the transaction (obsolete/duplicate attempt).
+    vi.mocked(runTransaction).mockImplementation((dbRef, updateFn) => {
+      const path = String(dbRef);
+      const current = mockDbState.get(path) ?? null;
+      const next = updateFn(current);
+      if (next === undefined) {
+        return { committed: false, snapshot: { val: () => current } };
+      }
+      mockDbState.set(path, next);
+      return { committed: true, snapshot: { val: () => next } };
     });
   });
 
@@ -314,7 +336,15 @@ describe("FirebaseStateContext", () => {
   });
 
   describe("match actions", () => {
-    it("startMatch sets started timestamp and clears countdown", () => {
+    it("startMatch sets started timestamp and clears countdown", async () => {
+      mockDbState.set("states/test-location/match", {
+        started: 0,
+        countdown: false,
+        halftimeCountdown: false,
+        timeElapsed: 0,
+        halfStops: [45, 90],
+      });
+      vi.mocked(firebaseDatabase.writeAuditOnly).mockClear();
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
@@ -329,10 +359,11 @@ describe("FirebaseStateContext", () => {
           />
         </FirebaseStateProvider>,
       );
-      act(() => {
+      await act(async () => {
         matchApi!.startMatch();
+        await Promise.resolve();
       });
-      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAuditOnly).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({
@@ -342,7 +373,15 @@ describe("FirebaseStateContext", () => {
       );
     });
 
-    it("pauseMatch sets started to 0", () => {
+    it("pauseMatch sets started to 0", async () => {
+      mockDbState.set("states/test-location/match", {
+        started: 0,
+        countdown: false,
+        halftimeCountdown: false,
+        timeElapsed: 0,
+        halfStops: [45, 90],
+      });
+      vi.mocked(firebaseDatabase.writeAuditOnly).mockClear();
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
@@ -357,10 +396,11 @@ describe("FirebaseStateContext", () => {
           />
         </FirebaseStateProvider>,
       );
-      act(() => {
+      await act(async () => {
         matchApi!.pauseMatch();
+        await Promise.resolve();
       });
-      expect(firebaseDatabase.writeAudited).not.toHaveBeenCalled();
+      expect(firebaseDatabase.writeAuditOnly).not.toHaveBeenCalled();
     });
 
     it("addGoal increments homeScore", () => {
@@ -1380,7 +1420,15 @@ describe("FirebaseStateContext", () => {
   });
 
   describe("pauseMatch with isHalfEnd", () => {
-    it("sets timeElapsed to first halfStop and slices halfStops", () => {
+    it("sets timeElapsed to first halfStop and slices halfStops", async () => {
+      mockDbState.set("states/test-location/match", {
+        started: 5000,
+        countdown: false,
+        halftimeCountdown: false,
+        timeElapsed: 0,
+        halfStops: [45, 90, 105, 120],
+      });
+      vi.mocked(firebaseDatabase.writeAuditOnly).mockClear();
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
@@ -1395,14 +1443,11 @@ describe("FirebaseStateContext", () => {
           />
         </FirebaseStateProvider>,
       );
-      act(() => {
-        matchApi!.startMatch();
-      });
-      vi.clearAllMocks();
-      act(() => {
+      await act(async () => {
         matchApi!.pauseMatch(true);
+        await Promise.resolve();
       });
-      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAuditOnly).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({
@@ -1414,7 +1459,15 @@ describe("FirebaseStateContext", () => {
       );
     });
 
-    it("accumulates timeElapsed on normal pause", () => {
+    it("accumulates timeElapsed on normal pause", async () => {
+      mockDbState.set("states/test-location/match", {
+        started: 5000,
+        countdown: false,
+        halftimeCountdown: false,
+        timeElapsed: 0,
+        halfStops: [45, 90, 105, 120],
+      });
+      vi.mocked(firebaseDatabase.writeAuditOnly).mockClear();
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
@@ -1429,14 +1482,11 @@ describe("FirebaseStateContext", () => {
           />
         </FirebaseStateProvider>,
       );
-      act(() => {
-        matchApi!.startMatch();
-      });
-      vi.clearAllMocks();
-      act(() => {
+      await act(async () => {
         matchApi!.pauseMatch();
+        await Promise.resolve();
       });
-      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAuditOnly).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({
@@ -1658,9 +1708,10 @@ describe("FirebaseStateContext", () => {
       expect(firebaseDatabase.writeAudited).not.toHaveBeenCalled();
     });
 
-    it("leaves the match paused at the completed boundary on halftime countdown expiry", () => {
+    it("leaves the match paused at the completed boundary on halftime countdown expiry", async () => {
       const matchApi = renderHalftimeApi();
-      act(() => {
+      vi.mocked(firebaseDatabase.writeAuditOnly).mockClear();
+      await act(async () => {
         matchApi.updateMatch({
           started: 1_234_567_890,
           timeElapsed: 0,
@@ -1668,12 +1719,23 @@ describe("FirebaseStateContext", () => {
           halftimeCountdown: true,
           halfStops: [45, 90],
         });
+        await Promise.resolve();
+      });
+      // Authoritative state must match what the operator observed (the
+      // conditional pause re-validates against current state).
+      mockDbState.set("states/test-location/match", {
+        started: 1_234_567_890,
+        timeElapsed: 0,
+        countdown: true,
+        halftimeCountdown: true,
+        halfStops: [45, 90],
       });
       vi.clearAllMocks();
-      act(() => {
+      await act(async () => {
         matchApi.pauseMatch();
+        await Promise.resolve();
       });
-      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAuditOnly).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({
@@ -2239,7 +2301,15 @@ describe("FirebaseStateContext", () => {
       expect(matchApi!.match.started).toBe(0);
     });
 
-    it("startMatch uses getServerTime for timestamp", () => {
+    it("startMatch uses getServerTime for timestamp", async () => {
+      mockDbState.set("states/test-location/match", {
+        started: 0,
+        countdown: false,
+        halftimeCountdown: false,
+        timeElapsed: 0,
+        halfStops: [45, 90],
+      });
+      vi.mocked(firebaseDatabase.writeAuditOnly).mockClear();
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
@@ -2254,17 +2324,27 @@ describe("FirebaseStateContext", () => {
           />
         </FirebaseStateProvider>,
       );
-      act(() => {
+      await act(async () => {
         matchApi!.startMatch();
+        await Promise.resolve();
       });
-      // Verify set was called with a timestamp close to Date.now()
-      const call = vi.mocked(firebaseDatabase.writeAudited).mock.calls[0]!;
-      const writtenMatch = call[2];
-      expect(writtenMatch.started).toBeGreaterThan(Date.now() - 100);
-      expect(writtenMatch.started).toBeLessThan(Date.now() + 100);
+      // Verify the audit records a timestamp close to Date.now()
+      const call = vi.mocked(firebaseDatabase.writeAuditOnly).mock.calls[0]!;
+      const writtenDiff = call[2];
+      expect(writtenDiff.started).toBeGreaterThan(Date.now() - 100);
+      expect(writtenDiff.started).toBeLessThan(Date.now() + 100);
     });
 
-    it("pauseMatch computes timeElapsed using getServerTime", () => {
+    it("pauseMatch computes timeElapsed using getServerTime", async () => {
+      const startedAt = Date.now();
+      mockDbState.set("states/test-location/match", {
+        started: startedAt,
+        countdown: false,
+        halftimeCountdown: false,
+        timeElapsed: 0,
+        halfStops: [45, 90],
+      });
+      vi.mocked(firebaseDatabase.writeAuditOnly).mockClear();
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
@@ -2279,14 +2359,11 @@ describe("FirebaseStateContext", () => {
           />
         </FirebaseStateProvider>,
       );
-      act(() => {
-        matchApi!.startMatch();
-      });
-      vi.clearAllMocks();
-      act(() => {
+      await act(async () => {
         matchApi!.pauseMatch();
+        await Promise.resolve();
       });
-      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAuditOnly).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({
@@ -2294,14 +2371,15 @@ describe("FirebaseStateContext", () => {
         }),
         expect.anything(),
       );
-      const pauseCall = vi.mocked(firebaseDatabase.writeAudited).mock.calls[0]!;
-      const pauseData = pauseCall[2];
+      const pauseCall = vi.mocked(firebaseDatabase.writeAuditOnly).mock
+        .calls[0]!;
+      const pauseDiff = pauseCall[2];
       // timeElapsed is computed via getServerTime() - started, ~0ms in tests.
       // The diff optimization may skip it if it stays at 0 (the default),
       // so we verify it's either absent or a small non-negative number.
-      if (pauseData.timeElapsed !== undefined) {
-        expect(pauseData.timeElapsed).toBeGreaterThanOrEqual(0);
-        expect(pauseData.timeElapsed).toBeLessThan(100);
+      if (pauseDiff.timeElapsed !== undefined) {
+        expect(pauseDiff.timeElapsed).toBeGreaterThanOrEqual(0);
+        expect(pauseDiff.timeElapsed).toBeLessThan(100);
       }
     });
   });
@@ -3292,5 +3370,136 @@ describe("goal scorer preparation", () => {
             String(path) === "states/vikuti/perimeter/goalScorerPreparation",
         ),
     ).toBe(false);
+  });
+
+  describe("conditional transitions (multi-controller convergence)", () => {
+    it("commits a current countdown completion once with one audit, and rejects an obsolete duplicate attempt", async () => {
+      // Authoritative state: an active pre-match countdown generation.
+      mockDbState.set("states/test-location/match", {
+        started: 1000,
+        countdown: true,
+        halftimeCountdown: false,
+        timeElapsed: 0,
+        halfStops: [45, 90],
+        homeScore: 0,
+        awayScore: 0,
+        homeTeam: "Víkingur R",
+        awayTeam: "",
+        homeTeamId: 103,
+        awayTeamId: 0,
+        injuryTime: 0,
+        matchType: "football",
+        home2min: [],
+        away2min: [],
+        timeout: 0,
+        homeTimeouts: 0,
+        awayTimeouts: 0,
+        buzzer: false,
+        injuryTimeDisplayMode: "full",
+      });
+
+      let matchApi: ReturnType<typeof useMatch> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+          screenKey={null}
+        >
+          <TestMatchConsumer
+            onMount={(api) => {
+              matchApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+
+      const observed = {
+        started: 1000,
+        countdown: true,
+        halftimeCountdown: false,
+      };
+
+      vi.mocked(firebaseDatabase.writeAuditOnly).mockClear();
+
+      // First controller completes the countdown.
+      await act(async () => {
+        const committed = await matchApi!.completeCountdownIfCurrent(
+          observed,
+          [45, 90],
+        );
+        expect(committed).toBe(true);
+      });
+      expect(vi.mocked(firebaseDatabase.writeAuditOnly)).toHaveBeenCalledTimes(
+        1,
+      );
+      expect(vi.mocked(firebaseDatabase.writeAuditOnly).mock.calls[0]![1]).toBe(
+        "match",
+      );
+
+      // A second controller observing the same (now-obsolete) generation is
+      // rejected atomically and writes no second audit.
+      await act(async () => {
+        const committed = await matchApi!.completeCountdownIfCurrent(
+          observed,
+          [45, 90],
+        );
+        expect(committed).toBe(false);
+      });
+      expect(vi.mocked(firebaseDatabase.writeAuditOnly)).toHaveBeenCalledTimes(
+        1,
+      );
+    });
+
+    it("rejects a conditional timeout expiry for a newer active timeout", async () => {
+      mockDbState.set("states/test-location/match", {
+        started: 0,
+        countdown: false,
+        halftimeCountdown: false,
+        timeElapsed: 0,
+        halfStops: [45, 90],
+        homeScore: 0,
+        awayScore: 0,
+        homeTeam: "Víkingur R",
+        awayTeam: "",
+        homeTeamId: 103,
+        awayTeamId: 0,
+        injuryTime: 0,
+        matchType: "football",
+        home2min: [],
+        away2min: [],
+        timeout: 9999,
+        homeTimeouts: 0,
+        awayTimeouts: 0,
+        buzzer: false,
+        injuryTimeDisplayMode: "full",
+      });
+
+      let matchApi: ReturnType<typeof useMatch> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+          screenKey={null}
+        >
+          <TestMatchConsumer
+            onMount={(api) => {
+              matchApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+
+      // Reset the audit mock explicitly: mocks created in the vi.mock factory
+      // are not always reset by the shared clearAllMocks between tests.
+      vi.mocked(firebaseDatabase.writeAuditOnly).mockClear();
+
+      await act(async () => {
+        const committed = await matchApi!.removeTimeoutIfCurrent({
+          timeout: 1234,
+        });
+        expect(committed).toBe(false);
+      });
+      expect(vi.mocked(firebaseDatabase.writeAuditOnly)).not.toHaveBeenCalled();
+    });
   });
 });

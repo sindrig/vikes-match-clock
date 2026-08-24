@@ -55,6 +55,50 @@ Multiple controllers can connect to the same `listenPrefix` simultaneously:
 - Uses **last-write-wins** semantics (no conflict resolution)
 - For production use, coordinate with your team to avoid simultaneous edits
 
+### Stale-Session Mutation Safety (REQUIRED RULES)
+
+A suspended/hidden/offline browser must never mutate authoritative state with
+obsolete timer-derived commands. The following rules are mandatory:
+
+**1. Rendering components are read-only.** `Clock`, `TimeoutClock`,
+`TwoMinClock`, and `Asset` may derive and display expired/zero state locally
+but MUST NOT call shared-state mutation functions from interval, timeout,
+media-end, mount, resume, or `visibilitychange` callbacks. Automatic
+progression (countdown completion, half-stops, timeout/penalty expiry, timed
+asset completion) is routed through the `MatchLifecycle` coordinator
+(`src/match/MatchLifecycle.tsx`) — mounted once in `App.tsx` — which submits
+generation-conditional actions.
+
+**2. Freshness barrier.** An authenticated client is only write-eligible while
+it has confirmed current Firebase state. `FirebaseStateContext` tracks
+`writeFreshness` (`loading | ready | hidden | offline | resyncing`); the client
+becomes ineligible on `visibilitychange`→hidden, `pagehide`, or offline, and
+returns to `ready` only after a core subscription delivers a post-resume
+snapshot. Every authenticated mutation is gated on `writeEligible`
+(`writeFreshness === "ready"`). Stale attempts are dropped, never queued for
+replay. The UI surfaces this via `ResyncNotice` (`controller/ResyncNotice.tsx`)
+and disables primary match controls while resyncing.
+
+**3. Conditional automatic transitions (compare-and-set).** Automatic
+lifecycle progression uses Firebase `runTransaction` to re-validate its
+precondition against CURRENT authoritative state before committing. Precondition
+identities come from existing fields only: `started`+`countdown`+
+`halftimeCountdown` (clock), `timeout` (timeout), penalty `key`+creation data
+(penalty), current-asset identity+queue (asset). An obsolete or duplicate
+attempt aborts the transaction and leaves state unchanged. Only the first
+concurrent attempt commits; exactly one audit event is written per committed
+transition (`firebaseDatabase.writeAuditOnly`).
+
+**4. Explicit controls are generation-conditional too.** `startMatch` and
+`pauseMatch` submit the observed generation as a precondition and fail closed
+if authoritative state advanced to a newer generation. Substantial backward
+time corrections (Tímastjórnun) require explicit operator confirmation and are
+audited distinctly (`match.correct-time-backward`).
+
+Do NOT reintroduce renderer-side mutations, optimistic expiry, or offline
+replay queues. See `openspec/changes/prevent-stale-session-mutations/` for the
+full design and the `e2e/stale-session.spec.ts` regression.
+
 ### Firebase Audit Trail (Breytingasaga)
 
 Every authenticated client mutation of shared match, controller, view,
@@ -92,6 +136,15 @@ write creates no event and no state change. Diff keys (which include nested
 paths like `queues/{id}`) are expanded into full leaf paths in the update map:
 an `update()` value object cannot contain keys with `/`, so writing the diff as
 a whole node value would be rejected or clobber sibling state.
+
+**Conditional (CAS) transitions** — automatic lifecycle transitions
+(`MatchLifecycle`) and generation-conditional explicit commands do NOT use
+`writeAudited`. They run a `runTransaction` on the state subtree to atomically
+re-validate the observed generation precondition and commit the mutation, then
+append exactly one audit record via `firebaseDatabase.writeAuditOnly` (audit
+only, no state). A transaction returning `undefined` aborts (obsolete/duplicate
+attempt). The transaction's returned node strips `undefined` optional fields so
+Firebase does not reject the write.
 
 **Write routing** — all writes flow through `writeAudited`:
 
@@ -1086,6 +1139,12 @@ The idle screen can display an optional sponsor ad image. The image is selected 
 
 - Main match timer with "half stops" (auto-stop at 45:00/90:00)
 - Injury time display modes (see **Injury Time Display Mode** below)
+- **Render-only**: the clock component never mutates shared state. Countdown
+  completion and half-stops are applied by `src/match/MatchLifecycle.tsx`
+  through generation-conditional, freshness-gated actions
+  (`completeCountdownIfCurrent`, `applyHalfStopIfCurrent`). `TimeoutClock` and
+  `TwoMinClock` are likewise render-only; their expiry goes through
+  `removeTimeoutIfCurrent` / `removePenaltyIfCurrent`.
 
 #### Penalties/Red Cards
 

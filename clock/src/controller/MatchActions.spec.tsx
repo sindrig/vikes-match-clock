@@ -6,6 +6,10 @@ import { Sports } from "../constants";
 
 vi.mock("../contexts/FirebaseStateContext", () => ({
   useMatch: vi.fn(),
+  useFirebaseState: vi.fn(() => ({
+    writeEligible: true,
+    writeFreshness: "ready",
+  })),
 }));
 
 import { useMatch } from "../contexts/FirebaseStateContext";
