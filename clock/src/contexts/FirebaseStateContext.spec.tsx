@@ -3450,6 +3450,93 @@ describe("goal scorer preparation", () => {
       );
     });
 
+    it("does not report success or write an audit when a transaction passes initially but aborts on retry", async () => {
+      // Authoritative state: an active pre-match countdown generation.
+      mockDbState.set("states/test-location/match", {
+        started: 1000,
+        countdown: true,
+        halftimeCountdown: false,
+        timeElapsed: 0,
+        halfStops: [45, 90],
+        homeScore: 0,
+        awayScore: 0,
+        homeTeam: "Víkingur R",
+        awayTeam: "",
+        homeTeamId: 103,
+        awayTeamId: 0,
+        injuryTime: 0,
+        matchType: "football",
+        home2min: [],
+        away2min: [],
+        timeout: 0,
+        homeTimeouts: 0,
+        awayTimeouts: 0,
+        buzzer: false,
+        injuryTimeDisplayMode: "full",
+      });
+
+      let matchApi: ReturnType<typeof useMatch> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+          screenKey={null}
+        >
+          <TestMatchConsumer
+            onMount={(api) => {
+              matchApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+
+      // Simulate Firebase retrying the update function because a concurrent
+      // writer changed the node: the first invocation would have passed the
+      // precondition, but the retry observes a newer generation and aborts.
+      // The helper must trust the transaction's final `committed` result (and
+      // reset its candidate diff), so the aborted attempt reports false and
+      // writes no audit.
+      vi.mocked(firebaseDatabase.writeAuditOnly).mockClear();
+      vi.mocked(runTransaction).mockImplementation((dbRef, updateFn) => {
+        // Retry 1: authoritative state still matches the observed generation.
+        const firstCurrent = mockDbState.get(String(dbRef)) ?? null;
+        const firstResult = updateFn(firstCurrent);
+        if (firstResult === undefined) {
+          return { committed: false, snapshot: { val: () => firstCurrent } };
+        }
+        // Retry 2: a concurrent controller already committed — the generation
+        // advanced, so the precondition now fails and the update aborts.
+        mockDbState.set(String(dbRef), {
+          ...firstResult,
+          started: 2000,
+          countdown: false,
+          halftimeCountdown: false,
+        });
+        const secondCurrent = mockDbState.get(String(dbRef)) ?? null;
+        const secondResult = updateFn(secondCurrent);
+        if (secondResult === undefined) {
+          return { committed: false, snapshot: { val: () => secondCurrent } };
+        }
+        mockDbState.set(String(dbRef), secondResult);
+        return { committed: true, snapshot: { val: () => secondResult } };
+      });
+
+      const observed = {
+        started: 1000,
+        countdown: true,
+        halftimeCountdown: false,
+      };
+
+      await act(async () => {
+        const committed = await matchApi!.completeCountdownIfCurrent(
+          observed,
+          [45, 90],
+        );
+        expect(committed).toBe(false);
+      });
+      expect(vi.mocked(firebaseDatabase.writeAuditOnly)).not.toHaveBeenCalled();
+    });
+
     it("rejects a conditional timeout expiry for a newer active timeout", async () => {
       mockDbState.set("states/test-location/match", {
         started: 0,

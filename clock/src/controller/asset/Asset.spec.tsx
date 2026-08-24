@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import AssetComponent from "./Asset";
 import assetTypes from "./AssetTypes";
 
@@ -21,8 +21,17 @@ vi.mock("../../contexts/LocalStateContext", () => ({
 
 // Mock child components
 vi.mock("./VideoPlayer", () => ({
-  default: ({ asset }: { asset: { key: string } }) => (
-    <div data-testid="video-player">VideoPlayer: {asset.key}</div>
+  default: ({
+    asset,
+    onEnded,
+  }: {
+    asset: { key: string };
+    onEnded?: () => void;
+  }) => (
+    <div data-testid="video-player">
+      VideoPlayer: {asset.key}
+      <button data-testid="video-ended" onClick={onEnded} />
+    </div>
   ),
 }));
 
@@ -76,6 +85,10 @@ describe("AssetComponent", () => {
 
     // Default mock implementations
     mockedUseController.mockReturnValue({
+      controller: {
+        activeQueueId: null,
+        playing: false,
+      },
       completeAssetIfCurrent: mockCompleteAssetIfCurrent,
     } as unknown as ReturnType<typeof useController>);
 
@@ -476,6 +489,39 @@ describe("AssetComponent", () => {
       vi.advanceTimersByTime(5000);
 
       expect(mockCompleteAssetIfCurrent).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Media completion (video / YouTube end event)", () => {
+    it("reports completion during active autoplay using the rendered controller's queue preconditions", () => {
+      // The controller is actively autoplaying a queue (activeQueueId set,
+      // playing true). The completion observation must carry these real
+      // values — hard-coding null/false would fail the precondition and the
+      // autoplay advance would be silently dropped.
+      mockedUseController.mockReturnValue({
+        controller: {
+          activeQueueId: "queue-1",
+          playing: true,
+        },
+        completeAssetIfCurrent: mockCompleteAssetIfCurrent,
+      } as unknown as ReturnType<typeof useController>);
+
+      const asset = {
+        type: assetTypes.VIDEO,
+        key: "video.mp4",
+      };
+
+      render(<AssetComponent asset={asset} time={3} />);
+
+      fireEvent.click(screen.getByTestId("video-ended"));
+
+      expect(mockCompleteAssetIfCurrent).toHaveBeenCalledTimes(1);
+      expect(mockCompleteAssetIfCurrent).toHaveBeenCalledWith({
+        assetKey: "video.mp4",
+        time: 3,
+        activeQueueId: "queue-1",
+        playing: true,
+      });
     });
   });
 });

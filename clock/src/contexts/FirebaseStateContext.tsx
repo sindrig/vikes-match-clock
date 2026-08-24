@@ -1278,7 +1278,13 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       let committed = false;
       let committedDiff: Record<string, unknown> = {};
       try {
-        await runTransaction(dbRef, (currentData) => {
+        // Firebase may re-invoke the update function on concurrent writes.
+        // Only the final invocation's outcome decides whether the transaction
+        // committed, so trust result.committed rather than a flag set inside a
+        // possibly-aborted retry, and reset the candidate diff each invocation
+        // so an aborted final attempt never audits a stale diff.
+        const result = await runTransaction(dbRef, (currentData) => {
+          committedDiff = {};
           const prev = parseMatch(currentData as unknown, matchRef.current);
           if (!prev) {
             return; // abort: no authoritative state to compare against
@@ -1296,7 +1302,6 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
           if (Object.keys(diff).length === 0) {
             return; // nothing to apply
           }
-          committed = true;
           committedDiff = diff;
           // A transaction replaces the whole node: strip optional undefined
           // fields (e.g. an unset matchStartTime) so Firebase does not reject
@@ -1307,6 +1312,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
           }
           return cleanState;
         });
+        committed = result.committed;
       } catch (error) {
         console.error("Conditional match transition failed:", error);
         return false;
@@ -1339,7 +1345,11 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       let committed = false;
       let committedDiff: Record<string, unknown> = {};
       try {
-        await runTransaction(dbRef, (currentData) => {
+        // See applyMatchConditionalTransition: trust result.committed and
+        // reset the candidate diff on each retry so an aborted final attempt
+        // neither reports success nor emits an audit.
+        const result = await runTransaction(dbRef, (currentData) => {
+          committedDiff = {};
           const prev = parseController(
             currentData as unknown,
             controllerRef.current,
@@ -1355,7 +1365,6 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
           if (Object.keys(diff).length === 0) {
             return;
           }
-          committed = true;
           committedDiff = diff;
           const cleanState: Record<string, unknown> = {};
           for (const [key, value] of Object.entries(newState)) {
@@ -1363,6 +1372,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
           }
           return cleanState;
         });
+        committed = result.committed;
       } catch (error) {
         console.error("Conditional controller transition failed:", error);
         return false;

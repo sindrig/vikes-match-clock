@@ -167,7 +167,7 @@ type AssetProps = OwnProps;
 
 const AssetComponent = (props: AssetProps) => {
   const { asset, thumbnail, time } = props;
-  const { completeAssetIfCurrent } = useController();
+  const { controller, completeAssetIfCurrent } = useController();
   const {
     view: { vp },
   } = useView();
@@ -180,13 +180,16 @@ const AssetComponent = (props: AssetProps) => {
 
   // For media with a natural end event (video / YouTube), notify completion
   // through the conditional action. The action verifies the current asset
-  // identity still matches, so a stale renderer cannot clear a newer asset.
+  // identity AND queue preconditions still match, so a stale renderer cannot
+  // clear a newer asset. The observed queue state comes from the rendered
+  // controller (not hard-coded values) so completion during active autoplay
+  // (activeQueueId set, playing true) still satisfies the precondition.
   const handleMediaEnded = () => {
     void completeAssetIfCurrent({
       assetKey: asset?.key ?? "",
       time: time ?? null,
-      activeQueueId: null,
-      playing: false,
+      activeQueueId: controller.activeQueueId,
+      playing: controller.playing,
     });
   };
 

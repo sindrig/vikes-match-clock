@@ -87,7 +87,11 @@ identities come from existing fields only: `started`+`countdown`+
 (penalty), current-asset identity+queue (asset). An obsolete or duplicate
 attempt aborts the transaction and leaves state unchanged. Only the first
 concurrent attempt commits; exactly one audit event is written per committed
-transition (`firebaseDatabase.writeAuditOnly`).
+transition (`firebaseDatabase.writeAuditOnly`). For media completion (video /
+YouTube end), `Asset.tsx` submits a `TimedAssetCompletionObservation` whose
+`activeQueueId`/`playing` come from the rendered controller's live values —
+not hard-coded `null`/`false` — so completion during active autoplay satisfies
+the queue precondition and advances the queue instead of being silently dropped.
 
 **4. Explicit controls are generation-conditional too.** `startMatch` and
 `pauseMatch` submit the observed generation as a precondition and fail closed
@@ -145,6 +149,18 @@ append exactly one audit record via `firebaseDatabase.writeAuditOnly` (audit
 only, no state). A transaction returning `undefined` aborts (obsolete/duplicate
 attempt). The transaction's returned node strips `undefined` optional fields so
 Firebase does not reject the write.
+
+**Retry-safe commit** — the CAS helpers (`applyMatchConditionalTransition`,
+`applyControllerConditionalTransition` in `FirebaseStateContext.tsx`) treat the
+transaction as committed **only** when the resolved result's `committed` flag
+is `true`, and they reset the candidate diff at the start of every update-function
+invocation. Firebase may re-run the update function when the node changes
+concurrently; a retry can observe a newer generation and abort (`undefined`)
+even though an earlier invocation would have passed. Because the helper trusts
+the final `committed` result and discards each invocation's candidate diff,
+such an aborted attempt returns `false` and writes **no** audit — a stale or
+concurrently-obsoleted attempt never reports success or leaves a spurious
+audit record.
 
 **Write routing** — all writes flow through `writeAudited`:
 
