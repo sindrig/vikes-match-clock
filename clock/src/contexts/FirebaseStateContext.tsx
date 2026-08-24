@@ -572,6 +572,17 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   const [writeFreshness, setWriteFreshness] =
     useState<WriteFreshness>("loading");
   const resyncPendingRef = useRef(false);
+  // Current Firebase connectivity, mirrored from `/.info/connected`. This is
+  // the authoritative signal for whether the existing subscription epoch is
+  // still live; `navigator.onLine` only reflects browser network state and is
+  // not a reliable readiness gate.
+  const firebaseConnectedRef = useRef(true);
+  // True when the Firebase connection was observed dropping while the client
+  // was suspended (hidden/offline). A resume that never observed a drop can
+  // restore eligibility immediately; a resume after a real drop must wait for
+  // a post-reconnect subscription delivery.
+  const suspendedDropRef = useRef(false);
+  const writeFreshnessRef = useRef<WriteFreshness>("loading");
 
   const matchRef = useRef(match);
   const controllerRef = useRef(controller);
@@ -604,10 +615,13 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   const markSubscriptionDelivered = useCallback(() => {
     if (!resyncPendingRef.current) return;
     resyncPendingRef.current = false;
-    if (
-      typeof document === "undefined" ||
-      (!document.hidden && navigator.onLine)
-    ) {
+    suspendedDropRef.current = false;
+    // A core subscription delivery after a resume is proof the SDK
+    // re-synchronized with current server state (a live-connection data
+    // change or a reconnect re-sync), so the client is eligible again.
+    // `navigator.onLine` is intentionally not consulted: it is unreliable and
+    // a genuinely offline client simply never receives a delivery.
+    if (typeof document === "undefined" || !document.hidden) {
       setWriteFreshness("ready");
     }
   }, []);
@@ -619,17 +633,34 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   // Any suspension or connectivity loss makes the client ineligible until a
   // fresh authoritative snapshot arrives. No writes are queued for replay.
   useEffect(() => {
+    // A resume only needs to wait for a post-resume snapshot when the
+    // Firebase connection actually dropped while the client was suspended.
+    // If the connection stayed up (no `/.info/connected` false observed and
+    // still connected now), the existing subscription epoch is still current,
+    // so restore eligibility immediately instead of waiting for an `onValue`
+    // delivery that will not come when no data changed while the tab was away.
+    const restoreAfterUndroppedResume = () => {
+      if (document.hidden) return;
+      if (firebaseConnectedRef.current && !suspendedDropRef.current) {
+        resyncPendingRef.current = false;
+        suspendedDropRef.current = false;
+        setWriteFreshness("ready");
+      }
+    };
     const onVisibilityChange = () => {
       if (document.hidden) {
         resyncPendingRef.current = false;
+        suspendedDropRef.current = false;
         setWriteFreshness("hidden");
       } else {
         resyncPendingRef.current = true;
         setWriteFreshness("resyncing");
+        restoreAfterUndroppedResume();
       }
     };
     const onPageHide = () => {
       resyncPendingRef.current = false;
+      suspendedDropRef.current = false;
       setWriteFreshness("hidden");
     };
     const onOffline = () => {
@@ -639,6 +670,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     const onOnline = () => {
       resyncPendingRef.current = true;
       setWriteFreshness("resyncing");
+      restoreAfterUndroppedResume();
     };
     document.addEventListener("visibilitychange", onVisibilityChange);
     window.addEventListener("pagehide", onPageHide);
@@ -672,6 +704,34 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   useEffect(() => {
     clubOverridesRef.current = clubOverrides;
   }, [clubOverrides]);
+  useEffect(() => {
+    writeFreshnessRef.current = writeFreshness;
+  }, [writeFreshness]);
+
+  // Track real Firebase connectivity (`.info/connected`), the authoritative
+  // signal for whether the current subscription epoch is still live. A drop
+  // while suspended (hidden/offline) is recorded so a resume cannot restore
+  // eligibility before a post-reconnect snapshot arrives; a drop while
+  // eligible immediately makes the client ineligible until a core
+  // subscription delivers again.
+  useEffect(() => {
+    const connectedRef = ref(database, ".info/connected");
+    const unsubConnected = onValue(connectedRef, (snapshot) => {
+      const connected = snapshot.val() === true;
+      firebaseConnectedRef.current = connected;
+      if (connected) return;
+      if (document.hidden || writeFreshnessRef.current !== "ready") {
+        suspendedDropRef.current = true;
+      } else {
+        resyncPendingRef.current = true;
+        setWriteFreshness("resyncing");
+      }
+    });
+
+    return () => {
+      unsubConnected();
+    };
+  }, []);
 
   // Builds the identity payload for an audited mutation, or null when the
   // provider is not in a position to write (unauthenticated or no venue).
@@ -745,8 +805,9 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
           if (
             !resyncPendingRef.current &&
             !document.hidden &&
-            navigator.onLine
+            firebaseConnectedRef.current
           ) {
+            suspendedDropRef.current = false;
             setWriteFreshness("ready");
           }
         }

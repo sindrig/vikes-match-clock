@@ -78,12 +78,18 @@ precondition rejects it unless the current asset/queue still matches.
 **2. Freshness barrier.** An authenticated client is only write-eligible while
 it has confirmed current Firebase state. `FirebaseStateContext` tracks
 `writeFreshness` (`loading | ready | hidden | offline | resyncing`); the client
-becomes ineligible on `visibilitychange`→hidden, `pagehide`, or offline, and
-returns to `ready` only after a core subscription delivers a post-resume
-snapshot. Every authenticated mutation is gated on `writeEligible`
-(`writeFreshness === "ready"`). Stale attempts are dropped, never queued for
-replay. The UI surfaces this via `ResyncNotice` (`controller/ResyncNotice.tsx`)
-and disables primary match controls while resyncing.
+becomes ineligible on `visibilitychange`→hidden, `pagehide`, offline, or an
+observed `/.info/connected` drop while eligible, and returns to `ready` once a
+core subscription delivers a post-resume/reconnect snapshot. A resume whose
+Firebase connection never dropped (no `/.info/connected` false observed while
+suspended and still connected on return) restores `ready` immediately, because
+the existing subscription epoch is still current and no `onValue` delivery
+would otherwise fire when no data changed. Eligibility is gated on
+`writeEligible` (`writeFreshness === "ready"`); `navigator.onLine` is never
+consulted — `/.info/connected` is the authoritative connectivity signal. Stale
+attempts are dropped, never queued for replay. The UI surfaces this via
+`ResyncNotice` (`controller/ResyncNotice.tsx`) and disables primary match
+controls while resyncing.
 
 **3. Conditional automatic transitions (compare-and-set).** Automatic
 lifecycle progression uses Firebase `runTransaction` to re-validate its
