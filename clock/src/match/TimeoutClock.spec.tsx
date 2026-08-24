@@ -148,5 +148,30 @@ describe("TimeoutClock", () => {
       expect(removeTimeout).not.toHaveBeenCalled();
       expect(buzz).not.toHaveBeenCalled();
     });
+
+    it("displays 00:01 at exactly TIMEOUT_LENGTH elapsed and 00:00 one second later", () => {
+      // Documents the +1000 display ceiling that MatchLifecycle aligns its
+      // expiry thresholds to: the timeout is cleared only when the displayed
+      // time reaches 00:00 (one second after TIMEOUT_LENGTH has elapsed).
+      const startTime = Date.now();
+      vi.setSystemTime(startTime);
+
+      mockedUseMatch.mockReturnValue({
+        match: { timeout: startTime },
+        removeTimeout: vi.fn(),
+        buzz: vi.fn(),
+        getServerTime: makeGetServerTime(),
+      } as unknown as ReturnType<typeof useMatch>);
+
+      const { rerender } = render(<TimeoutClock className="timeout-clock" />);
+
+      vi.advanceTimersByTime(TIMEOUT_LENGTH);
+      rerender(<TimeoutClock className="timeout-clock" />);
+      expect(screen.getByText("00:01")).toBeInTheDocument();
+
+      vi.advanceTimersByTime(1000);
+      rerender(<TimeoutClock className="timeout-clock" />);
+      expect(screen.getByText("00:00")).toBeInTheDocument();
+    });
   });
 });

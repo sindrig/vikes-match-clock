@@ -2845,6 +2845,7 @@ export const useMatch = () => {
     removePenaltyIfCurrent,
     updateRedCards,
     getServerTime,
+    writeEligible,
   } = useFirebaseState();
   return {
     match,
@@ -2871,6 +2872,7 @@ export const useMatch = () => {
     removePenaltyIfCurrent,
     updateRedCards,
     getServerTime,
+    writeEligible,
   };
 };
 

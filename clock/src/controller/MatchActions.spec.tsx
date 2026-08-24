@@ -12,9 +12,10 @@ vi.mock("../contexts/FirebaseStateContext", () => ({
   })),
 }));
 
-import { useMatch } from "../contexts/FirebaseStateContext";
+import { useMatch, useFirebaseState } from "../contexts/FirebaseStateContext";
 
 const mockedUseMatch = vi.mocked(useMatch);
+const mockedUseFirebaseState = vi.mocked(useFirebaseState);
 
 const MINUTE_MS = 60 * 1000;
 
@@ -203,5 +204,63 @@ describe("MatchActions — Næsti hálfleikur eligibility", () => {
 
     expect(screen.getByText("Byrja")).toBeInTheDocument();
     expect(screen.queryByText("Næsti hálfleikur")).not.toBeInTheDocument();
+  });
+});
+
+describe("MatchActions — mutating controls disabled while ineligible", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockedUseFirebaseState.mockReturnValue({
+      writeEligible: false,
+      writeFreshness: "hidden",
+    });
+  });
+
+  afterEach(() => {
+    mockedUseFirebaseState.mockReturnValue({
+      writeEligible: true,
+      writeFreshness: "ready",
+    });
+    vi.restoreAllMocks();
+  });
+
+  it("disables Reset while ineligible", () => {
+    buildMatchApi({});
+    render(<MatchActions />);
+
+    expect(screen.getByRole("button", { name: /Reset/i })).toBeDisabled();
+  });
+
+  it("disables Tímastjórnun entry while ineligible", () => {
+    buildMatchApi({});
+    render(<MatchActions />);
+
+    expect(
+      screen.getByRole("button", { name: /Tímastjórnun/i }),
+    ).toBeDisabled();
+  });
+
+  it("disables the injury-time input while ineligible (football)", () => {
+    buildMatchApi({ matchType: Sports.Football });
+    render(<MatchActions />);
+
+    expect(screen.getByPlaceholderText("Uppbót (mín)")).toBeDisabled();
+  });
+
+  it("disables the red-card entry while ineligible", () => {
+    buildMatchApi({});
+    render(<MatchActions />);
+
+    expect(screen.getByRole("button", { name: "Rauð spjöld" })).toBeDisabled();
+  });
+
+  it("disables the handball timeout buttons while ineligible", () => {
+    buildMatchApi({ matchType: Sports.Handball });
+    render(<MatchActions />);
+
+    expect(
+      screen.getByRole("button", { name: "Leikhlé heima" }),
+    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Leikhlé úti" })).toBeDisabled();
   });
 });

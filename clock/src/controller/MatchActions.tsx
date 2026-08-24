@@ -26,11 +26,13 @@ const ClockManipulationButton = ({
   match,
   adjustMatchTime,
   direction,
+  disabled,
 }: {
   seconds: number;
   match: Match;
   adjustMatchTime: (deltaMs: number) => void;
   direction: "add" | "subtract";
+  disabled: boolean;
 }) => {
   const { value, unit } = formatTimeUnit(seconds);
   const multiplier = direction === "add" ? 1 : -1;
@@ -54,7 +56,7 @@ const ClockManipulationButton = ({
         }
         adjustMatchTime(deltaMs);
       }}
-      disabled={!!match.timeout}
+      disabled={disabled || !!match.timeout}
     >
       {prefix}
       {value}
@@ -68,11 +70,13 @@ const TimeControlDialog = ({
   onClose,
   match,
   adjustMatchTime,
+  disabled,
 }: {
   open: boolean;
   onClose: () => void;
   match: Match;
   adjustMatchTime: (deltaMs: number) => void;
+  disabled: boolean;
 }) => {
   const timeSteps = [1, 5, 60, 60 * 5];
   return (
@@ -96,12 +100,14 @@ const TimeControlDialog = ({
                     match={match}
                     adjustMatchTime={adjustMatchTime}
                     direction="add"
+                    disabled={disabled}
                   />
                   <ClockManipulationButton
                     seconds={seconds}
                     match={match}
                     adjustMatchTime={adjustMatchTime}
                     direction="subtract"
+                    disabled={disabled}
                   />
                 </ButtonGroup>
               </div>
@@ -110,8 +116,8 @@ const TimeControlDialog = ({
         </div>
         {match.matchType === Sports.Handball ? (
           <div className="time-control-section-penalties">
-            <PenaltiesManipulationBox team="home" />
-            <PenaltiesManipulationBox team="away" />
+            <PenaltiesManipulationBox team="home" disabled={disabled} />
+            <PenaltiesManipulationBox team="away" disabled={disabled} />
           </div>
         ) : null}
       </Modal.Body>
@@ -210,24 +216,29 @@ const MatchActions = () => {
             color="red"
             appearance="primary"
             onClick={() => window.confirm("Ertu alveg viss?") && resetMatch()}
-            disabled={isMatchResetDisabled(match)}
+            disabled={isMatchResetDisabled(match) || !writeEligible}
           >
             <HistoryIcon /> Reset
           </Button>
-          <Button size="xs" onClick={() => setShowTimeDialog(true)}>
+          <Button
+            size="xs"
+            onClick={() => setShowTimeDialog(true)}
+            disabled={!writeEligible}
+          >
             <TimeIcon /> Tímastjórnun
           </Button>
         </div>
       </div>
 
       <div className="match-actions-clock-secondary">
-        <RedCardManipulation />
+        <RedCardManipulation disabled={!writeEligible} />
         {match.matchType === Sports.Football && (
           <input
             type="number"
             className="longerInput"
             placeholder="Uppbót (mín)"
             value={match.injuryTime || ""}
+            disabled={!writeEligible}
             onChange={({ target: { value } }) =>
               updateMatch({ injuryTime: parseInt(value, 10) })
             }
@@ -239,7 +250,11 @@ const MatchActions = () => {
         <div className="match-actions-handball">
           <div className="match-actions-timeouts">
             {match.timeout ? (
-              <Button size="sm" onClick={removeTimeout}>
+              <Button
+                size="sm"
+                onClick={removeTimeout}
+                disabled={!writeEligible}
+              >
                 Eyða Leikhlé
               </Button>
             ) : (
@@ -248,7 +263,11 @@ const MatchActions = () => {
                   { team: "home" as const, name: "heima" },
                   { team: "away" as const, name: "úti" },
                 ].map(({ team, name }) => (
-                  <Button key={team} onClick={() => matchTimeout(team)}>
+                  <Button
+                    key={team}
+                    onClick={() => matchTimeout(team)}
+                    disabled={!writeEligible}
+                  >
                     {`Leikhlé ${name}`}
                   </Button>
                 ))}
@@ -263,6 +282,7 @@ const MatchActions = () => {
         onClose={() => setShowTimeDialog(false)}
         match={match}
         adjustMatchTime={adjustMatchTime}
+        disabled={!writeEligible}
       />
     </div>
   );

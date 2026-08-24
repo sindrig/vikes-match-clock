@@ -93,11 +93,44 @@ YouTube end), `Asset.tsx` submits a `TimedAssetCompletionObservation` whose
 not hard-coded `null`/`false` — so completion during active autoplay satisfies
 the queue precondition and advances the queue instead of being silently dropped.
 
+`MatchLifecycle` is **commit-aware and retry-safe**, so a transition that is due
+while the client is ineligible is never lost and never latched prematurely:
+
+- An attempt is submitted only while `writeEligible`. While ineligible the
+  coordinator **defers** (it does not latch), so when the freshness barrier
+  clears — e.g. after a resume/resync — the due transition is retried and
+  commits. This prevents an expired countdown/penalty/timeout/asset from
+  staying stuck after resync.
+- A **per-generation in-flight guard** prevents concurrent duplicate
+  submissions while a conditional write is pending; the guard clears when the
+  attempt settles.
+- The per-generation latch is set **only after the conditional action reports a
+  committed (`true`) result**. An obsolete or failed attempt leaves the
+  transition unlatched so the next tick retries it; once committed, the latch
+  suppresses further attempts.
+- The timed-asset due time is anchored once per observed current-asset
+  generation and preserved across resyncs, so an ineligible completion is
+  retried after eligibility returns **without restarting the asset's timer**.
+
+Timeout warning/expiry thresholds are derived from the **same remaining-time
+calculation as `TimeoutClock`** (which displays one extra second, `+1000`): the
+warning buzzer fires when the displayed time reaches `00:10` (`remaining <=
+10000`) and the timeout is cleared/buzzed when it reaches `00:00` (`remaining
+<= 0`) — one second later than the raw `TIMEOUT_LENGTH` boundary.
+
 **4. Explicit controls are generation-conditional too.** `startMatch` and
 `pauseMatch` submit the observed generation as a precondition and fail closed
 if authoritative state advanced to a newer generation. Substantial backward
 time corrections (Tímastjórnun) require explicit operator confirmation and are
-audited distinctly (`match.correct-time-backward`).
+audited distinctly (`match.correct-time-backward`). While the client is
+ineligible, **every** mutating match control in `MatchActions` is disabled —
+not just the primary clock buttons: Reset, Tímastjórnun entry and its
+adjustment buttons, the injury-time input, the handball timeout buttons, red
+cards (`RedCardManipulation`), and penalties (`PenaltiesManipulationBox`). This
+also prevents confirmation dialogs (Reset's `window.confirm`, backward
+correction prompts) from opening for blocked actions. The context boundary
+still rejects any write that slips through; disabling the controls is operator
+feedback, not the safety mechanism.
 
 Do NOT reintroduce renderer-side mutations, optimistic expiry, or offline
 replay queues. See `openspec/changes/prevent-stale-session-mutations/` for the

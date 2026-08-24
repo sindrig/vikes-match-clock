@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { clampRedCards } from "../utils/matchUtils";
 import { useMatch } from "../contexts/FirebaseStateContext";
 
-function MatchScoreDialog() {
+function MatchScoreDialog({ disabled }: { disabled?: boolean }) {
   const { match, updateRedCards } = useMatch();
   const home = match.homeRedCards ?? 0;
   const away = match.awayRedCards ?? 0;
@@ -22,7 +22,9 @@ function MatchScoreDialog() {
 
   return (
     <div className="control-item stdbuttons">
-      <button onClick={() => setOpen(true)}>Rauð spjöld</button>
+      <button disabled={disabled} onClick={() => setOpen(true)}>
+        Rauð spjöld
+      </button>
       {open && (
         <div
           style={{
@@ -57,6 +59,7 @@ function MatchScoreDialog() {
                   max={11}
                   value={home}
                   onChange={handleHomeChange}
+                  disabled={disabled}
                   style={{ marginLeft: 8, width: 50 }}
                 />
               </label>
@@ -70,6 +73,7 @@ function MatchScoreDialog() {
                   max={11}
                   value={away}
                   onChange={handleAwayChange}
+                  disabled={disabled}
                   style={{ marginLeft: 8, width: 50 }}
                 />
               </label>
@@ -80,6 +84,7 @@ function MatchScoreDialog() {
                   onChange(0, 0);
                   setOpen(false);
                 }}
+                disabled={disabled}
               >
                 Hreinsa spjöld
               </button>

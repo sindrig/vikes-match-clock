@@ -276,4 +276,82 @@ test.describe("Stale session mutation safety", () => {
     expect(ctl.playing).toBe(true);
     expect(ctl.queues["queue-1"]?.items).toHaveLength(1);
   });
+
+  test("still-current countdown completes after resync once the client is eligible", async ({
+    page,
+  }) => {
+    // A countdown generation that is still authoritative when the phone
+    // resumes must NOT stay stuck: the lifecycle coordinator defers the due
+    // transition while the client is ineligible (offline) and completes it as
+    // soon as the freshness barrier clears and the client is ready to write
+    // again.
+    //
+    // getServerTime() is derived from the real server time via Firebase's
+    // serverTimeOffset, so a fake page clock cannot make a countdown "due"
+    // after resync (the offset is recomputed on reconnect). Instead this test
+    // seeds a still-current countdown whose `started` is a few seconds in the
+    // future in real server time:
+    //
+    //   1. The phone loads and observes the running countdown (not yet due).
+    //   2. It goes offline; generation A remains authoritative and, in real
+    //      time, `started` passes → the countdown becomes due while the phone
+    //      is ineligible.
+    //   3. The phone comes back online; after resync it is eligible again and
+    //      generation A is still current (real time has passed `started`), so
+    //      the countdown must complete.
+    //   4. We assert the countdown completed (started 0, countdown false)
+    //      rather than remaining latched-but-stuck on the expired generation.
+    //
+    // The emulator does not re-deliver unchanged subscription data on a raw
+    // WebSocket reconnect, so after the phone comes back online we deliver the
+    // post-resume authoritative snapshot explicitly with an innocuous match
+    // write (`timeElapsed`). This mirrors production Firebase, which re-fires
+    // the current value on reconnect and drives the client back to "ready".
+    await page.addInitScript(() => {
+      localStorage.clear();
+      localStorage.setItem("clock_sync", "true");
+    });
+    await page.goto("/");
+    await loginWithEmulatorUser(page);
+
+    // Seed a still-current countdown that becomes due ~15s from now (real
+    // server time), letting the phone observe it while it is still running.
+    const started = Date.now() + 15000;
+    await writeMatch({
+      started,
+      countdown: true,
+      halftimeCountdown: false,
+      timeElapsed: 0,
+      halfStops: [45, 90, 105, 120],
+    });
+    await page.waitForTimeout(1000);
+    let state = await emulatorState();
+    expect(state.match.started).toBe(started);
+    expect(state.match.countdown).toBe(true);
+
+    // --- Phase 2: isolate the phone while the countdown is still running. ---
+    const context = page.context();
+    await context.setOffline(true);
+
+    // --- Phase 3: wait out the countdown in real time while the phone is
+    // ineligible (offline). The lifecycle must defer the due transition, so
+    // generation A is left untouched. ---
+    await page.waitForTimeout(16000);
+    state = await emulatorState();
+    expect(state.match.started).toBe(started);
+    expect(state.match.countdown).toBe(true);
+
+    // --- Phase 4: resume. After resync the client is eligible again and the
+    // still-current generation A must complete rather than stay stuck. ---
+    await context.setOffline(false);
+    await page.waitForTimeout(3000);
+    await writeMatch({ timeElapsed: 1 });
+    await page.waitForTimeout(2000);
+
+    // --- Assert: the countdown completed (the due transition was retried, not
+    // dropped, once eligibility returned). ---
+    state = await emulatorState();
+    expect(state.match.started).toBe(0);
+    expect(state.match.countdown).toBe(false);
+  });
 });
