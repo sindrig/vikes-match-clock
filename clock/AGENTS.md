@@ -132,15 +132,15 @@ warning buzzer fires when the displayed time reaches `00:10` (`remaining <=
 
 **4. Explicit controls are generation-conditional too.** `startMatch` and
 `pauseMatch` submit the observed generation as a precondition and fail closed
-if authoritative state advanced to a newer generation. Substantial backward
-time corrections (Tímastjórnun) require explicit operator confirmation and are
-audited distinctly (`match.correct-time-backward`). While the client is
+if authoritative state advanced to a newer generation. Backward time
+corrections (Tímastjórnun) are audited distinctly
+(`match.correct-time-backward`). While the client is
 ineligible, **every** mutating match control in `MatchActions` is disabled —
 not just the primary clock buttons: Reset, Tímastjórnun entry and its
 adjustment buttons, the injury-time input, the handball timeout buttons, red
 cards (`RedCardManipulation`), and penalties (`PenaltiesManipulationBox`). This
-also prevents confirmation dialogs (Reset's `window.confirm`, backward
-correction prompts) from opening for blocked actions. The context boundary
+also prevents confirmation dialogs (Reset's `window.confirm`) from opening for
+blocked actions. The context boundary
 still rejects any write that slips through; disabling the controls is operator
 feedback, not the safety mechanism.
 

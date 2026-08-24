@@ -17,10 +17,6 @@ import {
 } from "../utils/matchUtils";
 import { useMatch, useFirebaseState } from "../contexts/FirebaseStateContext";
 
-// Backward corrections at or above this magnitude require explicit operator
-// confirmation before they are applied.
-const BACKWARD_CORRECTION_CONFIRM_THRESHOLD_MS = 60 * 1000;
-
 const ClockManipulationButton = ({
   seconds,
   match,
@@ -42,20 +38,7 @@ const ClockManipulationButton = ({
     <button
       type="button"
       className="time-adjust-btn"
-      onClick={() => {
-        // Substantial backward time corrections are destructive: require an
-        // explicit confirmation so an accidental tap cannot rewind the clock.
-        if (
-          deltaMs < 0 &&
-          -deltaMs >= BACKWARD_CORRECTION_CONFIRM_THRESHOLD_MS
-        ) {
-          const confirmed = window.confirm(
-            `Ertu viss um að leiðrétta tímann aftur um ${value}${unit}?`,
-          );
-          if (!confirmed) return;
-        }
-        adjustMatchTime(deltaMs);
-      }}
+      onClick={() => adjustMatchTime(deltaMs)}
       disabled={disabled || !!match.timeout}
     >
       {prefix}
