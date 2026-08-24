@@ -50,7 +50,7 @@ describe("Clock injuryTimeDisplayMode", () => {
   });
 
   describe("stop mode", () => {
-    it("pauses and buzzes when reaching the half-stop, forcing seconds to 00", () => {
+    it("clamps the display at the half-stop boundary without mutating state", () => {
       const started = NOW - (46 * 60 + 10) * 1000;
       const { container, pauseMatch, buzz } = renderClock({
         started,
@@ -59,8 +59,10 @@ describe("Clock injuryTimeDisplayMode", () => {
       });
 
       expect(container.textContent).toContain("45:00");
-      expect(pauseMatch).toHaveBeenCalledWith(true);
-      expect(buzz).toHaveBeenCalledWith(true);
+      // Clock is render-only: the half-stop transition is handled by the
+      // MatchLifecycle coordinator, never by the renderer.
+      expect(pauseMatch).not.toHaveBeenCalled();
+      expect(buzz).not.toHaveBeenCalled();
     });
 
     it("shows normal mm:ss before the half-stop", () => {

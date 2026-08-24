@@ -1,0 +1,25 @@
+REPRODUCED STALE-SESSION BUG ON UNCHANGED IMPLEMENTATION (task 1.2)
+
+Command:
+  cd clock && PORT=4520 VITE_USE_EMULATOR=true npx playwright test stale-session.spec.ts --reporter=list --workers=1
+
+Result: FAILED (bug reproduced)
+
+The suspended stale phone session, holding countdown generation A while offline,
+fired its obsolete countdown-end `pauseMatch` from generation-A state. When
+brought back online, the queued stale mutation (diff `{ started: 0 }`) was
+applied against authoritative generation B (running second half), pausing it.
+
+Key failure:
+  Expected: 1744296813000   (generation B running `started`)
+  Received: 0               (paused by the stale write)
+
+Assertion (e2e/stale-session.spec.ts:147):
+  expect(state.match.started).toBe(genBStarted)
+
+Task 1.3 (timed asset) also reproduced:
+The stale phone's delayed `removeAssetAfterTimeout` (fired via page.clock.runFor
+while offline) was queued and applied against authoritative generation B
+controller state on reconnect. The authoritative current asset/queue was
+mutated: `playing` went true -> false, queue consumed. Assertion failed at
+e2e/stale-session.spec.ts:268 (expect(ctl.playing).toBe(true)).

@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import AssetComponent from "./Asset";
 import assetTypes from "./AssetTypes";
 
@@ -21,8 +21,17 @@ vi.mock("../../contexts/LocalStateContext", () => ({
 
 // Mock child components
 vi.mock("./VideoPlayer", () => ({
-  default: ({ asset }: { asset: { key: string } }) => (
-    <div data-testid="video-player">VideoPlayer: {asset.key}</div>
+  default: ({
+    asset,
+    onEnded,
+  }: {
+    asset: { key: string };
+    onEnded?: () => void;
+  }) => (
+    <div data-testid="video-player">
+      VideoPlayer: {asset.key}
+      <button data-testid="video-ended" onClick={onEnded} />
+    </div>
   ),
 }));
 
@@ -64,21 +73,23 @@ vi.mock("react-youtube", () => ({
 }));
 
 import { useController, useView } from "../../contexts/FirebaseStateContext";
-import { useAuth } from "../../contexts/LocalStateContext";
 
 const mockedUseController = vi.mocked(useController);
 const mockedUseView = vi.mocked(useView);
-const mockedUseAuth = vi.mocked(useAuth);
 
 describe("AssetComponent", () => {
-  const mockRemoveAssetAfterTimeout = vi.fn();
+  const mockCompleteAssetIfCurrent = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
 
     // Default mock implementations
     mockedUseController.mockReturnValue({
-      removeAssetAfterTimeout: mockRemoveAssetAfterTimeout,
+      controller: {
+        activeQueueId: null,
+        playing: false,
+      },
+      completeAssetIfCurrent: mockCompleteAssetIfCurrent,
     } as unknown as ReturnType<typeof useController>);
 
     mockedUseView.mockReturnValue({
@@ -90,11 +101,6 @@ describe("AssetComponent", () => {
         },
       },
     } as unknown as ReturnType<typeof useView>);
-
-    mockedUseAuth.mockReturnValue({
-      isEmpty: false,
-      isLoaded: true,
-    } as unknown as ReturnType<typeof useAuth>);
   });
 
   describe("Null/Empty Asset", () => {
@@ -421,7 +427,7 @@ describe("AssetComponent", () => {
     });
   });
 
-  describe("Auto-remove timeout logic", () => {
+  describe("Passive rendering (auto-expiry)", () => {
     beforeEach(() => {
       vi.useFakeTimers();
     });
@@ -430,7 +436,7 @@ describe("AssetComponent", () => {
       vi.useRealTimers();
     });
 
-    it("sets timeout for IMAGE type when time is provided", () => {
+    it("does NOT mutate shared state when a timed IMAGE local timer elapses", () => {
       const asset = {
         type: assetTypes.IMAGE,
         key: "test-key",
@@ -439,14 +445,13 @@ describe("AssetComponent", () => {
 
       render(<AssetComponent asset={asset} time={5} />);
 
-      expect(mockRemoveAssetAfterTimeout).not.toHaveBeenCalled();
-
       vi.advanceTimersByTime(5000);
 
-      expect(mockRemoveAssetAfterTimeout).toHaveBeenCalledTimes(1);
+      // Rendering is passive: the Asset component never issues a mutation.
+      expect(mockCompleteAssetIfCurrent).not.toHaveBeenCalled();
     });
 
-    it("does not set timeout for URL type (manual remove)", () => {
+    it("renders URL assets without mutating state", () => {
       const asset = {
         type: assetTypes.URL,
         key: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
@@ -456,10 +461,10 @@ describe("AssetComponent", () => {
 
       vi.advanceTimersByTime(5000);
 
-      expect(mockRemoveAssetAfterTimeout).not.toHaveBeenCalled();
+      expect(mockCompleteAssetIfCurrent).not.toHaveBeenCalled();
     });
 
-    it("does not set timeout for VIDEO type (manual remove)", () => {
+    it("renders VIDEO assets without mutating state on a plain render", () => {
       const asset = {
         type: assetTypes.VIDEO,
         key: "video.mp4",
@@ -469,10 +474,10 @@ describe("AssetComponent", () => {
 
       vi.advanceTimersByTime(5000);
 
-      expect(mockRemoveAssetAfterTimeout).not.toHaveBeenCalled();
+      expect(mockCompleteAssetIfCurrent).not.toHaveBeenCalled();
     });
 
-    it("does not set timeout when thumbnail mode is active", () => {
+    it("renders thumbnails without mutating state", () => {
       const asset = {
         type: assetTypes.IMAGE,
         key: "test-key",
@@ -483,45 +488,40 @@ describe("AssetComponent", () => {
 
       vi.advanceTimersByTime(5000);
 
-      expect(mockRemoveAssetAfterTimeout).not.toHaveBeenCalled();
+      expect(mockCompleteAssetIfCurrent).not.toHaveBeenCalled();
     });
+  });
 
-    it("blocks timeout when auth.isEmpty=true", () => {
-      mockedUseAuth.mockReturnValue({
-        isEmpty: true,
-        isLoaded: true,
-      } as unknown as ReturnType<typeof useAuth>);
+  describe("Media completion (video / YouTube end event)", () => {
+    it("reports completion during active autoplay using the rendered controller's queue preconditions", () => {
+      // The controller is actively autoplaying a queue (activeQueueId set,
+      // playing true). The completion observation must carry these real
+      // values — hard-coding null/false would fail the precondition and the
+      // autoplay advance would be silently dropped.
+      mockedUseController.mockReturnValue({
+        controller: {
+          activeQueueId: "queue-1",
+          playing: true,
+        },
+        completeAssetIfCurrent: mockCompleteAssetIfCurrent,
+      } as unknown as ReturnType<typeof useController>);
 
       const asset = {
-        type: assetTypes.IMAGE,
-        key: "test-key",
-        url: "https://example.com/image.jpg",
+        type: assetTypes.VIDEO,
+        key: "video.mp4",
       };
 
-      render(<AssetComponent asset={asset} time={5} />);
+      render(<AssetComponent asset={asset} time={3} />);
 
-      vi.advanceTimersByTime(5000);
+      fireEvent.click(screen.getByTestId("video-ended"));
 
-      expect(mockRemoveAssetAfterTimeout).not.toHaveBeenCalled();
-    });
-
-    it("allows timeout when auth.isEmpty=false", () => {
-      mockedUseAuth.mockReturnValue({
-        isEmpty: false,
-        isLoaded: true,
-      } as unknown as ReturnType<typeof useAuth>);
-
-      const asset = {
-        type: assetTypes.IMAGE,
-        key: "test-key",
-        url: "https://example.com/image.jpg",
-      };
-
-      render(<AssetComponent asset={asset} time={5} />);
-
-      vi.advanceTimersByTime(5000);
-
-      expect(mockRemoveAssetAfterTimeout).toHaveBeenCalledTimes(1);
+      expect(mockCompleteAssetIfCurrent).toHaveBeenCalledTimes(1);
+      expect(mockCompleteAssetIfCurrent).toHaveBeenCalledWith({
+        assetKey: "video.mp4",
+        time: 3,
+        activeQueueId: "queue-1",
+        playing: true,
+      });
     });
   });
 });

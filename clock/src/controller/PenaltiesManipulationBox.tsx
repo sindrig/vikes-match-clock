@@ -12,11 +12,12 @@ interface Penalty {
 
 interface OwnProps {
   team: "home" | "away";
+  disabled?: boolean;
 }
 
 const MAX_TIMEOUTS_PER_TEAM = 4;
 
-const PenaltiesManipulationBox = ({ team }: OwnProps) => {
+const PenaltiesManipulationBox = ({ team, disabled }: OwnProps) => {
   const { match, addPenalty, removePenalty, addToPenalty } = useMatch();
   const started = match.started;
   const penalties = match[
@@ -34,7 +35,7 @@ const PenaltiesManipulationBox = ({ team }: OwnProps) => {
             <button
               type="button"
               onClick={() => setEditingPenalty(penalty)}
-              disabled={!!started}
+              disabled={disabled || !!started}
             >
               {`Breyta: ${translateTeam(team)} (${formatMillisAsTime(
                 atTimeElapsed,
@@ -53,6 +54,7 @@ const PenaltiesManipulationBox = ({ team }: OwnProps) => {
               removePenalty(editingPenalty.key);
               setEditingPenalty(null);
             }}
+            disabled={disabled}
           >
             Eyða
           </button>
@@ -61,6 +63,7 @@ const PenaltiesManipulationBox = ({ team }: OwnProps) => {
               addToPenalty(editingPenalty.key, PENALTY_LENGTH);
               setEditingPenalty(null);
             }}
+            disabled={disabled}
           >
             Bæta við 2 mín
           </button>
@@ -69,7 +72,9 @@ const PenaltiesManipulationBox = ({ team }: OwnProps) => {
       <button
         type="button"
         onClick={() => addPenalty(team, crypto.randomUUID(), PENALTY_LENGTH)}
-        disabled={penalties.length >= MAX_TIMEOUTS_PER_TEAM || !!started}
+        disabled={
+          disabled || penalties.length >= MAX_TIMEOUTS_PER_TEAM || !!started
+        }
         className="add-penalty"
       >
         {`2 mín - ${translateTeam(team)}`}

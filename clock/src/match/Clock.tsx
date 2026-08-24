@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useEffect } from "react";
+import React, { useCallback } from "react";
 import { formatTime } from "../utils/timeUtils";
 import ClockBase from "./ClockBase";
 import { useMatch } from "../contexts/FirebaseStateContext";
@@ -7,15 +7,17 @@ interface ClockProps {
   className: string;
 }
 
+// Render-only match clock. Automatic progression (countdown completion,
+// half-stops) is handled by the MatchLifecycle coordinator through
+// generation-conditional, freshness-gated actions. This component NEVER
+// mutates shared state; it only derives what to display from the current
+// authoritative match state and the server time.
 const Clock: React.FC<ClockProps> = ({ className }) => {
-  const { match, pauseMatch, buzz, getServerTime } = useMatch();
+  const { match, getServerTime } = useMatch();
   const { started, halfStops, timeElapsed, injuryTimeDisplayMode, countdown } =
     match;
 
   const halfStop = halfStops[0];
-
-  const hasFiredHalfStop = useRef(false);
-  const hasFiredCountdownEnd = useRef(false);
 
   const updateTime = useCallback((): string => {
     let milliSecondsElapsed = timeElapsed;
@@ -29,16 +31,7 @@ const Clock: React.FC<ClockProps> = ({ className }) => {
     let seconds;
     if (injuryTimeDisplayMode === "stop") {
       minutes = Math.min(minutesElapsed, halfStop ?? 0);
-      if (halfStopReached && started) {
-        seconds = 0;
-        if (!hasFiredHalfStop.current) {
-          hasFiredHalfStop.current = true;
-          pauseMatch(true);
-          buzz(true);
-        }
-      } else {
-        seconds = secondsElapsed % 60;
-      }
+      seconds = halfStopReached ? 0 : secondsElapsed % 60;
     } else {
       minutes = minutesElapsed;
       if (injuryTimeDisplayMode === "minutes" && halfStopReached) {
@@ -56,10 +49,6 @@ const Clock: React.FC<ClockProps> = ({ className }) => {
       if (minutes <= 0 && seconds <= 0) {
         minutes = 0;
         seconds = 0;
-        if (!hasFiredCountdownEnd.current) {
-          hasFiredCountdownEnd.current = true;
-          pauseMatch();
-        }
       }
     }
     return formatTime(minutes, seconds);
@@ -67,22 +56,10 @@ const Clock: React.FC<ClockProps> = ({ className }) => {
     started,
     halfStop,
     timeElapsed,
-    pauseMatch,
-    buzz,
     injuryTimeDisplayMode,
     countdown,
     getServerTime,
   ]);
-
-  // Reset half-stop latch when match starts/stops
-  useEffect(() => {
-    hasFiredHalfStop.current = false;
-  }, [started]);
-
-  // Reset countdown-end latch when match starts/stops or countdown mode changes
-  useEffect(() => {
-    hasFiredCountdownEnd.current = false;
-  }, [started, countdown]);
 
   return (
     <ClockBase

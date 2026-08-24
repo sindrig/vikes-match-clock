@@ -417,7 +417,23 @@ export async function closeTimeControl(page: Page) {
   await page.locator(".rs-modal").waitFor({ state: "hidden", timeout: 5000 });
 }
 
+// Register one confirmation-dialog handler per page: substantial backward
+// time corrections (Tímastjórnun) now require explicit operator confirmation.
+const confirmationHandlers = new WeakSet<Page>();
+function acceptTimeCorrectionConfirmations(page: Page) {
+  if (confirmationHandlers.has(page)) return;
+  confirmationHandlers.add(page);
+  page.on("dialog", (dialog) => {
+    if (dialog.message().includes("leiðrétta")) {
+      dialog.accept();
+    } else {
+      dialog.dismiss();
+    }
+  });
+}
+
 export async function adjustTime(page: Page, amount: string) {
+  acceptTimeCorrectionConfirmations(page);
   await openTimeControl(page);
   await page
     .locator(".time-adjust-btn", { hasText: amount })

@@ -11,39 +11,35 @@ import { Sports } from "../constants";
 import RedCardManipulation from "./RedCardManipulation";
 import { Match } from "../types";
 import {
-  roundMillisToSeconds,
   formatTimeUnit,
   isMatchResetDisabled,
   isHalftimeTransitionEligible,
 } from "../utils/matchUtils";
-import { useMatch } from "../contexts/FirebaseStateContext";
+import { useMatch, useFirebaseState } from "../contexts/FirebaseStateContext";
 
 const ClockManipulationButton = ({
   seconds,
   match,
-  updateMatch,
+  adjustMatchTime,
   direction,
+  disabled,
 }: {
   seconds: number;
   match: Match;
-  updateMatch: (update: Partial<Match>) => void;
+  adjustMatchTime: (deltaMs: number) => void;
   direction: "add" | "subtract";
+  disabled: boolean;
 }) => {
   const { value, unit } = formatTimeUnit(seconds);
   const multiplier = direction === "add" ? 1 : -1;
   const prefix = direction === "add" ? "+" : "-";
+  const deltaMs = seconds * 1000 * multiplier;
   return (
     <button
       type="button"
       className="time-adjust-btn"
-      onClick={() =>
-        updateMatch({
-          timeElapsed:
-            roundMillisToSeconds(match.timeElapsed) +
-            seconds * 1000 * multiplier,
-        })
-      }
-      disabled={!!match.timeout}
+      onClick={() => adjustMatchTime(deltaMs)}
+      disabled={disabled || !!match.timeout}
     >
       {prefix}
       {value}
@@ -56,12 +52,14 @@ const TimeControlDialog = ({
   open,
   onClose,
   match,
-  updateMatch,
+  adjustMatchTime,
+  disabled,
 }: {
   open: boolean;
   onClose: () => void;
   match: Match;
-  updateMatch: (update: Partial<Match>) => void;
+  adjustMatchTime: (deltaMs: number) => void;
+  disabled: boolean;
 }) => {
   const timeSteps = [1, 5, 60, 60 * 5];
   return (
@@ -83,14 +81,16 @@ const TimeControlDialog = ({
                   <ClockManipulationButton
                     seconds={seconds}
                     match={match}
-                    updateMatch={updateMatch}
+                    adjustMatchTime={adjustMatchTime}
                     direction="add"
+                    disabled={disabled}
                   />
                   <ClockManipulationButton
                     seconds={seconds}
                     match={match}
-                    updateMatch={updateMatch}
+                    adjustMatchTime={adjustMatchTime}
                     direction="subtract"
+                    disabled={disabled}
                   />
                 </ButtonGroup>
               </div>
@@ -99,8 +99,8 @@ const TimeControlDialog = ({
         </div>
         {match.matchType === Sports.Handball ? (
           <div className="time-control-section-penalties">
-            <PenaltiesManipulationBox team="home" />
-            <PenaltiesManipulationBox team="away" />
+            <PenaltiesManipulationBox team="home" disabled={disabled} />
+            <PenaltiesManipulationBox team="away" disabled={disabled} />
           </div>
         ) : null}
       </Modal.Body>
@@ -112,6 +112,7 @@ const MatchActions = () => {
   const {
     match,
     updateMatch,
+    adjustMatchTime,
     pauseMatch,
     startMatch,
     resetMatch,
@@ -121,6 +122,7 @@ const MatchActions = () => {
     startHalftimeCountdown,
     stopHalftimeCountdown,
   } = useMatch();
+  const { writeEligible } = useFirebaseState();
 
   const [showTimeDialog, setShowTimeDialog] = useState(false);
 
@@ -134,6 +136,7 @@ const MatchActions = () => {
               appearance="primary"
               size="sm"
               onClick={stopHalftimeCountdown}
+              disabled={!writeEligible}
               block
             >
               <PauseIcon /> Stöðva niðurtalningu
@@ -144,7 +147,7 @@ const MatchActions = () => {
               appearance="primary"
               size="sm"
               onClick={() => pauseMatch()}
-              disabled={!!match.timeout}
+              disabled={!!match.timeout || !writeEligible}
               block
             >
               <PauseIcon /> Pása
@@ -155,7 +158,7 @@ const MatchActions = () => {
               appearance="primary"
               size="sm"
               onClick={startMatch}
-              disabled={!!match.timeout}
+              disabled={!!match.timeout || !writeEligible}
               block
             >
               <PlayIcon /> Byrja
@@ -169,7 +172,7 @@ const MatchActions = () => {
                   appearance="primary"
                   size="sm"
                   onClick={countdown}
-                  disabled={!!match.timeout}
+                  disabled={!!match.timeout || !writeEligible}
                   block
                 >
                   Hefja niðurtalningu
@@ -183,7 +186,7 @@ const MatchActions = () => {
                   appearance="primary"
                   size="sm"
                   onClick={startHalftimeCountdown}
-                  disabled={!!match.timeout}
+                  disabled={!!match.timeout || !writeEligible}
                   block
                 >
                   Næsti hálfleikur
@@ -196,24 +199,29 @@ const MatchActions = () => {
             color="red"
             appearance="primary"
             onClick={() => window.confirm("Ertu alveg viss?") && resetMatch()}
-            disabled={isMatchResetDisabled(match)}
+            disabled={isMatchResetDisabled(match) || !writeEligible}
           >
             <HistoryIcon /> Reset
           </Button>
-          <Button size="xs" onClick={() => setShowTimeDialog(true)}>
+          <Button
+            size="xs"
+            onClick={() => setShowTimeDialog(true)}
+            disabled={!writeEligible}
+          >
             <TimeIcon /> Tímastjórnun
           </Button>
         </div>
       </div>
 
       <div className="match-actions-clock-secondary">
-        <RedCardManipulation />
+        <RedCardManipulation disabled={!writeEligible} />
         {match.matchType === Sports.Football && (
           <input
             type="number"
             className="longerInput"
             placeholder="Uppbót (mín)"
             value={match.injuryTime || ""}
+            disabled={!writeEligible}
             onChange={({ target: { value } }) =>
               updateMatch({ injuryTime: parseInt(value, 10) })
             }
@@ -225,7 +233,11 @@ const MatchActions = () => {
         <div className="match-actions-handball">
           <div className="match-actions-timeouts">
             {match.timeout ? (
-              <Button size="sm" onClick={removeTimeout}>
+              <Button
+                size="sm"
+                onClick={removeTimeout}
+                disabled={!writeEligible}
+              >
                 Eyða Leikhlé
               </Button>
             ) : (
@@ -234,7 +246,11 @@ const MatchActions = () => {
                   { team: "home" as const, name: "heima" },
                   { team: "away" as const, name: "úti" },
                 ].map(({ team, name }) => (
-                  <Button key={team} onClick={() => matchTimeout(team)}>
+                  <Button
+                    key={team}
+                    onClick={() => matchTimeout(team)}
+                    disabled={!writeEligible}
+                  >
                     {`Leikhlé ${name}`}
                   </Button>
                 ))}
@@ -248,7 +264,8 @@ const MatchActions = () => {
         open={showTimeDialog}
         onClose={() => setShowTimeDialog(false)}
         match={match}
-        updateMatch={updateMatch}
+        adjustMatchTime={adjustMatchTime}
+        disabled={!writeEligible}
       />
     </div>
   );

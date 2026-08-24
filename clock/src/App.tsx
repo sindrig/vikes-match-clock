@@ -12,6 +12,7 @@ import {
 import { useLocalState } from "./contexts/LocalStateContext";
 import { firebaseAuth } from "./firebaseAuth";
 import Controller from "./controller/Controller";
+import ResyncNotice from "./controller/ResyncNotice";
 import MatchActions from "./controller/MatchActions";
 import MatchCountdownDisplay from "./controller/MatchCountdownDisplay";
 import HomeTeamQuickActions from "./controller/HomeTeamQuickActions";
@@ -23,6 +24,7 @@ import GoalScorerDialog from "./controller/GoalScorerDialog";
 
 import ScoreBoard from "./screens/ScoreBoard";
 import Idle from "./screens/Idle";
+import MatchLifecycle from "./match/MatchLifecycle";
 
 import { VIEWS, Sports, getBackground, DEFAULT_THEME } from "./constants";
 import MatchController from "./match-controller/MatchController";
@@ -346,10 +348,12 @@ function App() {
 
   return (
     <div>
+      <MatchLifecycle />
       {view === VIEWS.control ? <MatchController /> : null}
       {showController && (
         <div className="controller-layout">
           <div className="controller-sidebar">
+            <ResyncNotice />
             <div className="preview-and-controls">
               <div className="preview-with-scores">
                 {showMatchControls ? (

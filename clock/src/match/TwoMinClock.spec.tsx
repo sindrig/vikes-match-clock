@@ -182,7 +182,7 @@ describe("TwoMinClock component", () => {
   });
 
   describe("penalty expiry", () => {
-    it("calls removePenalty when time expires", () => {
+    it("displays 00:00 when time expires (render-only, no mutation)", () => {
       const mockRemovePenalty = vi.fn();
       let currentTime = 1000000;
       vi.spyOn(Date, "now").mockImplementation(() => currentTime);
@@ -209,10 +209,13 @@ describe("TwoMinClock component", () => {
         vi.advanceTimersByTime(11000);
       });
 
-      expect(mockRemovePenalty).toHaveBeenCalledWith("test-penalty-123");
+      expect(screen.getByText("00:00")).toBeInTheDocument();
+      // Penalty expiry is handled by the MatchLifecycle coordinator through a
+      // conditional, freshness-gated action — never by the renderer.
+      expect(mockRemovePenalty).not.toHaveBeenCalled();
     });
 
-    it("calls removePenalty immediately if penalty already expired", () => {
+    it("displays 00:00 immediately if penalty already expired (render-only)", () => {
       const mockRemovePenalty = vi.fn();
       const currentTime = 1000000;
       vi.spyOn(Date, "now").mockImplementation(() => currentTime);
@@ -238,7 +241,8 @@ describe("TwoMinClock component", () => {
         vi.advanceTimersByTime(100);
       });
 
-      expect(mockRemovePenalty).toHaveBeenCalledWith("expired-penalty");
+      expect(screen.getByText("00:00")).toBeInTheDocument();
+      expect(mockRemovePenalty).not.toHaveBeenCalled();
     });
   });
 

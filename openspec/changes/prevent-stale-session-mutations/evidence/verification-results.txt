@@ -1,0 +1,40 @@
+Verification results (task 5.2 + follow-on hardening for commit-aware lifecycle)
+
+Vitest: 51 files, 1122 tests passed, including:
+  - new MatchLifecycle.spec.tsx (8 tests): ineligible expiry deferral + retry
+    after resync, latch-only-after-commit, uncommitted retry, in-flight
+    deduplication, penalty deferral, timeout 00:10-warning / 00:00-clear
+    boundaries, timeout ineligible deferral, timed-asset due-completion
+    without timer restart.
+  - extended TimeoutClock.spec.tsx (8 tests): documents the +1000 display
+    ceiling (00:01 at TIMEOUT_LENGTH elapsed, 00:00 one second later) that
+    MatchLifecycle aligns its expiry thresholds to.
+  - extended MatchActions.spec.tsx (14 tests): mutating controls (Reset,
+    Tímastjórnun, injury-time input, red cards, handball timeouts) are
+    disabled while writeEligible is false.
+
+Playwright E2E against Firebase emulators (auth+database started locally):
+  stale-session.spec.ts       3/3 passed. New regression: "still-current
+  countdown completes after resync once the client is eligible" — a countdown
+  that becomes due in real time while the phone is offline (ineligible) and is
+  still current is completed after resync rather than staying latched-stuck.
+  (The emulator does not re-deliver unchanged subscription data on a raw
+  WebSocket reconnect, so the test delivers the post-resume authoritative
+  snapshot with an innocuous match write, mirroring production Firebase's
+  reconnect re-delivery.)
+  halftime-countdown.spec.ts  2/2 passed
+  match-flow.spec.ts          6/6 passed
+  basic-navigation.spec.ts    3/3 passed
+  penalties.spec.ts           6/6 passed
+  assets/admin/disconnect/...  passed
+  Total: 45 passed, 3 failed.
+
+The 3 failures (admin.spec "create invitation", image-upload.spec x2) require
+the storage and functions emulators, which were NOT started in this local run
+(only auth+database). CI starts all four emulators
+(--only auth,database,storage,functions). These tests do not exercise the
+stale-session safety paths and are unrelated to this change.
+
+Formatting: prettier check passed.
+Linting: eslint src exit 0.
+Production build: tsc -p tsconfig.build.json --noEmit clean; vite build OK.

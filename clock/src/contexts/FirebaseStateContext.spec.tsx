@@ -1,7 +1,7 @@
 import React from "react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, act, waitFor } from "@testing-library/react";
-import { onValue, ref, set } from "firebase/database";
+import { onValue, ref, set, runTransaction } from "firebase/database";
 import { httpsCallable } from "firebase/functions";
 import {
   FirebaseStateProvider,
@@ -9,6 +9,7 @@ import {
   useController,
   useView,
   usePerimeter,
+  useFirebaseState,
 } from "./FirebaseStateContext";
 import { Asset, Roster, ViewPort } from "../types";
 import { Sports, DEFAULT_HALFSTOPS, VIEWS } from "../constants";
@@ -18,6 +19,7 @@ import { firebaseDatabase } from "../firebaseDatabase";
 vi.mock("../firebaseDatabase", () => ({
   firebaseDatabase: {
     writeAudited: vi.fn().mockResolvedValue(undefined),
+    writeAuditOnly: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
@@ -36,7 +38,15 @@ vi.mock("firebase/database", () => ({
   onValue: vi.fn(() => vi.fn()),
   set: vi.fn(() => Promise.resolve()),
   remove: vi.fn(() => Promise.resolve()),
+  runTransaction: vi.fn(),
 }));
+
+// In-memory authoritative database used to emulate compare-and-set
+// transactions for the conditional-transition tests.
+const mockDbState = new Map<string, unknown>();
+// Captured `onValue` callbacks keyed by path, so tests can drive Firebase
+// connectivity (`.info/connected`) and post-resume subscription deliveries.
+const mockOnValueCallbacks = new Map<string, unknown>();
 
 const TestMatchConsumer = ({
   onMount,
@@ -98,26 +108,80 @@ const TestPerimeterConsumer = ({
   );
 };
 
+const TestFirebaseStateConsumer = ({
+  onMount,
+}: {
+  onMount: (api: ReturnType<typeof useFirebaseState>) => void;
+}) => {
+  const api = useFirebaseState();
+  React.useEffect(() => {
+    onMount(api);
+  }, [api, onMount]);
+  return <div data-testid="firebase-state-consumer" />;
+};
+
+// Drives the freshness-barrier lifecycle: overrides `document.hidden` and
+// dispatches `visibilitychange` so the provider's listeners see the change.
+const setDocumentHidden = (hidden: boolean) => {
+  Object.defineProperty(document, "hidden", {
+    configurable: true,
+    value: hidden,
+  });
+  document.dispatchEvent(new Event("visibilitychange"));
+};
+
+// Wraps a custom onValue data resolver so the provider's `/.info/connected`
+// subscription reports a live connection (otherwise `firebaseConnectedRef`
+// stays false and the client never becomes write-eligible). The resolver
+// receives the path and the callback (the latter for tests that need to
+// capture a subscription and re-invoke it later).
+const withConnectedInfo =
+  (resolve: (path: string, callback: (snapshot: unknown) => void) => unknown) =>
+  (reference: unknown, callback: (snapshot: unknown) => void) => {
+    const path = String(reference);
+    callback({
+      val: () => (path === ".info/connected" ? true : resolve(path, callback)),
+    } as never);
+    return vi.fn();
+  };
+
 describe("FirebaseStateContext", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockDbState.clear();
+    mockOnValueCallbacks.clear();
     vi.mocked(ref).mockImplementation((_, path) => path as never);
 
     vi.mocked(onValue).mockImplementation((reference, callback) => {
       const path = String(reference);
-
-      if (path.includes("clubOverrides")) {
-        callback({
-          val: () => null,
-        } as never);
-      } else {
-        callback({
-          val: () => null,
-        } as never);
-      }
-
+      mockOnValueCallbacks.set(path, callback);
+      // `/.info/connected` is connected by default so readiness tests pass
+      // without special-casing; tests override it by re-invoking the callback.
+      const state =
+        path === ".info/connected" ? true : (mockDbState.get(path) ?? null);
+      callback({
+        val: () => state,
+      } as never);
       return vi.fn();
     });
+
+    // Emulate a compare-and-set transaction against the in-memory
+    // authoritative state. Returning `undefined` from the update function
+    // aborts the transaction (obsolete/duplicate attempt).
+    vi.mocked(runTransaction).mockImplementation((dbRef, updateFn) => {
+      const path = String(dbRef);
+      const current = mockDbState.get(path) ?? null;
+      const next = updateFn(current);
+      if (next === undefined) {
+        return { committed: false, snapshot: { val: () => current } };
+      }
+      mockDbState.set(path, next);
+      return { committed: true, snapshot: { val: () => next } };
+    });
+  });
+
+  afterEach(() => {
+    setDocumentHidden(false);
   });
 
   describe("empty listenPrefix protection", () => {
@@ -206,6 +270,201 @@ describe("FirebaseStateContext", () => {
         expect.objectContaining({ homeScore: 1 }),
         expect.anything(),
       );
+    });
+
+    it("becomes write-eligible once subscriptions deliver for an authenticated client", async () => {
+      let api: ReturnType<typeof useFirebaseState> | null = null;
+
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+          screenKey={null}
+        >
+          <TestFirebaseStateConsumer
+            onMount={(value) => {
+              api = value;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+
+      await waitFor(() => {
+        expect(api?.writeEligible).toBe(true);
+      });
+      expect(api?.writeFreshness).toBe("ready");
+    });
+
+    it("keeps an unauthenticated client write-ineligible even after subscriptions deliver", async () => {
+      let api: ReturnType<typeof useFirebaseState> | null = null;
+
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={false}
+          screenKey={null}
+        >
+          <TestFirebaseStateConsumer
+            onMount={(value) => {
+              api = value;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+
+      await waitFor(() => {
+        expect(api?.writeFreshness).toBe("ready");
+      });
+      expect(api?.writeEligible).toBe(false);
+    });
+
+    it("restores write eligibility immediately on tab resume when the Firebase connection never dropped", async () => {
+      let api: ReturnType<typeof useFirebaseState> | null = null;
+
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+          screenKey={null}
+        >
+          <TestFirebaseStateConsumer
+            onMount={(value) => {
+              api = value;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+
+      await waitFor(() => {
+        expect(api?.writeEligible).toBe(true);
+      });
+
+      act(() => {
+        setDocumentHidden(true);
+      });
+      expect(api?.writeFreshness).toBe("hidden");
+      expect(api?.writeEligible).toBe(false);
+
+      // The Firebase socket stayed up (`/.info/connected` was never false and
+      // no data changed), so no `onValue` delivery will follow the resume.
+      // The barrier must clear immediately rather than wait forever.
+      act(() => {
+        setDocumentHidden(false);
+      });
+      expect(api?.writeFreshness).toBe("ready");
+      expect(api?.writeEligible).toBe(true);
+    });
+
+    it("stays write-ineligible on resume until a post-reconnect delivery after a Firebase drop", async () => {
+      let api: ReturnType<typeof useFirebaseState> | null = null;
+
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+          screenKey={null}
+        >
+          <TestFirebaseStateConsumer
+            onMount={(value) => {
+              api = value;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+
+      await waitFor(() => {
+        expect(api?.writeEligible).toBe(true);
+      });
+
+      act(() => {
+        setDocumentHidden(true);
+      });
+      expect(api?.writeFreshness).toBe("hidden");
+
+      const connectedCallback = mockOnValueCallbacks.get(
+        ".info/connected",
+      ) as (snap: { val: () => unknown }) => void;
+      act(() => {
+        connectedCallback({ val: () => false });
+      });
+
+      // Resumed but the Firebase connection dropped while hidden: the barrier
+      // must NOT clear on connection alone — it needs a fresh snapshot.
+      act(() => {
+        setDocumentHidden(false);
+      });
+      expect(api?.writeFreshness).toBe("resyncing");
+      expect(api?.writeEligible).toBe(false);
+
+      act(() => {
+        connectedCallback({ val: () => true });
+      });
+
+      // A core subscription delivering after the reconnect is the proof that
+      // clears the barrier.
+      const matchCallback = mockOnValueCallbacks.get(
+        "states/test-location/match",
+      ) as (snap: { val: () => unknown }) => void;
+      act(() => {
+        matchCallback({
+          val: () => mockDbState.get("states/test-location/match") ?? null,
+        });
+      });
+
+      await waitFor(() => {
+        expect(api?.writeFreshness).toBe("ready");
+      });
+      expect(api?.writeEligible).toBe(true);
+    });
+
+    it("loses write eligibility when Firebase disconnects while visible and restores on delivery", async () => {
+      let api: ReturnType<typeof useFirebaseState> | null = null;
+
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+          screenKey={null}
+        >
+          <TestFirebaseStateConsumer
+            onMount={(value) => {
+              api = value;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+
+      await waitFor(() => {
+        expect(api?.writeEligible).toBe(true);
+      });
+
+      const connectedCallback = mockOnValueCallbacks.get(
+        ".info/connected",
+      ) as (snap: { val: () => unknown }) => void;
+      act(() => {
+        connectedCallback({ val: () => false });
+      });
+
+      expect(api?.writeFreshness).toBe("resyncing");
+      expect(api?.writeEligible).toBe(false);
+
+      act(() => {
+        connectedCallback({ val: () => true });
+      });
+
+      const matchCallback = mockOnValueCallbacks.get(
+        "states/test-location/match",
+      ) as (snap: { val: () => unknown }) => void;
+      act(() => {
+        matchCallback({
+          val: () => mockDbState.get("states/test-location/match") ?? null,
+        });
+      });
+
+      await waitFor(() => {
+        expect(api?.writeFreshness).toBe("ready");
+      });
+      expect(api?.writeEligible).toBe(true);
     });
 
     it("allows rapid sequential goal additions (updates ref immediately)", () => {
@@ -314,7 +573,15 @@ describe("FirebaseStateContext", () => {
   });
 
   describe("match actions", () => {
-    it("startMatch sets started timestamp and clears countdown", () => {
+    it("startMatch sets started timestamp and clears countdown", async () => {
+      mockDbState.set("states/test-location/match", {
+        started: 0,
+        countdown: false,
+        halftimeCountdown: false,
+        timeElapsed: 0,
+        halfStops: [45, 90],
+      });
+      vi.mocked(firebaseDatabase.writeAuditOnly).mockClear();
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
@@ -329,10 +596,11 @@ describe("FirebaseStateContext", () => {
           />
         </FirebaseStateProvider>,
       );
-      act(() => {
+      await act(async () => {
         matchApi!.startMatch();
+        await Promise.resolve();
       });
-      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAuditOnly).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({
@@ -342,7 +610,15 @@ describe("FirebaseStateContext", () => {
       );
     });
 
-    it("pauseMatch sets started to 0", () => {
+    it("pauseMatch sets started to 0", async () => {
+      mockDbState.set("states/test-location/match", {
+        started: 0,
+        countdown: false,
+        halftimeCountdown: false,
+        timeElapsed: 0,
+        halfStops: [45, 90],
+      });
+      vi.mocked(firebaseDatabase.writeAuditOnly).mockClear();
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
@@ -357,10 +633,11 @@ describe("FirebaseStateContext", () => {
           />
         </FirebaseStateProvider>,
       );
-      act(() => {
+      await act(async () => {
         matchApi!.pauseMatch();
+        await Promise.resolve();
       });
-      expect(firebaseDatabase.writeAudited).not.toHaveBeenCalled();
+      expect(firebaseDatabase.writeAuditOnly).not.toHaveBeenCalled();
     });
 
     it("addGoal increments homeScore", () => {
@@ -922,25 +1199,20 @@ describe("FirebaseStateContext", () => {
     });
 
     it("looks up custom team IDs from club overrides", () => {
-      vi.mocked(onValue).mockImplementation((reference, callback) => {
-        const path = String(reference);
-
-        callback({
-          val: () =>
-            path.includes("clubOverrides")
-              ? {
-                  customTeam: {
-                    name: "Kjánaprik",
-                    clubId: "-1",
-                    logoUrl: "https://example.com/kjanaprik.png",
-                    isOverride: false,
-                  },
-                }
-              : null,
-        } as never);
-
-        return vi.fn();
-      });
+      vi.mocked(onValue).mockImplementation(
+        withConnectedInfo((path) =>
+          path.includes("clubOverrides")
+            ? {
+                customTeam: {
+                  name: "Kjánaprik",
+                  clubId: "-1",
+                  logoUrl: "https://example.com/kjanaprik.png",
+                  isOverride: false,
+                },
+              }
+            : null,
+        ),
+      );
 
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
@@ -970,25 +1242,20 @@ describe("FirebaseStateContext", () => {
     });
 
     it("normalizes typed custom team names with trailing dots to override canonical name", () => {
-      vi.mocked(onValue).mockImplementation((reference, callback) => {
-        const path = String(reference);
-
-        callback({
-          val: () =>
-            path.includes("clubOverrides")
-              ? {
-                  customTeam: {
-                    name: "Kjánaprik",
-                    clubId: "-1",
-                    logoUrl: "https://example.com/kjanaprik.png",
-                    isOverride: false,
-                  },
-                }
-              : null,
-        } as never);
-
-        return vi.fn();
-      });
+      vi.mocked(onValue).mockImplementation(
+        withConnectedInfo((path) =>
+          path.includes("clubOverrides")
+            ? {
+                customTeam: {
+                  name: "Kjánaprik",
+                  clubId: "-1",
+                  logoUrl: "https://example.com/kjanaprik.png",
+                  isOverride: false,
+                },
+              }
+            : null,
+        ),
+      );
 
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
@@ -1380,7 +1647,15 @@ describe("FirebaseStateContext", () => {
   });
 
   describe("pauseMatch with isHalfEnd", () => {
-    it("sets timeElapsed to first halfStop and slices halfStops", () => {
+    it("sets timeElapsed to first halfStop and slices halfStops", async () => {
+      mockDbState.set("states/test-location/match", {
+        started: 5000,
+        countdown: false,
+        halftimeCountdown: false,
+        timeElapsed: 0,
+        halfStops: [45, 90, 105, 120],
+      });
+      vi.mocked(firebaseDatabase.writeAuditOnly).mockClear();
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
@@ -1395,14 +1670,11 @@ describe("FirebaseStateContext", () => {
           />
         </FirebaseStateProvider>,
       );
-      act(() => {
-        matchApi!.startMatch();
-      });
-      vi.clearAllMocks();
-      act(() => {
+      await act(async () => {
         matchApi!.pauseMatch(true);
+        await Promise.resolve();
       });
-      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAuditOnly).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({
@@ -1414,7 +1686,15 @@ describe("FirebaseStateContext", () => {
       );
     });
 
-    it("accumulates timeElapsed on normal pause", () => {
+    it("accumulates timeElapsed on normal pause", async () => {
+      mockDbState.set("states/test-location/match", {
+        started: 5000,
+        countdown: false,
+        halftimeCountdown: false,
+        timeElapsed: 0,
+        halfStops: [45, 90, 105, 120],
+      });
+      vi.mocked(firebaseDatabase.writeAuditOnly).mockClear();
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
@@ -1429,14 +1709,11 @@ describe("FirebaseStateContext", () => {
           />
         </FirebaseStateProvider>,
       );
-      act(() => {
-        matchApi!.startMatch();
-      });
-      vi.clearAllMocks();
-      act(() => {
+      await act(async () => {
         matchApi!.pauseMatch();
+        await Promise.resolve();
       });
-      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAuditOnly).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({
@@ -1658,9 +1935,10 @@ describe("FirebaseStateContext", () => {
       expect(firebaseDatabase.writeAudited).not.toHaveBeenCalled();
     });
 
-    it("leaves the match paused at the completed boundary on halftime countdown expiry", () => {
+    it("leaves the match paused at the completed boundary on halftime countdown expiry", async () => {
       const matchApi = renderHalftimeApi();
-      act(() => {
+      vi.mocked(firebaseDatabase.writeAuditOnly).mockClear();
+      await act(async () => {
         matchApi.updateMatch({
           started: 1_234_567_890,
           timeElapsed: 0,
@@ -1668,12 +1946,23 @@ describe("FirebaseStateContext", () => {
           halftimeCountdown: true,
           halfStops: [45, 90],
         });
+        await Promise.resolve();
+      });
+      // Authoritative state must match what the operator observed (the
+      // conditional pause re-validates against current state).
+      mockDbState.set("states/test-location/match", {
+        started: 1_234_567_890,
+        timeElapsed: 0,
+        countdown: true,
+        halftimeCountdown: true,
+        halfStops: [45, 90],
       });
       vi.clearAllMocks();
-      act(() => {
+      await act(async () => {
         matchApi.pauseMatch();
+        await Promise.resolve();
       });
-      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAuditOnly).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({
@@ -2239,7 +2528,15 @@ describe("FirebaseStateContext", () => {
       expect(matchApi!.match.started).toBe(0);
     });
 
-    it("startMatch uses getServerTime for timestamp", () => {
+    it("startMatch uses getServerTime for timestamp", async () => {
+      mockDbState.set("states/test-location/match", {
+        started: 0,
+        countdown: false,
+        halftimeCountdown: false,
+        timeElapsed: 0,
+        halfStops: [45, 90],
+      });
+      vi.mocked(firebaseDatabase.writeAuditOnly).mockClear();
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
@@ -2254,17 +2551,27 @@ describe("FirebaseStateContext", () => {
           />
         </FirebaseStateProvider>,
       );
-      act(() => {
+      await act(async () => {
         matchApi!.startMatch();
+        await Promise.resolve();
       });
-      // Verify set was called with a timestamp close to Date.now()
-      const call = vi.mocked(firebaseDatabase.writeAudited).mock.calls[0]!;
-      const writtenMatch = call[2];
-      expect(writtenMatch.started).toBeGreaterThan(Date.now() - 100);
-      expect(writtenMatch.started).toBeLessThan(Date.now() + 100);
+      // Verify the audit records a timestamp close to Date.now()
+      const call = vi.mocked(firebaseDatabase.writeAuditOnly).mock.calls[0]!;
+      const writtenDiff = call[2];
+      expect(writtenDiff.started).toBeGreaterThan(Date.now() - 100);
+      expect(writtenDiff.started).toBeLessThan(Date.now() + 100);
     });
 
-    it("pauseMatch computes timeElapsed using getServerTime", () => {
+    it("pauseMatch computes timeElapsed using getServerTime", async () => {
+      const startedAt = Date.now();
+      mockDbState.set("states/test-location/match", {
+        started: startedAt,
+        countdown: false,
+        halftimeCountdown: false,
+        timeElapsed: 0,
+        halfStops: [45, 90],
+      });
+      vi.mocked(firebaseDatabase.writeAuditOnly).mockClear();
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
@@ -2279,14 +2586,11 @@ describe("FirebaseStateContext", () => {
           />
         </FirebaseStateProvider>,
       );
-      act(() => {
-        matchApi!.startMatch();
-      });
-      vi.clearAllMocks();
-      act(() => {
+      await act(async () => {
         matchApi!.pauseMatch();
+        await Promise.resolve();
       });
-      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
+      expect(firebaseDatabase.writeAuditOnly).toHaveBeenCalledWith(
         "test-location",
         "match",
         expect.objectContaining({
@@ -2294,14 +2598,15 @@ describe("FirebaseStateContext", () => {
         }),
         expect.anything(),
       );
-      const pauseCall = vi.mocked(firebaseDatabase.writeAudited).mock.calls[0]!;
-      const pauseData = pauseCall[2];
+      const pauseCall = vi.mocked(firebaseDatabase.writeAuditOnly).mock
+        .calls[0]!;
+      const pauseDiff = pauseCall[2];
       // timeElapsed is computed via getServerTime() - started, ~0ms in tests.
       // The diff optimization may skip it if it stays at 0 (the default),
       // so we verify it's either absent or a small non-negative number.
-      if (pauseData.timeElapsed !== undefined) {
-        expect(pauseData.timeElapsed).toBeGreaterThanOrEqual(0);
-        expect(pauseData.timeElapsed).toBeLessThan(100);
+      if (pauseDiff.timeElapsed !== undefined) {
+        expect(pauseDiff.timeElapsed).toBeGreaterThanOrEqual(0);
+        expect(pauseDiff.timeElapsed).toBeLessThan(100);
       }
     });
   });
@@ -2312,15 +2617,11 @@ describe("FirebaseStateContext", () => {
       isAuthenticated: boolean,
       data: unknown = null,
     ): ReturnType<typeof usePerimeter> | null {
-      vi.mocked(onValue).mockImplementation((reference, callback) => {
-        const path = String(reference);
-        if (path.includes("/perimeter")) {
-          callback({ val: () => data } as never);
-        } else {
-          callback({ val: () => null } as never);
-        }
-        return vi.fn();
-      });
+      vi.mocked(onValue).mockImplementation(
+        withConnectedInfo((path) =>
+          path.includes("/perimeter") ? data : null,
+        ),
+      );
 
       let perimeterApi: ReturnType<typeof usePerimeter> | null = null;
       render(
@@ -2346,18 +2647,15 @@ describe("FirebaseStateContext", () => {
     ) {
       let controllerCallback: ((snapshot: unknown) => void) | null = null;
 
-      vi.mocked(onValue).mockImplementation((reference, callback) => {
-        const path = String(reference);
-        if (path.includes("/controller")) {
-          controllerCallback = callback as (snapshot: unknown) => void;
-          callback({ val: () => ({ view: initialView }) } as never);
-        } else if (path.includes("/perimeter")) {
-          callback({ val: () => data } as never);
-        } else {
-          callback({ val: () => null } as never);
-        }
-        return vi.fn();
-      });
+      vi.mocked(onValue).mockImplementation(
+        withConnectedInfo((path, callback) => {
+          if (path.includes("/controller")) {
+            controllerCallback = callback as (snapshot: unknown) => void;
+            return { view: initialView };
+          }
+          return path.includes("/perimeter") ? data : null;
+        }),
+      );
 
       let perimeterApi: ReturnType<typeof usePerimeter> | null = null;
       render(
@@ -2388,15 +2686,11 @@ describe("FirebaseStateContext", () => {
       listenPrefix: string,
       preview: unknown,
     ): ReturnType<typeof usePerimeter> | null {
-      vi.mocked(onValue).mockImplementation((reference, callback) => {
-        const path = String(reference);
-        if (path.startsWith("perimeter/")) {
-          callback({ val: () => preview } as never);
-        } else {
-          callback({ val: () => null } as never);
-        }
-        return vi.fn();
-      });
+      vi.mocked(onValue).mockImplementation(
+        withConnectedInfo((path) =>
+          path.startsWith("perimeter/") ? preview : null,
+        ),
+      );
 
       let perimeterApi: ReturnType<typeof usePerimeter> | null = null;
       render(
@@ -2590,17 +2884,17 @@ describe("FirebaseStateContext", () => {
 
     it("does not write the perimeter state when switching listenPrefix to a venue already in match view", () => {
       let currentControllerView: string = VIEWS.idle;
-      vi.mocked(onValue).mockImplementation((reference, callback) => {
-        const path = String(reference);
-        if (path.includes("/controller")) {
-          callback({ val: () => ({ view: currentControllerView }) } as never);
-        } else if (path.includes("/perimeter")) {
-          callback({ val: () => ({ enabled: true, state: "off" }) } as never);
-        } else {
-          callback({ val: () => null } as never);
-        }
-        return vi.fn();
-      });
+      vi.mocked(onValue).mockImplementation(
+        withConnectedInfo((path) => {
+          if (path.includes("/controller")) {
+            return { view: currentControllerView };
+          }
+          if (path.includes("/perimeter")) {
+            return { enabled: true, state: "off" };
+          }
+          return null;
+        }),
+      );
 
       const { rerender } = render(
         <FirebaseStateProvider
@@ -2668,17 +2962,17 @@ describe("FirebaseStateContext", () => {
       brightnessData: unknown = null,
       statusData: unknown = null,
     ): ReturnType<typeof usePerimeter> | null {
-      vi.mocked(onValue).mockImplementation((reference, callback) => {
-        const path = String(reference);
-        if (path.endsWith("/perimeter/brightness")) {
-          callback({ val: () => brightnessData } as never);
-        } else if (path.endsWith("/brightnessStatus")) {
-          callback({ val: () => statusData } as never);
-        } else {
-          callback({ val: () => null } as never);
-        }
-        return vi.fn();
-      });
+      vi.mocked(onValue).mockImplementation(
+        withConnectedInfo((path) => {
+          if (path.endsWith("/perimeter/brightness")) {
+            return brightnessData;
+          }
+          if (path.endsWith("/brightnessStatus")) {
+            return statusData;
+          }
+          return null;
+        }),
+      );
 
       let perimeterApi: ReturnType<typeof usePerimeter> | null = null;
       render(
@@ -2805,15 +3099,11 @@ describe("FirebaseStateContext", () => {
       isAuthenticated: boolean,
       mediaPairsData: unknown = null,
     ): ReturnType<typeof usePerimeter> | null {
-      vi.mocked(onValue).mockImplementation((reference, callback) => {
-        const path = String(reference);
-        if (path.includes("perimeter/mediaPairs")) {
-          callback({ val: () => mediaPairsData } as never);
-        } else {
-          callback({ val: () => null } as never);
-        }
-        return vi.fn();
-      });
+      vi.mocked(onValue).mockImplementation(
+        withConnectedInfo((path) =>
+          path.includes("perimeter/mediaPairs") ? mediaPairsData : null,
+        ),
+      );
 
       let perimeterApi: ReturnType<typeof usePerimeter> | null = null;
       render(
@@ -2965,17 +3255,17 @@ describe("goal scorer preparation", () => {
       geometry = geometryDoc,
     } = options;
     let perimeterApi: ReturnType<typeof usePerimeter> | null = null;
-    vi.mocked(onValue).mockImplementation((reference, callback) => {
-      const path = String(reference);
-      if (path.endsWith("/goalScorerPreparation")) {
-        callback({ val: () => data } as never);
-      } else if (path.endsWith("/overlayGeometry")) {
-        callback({ val: () => geometry } as never);
-      } else {
-        callback({ val: () => null } as never);
-      }
-      return vi.fn();
-    });
+    vi.mocked(onValue).mockImplementation(
+      withConnectedInfo((path) => {
+        if (path.endsWith("/goalScorerPreparation")) {
+          return data;
+        }
+        if (path.endsWith("/overlayGeometry")) {
+          return geometry;
+        }
+        return null;
+      }),
+    );
 
     render(
       <FirebaseStateProvider
@@ -3027,11 +3317,10 @@ describe("goal scorer preparation", () => {
 
   it("requests preparation in the background when the home roster has eligible players", async () => {
     const httpsCallableMock = vi.mocked(httpsCallable);
-    vi.mocked(onValue).mockImplementation((reference, callback) => {
-      const path = String(reference);
-      if (path.endsWith("/controller")) {
-        callback({
-          val: () => ({
+    vi.mocked(onValue).mockImplementation(
+      withConnectedInfo((path) => {
+        if (path.endsWith("/controller")) {
+          return {
             queues: {},
             activeQueueId: null,
             playing: false,
@@ -3042,17 +3331,17 @@ describe("goal scorer preparation", () => {
               ],
               away: [],
             },
-          }),
-        } as never);
-      } else if (path.endsWith("/perimeter")) {
-        callback({ val: () => ({ enabled: true, state: "off" }) } as never);
-      } else if (path.endsWith("/overlayGeometry")) {
-        callback({ val: () => geometryDoc } as never);
-      } else {
-        callback({ val: () => null } as never);
-      }
-      return vi.fn();
-    });
+          };
+        }
+        if (path.endsWith("/perimeter")) {
+          return { enabled: true, state: "off" };
+        }
+        if (path.endsWith("/overlayGeometry")) {
+          return geometryDoc;
+        }
+        return null;
+      }),
+    );
 
     render(
       <FirebaseStateProvider
@@ -3090,11 +3379,10 @@ describe("goal scorer preparation", () => {
 
   it("skips home players without a shirt number when requesting preparation", async () => {
     vi.mocked(set).mockClear();
-    vi.mocked(onValue).mockImplementation((reference, callback) => {
-      const path = String(reference);
-      if (path.endsWith("/controller")) {
-        callback({
-          val: () => ({
+    vi.mocked(onValue).mockImplementation(
+      withConnectedInfo((path) => {
+        if (path.endsWith("/controller")) {
+          return {
             queues: {},
             activeQueueId: null,
             playing: false,
@@ -3106,17 +3394,17 @@ describe("goal scorer preparation", () => {
               ],
               away: [],
             },
-          }),
-        } as never);
-      } else if (path.endsWith("/perimeter")) {
-        callback({ val: () => ({ enabled: true, state: "off" }) } as never);
-      } else if (path.endsWith("/overlayGeometry")) {
-        callback({ val: () => geometryDoc } as never);
-      } else {
-        callback({ val: () => null } as never);
-      }
-      return vi.fn();
-    });
+          };
+        }
+        if (path.endsWith("/perimeter")) {
+          return { enabled: true, state: "off" };
+        }
+        if (path.endsWith("/overlayGeometry")) {
+          return geometryDoc;
+        }
+        return null;
+      }),
+    );
 
     render(
       <FirebaseStateProvider
@@ -3148,11 +3436,10 @@ describe("goal scorer preparation", () => {
 
   it("does not request preparation when no geometry is published", async () => {
     vi.mocked(set).mockClear();
-    vi.mocked(onValue).mockImplementation((reference, callback) => {
-      const path = String(reference);
-      if (path.endsWith("/controller")) {
-        callback({
-          val: () => ({
+    vi.mocked(onValue).mockImplementation(
+      withConnectedInfo((path) => {
+        if (path.endsWith("/controller")) {
+          return {
             queues: {},
             activeQueueId: null,
             playing: false,
@@ -3163,15 +3450,14 @@ describe("goal scorer preparation", () => {
               ],
               away: [],
             },
-          }),
-        } as never);
-      } else if (path.endsWith("/perimeter")) {
-        callback({ val: () => ({ enabled: true, state: "off" }) } as never);
-      } else {
-        callback({ val: () => null } as never);
-      }
-      return vi.fn();
-    });
+          };
+        }
+        if (path.endsWith("/perimeter")) {
+          return { enabled: true, state: "off" };
+        }
+        return null;
+      }),
+    );
 
     render(
       <FirebaseStateProvider
@@ -3198,11 +3484,10 @@ describe("goal scorer preparation", () => {
 
   it("does not request preparation when the perimeter is disabled", async () => {
     vi.mocked(set).mockClear();
-    vi.mocked(onValue).mockImplementation((reference, callback) => {
-      const path = String(reference);
-      if (path.endsWith("/controller")) {
-        callback({
-          val: () => ({
+    vi.mocked(onValue).mockImplementation(
+      withConnectedInfo((path) => {
+        if (path.endsWith("/controller")) {
+          return {
             queues: {},
             activeQueueId: null,
             playing: false,
@@ -3213,17 +3498,17 @@ describe("goal scorer preparation", () => {
               ],
               away: [],
             },
-          }),
-        } as never);
-      } else if (path.endsWith("/perimeter")) {
-        callback({ val: () => ({ enabled: false, state: "off" }) } as never);
-      } else if (path.endsWith("/overlayGeometry")) {
-        callback({ val: () => geometryDoc } as never);
-      } else {
-        callback({ val: () => null } as never);
-      }
-      return vi.fn();
-    });
+          };
+        }
+        if (path.endsWith("/perimeter")) {
+          return { enabled: false, state: "off" };
+        }
+        if (path.endsWith("/overlayGeometry")) {
+          return geometryDoc;
+        }
+        return null;
+      }),
+    );
 
     render(
       <FirebaseStateProvider
@@ -3250,11 +3535,10 @@ describe("goal scorer preparation", () => {
 
   it("does not request preparation when the home roster has no valid player ids", async () => {
     vi.mocked(set).mockClear();
-    vi.mocked(onValue).mockImplementation((reference, callback) => {
-      const path = String(reference);
-      if (path.endsWith("/controller")) {
-        callback({
-          val: () => ({
+    vi.mocked(onValue).mockImplementation(
+      withConnectedInfo((path) => {
+        if (path.endsWith("/controller")) {
+          return {
             queues: {},
             activeQueueId: null,
             playing: false,
@@ -3263,13 +3547,11 @@ describe("goal scorer preparation", () => {
               home: [{ name: "Jón", number: 7, show: true, role: "FW" }],
               away: [],
             },
-          }),
-        } as never);
-      } else {
-        callback({ val: () => null } as never);
-      }
-      return vi.fn();
-    });
+          };
+        }
+        return null;
+      }),
+    );
 
     render(
       <FirebaseStateProvider
@@ -3292,5 +3574,267 @@ describe("goal scorer preparation", () => {
             String(path) === "states/vikuti/perimeter/goalScorerPreparation",
         ),
     ).toBe(false);
+  });
+
+  describe("conditional transitions (multi-controller convergence)", () => {
+    it("commits a current countdown completion once with one audit, and rejects an obsolete duplicate attempt", async () => {
+      // Authoritative state: an active pre-match countdown generation.
+      mockDbState.set("states/test-location/match", {
+        started: 1000,
+        countdown: true,
+        halftimeCountdown: false,
+        timeElapsed: 0,
+        halfStops: [45, 90],
+        homeScore: 0,
+        awayScore: 0,
+        homeTeam: "Víkingur R",
+        awayTeam: "",
+        homeTeamId: 103,
+        awayTeamId: 0,
+        injuryTime: 0,
+        matchType: "football",
+        home2min: [],
+        away2min: [],
+        timeout: 0,
+        homeTimeouts: 0,
+        awayTimeouts: 0,
+        buzzer: false,
+        injuryTimeDisplayMode: "full",
+        showInjuryTime: true,
+        futureMatchField: "preserve-me",
+      });
+
+      let matchApi: ReturnType<typeof useMatch> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+          screenKey={null}
+        >
+          <TestMatchConsumer
+            onMount={(api) => {
+              matchApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+
+      const observed = {
+        started: 1000,
+        countdown: true,
+        halftimeCountdown: false,
+      };
+
+      vi.mocked(firebaseDatabase.writeAuditOnly).mockClear();
+
+      // First controller completes the countdown.
+      await act(async () => {
+        const committed = await matchApi!.completeCountdownIfCurrent(observed);
+        expect(committed).toBe(true);
+      });
+      expect(vi.mocked(firebaseDatabase.writeAuditOnly)).toHaveBeenCalledTimes(
+        1,
+      );
+      expect(vi.mocked(firebaseDatabase.writeAuditOnly).mock.calls[0]![1]).toBe(
+        "match",
+      );
+      expect(mockDbState.get("states/test-location/match")).toEqual(
+        expect.objectContaining({
+          showInjuryTime: true,
+          futureMatchField: "preserve-me",
+        }),
+      );
+
+      // A second controller observing the same (now-obsolete) generation is
+      // rejected atomically and writes no second audit.
+      await act(async () => {
+        const committed = await matchApi!.completeCountdownIfCurrent(observed);
+        expect(committed).toBe(false);
+      });
+      expect(vi.mocked(firebaseDatabase.writeAuditOnly)).toHaveBeenCalledTimes(
+        1,
+      );
+    });
+
+    it("preserves unknown controller fields during conditional asset completion", async () => {
+      mockDbState.set("states/test-location/controller", {
+        queues: {},
+        activeQueueId: null,
+        playing: false,
+        view: "idle",
+        roster: { home: [], away: [] },
+        currentAsset: {
+          asset: { type: "image", key: "asset-1" },
+          time: 1,
+        },
+        refreshToken: "",
+        futureControllerField: "preserve-me",
+      });
+
+      let controllerApi: ReturnType<typeof useController> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+          screenKey={null}
+        >
+          <TestControllerConsumer
+            onMount={(api) => {
+              controllerApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+
+      await act(async () => {
+        const committed = await controllerApi!.completeAssetIfCurrent({
+          assetKey: "asset-1",
+          time: 1,
+          activeQueueId: null,
+          playing: false,
+        });
+        expect(committed).toBe(true);
+      });
+
+      expect(mockDbState.get("states/test-location/controller")).toEqual(
+        expect.objectContaining({ futureControllerField: "preserve-me" }),
+      );
+    });
+
+    it("does not report success or write an audit when a transaction passes initially but aborts on retry", async () => {
+      // Authoritative state: an active pre-match countdown generation.
+      mockDbState.set("states/test-location/match", {
+        started: 1000,
+        countdown: true,
+        halftimeCountdown: false,
+        timeElapsed: 0,
+        halfStops: [45, 90],
+        homeScore: 0,
+        awayScore: 0,
+        homeTeam: "Víkingur R",
+        awayTeam: "",
+        homeTeamId: 103,
+        awayTeamId: 0,
+        injuryTime: 0,
+        matchType: "football",
+        home2min: [],
+        away2min: [],
+        timeout: 0,
+        homeTimeouts: 0,
+        awayTimeouts: 0,
+        buzzer: false,
+        injuryTimeDisplayMode: "full",
+      });
+
+      let matchApi: ReturnType<typeof useMatch> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+          screenKey={null}
+        >
+          <TestMatchConsumer
+            onMount={(api) => {
+              matchApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+
+      // Simulate Firebase retrying the update function because a concurrent
+      // writer changed the node: the first invocation would have passed the
+      // precondition, but the retry observes a newer generation and aborts.
+      // The helper must trust the transaction's final `committed` result (and
+      // reset its candidate diff), so the aborted attempt reports false and
+      // writes no audit.
+      vi.mocked(firebaseDatabase.writeAuditOnly).mockClear();
+      vi.mocked(runTransaction).mockImplementation((dbRef, updateFn) => {
+        // Retry 1: authoritative state still matches the observed generation.
+        const firstCurrent = mockDbState.get(String(dbRef)) ?? null;
+        const firstResult = updateFn(firstCurrent);
+        if (firstResult === undefined) {
+          return { committed: false, snapshot: { val: () => firstCurrent } };
+        }
+        // Retry 2: a concurrent controller already committed — the generation
+        // advanced, so the precondition now fails and the update aborts.
+        mockDbState.set(String(dbRef), {
+          ...firstResult,
+          started: 2000,
+          countdown: false,
+          halftimeCountdown: false,
+        });
+        const secondCurrent = mockDbState.get(String(dbRef)) ?? null;
+        const secondResult = updateFn(secondCurrent);
+        if (secondResult === undefined) {
+          return { committed: false, snapshot: { val: () => secondCurrent } };
+        }
+        mockDbState.set(String(dbRef), secondResult);
+        return { committed: true, snapshot: { val: () => secondResult } };
+      });
+
+      const observed = {
+        started: 1000,
+        countdown: true,
+        halftimeCountdown: false,
+      };
+
+      await act(async () => {
+        const committed = await matchApi!.completeCountdownIfCurrent(observed);
+        expect(committed).toBe(false);
+      });
+      expect(vi.mocked(firebaseDatabase.writeAuditOnly)).not.toHaveBeenCalled();
+    });
+
+    it("rejects a conditional timeout expiry for a newer active timeout", async () => {
+      mockDbState.set("states/test-location/match", {
+        started: 0,
+        countdown: false,
+        halftimeCountdown: false,
+        timeElapsed: 0,
+        halfStops: [45, 90],
+        homeScore: 0,
+        awayScore: 0,
+        homeTeam: "Víkingur R",
+        awayTeam: "",
+        homeTeamId: 103,
+        awayTeamId: 0,
+        injuryTime: 0,
+        matchType: "football",
+        home2min: [],
+        away2min: [],
+        timeout: 9999,
+        homeTimeouts: 0,
+        awayTimeouts: 0,
+        buzzer: false,
+        injuryTimeDisplayMode: "full",
+      });
+
+      let matchApi: ReturnType<typeof useMatch> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+          screenKey={null}
+        >
+          <TestMatchConsumer
+            onMount={(api) => {
+              matchApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+
+      // Reset the audit mock explicitly: mocks created in the vi.mock factory
+      // are not always reset by the shared clearAllMocks between tests.
+      vi.mocked(firebaseDatabase.writeAuditOnly).mockClear();
+
+      await act(async () => {
+        const committed = await matchApi!.removeTimeoutIfCurrent({
+          timeout: 1234,
+        });
+        expect(committed).toBe(false);
+      });
+      expect(vi.mocked(firebaseDatabase.writeAuditOnly)).not.toHaveBeenCalled();
+    });
   });
 });

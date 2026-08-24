@@ -11,7 +11,7 @@ import React, {
 import { database, storageHelpers, FIREBASE_STORAGE_BUCKET } from "../firebase";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "../firebase";
-import { ref, onValue, set } from "firebase/database";
+import { ref, onValue, set, runTransaction } from "firebase/database";
 import {
   Match,
   InjuryTimeDisplayMode,
@@ -51,7 +51,26 @@ import {
 import { getOrCreateSessionId } from "../lib/sessionId";
 import { Sports, DEFAULT_HALFSTOPS, VIEWS } from "../constants";
 import { msUntilMatchStart } from "../utils/timeUtils";
-import { isHalftimeTransitionEligible } from "../utils/matchUtils";
+import {
+  isHalftimeTransitionEligible,
+  roundMillisToSeconds,
+} from "../utils/matchUtils";
+import {
+  countdownCompletionPrecondition,
+  countdownCompletionTransition,
+  halfStopPrecondition,
+  halfStopTransition,
+  timeoutExpiryPrecondition,
+  timeoutExpiryTransition,
+  penaltyExpiryPrecondition,
+  penaltyExpiryTransition,
+  timedAssetCompletionPrecondition,
+  CountdownCompletionObservation,
+  HalfStopObservation,
+  TimeoutExpiryObservation,
+  PenaltyExpiryObservation,
+  TimedAssetCompletionObservation,
+} from "../lib/conditionalTransitions";
 import clubIds from "../club-ids";
 import assetTypes from "../controller/asset/AssetTypes";
 import {
@@ -73,6 +92,11 @@ import {
 } from "./firebaseParsers";
 
 const HALFTIME_DURATION_MS = 15 * 60 * 1000;
+
+// Freshness barrier states for authenticated mutations. Firebase remains the
+// single source of truth; this only decides whether THIS browser may submit a
+// command based on its subscription epoch.
+type WriteFreshness = "loading" | "ready" | "hidden" | "offline" | "resyncing";
 
 const normalizeClubKey = (name: string): string => name.replace(/\.+$/, "");
 
@@ -198,6 +222,7 @@ interface FirebaseStateContextType {
   removePenalty: (key: string) => void;
   addToPenalty: (key: string, toAdd: number) => void;
   updateHalfLength: (currentValue: number, newValue: string) => void;
+  adjustMatchTime: (deltaMs: number) => void;
   setHalfStops: (halfStops: number[], mode: InjuryTimeDisplayMode) => void;
   matchTimeout: (team: "home" | "away") => void;
   removeTimeout: () => void;
@@ -205,6 +230,21 @@ interface FirebaseStateContextType {
   countdown: () => void;
   startHalftimeCountdown: () => void;
   stopHalftimeCountdown: () => void;
+  completeCountdownIfCurrent: (
+    observed: CountdownCompletionObservation,
+  ) => Promise<boolean>;
+  applyHalfStopIfCurrent: (observed: HalfStopObservation) => Promise<boolean>;
+  removeTimeoutIfCurrent: (
+    observed: TimeoutExpiryObservation,
+  ) => Promise<boolean>;
+  removePenaltyIfCurrent: (
+    observed: PenaltyExpiryObservation,
+  ) => Promise<boolean>;
+  completeAssetIfCurrent: (
+    observed: TimedAssetCompletionObservation,
+  ) => Promise<boolean>;
+  writeEligible: boolean;
+  writeFreshness: WriteFreshness;
   updateRedCards: (home: number, away: number) => void;
   getServerTime: () => number;
 
@@ -516,6 +556,34 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   ] = useState(false);
   const [ready, setReady] = useState(!listenPrefix);
 
+  // Freshness barrier: a browser may only submit shared-state mutations while
+  // it has confirmed current Firebase state for the selected venue.
+  //
+  // - "loading": the initial venue subscriptions have not all delivered yet.
+  // - "ready": current and eligible to write.
+  // - "hidden": the tab was hidden/paged out; mutations are blocked.
+  // - "offline": connectivity was lost; mutations are blocked.
+  // - "resyncing": the tab became visible/online again but has not yet
+  //   received a post-resume authoritative snapshot.
+  //
+  // Eligibility is a barrier, NOT a second state store: Firebase remains the
+  // single source of truth, and rendered values are unchanged. It only decides
+  // whether THIS browser may submit a command.
+  const [writeFreshness, setWriteFreshness] =
+    useState<WriteFreshness>("loading");
+  const resyncPendingRef = useRef(false);
+  // Current Firebase connectivity, mirrored from `/.info/connected`. This is
+  // the authoritative signal for whether the existing subscription epoch is
+  // still live; `navigator.onLine` only reflects browser network state and is
+  // not a reliable readiness gate.
+  const firebaseConnectedRef = useRef(true);
+  // True when the Firebase connection was observed dropping while the client
+  // was suspended (hidden/offline). A resume that never observed a drop can
+  // restore eligibility immediately; a resume after a real drop must wait for
+  // a post-reconnect subscription delivery.
+  const suspendedDropRef = useRef(false);
+  const writeFreshnessRef = useRef<WriteFreshness>("loading");
+
   const matchRef = useRef(match);
   const controllerRef = useRef(controller);
   const prevControllerViewRef = useRef<string | null>(null);
@@ -528,6 +596,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   if (prevListenPrefix !== listenPrefix) {
     setPrevListenPrefix(listenPrefix);
     setReady(!listenPrefix);
+    setWriteFreshness("loading");
     setPerimeterPreview(defaultPerimeterPreview);
     setPerimeterPreviewLoaded(false);
     setPerimeterAdLayoutState(null);
@@ -541,6 +610,88 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     setGoalScorerPreparationRequestLoaded(false);
   }
 
+  // Marks the end of a resume/reconnect epoch: a core subscription has
+  // delivered a snapshot after the tab became visible or online again.
+  const markSubscriptionDelivered = useCallback(() => {
+    if (!resyncPendingRef.current) return;
+    resyncPendingRef.current = false;
+    suspendedDropRef.current = false;
+    // A core subscription delivery after a resume is proof the SDK
+    // re-synchronized with current server state (a live-connection data
+    // change or a reconnect re-sync), so the client is eligible again.
+    // `navigator.onLine` is intentionally not consulted: it is unreliable and
+    // a genuinely offline client simply never receives a delivery.
+    if (typeof document === "undefined" || !document.hidden) {
+      setWriteFreshness("ready");
+    }
+  }, []);
+
+  // Initial load becomes write-eligible inside checkReady (below), once all
+  // required venue subscriptions have delivered — so no render-time ref reads
+  // are needed here.
+
+  // Any suspension or connectivity loss makes the client ineligible until a
+  // fresh authoritative snapshot arrives. No writes are queued for replay.
+  useEffect(() => {
+    // A resume only needs to wait for a post-resume snapshot when the
+    // Firebase connection actually dropped while the client was suspended.
+    // If the connection stayed up (no `/.info/connected` false observed and
+    // still connected now), the existing subscription epoch is still current,
+    // so restore eligibility immediately instead of waiting for an `onValue`
+    // delivery that will not come when no data changed while the tab was away.
+    const restoreAfterUndroppedResume = () => {
+      if (document.hidden) return;
+      if (firebaseConnectedRef.current && !suspendedDropRef.current) {
+        resyncPendingRef.current = false;
+        suspendedDropRef.current = false;
+        setWriteFreshness("ready");
+      }
+    };
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        resyncPendingRef.current = false;
+        suspendedDropRef.current = false;
+        setWriteFreshness("hidden");
+      } else {
+        resyncPendingRef.current = true;
+        setWriteFreshness("resyncing");
+        restoreAfterUndroppedResume();
+      }
+    };
+    const onPageHide = () => {
+      resyncPendingRef.current = false;
+      suspendedDropRef.current = false;
+      setWriteFreshness("hidden");
+    };
+    const onOffline = () => {
+      resyncPendingRef.current = true;
+      setWriteFreshness("offline");
+    };
+    const onOnline = () => {
+      resyncPendingRef.current = true;
+      setWriteFreshness("resyncing");
+      restoreAfterUndroppedResume();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("pagehide", onPageHide);
+    window.addEventListener("offline", onOffline);
+    window.addEventListener("online", onOnline);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("pagehide", onPageHide);
+      window.removeEventListener("offline", onOffline);
+      window.removeEventListener("online", onOnline);
+    };
+  }, []);
+
+  // A freshly loaded client that stays visible/online is eligible. This also
+  // covers venues that never transitioned through an explicit resume epoch.
+  // Eligibility is additionally gated on authentication: only authenticated
+  // controllers may ever become write-eligible, so unauthenticated displays
+  // never appear capable of mutating shared state (and MatchLifecycle never
+  // attempts conditional transitions for them).
+  const writeEligible = isAuthenticated && writeFreshness === "ready";
+
   useEffect(() => {
     matchRef.current = match;
   }, [match]);
@@ -553,6 +704,34 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   useEffect(() => {
     clubOverridesRef.current = clubOverrides;
   }, [clubOverrides]);
+  useEffect(() => {
+    writeFreshnessRef.current = writeFreshness;
+  }, [writeFreshness]);
+
+  // Track real Firebase connectivity (`.info/connected`), the authoritative
+  // signal for whether the current subscription epoch is still live. A drop
+  // while suspended (hidden/offline) is recorded so a resume cannot restore
+  // eligibility before a post-reconnect snapshot arrives; a drop while
+  // eligible immediately makes the client ineligible until a core
+  // subscription delivers again.
+  useEffect(() => {
+    const connectedRef = ref(database, ".info/connected");
+    const unsubConnected = onValue(connectedRef, (snapshot) => {
+      const connected = snapshot.val() === true;
+      firebaseConnectedRef.current = connected;
+      if (connected) return;
+      if (document.hidden || writeFreshnessRef.current !== "ready") {
+        suspendedDropRef.current = true;
+      } else {
+        resyncPendingRef.current = true;
+        setWriteFreshness("resyncing");
+      }
+    });
+
+    return () => {
+      unsubConnected();
+    };
+  }, []);
 
   // Builds the identity payload for an audited mutation, or null when the
   // provider is not in a position to write (unauthenticated or no venue).
@@ -602,6 +781,8 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       // Reset the transition baseline so a new venue's loaded view is treated
       // as an initial load, never a stale cross-venue transition.
       prevControllerViewRef.current = null;
+      // A new venue is a fresh initial load: no resume epoch is pending.
+      resyncPendingRef.current = false;
 
       let matchReady = false;
       let controllerReady = false;
@@ -618,6 +799,17 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
           perimeterReady
         ) {
           setReady(true);
+          // Initial load becomes write-eligible once all required venue
+          // subscriptions have delivered (unless a hide/offline event raced
+          // in before the last delivery).
+          if (
+            !resyncPendingRef.current &&
+            !document.hidden &&
+            firebaseConnectedRef.current
+          ) {
+            suspendedDropRef.current = false;
+            setWriteFreshness("ready");
+          }
         }
       };
 
@@ -637,6 +829,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
           } else {
             setMatch(defaultMatch);
           }
+          markSubscriptionDelivered();
           if (!matchReady) {
             matchReady = true;
             checkReady();
@@ -650,6 +843,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         (snapshot) => {
           const results = parseController(snapshot.val(), defaultController);
           setController(results ?? defaultController);
+          markSubscriptionDelivered();
           if (!controllerReady) {
             controllerReady = true;
             checkReady();
@@ -664,6 +858,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         (snapshot) => {
           const results = parseView(snapshot.val(), defaultView);
           setView(results ?? defaultView);
+          markSubscriptionDelivered();
           if (!viewReady) {
             viewReady = true;
             checkReady();
@@ -924,7 +1119,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         unsubGoalScorerPreparationRequest();
       };
     }
-  }, [listenPrefix]);
+  }, [listenPrefix, markSubscriptionDelivered]);
 
   const applyMatchUpdate = useCallback(
     (getNewState: (prev: Match) => Match, action: string) => {
@@ -932,7 +1127,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
       const prev = matchRef.current;
       const newState = getNewState(prev);
-      if (isAuthenticated) {
+      if (isAuthenticated && writeEligible) {
         matchRef.current = newState;
 
         // Compute diff: only send changed fields to avoid Firebase
@@ -956,7 +1151,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         }
       }
     },
-    [isAuthenticated, listenPrefix, makeAudit],
+    [isAuthenticated, listenPrefix, writeEligible, makeAudit],
   );
 
   const applyControllerUpdate = useCallback(
@@ -968,7 +1163,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
       const prev = controllerRef.current;
       const newState = getNewState(prev);
-      if (isAuthenticated) {
+      if (isAuthenticated && writeEligible) {
         controllerRef.current = newState;
 
         const diff = computeControllerDiff(prev, newState);
@@ -983,7 +1178,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         }
       }
     },
-    [isAuthenticated, listenPrefix, makeAudit],
+    [isAuthenticated, listenPrefix, writeEligible, makeAudit],
   );
 
   const applyViewUpdate = useCallback(
@@ -992,7 +1187,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
       const prev = viewRef.current;
       const newState = getNewState(prev);
-      if (isAuthenticated) {
+      if (isAuthenticated && writeEligible) {
         viewRef.current = newState;
 
         const diff: Record<string, unknown> = {};
@@ -1022,12 +1217,12 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         }
       }
     },
-    [isAuthenticated, listenPrefix, makeAudit],
+    [isAuthenticated, listenPrefix, writeEligible, makeAudit],
   );
 
   const updateMatch = useCallback(
     (updates: Partial<Match>) => {
-      if (!listenPrefix || !isAuthenticated) return;
+      if (!listenPrefix || !isAuthenticated || !writeEligible) return;
 
       const prev = matchRef.current;
       const newState: Match = { ...prev, ...updates };
@@ -1113,7 +1308,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
           .catch(console.error);
       }
     },
-    [isAuthenticated, listenPrefix, makeAudit],
+    [isAuthenticated, listenPrefix, writeEligible, makeAudit],
   );
 
   const getServerTime = useCallback(
@@ -1121,8 +1316,162 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     [],
   );
 
+  // ---- Conditional automatic transitions (compare-and-set) ----------------
+  //
+  // Automatic lifecycle progression is performed ONLY through these actions.
+  // Each one:
+  //  1. requires a write-eligible (fresh) client,
+  //  2. re-validates its precondition against CURRENT authoritative state via
+  //     a Firebase transaction (so a stale or duplicate attempt is rejected
+  //     atomically), and
+  //  3. writes exactly one audit event for a committed transition.
+  //
+  // The transaction itself mutates the state subtree atomically; the audit
+  // record is appended immediately after commit. A concurrent controller that
+  // observed the same due transition fails its precondition on the next
+  // transaction retry and produces no second audit.
+  const applyMatchConditionalTransition = useCallback(
+    async (
+      precondition: (prev: Match) => boolean,
+      getNewState: (prev: Match) => Match,
+      action: string,
+    ): Promise<boolean> => {
+      if (!listenPrefix || !isAuthenticated || !writeEligible) return false;
+
+      const dbRef = ref(database, `states/${listenPrefix}/match`);
+      let committed = false;
+      let committedDiff: Record<string, unknown> = {};
+      try {
+        // Firebase may re-invoke the update function on concurrent writes.
+        // Only the final invocation's outcome decides whether the transaction
+        // committed, so trust result.committed rather than a flag set inside a
+        // possibly-aborted retry, and reset the candidate diff each invocation
+        // so an aborted final attempt never audits a stale diff.
+        const result = await runTransaction(dbRef, (currentData) => {
+          committedDiff = {};
+          const prev = parseMatch(currentData as unknown, matchRef.current);
+          if (!prev) {
+            return; // abort: no authoritative state to compare against
+          }
+          if (!precondition(prev)) {
+            return; // abort: obsolete or duplicate attempt
+          }
+          const newState = getNewState(prev);
+          const diff: Record<string, unknown> = {};
+          for (const key of Object.keys(newState) as (keyof Match)[]) {
+            if (prev[key] !== newState[key]) {
+              diff[key] = newState[key];
+            }
+          }
+          if (Object.keys(diff).length === 0) {
+            return; // nothing to apply
+          }
+          committedDiff = diff;
+          // A transaction replaces the whole node: strip optional undefined
+          // fields (e.g. an unset matchStartTime) so Firebase does not reject
+          // the write.
+          const cleanState: Record<string, unknown> =
+            currentData && typeof currentData === "object"
+              ? { ...(currentData as Record<string, unknown>) }
+              : {};
+          for (const [key, value] of Object.entries(newState)) {
+            if (value !== undefined) {
+              cleanState[key] = value;
+            }
+          }
+          return cleanState;
+        });
+        committed = result.committed;
+      } catch (error) {
+        console.error("Conditional match transition failed:", error);
+        return false;
+      }
+
+      if (committed && Object.keys(committedDiff).length > 0) {
+        const audit = makeAudit("match", action);
+        if (audit) {
+          firebaseDatabase
+            .writeAuditOnly(listenPrefix, "match", committedDiff, audit)
+            .catch((error) =>
+              console.error("Failed to record audit for transition:", error),
+            );
+        }
+      }
+      return committed;
+    },
+    [isAuthenticated, listenPrefix, writeEligible, makeAudit],
+  );
+
+  const applyControllerConditionalTransition = useCallback(
+    async (
+      precondition: (prev: ControllerState) => boolean,
+      getNewState: (prev: ControllerState) => ControllerState,
+      action: string,
+    ): Promise<boolean> => {
+      if (!listenPrefix || !isAuthenticated || !writeEligible) return false;
+
+      const dbRef = ref(database, `states/${listenPrefix}/controller`);
+      let committed = false;
+      let committedDiff: Record<string, unknown> = {};
+      try {
+        // See applyMatchConditionalTransition: trust result.committed and
+        // reset the candidate diff on each retry so an aborted final attempt
+        // neither reports success nor emits an audit.
+        const result = await runTransaction(dbRef, (currentData) => {
+          committedDiff = {};
+          const prev = parseController(
+            currentData as unknown,
+            controllerRef.current,
+          );
+          if (!prev) {
+            return; // abort: no authoritative state to compare against
+          }
+          if (!precondition(prev)) {
+            return; // abort: obsolete or duplicate attempt
+          }
+          const newState = getNewState(prev);
+          const diff = computeControllerDiff(prev, newState);
+          if (Object.keys(diff).length === 0) {
+            return;
+          }
+          committedDiff = diff;
+          const cleanState: Record<string, unknown> =
+            currentData && typeof currentData === "object"
+              ? { ...(currentData as Record<string, unknown>) }
+              : {};
+          for (const [key, value] of Object.entries(newState)) {
+            if (value !== undefined) {
+              cleanState[key] = value;
+            }
+          }
+          return cleanState;
+        });
+        committed = result.committed;
+      } catch (error) {
+        console.error("Conditional controller transition failed:", error);
+        return false;
+      }
+
+      if (committed && Object.keys(committedDiff).length > 0) {
+        const audit = makeAudit("controller", action);
+        if (audit) {
+          firebaseDatabase
+            .writeAuditOnly(listenPrefix, "controller", committedDiff, audit)
+            .catch((error) =>
+              console.error("Failed to record audit for transition:", error),
+            );
+        }
+      }
+      return committed;
+    },
+    [isAuthenticated, listenPrefix, writeEligible, makeAudit],
+  );
+
   const startMatch = useCallback(() => {
-    applyMatchUpdate(
+    const observed = matchRef.current;
+    if (observed.started !== 0) return;
+    void applyMatchConditionalTransition(
+      (prev) => prev.started === observed.started,
       (prev) => ({
         ...prev,
         started: getServerTime(),
@@ -1131,33 +1480,41 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       }),
       "match.start",
     );
-  }, [applyMatchUpdate, getServerTime]);
+  }, [applyMatchConditionalTransition, getServerTime]);
 
   const pauseMatch = useCallback(
     (isHalfEnd?: boolean) => {
-      applyMatchUpdate((prev) => {
-        const newState: Match = { ...prev, started: 0 };
-        if (prev.halftimeCountdown) {
-          // Cancelling or completing halftime countdown — advance to next half
-          newState.countdown = false;
-          newState.halftimeCountdown = false;
-          newState.timeElapsed = (newState.halfStops[0] ?? 0) * 60 * 1000;
-          if (newState.halfStops.length > 1) {
-            newState.halfStops = newState.halfStops.slice(1);
+      const observed = matchRef.current;
+      void applyMatchConditionalTransition(
+        (prev) =>
+          prev.started === observed.started &&
+          prev.countdown === observed.countdown &&
+          prev.halftimeCountdown === observed.halftimeCountdown,
+        (prev) => {
+          const newState: Match = { ...prev, started: 0 };
+          if (prev.halftimeCountdown) {
+            // Cancelling or completing halftime countdown — advance to next half
+            newState.countdown = false;
+            newState.halftimeCountdown = false;
+            newState.timeElapsed = (newState.halfStops[0] ?? 0) * 60 * 1000;
+            if (newState.halfStops.length > 1) {
+              newState.halfStops = newState.halfStops.slice(1);
+            }
+          } else if (isHalfEnd) {
+            newState.timeElapsed = (newState.halfStops[0] ?? 0) * 60 * 1000;
+            if (newState.halfStops.length > 1) {
+              newState.halfStops = newState.halfStops.slice(1);
+            }
+          } else if (prev.started && !prev.countdown) {
+            newState.timeElapsed =
+              prev.timeElapsed + Math.floor(getServerTime() - prev.started);
           }
-        } else if (isHalfEnd) {
-          newState.timeElapsed = (newState.halfStops[0] ?? 0) * 60 * 1000;
-          if (newState.halfStops.length > 1) {
-            newState.halfStops = newState.halfStops.slice(1);
-          }
-        } else if (prev.started && !prev.countdown) {
-          newState.timeElapsed =
-            prev.timeElapsed + Math.floor(getServerTime() - prev.started);
-        }
-        return newState;
-      }, "match.pause");
+          return newState;
+        },
+        "match.pause",
+      );
     },
-    [applyMatchUpdate, getServerTime],
+    [applyMatchConditionalTransition, getServerTime],
   );
 
   const resetMatch = useCallback(() => {
@@ -1260,6 +1617,24 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
           ),
         };
       }, "match.update-half-length");
+    },
+    [applyMatchUpdate],
+  );
+
+  // Intentional match-time correction (Tímastjórnun). Backward corrections are
+  // audited distinctly so operators can distinguish an intentional correction
+  // from an ordinary match update or an accidental stale mutation.
+  const adjustMatchTime = useCallback(
+    (deltaMs: number) => {
+      const action =
+        deltaMs < 0
+          ? "match.correct-time-backward"
+          : "match.correct-time-forward";
+      applyMatchUpdate((prev) => {
+        const base = roundMillisToSeconds(prev.timeElapsed);
+        const next = Math.max(base + deltaMs, 0);
+        return { ...prev, timeElapsed: next };
+      }, action);
     },
     [applyMatchUpdate],
   );
@@ -1369,6 +1744,84 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       return newState;
     }, "match.stop-halftime-countdown");
   }, [applyMatchUpdate]);
+
+  // Countdown completion (pre-match or halftime), conditional on the exact
+  // observed countdown generation still being authoritative.
+  const completeCountdownIfCurrent = useCallback(
+    (observed: CountdownCompletionObservation): Promise<boolean> =>
+      applyMatchConditionalTransition(
+        countdownCompletionPrecondition(observed),
+        countdownCompletionTransition({
+          halftimeCountdown: observed.halftimeCountdown,
+        }),
+        "match.complete-countdown",
+      ),
+    [applyMatchConditionalTransition],
+  );
+
+  // Half-stop (injury-time "stop" mode) at a period boundary, conditional on
+  // the exact running generation still being authoritative.
+  const applyHalfStopIfCurrent = useCallback(
+    (observed: HalfStopObservation): Promise<boolean> =>
+      applyMatchConditionalTransition(
+        halfStopPrecondition(observed),
+        halfStopTransition({
+          halfStopBoundaryMinutes: observed.halfStopBoundaryMinutes,
+        }),
+        "match.half-stop",
+      ),
+    [applyMatchConditionalTransition],
+  );
+
+  // Timeout expiry, conditional on the exact timeout still being active.
+  const removeTimeoutIfCurrent = useCallback(
+    (observed: TimeoutExpiryObservation): Promise<boolean> =>
+      applyMatchConditionalTransition(
+        timeoutExpiryPrecondition(observed),
+        timeoutExpiryTransition(),
+        "match.remove-timeout",
+      ),
+    [applyMatchConditionalTransition],
+  );
+
+  // Penalty expiry, conditional on the exact penalty record still existing.
+  const removePenaltyIfCurrent = useCallback(
+    (observed: PenaltyExpiryObservation): Promise<boolean> =>
+      applyMatchConditionalTransition(
+        penaltyExpiryPrecondition(observed),
+        penaltyExpiryTransition({ key: observed.key }),
+        "match.remove-penalty",
+      ),
+    [applyMatchConditionalTransition],
+  );
+
+  // Timed asset completion, conditional on the exact current asset and queue
+  // still being authoritative. Mirrors the old renderer-owned
+  // `removeAssetAfterTimeout` behavior but only applies when the observed
+  // generation matches current state.
+  const completeAssetIfCurrent = useCallback(
+    (observed: TimedAssetCompletionObservation): Promise<boolean> =>
+      applyControllerConditionalTransition(
+        timedAssetCompletionPrecondition(observed),
+        (prev) => {
+          const activeQueue = prev.activeQueueId
+            ? prev.queues[prev.activeQueueId]
+            : null;
+          if (!activeQueue) {
+            return { ...prev, playing: false, currentAsset: null };
+          }
+          if (activeQueue.autoPlay) {
+            if (prev.playing) {
+              return getStateShowingNextAsset(prev);
+            }
+            return prev;
+          }
+          return { ...prev, currentAsset: null };
+        },
+        "controller.complete-asset",
+      ),
+    [applyControllerConditionalTransition],
+  );
 
   const updateRedCards = useCallback(
     (home: number, away: number) => {
@@ -1916,6 +2369,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   const saveClubOverride = useCallback(
     async (override: Omit<ClubOverride, "logoUrl"> & { logoFile: File }) => {
+      if (!writeEligible) return;
       const audit = makeAudit("clubOverrides", "clubOverrides.save");
       if (!audit) return;
 
@@ -1944,11 +2398,12 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         throw error;
       }
     },
-    [listenPrefix, makeAudit],
+    [listenPrefix, makeAudit, writeEligible],
   );
 
   const deleteClubOverride = useCallback(
     async (id: string) => {
+      if (!writeEligible) return;
       const audit = makeAudit("clubOverrides", "clubOverrides.delete");
       if (!audit) return;
 
@@ -1959,11 +2414,12 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         throw error;
       }
     },
-    [listenPrefix, makeAudit],
+    [listenPrefix, makeAudit, writeEligible],
   );
 
   const setPerimeterState = useCallback(
     (state: PerimeterState["state"]) => {
+      if (!writeEligible) return;
       const audit = makeAudit("perimeter", "perimeter.set-state");
       if (!audit) return;
 
@@ -1971,11 +2427,12 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         .writeAudited(listenPrefix, "perimeter", { state }, audit)
         .catch(console.error);
     },
-    [makeAudit, listenPrefix],
+    [makeAudit, listenPrefix, writeEligible],
   );
 
   const setPerimeterOverlay = useCallback(
     (overlay: PerimeterOverlay) => {
+      if (!writeEligible) return;
       const audit = makeAudit("perimeter", "perimeter.set-overlay");
       if (!audit) return;
 
@@ -1983,20 +2440,22 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         .writeAudited(listenPrefix, "perimeter", { overlay }, audit)
         .catch(console.error);
     },
-    [makeAudit, listenPrefix],
+    [makeAudit, listenPrefix, writeEligible],
   );
 
   const clearPerimeterOverlay = useCallback(() => {
+    if (!writeEligible) return;
     const audit = makeAudit("perimeter", "perimeter.clear-overlay");
     if (!audit) return;
 
     firebaseDatabase
       .writeAudited(listenPrefix, "perimeter", { overlay: null }, audit)
       .catch(console.error);
-  }, [makeAudit, listenPrefix]);
+  }, [makeAudit, listenPrefix, writeEligible]);
 
   const setPerimeterAdLayout = useCallback(
     (layout: PerimeterAdLayout | null): Promise<void> => {
+      if (!writeEligible) return Promise.resolve();
       const audit = makeAudit("perimeter", "perimeter.set-ad-layout");
       if (!audit) return Promise.resolve();
       // Let rejections propagate: the controller keeps its editor open and
@@ -2009,12 +2468,14 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         audit,
       );
     },
-    [makeAudit, listenPrefix],
+    [makeAudit, listenPrefix, writeEligible],
   );
 
   const setPerimeterBrightness = useCallback(
     (percent: number): Promise<void> => {
-      if (!listenPrefix || !isAuthenticated) return Promise.resolve();
+      if (!listenPrefix || !isAuthenticated || !writeEligible) {
+        return Promise.resolve();
+      }
       if (!Number.isInteger(percent) || percent < 0 || percent > 100) {
         console.warn(`Ignoring invalid brightness request: ${percent}`);
         return Promise.resolve();
@@ -2027,7 +2488,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         percent,
       );
     },
-    [isAuthenticated, listenPrefix],
+    [isAuthenticated, listenPrefix, writeEligible],
   );
 
   // Request background perimeter goal-scorer media preparation for the current
@@ -2036,7 +2497,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   // triggers the authenticated Cloud Function which performs the actual work.
   const requestGoalScorerPreparation = useCallback(
     async (force = false): Promise<void> => {
-      if (!listenPrefix || !isAuthenticated) return;
+      if (!listenPrefix || !isAuthenticated || !writeEligible) return;
       const home = controllerRef.current?.roster?.home ?? [];
       const players = home
         .filter(
@@ -2088,11 +2549,17 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         );
       }
     },
-    [isAuthenticated, listenPrefix, goalScorerPreparationRequestSignature],
+    [
+      isAuthenticated,
+      listenPrefix,
+      writeEligible,
+      goalScorerPreparationRequestSignature,
+    ],
   );
 
   const createPerimeterMediaPair = useCallback(
     (pairId: string, pair: PerimeterMediaPair): Promise<void> => {
+      if (!writeEligible) return Promise.resolve();
       const audit = makeAudit("perimeter", "perimeter.create-media-pair");
       if (!audit) return Promise.resolve();
       // Let rejections propagate so the create dialog can surface failures.
@@ -2103,11 +2570,12 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         audit,
       );
     },
-    [makeAudit, listenPrefix],
+    [makeAudit, listenPrefix, writeEligible],
   );
 
   const deletePerimeterMediaPair = useCallback(
     (pairId: string): Promise<void> => {
+      if (!writeEligible) return Promise.resolve();
       const audit = makeAudit("perimeter", "perimeter.delete-media-pair");
       if (!audit) return Promise.resolve();
       // Removes only the Firebase library record; Storage assets are kept.
@@ -2118,7 +2586,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         audit,
       );
     },
-    [makeAudit, listenPrefix],
+    [makeAudit, listenPrefix, writeEligible],
   );
 
   // Auto-start/stop the perimeter LEDs on view transitions: entering the match
@@ -2126,7 +2594,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   // writes when the perimeter is enabled, and only after initial subscriptions
   // have loaded so a reload/reconnect never replays a stale perimeter command.
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || !writeEligible) return;
 
     const nextView = controller.view;
     const prevView = prevControllerViewRef.current;
@@ -2140,7 +2608,13 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     } else if (nextView === VIEWS.idle) {
       setPerimeterState("off");
     }
-  }, [ready, controller.view, perimeter.enabled, setPerimeterState]);
+  }, [
+    ready,
+    writeEligible,
+    controller.view,
+    perimeter.enabled,
+    setPerimeterState,
+  ]);
 
   // Request goal-scorer perimeter media preparation whenever the home roster
   // gains eligible players (match selection or match-report roster loading).
@@ -2223,6 +2697,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       removePenalty,
       addToPenalty,
       updateHalfLength,
+      adjustMatchTime,
       setHalfStops,
       matchTimeout,
       removeTimeout,
@@ -2230,6 +2705,13 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       countdown,
       startHalftimeCountdown,
       stopHalftimeCountdown,
+      completeCountdownIfCurrent,
+      applyHalfStopIfCurrent,
+      removeTimeoutIfCurrent,
+      removePenaltyIfCurrent,
+      completeAssetIfCurrent,
+      writeEligible,
+      writeFreshness,
       updateRedCards,
       getServerTime,
       updateController,
@@ -2311,6 +2793,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       removePenalty,
       addToPenalty,
       updateHalfLength,
+      adjustMatchTime,
       setHalfStops,
       matchTimeout,
       removeTimeout,
@@ -2318,6 +2801,13 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       countdown,
       startHalftimeCountdown,
       stopHalftimeCountdown,
+      completeCountdownIfCurrent,
+      applyHalfStopIfCurrent,
+      removeTimeoutIfCurrent,
+      removePenaltyIfCurrent,
+      completeAssetIfCurrent,
+      writeEligible,
+      writeFreshness,
       updateRedCards,
       getServerTime,
       updateController,
@@ -2411,6 +2901,7 @@ export const useMatch = () => {
     removePenalty,
     addToPenalty,
     updateHalfLength,
+    adjustMatchTime,
     setHalfStops,
     matchTimeout,
     removeTimeout,
@@ -2418,8 +2909,13 @@ export const useMatch = () => {
     countdown,
     startHalftimeCountdown,
     stopHalftimeCountdown,
+    completeCountdownIfCurrent,
+    applyHalfStopIfCurrent,
+    removeTimeoutIfCurrent,
+    removePenaltyIfCurrent,
     updateRedCards,
     getServerTime,
+    writeEligible,
   } = useFirebaseState();
   return {
     match,
@@ -2432,6 +2928,7 @@ export const useMatch = () => {
     removePenalty,
     addToPenalty,
     updateHalfLength,
+    adjustMatchTime,
     setHalfStops,
     matchTimeout,
     removeTimeout,
@@ -2439,8 +2936,13 @@ export const useMatch = () => {
     countdown,
     startHalftimeCountdown,
     stopHalftimeCountdown,
+    completeCountdownIfCurrent,
+    applyHalfStopIfCurrent,
+    removeTimeoutIfCurrent,
+    removePenaltyIfCurrent,
     updateRedCards,
     getServerTime,
+    writeEligible,
   };
 };
 
@@ -2466,6 +2968,7 @@ export const useController = () => {
     renderAsset,
     showNextAsset,
     removeAssetAfterTimeout,
+    completeAssetIfCurrent,
     remoteRefresh,
     setRoster,
     editPlayer,
@@ -2495,6 +2998,7 @@ export const useController = () => {
     renderAsset,
     showNextAsset,
     removeAssetAfterTimeout,
+    completeAssetIfCurrent,
     remoteRefresh,
     setRoster,
     editPlayer,

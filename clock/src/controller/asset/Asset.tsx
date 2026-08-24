@@ -10,7 +10,6 @@ import assetTypes from "./AssetTypes";
 import "./Asset.css";
 import VideoPlayer from "./VideoPlayer";
 import { useController, useView } from "../../contexts/FirebaseStateContext";
-import { useAuth } from "../../contexts/LocalStateContext";
 import { useClubLogo } from "../../hooks/useClubLogo";
 import { isVideoUrl } from "../../utils/matchUtils";
 import { CurrentAsset } from "../../types";
@@ -168,26 +167,36 @@ type AssetProps = OwnProps;
 
 const AssetComponent = (props: AssetProps) => {
   const { asset, thumbnail, time } = props;
-  const { removeAssetAfterTimeout } = useController();
+  const { controller, completeAssetIfCurrent } = useController();
   const {
     view: { vp },
   } = useView();
-  const auth = useAuth();
   const teamLogoUrl = useClubLogo(asset?.teamName || "");
 
-  useEffect(() => {
-    if (auth.isEmpty) {
-      return;
-    }
-    const typesWithoutManualRemove = [assetTypes.URL, assetTypes.VIDEO];
-    const typeNeedsManualRemove =
-      asset && !typesWithoutManualRemove.includes(asset.type);
+  // Passive rendering: mounting, resuming, or a locally elapsed timer must
+  // never mutate shared state. Automatic asset expiry is routed through the
+  // MatchLifecycle coordinator (completeAssetIfCurrent), which is
+  // generation-conditional and freshness-gated. This component only renders,
+  // with one exception: a natural media-end event (video / YouTube) submits a
+  // conditional completion observation below. That is a renderer-initiated
+  // input, but not a blind mutation — the CAS precondition re-validates the
+  // current asset identity AND queue against authoritative state, so a stale
+  // renderer cannot clear a newer asset.
 
-    if (time && !thumbnail && typeNeedsManualRemove) {
-      const timeout = setTimeout(removeAssetAfterTimeout, time * 1000);
-      return () => clearTimeout(timeout);
-    }
-  }, [time, thumbnail, removeAssetAfterTimeout, asset, auth.isEmpty]);
+  // For media with a natural end event (video / YouTube), notify completion
+  // through the conditional action. The action verifies the current asset
+  // identity AND queue preconditions still match, so a stale renderer cannot
+  // clear a newer asset. The observed queue state comes from the rendered
+  // controller (not hard-coded values) so completion during active autoplay
+  // (activeQueueId set, playing true) still satisfies the precondition.
+  const handleMediaEnded = () => {
+    void completeAssetIfCurrent({
+      assetKey: asset?.key ?? "",
+      time: time ?? null,
+      activeQueueId: controller.activeQueueId,
+      playing: controller.playing,
+    });
+  };
 
   const getPlayerAsset = ({
     asset: playerAsset,
@@ -304,11 +313,7 @@ const AssetComponent = (props: AssetProps) => {
         }
         return (
           <div style={{ backgroundColor: "#000000" }}>
-            <YouTube
-              videoId={videoId}
-              opts={opts}
-              onEnd={removeAssetAfterTimeout}
-            />
+            <YouTube videoId={videoId} opts={opts} onEnd={handleMediaEnded} />
           </div>
         );
       }
@@ -354,7 +359,7 @@ const AssetComponent = (props: AssetProps) => {
       return (
         <VideoPlayer
           asset={asset}
-          onEnded={removeAssetAfterTimeout}
+          onEnded={handleMediaEnded}
           thumbnail={thumbnail}
         />
       );
