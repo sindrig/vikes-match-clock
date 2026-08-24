@@ -1370,9 +1370,14 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
           // A transaction replaces the whole node: strip optional undefined
           // fields (e.g. an unset matchStartTime) so Firebase does not reject
           // the write.
-          const cleanState: Record<string, unknown> = {};
+          const cleanState: Record<string, unknown> =
+            currentData && typeof currentData === "object"
+              ? { ...(currentData as Record<string, unknown>) }
+              : {};
           for (const [key, value] of Object.entries(newState)) {
-            if (value !== undefined) cleanState[key] = value;
+            if (value !== undefined) {
+              cleanState[key] = value;
+            }
           }
           return cleanState;
         });
@@ -1430,9 +1435,14 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
             return;
           }
           committedDiff = diff;
-          const cleanState: Record<string, unknown> = {};
+          const cleanState: Record<string, unknown> =
+            currentData && typeof currentData === "object"
+              ? { ...(currentData as Record<string, unknown>) }
+              : {};
           for (const [key, value] of Object.entries(newState)) {
-            if (value !== undefined) cleanState[key] = value;
+            if (value !== undefined) {
+              cleanState[key] = value;
+            }
           }
           return cleanState;
         });

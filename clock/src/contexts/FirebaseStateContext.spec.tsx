@@ -3600,6 +3600,8 @@ describe("goal scorer preparation", () => {
         awayTimeouts: 0,
         buzzer: false,
         injuryTimeDisplayMode: "full",
+        showInjuryTime: true,
+        futureMatchField: "preserve-me",
       });
 
       let matchApi: ReturnType<typeof useMatch> | null = null;
@@ -3636,6 +3638,12 @@ describe("goal scorer preparation", () => {
       expect(vi.mocked(firebaseDatabase.writeAuditOnly).mock.calls[0]![1]).toBe(
         "match",
       );
+      expect(mockDbState.get("states/test-location/match")).toEqual(
+        expect.objectContaining({
+          showInjuryTime: true,
+          futureMatchField: "preserve-me",
+        }),
+      );
 
       // A second controller observing the same (now-obsolete) generation is
       // rejected atomically and writes no second audit.
@@ -3645,6 +3653,51 @@ describe("goal scorer preparation", () => {
       });
       expect(vi.mocked(firebaseDatabase.writeAuditOnly)).toHaveBeenCalledTimes(
         1,
+      );
+    });
+
+    it("preserves unknown controller fields during conditional asset completion", async () => {
+      mockDbState.set("states/test-location/controller", {
+        queues: {},
+        activeQueueId: null,
+        playing: false,
+        view: "idle",
+        roster: { home: [], away: [] },
+        currentAsset: {
+          asset: { type: "image", key: "asset-1" },
+          time: 1,
+        },
+        refreshToken: "",
+        futureControllerField: "preserve-me",
+      });
+
+      let controllerApi: ReturnType<typeof useController> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+          screenKey={null}
+        >
+          <TestControllerConsumer
+            onMount={(api) => {
+              controllerApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+
+      await act(async () => {
+        const committed = await controllerApi!.completeAssetIfCurrent({
+          assetKey: "asset-1",
+          time: 1,
+          activeQueueId: null,
+          playing: false,
+        });
+        expect(committed).toBe(true);
+      });
+
+      expect(mockDbState.get("states/test-location/controller")).toEqual(
+        expect.objectContaining({ futureControllerField: "preserve-me" }),
       );
     });
 
