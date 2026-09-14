@@ -1376,7 +1376,9 @@ The ad image (`img.ad` in `ScoreBoard.css`) uses theme CSS vars for all position
 
 #### Per-Team Logo Scaling
 
-Each team's logo can be independently scaled via `homeLogoScale` and `awayLogoScale` (percentage strings, e.g. `"100%"`). The scaling uses CSS `transform: scale()` with `transform-origin: center center` on `.img-wrapper`, so logos resize "middle out" — maintaining their center position and vertical alignment. The `themeToCssVars()` function converts the percentage to a unitless scale factor (e.g. `"100%"` → `"1"`, `"150%"` → `"1.5"`). Because `transform: scale()` is used (not width/height changes), aspect ratio is always preserved.
+Each team's logo can be independently scaled via `homeLogoScale` and `awayLogoScale` (percentage strings, e.g. `"100%"`). The advanced theme dialog exposes these as separate `Stærð heimamerkis` and `Stærð útimerkis` fields below the shared logo position and bounds. The scaling uses CSS `transform: scale()` with `transform-origin: center center` on `.img-wrapper`, so logos resize "middle out" — maintaining their center position and vertical alignment. The `themeToCssVars()` function converts the percentage to a unitless scale factor (e.g. `"100%"` → `"1"`, `"150%"` → `"1.5"`). Because `transform: scale()` is used (not width/height changes), aspect ratio is always preserved.
+
+The bundled Keflavík crest has a team-specific `70%` image width in `ScoreBoard.css` because its artwork otherwise appears oversized relative to the other crests.
 
 #### Viewport Variants Note
 

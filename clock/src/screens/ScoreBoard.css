@@ -72,6 +72,10 @@
   margin-top: auto;
 }
 
+.team img[alt="Keflavík"] {
+  width: 70%;
+}
+
 .clock {
   position: absolute;
   background-color: var(--theme-clock-bg, black);

@@ -475,14 +475,15 @@ const ThemeEditorPanels = ({
         defaultValue={DEFAULT_THEME.logoWidth}
         onChange={(v) => onFieldChange("logoWidth", v)}
       />
+      <Divider className="theme-divider" />
       <PercentField
-        label="Stærð heima"
+        label="Stærð heimamerkis"
         value={effective.homeLogoScale}
         defaultValue={DEFAULT_THEME.homeLogoScale}
         onChange={(v) => onFieldChange("homeLogoScale", v)}
       />
       <PercentField
-        label="Stærð úti"
+        label="Stærð útimerkis"
         value={effective.awayLogoScale}
         defaultValue={DEFAULT_THEME.awayLogoScale}
         onChange={(v) => onFieldChange("awayLogoScale", v)}

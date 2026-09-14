@@ -1081,9 +1081,13 @@ describe("firebaseParsers", () => {
       const result = parseTheme({
         scoreBoxBg: "#ff0000",
         clockBg: "#00ff00",
+        homeLogoScale: "125%",
+        awayLogoScale: "80%",
       });
       expect(result!.scoreBoxBg).toBe("#ff0000");
       expect(result!.clockBg).toBe("#00ff00");
+      expect(result!.homeLogoScale).toBe("125%");
+      expect(result!.awayLogoScale).toBe("80%");
     });
 
     it("falls back to default for non-string values", () => {

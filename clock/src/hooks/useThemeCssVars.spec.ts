@@ -185,6 +185,17 @@ describe("useThemeCssVars", () => {
       expect(vars["--theme-ad-top"]).toBe(DEFAULT_THEME.adTop);
     });
 
+    it("maps home and away logo sizes independently", () => {
+      const vars = themeToCssVars({
+        ...DEFAULT_THEME,
+        homeLogoScale: "125%",
+        awayLogoScale: "80%",
+      });
+
+      expect(vars["--theme-home-logo-scale"]).toBe("1.25");
+      expect(vars["--theme-away-logo-scale"]).toBe("0.8");
+    });
+
     it("maps idle screen properties", () => {
       const vars = themeToCssVars(DEFAULT_THEME);
       expect(vars["--theme-idle-text-color"]).toBe(DEFAULT_THEME.idleTextColor);
