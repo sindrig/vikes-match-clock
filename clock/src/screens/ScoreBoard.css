@@ -59,7 +59,7 @@
   top: var(--theme-logo-top, 10%);
   height: var(--theme-logo-height, 43%);
   transform: scale(var(--logo-scale, 1));
-  transform-origin: center center;
+  transform-origin: top center;
 }
 
 .team img {
