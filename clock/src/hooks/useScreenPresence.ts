@@ -17,7 +17,10 @@ import { database } from "../firebase";
  *
  * Should only be used by unauthenticated screen instances (not controllers).
  */
-export default function useScreenPresence(listenPrefix: string): void {
+export default function useScreenPresence(
+  listenPrefix: string,
+  displayKind: "scoreboard" | "perimeter" = "scoreboard",
+): void {
   useEffect(() => {
     if (!listenPrefix) return;
 
@@ -33,7 +36,10 @@ export default function useScreenPresence(listenPrefix: string): void {
       // Register cleanup BEFORE setting presence (avoids race condition)
       void onDisconnect(connectionRef).remove();
 
-      void set(connectionRef, { connectedAt: serverTimestamp() });
+      void set(connectionRef, {
+        connectedAt: serverTimestamp(),
+        displayKind,
+      });
     });
 
     return () => {
@@ -42,5 +48,5 @@ export default function useScreenPresence(listenPrefix: string): void {
         void set(connectionRef, null);
       }
     };
-  }, [listenPrefix]);
+  }, [listenPrefix, displayKind]);
 }

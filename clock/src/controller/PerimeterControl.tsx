@@ -31,7 +31,7 @@ import {
   PerimeterAdLayoutFile,
   PerimeterAppliedAdFile,
 } from "../types";
-import { usePerimeter } from "../contexts/FirebaseStateContext";
+import { useListeners, usePerimeter } from "../contexts/FirebaseStateContext";
 import { useLocalState } from "../contexts/LocalStateContext";
 import { validateAdFileName } from "../contexts/firebaseParsers";
 import GoalScorerPreparation from "./GoalScorerPreparation";
@@ -182,7 +182,9 @@ const FilePicker = ({
   selectedFile,
   onSelect,
 }: FilePickerProps) => {
-  const [files, setFiles] = useState<{ name: string }[]>([]);
+  const [files, setFiles] = useState<
+    Array<{ name: string; generation?: string }>
+  >([]);
   const [listing, setListing] = useState(false);
   const [uploading, setUploading] = useState(false);
 
@@ -194,11 +196,22 @@ const FilePicker = ({
       const result: ListResult = await storageHelpers.listAll(storagePath);
       // The daemon and parsers enforce strict filename rules; hide objects
       // that could never be selected into a valid layout.
-      setFiles(
+      const listedFiles = await Promise.all(
         result.items
-          .map((item) => ({ name: item.name }))
-          .filter((f) => validateAdFileName(f.name)),
+          .filter((item) => validateAdFileName(item.name))
+          .map(async (item) => {
+            if (typeof storageHelpers.getMetadata !== "function") {
+              return { name: item.name };
+            }
+            try {
+              const metadata = await storageHelpers.getMetadata(item.fullPath);
+              return { name: item.name, generation: metadata.generation };
+            } catch {
+              return { name: item.name };
+            }
+          }),
       );
+      setFiles(listedFiles);
     } catch {
       setFiles([]);
     } finally {
@@ -264,7 +277,11 @@ const FilePicker = ({
                 selectedFile?.name === f.name ? " selected" : ""
               }`}
               onClick={() =>
-                onSelect({ name: f.name, source: makeGsUri(f.name) })
+                onSelect({
+                  name: f.name,
+                  source: makeGsUri(f.name),
+                  ...(f.generation ? { generation: f.generation } : {}),
+                })
               }
             >
               {f.name}
@@ -407,6 +424,7 @@ const PerimeterControl = () => {
     appliedAdLayoutError,
   } = usePerimeter();
   const { listenPrefix } = useLocalState();
+  const { screens } = useListeners();
 
   const [open, setOpen] = useState(false);
   const [now, setNow] = useState(0);
@@ -420,7 +438,24 @@ const PerimeterControl = () => {
   const [writePending, setWritePending] = useState(false);
   const [writeError, setWriteError] = useState<string | null>(null);
 
-  const lanes = appliedAdLayout?.lanes ?? [];
+  const perimeterConfiguration = useMemo(
+    () =>
+      screens.find((screen) => screen.key === listenPrefix)?.perimeterDisplay,
+    [listenPrefix, screens],
+  );
+  const isWebVenue = perimeterConfiguration?.renderer === "web";
+  const webLanes = useMemo(
+    () =>
+      Object.entries(perimeterConfiguration?.compatibilityKeys.base ?? {}).map(
+        ([id, logicalScreenId]) => ({
+          id,
+          name:
+            perimeterConfiguration?.logicalScreens[logicalScreenId]?.name ?? id,
+        }),
+      ),
+    [perimeterConfiguration],
+  );
+  const lanes = appliedAdLayout?.lanes ?? (isWebVenue ? webLanes : []);
   const columns = useMemo(() => adLayout?.columns ?? [], [adLayout?.columns]);
   const appliedColumnsMap = useMemo(() => {
     const map: Record<
@@ -454,6 +489,7 @@ const PerimeterControl = () => {
   const beforeRevisionRef = useRef<string | null>(null);
 
   const revisionMismatch =
+    !isWebVenue &&
     adLayout?.revision !== undefined &&
     appliedAdLayout?.revision !== undefined &&
     adLayout.revision !== appliedAdLayout.revision;
@@ -528,6 +564,7 @@ const PerimeterControl = () => {
 
   const isStale =
     now > 0 &&
+    !isWebVenue &&
     appliedAdLayout?.updatedAt != null &&
     now - appliedAdLayout.updatedAt > STALE_MS;
 
@@ -614,7 +651,7 @@ const PerimeterControl = () => {
         <Modal.Body>
           <BrightnessSection />
           <GoalScorerPreparation />
-          {!appliedAdLayoutLoaded ? (
+          {!isWebVenue && !appliedAdLayoutLoaded ? (
             <div className="perimeter-preview-state">
               <Loader content="Sæki forskoðun..." />
               <p className="perimeter-hint">
@@ -622,7 +659,7 @@ const PerimeterControl = () => {
                 jaðarskjárinn er kveiktur.
               </p>
             </div>
-          ) : appliedAdLayout === undefined ? (
+          ) : !isWebVenue && appliedAdLayout === undefined ? (
             appliedAdLayoutError ? (
               <div className="perimeter-error-state">
                 <div className="perimeter-error-badge">Villa</div>
@@ -645,15 +682,23 @@ const PerimeterControl = () => {
             <div className="perimeter-layout-board">
               {/* Status Bar */}
               <div className="perimeter-status-bar">
-                <Badge
-                  content={
-                    PHASE_LABELS[appliedAdLayout.phase] ?? appliedAdLayout.phase
-                  }
-                  className={`perimeter-phase-badge phase-${appliedAdLayout.phase}`}
-                />
-                {appliedAdLayout.error && (
+                {isWebVenue ? (
+                  <Badge
+                    content="Web"
+                    className="perimeter-phase-badge phase-playing"
+                  />
+                ) : (
+                  <Badge
+                    content={
+                      PHASE_LABELS[appliedAdLayout?.phase ?? "idle"] ??
+                      appliedAdLayout?.phase
+                    }
+                    className={`perimeter-phase-badge phase-${appliedAdLayout?.phase ?? "idle"}`}
+                  />
+                )}
+                {!isWebVenue && appliedAdLayout?.error && (
                   <span className="perimeter-status-error">
-                    {appliedAdLayout.error}
+                    {appliedAdLayout?.error}
                   </span>
                 )}
                 {writeError && (
@@ -669,15 +714,17 @@ const PerimeterControl = () => {
                     Uppfærslu beðið
                   </span>
                 )}
-                {!revisionMismatch && appliedAdLayout.revision && (
-                  <span className="perimeter-revision-live">Lifandi</span>
-                )}
+                {!isWebVenue &&
+                  !revisionMismatch &&
+                  appliedAdLayout?.revision && (
+                    <span className="perimeter-revision-live">Lifandi</span>
+                  )}
               </div>
 
               {isStale && (
                 <div className="perimeter-stale">
                   Staða jaðarskjás er gömul (uppfærð kl.{" "}
-                  {formatTimestamp(appliedAdLayout.updatedAt ?? null)}).
+                  {formatTimestamp(appliedAdLayout?.updatedAt ?? null)}).
                 </div>
               )}
 

@@ -34,6 +34,7 @@ import useScreenPresence from "./hooks/useScreenPresence";
 import { useThemeCssVars, resolveTheme } from "./hooks/useThemeCssVars";
 import assetTypes from "./controller/asset/AssetTypes";
 import { isVideoUrl, resolveGoalBackground } from "./utils/matchUtils";
+import PerimeterDisplay from "./perimeter/PerimeterDisplay";
 
 import "./App.css";
 
@@ -188,7 +189,14 @@ const ClearOverlayButton = () => {
 function App() {
   useGlobalShortcuts();
   const { controller, view: viewState, ready } = useFirebaseState();
-  const { auth, listenPrefix, setListenPrefix, setScreenKey } = useLocalState();
+  const {
+    auth,
+    listenPrefix,
+    setListenPrefix,
+    setScreenKey,
+    displayTarget,
+    setDisplayTarget,
+  } = useLocalState();
 
   const { view } = controller;
   const {
@@ -212,7 +220,10 @@ function App() {
 
   const isAuthenticated = auth.isLoaded && !auth.isEmpty;
 
-  useScreenPresence(isAuthenticated ? "" : listenPrefix);
+  useScreenPresence(
+    isAuthenticated ? "" : listenPrefix,
+    displayTarget?.kind === "perimeter" ? "perimeter" : "scoreboard",
+  );
 
   // Apply viewport fontSize to the root <html> element so all rem-based
   // content (clocks, scores, etc.) scales to the physical screen config.
@@ -292,6 +303,33 @@ function App() {
 
   // State 2: listenPrefix set, not authenticated — display screen + disconnect button only
   if (!isAuthenticated) {
+    const disconnectDisplay = () => {
+      if (setDisplayTarget) {
+        setDisplayTarget(null);
+      } else {
+        setScreenKey(null);
+      }
+      setListenPrefix("");
+    };
+
+    if (displayTarget?.kind === "perimeter") {
+      return (
+        <div>
+          <PerimeterDisplay />
+          <RefreshHandler />
+          <Button
+            color="red"
+            appearance="primary"
+            size="lg"
+            onClick={disconnectDisplay}
+            style={{ position: "fixed", bottom: 16, right: 16, zIndex: 9999 }}
+          >
+            Aftengja skjá
+          </Button>
+        </div>
+      );
+    }
+
     return (
       <div>
         <div className="App" style={style}>
@@ -308,8 +346,7 @@ function App() {
           appearance="primary"
           size="lg"
           onClick={() => {
-            setScreenKey(null);
-            setListenPrefix("");
+            disconnectDisplay();
           }}
           style={{ position: "fixed", bottom: 16, right: 16, zIndex: 9999 }}
         >
@@ -326,13 +363,16 @@ function App() {
 
   // State 4: authenticated + listenPrefix set — full UI with disconnect/logout buttons
   const disconnectScreen = () => {
-    setScreenKey(null);
+    if (setDisplayTarget) {
+      setDisplayTarget(null);
+    } else {
+      setScreenKey(null);
+    }
     setListenPrefix("");
   };
 
   const logout = () => {
-    setScreenKey(null);
-    setListenPrefix("");
+    disconnectScreen();
     firebaseAuth.logout().catch(console.error);
   };
 

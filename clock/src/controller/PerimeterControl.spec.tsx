@@ -9,13 +9,18 @@ import {
   within,
 } from "@testing-library/react";
 import PerimeterControl from "./PerimeterControl";
-import { usePerimeter, useController } from "../contexts/FirebaseStateContext";
+import {
+  useListeners,
+  usePerimeter,
+  useController,
+} from "../contexts/FirebaseStateContext";
 import { useLocalState } from "../contexts/LocalStateContext";
 import { closestCenter } from "@dnd-kit/core";
 import type { CollisionDetection, DragEndEvent } from "@dnd-kit/core";
 
 vi.mock("../contexts/FirebaseStateContext", () => ({
   usePerimeter: vi.fn(),
+  useListeners: vi.fn(),
   useController: vi.fn(),
 }));
 
@@ -51,6 +56,7 @@ vi.mock("@dnd-kit/core", async (importOriginal) => {
 });
 
 const mockedUsePerimeter = vi.mocked(usePerimeter);
+const mockedUseListeners = vi.mocked(useListeners);
 const mockedUseLocalState = vi.mocked(useLocalState);
 const mockedUseController = vi.mocked(useController);
 
@@ -132,6 +138,7 @@ const createMockLocalState = (
 beforeEach(() => {
   vi.clearAllMocks();
   mockedUsePerimeter.mockReturnValue(createMockPerimeterReturn());
+  mockedUseListeners.mockReturnValue({ available: [], screens: [] });
   mockedUseLocalState.mockReturnValue(createMockLocalState());
   mockedUseController.mockReturnValue({
     controller: { roster: { home: [], away: [] } },
@@ -139,6 +146,56 @@ beforeEach(() => {
 });
 
 describe("PerimeterControl", () => {
+  it("derives editable lanes from a web venue mapping without daemon status", () => {
+    mockedUseListeners.mockReturnValue({
+      available: [],
+      screens: [
+        {
+          key: "test-location",
+          label: "Test location",
+          screen: {} as never,
+          perimeterDisplay: {
+            renderer: "web",
+            compatibilityKeys: {
+              base: { "1": "left", "3": "right" },
+              overlay: {},
+            },
+            logicalScreens: {
+              left: { id: "left", name: "Left", width: 4, height: 1 },
+              right: { id: "right", name: "Right", width: 4, height: 1 },
+            },
+          } as never,
+        },
+      ],
+    });
+    mockedUsePerimeter.mockReturnValue(
+      createMockPerimeterReturn({
+        appliedAdLayout: undefined,
+        appliedAdLayoutLoaded: false,
+        adLayout: {
+          version: 1,
+          revision: "revision",
+          columns: [
+            {
+              id: "column",
+              files: {
+                "1": { name: "left.png", source: "gs://bucket/left.png" },
+                "3": { name: "right.png", source: "gs://bucket/right.png" },
+              },
+            },
+          ],
+        },
+      }),
+    );
+
+    render(<PerimeterControl />);
+    fireEvent.click(screen.getByRole("button", { name: "Opna" }));
+
+    expect(screen.getByText("2 raðir")).toBeInTheDocument();
+    expect(screen.getByText("Left")).toBeInTheDocument();
+    expect(screen.getByText("Right")).toBeInTheDocument();
+  });
+
   it("renders nothing when perimeter is not enabled", () => {
     mockedUsePerimeter.mockReturnValue(
       createMockPerimeterReturn({

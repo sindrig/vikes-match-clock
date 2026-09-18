@@ -61,6 +61,7 @@ import {
   useIsAdmin,
   useLocalState,
 } from "../contexts/LocalStateContext";
+import type { DisplayTarget } from "../types";
 import { Link } from "react-router-dom";
 
 const confirmRefresh = () => confirm("Are you absolutely sure?");
@@ -80,6 +81,7 @@ const Controller = () => {
     setListenPrefix,
     available,
     setScreenKey,
+    setDisplayTarget: setDisplayTargetFromContext,
   } = useLocalState();
   const auth = useAuth();
   const isAdmin = useIsAdmin();
@@ -105,6 +107,14 @@ const Controller = () => {
   const [auditOpen, setAuditOpen] = useState(false);
 
   const isAuthenticated = auth.isLoaded && !auth.isEmpty;
+  const selectDisplayTarget = (locationKey: string, target: DisplayTarget) => {
+    setListenPrefix(locationKey);
+    if (setDisplayTargetFromContext) {
+      setDisplayTargetFromContext(target);
+    } else if (target.kind === "scoreboard") {
+      setScreenKey(target.screenKey);
+    }
+  };
 
   // State 1: no listenPrefix, not authenticated — screen selector + login form only
   if (!listenPrefix && !isAuthenticated) {
@@ -150,8 +160,10 @@ const Controller = () => {
                 onClick={() => {
                   const screen = screens[parseInt(selectedScreen, 10)];
                   if (screen) {
-                    setScreenKey(screen.screen.key);
-                    setListenPrefix(screen.key);
+                    selectDisplayTarget(screen.key, {
+                      kind: "scoreboard",
+                      screenKey: screen.screen.key,
+                    });
                   }
                 }}
                 disabled={selectedScreen === ""}
@@ -243,13 +255,31 @@ const Controller = () => {
                 .join(" / ");
               const buttonLabel = `${label} ${screenNames}`;
 
+              const supportsWebPerimeter =
+                first.perimeterDisplay?.renderer === "web";
+
               return (
-                <ScreenSelectorButton
-                  key={locationKey}
-                  locationKey={locationKey}
-                  label={buttonLabel}
-                  onClick={() => setListenPrefix(locationKey)}
-                />
+                <div key={locationKey} className="screen-selector-location">
+                  <ScreenSelectorButton
+                    locationKey={locationKey}
+                    label={buttonLabel}
+                    onClick={() =>
+                      selectDisplayTarget(locationKey, {
+                        kind: "scoreboard",
+                        screenKey: first.screen.key,
+                      })
+                    }
+                  />
+                  {supportsWebPerimeter && (
+                    <ScreenSelectorButton
+                      locationKey={`${locationKey}-perimeter`}
+                      label={`${label} Perimeter`}
+                      onClick={() =>
+                        selectDisplayTarget(locationKey, { kind: "perimeter" })
+                      }
+                    />
+                  )}
+                </div>
               );
             })}
           </div>

@@ -267,6 +267,33 @@ retained).
 
 ### Perimeter Control
 
+#### Web Perimeter Display
+
+The local display target is persisted separately from Firebase in
+`LocalStateContext`: scoreboard targets retain their selected screen key,
+while the perimeter target is represented as `{ kind: "perimeter" }`. The
+controller's selector routes to `PerimeterDisplay`, which is read-only and
+does not write match or perimeter state.
+
+`PerimeterDisplay` uses `PerimeterWebGLRenderer` and `PerimeterRuntime` for
+browser playback. Published geometry is validated before activation; media is
+resolved only from the active Firebase Storage bucket and must include an
+immutable Storage `generation`. Legacy ad-layout records remain parseable for
+admin migration but are rejected by web playback until generations are
+backfilled. `PersistentMediaCache` keys entries by bucket, object path, and
+generation, replaces stale generations atomically, and reports quota or
+persistence failures without imposing an arbitrary playlist-size limit.
+Firebase Storage rules permit anonymous reads only below a venue's
+`perimeter/` and `perimeter-overlays/` prefixes; writes and unrelated objects
+remain authenticated-only.
+
+Base ads use a monotonic cue timeline and complete-revision preparation before
+swapping pair slots. Overlays use the same two-target mapping, replace the
+active command only after preparation, and render above the base channel.
+Power-off clears the WebGL framebuffer to black. The renderer and runtime must
+remain read-only; Firebase continues to be the source of truth for desired
+layout, overlay, and power state.
+
 The perimeter LED screens at the Víkin stadium are driven by a dedicated
 Resolume Arena composition. Control flows through the **fourth** Firebase
 state subtree, `states/${listenPrefix}/perimeter`:

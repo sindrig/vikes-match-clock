@@ -282,8 +282,79 @@ export interface ListenersState {
     key: string;
     pitchIds?: string[];
     teamId?: number;
+    perimeterDisplay?: PerimeterDisplayConfig;
   }>;
 }
+
+// Published venue geometry for a browser or Resolume perimeter installation.
+// This lives under locations/{location}/perimeterDisplay and is independent
+// from the desired runtime state under states/{location}.
+export type PerimeterRenderer = "web" | "resolume";
+export type PerimeterRotation = 0 | 90 | 180 | 270;
+
+export interface PerimeterRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface PerimeterFramebuffer {
+  width: number;
+  height: number;
+  background: "black";
+}
+
+export interface PerimeterLogicalScreen {
+  id: string;
+  name: string;
+  width: number;
+  height: number;
+}
+
+export interface PerimeterRegionTransform {
+  rotation: PerimeterRotation;
+  flipX: boolean;
+  flipY: boolean;
+  allowScaling: boolean;
+  allowClipping: boolean;
+  allowSourceOverlap: boolean;
+  allowDestinationOverlap: boolean;
+  zIndex: number;
+}
+
+export interface PerimeterRegion {
+  id: string;
+  logicalScreenId: string;
+  source: PerimeterRect;
+  destination: PerimeterRect;
+  transform: PerimeterRegionTransform;
+}
+
+export interface PerimeterCompatibilityKeys {
+  base: Record<string, string>;
+  overlay: Record<string, string>;
+}
+
+export interface PerimeterPlaybackDefaults {
+  cueDurationMs: number;
+  videoPolicy: "fit-to-cue";
+}
+
+export interface PerimeterDisplayConfig {
+  version: 1;
+  revision: string;
+  renderer: PerimeterRenderer;
+  framebuffer: PerimeterFramebuffer;
+  logicalScreens: Record<string, PerimeterLogicalScreen>;
+  compatibilityKeys: PerimeterCompatibilityKeys;
+  regions: PerimeterRegion[];
+  playback: PerimeterPlaybackDefaults;
+}
+
+export type DisplayTarget =
+  | { kind: "scoreboard"; screenKey: string }
+  | { kind: "perimeter" };
 
 // Perimeter LED (Resolume) state type
 export interface PerimeterState {
@@ -317,6 +388,7 @@ export interface PerimeterPreview {
 export interface PerimeterOverlayFile {
   name: string;
   source: string;
+  generation?: string;
 }
 
 export interface PerimeterOverlayColumn {
@@ -358,6 +430,9 @@ export interface PerimeterMediaPair {
 export interface PerimeterAdLayoutFile {
   name: string;
   source: string; // gs:// URI
+  // Firebase Storage generation. Legacy Resolume records may omit it, but
+  // browser playback must not activate content without immutable identity.
+  generation?: string;
 }
 
 export interface PerimeterAdLayoutColumn {
