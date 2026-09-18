@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import Controller from "./Controller";
 import { VIEWS } from "../constants";
+import { secondStadiumWebConfiguration } from "../perimeter/fixtures";
 
 vi.mock("../contexts/FirebaseStateContext", () => ({
   useController: vi.fn(),
@@ -309,12 +310,52 @@ describe("Controller", () => {
       render(<Controller />);
 
       const select = screen.getByRole("combobox");
-      fireEvent.change(select, { target: { value: "0" } });
+      fireEvent.change(select, { target: { value: "scoreboard-0" } });
 
       const button = screen.getByText("Birta skjá");
       fireEvent.click(button);
 
       expect(mockSetListenPrefix).toHaveBeenCalledWith("vikinni");
+    });
+
+    it("offers and selects one perimeter target for a web venue", () => {
+      const mockSetListenPrefix = vi.fn();
+      const mockSetDisplayTarget = vi.fn();
+      setupState1();
+      mockedUseLocalState.mockReturnValue({
+        ...mockedUseLocalState(),
+        setListenPrefix: mockSetListenPrefix,
+        setDisplayTarget: mockSetDisplayTarget,
+      });
+      mockedUseListeners.mockReturnValue({
+        screens: [
+          {
+            label: "Víkin",
+            screen: { name: "Main", style: {}, key: "main" },
+            key: "vikinni",
+            perimeterDisplay: secondStadiumWebConfiguration,
+          },
+          {
+            label: "Víkin",
+            screen: { name: "Secondary", style: {}, key: "secondary" },
+            key: "vikinni",
+            perimeterDisplay: secondStadiumWebConfiguration,
+          },
+        ],
+        available: [],
+      });
+      render(<Controller />);
+
+      expect(
+        screen.getAllByRole("option", { name: "Víkin Perimeter" }),
+      ).toHaveLength(1);
+      fireEvent.change(screen.getByRole("combobox"), {
+        target: { value: "perimeter-vikinni" },
+      });
+      fireEvent.click(screen.getByText("Birta skjá"));
+
+      expect(mockSetListenPrefix).toHaveBeenCalledWith("vikinni");
+      expect(mockSetDisplayTarget).toHaveBeenCalledWith({ kind: "perimeter" });
     });
 
     it("disables Birta skjá button when no screen is selected", () => {

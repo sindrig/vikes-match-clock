@@ -25,15 +25,15 @@ test("public perimeter target starts, survives refresh, and disconnects", async 
     await apiContext.dispose();
   }
 
-  await clockPage.addInitScript((listenPrefix) => {
+  await clockPage.addInitScript(() => {
     localStorage.clear();
-    localStorage.setItem("clock_listenPrefix", listenPrefix);
-    localStorage.setItem(
-      "clock_displayTarget",
-      JSON.stringify({ kind: "perimeter" }),
-    );
-  }, TEST_LISTEN_PREFIX);
+  });
   await clockPage.goto("/");
+
+  await clockPage.locator(".initial-screen-select").selectOption({
+    label: `Test Location ${TEST_LISTEN_PREFIX.replace("test-location-", "")} Perimeter`,
+  });
+  await clockPage.getByRole("button", { name: "Birta skjá" }).click();
 
   await expect(clockPage.getByTestId("perimeter-display")).toBeVisible();
   await expect(clockPage.getByTestId("perimeter-canvas")).toHaveAttribute(

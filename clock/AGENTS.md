@@ -272,8 +272,11 @@ retained).
 The local display target is persisted separately from Firebase in
 `LocalStateContext`: scoreboard targets retain their selected screen key,
 while the perimeter target is represented as `{ kind: "perimeter" }`. The
-controller's selector routes to `PerimeterDisplay`, which is read-only and
-does not write match or perimeter state.
+public display selector and authenticated controller selector each offer one
+Perimeter target for venues whose published mapping uses `renderer: "web"`.
+Selecting it routes to `PerimeterDisplay`, which is read-only and does not
+write match or perimeter state. The runtime `perimeter.enabled` controller
+flag does not expose a browser target without a valid web mapping.
 
 `PerimeterDisplay` uses `PerimeterWebGLRenderer` and `PerimeterRuntime` for
 browser playback. Published geometry is validated before activation; media is

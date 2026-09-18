@@ -118,6 +118,36 @@ const Controller = () => {
 
   // State 1: no listenPrefix, not authenticated — screen selector + login form only
   if (!listenPrefix && !isAuthenticated) {
+    const perimeterLocations = new Set<string>();
+    const displayOptions: Array<{
+      value: string;
+      label: string;
+      locationKey: string;
+      target: DisplayTarget;
+    }> = [];
+
+    screens.forEach(({ label, screen, key, perimeterDisplay }, index) => {
+      displayOptions.push({
+        value: `scoreboard-${index}`,
+        label: `${label} ${screen.name}`,
+        locationKey: key,
+        target: { kind: "scoreboard", screenKey: screen.key },
+      });
+
+      if (
+        perimeterDisplay?.renderer === "web" &&
+        !perimeterLocations.has(key)
+      ) {
+        perimeterLocations.add(key);
+        displayOptions.push({
+          value: `perimeter-${key}`,
+          label: `${label} Perimeter`,
+          locationKey: key,
+          target: { kind: "perimeter" },
+        });
+      }
+    });
+
     const login = (e: React.FormEvent) => {
       e.preventDefault();
       firebaseAuth
@@ -148,9 +178,9 @@ const Controller = () => {
                 <option value="" disabled>
                   Veldu skjá
                 </option>
-                {screens.map(({ label, screen }, i) => (
-                  <option value={String(i)} key={i}>
-                    {label} {screen.name}
+                {displayOptions.map(({ value, label }) => (
+                  <option value={value} key={value}>
+                    {label}
                   </option>
                 ))}
               </select>
@@ -158,12 +188,14 @@ const Controller = () => {
                 appearance="primary"
                 size="md"
                 onClick={() => {
-                  const screen = screens[parseInt(selectedScreen, 10)];
-                  if (screen) {
-                    selectDisplayTarget(screen.key, {
-                      kind: "scoreboard",
-                      screenKey: screen.screen.key,
-                    });
+                  const selectedOption = displayOptions.find(
+                    ({ value }) => value === selectedScreen,
+                  );
+                  if (selectedOption) {
+                    selectDisplayTarget(
+                      selectedOption.locationKey,
+                      selectedOption.target,
+                    );
                   }
                 }}
                 disabled={selectedScreen === ""}
