@@ -318,6 +318,32 @@ describe("FirebaseStateContext", () => {
       expect(api?.writeEligible).toBe(false);
     });
 
+    it("subscribes to protected perimeter telemetry only after authentication", () => {
+      const renderProvider = (isAuthenticated: boolean) => (
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={isAuthenticated}
+          screenKey={null}
+        >
+          <TestFirebaseStateConsumer onMount={() => undefined} />
+        </FirebaseStateProvider>
+      );
+      const { rerender } = render(renderProvider(false));
+      const protectedPath = "perimeter/test-location";
+      const subscribedPaths = () =>
+        vi.mocked(onValue).mock.calls.map(([reference]) => String(reference));
+
+      expect(subscribedPaths()).not.toContain(protectedPath);
+      expect(subscribedPaths()).toContain("states/test-location/perimeter");
+
+      rerender(renderProvider(true));
+
+      expect(subscribedPaths()).toContain(protectedPath);
+      expect(subscribedPaths()).toContain(
+        "perimeter/test-location/brightnessStatus",
+      );
+    });
+
     it("restores write eligibility immediately on tab resume when the Firebase connection never dropped", async () => {
       let api: ReturnType<typeof useFirebaseState> | null = null;
 

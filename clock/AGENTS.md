@@ -288,6 +288,10 @@ admin migration but are rejected by web playback until generations are
 backfilled. `PersistentMediaCache` keys entries by bucket, object path, and
 generation, replaces stale generations atomically, and reports quota or
 persistence failures without imposing an arbitrary playlist-size limit.
+Unauthenticated displays subscribe only to the public desired-state paths;
+daemon-owned `perimeter/{location}` telemetry subscriptions are started only
+for authenticated controllers so public screens do not generate permission
+errors.
 Firebase Storage rules permit anonymous reads only below a venue's
 `perimeter/` and `perimeter-overlays/` prefixes; writes and unrelated objects
 remain authenticated-only.
