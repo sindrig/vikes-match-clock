@@ -26,7 +26,6 @@ test("public perimeter target starts, survives refresh, and disconnects", async 
   }
 
   await clockPage.goto("/");
-  await clockPage.removeAllInitScripts();
 
   await clockPage.locator(".initial-screen-select").selectOption({
     label: `Test Location ${TEST_LISTEN_PREFIX.replace("test-location-", "")} Perimeter`,
