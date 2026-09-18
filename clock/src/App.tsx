@@ -21,6 +21,7 @@ import AssetComponent, { useDeferredAsset } from "./controller/asset/Asset";
 import PlaybackBar from "./controller/asset/queue/PlaybackBar";
 import SubstitutionInfo from "./controller/asset/queue/SubstitutionInfo";
 import GoalScorerDialog from "./controller/GoalScorerDialog";
+import PerimeterControl from "./controller/PerimeterControl";
 
 import ScoreBoard from "./screens/ScoreBoard";
 import Idle from "./screens/Idle";
@@ -375,6 +376,29 @@ function App() {
     disconnectScreen();
     firebaseAuth.logout().catch(console.error);
   };
+
+  if (displayTarget?.kind === "perimeter") {
+    return (
+      <div>
+        <PerimeterControl standalone />
+        <ButtonGroup
+          style={{ position: "fixed", bottom: 16, right: 16, zIndex: 9999 }}
+        >
+          <Button color="red" appearance="primary" size="lg" onClick={logout}>
+            Útskrá
+          </Button>
+          <Button
+            color="orange"
+            appearance="primary"
+            size="lg"
+            onClick={disconnectScreen}
+          >
+            Aftengjast skjá
+          </Button>
+        </ButtonGroup>
+      </div>
+    );
+  }
 
   const showController = view === VIEWS.match || view === VIEWS.idle;
   const showMatchControls = view !== VIEWS.idle;

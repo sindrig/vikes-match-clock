@@ -146,6 +146,20 @@ beforeEach(() => {
 });
 
 describe("PerimeterControl", () => {
+  it("renders standalone controls without an opener modal", () => {
+    const setPerimeterState = vi.fn();
+    mockedUsePerimeter.mockReturnValue(
+      createMockPerimeterReturn({ setPerimeterState }),
+    );
+
+    render(<PerimeterControl standalone />);
+
+    expect(screen.getByRole("heading", { name: "Jaðarskjár" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Opna" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Kveikja" }));
+    expect(setPerimeterState).toHaveBeenCalledWith("on");
+  });
+
   it("derives editable lanes from a web venue mapping without daemon status", () => {
     mockedUseListeners.mockReturnValue({
       available: [],

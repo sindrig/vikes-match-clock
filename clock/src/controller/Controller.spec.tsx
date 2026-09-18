@@ -198,6 +198,7 @@ function setupScreenSelector(
   overrides: {
     available?: string[] | null;
     setListenPrefix?: (prefix: string) => void;
+    setDisplayTarget?: ReturnType<typeof vi.fn>;
   } = {},
 ) {
   const mockSetListenPrefix =
@@ -222,6 +223,7 @@ function setupScreenSelector(
     available: mockAvailable,
     screenKey: null,
     setScreenKey: vi.fn(),
+    setDisplayTarget: overrides.setDisplayTarget ?? vi.fn(),
     isAdmin: false,
   });
   mockedUseRemoteSettings.mockReturnValue({
@@ -406,8 +408,9 @@ describe("Controller", () => {
       expect(screen.getByText("Hásteinsvöllur Skjár 1")).toBeInTheDocument();
     });
 
-    it("does not offer display targets in the controller selector", () => {
-      setupScreenSelector();
+    it("opens a dedicated perimeter controller for a web venue", () => {
+      const setDisplayTarget = vi.fn();
+      const { setListenPrefix } = setupScreenSelector({ setDisplayTarget });
       mockedUseListeners.mockReturnValue({
         screens: [
           {
@@ -421,7 +424,10 @@ describe("Controller", () => {
       } as unknown as ReturnType<typeof useListeners>);
       render(<Controller />);
 
-      expect(screen.queryByText("Víkingur Reykjavík Perimeter")).toBeNull();
+      fireEvent.click(screen.getByText("Víkingur Reykjavík Perimeter"));
+
+      expect(setListenPrefix).toHaveBeenCalledWith("vikinni");
+      expect(setDisplayTarget).toHaveBeenCalledWith({ kind: "perimeter" });
     });
 
     it("clicking location button calls setListenPrefix with location key", () => {
@@ -535,13 +541,13 @@ describe("Controller", () => {
       expect(screen.getByRole("dialog")).toBeInTheDocument();
     });
 
-    it("renders PerimeterControl inside the settings modal", () => {
+    it("does not render PerimeterControl inside the settings modal", () => {
       setupState3();
       render(<Controller />);
 
       fireEvent.click(screen.getByRole("button", { name: "Stillingar" }));
 
-      expect(screen.getByTestId("perimeter-control")).toBeInTheDocument();
+      expect(screen.queryByTestId("perimeter-control")).toBeNull();
     });
 
     it("switches to Myndefni tab locally", () => {

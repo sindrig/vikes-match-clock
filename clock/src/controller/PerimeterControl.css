@@ -1,5 +1,53 @@
 /* ── Legacy preview styles (kept for backward compat) ── */
 
+.perimeter-standalone {
+  min-height: 100vh;
+  padding: 32px 32px 104px;
+  background: #f7f8fa;
+}
+
+.perimeter-standalone-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  max-width: 1400px;
+  margin: 0 auto 24px;
+}
+
+.perimeter-standalone-header h1,
+.perimeter-standalone-header p {
+  margin: 0;
+}
+
+.perimeter-standalone-header p {
+  color: #666;
+}
+
+.perimeter-standalone .perimeter-layout-board {
+  max-width: 1400px;
+  margin: 0 auto;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgb(0 0 0 / 8%);
+}
+
+.perimeter-power-controls {
+  display: flex;
+  gap: 8px;
+}
+
+@media (max-width: 600px) {
+  .perimeter-standalone {
+    padding: 20px 16px 112px;
+  }
+
+  .perimeter-standalone-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
 .perimeter-preview-modal .perimeter-preview-state {
   display: flex;
   flex-direction: column;
