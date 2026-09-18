@@ -657,3 +657,26 @@ is never committed: `PERIMETER_VNNOX_PASSWORD_SOURCE=env` reads
 npm install
 npm test
 ```
+
+## Browser Web Perimeter
+
+The clock application can render a venue's packed perimeter output directly in
+Chromium without this Resolume daemon. The venue's published
+`locations/{location}/perimeterDisplay` document selects the renderer:
+`resolume` keeps the daemon path above, while `web` enables the public Perimeter
+display target. Both modes continue to use the same Firebase desired state and
+legacy numeric lane compatibility keys.
+
+For a web venue, measure and publish geometry with
+`WEB_MAPPING_MEASUREMENT.md`. Complete the Windows/Chromium qualification in
+`WEB_RENDERER_QUALIFICATION.md` before enabling it. The browser requires every
+selected base and overlay object to carry immutable Firebase Storage generation
+metadata and stores complete revisions in persistent Cache Storage. It keeps
+the last valid revision when a replacement cannot be downloaded, decoded, or
+retained.
+
+Storage rules permit anonymous reads only below the venue's `perimeter/` and
+`perimeter-overlays/` prefixes. Writes remain authenticated. A web rollback is
+performed by publishing/removing the venue's `web` mapping and reconnecting the
+previous output path; do not change the daemon's Resolume configuration for a
+venue that remains on `resolume`.

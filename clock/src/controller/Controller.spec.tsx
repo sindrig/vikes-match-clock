@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import Controller from "./Controller";
 import { VIEWS } from "../constants";
+import { secondStadiumWebConfiguration } from "../perimeter/fixtures";
 
 vi.mock("../contexts/FirebaseStateContext", () => ({
   useController: vi.fn(),
@@ -197,6 +198,7 @@ function setupScreenSelector(
   overrides: {
     available?: string[] | null;
     setListenPrefix?: (prefix: string) => void;
+    setDisplayTarget?: ReturnType<typeof vi.fn>;
   } = {},
 ) {
   const mockSetListenPrefix =
@@ -221,6 +223,7 @@ function setupScreenSelector(
     available: mockAvailable,
     screenKey: null,
     setScreenKey: vi.fn(),
+    setDisplayTarget: overrides.setDisplayTarget ?? vi.fn(),
     isAdmin: false,
   });
   mockedUseRemoteSettings.mockReturnValue({
@@ -309,12 +312,52 @@ describe("Controller", () => {
       render(<Controller />);
 
       const select = screen.getByRole("combobox");
-      fireEvent.change(select, { target: { value: "0" } });
+      fireEvent.change(select, { target: { value: "scoreboard-0" } });
 
       const button = screen.getByText("Birta skjá");
       fireEvent.click(button);
 
       expect(mockSetListenPrefix).toHaveBeenCalledWith("vikinni");
+    });
+
+    it("offers and selects one perimeter target for a web venue", () => {
+      const mockSetListenPrefix = vi.fn();
+      const mockSetDisplayTarget = vi.fn();
+      setupState1();
+      mockedUseLocalState.mockReturnValue({
+        ...mockedUseLocalState(),
+        setListenPrefix: mockSetListenPrefix,
+        setDisplayTarget: mockSetDisplayTarget,
+      });
+      mockedUseListeners.mockReturnValue({
+        screens: [
+          {
+            label: "Víkin",
+            screen: { name: "Main", style: {}, key: "main" },
+            key: "vikinni",
+            perimeterDisplay: secondStadiumWebConfiguration,
+          },
+          {
+            label: "Víkin",
+            screen: { name: "Secondary", style: {}, key: "secondary" },
+            key: "vikinni",
+            perimeterDisplay: secondStadiumWebConfiguration,
+          },
+        ],
+        available: [],
+      });
+      render(<Controller />);
+
+      expect(
+        screen.getAllByRole("option", { name: "Víkin Perimeter" }),
+      ).toHaveLength(1);
+      fireEvent.change(screen.getByRole("combobox"), {
+        target: { value: "perimeter-vikinni" },
+      });
+      fireEvent.click(screen.getByText("Birta skjá"));
+
+      expect(mockSetListenPrefix).toHaveBeenCalledWith("vikinni");
+      expect(mockSetDisplayTarget).toHaveBeenCalledWith({ kind: "perimeter" });
     });
 
     it("disables Birta skjá button when no screen is selected", () => {
@@ -363,6 +406,28 @@ describe("Controller", () => {
         screen.getByText("Víkingur Reykjavík Norðurskjár / Suðurskjár"),
       ).toBeInTheDocument();
       expect(screen.getByText("Hásteinsvöllur Skjár 1")).toBeInTheDocument();
+    });
+
+    it("opens a dedicated perimeter controller for a web venue", () => {
+      const setDisplayTarget = vi.fn();
+      const { setListenPrefix } = setupScreenSelector({ setDisplayTarget });
+      mockedUseListeners.mockReturnValue({
+        screens: [
+          {
+            label: "Víkingur Reykjavík",
+            screen: { name: "Norðurskjár", style: {}, key: "vikinni" },
+            key: "vikinni",
+            perimeterDisplay: secondStadiumWebConfiguration,
+          },
+        ],
+        available: ["vikinni"],
+      } as unknown as ReturnType<typeof useListeners>);
+      render(<Controller />);
+
+      fireEvent.click(screen.getByText("Víkingur Reykjavík Perimeter"));
+
+      expect(setListenPrefix).toHaveBeenCalledWith("vikinni");
+      expect(setDisplayTarget).toHaveBeenCalledWith({ kind: "perimeter" });
     });
 
     it("clicking location button calls setListenPrefix with location key", () => {
@@ -476,13 +541,13 @@ describe("Controller", () => {
       expect(screen.getByRole("dialog")).toBeInTheDocument();
     });
 
-    it("renders PerimeterControl inside the settings modal", () => {
+    it("does not render PerimeterControl inside the settings modal", () => {
       setupState3();
       render(<Controller />);
 
       fireEvent.click(screen.getByRole("button", { name: "Stillingar" }));
 
-      expect(screen.getByTestId("perimeter-control")).toBeInTheDocument();
+      expect(screen.queryByTestId("perimeter-control")).toBeNull();
     });
 
     it("switches to Myndefni tab locally", () => {

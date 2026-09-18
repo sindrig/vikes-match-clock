@@ -267,6 +267,42 @@ retained).
 
 ### Perimeter Control
 
+#### Web Perimeter Display
+
+The local display target is persisted separately from Firebase in
+`LocalStateContext`: scoreboard targets retain their selected screen key,
+while the perimeter target is represented as `{ kind: "perimeter" }`. The
+public display selector offers one Perimeter target for venues whose published
+mapping uses `renderer: "web"`. Selecting it routes to `PerimeterDisplay`,
+which is read-only and does not write match or perimeter state. The
+authenticated selector offers a separate Perimeter entry for every venue with
+a published perimeter mapping; it routes to the standalone perimeter manager,
+not the scoreboard controller. The runtime `perimeter.enabled` controller flag
+does not expose a browser target without a valid web mapping.
+
+`PerimeterDisplay` uses `PerimeterWebGLRenderer` and `PerimeterRuntime` for
+browser playback. Published geometry is validated before activation; media is
+resolved only from the active Firebase Storage bucket and must include an
+immutable Storage `generation`. Legacy ad-layout records remain parseable for
+admin migration but are rejected by web playback until generations are
+backfilled. `PersistentMediaCache` keys entries by bucket, object path, and
+generation, replaces stale generations atomically, and reports quota or
+persistence failures without imposing an arbitrary playlist-size limit.
+Unauthenticated displays subscribe only to the public desired-state paths;
+daemon-owned `perimeter/{location}` telemetry subscriptions are started only
+for authenticated controllers so public screens do not generate permission
+errors.
+Firebase Storage rules permit anonymous reads only below a venue's
+`perimeter/` and `perimeter-overlays/` prefixes; writes and unrelated objects
+remain authenticated-only.
+
+Base ads use a monotonic cue timeline and complete-revision preparation before
+swapping pair slots. Overlays use the same two-target mapping, replace the
+active command only after preparation, and render above the base channel.
+Power-off clears the WebGL framebuffer to black. The renderer and runtime must
+remain read-only; Firebase continues to be the source of truth for desired
+layout, overlay, and power state.
+
 The perimeter LED screens at the Víkin stadium are driven by a dedicated
 Resolume Arena composition. Control flows through the **fourth** Firebase
 state subtree, `states/${listenPrefix}/perimeter`:
@@ -297,19 +333,17 @@ state subtree, `states/${listenPrefix}/perimeter`:
   `FirebaseStateContext.tsx` subscribes to it independently and exposes it as
   `preview` through `usePerimeter()`. It is deliberately **not** part of app
   readiness: absent metadata must never block the controller.
-- `PerimeterControl.tsx` renders a `Jaðarskjár` settings row (matching the
-  other settings trigger rows) and self-hides when `perimeter.enabled !== true`.
-  It is mounted inside the `Stillingar` dialog in `Controller.tsx`. There are
-  **no manual on/off controls** — the perimeter turns on/off automatically on
-  view transitions (see below). Clicking the row opens an editable **ad layout
-  manager** modal for creating, reordering, and deleting ad columns across
-  daemon-published lanes, with file upload and Storage browsing (see
-  **Perimeter Ad Layout** below). The old composition preview snapshot is
-  preserved for diagnostic use. Because rsuite renders the dialog in a portal,
-  its styles are scoped to `.perimeter-preview-modal`, rather than
-  `.controller`. The dialog handles loading, "no preview yet", error, daemon
-  phase, revision comparison, empty-lanes, and empty-columns states; styles
-  live in `PerimeterControl.css`.
+- `PerimeterControl.tsx` is rendered as a standalone management page after the
+  operator selects a venue's Perimeter entry. It self-hides when
+  `perimeter.enabled !== true` and is not mounted in the scoreboard controller's
+  `Stillingar` dialog. The page provides explicit on/off controls and an
+  editable **ad layout manager** for creating, reordering, and deleting ad
+  columns with file upload and Storage browsing (see **Perimeter Ad Layout**
+  below). Web venues derive their upload lanes and labels from the published
+  mapping's `compatibilityKeys.base` and `logicalScreens`; Resolume venues use
+  daemon-published lanes. Víkin-specific 48/40 overlay pairs are therefore not
+  used by Virkið's web ad uploader. The old composition preview snapshot is
+  preserved for Resolume diagnostics. Styles live in `PerimeterControl.css`.
 - `FirebaseStateContext.tsx` **auto-toggles the perimeter on view transitions**:
   entering the match view (`controller.view` `idle` → `match`) writes
   `state: "on"`, and leaving any view for `idle` writes `state: "off"`. Both
@@ -1644,6 +1678,40 @@ This app requires testing scenarios with **two independent browser sessions** (e
 For testing Firebase sync between controller and display (e.g., PlaybackBar stop clearing on remote), you'll need to either test manually or write Playwright tests that can manage multiple browser contexts.
 
 ## Related Systems
+
+### Web Perimeter Rollout Runbook
+
+The browser perimeter target is a local display identity, persisted as
+`clock_displayTarget: { "kind": "perimeter" }` alongside
+`clock_listenPrefix`. Firebase remains authoritative for the desired perimeter
+state, base layout, overlay command, and mapping discovery; the anonymous
+renderer never writes those paths. `RefreshHandler` reloads either display
+kind when `controller.refreshToken` changes, and disconnect clears both local
+values.
+
+Web playback requires a published `locations/{location}/perimeterDisplay` with
+`renderer: "web"`, validated geometry, and immutable Storage `generation`
+metadata on every referenced base or overlay object. The renderer downloads a
+complete base revision into persistent Cache Storage before playback, validates
+native dimensions and pair completeness, and retains the previous complete
+revision if a replacement or quota check fails. Images and videos must decode
+at their configured logical-screen dimensions; video rate fitting is best
+effort and unsupported rates use natural playback with loop/cut behavior.
+
+Administrators measure a packed framebuffer and logical strips, then edit the
+mapping under `Stjórnborð` → `Staðsetningar` → the venue's `Perimeter mapping`
+section. The editor keeps changes in a local draft, can show a calibration
+preview, validates exact source coverage, and publishes a new revision as one
+complete Firebase document. See
+`perimeter-control/WEB_MAPPING_MEASUREMENT.md` and
+`perimeter-control/WEB_RENDERER_QUALIFICATION.md`. Keep Víkin's configuration
+at `renderer: "resolume"`; a second venue may use `web` independently.
+
+Public Storage reads are limited to `{location}/perimeter/` and
+`{location}/perimeter-overlays/`; anonymous writes and unrelated reads remain
+denied. To roll back, remove or change the venue's web mapping so the selector
+stops offering Perimeter, then reconnect its prior playback path. Do not delete
+the prior cached revision until the replacement has been qualified.
 
 - **`clock-api/`**: Python Lambda API for match data and weather
 

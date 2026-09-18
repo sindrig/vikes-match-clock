@@ -17,6 +17,7 @@ import {
   parsePerimeterBrightnessStatus,
   parsePerimeterOverlayGeometry,
   parseGoalScorerPreparationStatus,
+  parsePerimeterDisplay,
 } from "./firebaseParsers";
 import { Sports, DEFAULT_HALFSTOPS, DEFAULT_THEME } from "../constants";
 import type {
@@ -2391,6 +2392,112 @@ describe("firebaseParsers", () => {
         }),
       ).toBeNull();
     });
+  });
+});
+
+describe("parsePerimeterDisplay", () => {
+  const capturedVikinConfiguration = {
+    version: 1,
+    revision: "vikin-capture-1",
+    renderer: "resolume",
+    framebuffer: { width: 8448, height: 192, background: "black" },
+    logicalScreens: {
+      "screen-48": {
+        id: "screen-48",
+        name: "48 skjáir",
+        width: 4608,
+        height: 192,
+      },
+      "screen-40": {
+        id: "screen-40",
+        name: "40 skjáir",
+        width: 3840,
+        height: 192,
+      },
+    },
+    compatibilityKeys: {
+      base: { "1": "screen-48", "3": "screen-40" },
+      overlay: { "2": "screen-48", "4": "screen-40" },
+    },
+    regions: [
+      {
+        id: "screen-48-output",
+        logicalScreenId: "screen-48",
+        source: { x: 0, y: 0, width: 4608, height: 192 },
+        destination: { x: 0, y: 0, width: 4608, height: 192 },
+        transform: { rotation: 0, flipX: false, flipY: false, zIndex: 0 },
+      },
+      {
+        id: "screen-40-output",
+        logicalScreenId: "screen-40",
+        source: { x: 0, y: 0, width: 3840, height: 192 },
+        destination: { x: 4608, y: 0, width: 3840, height: 192 },
+        transform: { rotation: 0, flipX: false, flipY: false, zIndex: 1 },
+      },
+    ],
+    playback: { cueDurationMs: 20_000, videoPolicy: "fit-to-cue" },
+  };
+
+  it("accepts the captured Vikin configuration", () => {
+    expect(parsePerimeterDisplay(capturedVikinConfiguration)).toEqual({
+      ...capturedVikinConfiguration,
+      regions: [
+        {
+          ...capturedVikinConfiguration.regions[0],
+          transform: {
+            rotation: 0,
+            flipX: false,
+            flipY: false,
+            allowScaling: false,
+            allowClipping: false,
+            allowSourceOverlap: false,
+            allowDestinationOverlap: false,
+            zIndex: 0,
+          },
+        },
+        {
+          ...capturedVikinConfiguration.regions[1],
+          transform: {
+            rotation: 0,
+            flipX: false,
+            flipY: false,
+            allowScaling: false,
+            allowClipping: false,
+            allowSourceOverlap: false,
+            allowDestinationOverlap: false,
+            zIndex: 1,
+          },
+        },
+      ],
+    });
+  });
+
+  it.each([
+    ["missing revision", { revision: "" }],
+    ["unknown renderer", { renderer: "canvas" }],
+    ["missing framebuffer", { framebuffer: null }],
+    ["missing source coverage", { regions: [] }],
+  ])("rejects %s", (_label, override) => {
+    expect(
+      parsePerimeterDisplay({ ...capturedVikinConfiguration, ...override }),
+    ).toBeUndefined();
+  });
+
+  it("preserves optional perimeter config on parsed locations", () => {
+    const result = parseLocations({
+      vikuti: {
+        label: "Víkin",
+        screens: [
+          {
+            key: "outside",
+            name: "Úti",
+            style: { width: 1920, height: 1080 },
+          },
+        ],
+        perimeterDisplay: capturedVikinConfiguration,
+      },
+    });
+    expect(result?.screens[0]?.perimeterDisplay?.renderer).toBe("resolume");
   });
 });
 

@@ -18,6 +18,7 @@ npm-debug.log*
 
 /venv/
 /.direnv/
+/.secrets/
 
 /api/skyrsla/suds/
 
