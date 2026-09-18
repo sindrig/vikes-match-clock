@@ -46,7 +46,7 @@ export class PersistentMediaCache {
   constructor(options: PersistentMediaCacheOptions = {}) {
     this.cacheStorage = options.cacheStorage ?? globalThis.caches;
     this.cacheName = options.cacheName ?? "perimeter-media-v1";
-    this.fetchImpl = options.fetchImpl ?? fetch;
+    this.fetchImpl = options.fetchImpl ?? globalThis.fetch.bind(globalThis);
   }
 
   async getOrDownload(
