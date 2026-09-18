@@ -287,9 +287,6 @@ const Controller = () => {
                 .join(" / ");
               const buttonLabel = `${label} ${screenNames}`;
 
-              const supportsWebPerimeter =
-                first.perimeterDisplay?.renderer === "web";
-
               return (
                 <div key={locationKey} className="screen-selector-location">
                   <ScreenSelectorButton
@@ -302,15 +299,6 @@ const Controller = () => {
                       })
                     }
                   />
-                  {supportsWebPerimeter && (
-                    <ScreenSelectorButton
-                      locationKey={`${locationKey}-perimeter`}
-                      label={`${label} Perimeter`}
-                      onClick={() =>
-                        selectDisplayTarget(locationKey, { kind: "perimeter" })
-                      }
-                    />
-                  )}
                 </div>
               );
             })}

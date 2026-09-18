@@ -406,6 +406,24 @@ describe("Controller", () => {
       expect(screen.getByText("Hásteinsvöllur Skjár 1")).toBeInTheDocument();
     });
 
+    it("does not offer display targets in the controller selector", () => {
+      setupScreenSelector();
+      mockedUseListeners.mockReturnValue({
+        screens: [
+          {
+            label: "Víkingur Reykjavík",
+            screen: { name: "Norðurskjár", style: {}, key: "vikinni" },
+            key: "vikinni",
+            perimeterDisplay: secondStadiumWebConfiguration,
+          },
+        ],
+        available: ["vikinni"],
+      } as unknown as ReturnType<typeof useListeners>);
+      render(<Controller />);
+
+      expect(screen.queryByText("Víkingur Reykjavík Perimeter")).toBeNull();
+    });
+
     it("clicking location button calls setListenPrefix with location key", () => {
       const { setListenPrefix } = setupScreenSelector();
       render(<Controller />);
