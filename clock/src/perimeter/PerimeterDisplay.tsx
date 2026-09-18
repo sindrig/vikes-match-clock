@@ -13,6 +13,7 @@ export default function PerimeterDisplay() {
   const { perimeter, adLayout, overlay } = usePerimeter();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const runtimeRef = useRef<PerimeterRuntime | null>(null);
+  const rendererRef = useRef<PerimeterWebGLRenderer | null>(null);
   const [rendererError, setRendererError] = useState<string | null>(null);
   const configuration = useMemo(
     () =>
@@ -26,6 +27,18 @@ export default function PerimeterDisplay() {
 
   useEffect(() => {
     if (!configuration || !canvasRef.current) return undefined;
+    const existingRuntime = runtimeRef.current;
+    if (existingRuntime && rendererRef.current) {
+      if (!existingRuntime.replaceConfiguration(configuration)) {
+        queueMicrotask(() =>
+          setRendererError("Published perimeter mapping is invalid."),
+        );
+      } else {
+        queueMicrotask(() => setRendererError(null));
+      }
+      return undefined;
+    }
+
     let runtime: PerimeterRuntime | null = null;
     try {
       const renderer = new PerimeterWebGLRenderer(
@@ -38,6 +51,7 @@ export default function PerimeterDisplay() {
           storageHelpers.getDownloadURL(objectPath),
       });
       runtime = new PerimeterRuntime(configuration, { renderer, loader });
+      rendererRef.current = renderer;
       runtimeRef.current = runtime;
       runtime.render();
       queueMicrotask(() => {
@@ -50,11 +64,17 @@ export default function PerimeterDisplay() {
           : "WebGL renderer could not start.";
       queueMicrotask(() => setRendererError(message));
     }
-    return () => {
-      if (runtimeRef.current === runtime) runtimeRef.current = null;
-      runtime?.destroy();
-    };
+    return undefined;
   }, [configuration]);
+
+  useEffect(
+    () => () => {
+      runtimeRef.current?.destroy();
+      runtimeRef.current = null;
+      rendererRef.current = null;
+    },
+    [listenPrefix],
+  );
 
   useEffect(() => {
     const runtime = runtimeRef.current;

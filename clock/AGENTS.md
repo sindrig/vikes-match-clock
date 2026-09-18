@@ -1672,6 +1672,38 @@ For testing Firebase sync between controller and display (e.g., PlaybackBar stop
 
 ## Related Systems
 
+### Web Perimeter Rollout Runbook
+
+The browser perimeter target is a local display identity, persisted as
+`clock_displayTarget: { "kind": "perimeter" }` alongside
+`clock_listenPrefix`. Firebase remains authoritative for the desired perimeter
+state, base layout, overlay command, and mapping discovery; the anonymous
+renderer never writes those paths. `RefreshHandler` reloads either display
+kind when `controller.refreshToken` changes, and disconnect clears both local
+values.
+
+Web playback requires a published `locations/{location}/perimeterDisplay` with
+`renderer: "web"`, validated geometry, and immutable Storage `generation`
+metadata on every referenced base or overlay object. The renderer downloads a
+complete base revision into persistent Cache Storage before playback, validates
+native dimensions and pair completeness, and retains the previous complete
+revision if a replacement or quota check fails. Images and videos must decode
+at their configured logical-screen dimensions; video rate fitting is best
+effort and unsupported rates use natural playback with loop/cut behavior.
+
+Administrators measure a packed framebuffer and logical strips, edit a local
+mapping draft, run calibration preview, validate exact source coverage, and
+publish a new revision as one complete Firebase document. See
+`perimeter-control/WEB_MAPPING_MEASUREMENT.md` and
+`perimeter-control/WEB_RENDERER_QUALIFICATION.md`. Keep Víkin's configuration
+at `renderer: "resolume"`; a second venue may use `web` independently.
+
+Public Storage reads are limited to `{location}/perimeter/` and
+`{location}/perimeter-overlays/`; anonymous writes and unrelated reads remain
+denied. To roll back, remove or change the venue's web mapping so the selector
+stops offering Perimeter, then reconnect its prior playback path. Do not delete
+the prior cached revision until the replacement has been qualified.
+
 - **`clock-api/`**: Python Lambda API for match data and weather
 
 ## Team ID System & Match Data Pipeline

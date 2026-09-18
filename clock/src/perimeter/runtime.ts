@@ -10,13 +10,14 @@ import {
   validateWebMediaIdentity,
 } from "./media";
 import { PerimeterMediaLoader, type LoadedPerimeterMedia } from "./mediaLoader";
+import { validatePerimeterMapping } from "./perimeterMapping";
 import {
   OverlayPlayback,
   PairSlots,
   PerimeterPower,
   pairedPlaybackPlan,
 } from "./playback";
-import { createBaseTimeline } from "./timeline";
+import { createBaseTimeline, nextCueBoundary } from "./timeline";
 import type { PerimeterRenderSources } from "./webglRenderer";
 
 type PreparedColumn = {
@@ -37,7 +38,10 @@ function normalizeOverlayColumn(
 }
 
 export interface PerimeterRuntimeOptions {
-  renderer: { render: (sources: PerimeterRenderSources) => void };
+  renderer: {
+    render: (sources: PerimeterRenderSources) => void;
+    replaceConfiguration?: (configuration: PerimeterDisplayConfig) => boolean;
+  };
   loader: Pick<PerimeterMediaLoader, "loadPair">;
   now?: () => number;
 }
@@ -51,14 +55,24 @@ export class PerimeterRuntime {
   private currentBaseCue: number | null = null;
   private baseRequest = 0;
   private overlayRequest = 0;
+  private pendingBaseActivation: number | null = null;
 
   constructor(
-    private readonly configuration: PerimeterDisplayConfig,
+    private configuration: PerimeterDisplayConfig,
     private readonly options: PerimeterRuntimeOptions,
   ) {
     const now = options.now ?? (() => performance.now());
     this.power = new PerimeterPower(now);
     this.timeline = createBaseTimeline(configuration.playback.cueDurationMs, 0);
+  }
+
+  replaceConfiguration(configuration: PerimeterDisplayConfig): boolean {
+    if (!validatePerimeterMapping(configuration).valid) return false;
+    if (!this.options.renderer.replaceConfiguration?.(configuration))
+      return false;
+    this.configuration = configuration;
+    this.timeline.cueDurationMs = configuration.playback.cueDurationMs;
+    return true;
   }
 
   async prepareBase(
@@ -104,8 +118,21 @@ export class PerimeterRuntime {
   }
 
   activatePreparedBase(now: number): void {
+    if (this.baseColumns.length > 0 && this.timeline.origin !== null) {
+      this.pendingBaseActivation = nextCueBoundary(
+        now,
+        this.timeline.origin,
+        this.configuration.playback.cueDurationMs,
+      );
+      return;
+    }
+    this.commitPreparedBase(now);
+  }
+
+  private commitPreparedBase(now: number): void {
     const prepared = this.baseSlots.activate();
     if (!prepared) return;
+    this.pendingBaseActivation = null;
     this.releaseColumns(this.baseColumns);
     this.baseColumns = prepared;
     this.timeline.cueCount = prepared.length;
@@ -177,6 +204,12 @@ export class PerimeterRuntime {
   }
 
   render(now = performance.now()): void {
+    if (
+      this.pendingBaseActivation !== null &&
+      now >= this.pendingBaseActivation
+    ) {
+      this.commitPreparedBase(now);
+    }
     if (!this.power.isPowered) {
       this.options.renderer.render({ base: {} });
       return;

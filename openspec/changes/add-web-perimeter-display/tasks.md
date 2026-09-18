@@ -7,11 +7,11 @@
 
 ## 2. Perimeter Mapping Editor
 
-- [ ] 2.1 Add admin mapping-editor draft state and numeric controls for framebuffer, logical screens, regions, source/destination rectangles, rotation, flips, scaling, clipping, overlap, and z-order; verify component tests show edits remain local before Publish.
-- [ ] 2.2 Add linked source-strip and packed-output visualizations with selection, drag, and resize behavior; verify component tests keep visual and numeric edits synchronized.
+- [x] 2.1 Add admin mapping-editor draft state and numeric controls for framebuffer, logical screens, regions, source/destination rectangles, rotation, flips, scaling, clipping, overlap, and z-order; verify component tests show edits remain local before Publish.
+- [x] 2.2 Add linked source-strip and packed-output visualizations with selection, drag, and resize behavior; verify component tests keep visual and numeric edits synchronized.
 - [x] 2.3 Add identity-mapping and horizontal-split templates plus calibration-pattern preview; verify unit/component tests assert the generated region coordinates and identifiable calibration labels.
 - [x] 2.4 Add validation feedback and explicit whole-document Publish with a fresh revision ID; verify invalid drafts cannot write and a valid draft performs one complete Firebase write.
-- [ ] 2.5 Add the captured Víkin configuration as a validated `resolume` mapping fixture and document the process for measuring/publishing the second stadium's `web` mapping; verify both fixtures pass the shared validator.
+- [x] 2.5 Add the captured Víkin configuration as a validated `resolume` mapping fixture and document the process for measuring/publishing the second stadium's `web` mapping; verify both fixtures pass the shared validator.
 
 ## 3. Display Selection and Lifecycle
 
@@ -26,26 +26,26 @@
 - [x] 4.2 Add a metadata backfill/import operation for existing selected perimeter objects before a venue can be enabled for web rendering; verify it resolves generations, preserves layout order and IDs, and refuses activation when metadata is unavailable.
 - [x] 4.3 Implement approved `gs://` reference resolution and a persistent Cache Storage layer keyed by bucket, object path, and generation; verify unit tests cover cache hit, cache miss, generation replacement, corruption removal, and failed download behavior.
 - [x] 4.4 Add storage persistence and quota checks without a hard playlist-size limit, retaining the last complete revision when capacity is insufficient; verify mocked storage tests cover granted, denied, and insufficient-quota outcomes.
-- [ ] 4.5 Implement complete base-revision download and media metadata validation for image, video, and mixed pairs; verify tests prove playback readiness is withheld for partial downloads, decode failures, wrong dimensions, or incomplete pairs.
+- [x] 4.5 Implement complete base-revision download and media metadata validation for image, video, and mixed pairs; verify tests prove playback readiness is withheld for partial downloads, decode failures, wrong dimensions, or incomplete pairs.
 
 ## 5. Exact Output Renderer
 
-- [ ] 5.1 Build the single-surface WebGL renderer with exact backing framebuffer dimensions, black clearing, logical textures, source UVs, destination vertices, transforms, clipping, and z-order; verify pixel tests cover identity mapping, Víkin's three captured regions, black remainder, and the permitted negative two-pixel edge.
-- [ ] 5.2 Add image bitmap and video-frame texture sources with cleanup on revision replacement; verify renderer tests cover image/image, video/video, and mixed pairs without leaking obsolete resources.
-- [ ] 5.3 Add runtime mapping revision validation and atomic surface replacement while retaining the last valid mapping on failure; verify tests show malformed updates never replace valid output.
+- [x] 5.1 Build the single-surface WebGL renderer with exact backing framebuffer dimensions, black clearing, logical textures, source UVs, destination vertices, transforms, clipping, and z-order; verify pixel tests cover identity mapping, Víkin's three captured regions, black remainder, and the permitted negative two-pixel edge.
+- [x] 5.2 Add image bitmap and video-frame texture sources with cleanup on revision replacement; verify renderer tests cover image/image, video/video, and mixed pairs without leaking obsolete resources.
+- [x] 5.3 Add runtime mapping revision validation and atomic surface replacement while retaining the last valid mapping on failure; verify tests show malformed updates never replace valid output.
 
 ## 6. Base Playlist Playback
 
 - [x] 6.1 Implement the monotonic 20-second base timeline with ordered looping and elapsed-time cue derivation; verify fake-clock tests cover normal boundaries, final-to-first looping, delayed callbacks, and empty playlists.
 - [x] 6.2 Implement two decoded pair slots so the next complete pair is frame-ready before one-frame atomic visibility changes; verify playback tests assert no blank or half-pair frame appears at boundaries.
 - [x] 6.3 Implement shared paired-video start/seek behavior and supported native playback-rate fitting, with natural-rate loop/cut fallback; verify media tests cover short, exact, long, unsupported-rate, and mixed-media cues.
-- [ ] 6.4 Stage new base revisions in isolation and activate a complete revision from cue zero at a cue boundary; verify tests show the prior revision continues through download/validation failure and successful replacement is atomic.
+- [x] 6.4 Stage new base revisions in isolation and activate a complete revision from cue zero at a cue boundary; verify tests show the prior revision continues through download/validation failure and successful replacement is atomic.
 
 ## 7. Overlay and Power Channels
 
-- [ ] 7.1 Normalize existing numeric overlay keys to logical screens and implement an independent WebGL overlay channel above base content; verify tests prove base timing continues while the overlay is visible.
-- [ ] 7.2 Implement complete-pair overlay preparation, double-buffered replacement, atomic clear, declared intermediate-column durations, and final-column looping; verify fake-clock tests cover set, replace, clear, multi-column progression, and failed replacement.
-- [ ] 7.3 Implement perimeter power behavior that preloads while off, renders black while off, and starts base cue zero on each off-to-on transition; verify state-transition tests cover startup-off, startup-on, repeated toggles, and overlay state while powered off.
+- [x] 7.1 Normalize existing numeric overlay keys to logical screens and implement an independent WebGL overlay channel above base content; verify tests prove base timing continues while the overlay is visible.
+- [x] 7.2 Implement complete-pair overlay preparation, double-buffered replacement, atomic clear, declared intermediate-column durations, and final-column looping; verify fake-clock tests cover set, replace, clear, multi-column progression, and failed replacement.
+- [x] 7.3 Implement perimeter power behavior that preloads while off, renders black while off, and starts base cue zero on each off-to-on transition; verify state-transition tests cover startup-off, startup-on, repeated toggles, and overlay state while powered off.
 
 ## 8. Security, Compatibility, and Operational Verification
 
@@ -53,5 +53,5 @@
 - [x] 8.2 Adapt the perimeter ad-layout controller to derive lanes from published logical screens for web venues while preserving daemon-applied layout behavior for Resolume venues; verify controller tests cover both modes without fabricating applied status.
 - [ ] 8.3 Add end-to-end coverage for public web-perimeter selection, complete startup preload, 20-second cycling, power toggles, overlay layering, playlist replacement, disconnect, and remote restart recovery; verify the Playwright suite passes with controlled Firebase and media fixtures.
 - [ ] 8.4 Test the production Windows/Chromium target with calibration patterns, all intended codecs, a near-2-GB cache, offline restart, repeated remote restarts, and long-running paired-video playback; record framebuffer accuracy, texture limit, storage persistence, drift, and decoder results in deployment documentation.
-- [ ] 8.5 Update `clock/AGENTS.md` and operator documentation with the display-target model, Firebase ownership, cache guarantees, accepted media constraints, mapping publication, web/Resolume coexistence, and rollback procedure; verify documented paths and commands match the implemented system.
+- [x] 8.5 Update `clock/AGENTS.md` and operator documentation with the display-target model, Firebase ownership, cache guarantees, accepted media constraints, mapping publication, web/Resolume coexistence, and rollback procedure; verify documented paths and commands match the implemented system.
 - [ ] 8.6 Run `pnpm format`, `pnpm lint`, `pnpm test`, the relevant Firebase emulator rules tests, `pnpm build`, and perimeter Playwright tests from `clock/`; verify all checks pass before enabling the second stadium's `web` configuration.

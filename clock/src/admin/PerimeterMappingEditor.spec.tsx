@@ -50,6 +50,24 @@ describe("PerimeterMappingEditor", () => {
     expect(screen.getByLabelText("destination x")).toHaveValue("2");
   });
 
+  it("exposes draft framebuffer and transform controls without publishing", () => {
+    const onPublish = vi.fn<(value: typeof configuration) => void>();
+    render(
+      <PerimeterMappingEditor
+        configuration={configuration}
+        onPublish={onPublish}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("framebuffer width"), {
+      target: { value: "10" },
+    });
+    fireEvent.click(screen.getByText("Flip X"));
+
+    expect(screen.getByLabelText("framebuffer width")).toHaveValue("10");
+    expect(onPublish).not.toHaveBeenCalled();
+  });
+
   it("publishes a complete valid document with a fresh revision", () => {
     const onPublish = vi.fn<(value: typeof configuration) => void>();
     render(

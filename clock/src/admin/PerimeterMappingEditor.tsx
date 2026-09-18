@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Button, InputNumber, Message } from "rsuite";
+import { useState, type PointerEvent } from "react";
+import { Button, Checkbox, InputNumber, Message } from "rsuite";
 import type {
   PerimeterDisplayConfig,
   PerimeterRect,
@@ -11,6 +11,7 @@ import {
   applyIdentityTemplate,
   calibrationLabels,
 } from "../perimeter/templates";
+import "./PerimeterMappingEditor.css";
 
 interface Props {
   configuration: PerimeterDisplayConfig;
@@ -23,6 +24,10 @@ function updateRect(
   value: number | null,
 ): PerimeterRect {
   return { ...rect, [key]: value ?? 0 };
+}
+
+function numericValue(value: number | string | null): number {
+  return value === null ? 0 : typeof value === "number" ? value : Number(value);
 }
 
 export default function PerimeterMappingEditor({
@@ -48,6 +53,103 @@ export default function PerimeterMappingEditor({
       ),
     }));
     setError(null);
+  };
+
+  const updateScreen = (
+    screenId: string,
+    key: "width" | "height",
+    value: number | string | null,
+  ) => {
+    setDraft((current) => {
+      const screen = current.logicalScreens[screenId];
+      if (!screen) return current;
+      return {
+        ...current,
+        logicalScreens: {
+          ...current.logicalScreens,
+          [screenId]: {
+            ...screen,
+            [key]: numericValue(value),
+          },
+        },
+      };
+    });
+    setError(null);
+  };
+
+  const updateFramebuffer = (
+    key: "width" | "height",
+    value: number | string | null,
+  ) => {
+    setDraft((current) => ({
+      ...current,
+      framebuffer: { ...current.framebuffer, [key]: numericValue(value) },
+    }));
+    setError(null);
+  };
+
+  const updateRegionGeometry = (
+    region: PerimeterRegion,
+    side: "source" | "destination",
+    deltaX: number,
+    deltaY: number,
+    resize: boolean,
+  ) => {
+    const rect = region[side];
+    updateRegion({
+      ...region,
+      [side]: {
+        ...rect,
+        ...(resize
+          ? {
+              width: Math.max(1, Math.round(rect.width + deltaX)),
+              height: Math.max(1, Math.round(rect.height + deltaY)),
+            }
+          : {
+              x: Math.round(rect.x + deltaX),
+              y: Math.round(rect.y + deltaY),
+            }),
+      },
+    });
+  };
+
+  const startPointerEdit = (
+    event: PointerEvent<HTMLButtonElement>,
+    region: PerimeterRegion,
+    side: "source" | "destination",
+    resize: boolean,
+  ) => {
+    event.currentTarget.setPointerCapture(event.pointerId);
+    const bounds =
+      event.currentTarget.parentElement?.parentElement?.getBoundingClientRect();
+    if (!bounds) return;
+    const logicalWidth =
+      side === "destination"
+        ? draft.framebuffer.width
+        : (draft.logicalScreens[region.logicalScreenId]?.width ?? 1);
+    const logicalHeight =
+      side === "destination"
+        ? draft.framebuffer.height
+        : (draft.logicalScreens[region.logicalScreenId]?.height ?? 1);
+    const scaleX = logicalWidth / Math.max(bounds.width, 1);
+    const scaleY = logicalHeight / Math.max(bounds.height, 1);
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const onMove = (moveEvent: globalThis.PointerEvent) => {
+      updateRegionGeometry(
+        region,
+        side,
+        (moveEvent.clientX - startX) * scaleX,
+        (moveEvent.clientY - startY) * scaleY,
+        resize,
+      );
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp, { once: true });
   };
 
   const applyTemplate = (next: PerimeterDisplayConfig) => {
@@ -85,6 +187,32 @@ export default function PerimeterMappingEditor({
           {error}
         </Message>
       )}
+      <div className="perimeter-mapping-global-controls">
+        <strong>Framebuffer</strong>
+        {(["width", "height"] as const).map((key) => (
+          <InputNumber
+            key={key}
+            size="sm"
+            value={draft.framebuffer[key]}
+            aria-label={`framebuffer ${key}`}
+            onChange={(value) => updateFramebuffer(key, value)}
+          />
+        ))}
+        {Object.values(draft.logicalScreens).map((screen) => (
+          <div key={screen.id} data-testid={`logical-screen-${screen.id}`}>
+            <strong>{screen.name}</strong>
+            {(["width", "height"] as const).map((key) => (
+              <InputNumber
+                key={key}
+                size="sm"
+                value={screen[key]}
+                aria-label={`${screen.id} ${key}`}
+                onChange={(value) => updateScreen(screen.id, key, value)}
+              />
+            ))}
+          </div>
+        ))}
+      </div>
       <div className="perimeter-mapping-canvas-row">
         <div
           className="perimeter-mapping-source-view"
@@ -92,16 +220,45 @@ export default function PerimeterMappingEditor({
         >
           <strong>Logical sources</strong>
           {draft.regions.map((region) => (
-            <button
-              type="button"
+            <div
               key={region.id}
-              className={
-                region.id === selectedRegionId ? "selected" : undefined
-              }
-              onClick={() => setSelectedRegionId(region.id)}
+              className="perimeter-mapping-source-region"
+              style={{
+                width: `${
+                  (region.source.width /
+                    (draft.logicalScreens[region.logicalScreenId]?.width ??
+                      1)) *
+                  100
+                }%`,
+                height: `${
+                  (region.source.height /
+                    (draft.logicalScreens[region.logicalScreenId]?.height ??
+                      1)) *
+                  100
+                }%`,
+              }}
             >
-              {region.id}
-            </button>
+              <button
+                type="button"
+                className={
+                  region.id === selectedRegionId ? "selected" : undefined
+                }
+                onClick={() => setSelectedRegionId(region.id)}
+                onPointerDown={(event) =>
+                  startPointerEdit(event, region, "source", false)
+                }
+              >
+                {region.id}
+              </button>
+              <button
+                type="button"
+                aria-label={`Resize ${region.id} source`}
+                className="perimeter-mapping-resize-handle"
+                onPointerDown={(event) =>
+                  startPointerEdit(event, region, "source", true)
+                }
+              />
+            </div>
           ))}
         </div>
         <div
@@ -112,8 +269,7 @@ export default function PerimeterMappingEditor({
           }}
         >
           {draft.regions.map((region) => (
-            <button
-              type="button"
+            <div
               key={region.id}
               className={
                 region.id === selectedRegionId ? "selected" : undefined
@@ -125,10 +281,25 @@ export default function PerimeterMappingEditor({
                 height: `${(region.destination.height / draft.framebuffer.height) * 100}%`,
                 zIndex: region.transform.zIndex,
               }}
-              onClick={() => setSelectedRegionId(region.id)}
             >
-              {calibration ? region.logicalScreenId : region.id}
-            </button>
+              <button
+                type="button"
+                onClick={() => setSelectedRegionId(region.id)}
+                onPointerDown={(event) =>
+                  startPointerEdit(event, region, "destination", false)
+                }
+              >
+                {calibration ? region.logicalScreenId : region.id}
+              </button>
+              <button
+                type="button"
+                aria-label={`Resize ${region.id} destination`}
+                className="perimeter-mapping-resize-handle"
+                onPointerDown={(event) =>
+                  startPointerEdit(event, region, "destination", true)
+                }
+              />
+            </div>
           ))}
         </div>
       </div>
@@ -199,6 +370,54 @@ export default function PerimeterMappingEditor({
               })
             }
           />
+          <div className="perimeter-mapping-transform-controls">
+            <Checkbox
+              checked={selectedRegion.transform.flipX}
+              onChange={(_, checked) =>
+                updateRegion({
+                  ...selectedRegion,
+                  transform: { ...selectedRegion.transform, flipX: checked },
+                })
+              }
+            >
+              Flip X
+            </Checkbox>
+            <Checkbox
+              checked={selectedRegion.transform.flipY}
+              onChange={(_, checked) =>
+                updateRegion({
+                  ...selectedRegion,
+                  transform: { ...selectedRegion.transform, flipY: checked },
+                })
+              }
+            >
+              Flip Y
+            </Checkbox>
+            {(
+              [
+                ["allowScaling", "Allow scaling"],
+                ["allowClipping", "Allow clipping"],
+                ["allowSourceOverlap", "Allow source overlap"],
+                ["allowDestinationOverlap", "Allow destination overlap"],
+              ] as const
+            ).map(([key, label]) => (
+              <Checkbox
+                key={key}
+                checked={selectedRegion.transform[key]}
+                onChange={(_, checked) =>
+                  updateRegion({
+                    ...selectedRegion,
+                    transform: {
+                      ...selectedRegion.transform,
+                      [key]: checked,
+                    },
+                  })
+                }
+              >
+                {label}
+              </Checkbox>
+            ))}
+          </div>
         </div>
       )}
       <div className="perimeter-mapping-templates">
