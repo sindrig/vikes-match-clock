@@ -45,6 +45,7 @@ test("public perimeter target starts, survives refresh, and disconnects", async 
     "108",
   );
 
+  const reloaded = clockPage.waitForEvent("load");
   const refreshContext = await request.newContext();
   try {
     await refreshContext.patch(
@@ -57,6 +58,7 @@ test("public perimeter target starts, survives refresh, and disconnects", async 
   } finally {
     await refreshContext.dispose();
   }
+  await reloaded;
   await expect(clockPage.getByTestId("perimeter-display")).toBeVisible();
 
   await clockPage.getByRole("button", { name: "Aftengja skjá" }).click();
