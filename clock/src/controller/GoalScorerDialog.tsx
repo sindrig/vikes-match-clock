@@ -45,12 +45,13 @@ const GoalScorerDialog = ({
   const { screens } = useListeners();
   const { listenPrefix } = useRemoteSettings();
 
-  // The venue's published renderer selects the overlay path: web venues
-  // compose the scorer in the browser from semantic data, Resolume venues
-  // keep the prepared-PNG workflow, and a missing/invalid mapping leaves
-  // the generic goal overlay unchanged.
+  // The venue's published renderer selects the overlay path: only an
+  // explicit "web" mapping composes the scorer in the browser from semantic
+  // data. Every other venue — including one with no published mapping
+  // (all existing Resolume venues) — keeps the prepared-PNG workflow.
   const renderer = screens.find((entry) => entry.key === listenPrefix)
     ?.perimeterDisplay?.renderer;
+  const isWebVenue = renderer === "web";
 
   const selectPlayer = useCallback(
     (player: Player) => {
@@ -64,17 +65,17 @@ const GoalScorerDialog = ({
       let semanticCommand:
         | ReturnType<typeof buildGoalScorerOverlayCommand>
         | undefined;
-      if (renderer === "web") {
+      if (isWebVenue) {
         // Web venues compose the scorer in the browser from semantic data;
         // generated perimeter media is neither required nor referenced.
         const scorerPlayer = goalScorerPlayerFromSelection(player);
         if (scorerPlayer) {
           semanticCommand = buildGoalScorerOverlayCommand(scorerPlayer);
         }
-      } else if (renderer === "resolume") {
-        // Retain the prepared-file workflow for Resolume venues: only a
-        // ready personalized or crest-fallback result replaces the generic
-        // goal overlay.
+      } else {
+        // Retain the prepared-file workflow for Resolume venues (including
+        // venues without a published mapping): only a ready personalized or
+        // crest-fallback result replaces the generic goal overlay.
         const result =
           player.id !== undefined && player.id !== null
             ? goalScorerPreparationStatus?.players[String(player.id)]
@@ -87,8 +88,6 @@ const GoalScorerDialog = ({
             ? result.files
             : undefined;
       }
-      // A missing or invalid published mapping intentionally leaves the
-      // generic goal overlay unchanged.
 
       void getPlayerAssetObject({
         player,
@@ -118,7 +117,7 @@ const GoalScorerDialog = ({
     [
       teamName,
       listenPrefix,
-      renderer,
+      isWebVenue,
       renderAsset,
       onClose,
       goalGif2,
@@ -131,7 +130,7 @@ const GoalScorerDialog = ({
   // roster-wide generated media: absent preparation status must never mark
   // players unavailable, so web readiness stays unlabeled.
   const readiness: Record<string, GoalScorerPlayerStatus> = {};
-  if (renderer === "resolume") {
+  if (!isWebVenue) {
     for (const [playerId, result] of Object.entries(
       goalScorerPreparationStatus?.players ?? {},
     )) {

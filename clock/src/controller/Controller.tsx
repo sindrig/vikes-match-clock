@@ -47,6 +47,7 @@ import HomeTeamSettingsModal from "./HomeTeamSettingsModal";
 import MediaManager from "./media/MediaManager";
 import RefreshHandler from "./RefreshHandler";
 import AssetController from "./asset/AssetController";
+import PerimeterControl from "./PerimeterControl";
 import AuditHistoryModal from "./audit/AuditHistory";
 import "rsuite/dist/rsuite.min.css";
 import "./Controller.css";
@@ -80,6 +81,7 @@ const Controller = () => {
     setListenPrefix,
     available,
     setScreenKey,
+    displayTarget,
     setDisplayTarget: setDisplayTargetFromContext,
   } = useLocalState();
   const auth = useAuth();
@@ -113,6 +115,28 @@ const Controller = () => {
     } else if (target.kind === "scoreboard") {
       setScreenKey(target.screenKey);
     }
+  };
+
+  // Selecting a controller venue keeps the operator's persisted screen
+  // choice when it still belongs to that venue, and only defaults to the
+  // venue's first screen otherwise. Force-selecting a screen on every venue
+  // change would silently switch the controller viewport (e.g. always the
+  // big indoor screen for multi-screen venues) and discard the prior choice.
+  const selectControllerLocation = (locationKey: string) => {
+    const locationScreens = screens.filter((s) => s.key === locationKey);
+    if (
+      displayTarget?.kind === "scoreboard" &&
+      locationScreens.some((s) => s.screen.key === displayTarget.screenKey)
+    ) {
+      setListenPrefix(locationKey);
+      return;
+    }
+    const first = locationScreens[0];
+    if (!first) return;
+    selectDisplayTarget(locationKey, {
+      kind: "scoreboard",
+      screenKey: first.screen.key,
+    });
   };
 
   // State 1: no listenPrefix, not authenticated — screen selector + login form only
@@ -291,12 +315,7 @@ const Controller = () => {
                   <ScreenSelectorButton
                     locationKey={locationKey}
                     label={buttonLabel}
-                    onClick={() =>
-                      selectDisplayTarget(locationKey, {
-                        kind: "scoreboard",
-                        screenKey: first.screen.key,
-                      })
-                    }
+                    onClick={() => selectControllerLocation(locationKey)}
                   />
                   {first.perimeterDisplay && (
                     <button
@@ -398,6 +417,14 @@ const Controller = () => {
         </Modal.Header>
         <Modal.Body>
           <MatchActionSettings />
+          {/* Venues with a published perimeter mapping manage the perimeter
+          through the standalone perimeter manager (offered on the screen
+          selector); legacy venues without a mapping keep the
+          settings-embedded control so their brightness, ad layout, media
+          pairs, and preparation controls stay reachable. */}
+          {!screens.some(
+            (s) => s.key === listenPrefix && s.perimeterDisplay,
+          ) && <PerimeterControl />}
           <div className="theme-trigger-row">
             <div className="theme-trigger-info">
               <span className="theme-trigger-label">Klukku þema</span>

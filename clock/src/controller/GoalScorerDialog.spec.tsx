@@ -324,15 +324,42 @@ describe("GoalScorerDialog", () => {
     expect(screen.queryByText("Ekki tiltækt")).not.toBeInTheDocument();
   });
 
-  it("leaves the generic overlay unchanged when the venue mapping is missing", async () => {
-    setupContexts({});
+  it("keeps the Resolume prepared-file workflow when the venue mapping is missing", async () => {
+    // Missing mappings default to the legacy Resolume path: a ready
+    // prepared pair still replaces the generic goal overlay.
+    setupContexts({
+      preparationStatus: {
+        jobId: "job-1",
+        phase: "ready",
+        readyCount: 1,
+        fallbackCount: 0,
+        unavailableCount: 0,
+        failedCount: 0,
+        total: 1,
+        updatedAt: 1723392000000,
+        error: null,
+        players: { "10": readyResult },
+      },
+    });
     renderDialog();
     fireEvent.click(screen.getByText("Jón"));
-    await waitFor(() => expect(renderAsset).toHaveBeenCalled());
-    expect(setPerimeterOverlay).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(setPerimeterOverlay).toHaveBeenCalledWith(
+        expect.objectContaining({
+          version: 1,
+          columns: [
+            expect.objectContaining({
+              durationMs: 10000,
+              files: readyResult.files,
+            }),
+          ],
+        }),
+      ),
+    );
+    expect(renderAsset).toHaveBeenCalled();
   });
 
-  it("leaves the generic overlay unchanged for an invalid mapping renderer", async () => {
+  it("keeps the Resolume prepared-file workflow for an unrecognized mapping renderer", async () => {
     setupContexts({ renderer: "resolume" });
     mockedUseListeners.mockReturnValue({
       screens: [
@@ -347,10 +374,38 @@ describe("GoalScorerDialog", () => {
         },
       ],
     } as unknown as ReturnType<typeof useListeners>);
+    // Unrecognized renderers never opt into browser composition, so the
+    // legacy prepared-file path applies: a ready pair still replaces the
+    // generic goal overlay.
+    mockedUsePerimeter.mockReturnValue({
+      goalScorerPreparationStatus: {
+        jobId: "job-1",
+        phase: "ready",
+        readyCount: 1,
+        fallbackCount: 0,
+        unavailableCount: 0,
+        failedCount: 0,
+        total: 1,
+        updatedAt: 1723392000000,
+        error: null,
+        players: { "10": readyResult },
+      },
+      setPerimeterOverlay,
+    } as unknown as ReturnType<typeof usePerimeter>);
     renderDialog();
     fireEvent.click(screen.getByText("Jón"));
-    await waitFor(() => expect(renderAsset).toHaveBeenCalled());
-    expect(setPerimeterOverlay).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(setPerimeterOverlay).toHaveBeenCalledWith(
+        expect.objectContaining({
+          version: 1,
+          columns: [
+            expect.objectContaining({
+              files: readyResult.files,
+            }),
+          ],
+        }),
+      ),
+    );
   });
 
   // -- Shared behavior -------------------------------------------------------

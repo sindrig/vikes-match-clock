@@ -267,6 +267,35 @@ function LocationEditor({
     markDirty();
   };
 
+  // Bootstrap a perimeter mapping draft for a venue that has none, so the
+  // mapping editor can be opened and published through the UI instead of a
+  // hand-written Firebase document. The draft starts from the venue's first
+  // screen as a single logical screen; admins adjust geometry, templates,
+  // and the cue duration in the editor before publishing.
+  const addPerimeterMapping = () => {
+    const first = screens[0];
+    const width = first?.style.width ?? 1024;
+    const height = first?.style.height ?? 256;
+    const screenId = first?.key.trim() || "skjar-1";
+    setPerimeterDisplay({
+      version: 1,
+      revision: crypto.randomUUID(),
+      renderer: "web",
+      framebuffer: { width, height, background: "black" },
+      logicalScreens: {
+        [screenId]: {
+          id: screenId,
+          name: first?.name.trim() || "Skjár",
+          width,
+          height,
+        },
+      },
+      compatibilityKeys: { base: {}, overlay: {} },
+      regions: [],
+      playback: { cueDurationMs: 20000, videoPolicy: "fit-to-cue" },
+    });
+  };
+
   return (
     <Panel
       header={
@@ -359,6 +388,18 @@ function LocationEditor({
             onChange={(updated) => updateScreen(i, updated)}
           />
         ))}
+
+        {!perimeterDisplay && (
+          <div className="loc-perimeter-add">
+            <Button size="sm" appearance="ghost" onClick={addPerimeterMapping}>
+              Nýtt perimeter mapping
+            </Button>
+            <small className="loc-hint">
+              Býr til uppkast fyrir völlinn svo jáðarskjárinn sé settur upp í
+              ritlinum og birt með „Vista breytingar“.
+            </small>
+          </div>
+        )}
 
         {perimeterDisplay && (
           <PerimeterMappingEditor

@@ -199,6 +199,7 @@ function setupScreenSelector(
     available?: string[] | null;
     setListenPrefix?: (prefix: string) => void;
     setDisplayTarget?: ReturnType<typeof vi.fn>;
+    displayTarget?: { kind: "scoreboard"; screenKey: string } | null;
   } = {},
 ) {
   const mockSetListenPrefix =
@@ -224,6 +225,7 @@ function setupScreenSelector(
     screenKey: null,
     setScreenKey: vi.fn(),
     setDisplayTarget: overrides.setDisplayTarget ?? vi.fn(),
+    displayTarget: overrides.displayTarget ?? null,
     isAdmin: false,
   });
   mockedUseRemoteSettings.mockReturnValue({
@@ -439,6 +441,39 @@ describe("Controller", () => {
       expect(setListenPrefix).toHaveBeenCalledWith("hasteinsvollur");
     });
 
+    it("preserves the persisted screen choice when selecting a venue that contains it", () => {
+      const setDisplayTarget = vi.fn();
+      const { setListenPrefix } = setupScreenSelector({
+        setDisplayTarget,
+        displayTarget: { kind: "scoreboard", screenKey: "vikinni" },
+      });
+      render(<Controller />);
+
+      fireEvent.click(
+        screen.getByText("Víkingur Reykjavík Norðurskjár / Suðurskjár"),
+      );
+
+      expect(setListenPrefix).toHaveBeenCalledWith("vikinni");
+      expect(setDisplayTarget).not.toHaveBeenCalled();
+    });
+
+    it("defaults to the venue's first screen when the persisted choice belongs to another venue", () => {
+      const setDisplayTarget = vi.fn();
+      const { setListenPrefix } = setupScreenSelector({
+        setDisplayTarget,
+        displayTarget: { kind: "scoreboard", screenKey: "vikinni" },
+      });
+      render(<Controller />);
+
+      fireEvent.click(screen.getByText("Hásteinsvöllur Skjár 1"));
+
+      expect(setListenPrefix).toHaveBeenCalledWith("hasteinsvollur");
+      expect(setDisplayTarget).toHaveBeenCalledWith({
+        kind: "scoreboard",
+        screenKey: "hasteinsvollur",
+      });
+    });
+
     it("renders logout button that calls firebaseAuth.logout", () => {
       setupScreenSelector();
       render(<Controller />);
@@ -541,8 +576,28 @@ describe("Controller", () => {
       expect(screen.getByRole("dialog")).toBeInTheDocument();
     });
 
-    it("does not render PerimeterControl inside the settings modal", () => {
+    it("renders PerimeterControl inside the settings modal for a venue without a published mapping", () => {
       setupState3();
+      render(<Controller />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Stillingar" }));
+
+      expect(screen.getByTestId("perimeter-control")).toBeInTheDocument();
+    });
+
+    it("does not render PerimeterControl inside the settings modal for a venue with a published mapping", () => {
+      setupState3();
+      mockedUseListeners.mockReturnValue({
+        screens: [
+          {
+            label: "Víkin",
+            screen: { name: "Main", style: {}, key: "vikinni" },
+            key: "vikinni",
+            perimeterDisplay: secondStadiumWebConfiguration,
+          },
+        ],
+        available: ["vikinni"],
+      } as unknown as ReturnType<typeof useListeners>);
       render(<Controller />);
 
       fireEvent.click(screen.getByRole("button", { name: "Stillingar" }));

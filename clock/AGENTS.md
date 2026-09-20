@@ -279,7 +279,11 @@ mapping uses `renderer: "web"`. Selecting it routes to `PerimeterDisplay`,
 which is read-only and does not write match or perimeter state. The
 authenticated selector offers a separate Perimeter entry for every venue with
 a published perimeter mapping; it routes to the standalone perimeter manager,
-not the scoreboard controller. The runtime `perimeter.enabled` controller flag
+not the scoreboard controller. Selecting the venue's scoreboard button only
+switches the location: a persisted screen choice that still belongs to that
+venue is preserved (the controller viewport never silently changes), and only
+a stale or missing choice defaults to the venue's first screen. The runtime
+`perimeter.enabled` controller flag
 does not expose a browser target without a valid web mapping.
 
 `PerimeterDisplay` uses `PerimeterWebGLRenderer` and `PerimeterRuntime` for
@@ -337,8 +341,12 @@ state subtree, `states/${listenPrefix}/perimeter`:
   readiness: absent metadata must never block the controller.
 - `PerimeterControl.tsx` is rendered as a standalone management page after the
   operator selects a venue's Perimeter entry. It self-hides when
-  `perimeter.enabled !== true` and is not mounted in the scoreboard controller's
-  `Stillingar` dialog. The page provides explicit on/off controls and an
+  `perimeter.enabled !== true`. Venues with a published perimeter mapping get
+  the standalone page only; legacy venues without a mapping keep
+  `<PerimeterControl />` mounted inside the scoreboard controller's
+  `Stillingar` dialog so their brightness, ad layout, media pairs, and
+  preparation controls stay reachable. The page provides explicit on/off
+  controls and an
   editable **ad layout manager** for creating, reordering, and deleting ad
   columns with file upload and Storage browsing (see **Perimeter Ad Layout**
   below). Web venues derive their upload lanes and labels from the published
@@ -1174,8 +1182,10 @@ the production bucket.
   write and the `prepareGoalScorerMedia` callable run fire-and-forget and never
   block the roster from becoming available. The request is gated on the venue
   being a Resolume venue (`locations/{location}/perimeterDisplay` `renderer:
-  "resolume"`), having opted into the perimeter (`states/{location}/perimeter`
-  `enabled: true`)
+  "resolume"` **or the mapping absent** — every venue without a published
+  mapping is treated as a legacy Resolume venue, so existing venues never
+  silently lose the pipeline), having opted into the perimeter
+  (`states/{location}/perimeter` `enabled: true`)
   AND
   a daemon having published overlay geometry (`perimeter/{location}/overlayGeometry`
   present) — a venue without either would only produce a job that must fail, so
@@ -1184,16 +1194,19 @@ the production bucket.
   preparation request even when the perimeter is enabled.
 - The geometry and preparation-status subscriptions (and the desired
   request-document subscription) start only for authenticated controllers at
-  Resolume venues. When the published renderer is not `"resolume"` the
-  subscriptions stop and `overlayGeometry`/`goalScorerPreparationStatus`
-  reset to null, so a venue switching to web drops its generated-media
-  dependency immediately.
+  Resolume venues. Only a published `renderer: "web"` mapping (or a venue
+  whose locations entry has not loaded yet) stops the subscriptions and
+  resets `overlayGeometry`/`goalScorerPreparationStatus` to null, so a venue
+  switching to web drops its generated-media dependency immediately.
 - `GoalScorerPreparation.tsx` (rendered inside the `Jaðarskjár` modal) lists
   each home player's celebration-image source and prepared-media outcome with
   counts and an explicit "Endurtaka undirbúning" retry action.
 - On scorer selection, `GoalScorerDialog.tsx` resolves the venue's published
-  renderer before submitting the perimeter replacement:
-  - `resolume`: keeps the generic home-goal overlay until the selected
+  renderer before submitting the perimeter replacement (only an explicit
+  `renderer: "web"` mapping opts into the web path — a missing or
+  unrecognized mapping keeps the legacy Resolume path):
+  - `resolume` (including venues with no published mapping): keeps the
+    generic home-goal overlay until the selected
     player's preparation result is `ready`/`fallback`; only then does it
     replace the generic overlay with the player's prepared target pair
     (version-1 command). The dialog shows a per-player readiness label so the
@@ -1204,8 +1217,6 @@ the production bucket.
     referencing generated media. A player with an invalid identifier, empty
     name, or missing shirt number still gets the main-screen reveal but never
     a malformed perimeter command, and shows no readiness label.
-  - missing/invalid mapping: the main-screen reveal happens and the generic
-    perimeter goal overlay is left unchanged.
   The main-screen reveal is always submitted before the perimeter command.
 - The existing clear action (`Hreinsa virkt overlay`) writes `overlay: null`,
   clearing both the main-screen reveal and the player perimeter pair and
@@ -2018,7 +2029,11 @@ they are cut at the cue boundary.
 
 Administrators measure a packed framebuffer and logical strips, then edit the
 mapping under `Stjórnborð` → `Staðsetningar` → the venue's `Perimeter mapping`
-section. The editor keeps changes in a local draft, can show a calibration
+section. A venue without a mapping shows a **Nýtt perimeter mapping** button
+that materializes an editable draft (first screen as a single logical screen,
+20 s cue default) so a first mapping can be bootstrapped and published from
+the UI instead of a hand-written Firebase document. The editor keeps changes
+in a local draft, can show a calibration
 preview, validates exact source coverage, and publishes a new revision as one
 complete Firebase document. Its Playback control edits the base-ads cue
 length in seconds (stored as `playback.cueDurationMs`, defaulting to 20 s

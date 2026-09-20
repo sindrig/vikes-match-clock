@@ -566,16 +566,22 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   ] = useState(false);
   const [ready, setReady] = useState(!listenPrefix);
 
-  // The venue's published perimeter renderer decides which scorer path the
-  // controller exposes: Resolume venues keep the prepared-file pipeline
-  // (daemon geometry, preparation status, retry), web venues compose the
-  // scorer in the browser and create no generated-media dependency.
-  const venueRenderer = useMemo(
-    () =>
-      listeners.screens.find((entry) => entry.key === listenPrefix)
-        ?.perimeterDisplay?.renderer,
-    [listeners.screens, listenPrefix],
-  );
+  // Whether the controller's venue uses the legacy Resolume scorer path.
+  // Only an explicit `renderer: "web"` mapping opts into browser
+  // composition; every known venue without one — including all existing
+  // Resolume venues with no published mapping — keeps the prepared-file
+  // pipeline (daemon geometry, preparation status, retry). While the
+  // locations snapshot has not delivered, the venue is unknown and no
+  // Resolume machinery starts.
+  const isResolumeVenue = useMemo(() => {
+    const venueScreens = listeners.screens.filter(
+      (entry) => entry.key === listenPrefix,
+    );
+    if (venueScreens.length === 0) return false;
+    return venueScreens.every(
+      (entry) => entry.perimeterDisplay?.renderer !== "web",
+    );
+  }, [listeners.screens, listenPrefix]);
 
   // Freshness barrier: a browser may only submit shared-state mutations while
   // it has confirmed current Firebase state for the selected venue.
@@ -1115,10 +1121,12 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   // daemon-published overlay geometry, the service-owned preparation status,
   // and the desired request document. Web venues compose scorers in the
   // browser and create no preparation request or generated output
-  // dependency, so these subscriptions (and the state behind them) stop for
-  // any venue whose published renderer is not "resolume".
+  // dependency. A venue with no published mapping is a legacy Resolume
+  // venue and keeps the machinery; subscriptions (and the state behind
+  // them) stop only for venues whose published renderer is "web" and for
+  // venues whose locations entry has not loaded yet.
   useEffect(() => {
-    if (!isAuthenticated || !listenPrefix || venueRenderer !== "resolume") {
+    if (!isAuthenticated || !listenPrefix || !isResolumeVenue) {
       return undefined;
     }
 
@@ -1177,13 +1185,12 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       unsubGoalScorerPreparation();
       unsubGoalScorerPreparationRequest();
     };
-  }, [isAuthenticated, listenPrefix, venueRenderer]);
+  }, [isAuthenticated, listenPrefix, isResolumeVenue]);
 
   // The preparation state is only meaningful while the Resolume machinery is
   // subscribed; non-Resolume venues expose nothing, so a renderer change
   // drops the generated-media dependency without touching shared state.
-  const goalScorerMachineryActive =
-    isAuthenticated && venueRenderer === "resolume";
+  const goalScorerMachineryActive = isAuthenticated && isResolumeVenue;
   const publishedOverlayGeometry = goalScorerMachineryActive
     ? overlayGeometry
     : null;
@@ -2771,7 +2778,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     if (
       !ready ||
       !isAuthenticated ||
-      venueRenderer !== "resolume" ||
+      !isResolumeVenue ||
       !perimeter.enabled ||
       !hasOverlayGeometry ||
       !goalScorerPreparationRequestLoaded ||
@@ -2785,7 +2792,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     eligibleRosterSignature,
     ready,
     isAuthenticated,
-    venueRenderer,
+    isResolumeVenue,
     perimeter.enabled,
     hasOverlayGeometry,
     goalScorerPreparationRequestLoaded,

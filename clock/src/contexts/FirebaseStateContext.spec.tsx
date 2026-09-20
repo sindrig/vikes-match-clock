@@ -4072,14 +4072,16 @@ describe("goal scorer preparation", () => {
     const STATUS_PATH = "perimeter/test-location/goalScorerPreparation";
     const REQUEST_PATH = "states/test-location/perimeter/goalScorerPreparation";
 
-    const locationsFor = (renderer: "web" | "resolume") => ({
+    const locationsFor = (renderer: "web" | "resolume" | "none") => ({
       "test-location": {
         label: "Test Location",
         screens: [{ name: "Display 1" }],
         perimeterDisplay:
           renderer === "web"
             ? secondStadiumWebConfiguration
-            : capturedVikinConfiguration,
+            : renderer === "resolume"
+              ? capturedVikinConfiguration
+              : undefined,
       },
     });
 
@@ -4104,7 +4106,7 @@ describe("goal scorer preparation", () => {
       ],
     };
 
-    const seedVenueState = (renderer: "web" | "resolume") => {
+    const seedVenueState = (renderer: "web" | "resolume" | "none") => {
       mockDbState.set("locations", locationsFor(renderer));
       mockDbState.set("states/test-location/perimeter", {
         enabled: true,
@@ -4187,6 +4189,28 @@ describe("goal scorer preparation", () => {
 
     it("starts the daemon geometry and status subscriptions at a Resolume venue", () => {
       seedVenueState("resolume");
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+          screenKey={null}
+        >
+          <TestPerimeterConsumer onMount={() => undefined} />
+        </FirebaseStateProvider>,
+      );
+      const subscribedPaths = vi
+        .mocked(onValue)
+        .mock.calls.map(([reference]) => String(reference));
+      expect(subscribedPaths).toContain(GEOMETRY_PATH);
+      expect(subscribedPaths).toContain(STATUS_PATH);
+      expect(subscribedPaths).toContain(REQUEST_PATH);
+    });
+
+    it("starts the preparation machinery when no perimeter mapping is published", () => {
+      // A venue without a published mapping is a legacy Resolume venue, so
+      // the Resolume machinery must stay active (missing mappings never
+      // silently disable the prepared-scorer pipeline).
+      seedVenueState("none");
       render(
         <FirebaseStateProvider
           listenPrefix="test-location"
