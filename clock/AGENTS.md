@@ -214,9 +214,11 @@ audit record.
   `controller.select-view`, `view.set-theme`).
 - `updateMatch` uses `match.update`; a dedicated `resetMatch()` context action
   emits `match.reset` (used by the Reset button in `MatchActions.tsx`).
-- Perimeter actions use `perimeter.set-state`, `perimeter.set-overlay`,
+- Perimeter actions use `perimeter.set-state`, `perimeter.skip-cue`,
+  `perimeter.set-overlay`,
   `perimeter.clear-overlay`, `perimeter.set-ad-layout`,
-  `perimeter.create-media-pair`, `perimeter.delete-media-pair`.
+  `perimeter.set-goal-video`, `perimeter.create-media-pair`,
+  `perimeter.delete-media-pair`.
 - Club overrides use `clubOverrides.create|update|save|delete` (both the
   context actions and `ClubOverrideForm.tsx`, which builds its own audit
   payload).
@@ -267,6 +269,46 @@ retained).
 
 ### Perimeter Control
 
+#### Web Perimeter Display
+
+The local display target is persisted separately from Firebase in
+`LocalStateContext`: scoreboard targets retain their selected screen key,
+while the perimeter target is represented as `{ kind: "perimeter" }`. The
+public display selector offers one Perimeter target for venues whose published
+mapping uses `renderer: "web"`. Selecting it routes to `PerimeterDisplay`,
+which is read-only and does not write match or perimeter state. The
+authenticated selector offers a separate Perimeter entry for every venue with
+a published perimeter mapping; it routes to the standalone perimeter manager,
+not the scoreboard controller. Selecting the venue's scoreboard button only
+switches the location: a persisted screen choice that still belongs to that
+venue is preserved (the controller viewport never silently changes), and only
+a stale or missing choice defaults to the venue's first screen. The runtime
+`perimeter.enabled` controller flag
+does not expose a browser target without a valid web mapping.
+
+`PerimeterDisplay` uses `PerimeterWebGLRenderer` and `PerimeterRuntime` for
+browser playback. Published geometry is validated before activation; media is
+resolved only from the active Firebase Storage bucket and must include an
+immutable Storage `generation`. Legacy ad-layout records remain parseable for
+admin migration but are rejected by web playback until generations are
+backfilled. `PersistentMediaCache` keys entries by bucket, object path, and
+generation, replaces stale generations atomically, and reports quota or
+persistence failures without imposing an arbitrary playlist-size limit.
+Unauthenticated displays subscribe only to the public desired-state paths;
+daemon-owned `perimeter/{location}` telemetry subscriptions are started only
+for authenticated controllers so public screens do not generate permission
+errors.
+Firebase Storage rules permit anonymous reads only below a venue's
+`perimeter/` and `perimeter-overlays/` prefixes; writes and unrelated objects
+remain authenticated-only.
+
+Base ads use a monotonic cue timeline and complete-revision preparation before
+swapping pair slots. Overlays use the same two-target mapping, replace the
+active command only after preparation, and render above the base channel.
+Power-off clears the WebGL framebuffer to black. The renderer and runtime must
+remain read-only; Firebase continues to be the source of truth for desired
+layout, overlay, and power state.
+
 The perimeter LED screens at the Víkin stadium are driven by a dedicated
 Resolume Arena composition. Control flows through the **fourth** Firebase
 state subtree, `states/${listenPrefix}/perimeter`:
@@ -297,19 +339,21 @@ state subtree, `states/${listenPrefix}/perimeter`:
   `FirebaseStateContext.tsx` subscribes to it independently and exposes it as
   `preview` through `usePerimeter()`. It is deliberately **not** part of app
   readiness: absent metadata must never block the controller.
-- `PerimeterControl.tsx` renders a `Jaðarskjár` settings row (matching the
-  other settings trigger rows) and self-hides when `perimeter.enabled !== true`.
-  It is mounted inside the `Stillingar` dialog in `Controller.tsx`. There are
-  **no manual on/off controls** — the perimeter turns on/off automatically on
-  view transitions (see below). Clicking the row opens an editable **ad layout
-  manager** modal for creating, reordering, and deleting ad columns across
-  daemon-published lanes, with file upload and Storage browsing (see
-  **Perimeter Ad Layout** below). The old composition preview snapshot is
-  preserved for diagnostic use. Because rsuite renders the dialog in a portal,
-  its styles are scoped to `.perimeter-preview-modal`, rather than
-  `.controller`. The dialog handles loading, "no preview yet", error, daemon
-  phase, revision comparison, empty-lanes, and empty-columns states; styles
-  live in `PerimeterControl.css`.
+- `PerimeterControl.tsx` is rendered as a standalone management page after the
+  operator selects a venue's Perimeter entry. It self-hides when
+  `perimeter.enabled !== true`. Venues with a published perimeter mapping get
+  the standalone page only; legacy venues without a mapping keep
+  `<PerimeterControl />` mounted inside the scoreboard controller's
+  `Stillingar` dialog so their brightness, ad layout, media pairs, and
+  preparation controls stay reachable. The page provides explicit on/off
+  controls and an
+  editable **ad layout manager** for creating, reordering, and deleting ad
+  columns with file upload and Storage browsing (see **Perimeter Ad Layout**
+  below). Web venues derive their upload lanes and labels from the published
+  mapping's `compatibilityKeys.base` and `logicalScreens`; Resolume venues use
+  daemon-published lanes. Víkin-specific 48/40 overlay pairs are therefore not
+  used by Virkið's web ad uploader. The old composition preview snapshot is
+  preserved for Resolume diagnostics. Styles live in `PerimeterControl.css`.
 - `FirebaseStateContext.tsx` **auto-toggles the perimeter on view transitions**:
   entering the match view (`controller.view` `idle` → `match`) writes
   `state: "on"`, and leaving any view for `idle` writes `state: "off"`. Both
@@ -378,6 +422,91 @@ Resolume-version-specific parsing is isolated in
 `resolume-preview.js`; see `perimeter-control/README.md` for installation and
 operation.
 
+#### Perimeter Display Diagnostics (Skjáarvillur)
+
+Web perimeter screens report renderer problems to the controller so an
+operator at the admin page can see a stuck/erroring screen without standing at
+the venue. Screens are unauthenticated and can write only to the presence
+path, so diagnostics ride along on each screen's existing presence record —
+no new writable path, no shared-state writes, and the display remains
+read-only.
+
+**Data**: `presence/{location}/{connectionId}` (one record per connected
+screen, auto-removed by `onDisconnect().remove()`):
+
+```json
+{
+  "connectedAt": 1723392000000,
+  "displayKind": "perimeter",
+  "label": "Skjár A7F3",
+  "resolution": "3840x1080",
+  "error": "Perimeter media column 1 is missing left.",
+  "errorAt": 1723392100000,
+  "lastHeartbeat": 1723392160000
+}
+```
+
+- `label` is a stable, human-readable per-browser label from
+  `getOrCreateDisplayLabel()` in `lib/displayIdentity.ts` (localStorage
+  `clock_displayLabel`, e.g. "Skjár A7F3"), so multiple venue screens are
+  distinguishable across reloads. `resolution` is `window.screen.width x
+window.screen.height`.
+- `error`/`errorAt` are written on every connect (so a reconnecting screen
+  re-reports immediately) and merged into the live record whenever the error
+  changes; a null error removes both fields (screen reports healthy). Error
+  text is truncated to 300 chars.
+- `lastHeartbeat` is a `serverTimestamp()` refreshed once per minute while
+  connected; a stale heartbeat (>3 min) flags a wedged browser tab even when
+  the presence record is still connected. A screen that disconnects
+  (crash/power loss/network drop) simply disappears from the list.
+
+**Display side** — `App.tsx` wraps the whole app tree in
+`DisplayDiagnosticsProvider` (`contexts/DisplayDiagnosticsContext.tsx`), which
+owns the `useScreenPresence` call (unauthenticated screens only) and exposes
+`reportError()` via `useDisplayDiagnostics()`. `PerimeterDisplay` reports its
+derived error state: `null` when healthy, the `rendererError` message on
+failure, and `"Engin gild perimeter stilling tiltæk."` when no published web
+mapping exists — gated on `ready` so the brief pre-subscription window cannot
+publish a phantom missing-mapping error. Successful `prepareBase`/overlay
+preparation now **clears** a previously set error so recovered decks never
+leave a stale error on the display or in the controller.
+
+**Renderer-internal errors are propagated too.**
+`PerimeterWebGLRenderer` accepts `PerimeterRendererOptions.onError`; problems
+only detectable inside the render loop (a source larger than the GPU's
+`MAX_TEXTURE_SIZE`) are reported through it once per state change (joined
+message across affected texture keys) and re-reported after any change, so a
+successful `prepareBase` cannot hide a still-broken texture.
+`PerimeterDisplay` keeps this in a separate `textureError` state and joins it
+with `rendererError` for both the on-screen `<p>` below the canvas and the
+`reportError()` payload. Oversized **images** are recovered automatically:
+the renderer redraws them into an offscreen `<canvas>` scaled to fit
+`MAX_TEXTURE_SIZE` before `texImage2D` (no error, no black region);
+oversized **videos** cannot be downscaled per frame, so they keep
+skip-and-report behavior with the "Re-export the asset at a smaller size"
+message.
+
+**Admin side** — `hooks/useScreenReports.ts` subscribes to
+`presence/{listenPrefix}` and returns validated entries sorted by label.
+`controller/PerimeterDisplayReports.tsx` renders the **Skjáarvillur (jaðarskjáir)**
+panel at the top of the web-venue ad-layout board (standalone page and modal):
+one row per connected perimeter screen with label, resolution, a status badge
+(`Villa` red / `Ósvöruð` orange on stale heartbeat / `Í lagi` green), the error
+text with its time, and a warning when **zero** perimeter screens are
+connected (often the real cause of a stuck deck). Styles live in
+`PerimeterControl.css` under `.perimeter-display-reports*`.
+
+**Rules** (`firebase-rules.json`): presence writes stay `true` per connection;
+explicit `.validate` rules were added for the optional fields (`displayKind`,
+`label`, `resolution` ≤ 40 chars, `error` ≤ 300 chars, `errorAt` and
+`lastHeartbeat` numbers). Child-level rules only apply when the child exists,
+so clearing a field via a `null` update is allowed.
+
+**Known tradeoff**: diagnostics persist only while the screen process is
+alive and connected. True crash-surviving error history would need a trusted
+writer (e.g. a Cloud Function DB trigger copying errors into
+`perimeter/{location}/displayErrors`); that is deliberately out of scope.
+
 #### Perimeter Overlay (Goal-Triggered Video Sequences)
 
 When a **home goal** is scored, a Firebase-controlled perimeter overlay
@@ -386,6 +515,37 @@ LED screens above the existing `Efni` advertisements, then loops the final
 column until explicitly cleared.
 
 **Firebase path**: `states/${listenPrefix}/perimeter/overlay`
+
+When the home goal button is pressed, the controller writes the
+**operator-configured goal video** as a version-1 overlay command. The config
+lives at `states/${listenPrefix}/perimeter/goalVideo` and is edited from the
+standalone perimeter manager's **Markamyndband** section (one file per overlay
+target, picked or uploaded from `{listenPrefix}/perimeter/` in Storage):
+
+```json
+{
+  "files": {
+    "2": {
+      "name": "goal-48.mp4",
+      "source": "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/goal-48.mp4",
+      "generation": "1700000000000001"
+    },
+    "4": {
+      "name": "goal-40.mp4",
+      "source": "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/goal-40.mp4"
+    }
+  }
+}
+```
+
+- `parsePerimeterGoalVideo()` requires exactly the two overlay targets (`"2"`
+  and `"4"`) with distinct names, bucket- and location-scoped like overlay
+  columns; a malformed config is dropped and the legacy fallback applies.
+- **Fallback**: with no (or an invalid) config, the controller uses the legacy
+  `goal-48.mp4` + `goal-40.mp4` pair under `{location}/perimeter/` in the
+  **active environment's bucket** (`FIREBASE_STORAGE_BUCKET`) — never the
+  hardcoded production bucket, which the environment-scoped overlay parser
+  would reject.
 
 ```json
 {
@@ -450,7 +610,9 @@ overlay (`states/${listenPrefix}/perimeter/overlay`).
 
 Types are defined in `types.ts`:
 
-- `PerimeterOverlay` — overlay document
+- `PerimeterOverlay` — discriminated union: `PerimeterFileOverlay` (version 1,
+  timed file columns) or `GoalScorerOverlayCommand` (version 2, semantic web
+  scorer — see **Web Goal Scorer Overlay (Browser Composition)** below)
 - `PerimeterOverlayColumn` — a column with duration and paired files
 - `PerimeterOverlayFile` — filename + GCS source
 - `PerimeterOverlayStatus` — daemon-published status
@@ -458,8 +620,10 @@ Types are defined in `types.ts`:
 
 Parsing is in `firebaseParsers.ts`:
 
-- `parsePerimeterOverlay()` — strict validation (version, id, column count,
-  duration bounds, paired targets, filename safety, approved bucket only).
+- `parsePerimeterOverlay()` — strict validation (discriminated union on
+  version, id bound, column count, duration bounds, paired targets, filename
+  safety, approved bucket only; version-2 scorer payload bounds; mixed shapes
+  rejected).
 
 Write actions are in `FirebaseStateContext.tsx`:
 
@@ -483,11 +647,13 @@ for the 40-screen target (layer `"4"`). Files may be images or videos.
   "files": {
     "2": {
       "name": "48-1723392000000-sindri.mp4",
-      "source": "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter-overlays/11111111-1111-4111-8111-111111111111/48/48-1723392000000-sindri.mp4"
+      "source": "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter-overlays/11111111-1111-4111-8111-111111111111/48/48-1723392000000-sindri.mp4",
+      "generation": "1700000000000000"
     },
     "4": {
       "name": "40-1723392000000-sindri.png",
-      "source": "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter-overlays/11111111-1111-4111-8111-111111111111/40/40-1723392000000-sindri.png"
+      "source": "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter-overlays/11111111-1111-4111-8111-111111111111/40/40-1723392000000-sindri.png",
+      "generation": "1700000000000001"
     }
   }
 }
@@ -496,6 +662,11 @@ for the 40-screen target (layer `"4"`). Files may be images or videos.
 - `pairId` is a UUID generated before upload and used as both the map key and
   the source-path segment.
 - `name` is required, trimmed, non-empty, and bounded (≤ 80 chars).
+- Each file record carries the object's immutable Storage `generation`, captured
+  from the upload result when the pair is created. Legacy records that omit it
+  are still playable: the web display backfills missing overlay generations
+  from Storage metadata before loading (`backfillOverlayGenerations`, shared
+  with the base-layout backfill).
 - Each pair has exactly the two targets `"2"` and `"4"`. Layer `"2"` files must
   live under `{location}/perimeter-overlays/{pairId}/48/`; layer `"4"` files
   under `.../40/`. A path/layer mismatch is rejected.
@@ -707,9 +878,20 @@ refused with an `error` status (each ad needs its own deck column).
 **UI operations**:
 
 - **Add column**: Dialog with one file selector per lane. Lists existing files
-  from `{listenPrefix}/perimeter/` in Storage, permits upload. Saves only when
-  every lane has a selection. Sources are stored as `gs://` URIs. Adding is
-  disabled once the layout reaches 20 columns (the daemon/parser limit).
+  (sorted by name) from `{listenPrefix}/perimeter/` in Storage with a small
+  thumbnail preview per option, and permits upload. Saves only when every lane
+  has a selection. Sources are stored as `gs://` URIs. Adding is disabled once
+  the layout reaches 20 columns (the daemon/parser limit). The file-picker
+  styles in `PerimeterControl.css` are deliberately **not** scoped under
+  `.perimeter-preview-modal`: rsuite portals the add dialog to `document.body`,
+  so a preview-modal scope would never match and the dialog would render raw.
+- **Thumbnails**: `controller/PerimeterFileThumb.tsx` renders per-file previews
+  anywhere in the ad-layout UI. It prefers the daemon-published applied
+  thumbnail; when absent (e.g. web venues, freshly edited columns), it resolves
+  the Storage object itself via a cached `getDownloadURL` — images render as
+  `<img loading="lazy">`, videos as a first-frame `<video preload="metadata">`
+  — falling back to an "Engin mynd" placeholder. Resolution failures and media
+  errors degrade to the placeholder instead of breaking the card.
 - **Delete column**: Red X button with confirmation dialog
   (`Fjarlægja dálk? Skrárnar verða áfram í Firebase Storage.`). Removes only
   the layout reference, never deletes Storage objects.
@@ -732,6 +914,53 @@ refused with an `error` status (each ad needs its own deck column).
 If `adLayout.revision !== appliedAdLayout.revision`, the UI shows
 "Uppfærslu beðið" (update pending). When they match, it shows "Lifandi" (live)
 with the daemon phase.
+
+**Skip-forward command (web venues)**:
+
+- The standalone admin header offers a "Næsti dálkur" button (web venues only)
+  that advances every subscribed web perimeter display to the next ad column
+  immediately.
+- The write is an opaque `skipCue` token (a UUID) under the desired
+  `states/{location}/perimeter` path, audited as `perimeter.skip-cue`. Only a
+  change of the token value matters; its content is never interpreted.
+- `parsePerimeterState()` preserves `skipCue` verbatim when it is a non-empty
+  string and drops it otherwise (the field is optional, so absent tokens keep
+  the parsed shape unchanged).
+- `PerimeterDisplay` tracks the last observed token: the first delivery only
+  initializes the baseline (a display that reconnects never replays an old
+  skip), and every subsequent change calls `PerimeterRuntime.skipCue(now)`,
+  which re-anchors the base timeline so the next cue boundary is now — the
+  current cue ends and the following one starts with a full fresh duration. A
+  prepared base revision waiting on a cue boundary commits with the skip. The
+  button is disabled while the perimeter is off or no columns exist.
+- `createBaseTimeline()` stores `cueDurationMs` and `cueCount` in closure
+  variables exposed through accessor properties: the runtime mutates them
+  after construction (`commitPreparedBase`, `replaceConfiguration`), and plain
+  object property writes would never be seen by the timeline's closures.
+
+**Display restart command (web venues)**:
+
+- The standalone admin header also offers an "Endurræsa skjá" button (web
+  venues only) that asks every subscribed web perimeter display to perform a
+  full page reload of itself — the remote equivalent of the manual hard
+  refresh, for when a display is stuck on stale media and the operator cannot
+  reach the venue computer.
+- The write is an opaque `refreshToken` token (a UUID) under the desired
+  `states/{location}/perimeter` path, audited as `perimeter.restart-displays`.
+  Only a change of the token value matters; its content is never interpreted.
+- `parsePerimeterState()` preserves `refreshToken` verbatim when it is a
+  non-empty string and drops it otherwise (same tolerant rules as `skipCue`).
+- `PerimeterDisplay` tracks the last observed token: the first delivery only
+  initializes the baseline (a display that reconnects never replays an old
+  restart), and every subsequent change calls `window.location.reload()`. The
+  effect runs before the runtime exists, so a restart is honored even while
+  the renderer is still initializing.
+- This is perimeter-scoped and independent of `controller.refreshToken`
+  (the "Endurræsa alla skjái" button in the scoreboard controller's
+  Stillingar dialog): the global button also reloads perimeter displays
+  because `RefreshHandler` is mounted in the perimeter display path, while
+  the perimeter button restarts perimeter screens without interrupting
+  scoreboard screens.
 
 Types are defined in `types.ts`:
 
@@ -812,9 +1041,13 @@ directly and never treats a Firebase write confirmation as a hardware result.
 
 **Operator behavior** (`PerimeterControl.tsx`):
 
-- The `Bjartleiki jaðarskjás` section renders above the ad-layout board and is
-  gated by the same `perimeter.enabled` feature flag (the whole modal is hidden
-  when disabled).
+- The `Bjartleiki jaðarskjás` section renders above the ad-layout board for
+  **both web and Resolume venues** (it is renderer-agnostic — brightness always
+  flows through a venue-local daemon, never the browser renderer) and is gated
+  by the same `perimeter.enabled` feature flag (the whole modal is hidden when
+  disabled). A web venue only sees the section take effect if its daemon has
+  brightness enabled (`PERIMETER_BRIGHTNESS_ENABLED=true`) with the venue's
+  Firebase path and Vnnox screen GUID configured.
 - It shows the Firebase-synchronized requested value, the daemon phase, the
   verified applied value, and any safe failure message.
 - Submitting is an explicit `Vista` action; the input is client-validated to a
@@ -834,7 +1067,7 @@ directly and never treats a Firebase write confirmation as a hardware result.
 - The input carries an accessible label (`aria-label="Bjartleiki jaðarskjás"`)
   matching the section title.
 
-#### Goal-Scorer Perimeter Media Preparation
+#### Goal-Scorer Perimeter Media Preparation (Resolume venues)
 
 Before a home goal happens, the controller prepares player-specific repeating
 perimeter media for every eligible home player so scorer selection can
@@ -842,6 +1075,15 @@ attribute the goal reliably during live play. A Firebase Cloud Function
 renders static PNG bands (see `functions/src/goalScorerPreparation.ts`) using
 the daemon-published overlay geometry; the controller never renders media and
 never infers readiness from Storage listings.
+
+**This pipeline is Resolume-scoped.** A venue whose published
+`locations/{location}/perimeterDisplay` mapping says `renderer: "web"` uses
+the browser-composed semantic scorer overlay instead (see **Web Goal Scorer
+Overlay (Browser Composition)** below): web rosters create no preparation
+request, no geometry/status subscriptions, and no generated output
+dependency. The machinery below starts only at Resolume venues; the
+preparation panel and its "Endurtaka undirbúning" retry are hidden on web
+venues.
 
 **Data ownership:**
 
@@ -929,7 +1171,8 @@ the production bucket.
   reach the endpoint; the inner callable still requires Firebase Auth and
   verifies the caller can access the location.
 - Preparation is requested in the background whenever the home roster gains
-  eligible players (match selection or match-report roster loading). The
+  eligible players (match selection or match-report roster loading) at a
+  Resolume venue. The
   controller waits for the service-owned preparation status and skips it when
   its roster signature is unchanged, so a refresh or scorer selection never
   starts another job. A player
@@ -938,21 +1181,43 @@ the production bucket.
   values and the rendered band cannot attribute an unnumbered player. The
   write and the `prepareGoalScorerMedia` callable run fire-and-forget and never
   block the roster from becoming available. The request is gated on the venue
-  having opted into the perimeter (`states/{location}/perimeter` `enabled: true`)
+  being a Resolume venue (`locations/{location}/perimeterDisplay` `renderer:
+  "resolume"` **or the mapping absent** — every venue without a published
+  mapping is treated as a legacy Resolume venue, so existing venues never
+  silently lose the pipeline), having opted into the perimeter
+  (`states/{location}/perimeter` `enabled: true`)
   AND
   a daemon having published overlay geometry (`perimeter/{location}/overlayGeometry`
   present) — a venue without either would only produce a job that must fail, so
   no request is issued for it. The explicit "Endurtaka undirbúning" retry below
-  bypasses the gate.
+  bypasses the gate. A venue whose published renderer is `web` never receives a
+  preparation request even when the perimeter is enabled.
+- The geometry and preparation-status subscriptions (and the desired
+  request-document subscription) start only for authenticated controllers at
+  Resolume venues. Only a published `renderer: "web"` mapping (or a venue
+  whose locations entry has not loaded yet) stops the subscriptions and
+  resets `overlayGeometry`/`goalScorerPreparationStatus` to null, so a venue
+  switching to web drops its generated-media dependency immediately.
 - `GoalScorerPreparation.tsx` (rendered inside the `Jaðarskjár` modal) lists
   each home player's celebration-image source and prepared-media outcome with
   counts and an explicit "Endurtaka undirbúning" retry action.
-- On scorer selection, `GoalScorerDialog.tsx` keeps the generic home-goal
-  overlay until the selected player's preparation result is `ready`/`fallback`;
-  only then does it replace the generic overlay with the player's prepared
-  target pair. The dialog shows a per-player readiness label so the operator
-  knows which players can be attributed. The generic overlay stays when the
-  player is preparing/unavailable/failed.
+- On scorer selection, `GoalScorerDialog.tsx` resolves the venue's published
+  renderer before submitting the perimeter replacement (only an explicit
+  `renderer: "web"` mapping opts into the web path — a missing or
+  unrecognized mapping keeps the legacy Resolume path):
+  - `resolume` (including venues with no published mapping): keeps the
+    generic home-goal overlay until the selected
+    player's preparation result is `ready`/`fallback`; only then does it
+    replace the generic overlay with the player's prepared target pair
+    (version-1 command). The dialog shows a per-player readiness label so the
+    operator knows which players can be attributed. The generic overlay stays
+    when the player is preparing/unavailable/failed.
+  - `web`: validates the selected player's display data and writes a fresh
+    version-2 semantic scorer command (see below) without waiting for or
+    referencing generated media. A player with an invalid identifier, empty
+    name, or missing shirt number still gets the main-screen reveal but never
+    a malformed perimeter command, and shows no readiness label.
+  The main-screen reveal is always submitted before the perimeter command.
 - The existing clear action (`Hreinsa virkt overlay`) writes `overlay: null`,
   clearing both the main-screen reveal and the player perimeter pair and
   restoring the rotating perimeter content.
@@ -970,6 +1235,95 @@ The overlay parsers (`parsePerimeterOverlay`, `parsePerimeterMediaPairs`,
 `parsePerimeterAdLayout`) are scoped to the active environment's storage bucket
 (`FIREBASE_STORAGE_BUCKET`), so a source from another environment's bucket is
 rejected for the active deployment.
+
+#### Web Goal Scorer Overlay (Browser Composition)
+
+At a venue whose published mapping says `renderer: "web"`, the perimeter
+browser composes the goal-scorer band locally from a semantic command — no
+Cloud Function, generated files, daemon geometry, or preparation status are
+involved.
+
+**Command schema** (`states/{location}/perimeter/overlay`, version 2):
+
+```json
+{
+  "version": 2,
+  "kind": "goal-scorer",
+  "id": "uuid",
+  "player": { "id": "2492", "name": "Jón Jónsson", "number": "7" }
+}
+```
+
+The active overlay channel is a **discriminated union**
+(`PerimeterOverlay = PerimeterFileOverlay | GoalScorerOverlayCommand` in
+`types.ts`):
+
+- Version 1 (`PerimeterFileOverlay`) — unchanged: timed `columns` of paired
+  overlay files (home-goal videos, named media pairs, Resolume scorer pairs).
+- Version 2 (`GoalScorerOverlayCommand`): semantic player data for browser
+  composition. `player.id` is a safe identifier (`[A-Za-z0-9_-]{1,64}`, also
+  used to derive the approved celebration-image path), `name` is a bounded
+  (≤ 80 chars) non-empty display name, and `number` is a digit-only string
+  (≤ 4 digits). Every selection generates a new command `id`, so re-selecting
+  the same player is still a new replacement request.
+
+The command deliberately contains **no** generated file references, download
+URLs, location, bucket, colors, dimensions, or layout values: the active
+subscription scopes the location, the deployment provides the bucket, and the
+published web mapping provides the logical-screen dimensions.
+
+Parsing (`parsePerimeterOverlay`) and the RTDB rules
+(`firebase-rules.json` → `states/$location/perimeter/overlay`) accept both
+shapes and reject mixed documents (a version-2 command carrying `columns`, a
+version-1 command carrying `kind`/`player`), unknown children, and
+oversized/bounded violations. `buildGoalScorerOverlayCommand()` serializes a
+validated selection; `goalScorerPlayerFromSelection()` validates roster
+players for semantic submission.
+
+**Browser composition** (`perimeter/scorerCompositor.ts`):
+
+- `ScorerSourceLoader` derives the same-location approved paths
+  `{location}/players/{playerId}-fagn.png` (celebration) and
+  `{location}/crest.png` (fallback), resolves immutable Storage generation
+  metadata, and loads through the persistent media cache. The celebration
+  image is tried first; the crest is used only when it is missing, unreadable,
+  or undecodable. When the Storage crest is also unusable, the loader falls
+  back to the **bundled club crest** for the venue's home team (resolved via
+  `match.homeTeam` → `images/clubLogos`), so the band always renders
+  crest + number + name and a missing `crest.png` object never breaks the
+  overlay. Only when every source is unusable does the previous overlay stay
+  (or the base stay unobscured on cold start) and the error surface through
+  the display diagnostics.
+- `composeScorerBand()` draws one static 2D-canvas band at each configured
+  overlay logical screen's native dimensions, repeating
+  `[portrait-or-crest fitted to the band height (contain, never cropped) | shirt number | fitted name | gap]`
+  left to right until the width is covered (final repetition clipped). All
+  measurements scale from the band height with the same multipliers as the
+  server renderer (gap 0.45, number font 0.55, name font 0.28, name area
+  3.0×height), text uses the bundled GT America bold, and the name shrinks
+  toward a defined minimum before truncation so repeated units never overlap.
+  Fonts are awaited through the font-loading API before measuring; composition
+  is a pure, independently unit-testable module (see
+  `perimeter/scorerCompositor.spec.ts` and the snapshot specs) and never a DOM
+  component over the WebGL canvas.
+- `PerimeterRuntime` dispatches on the command version: file commands keep
+  timed multi-column playback; scorer commands load the source, await fonts,
+  compose every overlay logical screen once, and hold one static source map
+  until clear or replacement. Both branches share the prepared-generation
+  lifecycle: atomic activation, stale-request invalidation (only the latest
+  command wins), and release of superseded resources. Replacing the published
+  mapping while a scorer is visible reruns composition at the new logical
+  dimensions before swapping textures; a recomposition failure retains the
+  current textures.
+- Scorer failures report through the existing **Skjáarvillur** diagnostics
+  channel with bounded, safe messages (no bucket URLs or auth details). The
+  renderer stays read-only: nothing in the web display writes Firebase state.
+
+**Public read access** (`storage.rules`): anonymous reads are permitted only
+for the exact `{location}/crest.png` object and `{location}/players/{id}-fagn.png`
+objects whose name matches the safe `[A-Za-z0-9_-]{1,64}-fagn.png`
+convention; writes stay authenticated-only, and all other player media
+remains private.
 
 ### The `listenPrefix` System
 
@@ -1644,6 +1998,116 @@ This app requires testing scenarios with **two independent browser sessions** (e
 For testing Firebase sync between controller and display (e.g., PlaybackBar stop clearing on remote), you'll need to either test manually or write Playwright tests that can manage multiple browser contexts.
 
 ## Related Systems
+
+### Web Perimeter Rollout Runbook
+
+The browser perimeter target is a local display identity, persisted as
+`clock_displayTarget: { "kind": "perimeter" }` alongside
+`clock_listenPrefix`. Firebase remains authoritative for the desired perimeter
+state, base layout, overlay command, and mapping discovery; the anonymous
+renderer never writes those paths. `RefreshHandler` reloads either display
+kind when `controller.refreshToken` changes, and disconnect clears both local
+values.
+
+Web playback requires a published `locations/{location}/perimeterDisplay` with
+`renderer: "web"`, validated geometry, and immutable Storage `generation`
+metadata on every referenced base or overlay object. The renderer downloads a
+complete base revision into persistent Cache Storage before playback, validates
+pair completeness, and retains the previous complete revision if a replacement
+or quota check fails. Media whose dimensions differ from the configured
+logical-screen dimensions only log a console warning — the WebGL renderer
+samples the full texture with normalized UVs, so such content is stretched
+(with skew) to fill the region instead of blocking playback. Sources larger
+than the GPU's `MAX_TEXTURE_SIZE` (e.g. 8192 px on the venue GPUs) no longer
+black out their region: images are downscaled into an offscreen canvas that
+fits the limit before `texImage2D`, while oversized videos are skipped and
+reported through the renderer's `onError` (surfaced on the display and in the
+Skjáarvillur panel — see **Perimeter Display Diagnostics** above). Videos
+shorter than the cue duration loop at natural rate; videos longer than the cue
+duration play faster when the browser supports the required rate, otherwise
+they are cut at the cue boundary.
+
+Administrators measure a packed framebuffer and logical strips, then edit the
+mapping under `Stjórnborð` → `Staðsetningar` → the venue's `Perimeter mapping`
+section. A venue without a mapping shows a **Nýtt perimeter mapping** button
+that materializes an editable draft (first screen as a single logical screen,
+20 s cue default) so a first mapping can be bootstrapped and published from
+the UI instead of a hand-written Firebase document. The editor keeps changes
+in a local draft, can show a calibration
+preview, validates exact source coverage, and publishes a new revision as one
+complete Firebase document. Its Playback control edits the base-ads cue
+length in seconds (stored as `playback.cueDurationMs`, defaulting to 20 s
+when absent); validation rejects non-positive durations, and short videos
+loop while long ones speed up to fit the configured cue. Besides the generic
+"Identity mapping" and "Horizontal split" templates, the editor offers two
+venue templates: "Víkin úti (sannreynt)" (`applyVikinOutdoorTemplate` in
+`perimeter/templates.ts`), which reproduces the physically verified
+Víkin-outdoor layout from the vikin-gateway handoff
+(`default-venue.json`) — a 3840x1080 framebuffer with screen-40 as one full
+strip at y=0 and screen-48 split into two stacked halves at y=192 (keeping
+the captured `x=-2`, width-2308 scaled/clipped calibration quirk, the only
+region with `allowScaling`/`allowClipping`) and y=384 — and
+"Virkið (sannreynt)" (`applyStackedTemplate`), a generic widest-first
+stacked layout that reproduces the published Virkið staging document
+(3648x384 framebuffer, screen-3648 at y=0, screen-3264 at y=192). Both are
+no-ops for drafts lacking the expected logical screens. See
+`perimeter-control/WEB_MAPPING_MEASUREMENT.md` and
+`perimeter-control/WEB_RENDERER_QUALIFICATION.md`. Keep Víkin's configuration
+at `renderer: "resolume"`; a second venue may use `web` independently.
+
+Public Storage reads are limited to `{location}/perimeter/`,
+`{location}/perimeter-overlays/`, the venue crest (`{location}/crest.png`),
+and player celebration images matching the safe
+`{location}/players/{id}-fagn.png` convention; anonymous writes and unrelated
+reads remain denied.
+
+**Goal-scorer overlay rollout (two command forms):**
+
+- The overlay channel `states/{location}/perimeter/overlay` carries two
+  command forms: the established version-1 file command and the version-2
+  semantic goal-scorer command (schema in **Web Goal Scorer Overlay (Browser
+  Composition)** above). All controllers can parse and clear both forms; only
+  the controller at a `web` venue *emits* version 2.
+- **Deployment order**: deploy the web display bundle (version-2 parser,
+  runtime scorer branch, compositor, scoped Storage reads) and remotely
+  restart the qualified web perimeter displays (`Endurræsa skjá`) BEFORE
+  enabling controller submission at the venue. A stale web bundle cannot parse
+  version-2 commands — the command would be ignored (or rejected by strict
+  parsing), leaving the generic goal overlay visible. Resolume commands remain
+  version 1 and are unaffected.
+- **Qualification cases** for a web venue after the restart: personalized
+  celebration band, crest fallback (no `players/{id}-fagn.png`), unavailable
+  sources (neither object exists — bundled home-team crest shown), long names
+  (fitted, no unit overlap), clear (base returns), power off/on (black while
+  off, scorer restored), and mapping replacement (bands recomposed at the new
+  logical dimensions). The targeted Playwright scenario is
+  `e2e/perimeter-goal-scorer.spec.ts` (emulator).
+- **Compatibility boundary**: the daemon and the Resolume preparation
+  pipeline never see a semantic command — Resolume venues keep version-1
+  commands, and web rosters create no preparation requests, geometry/status
+  subscriptions, or generated output dependency.
+- **Rollback**: clear any active version-2 overlay, restore controller
+  emission to version 1 (revert the renderer-aware dialog submission), and
+  deploy the prior web display bundle. No semantic command migrates persisted
+  roster or media data; Resolume behavior is unchanged throughout. Web-venue
+  generated scorer files from prior preparation jobs may age out separately
+  because no new command references them.
+
+To roll back the browser perimeter target entirely, remove or change the
+venue's web mapping so the selector stops offering Perimeter, then reconnect
+its prior playback path. Do not delete the prior cached revision until the
+replacement has been qualified.
+
+**Storage CORS (one-time bucket configuration)**: unlike `<img>` tags elsewhere
+in the app, the perimeter media loader downloads via `fetch()` into Cache
+Storage (`cache.ts`), which the browser blocks with
+"Cross-Origin Request Blocked … CORS header ‘Access-Control-Allow-Origin’
+missing" unless the bucket's CORS configuration allows the display origin. The
+Firebase-created buckets have no CORS configuration by default. Apply
+`scripts/storage-cors.json` with `scripts/set-storage-cors.sh` (requires
+`gcloud` authenticated with `storage.buckets.update` on both projects); it
+allows `GET`/`HEAD` from `klukka.irdn.is`, `staging-klukka.irdn.is`, and the
+localhost dev ports.
 
 - **`clock-api/`**: Python Lambda API for match data and weather
 

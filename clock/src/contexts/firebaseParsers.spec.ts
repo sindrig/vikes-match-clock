@@ -10,13 +10,16 @@ import {
   parsePerimeterState,
   parsePerimeterPreview,
   parsePerimeterOverlay,
+  buildGoalScorerOverlayCommand,
   parsePerimeterMediaPairs,
+  parsePerimeterGoalVideo,
   parsePerimeterAdLayout,
   parsePerimeterAppliedAdLayout,
   parsePerimeterBrightness,
   parsePerimeterBrightnessStatus,
   parsePerimeterOverlayGeometry,
   parseGoalScorerPreparationStatus,
+  parsePerimeterDisplay,
 } from "./firebaseParsers";
 import { Sports, DEFAULT_HALFSTOPS, DEFAULT_THEME } from "../constants";
 import type {
@@ -1392,6 +1395,46 @@ describe("firebaseParsers", () => {
         state: "off",
       });
     });
+
+    it("preserves a non-empty skipCue token verbatim", () => {
+      const token = "550e8400-e29b-41d4-a716-446655440000";
+      expect(
+        parsePerimeterState({ enabled: true, state: "on", skipCue: token }),
+      ).toEqual({ enabled: true, state: "on", skipCue: token });
+    });
+
+    it("drops malformed skipCue values", () => {
+      expect(parsePerimeterState({ skipCue: 123 })).toEqual({
+        enabled: false,
+        state: "off",
+      });
+      expect(parsePerimeterState({ skipCue: "" })).toEqual({
+        enabled: false,
+        state: "off",
+      });
+    });
+
+    it("preserves a non-empty refreshToken token verbatim", () => {
+      const token = "c9bf9e57-1685-4c89-bafb-ff5af830be8a";
+      expect(
+        parsePerimeterState({
+          enabled: true,
+          state: "on",
+          refreshToken: token,
+        }),
+      ).toEqual({ enabled: true, state: "on", refreshToken: token });
+    });
+
+    it("drops malformed refreshToken values", () => {
+      expect(parsePerimeterState({ refreshToken: 123 })).toEqual({
+        enabled: false,
+        state: "off",
+      });
+      expect(parsePerimeterState({ refreshToken: "" })).toEqual({
+        enabled: false,
+        state: "off",
+      });
+    });
   });
 
   describe("parsePerimeterPreview", () => {
@@ -1939,8 +1982,10 @@ describe("firebaseParsers", () => {
       const result = parsePerimeterOverlay(goalOverlay, {
         location: "vikuti",
       });
-      expect(result).not.toBeNull();
-      expect(result?.columns[0]?.files["2"]?.name).toBe("goal-48.mp4");
+      expect(result?.version).toBe(1);
+      expect(result?.kind).toBeUndefined();
+      if (result?.version !== 1) return;
+      expect(result.columns[0]?.files["2"]?.name).toBe("goal-48.mp4");
     });
 
     it("accepts named media-pair files under {location}/perimeter-overlays/", () => {
@@ -2058,6 +2103,164 @@ describe("firebaseParsers", () => {
         }),
       ).toBeNull();
     });
+
+    // -- Version-2 semantic scorer commands -----------------------------------
+
+    const validScorerCommand = {
+      version: 2,
+      kind: "goal-scorer",
+      id: "11111111-1111-4111-8111-111111111111",
+      player: { id: "2492", name: "Jón Jónsson", number: "7" },
+    };
+
+    it("accepts a bounded valid version-2 scorer command", () => {
+      const result = parsePerimeterOverlay(validScorerCommand);
+      expect(result).toEqual(validScorerCommand);
+    });
+
+    it("normalizes a version-2 player number provided as a number", () => {
+      const result = parsePerimeterOverlay({
+        ...validScorerCommand,
+        player: { id: "2492", name: "Jón", number: 7 },
+      });
+      expect(result?.version).toBe(2);
+      if (result?.version !== 2) return;
+      expect(result.player.number).toBe("7");
+    });
+
+    it("preserves the version-1 shape untouched", () => {
+      const result = parsePerimeterOverlay(goalOverlay);
+      expect(result).not.toBeNull();
+      expect(result?.version).toBe(1);
+    });
+
+    it("rejects a version-2 command without the goal-scorer kind", () => {
+      expect(
+        parsePerimeterOverlay({ ...validScorerCommand, kind: "file" }),
+      ).toBeNull();
+      expect(
+        parsePerimeterOverlay({ ...validScorerCommand, kind: null }),
+      ).toBeNull();
+    });
+
+    it("rejects a version-2 command missing the player payload", () => {
+      expect(
+        parsePerimeterOverlay({ ...validScorerCommand, player: null }),
+      ).toBeNull();
+      const withoutPlayer = { ...validScorerCommand } as Record<
+        string,
+        unknown
+      >;
+      delete withoutPlayer.player;
+      expect(parsePerimeterOverlay(withoutPlayer)).toBeNull();
+    });
+
+    it("rejects a version-2 command with a mixed version-1 columns field", () => {
+      expect(
+        parsePerimeterOverlay({ ...validScorerCommand, columns: [] }),
+      ).toBeNull();
+    });
+
+    it("rejects a version-1 command carrying version-2 scorer fields", () => {
+      expect(
+        parsePerimeterOverlay({ ...goalOverlay, kind: "goal-scorer" }),
+      ).toBeNull();
+      expect(
+        parsePerimeterOverlay({
+          ...goalOverlay,
+          player: { id: "2492", name: "Jón", number: "7" },
+        }),
+      ).toBeNull();
+    });
+
+    it("rejects overlong or unsafe command ids", () => {
+      expect(
+        parsePerimeterOverlay({
+          ...validScorerCommand,
+          id: "x".repeat(129),
+        }),
+      ).toBeNull();
+    });
+
+    it("rejects unsafe player identifiers", () => {
+      for (const id of ["", " ", "24 92", "../crest", "a".repeat(65), ".x"]) {
+        expect(
+          parsePerimeterOverlay({
+            ...validScorerCommand,
+            player: { ...validScorerCommand.player, id },
+          }),
+        ).toBeNull();
+      }
+    });
+
+    it("rejects empty or overlong names", () => {
+      expect(
+        parsePerimeterOverlay({
+          ...validScorerCommand,
+          player: { ...validScorerCommand.player, name: "   " },
+        }),
+      ).toBeNull();
+      expect(
+        parsePerimeterOverlay({
+          ...validScorerCommand,
+          player: {
+            ...validScorerCommand.player,
+            name: "a".repeat(81),
+          },
+        }),
+      ).toBeNull();
+      expect(
+        parsePerimeterOverlay({
+          ...validScorerCommand,
+          player: { ...validScorerCommand.player, name: "a\u0000b" },
+        }),
+      ).toBeNull();
+    });
+
+    it("rejects invalid shirt numbers", () => {
+      for (const number of [
+        "",
+        "7a",
+        "7 7",
+        "-1",
+        "1.5",
+        "12345",
+        null,
+        true,
+      ]) {
+        expect(
+          parsePerimeterOverlay({
+            ...validScorerCommand,
+            player: { ...validScorerCommand.player, number },
+          }),
+        ).toBeNull();
+      }
+    });
+
+    it("builds a fresh version-2 command per selection", () => {
+      const first = buildGoalScorerOverlayCommand({
+        id: " 2492 ",
+        name: " Jón Jónsson ",
+        number: " 7 ",
+      });
+      const second = buildGoalScorerOverlayCommand({
+        id: "2492",
+        name: "Jón Jónsson",
+        number: 7,
+      });
+      for (const command of [first, second]) {
+        expect(command.version).toBe(2);
+        expect(command.kind).toBe("goal-scorer");
+        expect(command.player).toEqual({
+          id: "2492",
+          name: "Jón Jónsson",
+          number: "7",
+        });
+      }
+      expect(first.id).not.toBe(second.id);
+      expect(parsePerimeterOverlay(first)).toEqual(first);
+      expect(parsePerimeterOverlay(second)).toEqual(second);
+    });
   });
 
   describe("parsePerimeterMediaPairs", () => {
@@ -2089,6 +2292,22 @@ describe("firebaseParsers", () => {
       expect(result[pairId]?.name).toBe("Sindri");
       expect(result[pairId]?.files["2"]?.name).toBe("48-1-sindri.mp4");
       expect(result[pairId]?.files["4"]?.name).toBe("40-1-sindri.png");
+    });
+
+    it("preserves an optional Storage generation on pair files", () => {
+      const withGeneration = validPair();
+      const pairFiles = withGeneration[pairId].files as Record<
+        string,
+        { generation?: string }
+      >;
+      pairFiles["2"]!.generation = "1700000000000000";
+      pairFiles["4"]!.generation = "1700000000000001";
+      const result = parsePerimeterMediaPairs(withGeneration, {
+        location,
+        bucket,
+      });
+      expect(result[pairId]?.files["2"]?.generation).toBe("1700000000000000");
+      expect(result[pairId]?.files["4"]?.generation).toBe("1700000000000001");
     });
 
     it("returns an empty map for null/undefined/primitive input", () => {
@@ -2231,6 +2450,99 @@ describe("firebaseParsers", () => {
       expect(Object.keys(result)).toHaveLength(2);
       expect(result["22222222-2222-4222-8222-222222222222"]?.name).toBe("Góð");
       expect(result.broken).toBeUndefined();
+    });
+  });
+
+  describe("parsePerimeterGoalVideo", () => {
+    const bucket = "vikes-match-clock-firebase.appspot.com";
+    const location = "vikuti";
+    const validConfig = () => ({
+      files: {
+        "2": {
+          name: "goal-48.mp4",
+          source: `gs://${bucket}/${location}/perimeter/goal-48.mp4`,
+          generation: "1700000000000001",
+        },
+        "4": {
+          name: "goal-40.mp4",
+          source: `gs://${bucket}/${location}/perimeter/goal-40.mp4`,
+        },
+      },
+    });
+
+    it("accepts a valid configuration with the active bucket's goal prefix", () => {
+      const result = parsePerimeterGoalVideo(validConfig(), {
+        location,
+        bucket,
+      });
+      expect(result?.files["2"]?.name).toBe("goal-48.mp4");
+      expect(result?.files["2"]?.generation).toBe("1700000000000001");
+      expect(result?.files["4"]?.name).toBe("goal-40.mp4");
+    });
+
+    it("treats absent config as null so the legacy fallback applies", () => {
+      expect(parsePerimeterGoalVideo(null)).toBeNull();
+      expect(parsePerimeterGoalVideo(undefined)).toBeNull();
+    });
+
+    it("rejects non-object documents and a missing files map", () => {
+      expect(parsePerimeterGoalVideo("x")).toBeNull();
+      expect(parsePerimeterGoalVideo(42)).toBeNull();
+      expect(parsePerimeterGoalVideo({})).toBeNull();
+      expect(parsePerimeterGoalVideo({ other: true })).toBeNull();
+    });
+
+    it("rejects a config missing an overlay target", () => {
+      const data = validConfig();
+      delete (data.files as Record<string, unknown>)["4"];
+      expect(parsePerimeterGoalVideo(data, { location, bucket })).toBeNull();
+    });
+
+    it("rejects an extra target key", () => {
+      const data = validConfig();
+      (data.files as Record<string, unknown>)["5"] = {
+        name: "x.mp4",
+        source: `gs://${bucket}/${location}/perimeter/x.mp4`,
+      };
+      expect(parsePerimeterGoalVideo(data, { location, bucket })).toBeNull();
+    });
+
+    it("rejects a source outside the location or the active bucket", () => {
+      const wrongBucket = validConfig();
+      (wrongBucket.files as Record<string, { source: string }>)["2"].source =
+        `gs://wrong.appspot.com/${location}/perimeter/goal-48.mp4`;
+      expect(
+        parsePerimeterGoalVideo(wrongBucket, { location, bucket }),
+      ).toBeNull();
+
+      const wrongLocation = validConfig();
+      (wrongLocation.files as Record<string, { source: string }>)["2"].source =
+        `gs://${bucket}/other/perimeter/goal-48.mp4`;
+      expect(
+        parsePerimeterGoalVideo(wrongLocation, { location, bucket }),
+      ).toBeNull();
+    });
+
+    it("rejects an unsafe filename and duplicate target filenames", () => {
+      const unsafe = validConfig();
+      (unsafe.files as Record<string, { name: string }>)["2"].name =
+        "../evil.mp4";
+      expect(parsePerimeterGoalVideo(unsafe, { location, bucket })).toBeNull();
+
+      const duplicated = validConfig();
+      (duplicated.files as Record<string, { name: string }>)["4"].name =
+        "goal-48.mp4";
+      expect(
+        parsePerimeterGoalVideo(duplicated, { location, bucket }),
+      ).toBeNull();
+    });
+
+    it("drops a malformed generation without rejecting the config", () => {
+      const data = validConfig();
+      (data.files as Record<string, { generation?: unknown }>)["2"].generation =
+        1700000000000001;
+      const result = parsePerimeterGoalVideo(data, { location, bucket });
+      expect(result?.files["2"]?.generation).toBeUndefined();
     });
   });
 
@@ -2391,6 +2703,112 @@ describe("firebaseParsers", () => {
         }),
       ).toBeNull();
     });
+  });
+});
+
+describe("parsePerimeterDisplay", () => {
+  const capturedVikinConfiguration = {
+    version: 1,
+    revision: "vikin-capture-1",
+    renderer: "resolume",
+    framebuffer: { width: 8448, height: 192, background: "black" },
+    logicalScreens: {
+      "screen-48": {
+        id: "screen-48",
+        name: "48 skjáir",
+        width: 4608,
+        height: 192,
+      },
+      "screen-40": {
+        id: "screen-40",
+        name: "40 skjáir",
+        width: 3840,
+        height: 192,
+      },
+    },
+    compatibilityKeys: {
+      base: { "1": "screen-48", "3": "screen-40" },
+      overlay: { "2": "screen-48", "4": "screen-40" },
+    },
+    regions: [
+      {
+        id: "screen-48-output",
+        logicalScreenId: "screen-48",
+        source: { x: 0, y: 0, width: 4608, height: 192 },
+        destination: { x: 0, y: 0, width: 4608, height: 192 },
+        transform: { rotation: 0, flipX: false, flipY: false, zIndex: 0 },
+      },
+      {
+        id: "screen-40-output",
+        logicalScreenId: "screen-40",
+        source: { x: 0, y: 0, width: 3840, height: 192 },
+        destination: { x: 4608, y: 0, width: 3840, height: 192 },
+        transform: { rotation: 0, flipX: false, flipY: false, zIndex: 1 },
+      },
+    ],
+    playback: { cueDurationMs: 20_000, videoPolicy: "fit-to-cue" },
+  };
+
+  it("accepts the captured Vikin configuration", () => {
+    expect(parsePerimeterDisplay(capturedVikinConfiguration)).toEqual({
+      ...capturedVikinConfiguration,
+      regions: [
+        {
+          ...capturedVikinConfiguration.regions[0],
+          transform: {
+            rotation: 0,
+            flipX: false,
+            flipY: false,
+            allowScaling: false,
+            allowClipping: false,
+            allowSourceOverlap: false,
+            allowDestinationOverlap: false,
+            zIndex: 0,
+          },
+        },
+        {
+          ...capturedVikinConfiguration.regions[1],
+          transform: {
+            rotation: 0,
+            flipX: false,
+            flipY: false,
+            allowScaling: false,
+            allowClipping: false,
+            allowSourceOverlap: false,
+            allowDestinationOverlap: false,
+            zIndex: 1,
+          },
+        },
+      ],
+    });
+  });
+
+  it.each([
+    ["missing revision", { revision: "" }],
+    ["unknown renderer", { renderer: "canvas" }],
+    ["missing framebuffer", { framebuffer: null }],
+    ["missing source coverage", { regions: [] }],
+  ])("rejects %s", (_label, override) => {
+    expect(
+      parsePerimeterDisplay({ ...capturedVikinConfiguration, ...override }),
+    ).toBeUndefined();
+  });
+
+  it("preserves optional perimeter config on parsed locations", () => {
+    const result = parseLocations({
+      vikuti: {
+        label: "Víkin",
+        screens: [
+          {
+            key: "outside",
+            name: "Úti",
+            style: { width: 1920, height: 1080 },
+          },
+        ],
+        perimeterDisplay: capturedVikinConfiguration,
+      },
+    });
+    expect(result?.screens[0]?.perimeterDisplay?.renderer).toBe("resolume");
   });
 });
 
