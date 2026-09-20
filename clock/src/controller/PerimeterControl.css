@@ -680,6 +680,40 @@
   background: #ef5350;
 }
 
+/* Goal video (operator-configured home-goal overlay media) */
+.perimeter-preview-modal .perimeter-goal-video {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  background: #f7f9fb;
+  border: 1px solid #e0e3e7;
+  border-radius: 6px;
+}
+
+.perimeter-preview-modal .perimeter-goal-video-files {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.perimeter-preview-modal .perimeter-goal-video-file {
+  font-weight: 600;
+}
+
+.perimeter-preview-modal .perimeter-goal-video-empty {
+  color: #607d8b;
+}
+
+.perimeter-preview-modal .perimeter-goal-video-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 /* ── Goal scorer preparation status ── */
 
 .perimeter-preview-modal .goal-scorer-preparation {

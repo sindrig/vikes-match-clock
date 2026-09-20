@@ -53,6 +53,21 @@ const validScorerOverlay = {
   player: { id: "2492", name: "Jón Jónsson", number: "7" },
 };
 
+const validGoalVideoConfig = {
+  files: {
+    "2": {
+      name: "goal-48.mp4",
+      source: `gs://${BUCKET}/${LOCATION}/perimeter/goal-48.mp4`,
+      generation: "1700000000000001",
+    },
+    "4": {
+      name: "goal-40.mp4",
+      source: `gs://${BUCKET}/${LOCATION}/perimeter/goal-40.mp4`,
+      generation: "1700000000000002",
+    },
+  },
+};
+
 describeRules("Firebase perimeter overlay rules", () => {
   let env: RulesTestEnvironment;
 
@@ -267,6 +282,54 @@ describeRules("Firebase perimeter overlay rules", () => {
             },
           },
         ],
+      }),
+    );
+  });
+
+  it("allows an authorized operator to write valid goal-video config", async () => {
+    const db = env.authenticatedContext(UID).database();
+    await assertSucceeds(
+      db
+        .ref(`states/${LOCATION}/perimeter/goalVideo`)
+        .set(validGoalVideoConfig),
+    );
+  });
+
+  it("allows an authorized operator to clear the goal-video config", async () => {
+    const db = env.authenticatedContext(UID).database();
+    await assertSucceeds(
+      db.ref(`states/${LOCATION}/perimeter/goalVideo`).remove(),
+    );
+  });
+
+  it("rejects unauthenticated or malformed goal-video config writes", async () => {
+    const unauth = env.unauthenticatedContext().database();
+    await assertFails(
+      unauth
+        .ref(`states/${LOCATION}/perimeter/goalVideo`)
+        .set(validGoalVideoConfig),
+    );
+    const db = env.authenticatedContext(UID).database();
+    await assertFails(
+      db.ref(`states/${LOCATION}/perimeter/goalVideo`).set({ extra: true }),
+    );
+    await assertFails(
+      db
+        .ref(`states/${LOCATION}/perimeter/goalVideo`)
+        .set({ files: { "2": { name: "goal-48.mp4" } } }),
+    );
+    await assertFails(
+      db.ref(`states/${LOCATION}/perimeter/goalVideo`).set({
+        files: {
+          "2": {
+            name: "goal-48.mp4",
+            source: "http://not-a-gs-uri/goal-48.mp4",
+          },
+          "4": {
+            name: "goal-40.mp4",
+            source: `gs://${BUCKET}/${LOCATION}/perimeter/goal-40.mp4`,
+          },
+        },
       }),
     );
   });

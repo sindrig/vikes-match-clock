@@ -6,8 +6,8 @@ import {
   bandNumberFontSize,
   composeScorerBand,
   composeScorerBands,
-  coverCrop,
   layoutBandUnit,
+  portraitFitWidth,
   scorerBandFonts,
   scorerBandFontSpec,
   type BandRenderingContext,
@@ -121,22 +121,18 @@ describe("band metrics", () => {
     }
   });
 
-  it("cover-crops a tall portrait to the band aspect", () => {
-    const crop = coverCrop(100, 200, 108);
-    // Crop width keeps the source aspect: (100/200)*108 = 54 wide slice,
-    // centered horizontally, full source height.
-    expect(crop.sw).toBeCloseTo(54);
-    expect(crop.sh).toBeCloseTo(108);
-    expect(crop.sx).toBeCloseTo(23);
-    expect(crop.sy).toBeCloseTo(46);
+  it("fits a tall portrait to the band height without cropping", () => {
+    // Contain fit: the full 100x200 source at band height 108 is 54 wide.
+    expect(portraitFitWidth(100, 200, 108)).toBe(54);
   });
 
-  it("cover-crops a wide image by clamping to the source width", () => {
-    const crop = coverCrop(400, 50, 108);
-    expect(crop.sw).toBe(400);
-    expect(crop.sh).toBe(50);
-    expect(crop.sx).toBe(0);
-    expect(crop.sy).toBe(0);
+  it("fits a wide image by scaling to the height", () => {
+    expect(portraitFitWidth(400, 50, 108)).toBe(Math.round((400 / 50) * 108));
+  });
+
+  it("returns zero for empty sources so no portrait is drawn", () => {
+    expect(portraitFitWidth(0, 200, 108)).toBe(0);
+    expect(portraitFitWidth(100, 0, 108)).toBe(0);
   });
 });
 
@@ -152,7 +148,7 @@ describe("layoutBandUnit", () => {
     );
     const gap = bandGap(108);
     expect(unit.gap).toBe(gap);
-    // Portrait cover-cropped: aspect 0.5 → 54 wide at height 108.
+    // Portrait fits the full source: aspect 0.5 → 54 wide at height 108.
     expect(unit.portraitWidth).toBe(54);
     expect(unit.numberFontSize).toBe(bandNumberFontSize(108));
     expect(unit.nameFontSize).toBe(bandNameFontSize(108));
@@ -246,6 +242,8 @@ describe("composeScorerBand", () => {
       expect(slice[1]?.op).toBe("fillText");
       expect(slice[2]?.op).toBe("fillText");
       expect(slice[0]?.args[4]).toBe(unitIndex * unit.unitWidth);
+      // Contain fit: the full source is drawn, never a cropped slice.
+      expect(slice[0]?.args.slice(0, 4)).toEqual([0, 0, 100, 200]);
     }
   });
 

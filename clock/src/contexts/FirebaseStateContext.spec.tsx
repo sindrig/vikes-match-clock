@@ -3273,6 +3273,127 @@ describe("FirebaseStateContext", () => {
       expect(firebaseDatabase.writeAudited).not.toHaveBeenCalled();
     });
   });
+
+  describe("perimeter goal video", () => {
+    const bucket = "vikes-match-clock-firebase.appspot.com";
+    const goalVideoConfig = {
+      files: {
+        "2": {
+          name: "goal-48.mp4",
+          source: `gs://${bucket}/vikuti/perimeter/goal-48.mp4`,
+          generation: "1700000000000001",
+        },
+        "4": {
+          name: "goal-40.mp4",
+          source: `gs://${bucket}/vikuti/perimeter/goal-40.mp4`,
+        },
+      },
+    };
+
+    function renderGoalVideo(
+      listenPrefix: string,
+      isAuthenticated: boolean,
+      perimeterData: unknown = null,
+    ): ReturnType<typeof usePerimeter> | null {
+      vi.mocked(onValue).mockImplementation(
+        withConnectedInfo((path) =>
+          path.endsWith(`${listenPrefix}/perimeter`) ? perimeterData : null,
+        ),
+      );
+
+      let perimeterApi: ReturnType<typeof usePerimeter> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix={listenPrefix}
+          isAuthenticated={isAuthenticated}
+          screenKey={null}
+        >
+          <TestPerimeterConsumer
+            onMount={(api) => {
+              perimeterApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      return perimeterApi;
+    }
+
+    it("parses the goal-video config from the desired perimeter state", () => {
+      const perimeterApi = renderGoalVideo("vikuti", true, {
+        goalVideo: goalVideoConfig,
+      });
+
+      expect(perimeterApi).not.toBeNull();
+      expect(perimeterApi!.goalVideo).toEqual(goalVideoConfig);
+    });
+
+    it("stays null when no goal-video config exists", () => {
+      const perimeterApi = renderGoalVideo("vikuti", true, null);
+
+      expect(perimeterApi).not.toBeNull();
+      expect(perimeterApi!.goalVideo).toBeNull();
+    });
+
+    it("drops a config referencing another environment's bucket", () => {
+      const perimeterApi = renderGoalVideo("vikuti", true, {
+        goalVideo: {
+          files: {
+            ...goalVideoConfig.files,
+            "2": {
+              name: "goal-48.mp4",
+              source: "gs://staging-bucket/vikuti/perimeter/goal-48.mp4",
+            },
+          },
+        },
+      });
+
+      expect(perimeterApi!.goalVideo).toBeNull();
+    });
+
+    it("setPerimeterGoalVideo writes the audited config document", async () => {
+      const perimeterApi = renderGoalVideo("vikuti", true);
+
+      await act(async () => {
+        await perimeterApi!.setPerimeterGoalVideo(goalVideoConfig);
+      });
+
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
+        "vikuti",
+        "perimeter",
+        expect.objectContaining({
+          goalVideo: goalVideoConfig,
+        }),
+        expect.anything(),
+      );
+    });
+
+    it("clears the config with a null write", async () => {
+      const perimeterApi = renderGoalVideo("vikuti", true);
+
+      await act(async () => {
+        await perimeterApi!.setPerimeterGoalVideo(null);
+      });
+
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
+        "vikuti",
+        "perimeter",
+        expect.objectContaining({
+          goalVideo: null,
+        }),
+        expect.anything(),
+      );
+    });
+
+    it("blocks setPerimeterGoalVideo when not authenticated", async () => {
+      const perimeterApi = renderGoalVideo("vikuti", false);
+
+      await act(async () => {
+        await perimeterApi!.setPerimeterGoalVideo(goalVideoConfig);
+      });
+
+      expect(firebaseDatabase.writeAudited).not.toHaveBeenCalled();
+    });
+  });
 });
 
 describe("goal scorer preparation", () => {

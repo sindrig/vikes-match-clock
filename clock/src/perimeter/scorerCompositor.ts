@@ -49,30 +49,17 @@ export function scorerBandFonts(height: number): string[] {
   ];
 }
 
-// A deterministic cover crop of the source image into the band height: the
-// drawn region is centered, covers the full target height, and keeps the
-// widest source slice that matches the band aspect.
-export function coverCrop(
+// The portrait slot fits the entire source image to the band height
+// (contain): the full source is drawn, never clipped top/bottom or sides,
+// matching the server band renderer's `fit: "contain"` resize. Returns the
+// slot width in pixels (0 when the source has no pixels).
+export function portraitFitWidth(
   sourceWidth: number,
   sourceHeight: number,
-  targetHeight: number,
-): { sx: number; sy: number; sw: number; sh: number } {
-  if (sourceWidth <= 0 || sourceHeight <= 0) {
-    return { sx: 0, sy: 0, sw: 0, sh: 0 };
-  }
-  const aspect = sourceWidth / sourceHeight;
-  let cropWidth = aspect * targetHeight;
-  let cropHeight = cropWidth / aspect;
-  if (cropWidth > sourceWidth) {
-    cropWidth = sourceWidth;
-    cropHeight = cropWidth / aspect;
-  }
-  return {
-    sx: (sourceWidth - cropWidth) / 2,
-    sy: (sourceHeight - cropHeight) / 2,
-    sw: cropWidth,
-    sh: cropHeight,
-  };
+  height: number,
+): number {
+  if (sourceWidth <= 0 || sourceHeight <= 0) return 0;
+  return Math.max(1, Math.round((sourceWidth / sourceHeight) * height));
 }
 
 // The subset of the 2D context the compositor uses, narrowed so tests can
@@ -131,10 +118,10 @@ export interface BandUnit {
   unitWidth: number;
 }
 
-// One repeating unit: [cropped portrait] [gap] [number] [gap] [name] [gap].
-// The name is measured at its nominal size, reduced toward the defined
-// minimum size, and only then truncated, so one unit can never overlap the
-// next.
+// One repeating unit: [full portrait fitted to the band height] [gap] [number]
+// [gap] [name] [gap]. The name is measured at its nominal size, reduced toward
+// the defined minimum size, and only then truncated, so one unit can never
+// overlap the next.
 export function layoutBandUnit(
   source: { width: number; height: number },
   numberText: string,
@@ -142,9 +129,7 @@ export function layoutBandUnit(
   height: number,
   context: BandRenderingContext,
 ): BandUnit {
-  const { sw, sh } = coverCrop(source.width, source.height, height);
-  const portraitWidth =
-    sh > 0 ? Math.max(1, Math.round((sw / sh) * height)) : 0;
+  const portraitWidth = portraitFitWidth(source.width, source.height, height);
   const gap = bandGap(height);
   const numberFontSize = bandNumberFontSize(height);
   context.font = scorerBandFontSpec(numberFontSize);
@@ -207,18 +192,20 @@ export function layoutBandUnit(
 function drawUnit(
   context: BandRenderingContext,
   image: HTMLImageElement,
-  crop: { sx: number; sy: number; sw: number; sh: number },
+  source: { width: number; height: number },
   unit: BandUnit,
   originX: number,
   height: number,
 ): void {
-  if (unit.portraitWidth > 0 && crop.sw > 0 && crop.sh > 0) {
+  if (unit.portraitWidth > 0 && source.width > 0 && source.height > 0) {
+    // Contain fit: the full source image is scaled to the slot, so nothing
+    // is clipped away at the band's top or bottom edge.
     context.drawImage(
       image,
-      crop.sx,
-      crop.sy,
-      crop.sw,
-      crop.sh,
+      0,
+      0,
+      source.width,
+      source.height,
       originX,
       0,
       unit.portraitWidth,
@@ -256,9 +243,12 @@ export async function composeScorerBand(
   if (!context) {
     throw new Error("Canvas 2D context is unavailable.");
   }
-  const crop = coverCrop(source.naturalWidth, source.naturalHeight, height);
+  const sourceSize = {
+    width: source.naturalWidth,
+    height: source.naturalHeight,
+  };
   const unit = layoutBandUnit(
-    { width: source.naturalWidth, height: source.naturalHeight },
+    sourceSize,
     player.number,
     player.name,
     height,
@@ -274,7 +264,7 @@ export async function composeScorerBand(
       context.rect(x, 0, remaining, height);
       context.clip();
     }
-    drawUnit(context, source, crop, unit, x, height);
+    drawUnit(context, source, sourceSize, unit, x, height);
     if (clipped) {
       context.restore();
     }

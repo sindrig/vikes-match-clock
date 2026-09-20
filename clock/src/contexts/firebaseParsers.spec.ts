@@ -12,6 +12,7 @@ import {
   parsePerimeterOverlay,
   buildGoalScorerOverlayCommand,
   parsePerimeterMediaPairs,
+  parsePerimeterGoalVideo,
   parsePerimeterAdLayout,
   parsePerimeterAppliedAdLayout,
   parsePerimeterBrightness,
@@ -2449,6 +2450,99 @@ describe("firebaseParsers", () => {
       expect(Object.keys(result)).toHaveLength(2);
       expect(result["22222222-2222-4222-8222-222222222222"]?.name).toBe("Góð");
       expect(result.broken).toBeUndefined();
+    });
+  });
+
+  describe("parsePerimeterGoalVideo", () => {
+    const bucket = "vikes-match-clock-firebase.appspot.com";
+    const location = "vikuti";
+    const validConfig = () => ({
+      files: {
+        "2": {
+          name: "goal-48.mp4",
+          source: `gs://${bucket}/${location}/perimeter/goal-48.mp4`,
+          generation: "1700000000000001",
+        },
+        "4": {
+          name: "goal-40.mp4",
+          source: `gs://${bucket}/${location}/perimeter/goal-40.mp4`,
+        },
+      },
+    });
+
+    it("accepts a valid configuration with the active bucket's goal prefix", () => {
+      const result = parsePerimeterGoalVideo(validConfig(), {
+        location,
+        bucket,
+      });
+      expect(result?.files["2"]?.name).toBe("goal-48.mp4");
+      expect(result?.files["2"]?.generation).toBe("1700000000000001");
+      expect(result?.files["4"]?.name).toBe("goal-40.mp4");
+    });
+
+    it("treats absent config as null so the legacy fallback applies", () => {
+      expect(parsePerimeterGoalVideo(null)).toBeNull();
+      expect(parsePerimeterGoalVideo(undefined)).toBeNull();
+    });
+
+    it("rejects non-object documents and a missing files map", () => {
+      expect(parsePerimeterGoalVideo("x")).toBeNull();
+      expect(parsePerimeterGoalVideo(42)).toBeNull();
+      expect(parsePerimeterGoalVideo({})).toBeNull();
+      expect(parsePerimeterGoalVideo({ other: true })).toBeNull();
+    });
+
+    it("rejects a config missing an overlay target", () => {
+      const data = validConfig();
+      delete (data.files as Record<string, unknown>)["4"];
+      expect(parsePerimeterGoalVideo(data, { location, bucket })).toBeNull();
+    });
+
+    it("rejects an extra target key", () => {
+      const data = validConfig();
+      (data.files as Record<string, unknown>)["5"] = {
+        name: "x.mp4",
+        source: `gs://${bucket}/${location}/perimeter/x.mp4`,
+      };
+      expect(parsePerimeterGoalVideo(data, { location, bucket })).toBeNull();
+    });
+
+    it("rejects a source outside the location or the active bucket", () => {
+      const wrongBucket = validConfig();
+      (wrongBucket.files as Record<string, { source: string }>)["2"].source =
+        `gs://wrong.appspot.com/${location}/perimeter/goal-48.mp4`;
+      expect(
+        parsePerimeterGoalVideo(wrongBucket, { location, bucket }),
+      ).toBeNull();
+
+      const wrongLocation = validConfig();
+      (wrongLocation.files as Record<string, { source: string }>)["2"].source =
+        `gs://${bucket}/other/perimeter/goal-48.mp4`;
+      expect(
+        parsePerimeterGoalVideo(wrongLocation, { location, bucket }),
+      ).toBeNull();
+    });
+
+    it("rejects an unsafe filename and duplicate target filenames", () => {
+      const unsafe = validConfig();
+      (unsafe.files as Record<string, { name: string }>)["2"].name =
+        "../evil.mp4";
+      expect(parsePerimeterGoalVideo(unsafe, { location, bucket })).toBeNull();
+
+      const duplicated = validConfig();
+      (duplicated.files as Record<string, { name: string }>)["4"].name =
+        "goal-48.mp4";
+      expect(
+        parsePerimeterGoalVideo(duplicated, { location, bucket }),
+      ).toBeNull();
+    });
+
+    it("drops a malformed generation without rejecting the config", () => {
+      const data = validConfig();
+      (data.files as Record<string, { generation?: unknown }>)["2"].generation =
+        1700000000000001;
+      const result = parsePerimeterGoalVideo(data, { location, bucket });
+      expect(result?.files["2"]?.generation).toBeUndefined();
     });
   });
 

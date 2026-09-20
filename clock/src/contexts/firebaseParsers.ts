@@ -20,6 +20,7 @@ import type {
   GoalScorerOverlayCommand,
   GoalScorerOverlayPlayer,
   PerimeterMediaPair,
+  PerimeterGoalVideoConfig,
   PerimeterAdLayout,
   PerimeterAdLayoutColumn,
   PerimeterAdLayoutFile,
@@ -970,6 +971,40 @@ function validateMediaPairSource(
   if (filename.includes("/") || filename.includes("..")) return false;
   if (!MEDIA_PAIR_FILENAME_RE.test(filename)) return false;
   return true;
+}
+
+// Strict parse of the operator-configured home-goal overlay media under
+// `states/{location}/perimeter/goalVideo`. The config is optional (an absent
+// document is null, so the goal button falls back to the legacy pair); a
+// present document must carry exactly the two overlay target files ("2" and
+// "4"), parsed with the same file validation as overlay columns.
+export function parsePerimeterGoalVideo(
+  data: unknown,
+  options?: { location?: string; bucket?: string },
+): PerimeterGoalVideoConfig | null {
+  if (data === null || data === undefined) return null;
+  if (!data || typeof data !== "object") return null;
+  const raw = data as Record<string, unknown>;
+  const filesRaw = raw.files;
+  if (!filesRaw || typeof filesRaw !== "object") return null;
+  const filesMap = filesRaw as Record<string, unknown>;
+  const keys = Object.keys(filesMap);
+  if (
+    keys.length !== MEDIA_PAIR_TARGET_KEYS.length ||
+    !MEDIA_PAIR_TARGET_KEYS.every((key) => keys.includes(key))
+  ) {
+    return null;
+  }
+  const files: Record<string, PerimeterOverlayFile> = {};
+  const seenNames = new Set<string>();
+  for (const target of MEDIA_PAIR_TARGETS) {
+    const parsed = parseOverlayFile(filesMap[target.key], options);
+    if (!parsed) return null;
+    if (seenNames.has(parsed.name)) return null;
+    seenNames.add(parsed.name);
+    files[target.key] = parsed;
+  }
+  return { files };
 }
 
 export function parsePerimeterMediaPairs(

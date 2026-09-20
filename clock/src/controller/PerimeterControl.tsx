@@ -30,6 +30,7 @@ import {
   PerimeterAdLayoutColumn,
   PerimeterAdLayoutFile,
   PerimeterAppliedAdFile,
+  PerimeterOverlayFile,
 } from "../types";
 import { useListeners, usePerimeter } from "../contexts/FirebaseStateContext";
 import { useLocalState } from "../contexts/LocalStateContext";
@@ -301,6 +302,195 @@ const FilePicker = ({
           />
         </label>
       </div>
+    </div>
+  );
+};
+
+// Canonical home-goal overlay targets. The keys are the shared overlay layer
+// ids consumed by both the web runtime (via the published mapping's
+// compatibilityKeys.overlay) and the Resolume daemon; labels fall back to the
+// established 48/40 screen names when no web mapping is published.
+const GOAL_VIDEO_TARGETS = [
+  { key: "2", fallbackLabel: "48 skjáir" },
+  { key: "4", fallbackLabel: "40 skjáir" },
+] as const;
+
+const GoalVideoSection = () => {
+  const { goalVideo, setPerimeterGoalVideo } = usePerimeter();
+  const { listenPrefix } = useLocalState();
+  const { screens } = useListeners();
+
+  const [showEdit, setShowEdit] = useState(false);
+  const [draft, setDraft] = useState<Record<string, PerimeterOverlayFile>>({});
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const perimeterConfiguration = useMemo(
+    () =>
+      screens.find((screen) => screen.key === listenPrefix)?.perimeterDisplay,
+    [listenPrefix, screens],
+  );
+  const targets = useMemo(
+    () =>
+      GOAL_VIDEO_TARGETS.map(({ key, fallbackLabel }) => ({
+        key,
+        label:
+          perimeterConfiguration?.logicalScreens[
+            perimeterConfiguration?.compatibilityKeys.overlay?.[key] ?? ""
+          ]?.name ?? fallbackLabel,
+      })),
+    [perimeterConfiguration],
+  );
+
+  const configuredFiles = goalVideo?.files ?? {};
+  const configuredNames = GOAL_VIDEO_TARGETS.map(
+    ({ key }) => configuredFiles[key]?.name ?? null,
+  );
+
+  const openEdit = () => {
+    setError(null);
+    setDraft({ ...configuredFiles });
+    setShowEdit(true);
+  };
+
+  const closeEdit = () => {
+    if (saving) return;
+    setShowEdit(false);
+  };
+
+  const handleSave = async () => {
+    if (saving) return;
+    if (!GOAL_VIDEO_TARGETS.every(({ key }) => draft[key] !== undefined)) {
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      await setPerimeterGoalVideo({ files: { ...draft } });
+      setShowEdit(false);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Ekki tókst að vista markmyndband. Reyndu aftur.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleClear = async () => {
+    if (saving) return;
+    if (
+      !window.confirm(
+        "Hreinsa markmyndband? Markahnappurinn notar þá sjálfgefnu goal-48/goal-40 skrárnar.",
+      )
+    ) {
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      await setPerimeterGoalVideo(null);
+      setShowEdit(false);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Ekki tókst að hreinsa markmyndband. Reyndu aftur.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="perimeter-goal-video">
+      <div className="perimeter-brightness-header">
+        <span className="perimeter-brightness-title">Markamyndband</span>
+      </div>
+      <div className="perimeter-goal-video-files">
+        {configuredNames.every((name) => name === null) ? (
+          <span className="perimeter-goal-video-empty">
+            Ekkert stillt — markið notar goal-48/goal-40 skrárnar
+          </span>
+        ) : (
+          targets.map(({ key, label }) => (
+            <span key={key} className="perimeter-goal-video-file">
+              {label}: {configuredFiles[key]?.name ?? "—"}
+            </span>
+          ))
+        )}
+      </div>
+      {error && (
+        <span className="perimeter-status-error">
+          Ekki tókst að vista: {error}
+        </span>
+      )}
+      <div className="perimeter-goal-video-actions">
+        <Button size="sm" appearance="primary" onClick={openEdit}>
+          {configuredNames.every((name) => name === null)
+            ? "Stilla markmyndband"
+            : "Breyta"}
+        </Button>
+      </div>
+      <p className="perimeter-hint">
+        Þegar mark er skorað spilar þetta efni á jaðarskjánum þar til
+        markaskorari er valinn. Skrárnar eru valdar úr sama myndefnisgeymi og
+        auglýsingadálkar.
+      </p>
+      <Modal open={showEdit} onClose={closeEdit} size="sm">
+        <Modal.Header>
+          <Modal.Title>Markamyndband</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p className="perimeter-add-hint">
+            Veldu skrá fyrir hvern jaðarskjá úr listanum eða hlaðið upp nýrri
+            skrá.
+          </p>
+          <div className="perimeter-add-form">
+            {targets.map(({ key, label }) => (
+              <FilePicker
+                key={key}
+                laneName={label}
+                listenPrefix={listenPrefix}
+                selectedFile={draft[key] ?? null}
+                onSelect={(file) =>
+                  setDraft((prev) => ({ ...prev, [key]: file }))
+                }
+              />
+            ))}
+          </div>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button
+            appearance="primary"
+            onClick={() => {
+              void handleSave();
+            }}
+            disabled={
+              saving || !GOAL_VIDEO_TARGETS.every(({ key }) => draft[key])
+            }
+          >
+            Vista
+          </Button>
+          {configuredNames.some((name) => name !== null) && (
+            <Button
+              appearance="ghost"
+              color="red"
+              onClick={() => {
+                void handleClear();
+              }}
+              disabled={saving}
+            >
+              Hreinsa stillingu
+            </Button>
+          )}
+          <Button onClick={closeEdit} disabled={saving}>
+            Hætta við
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </div>
   );
 };
@@ -634,6 +824,7 @@ const PerimeterControl = ({ standalone = false }: { standalone?: boolean }) => {
     <>
       {isWebVenue && <PerimeterDisplayReports />}
       <BrightnessSection />
+      <GoalVideoSection />
       {!isWebVenue && <GoalScorerPreparation />}
       {!isWebVenue && !appliedAdLayoutLoaded ? (
         <div className="perimeter-preview-state">

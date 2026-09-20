@@ -36,6 +36,7 @@ import { DisplayDiagnosticsProvider } from "./contexts/DisplayDiagnosticsContext
 import assetTypes from "./controller/asset/AssetTypes";
 import { isVideoUrl, resolveGoalBackground } from "./utils/matchUtils";
 import PerimeterDisplay from "./perimeter/PerimeterDisplay";
+import { FIREBASE_STORAGE_BUCKET } from "./firebase";
 
 import "./App.css";
 
@@ -45,7 +46,7 @@ const ScoreButtons = ({ side }: { side: "home" | "away" }) => {
     renderAsset,
     controller: { roster },
   } = useController();
-  const { setPerimeterOverlay } = usePerimeter();
+  const { setPerimeterOverlay, goalVideo } = usePerimeter();
   const { view } = useView();
   const { listenPrefix } = useLocalState();
   const scoreKeys = { home: "homeScore", away: "awayScore" } as const;
@@ -58,25 +59,28 @@ const ScoreButtons = ({ side }: { side: "home" | "away" }) => {
   const handleGoal = () => {
     addGoal(side);
     if (side === "home") {
-      const bucketName = "vikes-match-clock-firebase.appspot.com";
-      setPerimeterOverlay({
-        version: 1,
-        id: crypto.randomUUID(),
-        columns: [
-          {
-            durationMs: 10000,
-            files: {
+      // The goal video is operator-configured under
+      // states/{location}/perimeter/goalVideo; without a configuration the
+      // legacy goal-48/goal-40 pair from the active deployment's bucket is
+      // used (a stale production-bucket reference would be rejected by the
+      // environment-scoped overlay parser).
+      const goalFiles =
+        goalVideo && Object.keys(goalVideo.files).length > 0
+          ? goalVideo.files
+          : {
               "2": {
                 name: "goal-48.mp4",
-                source: `gs://${bucketName}/${listenPrefix}/perimeter/goal-48.mp4`,
+                source: `gs://${FIREBASE_STORAGE_BUCKET}/${listenPrefix}/perimeter/goal-48.mp4`,
               },
               "4": {
                 name: "goal-40.mp4",
-                source: `gs://${bucketName}/${listenPrefix}/perimeter/goal-40.mp4`,
+                source: `gs://${FIREBASE_STORAGE_BUCKET}/${listenPrefix}/perimeter/goal-40.mp4`,
               },
-            },
-          },
-        ],
+            };
+      setPerimeterOverlay({
+        version: 1,
+        id: crypto.randomUUID(),
+        columns: [{ durationMs: 10000, files: goalFiles }],
       });
       if (view.goalGif1) {
         renderAsset({

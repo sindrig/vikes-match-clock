@@ -32,6 +32,7 @@ import {
   PerimeterOverlay,
   PerimeterOverlayStatus,
   PerimeterMediaPair,
+  PerimeterGoalVideoConfig,
   PerimeterAdLayout,
   PerimeterAppliedAdLayout,
   AuditStateArea,
@@ -83,6 +84,7 @@ import {
   parsePerimeterPreview,
   parsePerimeterOverlay,
   parsePerimeterMediaPairs,
+  parsePerimeterGoalVideo,
   parsePerimeterAdLayout,
   parsePerimeterAppliedAdLayout,
   parsePerimeterBrightness,
@@ -324,7 +326,11 @@ interface FirebaseStateContextType {
     pair: PerimeterMediaPair,
   ) => Promise<void>;
   deletePerimeterMediaPair: (pairId: string) => Promise<void>;
+  setPerimeterGoalVideo: (
+    config: PerimeterGoalVideoConfig | null,
+  ) => Promise<void>;
   mediaPairs: Record<string, PerimeterMediaPair>;
+  perimeterGoalVideo: PerimeterGoalVideoConfig | null;
   perimeterOverlay: PerimeterOverlay | null;
   perimeterOverlayStatus: PerimeterOverlayStatus | null;
   perimeterAdLayout: PerimeterAdLayout | null;
@@ -532,6 +538,8 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   const [perimeterMediaPairs, setMediaPairs] = useState<
     Record<string, PerimeterMediaPair>
   >({});
+  const [perimeterGoalVideo, setPerimeterGoalVideoState] =
+    useState<PerimeterGoalVideoConfig | null>(null);
   const [perimeterAppliedAdLayout, setPerimeterAppliedAdLayout] = useState<
     PerimeterAppliedAdLayout | undefined
   >(undefined);
@@ -614,6 +622,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     setPerimeterPreviewLoaded(false);
     setPerimeterAdLayoutState(null);
     setMediaPairs({});
+    setPerimeterGoalVideoState(null);
     setPerimeterAppliedAdLayout(undefined);
     setPerimeterAppliedAdLayoutLoaded(false);
     setPerimeterAppliedAdLayoutError(null);
@@ -907,6 +916,17 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
                 )
               : null;
           setOverlay(overlay);
+          // The operator-configured home-goal overlay media rides along on
+          // the same desired-state subscription (absent config is null and
+          // the goal button falls back to the legacy pair).
+          setPerimeterGoalVideoState(
+            parsePerimeterGoalVideo(
+              raw && typeof raw === "object"
+                ? ((raw as Record<string, unknown>).goalVideo ?? null)
+                : null,
+              { location: listenPrefix, bucket: FIREBASE_STORAGE_BUCKET },
+            ),
+          );
           if (!perimeterReady) {
             perimeterReady = true;
             checkReady();
@@ -2559,6 +2579,23 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     [makeAudit, listenPrefix, writeEligible],
   );
 
+  // Operator-configured home-goal overlay media. A null write clears the
+  // config so the goal button falls back to the legacy goal-48/goal-40 pair.
+  const setPerimeterGoalVideo = useCallback(
+    (config: PerimeterGoalVideoConfig | null): Promise<void> => {
+      if (!writeEligible) return Promise.resolve();
+      const audit = makeAudit("perimeter", "perimeter.set-goal-video");
+      if (!audit) return Promise.resolve();
+      return firebaseDatabase.writeAudited(
+        listenPrefix,
+        "perimeter",
+        { goalVideo: config },
+        audit,
+      );
+    },
+    [makeAudit, listenPrefix, writeEligible],
+  );
+
   const setPerimeterBrightness = useCallback(
     (percent: number): Promise<void> => {
       if (!listenPrefix || !isAuthenticated || !writeEligible) {
@@ -2856,6 +2893,8 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       setPerimeterAdLayout,
       createPerimeterMediaPair,
       deletePerimeterMediaPair,
+      setPerimeterGoalVideo,
+      perimeterGoalVideo,
       mediaPairs: perimeterMediaPairs,
       perimeterAdLayout,
       perimeterAppliedAdLayout,
@@ -2954,6 +2993,8 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       setPerimeterAdLayout,
       createPerimeterMediaPair,
       deletePerimeterMediaPair,
+      setPerimeterGoalVideo,
+      perimeterGoalVideo,
       perimeterMediaPairs,
       perimeterAdLayout,
       perimeterAppliedAdLayout,
@@ -3166,7 +3207,9 @@ export const usePerimeter = () => {
     setPerimeterAdLayout,
     createPerimeterMediaPair,
     deletePerimeterMediaPair,
+    setPerimeterGoalVideo,
     mediaPairs,
+    perimeterGoalVideo,
     perimeterOverlay,
     perimeterOverlayStatus,
     perimeterAdLayout,
@@ -3193,7 +3236,9 @@ export const usePerimeter = () => {
     setPerimeterAdLayout,
     createPerimeterMediaPair,
     deletePerimeterMediaPair,
+    setPerimeterGoalVideo,
     mediaPairs,
+    goalVideo: perimeterGoalVideo,
     overlay: perimeterOverlay,
     overlayStatus: perimeterOverlayStatus,
     adLayout: perimeterAdLayout,

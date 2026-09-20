@@ -258,6 +258,134 @@ describe("PerimeterControl", () => {
     ).toBeVisible();
   });
 
+  it("shows the unconfigured goal-video fallback state", () => {
+    mockedUsePerimeter.mockReturnValue(
+      createMockPerimeterReturn({
+        perimeter: { enabled: true, state: "on" },
+        adLayout: webVenueAdLayout,
+        goalVideo: null,
+        setPerimeterGoalVideo: vi.fn().mockResolvedValue(undefined),
+      }),
+    );
+
+    render(<PerimeterControl standalone />);
+
+    const section = document.querySelector(".perimeter-goal-video");
+    expect(section).not.toBeNull();
+    expect(
+      within(section as HTMLElement).getByText(
+        "Ekkert stillt — markið notar goal-48/goal-40 skrárnar",
+      ),
+    ).toBeVisible();
+    expect(
+      within(section as HTMLElement).getByRole("button", {
+        name: "Stilla markmyndband",
+      }),
+    ).toBeVisible();
+  });
+
+  it("shows the configured goal-video files and edits them", async () => {
+    const setPerimeterGoalVideo = vi
+      .fn<ReturnType<typeof usePerimeter>["setPerimeterGoalVideo"]>()
+      .mockResolvedValue(undefined);
+    mockedUseListeners.mockReturnValue({
+      available: [],
+      screens: [
+        {
+          key: "test-location",
+          label: "Test location",
+          screen: {} as never,
+          perimeterDisplay: {
+            renderer: "web",
+            compatibilityKeys: {
+              base: { "1": "left" },
+              overlay: { "2": "screen-48", "4": "screen-40" },
+            },
+            logicalScreens: {
+              "screen-48": {
+                id: "screen-48",
+                name: "48 skjáir",
+                width: 100,
+                height: 10,
+              },
+              "screen-40": {
+                id: "screen-40",
+                name: "40 skjáir",
+                width: 90,
+                height: 10,
+              },
+            },
+          } as never,
+        },
+      ],
+    });
+    mockedUsePerimeter.mockReturnValue(
+      createMockPerimeterReturn({
+        perimeter: { enabled: true, state: "on" },
+        adLayout: webVenueAdLayout,
+        goalVideo: {
+          files: {
+            "2": {
+              name: "goal-48.mp4",
+              source: "gs://bucket/test-location/perimeter/goal-48.mp4",
+              generation: "1",
+            },
+            "4": {
+              name: "goal-40.mp4",
+              source: "gs://bucket/test-location/perimeter/goal-40.mp4",
+              generation: "2",
+            },
+          },
+        },
+        setPerimeterGoalVideo,
+      }),
+    );
+
+    render(<PerimeterControl standalone />);
+
+    const section = document.querySelector(".perimeter-goal-video");
+    expect(section).not.toBeNull();
+    expect(
+      within(section as HTMLElement).getByText("48 skjáir: goal-48.mp4"),
+    ).toBeVisible();
+    expect(
+      within(section as HTMLElement).getByText("40 skjáir: goal-40.mp4"),
+    ).toBeVisible();
+
+    fireEvent.click(
+      within(section as HTMLElement).getByRole("button", { name: "Breyta" }),
+    );
+    const modal = screen.getByRole("dialog");
+    // The edit modal opens with one picker per configured overlay target.
+    expect(
+      within(modal).getByRole("button", {
+        name: "Hreinsa stillingu",
+      }),
+    ).toBeEnabled();
+    const save = within(modal).getByRole("button", {
+      name: "Vista",
+    });
+    expect(save).toBeEnabled();
+    fireEvent.click(save);
+    await waitFor(() => {
+      expect(setPerimeterGoalVideo).toHaveBeenCalledTimes(1);
+    });
+    expect(setPerimeterGoalVideo).toHaveBeenCalledWith({
+      files: {
+        "2": {
+          name: "goal-48.mp4",
+          source: "gs://bucket/test-location/perimeter/goal-48.mp4",
+          generation: "1",
+        },
+        "4": {
+          name: "goal-40.mp4",
+          source: "gs://bucket/test-location/perimeter/goal-40.mp4",
+          generation: "2",
+        },
+      },
+    });
+  });
+
   it("hides the skip-forward button on non-web venues", () => {
     mockedUsePerimeter.mockReturnValue(
       createMockPerimeterReturn({

@@ -441,6 +441,15 @@ export interface GoalScorerOverlayCommand {
 
 export type PerimeterOverlay = PerimeterFileOverlay | GoalScorerOverlayCommand;
 
+// Operator-configured home-goal overlay media: the overlay files played as
+// soon as a home goal is scored, before any scorer selection replaces it.
+// Stored under states/{location}/perimeter/goalVideo with one file per
+// overlay target ("2" and "4"); absent config falls back to the legacy
+// `{location}/perimeter/goal-48.mp4` + `goal-40.mp4` pair.
+export interface PerimeterGoalVideoConfig {
+  files: Record<string, PerimeterOverlayFile>;
+}
+
 export type PerimeterOverlayPhase =
   | "downloading"
   | "copying"

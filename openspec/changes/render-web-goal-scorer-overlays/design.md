@@ -70,10 +70,10 @@ Alternative considered: always write the semantic command and have a trusted ser
 A browser compositor accepts validated player data, one decoded image, a logical target width/height, and fixed style tokens. It returns an `HTMLCanvasElement` sized to that logical screen. The algorithm draws repeated units from left to right:
 
 ```text
-[cropped portrait or crest] [shirt number] [fitted player name] [gap]
+[portrait or crest fitted to the band height] [shirt number] [fitted player name] [gap]
 ```
 
-All measurements scale from target height. The image uses a deterministic cover crop. Number and name use bundled font families and weights; composition waits for the required fonts through the browser font-loading API. Name text is measured and reduced to a defined minimum size before truncation, ensuring one unit cannot overlap the next. Drawing stops after covering the target width, including a final clipped unit when necessary.
+All measurements scale from target height. The image is always contained within the band height — the full source is drawn, never cropped top/bottom or sides, matching the server band renderer's contain resize. Number and name use bundled font families and weights; composition waits for the required fonts through the browser font-loading API. Name text is measured and reduced to a defined minimum size before truncation, ensuring one unit cannot overlap the next. Drawing stops after covering the target width, including a final clipped unit when necessary.
 
 One static canvas is generated per configured overlay logical screen and is passed directly as a `TexImageSource` to the existing WebGL renderer. The compositor runs only when the command, mapping revision, source generation, or loaded font changes; it does not redraw on animation frames.
 

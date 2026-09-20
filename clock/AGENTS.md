@@ -217,7 +217,8 @@ audit record.
 - Perimeter actions use `perimeter.set-state`, `perimeter.skip-cue`,
   `perimeter.set-overlay`,
   `perimeter.clear-overlay`, `perimeter.set-ad-layout`,
-  `perimeter.create-media-pair`, `perimeter.delete-media-pair`.
+  `perimeter.set-goal-video`, `perimeter.create-media-pair`,
+  `perimeter.delete-media-pair`.
 - Club overrides use `clubOverrides.create|update|save|delete` (both the
   context actions and `ClubOverrideForm.tsx`, which builds its own audit
   payload).
@@ -506,6 +507,37 @@ LED screens above the existing `Efni` advertisements, then loops the final
 column until explicitly cleared.
 
 **Firebase path**: `states/${listenPrefix}/perimeter/overlay`
+
+When the home goal button is pressed, the controller writes the
+**operator-configured goal video** as a version-1 overlay command. The config
+lives at `states/${listenPrefix}/perimeter/goalVideo` and is edited from the
+standalone perimeter manager's **Markamyndband** section (one file per overlay
+target, picked or uploaded from `{listenPrefix}/perimeter/` in Storage):
+
+```json
+{
+  "files": {
+    "2": {
+      "name": "goal-48.mp4",
+      "source": "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/goal-48.mp4",
+      "generation": "1700000000000001"
+    },
+    "4": {
+      "name": "goal-40.mp4",
+      "source": "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/goal-40.mp4"
+    }
+  }
+}
+```
+
+- `parsePerimeterGoalVideo()` requires exactly the two overlay targets (`"2"`
+  and `"4"`) with distinct names, bucket- and location-scoped like overlay
+  columns; a malformed config is dropped and the legacy fallback applies.
+- **Fallback**: with no (or an invalid) config, the controller uses the legacy
+  `goal-48.mp4` + `goal-40.mp4` pair under `{location}/perimeter/` in the
+  **active environment's bucket** (`FIREBASE_STORAGE_BUCKET`) — never the
+  hardcoded production bucket, which the environment-scoped overlay parser
+  would reject.
 
 ```json
 {
@@ -1253,7 +1285,7 @@ players for semantic submission.
   the display diagnostics.
 - `composeScorerBand()` draws one static 2D-canvas band at each configured
   overlay logical screen's native dimensions, repeating
-  `[cover-cropped portrait-or-crest | shirt number | fitted name | gap]`
+  `[portrait-or-crest fitted to the band height (contain, never cropped) | shirt number | fitted name | gap]`
   left to right until the width is covered (final repetition clipped). All
   measurements scale from the band height with the same multipliers as the
   server renderer (gap 0.45, number font 0.55, name font 0.28, name area
