@@ -9,6 +9,7 @@ import { User } from "firebase/auth";
 import { ref, onValue } from "firebase/database";
 import { firebaseAuth } from "../firebaseAuth";
 import { database } from "../firebase";
+import type { DisplayTarget } from "../types";
 
 export interface FirebaseAuthState {
   isLoaded: boolean;
@@ -30,6 +31,8 @@ interface LocalStateContextType {
   // Screen key (from "Birta skjá" selection) — used to resolve viewport from live Firebase locations
   screenKey: string | null;
   setScreenKey: (key: string | null) => void;
+  displayTarget: DisplayTarget | null;
+  setDisplayTarget: (target: DisplayTarget | null) => void;
 
   // Login form state
   email: string;
@@ -44,6 +47,67 @@ const LocalStateContext = createContext<LocalStateContextType | undefined>(
 
 const LISTEN_PREFIX_KEY = "clock_listenPrefix";
 const SCREEN_KEY_KEY = "clock_screenKey";
+const DISPLAY_TARGET_KEY = "clock_displayTarget";
+
+function parseStoredDisplayTarget(value: string | null): DisplayTarget | null {
+  if (!value) return null;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      "kind" in parsed &&
+      parsed.kind === "perimeter"
+    ) {
+      return { kind: "perimeter" };
+    }
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      "kind" in parsed &&
+      parsed.kind === "scoreboard" &&
+      "screenKey" in parsed &&
+      typeof parsed.screenKey === "string" &&
+      parsed.screenKey.length > 0
+    ) {
+      return { kind: "scoreboard", screenKey: parsed.screenKey };
+    }
+  } catch {
+    // A malformed local value should behave like a fresh display.
+  }
+  return null;
+}
+
+function getInitialDisplayTarget(): DisplayTarget | null {
+  const stored = parseStoredDisplayTarget(
+    localStorage.getItem(DISPLAY_TARGET_KEY),
+  );
+  if (stored) return stored;
+
+  const storedScreenKey = localStorage.getItem(SCREEN_KEY_KEY);
+  if (storedScreenKey) {
+    const target = { kind: "scoreboard", screenKey: storedScreenKey } as const;
+    localStorage.setItem(DISPLAY_TARGET_KEY, JSON.stringify(target));
+    return target;
+  }
+
+  const oldViewport = localStorage.getItem("clock_screenViewport");
+  if (oldViewport) {
+    try {
+      const parsed = JSON.parse(oldViewport) as { key?: string };
+      if (parsed.key) {
+        const target = { kind: "scoreboard", screenKey: parsed.key } as const;
+        localStorage.setItem(DISPLAY_TARGET_KEY, JSON.stringify(target));
+        localStorage.setItem(SCREEN_KEY_KEY, parsed.key);
+        localStorage.removeItem("clock_screenViewport");
+        return target;
+      }
+    } catch {
+      // Ignore legacy parse errors.
+    }
+  }
+  return null;
+}
 
 export function LocalStateProvider({ children }: { children: ReactNode }) {
   // Auth State
@@ -68,8 +132,17 @@ export function LocalStateProvider({ children }: { children: ReactNode }) {
   // Admin state
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
 
-  // Screen key (set when selecting a screen via "Birta skjá")
+  const [displayTarget, setDisplayTargetState] = useState<DisplayTarget | null>(
+    getInitialDisplayTarget,
+  );
+
+  // Screen key (set when selecting a scoreboard via "Birta skjá")
   const [screenKey, setScreenKeyState] = useState<string | null>(() => {
+    const target = parseStoredDisplayTarget(
+      localStorage.getItem(DISPLAY_TARGET_KEY),
+    );
+    if (target?.kind === "scoreboard") return target.screenKey;
+    if (target?.kind === "perimeter") return null;
     const stored = localStorage.getItem(SCREEN_KEY_KEY);
     if (stored) return stored;
 
@@ -100,13 +173,26 @@ export function LocalStateProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(LISTEN_PREFIX_KEY, newPrefix);
   };
 
-  const setScreenKey = (key: string | null) => {
-    setScreenKeyState(key);
-    if (key) {
-      localStorage.setItem(SCREEN_KEY_KEY, key);
+  const setDisplayTarget = (target: DisplayTarget | null) => {
+    setDisplayTargetState(target);
+    if (target) {
+      localStorage.setItem(DISPLAY_TARGET_KEY, JSON.stringify(target));
+    } else {
+      localStorage.removeItem(DISPLAY_TARGET_KEY);
+    }
+
+    const scoreboardKey =
+      target?.kind === "scoreboard" ? target.screenKey : null;
+    setScreenKeyState(scoreboardKey);
+    if (scoreboardKey) {
+      localStorage.setItem(SCREEN_KEY_KEY, scoreboardKey);
     } else {
       localStorage.removeItem(SCREEN_KEY_KEY);
     }
+  };
+
+  const setScreenKey = (key: string | null) => {
+    setDisplayTarget(key ? { kind: "scoreboard", screenKey: key } : null);
   };
 
   // Auth Listener
@@ -173,6 +259,8 @@ export function LocalStateProvider({ children }: { children: ReactNode }) {
     available,
     screenKey,
     setScreenKey,
+    displayTarget,
+    setDisplayTarget,
     email,
     setEmail,
     password,

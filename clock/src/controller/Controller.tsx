@@ -61,6 +61,7 @@ import {
   useIsAdmin,
   useLocalState,
 } from "../contexts/LocalStateContext";
+import type { DisplayTarget } from "../types";
 import { Link } from "react-router-dom";
 
 const confirmRefresh = () => confirm("Are you absolutely sure?");
@@ -80,6 +81,8 @@ const Controller = () => {
     setListenPrefix,
     available,
     setScreenKey,
+    displayTarget,
+    setDisplayTarget: setDisplayTargetFromContext,
   } = useLocalState();
   const auth = useAuth();
   const isAdmin = useIsAdmin();
@@ -105,9 +108,69 @@ const Controller = () => {
   const [auditOpen, setAuditOpen] = useState(false);
 
   const isAuthenticated = auth.isLoaded && !auth.isEmpty;
+  const selectDisplayTarget = (locationKey: string, target: DisplayTarget) => {
+    setListenPrefix(locationKey);
+    if (setDisplayTargetFromContext) {
+      setDisplayTargetFromContext(target);
+    } else if (target.kind === "scoreboard") {
+      setScreenKey(target.screenKey);
+    }
+  };
+
+  // Selecting a controller venue keeps the operator's persisted screen
+  // choice when it still belongs to that venue, and only defaults to the
+  // venue's first screen otherwise. Force-selecting a screen on every venue
+  // change would silently switch the controller viewport (e.g. always the
+  // big indoor screen for multi-screen venues) and discard the prior choice.
+  const selectControllerLocation = (locationKey: string) => {
+    const locationScreens = screens.filter((s) => s.key === locationKey);
+    if (
+      displayTarget?.kind === "scoreboard" &&
+      locationScreens.some((s) => s.screen.key === displayTarget.screenKey)
+    ) {
+      setListenPrefix(locationKey);
+      return;
+    }
+    const first = locationScreens[0];
+    if (!first) return;
+    selectDisplayTarget(locationKey, {
+      kind: "scoreboard",
+      screenKey: first.screen.key,
+    });
+  };
 
   // State 1: no listenPrefix, not authenticated — screen selector + login form only
   if (!listenPrefix && !isAuthenticated) {
+    const perimeterLocations = new Set<string>();
+    const displayOptions: Array<{
+      value: string;
+      label: string;
+      locationKey: string;
+      target: DisplayTarget;
+    }> = [];
+
+    screens.forEach(({ label, screen, key, perimeterDisplay }, index) => {
+      displayOptions.push({
+        value: `scoreboard-${index}`,
+        label: `${label} ${screen.name}`,
+        locationKey: key,
+        target: { kind: "scoreboard", screenKey: screen.key },
+      });
+
+      if (
+        perimeterDisplay?.renderer === "web" &&
+        !perimeterLocations.has(key)
+      ) {
+        perimeterLocations.add(key);
+        displayOptions.push({
+          value: `perimeter-${key}`,
+          label: `${label} Perimeter`,
+          locationKey: key,
+          target: { kind: "perimeter" },
+        });
+      }
+    });
+
     const login = (e: React.FormEvent) => {
       e.preventDefault();
       firebaseAuth
@@ -138,9 +201,9 @@ const Controller = () => {
                 <option value="" disabled>
                   Veldu skjá
                 </option>
-                {screens.map(({ label, screen }, i) => (
-                  <option value={String(i)} key={i}>
-                    {label} {screen.name}
+                {displayOptions.map(({ value, label }) => (
+                  <option value={value} key={value}>
+                    {label}
                   </option>
                 ))}
               </select>
@@ -148,10 +211,14 @@ const Controller = () => {
                 appearance="primary"
                 size="md"
                 onClick={() => {
-                  const screen = screens[parseInt(selectedScreen, 10)];
-                  if (screen) {
-                    setScreenKey(screen.screen.key);
-                    setListenPrefix(screen.key);
+                  const selectedOption = displayOptions.find(
+                    ({ value }) => value === selectedScreen,
+                  );
+                  if (selectedOption) {
+                    selectDisplayTarget(
+                      selectedOption.locationKey,
+                      selectedOption.target,
+                    );
                   }
                 }}
                 disabled={selectedScreen === ""}
@@ -244,12 +311,24 @@ const Controller = () => {
               const buttonLabel = `${label} ${screenNames}`;
 
               return (
-                <ScreenSelectorButton
-                  key={locationKey}
-                  locationKey={locationKey}
-                  label={buttonLabel}
-                  onClick={() => setListenPrefix(locationKey)}
-                />
+                <div key={locationKey} className="screen-selector-location">
+                  <ScreenSelectorButton
+                    locationKey={locationKey}
+                    label={buttonLabel}
+                    onClick={() => selectControllerLocation(locationKey)}
+                  />
+                  {first.perimeterDisplay && (
+                    <button
+                      type="button"
+                      className="screen-selector-button"
+                      onClick={() =>
+                        selectDisplayTarget(locationKey, { kind: "perimeter" })
+                      }
+                    >
+                      {label} Perimeter
+                    </button>
+                  )}
+                </div>
               );
             })}
           </div>
@@ -338,7 +417,14 @@ const Controller = () => {
         </Modal.Header>
         <Modal.Body>
           <MatchActionSettings />
-          <PerimeterControl />
+          {/* Venues with a published perimeter mapping manage the perimeter
+          through the standalone perimeter manager (offered on the screen
+          selector); legacy venues without a mapping keep the
+          settings-embedded control so their brightness, ad layout, media
+          pairs, and preparation controls stay reachable. */}
+          {!screens.some(
+            (s) => s.key === listenPrefix && s.perimeterDisplay,
+          ) && <PerimeterControl />}
           <div className="theme-trigger-row">
             <div className="theme-trigger-info">
               <span className="theme-trigger-label">Klukku þema</span>

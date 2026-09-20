@@ -56,6 +56,11 @@ vi.mock("firebase/database", () => ({
     /* unsubscribe noop */
   }),
   set: vi.fn(),
+  update: vi.fn(),
+  push: vi.fn(),
+  onDisconnect: vi.fn(() => ({ remove: vi.fn() })),
+  serverTimestamp: vi.fn(() => 0),
+  off: vi.fn(),
 }));
 
 vi.mock("firebase/storage", () => ({

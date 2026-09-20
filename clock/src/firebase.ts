@@ -17,6 +17,7 @@ import {
   uploadBytes,
   uploadString,
   getDownloadURL,
+  getMetadata,
   listAll,
   deleteObject,
   ListResult,
@@ -98,6 +99,7 @@ const storageHelpers = {
   uploadString: (path: string, data: string) =>
     uploadString(storageRef(storage, path), data),
   getDownloadURL: (path: string) => getDownloadURL(storageRef(storage, path)),
+  getMetadata: (path: string) => getMetadata(storageRef(storage, path)),
   listAll: (path: string): Promise<ListResult> =>
     listAll(storageRef(storage, path)),
   deleteObject: (path: string) => deleteObject(storageRef(storage, path)),
@@ -114,6 +116,7 @@ export {
   uploadBytes,
   uploadString,
   getDownloadURL,
+  getMetadata,
   listAll,
   deleteObject,
 };
