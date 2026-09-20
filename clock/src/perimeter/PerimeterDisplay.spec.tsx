@@ -103,14 +103,17 @@ const setupContexts = ({
   ready = true,
   adLayout = { version: 1, revision: "rev-1", columns: [] },
   overlay = null,
+  homeTeam = "Víkingur R",
 }: {
   screens?: unknown[];
   ready?: boolean;
   adLayout?: unknown;
   overlay?: unknown;
+  homeTeam?: string;
 } = {}) => {
   mockedUseFirebaseState.mockReturnValue({
     ready,
+    match: { homeTeam },
   } as unknown as ReturnType<typeof useFirebaseState>);
   mockedUseListeners.mockReturnValue({
     screens,

@@ -6,6 +6,7 @@ import {
 } from "../contexts/FirebaseStateContext";
 import { useDisplayDiagnostics } from "../contexts/DisplayDiagnosticsContext";
 import { useLocalState } from "../contexts/LocalStateContext";
+import clubLogos from "../images/clubLogos";
 import { FIREBASE_STORAGE_BUCKET, storageHelpers } from "../firebase";
 import { parseGsReference } from "./cache";
 import { PerimeterMediaLoader } from "./mediaLoader";
@@ -30,7 +31,7 @@ const resolveGeneration = async (source: string) => {
 export default function PerimeterDisplay() {
   const { listenPrefix } = useLocalState();
   const { screens } = useListeners();
-  const { ready } = useFirebaseState();
+  const { ready, match } = useFirebaseState();
   const { perimeter, adLayout, overlay } = usePerimeter();
   const { reportError } = useDisplayDiagnostics();
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -40,6 +41,14 @@ export default function PerimeterDisplay() {
   const lastRefreshTokenRef = useRef<string | null>(null);
   const [rendererError, setRendererError] = useState<string | null>(null);
   const [textureError, setTextureError] = useState<string | null>(null);
+  // The runtime (and its scorer source loader) is constructed once per
+  // configuration, so the bundled-crest fallback resolves the home team's
+  // club logo through this ref at load time instead of capturing state that
+  // would go stale between scorer selections.
+  const homeTeamRef = useRef(match.homeTeam);
+  useEffect(() => {
+    homeTeamRef.current = match.homeTeam;
+  }, [match.homeTeam]);
   const configuration = useMemo(
     () =>
       screens.find(
@@ -108,7 +117,9 @@ export default function PerimeterDisplay() {
       // Semantic scorer source access is location-scoped: the loader derives
       // the approved `{location}/players/{id}-fagn.png` celebration path and
       // `{location}/crest.png` fallback inside the active subscription's
-      // location and loads through the persistent media cache.
+      // location and loads through the persistent media cache. When both
+      // Storage objects are unusable, the bundled club crest for the home
+      // team keeps the band showing crest + number + name.
       const scorerSourceLoader = new ScorerSourceLoader({
         bucket: FIREBASE_STORAGE_BUCKET,
         location: listenPrefix,
@@ -118,6 +129,20 @@ export default function PerimeterDisplay() {
         },
         resolveDownloadUrl: (objectPath) =>
           storageHelpers.getDownloadURL(objectPath),
+        bundledCrest: () => {
+          const clubName = homeTeamRef.current;
+          const crestUrl = (clubLogos as Record<string, string>)[
+            clubName?.trim() ?? ""
+          ];
+          if (!crestUrl) return Promise.resolve(null);
+          return new Promise<HTMLImageElement | null>((resolve) => {
+            const image = new Image();
+            image.decoding = "async";
+            image.onload = () => resolve(image);
+            image.onerror = () => resolve(null);
+            image.src = crestUrl;
+          });
+        },
       });
       runtime = new PerimeterRuntime(configuration, {
         renderer,

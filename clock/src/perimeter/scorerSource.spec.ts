@@ -66,6 +66,7 @@ Object.defineProperty(FakeImage.prototype, "src", {
 function createHarness(
   overrides: {
     resolveGeneration?: (path: string) => Promise<string | null>;
+    bundledCrest?: () => Promise<HTMLImageElement | null>;
   } = {},
 ) {
   const objectUrls: string[] = [];
@@ -83,6 +84,7 @@ function createHarness(
       overrides.resolveGeneration ??
       (() => Promise.resolve("1700000000000000")),
     resolveDownloadUrl: () => Promise.resolve("https://dl.example/url"),
+    bundledCrest: overrides.bundledCrest,
     createObjectUrl: (blob) => {
       const url = `blob:${nextUrlId++}-${blob.size}`;
       objectUrls.push(url);
@@ -156,6 +158,41 @@ describe("ScorerSourceLoader", () => {
       "Scorer source could not be loaded",
     );
     expect(objectUrls).toHaveLength(0);
+  });
+
+  it("falls back to the bundled crest when both approved sources are unusable", async () => {
+    const bundled = new FakeImage();
+    bundled.src = "bundled-vikingur-crest.png";
+    const { loader, objectUrls } = createHarness({
+      resolveGeneration: () => Promise.resolve(null),
+      bundledCrest: () => Promise.resolve(bundled),
+    });
+    const loaded = await loader.load(PLAYER);
+    expect(loaded.kind).toBe("crest");
+    expect(loaded.objectPath).toBe("bundled-crest");
+    expect(loaded.generation).toBe("bundled");
+    expect(loaded.image).toBe(bundled);
+    // No Storage download happened, and there is no object URL to release.
+    expect(objectUrls).toHaveLength(0);
+    loaded.release();
+  });
+
+  it("throws when the bundled crest is also unavailable", async () => {
+    const { loader } = createHarness({
+      resolveGeneration: () => Promise.resolve(null),
+      bundledCrest: () => Promise.resolve(null),
+    });
+    await expect(loader.load(PLAYER)).rejects.toThrow(
+      "Scorer source could not be loaded",
+    );
+  });
+
+  it("does not consult the bundled crest when a Storage source loads", async () => {
+    const bundledCrest = vi.fn(() => Promise.resolve(new FakeImage()));
+    const { loader } = createHarness({ bundledCrest });
+    const loaded = await loader.load(PLAYER);
+    expect(loaded.kind).toBe("player");
+    expect(bundledCrest).not.toHaveBeenCalled();
   });
 
   it("releases the object URL while the generation stays cached", async () => {

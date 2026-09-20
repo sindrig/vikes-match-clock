@@ -20,6 +20,10 @@ export interface ScorerSourceLoaderOptions {
   cache?: PersistentMediaCache;
   resolveGeneration: (objectPath: string) => Promise<string | null>;
   resolveDownloadUrl: (objectPath: string) => Promise<string>;
+  // Last-resort source used when neither approved Storage object can be
+  // loaded: a bundled club crest decoded without Storage access so a goal
+  // scorer band never fails outright while the crest object is missing.
+  bundledCrest?: () => Promise<HTMLImageElement | null>;
   fetchImpl?: typeof fetch;
   createObjectUrl?: (blob: Blob) => string;
   revokeObjectUrl?: (url: string) => void;
@@ -50,8 +54,10 @@ export class ScorerSourceLoader {
 
   // Loads the selected player's celebration image first and falls back to
   // the venue crest only when the celebration image is missing, unreadable,
-  // or undecodable. Throws when neither approved source is usable so the
-  // caller can retain the currently visible overlay.
+  // or undecodable. When the Storage crest is also unusable, the optional
+  // bundled club crest keeps the band renderable (crest + number + name).
+  // Throws only when every source is unusable so the caller can retain the
+  // currently visible overlay.
   async load(player: GoalScorerOverlayPlayer): Promise<LoadedScorerSource> {
     const { celebrationPath, crestPath } = scorerSourcePaths(
       player,
@@ -62,6 +68,8 @@ export class ScorerSourceLoader {
     try {
       return await this.loadObject(crestPath, "crest");
     } catch {
+      const bundled = await this.tryLoadBundledCrest();
+      if (bundled) return bundled;
       throw new Error(
         `Scorer source could not be loaded (${celebrationError.message}).`,
       );
@@ -75,6 +83,24 @@ export class ScorerSourceLoader {
       return await this.loadObject(celebrationPath, "player");
     } catch (error) {
       return error instanceof Error ? error : new Error(String(error));
+    }
+  }
+
+  private async tryLoadBundledCrest(): Promise<LoadedScorerSource | null> {
+    const bundledCrest = this.options.bundledCrest;
+    if (!bundledCrest) return null;
+    try {
+      const image = await bundledCrest();
+      if (!image) return null;
+      return {
+        kind: "crest",
+        objectPath: "bundled-crest",
+        generation: "bundled",
+        image,
+        release: () => undefined,
+      };
+    } catch {
+      return null;
     }
   }
 

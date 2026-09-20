@@ -1244,9 +1244,13 @@ players for semantic submission.
   `{location}/crest.png` (fallback), resolves immutable Storage generation
   metadata, and loads through the persistent media cache. The celebration
   image is tried first; the crest is used only when it is missing, unreadable,
-  or undecodable. When neither source loads, the previous overlay stays (or
-  the base stays unobscured on cold start) and the error surfaces through the
-  display diagnostics.
+  or undecodable. When the Storage crest is also unusable, the loader falls
+  back to the **bundled club crest** for the venue's home team (resolved via
+  `match.homeTeam` → `images/clubLogos`), so the band always renders
+  crest + number + name and a missing `crest.png` object never breaks the
+  overlay. Only when every source is unusable does the previous overlay stay
+  (or the base stay unobscured on cold start) and the error surface through
+  the display diagnostics.
 - `composeScorerBand()` draws one static 2D-canvas band at each configured
   overlay logical screen's native dimensions, repeating
   `[cover-cropped portrait-or-crest | shirt number | fitted name | gap]`
@@ -2026,11 +2030,11 @@ reads remain denied.
   version 1 and are unaffected.
 - **Qualification cases** for a web venue after the restart: personalized
   celebration band, crest fallback (no `players/{id}-fagn.png`), unavailable
-  sources (neither object exists — previous overlay retained, diagnostics
-  report the failure), long names (fitted, no unit overlap), clear (base
-  returns), power off/on (black while off, scorer restored), and mapping
-  replacement (bands recomposed at the new logical dimensions). The targeted
-  Playwright scenario is `e2e/perimeter-goal-scorer.spec.ts` (emulator).
+  sources (neither object exists — bundled home-team crest shown), long names
+  (fitted, no unit overlap), clear (base returns), power off/on (black while
+  off, scorer restored), and mapping replacement (bands recomposed at the new
+  logical dimensions). The targeted Playwright scenario is
+  `e2e/perimeter-goal-scorer.spec.ts` (emulator).
 - **Compatibility boundary**: the daemon and the Resolume preparation
   pipeline never see a semantic command — Resolume venues keep version-1
   commands, and web rosters create no preparation requests, geometry/status
