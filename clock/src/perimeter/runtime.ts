@@ -1,8 +1,9 @@
 import type {
   PerimeterAdLayout,
   PerimeterDisplayConfig,
-  PerimeterOverlay,
+  GoalScorerOverlayCommand,
   PerimeterOverlayColumn,
+  PerimeterOverlay,
 } from "../types";
 import {
   backfillOverlayGenerations,
@@ -26,6 +27,31 @@ type PreparedColumn = {
   sources: Record<string, LoadedPerimeterMedia>;
 };
 
+// One prepared version-1 column: the normalized column plus the media
+// loaded for every logical screen it covers.
+type PreparedOverlayColumn = {
+  column: PerimeterOverlayColumn;
+  sources: Record<string, LoadedPerimeterMedia>;
+};
+
+// A fully prepared overlay generation: either timed version-1 file columns
+// or a static version-2 scorer source map. Both variants carry the command
+// id they were prepared for plus a release function, so the runtime can
+// activate the latest generation atomically and release stale or failed
+// work without knowing which branch produced it.
+interface PreparedOverlayGeneration {
+  commandId: string;
+  kind: "file" | "scorer";
+  // File commands: normalized columns with loaded media, keyed by logical
+  // screen id. Scorer commands: static composed sources per logical screen.
+  columns?: PreparedOverlayColumn[];
+  staticSources?: Record<string, HTMLCanvasElement>;
+  // The semantic command behind a scorer generation, retained so a mapping
+  // replacement can recompose it at the new logical-screen dimensions.
+  scorerCommand?: GoalScorerOverlayCommand;
+  release: () => void;
+}
+
 function normalizeOverlayColumn(
   column: PerimeterOverlayColumn,
   configuration: PerimeterDisplayConfig,
@@ -38,12 +64,33 @@ function normalizeOverlayColumn(
   return { ...column, files };
 }
 
+export interface PerimeterOverlayScorerDependencies {
+  // Loads and decodes the scorer source image (player portrait or crest)
+  // through the persistent media cache, falling back in the specified
+  // order. The returned handle must be released by the caller.
+  loadSource: (command: GoalScorerOverlayCommand) => Promise<{
+    image: HTMLImageElement;
+    release: () => void;
+  }>;
+  // Awaits readiness of the fonts the compositor will use.
+  ensureFonts?: (command: GoalScorerOverlayCommand) => Promise<void>;
+  // Composes one static band per logical screen. The runtime passes the
+  // overlay logical screens of its CURRENT configuration, so a mapping
+  // replacement recomposes at the new native dimensions.
+  compose: (
+    command: GoalScorerOverlayCommand,
+    source: HTMLImageElement,
+    screens: readonly { id: string; width: number; height: number }[],
+  ) => Promise<Record<string, HTMLCanvasElement>>;
+}
+
 export interface PerimeterRuntimeOptions {
   renderer: {
     render: (sources: PerimeterRenderSources) => void;
     replaceConfiguration?: (configuration: PerimeterDisplayConfig) => boolean;
   };
   loader: Pick<PerimeterMediaLoader, "loadPair">;
+  scorer?: PerimeterOverlayScorerDependencies;
   now?: () => number;
 }
 
@@ -57,6 +104,19 @@ export class PerimeterRuntime {
   private baseRequest = 0;
   private overlayRequest = 0;
   private pendingBaseActivation: number | null = null;
+  // The active file-command columns and every loaded media element behind
+  // them. Kept together so clear/replacement releases exactly what the
+  // active overlay uses.
+  private activeFileColumns: PerimeterOverlayColumn[] | null = null;
+  private activeFileMedia: LoadedPerimeterMedia[] = [];
+  // The active semantic scorer generation. Composed canvases stay in memory
+  // until clear or replacement; released sources are re-decoded from the
+  // persistent media cache when a mapping change requires recomposition.
+  private activeScorer: {
+    command: GoalScorerOverlayCommand;
+    sources: Record<string, HTMLCanvasElement>;
+    release: () => void;
+  } | null = null;
 
   constructor(
     private configuration: PerimeterDisplayConfig,
@@ -73,6 +133,23 @@ export class PerimeterRuntime {
       return false;
     this.configuration = configuration;
     this.timeline.cueDurationMs = configuration.playback.cueDurationMs;
+    // A mapping replacement is a new overlay preparation for an active
+    // semantic scorer: recompose at the new logical-screen dimensions while
+    // the current textures stay visible until every new-size band is ready.
+    // Failures retain the current textures and surface through the same
+    // overlay preparation error path.
+    const activeCommand = this.activeScorer?.command;
+    if (activeCommand) {
+      const request = ++this.overlayRequest;
+      void this.prepareScorerOverlay(activeCommand, request).catch(
+        (error: unknown) => {
+          console.error(
+            "Scorer recomposition after mapping replacement failed:",
+            error,
+          );
+        },
+      );
+    }
     return true;
   }
 
@@ -148,13 +225,36 @@ export class PerimeterRuntime {
   ): Promise<void> {
     const request = ++this.overlayRequest;
     if (!overlay) {
-      for (const media of this.loadedOverlayMedia) media.release();
-      this.loadedOverlayMedia = [];
+      this.releaseActiveOverlay();
       this.overlayPlayback.clear();
       return;
     }
+    if (overlay.version === 2) {
+      await this.prepareScorerOverlay(overlay, request);
+      return;
+    }
+    await this.prepareFileOverlay(overlay, request, now, resolveGeneration);
+  }
+
+  private releaseActiveOverlay(): void {
+    for (const media of this.activeFileMedia) media.release();
+    this.activeFileMedia = [];
+    this.activeFileColumns = null;
+    if (this.activeScorer) this.activeScorer.release();
+    this.activeScorer = null;
+  }
+
+  private async prepareFileOverlay(
+    overlay: Extract<PerimeterOverlay, { version: 1 }>,
+    request: number,
+    now: number,
+    resolveGeneration?: (source: string) => Promise<string | null>,
+  ): Promise<void> {
     const complete = resolveGeneration
-      ? await backfillOverlayGenerations(overlay, resolveGeneration)
+      ? ((await backfillOverlayGenerations(
+          overlay,
+          resolveGeneration,
+        )) as Extract<PerimeterOverlay, { version: 1 }>)
       : overlay;
     const normalized = complete.columns.map((column) =>
       normalizeOverlayColumn(column, this.configuration),
@@ -163,41 +263,134 @@ export class PerimeterRuntime {
       normalized.map((column) => column.files),
       Object.values(this.configuration.compatibilityKeys.overlay),
     );
-    const prepared = await Promise.all(
+    const preparedColumns = await Promise.all(
       normalized.map(async (column) => ({
         column,
         sources: await this.options.loader.loadPair(column.files),
       })),
     );
+    const loadedMedia: LoadedPerimeterMedia[] = preparedColumns.flatMap(
+      (pair) => Object.values(pair.sources),
+    );
     try {
-      this.validatePreparedSources(prepared.flatMap((pair) => [pair.sources]));
+      this.validatePreparedSources(preparedColumns.map((pair) => pair.sources));
     } catch (error) {
-      for (const pair of prepared) {
-        for (const media of Object.values(pair.sources)) media.release();
-      }
+      for (const media of loadedMedia) media.release();
       throw error;
     }
     if (request !== this.overlayRequest) {
-      for (const pair of prepared) {
-        for (const media of Object.values(pair.sources)) media.release();
-      }
+      for (const media of loadedMedia) media.release();
       return;
     }
-    const previousMedia = this.loadedOverlayMedia;
-    this.loadedOverlayMedia = [];
-    this.overlayPlayback.set(complete.id, normalized, now);
-    this.overlayPlayback.prepareFirstPair(normalized[0]!);
-    this.overlayPlayback.activatePrepared(complete.id, now);
-    for (const pair of prepared) {
-      for (const [logicalScreenId, media] of Object.entries(pair.sources)) {
-        const file = pair.column.files[logicalScreenId];
-        if (!file) continue;
-        media.element.dataset.perimeterSource = `${file.source}:${file.generation ?? ""}`;
-        this.loadedOverlayMedia.push(media);
-      }
-      this.playPair(pair.sources);
+    this.commitPreparedGeneration(
+      {
+        commandId: complete.id,
+        kind: "file",
+        columns: normalized.map((column, index) => {
+          const sources = preparedColumns[index]?.sources ?? {};
+          for (const [logicalScreenId, media] of Object.entries(sources)) {
+            const file = column.files[logicalScreenId];
+            if (!file) continue;
+            media.element.dataset.perimeterSource = `${file.source}:${file.generation ?? ""}`;
+          }
+          return { column, sources };
+        }),
+        release: () => {
+          for (const media of loadedMedia) media.release();
+        },
+      },
+      now,
+    );
+  }
+
+  private async prepareScorerOverlay(
+    command: GoalScorerOverlayCommand,
+    request: number,
+  ): Promise<void> {
+    const scorer = this.options.scorer;
+    if (!scorer) {
+      throw new Error("Semantic scorer overlays are not configured.");
     }
-    for (const media of previousMedia) media.release();
+    const loaded = await scorer.loadSource(command);
+    try {
+      if (request !== this.overlayRequest) {
+        loaded.release();
+        return;
+      }
+      if (scorer.ensureFonts) await scorer.ensureFonts(command);
+      if (request !== this.overlayRequest) {
+        loaded.release();
+        return;
+      }
+      const staticSources = await scorer.compose(
+        command,
+        loaded.image,
+        Object.values(this.configuration.logicalScreens),
+      );
+      const missing = Object.values(
+        this.configuration.compatibilityKeys.overlay,
+      ).filter((screenId) => !staticSources[screenId]);
+      if (missing.length > 0) {
+        throw new Error(`Scorer composition is missing ${missing.join(", ")}.`);
+      }
+      if (request !== this.overlayRequest) {
+        loaded.release();
+        return;
+      }
+      this.commitPreparedGeneration(
+        {
+          commandId: command.id,
+          kind: "scorer",
+          staticSources,
+          scorerCommand: command,
+          release: loaded.release,
+        },
+        0,
+      );
+    } catch (error) {
+      loaded.release();
+      throw error;
+    }
+  }
+
+  private commitPreparedGeneration(
+    prepared: PreparedOverlayGeneration,
+    now: number,
+  ): void {
+    // One atomic activation: build the new active state completely before
+    // discarding the previous generation so a failed hand-off can never
+    // show the base through the overlay channel.
+    const previousFileMedia = this.activeFileMedia;
+    const previousScorer = this.activeScorer;
+
+    if (prepared.kind === "file") {
+      const columns = prepared.columns ?? [];
+      const media: LoadedPerimeterMedia[] = [];
+      for (const pair of columns) {
+        for (const item of Object.values(pair.sources)) media.push(item);
+      }
+      this.activeFileColumns = columns.map((pair) => pair.column);
+      this.activeFileMedia = media;
+      this.activeScorer = null;
+      this.overlayPlayback.set(prepared.commandId, this.activeFileColumns, now);
+      this.overlayPlayback.prepareFirstPair(this.activeFileColumns[0]!);
+      this.overlayPlayback.activatePrepared(prepared.commandId, now);
+      for (const pair of columns) this.playPair(pair.sources);
+    } else {
+      this.activeFileColumns = null;
+      this.activeFileMedia = [];
+      this.activeScorer = {
+        command: prepared.scorerCommand!,
+        sources: prepared.staticSources ?? {},
+        release: prepared.release,
+      };
+      this.overlayPlayback.clear();
+    }
+
+    if (previousScorer && previousScorer !== this.activeScorer) {
+      previousScorer.release();
+    }
+    for (const media of previousFileMedia) media.release();
   }
 
   setPowered(powered: boolean, now: number): void {
@@ -238,10 +431,15 @@ export class PerimeterRuntime {
       if (column) this.playPair(column.sources);
     }
     const base = this.baseColumns[this.currentBaseCue ?? 0]?.sources ?? {};
-    const overlayColumn = this.overlayPlayback.visibleColumn(now);
-    const overlay = overlayColumn
-      ? this.findOverlaySources(overlayColumn)
-      : undefined;
+    let overlay: Record<string, TexImageSource> | undefined;
+    if (this.activeScorer) {
+      overlay = { ...this.activeScorer.sources };
+    } else {
+      const overlayColumn = this.overlayPlayback.visibleColumn(now);
+      overlay = overlayColumn
+        ? this.findOverlaySources(overlayColumn)
+        : undefined;
+    }
     this.options.renderer.render({ base: this.elements(base), overlay });
   }
 
@@ -253,8 +451,7 @@ export class PerimeterRuntime {
     if (prepared && prepared !== this.baseColumns) {
       this.releaseColumns(prepared);
     }
-    for (const media of this.loadedOverlayMedia) media.release();
-    this.loadedOverlayMedia = [];
+    this.releaseActiveOverlay();
     this.baseColumns = [];
     this.baseSlots.clear();
     this.overlayPlayback.clear();
@@ -274,13 +471,11 @@ export class PerimeterRuntime {
     return sources;
   }
 
-  private loadedOverlayMedia: LoadedPerimeterMedia[] = [];
-
   private findLoadedMedia(
     source: string,
     generation?: string,
   ): LoadedPerimeterMedia | undefined {
-    return this.loadedOverlayMedia.find(
+    return this.activeFileMedia.find(
       (media) =>
         (media.element as HTMLMediaElement).dataset.perimeterSource ===
         `${source}:${generation ?? ""}`,

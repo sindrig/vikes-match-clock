@@ -404,11 +404,42 @@ export interface PerimeterOverlayColumn {
   files: Record<string, PerimeterOverlayFile>;
 }
 
-export interface PerimeterOverlay {
-  version: number;
+// Version-1 overlay command: timed columns of prepared media files (goal
+// videos, named media pairs, prepared scorer PNGs). Unchanged from the
+// original single overlay type; the active overlay channel is now a
+// discriminated union of this and GoalScorerOverlayCommand.
+export interface PerimeterFileOverlay {
+  version: 1;
   id: string;
   columns: PerimeterOverlayColumn[];
 }
+
+// Semantic player payload carried by a version-2 scorer command. Values are
+// display data only: no generated file references, download URLs, colors,
+// dimensions, or layout values. The active subscription scopes the location,
+// the deployment provides the bucket, and the published web mapping provides
+// the logical-screen dimensions.
+export interface GoalScorerOverlayPlayer {
+  // Safe KSI player identifier (also used to derive the approved Storage
+  // celebration-image path `{location}/players/{id}-fagn.png`).
+  id: string;
+  // Bounded, non-empty display name.
+  name: string;
+  // Shirt number normalized to a digit-only string.
+  number: string;
+}
+
+// Version-2 overlay command: semantic goal scorer composed by web perimeter
+// browsers. A fresh command instance per selection, so re-selecting the same
+// player is still a new replacement request.
+export interface GoalScorerOverlayCommand {
+  version: 2;
+  kind: "goal-scorer";
+  id: string;
+  player: GoalScorerOverlayPlayer;
+}
+
+export type PerimeterOverlay = PerimeterFileOverlay | GoalScorerOverlayCommand;
 
 export type PerimeterOverlayPhase =
   | "downloading"

@@ -11,6 +11,8 @@ import { parseGsReference } from "./cache";
 import { PerimeterMediaLoader } from "./mediaLoader";
 import { PerimeterWebGLRenderer } from "./webglRenderer";
 import { PerimeterRuntime } from "./runtime";
+import { ScorerSourceLoader } from "./scorerSource";
+import { composeScorerBands, defaultScorerBandDeps } from "./scorerCompositor";
 
 const NO_CONFIGURATION_MESSAGE = "Engin gild perimeter stilling tiltæk.";
 
@@ -103,7 +105,32 @@ export default function PerimeterDisplay() {
         resolveDownloadUrl: (objectPath) =>
           storageHelpers.getDownloadURL(objectPath),
       });
-      runtime = new PerimeterRuntime(configuration, { renderer, loader });
+      // Semantic scorer source access is location-scoped: the loader derives
+      // the approved `{location}/players/{id}-fagn.png` celebration path and
+      // `{location}/crest.png` fallback inside the active subscription's
+      // location and loads through the persistent media cache.
+      const scorerSourceLoader = new ScorerSourceLoader({
+        bucket: FIREBASE_STORAGE_BUCKET,
+        location: listenPrefix,
+        resolveGeneration: async (objectPath) => {
+          const metadata = await storageHelpers.getMetadata(objectPath);
+          return metadata.generation;
+        },
+        resolveDownloadUrl: (objectPath) =>
+          storageHelpers.getDownloadURL(objectPath),
+      });
+      runtime = new PerimeterRuntime(configuration, {
+        renderer,
+        loader,
+        scorer: {
+          loadSource: async (command) => {
+            const loaded = await scorerSourceLoader.load(command.player);
+            return { image: loaded.image, release: loaded.release };
+          },
+          compose: (command, source, screens) =>
+            composeScorerBands(command, source, screens, defaultScorerBandDeps),
+        },
+      });
       rendererRef.current = renderer;
       runtimeRef.current = runtime;
       runtime.render();
@@ -118,7 +145,7 @@ export default function PerimeterDisplay() {
       queueMicrotask(() => setRendererError(message));
     }
     return undefined;
-  }, [configuration]);
+  }, [configuration, listenPrefix]);
 
   useEffect(
     () => () => {

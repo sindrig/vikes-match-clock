@@ -78,6 +78,7 @@ describe("perimeter media identity", () => {
     const result = await backfillOverlayGenerations(overlay, (source) =>
       Promise.resolve(source.endsWith("left.png") ? "1" : "2"),
     );
+    if (result.version !== 1) throw new Error("expected a file overlay");
     expect(result.columns[0]?.files["2"]?.generation).toBe("1");
     expect(result.columns[0]?.files["4"]?.generation).toBe("2");
   });
@@ -101,6 +102,7 @@ describe("perimeter media identity", () => {
     };
     const resolve = vi.fn(() => Promise.resolve("9"));
     const result = await backfillOverlayGenerations(overlay, resolve);
+    if (result.version !== 1) throw new Error("expected a file overlay");
     expect(result.columns[0]?.files["2"]?.generation).toBe("7");
     expect(resolve).not.toHaveBeenCalled();
   });

@@ -28,6 +28,16 @@ Chromium version, GPU, and configuration revision with the results.
 7. Send repeated remote restart tokens while on and off. Confirm the display target remains perimeter and no scoreboard selector appears.
 8. Run a paired video playlist for at least two hours. Record cue-boundary drift, dropped frames, decoder errors, GPU memory growth, and whether the final cue loops correctly.
 9. Show, replace, and clear an overlay while the base playlist is running. Confirm the base clock continues and visibility changes are atomic.
+10. Goal-scorer overlay cases (after the venue's controller is cleared to emit
+    version-2 semantic commands — see `clock/AGENTS.md`):
+    a. Select a scorer with a `players/{id}-fagn.png` celebration image. The band repeats `[portrait | number | name]` at each overlay logical screen's native dimensions above the advancing base.
+    b. Select a scorer whose celebration image is missing or undecodable. The band uses the venue crest (`{location}/crest.png`).
+    c. Temporarily remove both source objects and select a scorer. Confirm the previously visible overlay is retained (or the base stays unobscured on a cold start) and the failure appears in the Skjáarvillur panel with a safe message.
+    d. Select a scorer with a long name (over 3x band height at nominal size). Confirm the name shrinks to the minimum before truncating and repeated units never overlap.
+    e. Clear the active overlay. Confirm every scorer target is removed atomically and the base playlist resumes.
+    f. Power the perimeter off and on with a scorer active. Confirm black while off and the composed scorer restored when powered on.
+    g. Publish a changed mapping while a scorer is visible. Confirm the bands recompose at the new logical-screen dimensions before the textures swap, and the previous textures are retained until all new-size bands are ready.
+    h. Confirm the automated emulator scenario (`clock/e2e/perimeter-goal-scorer.spec.ts`) passes for the venue's fixture shapes.
 
 ## Evidence
 

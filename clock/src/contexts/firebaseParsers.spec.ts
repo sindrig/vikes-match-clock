@@ -10,6 +10,7 @@ import {
   parsePerimeterState,
   parsePerimeterPreview,
   parsePerimeterOverlay,
+  buildGoalScorerOverlayCommand,
   parsePerimeterMediaPairs,
   parsePerimeterAdLayout,
   parsePerimeterAppliedAdLayout,
@@ -1980,8 +1981,10 @@ describe("firebaseParsers", () => {
       const result = parsePerimeterOverlay(goalOverlay, {
         location: "vikuti",
       });
-      expect(result).not.toBeNull();
-      expect(result?.columns[0]?.files["2"]?.name).toBe("goal-48.mp4");
+      expect(result?.version).toBe(1);
+      expect(result?.kind).toBeUndefined();
+      if (result?.version !== 1) return;
+      expect(result.columns[0]?.files["2"]?.name).toBe("goal-48.mp4");
     });
 
     it("accepts named media-pair files under {location}/perimeter-overlays/", () => {
@@ -2098,6 +2101,164 @@ describe("firebaseParsers", () => {
           bucket: "vikes-match-clock-staging.appspot.com",
         }),
       ).toBeNull();
+    });
+
+    // -- Version-2 semantic scorer commands -----------------------------------
+
+    const validScorerCommand = {
+      version: 2,
+      kind: "goal-scorer",
+      id: "11111111-1111-4111-8111-111111111111",
+      player: { id: "2492", name: "Jón Jónsson", number: "7" },
+    };
+
+    it("accepts a bounded valid version-2 scorer command", () => {
+      const result = parsePerimeterOverlay(validScorerCommand);
+      expect(result).toEqual(validScorerCommand);
+    });
+
+    it("normalizes a version-2 player number provided as a number", () => {
+      const result = parsePerimeterOverlay({
+        ...validScorerCommand,
+        player: { id: "2492", name: "Jón", number: 7 },
+      });
+      expect(result?.version).toBe(2);
+      if (result?.version !== 2) return;
+      expect(result.player.number).toBe("7");
+    });
+
+    it("preserves the version-1 shape untouched", () => {
+      const result = parsePerimeterOverlay(goalOverlay);
+      expect(result).not.toBeNull();
+      expect(result?.version).toBe(1);
+    });
+
+    it("rejects a version-2 command without the goal-scorer kind", () => {
+      expect(
+        parsePerimeterOverlay({ ...validScorerCommand, kind: "file" }),
+      ).toBeNull();
+      expect(
+        parsePerimeterOverlay({ ...validScorerCommand, kind: null }),
+      ).toBeNull();
+    });
+
+    it("rejects a version-2 command missing the player payload", () => {
+      expect(
+        parsePerimeterOverlay({ ...validScorerCommand, player: null }),
+      ).toBeNull();
+      const withoutPlayer = { ...validScorerCommand } as Record<
+        string,
+        unknown
+      >;
+      delete withoutPlayer.player;
+      expect(parsePerimeterOverlay(withoutPlayer)).toBeNull();
+    });
+
+    it("rejects a version-2 command with a mixed version-1 columns field", () => {
+      expect(
+        parsePerimeterOverlay({ ...validScorerCommand, columns: [] }),
+      ).toBeNull();
+    });
+
+    it("rejects a version-1 command carrying version-2 scorer fields", () => {
+      expect(
+        parsePerimeterOverlay({ ...goalOverlay, kind: "goal-scorer" }),
+      ).toBeNull();
+      expect(
+        parsePerimeterOverlay({
+          ...goalOverlay,
+          player: { id: "2492", name: "Jón", number: "7" },
+        }),
+      ).toBeNull();
+    });
+
+    it("rejects overlong or unsafe command ids", () => {
+      expect(
+        parsePerimeterOverlay({
+          ...validScorerCommand,
+          id: "x".repeat(129),
+        }),
+      ).toBeNull();
+    });
+
+    it("rejects unsafe player identifiers", () => {
+      for (const id of ["", " ", "24 92", "../crest", "a".repeat(65), ".x"]) {
+        expect(
+          parsePerimeterOverlay({
+            ...validScorerCommand,
+            player: { ...validScorerCommand.player, id },
+          }),
+        ).toBeNull();
+      }
+    });
+
+    it("rejects empty or overlong names", () => {
+      expect(
+        parsePerimeterOverlay({
+          ...validScorerCommand,
+          player: { ...validScorerCommand.player, name: "   " },
+        }),
+      ).toBeNull();
+      expect(
+        parsePerimeterOverlay({
+          ...validScorerCommand,
+          player: {
+            ...validScorerCommand.player,
+            name: "a".repeat(81),
+          },
+        }),
+      ).toBeNull();
+      expect(
+        parsePerimeterOverlay({
+          ...validScorerCommand,
+          player: { ...validScorerCommand.player, name: "a\u0000b" },
+        }),
+      ).toBeNull();
+    });
+
+    it("rejects invalid shirt numbers", () => {
+      for (const number of [
+        "",
+        "7a",
+        "7 7",
+        "-1",
+        "1.5",
+        "12345",
+        null,
+        true,
+      ]) {
+        expect(
+          parsePerimeterOverlay({
+            ...validScorerCommand,
+            player: { ...validScorerCommand.player, number },
+          }),
+        ).toBeNull();
+      }
+    });
+
+    it("builds a fresh version-2 command per selection", () => {
+      const first = buildGoalScorerOverlayCommand({
+        id: " 2492 ",
+        name: " Jón Jónsson ",
+        number: " 7 ",
+      });
+      const second = buildGoalScorerOverlayCommand({
+        id: "2492",
+        name: "Jón Jónsson",
+        number: 7,
+      });
+      for (const command of [first, second]) {
+        expect(command.version).toBe(2);
+        expect(command.kind).toBe("goal-scorer");
+        expect(command.player).toEqual({
+          id: "2492",
+          name: "Jón Jónsson",
+          number: "7",
+        });
+      }
+      expect(first.id).not.toBe(second.id);
+      expect(parsePerimeterOverlay(first)).toEqual(first);
+      expect(parsePerimeterOverlay(second)).toEqual(second);
     });
   });
 

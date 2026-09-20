@@ -1,7 +1,9 @@
 rules_version = '2';
 
 // Public display media is readable without auth. All writes and unrelated
-// objects remain authenticated-only.
+// objects remain authenticated-only. The goal-scorer browser compositor adds
+// two narrowly scoped anonymous-read exceptions: the venue crest and player
+// celebration images matching the safe `{playerId}-fagn.png` shape.
 service firebase.storage {
   match /b/{bucket}/o {
     match /{location}/perimeter/{fileName} {
@@ -11,6 +13,20 @@ service firebase.storage {
 
     match /{location}/perimeter-overlays/{allPaths=**} {
       allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // The venue crest used as the scorer band fallback source.
+    match /{location}/crest.png {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // Player celebration images. Read access is restricted to the exact
+    // `{playerId}-fagn.png` naming convention with a bounded safe player
+    // identifier, so unrelated player media stays private.
+    match /{location}/players/{fileName} {
+      allow read: if fileName.matches("^[A-Za-z0-9_-]{1,64}-fagn[.]png$");
       allow write: if request.auth != null;
     }
 

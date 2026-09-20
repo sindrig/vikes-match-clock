@@ -2,6 +2,7 @@ import type {
   PerimeterAdLayout,
   PerimeterAdLayoutFile,
   PerimeterDisplayConfig,
+  PerimeterFileOverlay,
   PerimeterOverlay,
   PerimeterOverlayFile,
 } from "../types";
@@ -76,10 +77,12 @@ export async function backfillStorageGenerations(
 // written by writers that could not know the immutable Storage generation
 // (legacy media pairs, goal-scorer preparation). Backfill it the same way the
 // base layout does so playback can activate immutable identity at load time.
+// Semantic scorer commands carry no file references and pass through as-is.
 export async function backfillOverlayGenerations(
   overlay: PerimeterOverlay,
   resolveGeneration: (source: string) => Promise<string | null>,
 ): Promise<PerimeterOverlay> {
+  if (overlay.version !== 1) return overlay;
   const columns = [];
   for (const column of overlay.columns) {
     const files: Record<string, PerimeterOverlayFile> = {};
@@ -95,7 +98,8 @@ export async function backfillOverlayGenerations(
     }
     columns.push({ ...column, files });
   }
-  return { ...overlay, columns };
+  const complete: PerimeterFileOverlay = { ...overlay, columns };
+  return complete;
 }
 
 export const importStorageGenerations = backfillStorageGenerations;

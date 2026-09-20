@@ -81,6 +81,7 @@ vi.mock("./mediaLoader", () => ({
 
 vi.mock("./cache", () => ({
   parseGsReference: vi.fn(() => null),
+  PersistentMediaCache: class PersistentMediaCacheMock {},
 }));
 
 vi.mock("../firebase", () => ({
@@ -101,10 +102,12 @@ const setupContexts = ({
   screens = [{ key: "vikuti", perimeterDisplay: configuration }],
   ready = true,
   adLayout = { version: 1, revision: "rev-1", columns: [] },
+  overlay = null,
 }: {
   screens?: unknown[];
   ready?: boolean;
   adLayout?: unknown;
+  overlay?: unknown;
 } = {}) => {
   mockedUseFirebaseState.mockReturnValue({
     ready,
@@ -115,7 +118,7 @@ const setupContexts = ({
   mockedUsePerimeter.mockReturnValue({
     perimeter: { state: "on" },
     adLayout,
-    overlay: null,
+    overlay,
   } as unknown as ReturnType<typeof usePerimeter>);
 };
 
@@ -248,5 +251,36 @@ describe("PerimeterDisplay", () => {
     expect(
       screen.getByText("Column missing texture problem"),
     ).toBeInTheDocument();
+  });
+
+  it("recovers and reports healthy after a failed scorer overlay preparation", async () => {
+    const scorerCommand = {
+      version: 2,
+      kind: "goal-scorer",
+      id: "scorer-1",
+      player: { id: "2492", name: "Jón Jónsson", number: "7" },
+    };
+    runtimeInstance.setOverlay = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("Scorer source could not be loaded"))
+      .mockResolvedValue(undefined);
+
+    const { rerender } = render(<PerimeterDisplay />);
+
+    await waitFor(() =>
+      expect(mockReportError).toHaveBeenCalledWith(
+        "Scorer source could not be loaded",
+      ),
+    );
+
+    // The next semantic command prepares successfully and the display
+    // reports healthy again.
+    setupContexts({ overlay: { ...scorerCommand, id: "scorer-2" } });
+    rerender(<PerimeterDisplay />);
+
+    await waitFor(() => {
+      const calls = mockReportError.mock.calls;
+      expect(calls[calls.length - 1]).toEqual([null]);
+    });
   });
 });

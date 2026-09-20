@@ -558,6 +558,17 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   ] = useState(false);
   const [ready, setReady] = useState(!listenPrefix);
 
+  // The venue's published perimeter renderer decides which scorer path the
+  // controller exposes: Resolume venues keep the prepared-file pipeline
+  // (daemon geometry, preparation status, retry), web venues compose the
+  // scorer in the browser and create no generated-media dependency.
+  const venueRenderer = useMemo(
+    () =>
+      listeners.screens.find((entry) => entry.key === listenPrefix)
+        ?.perimeterDisplay?.renderer,
+    [listeners.screens, listenPrefix],
+  );
+
   // Freshness barrier: a browser may only submit shared-state mutations while
   // it has confirmed current Firebase state for the selected venue.
   //
@@ -1063,63 +1074,6 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
           )
         : () => undefined;
 
-      // Daemon-published overlay target geometry and the service-owned
-      // goal-scorer preparation status. Both are read-only to clients and
-      // deliberately NOT part of readiness.
-      const overlayGeometryPath = `perimeter/${listenPrefix}/overlayGeometry`;
-      const unsubOverlayGeometry = isAuthenticated
-        ? onValue(
-            ref(database, overlayGeometryPath),
-            (snapshot) => {
-              setOverlayGeometry(parsePerimeterOverlayGeometry(snapshot.val()));
-            },
-            (error) =>
-              console.error(
-                "Firebase perimeter overlayGeometry subscription error:",
-                error,
-              ),
-          )
-        : () => undefined;
-
-      const goalScorerPreparationPath = `perimeter/${listenPrefix}/goalScorerPreparation`;
-      const unsubGoalScorerPreparation = isAuthenticated
-        ? onValue(
-            ref(database, goalScorerPreparationPath),
-            (snapshot) => {
-              setGoalScorerPreparationStatus(
-                parseGoalScorerPreparationStatus(snapshot.val(), {
-                  location: listenPrefix,
-                  bucket: FIREBASE_STORAGE_BUCKET,
-                }),
-              );
-            },
-            (error) =>
-              console.error(
-                "Firebase perimeter goalScorerPreparation subscription error:",
-                error,
-              ),
-          )
-        : () => undefined;
-
-      const goalScorerPreparationRequestPath = `states/${listenPrefix}/perimeter/goalScorerPreparation`;
-      const unsubGoalScorerPreparationRequest = onValue(
-        ref(database, goalScorerPreparationRequestPath),
-        (snapshot) => {
-          const request = snapshot.val() as Record<string, unknown> | null;
-          setGoalScorerPreparationRequestSignature(
-            typeof request?.rosterSignature === "string"
-              ? request.rosterSignature
-              : null,
-          );
-          setGoalScorerPreparationRequestLoaded(true);
-        },
-        (error) =>
-          console.error(
-            "Firebase perimeter goalScorerPreparation request subscription error:",
-            error,
-          ),
-      );
-
       return () => {
         unsubMatch();
         unsubController();
@@ -1133,12 +1087,89 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         unsubMediaPairs();
         unsubBrightness();
         unsubBrightnessStatus();
-        unsubOverlayGeometry();
-        unsubGoalScorerPreparation();
-        unsubGoalScorerPreparationRequest();
       };
     }
   }, [isAuthenticated, listenPrefix, markSubscriptionDelivered]);
+
+  // Goal-scorer preparation machinery exists only for Resolume venues: the
+  // daemon-published overlay geometry, the service-owned preparation status,
+  // and the desired request document. Web venues compose scorers in the
+  // browser and create no preparation request or generated output
+  // dependency, so these subscriptions (and the state behind them) stop for
+  // any venue whose published renderer is not "resolume".
+  useEffect(() => {
+    if (!isAuthenticated || !listenPrefix || venueRenderer !== "resolume") {
+      return undefined;
+    }
+
+    const overlayGeometryPath = `perimeter/${listenPrefix}/overlayGeometry`;
+    const unsubOverlayGeometry = onValue(
+      ref(database, overlayGeometryPath),
+      (snapshot) => {
+        setOverlayGeometry(parsePerimeterOverlayGeometry(snapshot.val()));
+      },
+      (error) =>
+        console.error(
+          "Firebase perimeter overlayGeometry subscription error:",
+          error,
+        ),
+    );
+
+    const goalScorerPreparationPath = `perimeter/${listenPrefix}/goalScorerPreparation`;
+    const unsubGoalScorerPreparation = onValue(
+      ref(database, goalScorerPreparationPath),
+      (snapshot) => {
+        setGoalScorerPreparationStatus(
+          parseGoalScorerPreparationStatus(snapshot.val(), {
+            location: listenPrefix,
+            bucket: FIREBASE_STORAGE_BUCKET,
+          }),
+        );
+      },
+      (error) =>
+        console.error(
+          "Firebase perimeter goalScorerPreparation subscription error:",
+          error,
+        ),
+    );
+
+    const goalScorerPreparationRequestPath = `states/${listenPrefix}/perimeter/goalScorerPreparation`;
+    const unsubGoalScorerPreparationRequest = onValue(
+      ref(database, goalScorerPreparationRequestPath),
+      (snapshot) => {
+        const request = snapshot.val() as Record<string, unknown> | null;
+        setGoalScorerPreparationRequestSignature(
+          typeof request?.rosterSignature === "string"
+            ? request.rosterSignature
+            : null,
+        );
+        setGoalScorerPreparationRequestLoaded(true);
+      },
+      (error) =>
+        console.error(
+          "Firebase perimeter goalScorerPreparation request subscription error:",
+          error,
+        ),
+    );
+
+    return () => {
+      unsubOverlayGeometry();
+      unsubGoalScorerPreparation();
+      unsubGoalScorerPreparationRequest();
+    };
+  }, [isAuthenticated, listenPrefix, venueRenderer]);
+
+  // The preparation state is only meaningful while the Resolume machinery is
+  // subscribed; non-Resolume venues expose nothing, so a renderer change
+  // drops the generated-media dependency without touching shared state.
+  const goalScorerMachineryActive =
+    isAuthenticated && venueRenderer === "resolume";
+  const publishedOverlayGeometry = goalScorerMachineryActive
+    ? overlayGeometry
+    : null;
+  const publishedGoalScorerPreparationStatus = goalScorerMachineryActive
+    ? goalScorerPreparationStatus
+    : null;
 
   const applyMatchUpdate = useCallback(
     (getNewState: (prev: Match) => Match, action: string) => {
@@ -2691,16 +2722,19 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   // Boolean (not the geometry object) so a daemon re-publish of unchanged
   // geometry does not re-trigger a preparation request on every refresh.
   const hasOverlayGeometry = useMemo(
-    () => overlayGeometry !== null,
-    [overlayGeometry],
+    () => publishedOverlayGeometry !== null,
+    [publishedOverlayGeometry],
   );
   useEffect(() => {
     // Preparation needs a venue that has opted into the perimeter AND a
     // daemon that has published overlay geometry; a venue without either
     // would only produce a job that must fail, so no request is issued.
+    // Web venues are excluded entirely: browser composition needs no
+    // generated perimeter files, so web rosters create no preparation job.
     if (
       !ready ||
       !isAuthenticated ||
+      venueRenderer !== "resolume" ||
       !perimeter.enabled ||
       !hasOverlayGeometry ||
       !goalScorerPreparationRequestLoaded ||
@@ -2714,6 +2748,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     eligibleRosterSignature,
     ready,
     isAuthenticated,
+    venueRenderer,
     perimeter.enabled,
     hasOverlayGeometry,
     goalScorerPreparationRequestLoaded,
@@ -2829,8 +2864,8 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       perimeterBrightness,
       perimeterBrightnessStatus,
       setPerimeterBrightness,
-      overlayGeometry,
-      goalScorerPreparationStatus,
+      overlayGeometry: publishedOverlayGeometry,
+      goalScorerPreparationStatus: publishedGoalScorerPreparationStatus,
       requestGoalScorerPreparation,
     }),
     [
@@ -2927,8 +2962,8 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       perimeterBrightness,
       perimeterBrightnessStatus,
       setPerimeterBrightness,
-      overlayGeometry,
-      goalScorerPreparationStatus,
+      publishedOverlayGeometry,
+      publishedGoalScorerPreparationStatus,
       requestGoalScorerPreparation,
     ],
   );
@@ -3141,8 +3176,8 @@ export const usePerimeter = () => {
     perimeterBrightness,
     perimeterBrightnessStatus,
     setPerimeterBrightness,
-    overlayGeometry,
-    goalScorerPreparationStatus,
+    overlayGeometry: publishedOverlayGeometry,
+    goalScorerPreparationStatus: publishedGoalScorerPreparationStatus,
     requestGoalScorerPreparation,
     getServerTime,
   } = useFirebaseState();
@@ -3168,8 +3203,8 @@ export const usePerimeter = () => {
     brightness: perimeterBrightness,
     brightnessStatus: perimeterBrightnessStatus,
     setPerimeterBrightness,
-    overlayGeometry,
-    goalScorerPreparationStatus,
+    overlayGeometry: publishedOverlayGeometry,
+    goalScorerPreparationStatus: publishedGoalScorerPreparationStatus,
     requestGoalScorerPreparation,
     getServerTime,
   };

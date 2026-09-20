@@ -17,6 +17,8 @@ import type {
   PerimeterOverlay,
   PerimeterOverlayColumn,
   PerimeterOverlayFile,
+  GoalScorerOverlayCommand,
+  GoalScorerOverlayPlayer,
   PerimeterMediaPair,
   PerimeterAdLayout,
   PerimeterAdLayoutColumn,
@@ -706,11 +708,24 @@ export function parsePerimeterPreview(
 const MAX_OVERLAY_COLUMNS = 20;
 const MAX_OVERLAY_DURATION_MS = 120_000;
 const MIN_OVERLAY_DURATION_MS = 100;
-const VALID_OVERLAY_VERSIONS = new Set([1]);
+const VALID_OVERLAY_VERSIONS = new Set([1, 2]);
 const ALLOWED_OVERLAY_BUCKET = "vikes-match-clock-firebase.appspot.com";
 // \p{Cc} matches control characters (\x00-\x1f and \x7f-\x9f); written as a
 // property escape so the literal contains no raw control characters.
 const UNSAFE_FILENAME_RE = /["%\\/]|[\p{Cc}]/u;
+
+// -- Version-2 semantic scorer command bounds --------------------------------
+
+const MAX_OVERLAY_COMMAND_ID_LENGTH = 128;
+const MAX_SCORER_PLAYER_NAME_LENGTH = 80;
+// Safe player identifier: the KSI ids are numeric, but manual rosters can use
+// other opaque identifiers. The same shape is enforced by the RTDB rules and
+// the Storage rule for `{location}/players/{id}-fagn.png`.
+const SCORER_PLAYER_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+// Shirt numbers are digit-only, at most 4 digits, and never zero-length.
+const SCORER_PLAYER_NUMBER_RE = /^[0-9]{1,4}$/;
+
+export const GOAL_SCORER_OVERLAY_KIND = "goal-scorer" as const;
 
 function validateOverlayFileName(name: string): boolean {
   if (!name || name.length > 255) return false;
@@ -806,7 +821,18 @@ export function parsePerimeterOverlay(
   const version = typeof raw.version === "number" ? raw.version : 0;
   if (!VALID_OVERLAY_VERSIONS.has(version)) return null;
   const id = typeof raw.id === "string" ? raw.id : "";
-  if (!id) return null;
+  if (!id || id.length > MAX_OVERLAY_COMMAND_ID_LENGTH) return null;
+
+  if (version === 2) {
+    // The discriminator is required; a version-2 document that also carries
+    // version-1 columns is a mixed shape and is rejected wholesale.
+    if (raw.kind !== GOAL_SCORER_OVERLAY_KIND) return null;
+    if ("columns" in raw) return null;
+    return parseGoalScorerCommand(raw, id);
+  }
+
+  // Version-1 file commands must not carry version-2 scorer fields.
+  if ("kind" in raw || "player" in raw) return null;
   const columnsRaw = raw.columns;
   if (!Array.isArray(columnsRaw) || columnsRaw.length === 0) return null;
   if (columnsRaw.length > MAX_OVERLAY_COLUMNS) return null;
@@ -816,7 +842,90 @@ export function parsePerimeterOverlay(
     if (!column) return null;
     columns.push(column);
   }
-  return { version, id, columns };
+  return { version: 1, id, columns };
+}
+
+// Strict parse of the version-2 semantic player payload. Every field must be
+// present, bounded, and safe: missing discriminator data, empty or overlong
+// text, unsafe player identifiers, and invalid shirt numbers reject the
+// whole command.
+function parseGoalScorerCommand(
+  raw: Record<string, unknown>,
+  id: string,
+): GoalScorerOverlayCommand | null {
+  const playerRaw = raw.player;
+  if (!playerRaw || typeof playerRaw !== "object") return null;
+  const player = playerRaw as Record<string, unknown>;
+
+  const playerId = typeof player.id === "string" ? player.id.trim() : "";
+  if (!SCORER_PLAYER_ID_RE.test(playerId)) return null;
+
+  const name = typeof player.name === "string" ? player.name.trim() : "";
+  if (!name || name.length > MAX_SCORER_PLAYER_NAME_LENGTH) return null;
+  if (/[\p{Cc}]/u.test(name)) return null;
+
+  const number =
+    typeof player.number === "number"
+      ? String(player.number)
+      : typeof player.number === "string"
+        ? player.number.trim()
+        : "";
+  if (!SCORER_PLAYER_NUMBER_RE.test(number)) return null;
+
+  return {
+    version: 2,
+    kind: GOAL_SCORER_OVERLAY_KIND,
+    id,
+    player: { id: playerId, name, number },
+  };
+}
+
+// Serialize a validated scorer selection as a fresh version-2 semantic
+// command. Every selection gets a new command id, so selecting the same
+// player again is still a new replacement request.
+export function buildGoalScorerOverlayCommand(
+  player: GoalScorerOverlayPlayer,
+): GoalScorerOverlayCommand {
+  return {
+    version: 2,
+    kind: GOAL_SCORER_OVERLAY_KIND,
+    id: crypto.randomUUID(),
+    player: {
+      id: player.id.trim(),
+      name: player.name.trim(),
+      number: String(player.number).trim(),
+    },
+  };
+}
+
+// Validates a roster player as semantic scorer display data and normalizes
+// it to the bounded command payload. Returns null when the identifier,
+// name, or shirt number is invalid, so the caller can keep the generic
+// perimeter overlay unchanged instead of writing a malformed command.
+export function goalScorerPlayerFromSelection(
+  player:
+    | {
+        id?: number | string | null;
+        name?: string;
+        number?: number | string | null;
+      }
+    | null
+    | undefined,
+): GoalScorerOverlayPlayer | null {
+  if (!player) return null;
+  const id =
+    player.id === undefined || player.id === null
+      ? ""
+      : String(player.id).trim();
+  if (!SCORER_PLAYER_ID_RE.test(id)) return null;
+  const name = (player.name ?? "").trim();
+  if (!name || name.length > MAX_SCORER_PLAYER_NAME_LENGTH) return null;
+  const number =
+    player.number === undefined || player.number === null
+      ? ""
+      : String(player.number).trim();
+  if (!SCORER_PLAYER_NUMBER_RE.test(number)) return null;
+  return { id, name, number };
 }
 
 // -- Named perimeter media pairs ----------------------------------------------

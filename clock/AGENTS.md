@@ -570,7 +570,9 @@ overlay (`states/${listenPrefix}/perimeter/overlay`).
 
 Types are defined in `types.ts`:
 
-- `PerimeterOverlay` — overlay document
+- `PerimeterOverlay` — discriminated union: `PerimeterFileOverlay` (version 1,
+  timed file columns) or `GoalScorerOverlayCommand` (version 2, semantic web
+  scorer — see **Web Goal Scorer Overlay (Browser Composition)** below)
 - `PerimeterOverlayColumn` — a column with duration and paired files
 - `PerimeterOverlayFile` — filename + GCS source
 - `PerimeterOverlayStatus` — daemon-published status
@@ -578,8 +580,10 @@ Types are defined in `types.ts`:
 
 Parsing is in `firebaseParsers.ts`:
 
-- `parsePerimeterOverlay()` — strict validation (version, id, column count,
-  duration bounds, paired targets, filename safety, approved bucket only).
+- `parsePerimeterOverlay()` — strict validation (discriminated union on
+  version, id bound, column count, duration bounds, paired targets, filename
+  safety, approved bucket only; version-2 scorer payload bounds; mixed shapes
+  rejected).
 
 Write actions are in `FirebaseStateContext.tsx`:
 
@@ -1019,7 +1023,7 @@ directly and never treats a Firebase write confirmation as a hardware result.
 - The input carries an accessible label (`aria-label="Bjartleiki jaðarskjás"`)
   matching the section title.
 
-#### Goal-Scorer Perimeter Media Preparation
+#### Goal-Scorer Perimeter Media Preparation (Resolume venues)
 
 Before a home goal happens, the controller prepares player-specific repeating
 perimeter media for every eligible home player so scorer selection can
@@ -1027,6 +1031,15 @@ attribute the goal reliably during live play. A Firebase Cloud Function
 renders static PNG bands (see `functions/src/goalScorerPreparation.ts`) using
 the daemon-published overlay geometry; the controller never renders media and
 never infers readiness from Storage listings.
+
+**This pipeline is Resolume-scoped.** A venue whose published
+`locations/{location}/perimeterDisplay` mapping says `renderer: "web"` uses
+the browser-composed semantic scorer overlay instead (see **Web Goal Scorer
+Overlay (Browser Composition)** below): web rosters create no preparation
+request, no geometry/status subscriptions, and no generated output
+dependency. The machinery below starts only at Resolume venues; the
+preparation panel and its "Endurtaka undirbúning" retry are hidden on web
+venues.
 
 **Data ownership:**
 
@@ -1114,7 +1127,8 @@ the production bucket.
   reach the endpoint; the inner callable still requires Firebase Auth and
   verifies the caller can access the location.
 - Preparation is requested in the background whenever the home roster gains
-  eligible players (match selection or match-report roster loading). The
+  eligible players (match selection or match-report roster loading) at a
+  Resolume venue. The
   controller waits for the service-owned preparation status and skips it when
   its roster signature is unchanged, so a refresh or scorer selection never
   starts another job. A player
@@ -1123,21 +1137,40 @@ the production bucket.
   values and the rendered band cannot attribute an unnumbered player. The
   write and the `prepareGoalScorerMedia` callable run fire-and-forget and never
   block the roster from becoming available. The request is gated on the venue
-  having opted into the perimeter (`states/{location}/perimeter` `enabled: true`)
+  being a Resolume venue (`locations/{location}/perimeterDisplay` `renderer:
+  "resolume"`), having opted into the perimeter (`states/{location}/perimeter`
+  `enabled: true`)
   AND
   a daemon having published overlay geometry (`perimeter/{location}/overlayGeometry`
   present) — a venue without either would only produce a job that must fail, so
   no request is issued for it. The explicit "Endurtaka undirbúning" retry below
-  bypasses the gate.
+  bypasses the gate. A venue whose published renderer is `web` never receives a
+  preparation request even when the perimeter is enabled.
+- The geometry and preparation-status subscriptions (and the desired
+  request-document subscription) start only for authenticated controllers at
+  Resolume venues. When the published renderer is not `"resolume"` the
+  subscriptions stop and `overlayGeometry`/`goalScorerPreparationStatus`
+  reset to null, so a venue switching to web drops its generated-media
+  dependency immediately.
 - `GoalScorerPreparation.tsx` (rendered inside the `Jaðarskjár` modal) lists
   each home player's celebration-image source and prepared-media outcome with
   counts and an explicit "Endurtaka undirbúning" retry action.
-- On scorer selection, `GoalScorerDialog.tsx` keeps the generic home-goal
-  overlay until the selected player's preparation result is `ready`/`fallback`;
-  only then does it replace the generic overlay with the player's prepared
-  target pair. The dialog shows a per-player readiness label so the operator
-  knows which players can be attributed. The generic overlay stays when the
-  player is preparing/unavailable/failed.
+- On scorer selection, `GoalScorerDialog.tsx` resolves the venue's published
+  renderer before submitting the perimeter replacement:
+  - `resolume`: keeps the generic home-goal overlay until the selected
+    player's preparation result is `ready`/`fallback`; only then does it
+    replace the generic overlay with the player's prepared target pair
+    (version-1 command). The dialog shows a per-player readiness label so the
+    operator knows which players can be attributed. The generic overlay stays
+    when the player is preparing/unavailable/failed.
+  - `web`: validates the selected player's display data and writes a fresh
+    version-2 semantic scorer command (see below) without waiting for or
+    referencing generated media. A player with an invalid identifier, empty
+    name, or missing shirt number still gets the main-screen reveal but never
+    a malformed perimeter command, and shows no readiness label.
+  - missing/invalid mapping: the main-screen reveal happens and the generic
+    perimeter goal overlay is left unchanged.
+  The main-screen reveal is always submitted before the perimeter command.
 - The existing clear action (`Hreinsa virkt overlay`) writes `overlay: null`,
   clearing both the main-screen reveal and the player perimeter pair and
   restoring the rotating perimeter content.
@@ -1155,6 +1188,91 @@ The overlay parsers (`parsePerimeterOverlay`, `parsePerimeterMediaPairs`,
 `parsePerimeterAdLayout`) are scoped to the active environment's storage bucket
 (`FIREBASE_STORAGE_BUCKET`), so a source from another environment's bucket is
 rejected for the active deployment.
+
+#### Web Goal Scorer Overlay (Browser Composition)
+
+At a venue whose published mapping says `renderer: "web"`, the perimeter
+browser composes the goal-scorer band locally from a semantic command — no
+Cloud Function, generated files, daemon geometry, or preparation status are
+involved.
+
+**Command schema** (`states/{location}/perimeter/overlay`, version 2):
+
+```json
+{
+  "version": 2,
+  "kind": "goal-scorer",
+  "id": "uuid",
+  "player": { "id": "2492", "name": "Jón Jónsson", "number": "7" }
+}
+```
+
+The active overlay channel is a **discriminated union**
+(`PerimeterOverlay = PerimeterFileOverlay | GoalScorerOverlayCommand` in
+`types.ts`):
+
+- Version 1 (`PerimeterFileOverlay`) — unchanged: timed `columns` of paired
+  overlay files (home-goal videos, named media pairs, Resolume scorer pairs).
+- Version 2 (`GoalScorerOverlayCommand`): semantic player data for browser
+  composition. `player.id` is a safe identifier (`[A-Za-z0-9_-]{1,64}`, also
+  used to derive the approved celebration-image path), `name` is a bounded
+  (≤ 80 chars) non-empty display name, and `number` is a digit-only string
+  (≤ 4 digits). Every selection generates a new command `id`, so re-selecting
+  the same player is still a new replacement request.
+
+The command deliberately contains **no** generated file references, download
+URLs, location, bucket, colors, dimensions, or layout values: the active
+subscription scopes the location, the deployment provides the bucket, and the
+published web mapping provides the logical-screen dimensions.
+
+Parsing (`parsePerimeterOverlay`) and the RTDB rules
+(`firebase-rules.json` → `states/$location/perimeter/overlay`) accept both
+shapes and reject mixed documents (a version-2 command carrying `columns`, a
+version-1 command carrying `kind`/`player`), unknown children, and
+oversized/bounded violations. `buildGoalScorerOverlayCommand()` serializes a
+validated selection; `goalScorerPlayerFromSelection()` validates roster
+players for semantic submission.
+
+**Browser composition** (`perimeter/scorerCompositor.ts`):
+
+- `ScorerSourceLoader` derives the same-location approved paths
+  `{location}/players/{playerId}-fagn.png` (celebration) and
+  `{location}/crest.png` (fallback), resolves immutable Storage generation
+  metadata, and loads through the persistent media cache. The celebration
+  image is tried first; the crest is used only when it is missing, unreadable,
+  or undecodable. When neither source loads, the previous overlay stays (or
+  the base stays unobscured on cold start) and the error surfaces through the
+  display diagnostics.
+- `composeScorerBand()` draws one static 2D-canvas band at each configured
+  overlay logical screen's native dimensions, repeating
+  `[cover-cropped portrait-or-crest | shirt number | fitted name | gap]`
+  left to right until the width is covered (final repetition clipped). All
+  measurements scale from the band height with the same multipliers as the
+  server renderer (gap 0.45, number font 0.55, name font 0.28, name area
+  3.0×height), text uses the bundled GT America bold, and the name shrinks
+  toward a defined minimum before truncation so repeated units never overlap.
+  Fonts are awaited through the font-loading API before measuring; composition
+  is a pure, independently unit-testable module (see
+  `perimeter/scorerCompositor.spec.ts` and the snapshot specs) and never a DOM
+  component over the WebGL canvas.
+- `PerimeterRuntime` dispatches on the command version: file commands keep
+  timed multi-column playback; scorer commands load the source, await fonts,
+  compose every overlay logical screen once, and hold one static source map
+  until clear or replacement. Both branches share the prepared-generation
+  lifecycle: atomic activation, stale-request invalidation (only the latest
+  command wins), and release of superseded resources. Replacing the published
+  mapping while a scorer is visible reruns composition at the new logical
+  dimensions before swapping textures; a recomposition failure retains the
+  current textures.
+- Scorer failures report through the existing **Skjáarvillur** diagnostics
+  channel with bounded, safe messages (no bucket URLs or auth details). The
+  renderer stays read-only: nothing in the web display writes Firebase state.
+
+**Public read access** (`storage.rules`): anonymous reads are permitted only
+for the exact `{location}/crest.png` object and `{location}/players/{id}-fagn.png`
+objects whose name matches the safe `[A-Za-z0-9_-]{1,64}-fagn.png`
+convention; writes stay authenticated-only, and all other player media
+remains private.
 
 ### The `listenPrefix` System
 
@@ -1882,11 +2000,48 @@ no-ops for drafts lacking the expected logical screens. See
 `perimeter-control/WEB_RENDERER_QUALIFICATION.md`. Keep Víkin's configuration
 at `renderer: "resolume"`; a second venue may use `web` independently.
 
-Public Storage reads are limited to `{location}/perimeter/` and
-`{location}/perimeter-overlays/`; anonymous writes and unrelated reads remain
-denied. To roll back, remove or change the venue's web mapping so the selector
-stops offering Perimeter, then reconnect its prior playback path. Do not delete
-the prior cached revision until the replacement has been qualified.
+Public Storage reads are limited to `{location}/perimeter/`,
+`{location}/perimeter-overlays/`, the venue crest (`{location}/crest.png`),
+and player celebration images matching the safe
+`{location}/players/{id}-fagn.png` convention; anonymous writes and unrelated
+reads remain denied.
+
+**Goal-scorer overlay rollout (two command forms):**
+
+- The overlay channel `states/{location}/perimeter/overlay` carries two
+  command forms: the established version-1 file command and the version-2
+  semantic goal-scorer command (schema in **Web Goal Scorer Overlay (Browser
+  Composition)** above). All controllers can parse and clear both forms; only
+  the controller at a `web` venue *emits* version 2.
+- **Deployment order**: deploy the web display bundle (version-2 parser,
+  runtime scorer branch, compositor, scoped Storage reads) and remotely
+  restart the qualified web perimeter displays (`Endurræsa skjá`) BEFORE
+  enabling controller submission at the venue. A stale web bundle cannot parse
+  version-2 commands — the command would be ignored (or rejected by strict
+  parsing), leaving the generic goal overlay visible. Resolume commands remain
+  version 1 and are unaffected.
+- **Qualification cases** for a web venue after the restart: personalized
+  celebration band, crest fallback (no `players/{id}-fagn.png`), unavailable
+  sources (neither object exists — previous overlay retained, diagnostics
+  report the failure), long names (fitted, no unit overlap), clear (base
+  returns), power off/on (black while off, scorer restored), and mapping
+  replacement (bands recomposed at the new logical dimensions). The targeted
+  Playwright scenario is `e2e/perimeter-goal-scorer.spec.ts` (emulator).
+- **Compatibility boundary**: the daemon and the Resolume preparation
+  pipeline never see a semantic command — Resolume venues keep version-1
+  commands, and web rosters create no preparation requests, geometry/status
+  subscriptions, or generated output dependency.
+- **Rollback**: clear any active version-2 overlay, restore controller
+  emission to version 1 (revert the renderer-aware dialog submission), and
+  deploy the prior web display bundle. No semantic command migrates persisted
+  roster or media data; Resolume behavior is unchanged throughout. Web-venue
+  generated scorer files from prior preparation jobs may age out separately
+  because no new command references them.
+
+To roll back the browser perimeter target entirely, remove or change the
+venue's web mapping so the selector stops offering Perimeter, then reconnect
+its prior playback path. Do not delete the prior cached revision until the
+replacement has been qualified.
 
 **Storage CORS (one-time bucket configuration)**: unlike `<img>` tags elsewhere
 in the app, the perimeter media loader downloads via `fetch()` into Cache

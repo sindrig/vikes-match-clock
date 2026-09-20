@@ -124,7 +124,7 @@ jobs:
         working-directory: ./functions
         env:
           RUN_RULES_TESTS: "true"
-        run: npm exec vitest run src/__tests__/audit-rules.test.ts
+        run: npm exec vitest run src/__tests__/audit-rules.test.ts src/__tests__/perimeter-overlay-rules.test.ts src/__tests__/scorer-storage-rules.test.ts
 
       - name: Start Vite dev server
         working-directory: ./clock

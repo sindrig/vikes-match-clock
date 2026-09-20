@@ -246,7 +246,6 @@ describe("PerimeterControl", () => {
     );
 
     render(<PerimeterControl standalone />);
-
     expect(
       screen.queryByRole("button", { name: "Fara á næsta dálk" }),
     ).toBeNull();
@@ -289,6 +288,96 @@ describe("PerimeterControl", () => {
     expect(
       screen.queryByRole("button", { name: "Endurræsa alla jaðarskjá" }),
     ).toBeNull();
+  });
+
+  it("hides the scorer preparation panel and retry control on a web venue", () => {
+    mockedUseListeners.mockReturnValue({
+      available: [],
+      screens: mockWebVenueScreens,
+    });
+    mockedUsePerimeter.mockReturnValue(
+      createMockPerimeterReturn({
+        perimeter: { enabled: true, state: "on" },
+        adLayout: webVenueAdLayout,
+        goalScorerPreparationStatus: {
+          jobId: "job-1",
+          phase: "preparing",
+          readyCount: 0,
+          fallbackCount: 0,
+          unavailableCount: 0,
+          failedCount: 0,
+          total: 2,
+          updatedAt: Date.now(),
+          error: null,
+          players: {},
+        } as never,
+      }),
+    );
+
+    render(<PerimeterControl standalone />);
+
+    expect(
+      screen.queryByText("Markaskorari — jaðarefni"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Endurtaka undirbúning" }),
+    ).toBeNull();
+  });
+
+  it("keeps the scorer preparation panel and retry control on a Resolume venue", () => {
+    const requestGoalScorerPreparation = vi.fn().mockResolvedValue(undefined);
+    mockedUseListeners.mockReturnValue({
+      available: [],
+      screens: [
+        {
+          key: "test-location",
+          label: "Test location",
+          screen: {} as never,
+          perimeterDisplay: {
+            renderer: "resolume",
+            compatibilityKeys: { base: {}, overlay: {} },
+            logicalScreens: {},
+          } as never,
+        },
+      ],
+    });
+    mockedUseController.mockReturnValue({
+      controller: {
+        roster: {
+          home: [{ id: 10, name: "Jón", number: 7, show: true, role: "FW" }],
+          away: [],
+        },
+      },
+    } as unknown as ReturnType<typeof useController>);
+    mockedUsePerimeter.mockReturnValue(
+      createMockPerimeterReturn({
+        perimeter: { enabled: true, state: "on" },
+        goalScorerPreparationStatus: {
+          jobId: "job-1",
+          phase: "ready",
+          readyCount: 1,
+          fallbackCount: 0,
+          unavailableCount: 0,
+          failedCount: 0,
+          total: 1,
+          updatedAt: Date.now(),
+          error: null,
+          players: {
+            "10": { status: "ready", error: null },
+          },
+        } as never,
+        requestGoalScorerPreparation,
+      }),
+    );
+
+    render(<PerimeterControl standalone />);
+
+    expect(screen.getByText("Markaskorari — jaðarefni")).toBeVisible();
+    expect(screen.getByTestId("goal-scorer-player-10")).toBeVisible();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Endurtaka undirbúning" }),
+    );
+    expect(requestGoalScorerPreparation).toHaveBeenCalledWith(true);
   });
 
   it("derives editable lanes from a web venue mapping without daemon status", () => {
