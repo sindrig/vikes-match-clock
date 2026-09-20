@@ -349,4 +349,43 @@ describeRules("Firebase perimeter overlay rules", () => {
     };
     await assertSucceeds(db.ref().update(updates));
   });
+
+  it("allows an authorized operator to write a known scorer celebration style", async () => {
+    const db = env.authenticatedContext(UID).database();
+    for (const style of [
+      "ribbon",
+      "tunnel",
+      "wave",
+      "procession",
+      "cutout",
+    ]) {
+      await assertSucceeds(
+        db.ref(`states/${LOCATION}/perimeter/scorerCelebration`).set(style),
+      );
+    }
+  });
+
+  it("allows an authorized operator to clear the scorer celebration", async () => {
+    const db = env.authenticatedContext(UID).database();
+    await assertSucceeds(
+      db.ref(`states/${LOCATION}/perimeter/scorerCelebration`).remove(),
+    );
+    await assertSucceeds(
+      db.ref(`states/${LOCATION}/perimeter/scorerCelebration`).set(null),
+    );
+  });
+
+  it("rejects unauthenticated or unknown scorer celebration values", async () => {
+    const unauth = env.unauthenticatedContext().database();
+    await assertFails(
+      unauth.ref(`states/${LOCATION}/perimeter/scorerCelebration`).set("wave"),
+    );
+    const db = env.authenticatedContext(UID).database();
+    await assertFails(
+      db.ref(`states/${LOCATION}/perimeter/scorerCelebration`).set("nonsense"),
+    );
+    await assertFails(
+      db.ref(`states/${LOCATION}/perimeter/scorerCelebration`).set(7),
+    );
+  });
 });

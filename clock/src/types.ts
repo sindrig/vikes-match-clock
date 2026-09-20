@@ -368,7 +368,21 @@ export interface PerimeterState {
   // every web perimeter display (remote restart). A new token value means
   // "restart now"; absent/null is inert.
   refreshToken?: string | null;
+  // Goal-scorer celebration presentation selected in the perimeter admin
+  // view. Absent/invalid values fall back to the default style in the
+  // web runtime; the field only affects web-rendered scorer bands.
+  scorerCelebration?: ScorerCelebrationStyle;
 }
+
+// Visual presentation styles for the web goal-scorer perimeter band. The
+// semantic version-2 command is unchanged by the style; it only changes how
+// the display browser animates the composed band.
+export type ScorerCelebrationStyle =
+  | "ribbon"
+  | "tunnel"
+  | "wave"
+  | "procession"
+  | "cutout";
 
 // A single clip in the perimeter composition preview.
 export interface PerimeterClip {

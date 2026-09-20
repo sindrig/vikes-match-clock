@@ -4,6 +4,10 @@ import { validatePerimeterMapping } from "./perimeterMapping";
 export interface PerimeterRenderSources {
   base: Record<string, TexImageSource>;
   overlay?: Record<string, TexImageSource>;
+  // Animated scorer presentations redraw their canvases every frame while
+  // keeping the same canvas identity, so the overlay channel re-uploads its
+  // textures even when the sources do not change.
+  overlayDynamic?: boolean;
 }
 
 export interface PerimeterRendererOptions {
@@ -221,7 +225,28 @@ export class PerimeterWebGLRenderer {
     return true;
   }
 
-  uploadSource(textureKey: string, source: TexImageSource): void {
+  // Deletes every uploaded texture of a channel so content that is no longer
+  // live can never be re-drawn: drawChannel binds `null` for a region without
+  // a texture instead of the previous generation's pixels.
+  clearChannel(channel: "base" | "overlay"): void {
+    const prefix = `${channel}:`;
+    let emitted = false;
+    for (const [key, texture] of [...this.textures]) {
+      if (!key.startsWith(prefix)) continue;
+      this.gl.deleteTexture(texture);
+      this.textures.delete(key);
+      this.textureSources.delete(key);
+      this.oversizedLogged.delete(key);
+      if (this.oversizedErrors.delete(key)) emitted = true;
+    }
+    if (emitted) this.emitError();
+  }
+
+  uploadSource(
+    textureKey: string,
+    source: TexImageSource,
+    dynamic = false,
+  ): void {
     const gl = this.gl;
     const isVideo =
       typeof HTMLVideoElement !== "undefined" &&
@@ -265,7 +290,11 @@ export class PerimeterWebGLRenderer {
         effectiveSource = scaled;
       }
     }
-    if (!isVideo && this.textureSources.get(textureKey) === effectiveSource)
+    if (
+      !isVideo &&
+      !dynamic &&
+      this.textureSources.get(textureKey) === effectiveSource
+    )
       return;
     const texture = this.textures.get(textureKey) ?? gl.createTexture();
     if (!texture) throw new Error("Unable to create perimeter texture.");
@@ -340,13 +369,20 @@ export class PerimeterWebGLRenderer {
     gl.clearColor(0, 0, 0, 1);
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.useProgram(this.program);
-    this.drawChannel(sources.base, "base");
-    if (sources.overlay) this.drawChannel(sources.overlay, "overlay");
+    this.drawChannel(sources.base, "base", false);
+    if (sources.overlay) {
+      this.drawChannel(
+        sources.overlay,
+        "overlay",
+        sources.overlayDynamic === true,
+      );
+    }
   }
 
   private drawChannel(
     sources: Record<string, TexImageSource>,
     channel: "base" | "overlay",
+    dynamic: boolean,
   ): void {
     const gl = this.gl;
     const positionLocation = gl.getAttribLocation(this.program, "position");
@@ -360,7 +396,7 @@ export class PerimeterWebGLRenderer {
       const source = sources[region.logicalScreenId];
       if (!source) continue;
       const textureKey = `${channel}:${region.logicalScreenId}`;
-      this.uploadSource(textureKey, source);
+      this.uploadSource(textureKey, source, dynamic);
       const screen = this.configuration.logicalScreens[region.logicalScreenId];
       if (!screen) continue;
       const vertices = regionVertices(

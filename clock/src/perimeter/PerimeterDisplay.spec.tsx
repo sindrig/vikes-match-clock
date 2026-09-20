@@ -39,6 +39,7 @@ const runtimeInstance = vi.hoisted(() => ({
   prepareBase: vi.fn(),
   activatePreparedBase: vi.fn(),
   setOverlay: vi.fn(),
+  setScorerStyle: vi.fn(),
 }));
 
 const rendererInstance = vi.hoisted(() => ({
@@ -104,12 +105,14 @@ const setupContexts = ({
   adLayout = { version: 1, revision: "rev-1", columns: [] },
   overlay = null,
   homeTeam = "Víkingur R",
+  perimeter = { state: "on" },
 }: {
   screens?: unknown[];
   ready?: boolean;
   adLayout?: unknown;
   overlay?: unknown;
   homeTeam?: string;
+  perimeter?: unknown;
 } = {}) => {
   mockedUseFirebaseState.mockReturnValue({
     ready,
@@ -119,7 +122,7 @@ const setupContexts = ({
     screens,
   } as unknown as ReturnType<typeof useListeners>);
   mockedUsePerimeter.mockReturnValue({
-    perimeter: { state: "on" },
+    perimeter,
     adLayout,
     overlay,
   } as unknown as ReturnType<typeof usePerimeter>);
@@ -285,5 +288,29 @@ describe("PerimeterDisplay", () => {
       const calls = mockReportError.mock.calls;
       expect(calls[calls.length - 1]).toEqual([null]);
     });
+  });
+
+  it("applies the selected scorer celebration style to the runtime", async () => {
+    const { rerender } = render(<PerimeterDisplay />);
+    await waitFor(() =>
+      expect(runtimeInstance.setScorerStyle).toHaveBeenCalledWith("ribbon"),
+    );
+
+    setupContexts({
+      perimeter: { state: "on", scorerCelebration: "tunnel" },
+    });
+    rerender(<PerimeterDisplay />);
+    await waitFor(() =>
+      expect(runtimeInstance.setScorerStyle).toHaveBeenCalledWith("tunnel"),
+    );
+
+    // An invalid value falls back to the default presentation.
+    setupContexts({
+      perimeter: { state: "on", scorerCelebration: "nonsense" },
+    });
+    rerender(<PerimeterDisplay />);
+    await waitFor(() =>
+      expect(runtimeInstance.setScorerStyle).toHaveBeenCalledWith("ribbon"),
+    );
   });
 });

@@ -13,7 +13,12 @@ import { PerimeterMediaLoader } from "./mediaLoader";
 import { PerimeterWebGLRenderer } from "./webglRenderer";
 import { PerimeterRuntime } from "./runtime";
 import { ScorerSourceLoader } from "./scorerSource";
-import { composeScorerBands, defaultScorerBandDeps } from "./scorerCompositor";
+import {
+  DEFAULT_SCORER_CELEBRATION_STYLE,
+  createScorerPresentations,
+} from "./scorerPresentation";
+import type { ScorerCelebrationStyle } from "../types";
+import { defaultScorerBandDeps } from "./scorerCompositor";
 
 const NO_CONFIGURATION_MESSAGE = "Engin gild perimeter stilling tiltæk.";
 
@@ -39,6 +44,10 @@ export default function PerimeterDisplay() {
   const rendererRef = useRef<PerimeterWebGLRenderer | null>(null);
   const lastSkipCueRef = useRef<string | null>(null);
   const lastRefreshTokenRef = useRef<string | null>(null);
+  // The goal-scorer celebration style selected in the perimeter admin view;
+  // absent or invalid values fall back to the default presentation.
+  const scorerCelebration: ScorerCelebrationStyle =
+    perimeter.scorerCelebration ?? DEFAULT_SCORER_CELEBRATION_STYLE;
   const [rendererError, setRendererError] = useState<string | null>(null);
   const [textureError, setTextureError] = useState<string | null>(null);
   // The runtime (and its scorer source loader) is constructed once per
@@ -152,8 +161,14 @@ export default function PerimeterDisplay() {
             const loaded = await scorerSourceLoader.load(command.player);
             return { image: loaded.image, release: loaded.release };
           },
-          compose: (command, source, screens) =>
-            composeScorerBands(command, source, screens, defaultScorerBandDeps),
+          compose: (style, command, source, screens) =>
+            createScorerPresentations(
+              style,
+              command,
+              source,
+              screens,
+              defaultScorerBandDeps,
+            ),
         },
       });
       rendererRef.current = renderer;
@@ -180,6 +195,15 @@ export default function PerimeterDisplay() {
     },
     [listenPrefix],
   );
+
+  // The goal-scorer celebration style is applied to the live runtime before
+  // the overlay effect below runs, so a commit that changes both the style
+  // and the overlay command prepares with the new presentation style. The
+  // runtime itself recomposes an active scorer presentation when the style
+  // changes; failures keep the current textures on screen.
+  useEffect(() => {
+    runtimeRef.current?.setScorerStyle(scorerCelebration);
+  }, [scorerCelebration, configuration]);
 
   useEffect(() => {
     const runtime = runtimeRef.current;

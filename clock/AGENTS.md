@@ -1313,8 +1313,9 @@ players for semantic submission.
   component over the WebGL canvas.
 - `PerimeterRuntime` dispatches on the command version: file commands keep
   timed multi-column playback; scorer commands load the source, await fonts,
-  compose every overlay logical screen once, and hold one static source map
-  until clear or replacement. Both branches share the prepared-generation
+  create one animated presentation per overlay logical screen
+  (`perimeter/scorerPresentation.ts`), and hold those presentations until
+  clear or replacement. Both branches share the prepared-generation
   lifecycle: atomic activation, stale-request invalidation (only the latest
   command wins), and release of superseded resources. A replacement command
   drops the active generation immediately, so the base channel shows through
@@ -1327,6 +1328,48 @@ players for semantic submission.
 - Scorer failures report through the existing **Skjáarvillur** diagnostics
   channel with bounded, safe messages (no bucket URLs or auth details). The
   renderer stays read-only: nothing in the web display writes Firebase state.
+
+**Goal-scorer celebration presentations** (`perimeter/scorerPresentation.ts`):
+
+- The scorer band is animated by the display browser. Each logical screen
+  gets a `ScorerPresentation` — a canvas plus `draw(elapsedMs)` — that the
+  runtime redraws every frame while the scorer command is active. The
+  elapsed time is anchored at the first visible render after activation, so
+  the entrance always plays from the moment the scorer appears. Because the
+  canvas identity never changes, the renderer receives
+  `overlayDynamic: true` so `PerimeterWebGLRenderer` re-uploads the overlay
+  textures each frame instead of its identity short-circuit.
+- Every style shares one entrance language (constants in
+  `SCORER_PRESENTATION_TIMELINE`): a ~140 ms white impact flash, a red wipe
+  edge crossing the band, and a left-to-right foreground reveal ending
+  ~800 ms in, followed by a slow ambient loop. The foreground unit layout
+  (portrait contain-fit, shirt number, fitted name) is unchanged from the
+  static band; `drawBandUnit` in `scorerCompositor.ts` accepts optional
+  motion (portrait scale/alpha, text slide/alpha, unit alpha) that only the
+  presentations use, so `composeScorerBand()` geometry and snapshots are
+  unchanged.
+- The five styles selectable in the perimeter admin view
+  (`states/{location}/perimeter/scorerCelebration`, default `ribbon`):
+  - `ribbon` — "Sjálfgefið": black-to-red kinetic field, racing diagonal
+    streaks, ambient glow sweep every 4 s.
+  - `tunnel` — giant low-contrast `MARK` typography scrolling
+    right-to-left behind the band plus thin speed lines.
+  - `wave` — red radial energy breathing from every portrait center with a
+    bright pulse travelling along the band.
+  - `procession` — the repeated units themselves drift slowly
+    right-to-left (height-relative speed, seamless unit wrap).
+  - `cutout` — portrait scale-down pop with a pulsing glow while the
+    number and name slide in slightly later.
+- The style lives in the parsed `PerimeterState`
+  (`perimeter.scorerCelebration`), written by
+  `setPerimeterScorerCelebration()` (audited as
+  `perimeter.set-scorer-celebration`) from the **Markasvör** section in the
+  standalone perimeter manager (web venues only; the Resolume
+  preparation pipeline is untouched). Absent or invalid values fall back
+  to `DEFAULT_SCORER_CELEBRATION_STYLE`. The display applies the style
+  before the overlay effect runs, and a style change while a scorer is
+  visible recomposes the active command's presentations; failures retain
+  the current textures.
 
 **Public read access** (`storage.rules`): anonymous reads are permitted only
 for the exact `{location}/crest.png` object and `{location}/players/{id}-fagn.png`

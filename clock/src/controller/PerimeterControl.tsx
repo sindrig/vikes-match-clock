@@ -31,6 +31,7 @@ import {
   PerimeterAdLayoutFile,
   PerimeterAppliedAdFile,
   PerimeterOverlayFile,
+  ScorerCelebrationStyle,
 } from "../types";
 import { useListeners, usePerimeter } from "../contexts/FirebaseStateContext";
 import { useLocalState } from "../contexts/LocalStateContext";
@@ -604,6 +605,81 @@ const BrightnessSection = () => {
   );
 };
 
+// Goal-scorer celebration presentations for web perimeter displays. The
+// keys are the ScorerCelebrationStyle values; the default style is applied
+// by the display runtime whenever the field is absent or invalid, so the
+// selector marks it active even before an explicit write exists.
+const SCORER_CELEBRATION_LABELS: Record<ScorerCelebrationStyle, string> = {
+  ribbon: "Sjálfgefið",
+  tunnel: "MARK borði",
+  wave: "Bylgja",
+  procession: "Hreyfandi borði",
+  cutout: "Leikmannsáhersla",
+};
+
+const SCORER_CELEBRATION_ORDER: ScorerCelebrationStyle[] = [
+  "ribbon",
+  "tunnel",
+  "wave",
+  "procession",
+  "cutout",
+];
+
+const ScorerCelebrationSection = () => {
+  const { perimeter, setPerimeterScorerCelebration } = usePerimeter();
+  const selected: ScorerCelebrationStyle =
+    perimeter.scorerCelebration ?? "ribbon";
+  const [savingStyle, setSavingStyle] = useState<ScorerCelebrationStyle | null>(
+    null,
+  );
+  // The write settles once the perimeter subscription reflects the chosen
+  // style (no optimistic local state); a rejected write clears the pending
+  // flag so another selection is possible.
+  const settling = savingStyle !== null && selected !== savingStyle;
+
+  const handleSelect = (style: ScorerCelebrationStyle) => {
+    if (settling) return;
+    setSavingStyle(style);
+    setPerimeterScorerCelebration(style)
+      .catch(() => setSavingStyle(null))
+      .finally(() => {
+        setSavingStyle((current) => (current === style ? null : current));
+      });
+  };
+
+  return (
+    <div className="perimeter-scorer-celebration">
+      <div className="perimeter-brightness-header">
+        <span className="perimeter-brightness-title">Markasvör</span>
+      </div>
+      <div className="perimeter-scorer-celebration-options" role="radiogroup">
+        {SCORER_CELEBRATION_ORDER.map((style) => (
+          <Button
+            key={style}
+            size="sm"
+            appearance={style === selected ? "primary" : "ghost"}
+            active={style === selected}
+            onClick={() => handleSelect(style)}
+            disabled={settling}
+            aria-pressed={style === selected}
+          >
+            {SCORER_CELEBRATION_LABELS[style]}
+          </Button>
+        ))}
+      </div>
+      {settling && (
+        <span className="perimeter-scorer-celebration-status">Vistar…</span>
+      )}
+      <p className="perimeter-hint">
+        Birtingin sem spilar á jaðarskjánum þegar markaskorari er valinn. Sem
+        sjálfgefið er rauða kraftborðið; hinar stílnir setja stóran MARK texta,
+        bylgjuáberingu, hreyfingu eða leikmannsáherslu í fokus. Breytingin
+        beitist strax á lífandi borðanum.
+      </p>
+    </div>
+  );
+};
+
 const PerimeterControl = ({ standalone = false }: { standalone?: boolean }) => {
   const {
     perimeter,
@@ -825,6 +901,7 @@ const PerimeterControl = ({ standalone = false }: { standalone?: boolean }) => {
       {isWebVenue && <PerimeterDisplayReports />}
       <BrightnessSection />
       <GoalVideoSection />
+      {isWebVenue && <ScorerCelebrationSection />}
       {!isWebVenue && <GoalScorerPreparation />}
       {!isWebVenue && !appliedAdLayoutLoaded ? (
         <div className="perimeter-preview-state">

@@ -4,6 +4,7 @@ import type {
   GoalScorerOverlayCommand,
   PerimeterOverlayColumn,
   PerimeterOverlay,
+  ScorerCelebrationStyle,
 } from "../types";
 import {
   backfillOverlayGenerations,
@@ -19,6 +20,10 @@ import {
   PerimeterPower,
   pairedPlaybackPlan,
 } from "./playback";
+import {
+  DEFAULT_SCORER_CELEBRATION_STYLE,
+  type ScorerPresentation,
+} from "./scorerPresentation";
 import { createBaseTimeline, nextCueBoundary } from "./timeline";
 import type { PerimeterRenderSources } from "./webglRenderer";
 
@@ -43,11 +48,11 @@ interface PreparedOverlayGeneration {
   commandId: string;
   kind: "file" | "scorer";
   // File commands: normalized columns with loaded media, keyed by logical
-  // screen id. Scorer commands: static composed sources per logical screen.
+  // screen id. Scorer commands: animated presentations per logical screen.
   columns?: PreparedOverlayColumn[];
-  staticSources?: Record<string, HTMLCanvasElement>;
+  presentations?: Record<string, ScorerPresentation>;
   // The semantic command behind a scorer generation, retained so a mapping
-  // replacement can recompose it at the new logical-screen dimensions.
+  // replacement or style change can recompose it.
   scorerCommand?: GoalScorerOverlayCommand;
   release: () => void;
 }
@@ -74,20 +79,25 @@ export interface PerimeterOverlayScorerDependencies {
   }>;
   // Awaits readiness of the fonts the compositor will use.
   ensureFonts?: (command: GoalScorerOverlayCommand) => Promise<void>;
-  // Composes one static band per logical screen. The runtime passes the
-  // overlay logical screens of its CURRENT configuration, so a mapping
-  // replacement recomposes at the new native dimensions.
+  // Creates one animated presentation per logical screen for the requested
+  // celebration style. The runtime passes the overlay logical screens of its
+  // CURRENT configuration, so a mapping replacement or style change recreates
+  // the presentations at the new native dimensions.
   compose: (
+    style: ScorerCelebrationStyle,
     command: GoalScorerOverlayCommand,
     source: HTMLImageElement,
     screens: readonly { id: string; width: number; height: number }[],
-  ) => Promise<Record<string, HTMLCanvasElement>>;
+  ) => Promise<Record<string, ScorerPresentation>>;
 }
 
 export interface PerimeterRuntimeOptions {
   renderer: {
     render: (sources: PerimeterRenderSources) => void;
     replaceConfiguration?: (configuration: PerimeterDisplayConfig) => boolean;
+    // Forgets every uploaded texture of a channel so content that is no
+    // longer live can never be re-drawn as a stale fallback.
+    clearChannel?: (channel: "base" | "overlay") => void;
   };
   loader: Pick<PerimeterMediaLoader, "loadPair">;
   scorer?: PerimeterOverlayScorerDependencies;
@@ -99,6 +109,7 @@ export class PerimeterRuntime {
   private readonly overlayPlayback = new OverlayPlayback();
   private readonly power: PerimeterPower;
   private readonly timeline;
+  private readonly nowMs: () => number;
   private baseColumns: PreparedColumn[] = [];
   private currentBaseCue: number | null = null;
   private baseRequest = 0;
@@ -112,21 +123,27 @@ export class PerimeterRuntime {
   // Storage identity of the generation currently on screen, used to ignore
   // re-deliveries of an already-live command.
   private activeOverlayCommandId: string | null = null;
-  // The active semantic scorer generation. Composed canvases stay in memory
+  // The active semantic scorer generation. Presentations stay in memory
   // until clear or replacement; released sources are re-decoded from the
-  // persistent media cache when a mapping change requires recomposition.
+  // persistent media cache when a mapping change or style change requires
+  // recomposition. `startedAt` is anchored on the first visible render so
+  // the entrance animation plays from the frame the scorer appears.
   private activeScorer: {
     command: GoalScorerOverlayCommand;
-    sources: Record<string, HTMLCanvasElement>;
+    presentations: Record<string, ScorerPresentation>;
+    startedAt: number | null;
     release: () => void;
   } | null = null;
+  // The goal-scorer celebration style written by the perimeter admin view.
+  private scorerStyle: ScorerCelebrationStyle =
+    DEFAULT_SCORER_CELEBRATION_STYLE;
 
   constructor(
     private configuration: PerimeterDisplayConfig,
     private readonly options: PerimeterRuntimeOptions,
   ) {
-    const now = options.now ?? (() => performance.now());
-    this.power = new PerimeterPower(now);
+    this.nowMs = options.now ?? (() => performance.now());
+    this.power = new PerimeterPower(this.nowMs);
     this.timeline = createBaseTimeline(configuration.playback.cueDurationMs, 0);
   }
 
@@ -144,16 +161,36 @@ export class PerimeterRuntime {
     const activeCommand = this.activeScorer?.command;
     if (activeCommand) {
       const request = ++this.overlayRequest;
-      void this.prepareScorerOverlay(activeCommand, request).catch(
-        (error: unknown) => {
-          console.error(
-            "Scorer recomposition after mapping replacement failed:",
-            error,
-          );
-        },
-      );
+      void this.prepareScorerOverlay(
+        activeCommand,
+        request,
+        this.nowMs(),
+      ).catch((error: unknown) => {
+        console.error(
+          "Scorer recomposition after mapping replacement failed:",
+          error,
+        );
+      });
     }
     return true;
+  }
+
+  // Applies the goal-scorer celebration style chosen in the perimeter admin
+  // view. Changing the style while a scorer is visible is a new overlay
+  // preparation for the active command: the current textures stay visible
+  // until every presentation for the new style is ready. Failures retain the
+  // current textures and surface through the overlay preparation error path.
+  setScorerStyle(style: ScorerCelebrationStyle): void {
+    if (style === this.scorerStyle) return;
+    this.scorerStyle = style;
+    const activeCommand = this.activeScorer?.command;
+    if (!activeCommand) return;
+    const request = ++this.overlayRequest;
+    void this.prepareScorerOverlay(activeCommand, request, this.nowMs()).catch(
+      (error: unknown) => {
+        console.error("Scorer recomposition after style change failed:", error);
+      },
+    );
   }
 
   async prepareBase(
@@ -230,19 +267,18 @@ export class PerimeterRuntime {
     if (!overlay) {
       this.releaseActiveOverlay();
       this.overlayPlayback.clear();
+      // The cleared generation's uploaded pixels must not survive in the
+      // renderer: while a later command prepares, the base channel shows
+      // through, and a slot without its own texture must never re-draw the
+      // cleared content.
+      this.options.renderer.clearChannel?.("overlay");
       return;
     }
     // The same command re-delivered (snapshot refresh, reconnect) is already
     // live: re-preparing identical media would only restart its playback.
     if (this.activeOverlayCommandId === overlay.id) return;
-    // A different command replaces the active one. The stale generation is
-    // dropped immediately instead of double-buffered: the base channel shows
-    // through until the replacement is fully prepared, so a previous goal's
-    // content never lingers on screen while new media loads.
-    this.releaseActiveOverlay();
-    this.overlayPlayback.clear();
     if (overlay.version === 2) {
-      await this.prepareScorerOverlay(overlay, request);
+      await this.prepareScorerOverlay(overlay, request, now);
       return;
     }
     await this.prepareFileOverlay(overlay, request, now, resolveGeneration);
@@ -319,6 +355,7 @@ export class PerimeterRuntime {
   private async prepareScorerOverlay(
     command: GoalScorerOverlayCommand,
     request: number,
+    now: number,
   ): Promise<void> {
     const scorer = this.options.scorer;
     if (!scorer) {
@@ -335,14 +372,15 @@ export class PerimeterRuntime {
         loaded.release();
         return;
       }
-      const staticSources = await scorer.compose(
+      const presentations = await scorer.compose(
+        this.scorerStyle,
         command,
         loaded.image,
         Object.values(this.configuration.logicalScreens),
       );
       const missing = Object.values(
         this.configuration.compatibilityKeys.overlay,
-      ).filter((screenId) => !staticSources[screenId]);
+      ).filter((screenId) => !presentations[screenId]);
       if (missing.length > 0) {
         throw new Error(`Scorer composition is missing ${missing.join(", ")}.`);
       }
@@ -354,11 +392,11 @@ export class PerimeterRuntime {
         {
           commandId: command.id,
           kind: "scorer",
-          staticSources,
+          presentations,
           scorerCommand: command,
           release: loaded.release,
         },
-        0,
+        now,
       );
     } catch (error) {
       loaded.release();
@@ -376,6 +414,10 @@ export class PerimeterRuntime {
     const previousFileMedia = this.activeFileMedia;
     const previousScorer = this.activeScorer;
     this.activeOverlayCommandId = prepared.commandId;
+    // The previous generation's textures are gone from the runtime; forget
+    // them in the renderer too, so a new-generation slot whose video has not
+    // decoded yet holds on the base instead of re-drawing old pixels.
+    this.options.renderer.clearChannel?.("overlay");
 
     if (prepared.kind === "file") {
       const columns = prepared.columns ?? [];
@@ -395,7 +437,8 @@ export class PerimeterRuntime {
       this.activeFileMedia = [];
       this.activeScorer = {
         command: prepared.scorerCommand!,
-        sources: prepared.staticSources ?? {},
+        presentations: prepared.presentations ?? {},
+        startedAt: null,
         release: prepared.release,
       };
       this.overlayPlayback.clear();
@@ -435,7 +478,7 @@ export class PerimeterRuntime {
       this.commitPreparedBase(now);
     }
     if (!this.power.isPowered) {
-      this.options.renderer.render({ base: {} });
+      this.options.renderer.render({ base: {}, overlayDynamic: false });
       return;
     }
     const cue = this.timeline.cueIndex(now);
@@ -446,15 +489,34 @@ export class PerimeterRuntime {
     }
     const base = this.baseColumns[this.currentBaseCue ?? 0]?.sources ?? {};
     let overlay: Record<string, TexImageSource> | undefined;
+    let overlayDynamic = false;
     if (this.activeScorer) {
-      overlay = { ...this.activeScorer.sources };
+      // Animated scorer presentations redraw their canvases every frame. The
+      // entrance animation is anchored on the first visible render so the
+      // impact flash and reveal play from the frame the scorer appears.
+      if (this.activeScorer.startedAt === null) {
+        this.activeScorer.startedAt = now;
+      }
+      const elapsed = Math.max(0, now - this.activeScorer.startedAt);
+      overlay = {};
+      for (const [screenId, presentation] of Object.entries(
+        this.activeScorer.presentations,
+      )) {
+        presentation.draw(elapsed);
+        overlay[screenId] = presentation.canvas;
+      }
+      overlayDynamic = true;
     } else {
       const overlayColumn = this.overlayPlayback.visibleColumn(now);
       overlay = overlayColumn
         ? this.findOverlaySources(overlayColumn)
         : undefined;
     }
-    this.options.renderer.render({ base: this.elements(base), overlay });
+    this.options.renderer.render({
+      base: this.elements(base),
+      overlay,
+      overlayDynamic,
+    });
   }
 
   destroy(): void {

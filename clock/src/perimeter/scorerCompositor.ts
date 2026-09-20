@@ -68,6 +68,7 @@ export interface BandRenderingContext {
   fillStyle: string | CanvasGradient | CanvasPattern;
   font: string;
   textBaseline: CanvasTextBaseline;
+  globalAlpha: number;
   measureText(text: string): { width: number };
   save(): void;
   restore(): void;
@@ -197,33 +198,77 @@ function drawUnit(
   originX: number,
   height: number,
 ): void {
+  drawBandUnit(context, image, source, unit, originX, height);
+}
+
+// Optional per-unit motion applied by animated scorer presentations. The
+// static band composition passes no motion, so its geometry is unchanged.
+export interface BandUnitMotion {
+  // Portrait scale about the portrait slot's center (1 = natural size).
+  portraitScale?: number;
+  // Horizontal offset applied to the number and name text.
+  textOffsetX?: number;
+  // Alpha multiplier for the portrait (0..1); defaults to the unit alpha.
+  portraitAlpha?: number;
+  // Alpha multiplier for the number and name (0..1); defaults to 1.
+  textAlpha?: number;
+  // Whole-unit alpha multiplier (0..1); defaults to 1.
+  alpha?: number;
+}
+
+// Draws one band unit: [full portrait fitted to the band height] [gap]
+// [number] [gap] [name] at the given origin. The portrait is scaled about
+// its slot's center and the text can slide horizontally, which the animated
+// presentations use for entrances without changing the static layout.
+export function drawBandUnit(
+  context: BandRenderingContext,
+  image: HTMLImageElement,
+  source: { width: number; height: number },
+  unit: BandUnit,
+  originX: number,
+  height: number,
+  motion: BandUnitMotion = {},
+): void {
+  const alpha = motion.alpha ?? 1;
+  const portraitScale = motion.portraitScale ?? 1;
+  const portraitAlpha = alpha * (motion.portraitAlpha ?? 1);
+  const textAlpha = alpha * (motion.textAlpha ?? 1);
+  const textOffsetX = motion.textOffsetX ?? 0;
+  context.save();
   if (unit.portraitWidth > 0 && source.width > 0 && source.height > 0) {
     // Contain fit: the full source image is scaled to the slot, so nothing
-    // is clipped away at the band's top or bottom edge.
+    // is clipped away at the band's top or bottom edge. Scaling keeps the
+    // slot's center fixed so repeated units never collide.
+    const drawWidth = unit.portraitWidth * portraitScale;
+    const drawHeight = height * portraitScale;
+    const centerX = originX + unit.portraitWidth / 2;
+    context.globalAlpha = portraitAlpha;
     context.drawImage(
       image,
       0,
       0,
       source.width,
       source.height,
-      originX,
-      0,
-      unit.portraitWidth,
-      height,
+      centerX - drawWidth / 2,
+      (height - drawHeight) / 2,
+      drawWidth,
+      drawHeight,
     );
   }
   let cursor = originX + unit.portraitWidth + unit.gap;
   context.fillStyle = SCORER_BAND_STYLE.fillStyle;
   context.textBaseline = "middle";
+  context.globalAlpha = textAlpha;
   if (unit.numberWidth > 0) {
     context.font = scorerBandFontSpec(unit.numberFontSize);
-    context.fillText(unit.numberText, cursor, height / 2);
+    context.fillText(unit.numberText, cursor + textOffsetX, height / 2);
     cursor += unit.numberWidth + unit.gap;
   }
   if (unit.nameWidth > 0) {
     context.font = scorerBandFontSpec(unit.nameFontSize);
-    context.fillText(unit.nameText, cursor, height / 2);
+    context.fillText(unit.nameText, cursor + textOffsetX, height / 2);
   }
+  context.restore();
 }
 
 // Composes one static repeat band at the given logical screen's native

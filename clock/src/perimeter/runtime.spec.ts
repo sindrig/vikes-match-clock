@@ -80,6 +80,7 @@ function createRuntime() {
     lastFrame = sources;
     renderCount += 1;
   });
+  const clearChannel = vi.fn();
   const release = vi.fn();
   const element = {
     naturalWidth: 2,
@@ -102,7 +103,7 @@ function createRuntime() {
     ),
   );
   const runtime = new PerimeterRuntime(configuration, {
-    renderer: { render },
+    renderer: { render, clearChannel },
     loader: { loadPair },
     now: () => 0,
   });
@@ -111,6 +112,7 @@ function createRuntime() {
     render,
     loadPair,
     release,
+    clearChannel,
     getLastFrame: () => lastFrame,
     getRenderCount: () => renderCount,
   };
@@ -120,6 +122,7 @@ function loadedMedia(
   kind: "image" | "video",
   width = 2,
   height = 1,
+  readyState = 4,
 ): LoadedPerimeterMedia {
   const element = {
     naturalWidth: width,
@@ -127,7 +130,7 @@ function loadedMedia(
     videoWidth: width,
     videoHeight: height,
     duration: 20,
-    readyState: 4,
+    readyState,
     dataset: {},
     pause: vi.fn(),
     play: vi.fn(() => Promise.resolve()),
@@ -147,7 +150,10 @@ describe("PerimeterRuntime", () => {
     runtime.activatePreparedBase(0);
 
     runtime.render(1);
-    expect(render).toHaveBeenLastCalledWith({ base: {} });
+    expect(render).toHaveBeenLastCalledWith({
+      base: {},
+      overlayDynamic: false,
+    });
 
     runtime.setPowered(true, 100);
     runtime.render(100);
@@ -208,7 +214,52 @@ describe("PerimeterRuntime", () => {
     expect(getLastFrame()?.overlay?.left).toBeDefined();
   });
 
-  it("shows only the base while a replacement is preparing", async () => {
+  it("never resurrects the cleared overlay when a later command activates", async () => {
+    const { runtime, loadPair, clearChannel, getLastFrame } = createRuntime();
+    await runtime.prepareBase(layout);
+    runtime.activatePreparedBase(0);
+    runtime.setPowered(true, 0);
+    // First overlay (video pair) is shown and reaches the renderer.
+    await runtime.setOverlay(overlay, 0);
+    runtime.render(0);
+    expect(getLastFrame()?.overlay?.left).toBeDefined();
+
+    // Clearing shows the base again and forgets the cleared generation's
+    // uploaded pixels in the renderer.
+    await runtime.setOverlay(null, 100);
+    runtime.render(100);
+    expect(getLastFrame()?.overlay).toBeUndefined();
+    expect(clearChannel).toHaveBeenCalledWith("overlay");
+
+    // Selecting another overlay afterwards must not bring the cleared one
+    // back: during preparation the base channel shows through.
+    let resolveReplacement:
+      | ((value: Record<string, LoadedPerimeterMedia>) => void)
+      | undefined;
+    loadPair.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveReplacement = resolve;
+        }),
+    );
+    const replacement = runtime.setOverlay(
+      { ...overlay, id: "overlay-2" },
+      1_000,
+    );
+    runtime.render(1_000);
+    expect(getLastFrame()?.overlay).toBeUndefined();
+
+    // The replacement commits while its video has not decoded a frame yet:
+    // the slot must stay on the base rather than flashing the cleared
+    // generation's pixels (the renderer keeps the previous texture for a
+    // slot whose upload is skipped).
+    resolveReplacement?.({ left: loadedMedia("video", 2, 1, 1) });
+    await replacement;
+    runtime.render(1_100);
+    expect(getLastFrame()?.overlay).toEqual({});
+  });
+
+  it("keeps the visible overlay while a replacement is preparing", async () => {
     const { runtime, loadPair, getLastFrame } = createRuntime();
     await runtime.prepareBase(layout);
     runtime.activatePreparedBase(0);
@@ -228,17 +279,15 @@ describe("PerimeterRuntime", () => {
       { ...overlay, id: "overlay-2" },
       1_000,
     );
-    // The previous generation is dropped the moment its replacement is
-    // requested, so the base shows through instead of a stale overlay.
+    // A swap keeps the active generation visible until its replacement is
+    // committed, so the overlay never blinks to the base in between.
     runtime.render(1_000);
-    expect(getLastFrame()?.overlay).toBeUndefined();
+    expect(getLastFrame()?.overlay?.left).toBeDefined();
     resolveReplacement?.({ left: loadedMedia("image") });
     await replacement;
-    runtime.render(1_100);
-    expect(getLastFrame()?.overlay?.left).toBeDefined();
   });
 
-  it("clears the visible overlay when a replacement fails", async () => {
+  it("keeps the visible overlay when a replacement fails", async () => {
     const { runtime, loadPair, getLastFrame } = createRuntime();
     await runtime.prepareBase(layout);
     runtime.activatePreparedBase(0);
@@ -250,7 +299,7 @@ describe("PerimeterRuntime", () => {
       runtime.setOverlay({ ...overlay, id: "overlay-2" }, 1_000),
     ).rejects.toThrow("overlay decode failed");
     runtime.render(1_000);
-    expect(getLastFrame()?.overlay).toBeUndefined();
+    expect(getLastFrame()?.overlay?.left).toBeDefined();
   });
 
   it("ignores a re-delivery of the already-live overlay command", async () => {
@@ -341,9 +390,15 @@ describe("PerimeterRuntime", () => {
     await runtime.prepareBase({ ...layout, revision: "ads-2" });
     runtime.activatePreparedBase(1_000);
     runtime.render(1_000);
-    expect(render).toHaveBeenLastCalledWith({ base: { left: first.element } });
+    expect(render).toHaveBeenLastCalledWith({
+      base: { left: first.element },
+      overlayDynamic: false,
+    });
     runtime.render(20_000);
-    expect(render).toHaveBeenLastCalledWith({ base: { left: second.element } });
+    expect(render).toHaveBeenLastCalledWith({
+      base: { left: second.element },
+      overlayDynamic: false,
+    });
   });
 
   it("advances to the next cue immediately on skipCue", async () => {
@@ -378,16 +433,28 @@ describe("PerimeterRuntime", () => {
     runtime.activatePreparedBase(0);
     runtime.setPowered(true, 0);
     runtime.render(0);
-    expect(render).toHaveBeenLastCalledWith({ base: { left: first.element } });
+    expect(render).toHaveBeenLastCalledWith({
+      base: { left: first.element },
+      overlayDynamic: false,
+    });
 
     // Halfway through cue 0, a skip lands on cue 1 and gives it a full
     // fresh 20s duration.
     runtime.skipCue(10_000);
-    expect(render).toHaveBeenLastCalledWith({ base: { left: second.element } });
+    expect(render).toHaveBeenLastCalledWith({
+      base: { left: second.element },
+      overlayDynamic: false,
+    });
     runtime.render(29_000);
-    expect(render).toHaveBeenLastCalledWith({ base: { left: second.element } });
+    expect(render).toHaveBeenLastCalledWith({
+      base: { left: second.element },
+      overlayDynamic: false,
+    });
     runtime.render(30_000);
-    expect(render).toHaveBeenLastCalledWith({ base: { left: third.element } });
+    expect(render).toHaveBeenLastCalledWith({
+      base: { left: third.element },
+      overlayDynamic: false,
+    });
   });
 
   it("does not skip when the timeline is not running or a single cue loops", async () => {
@@ -403,7 +470,10 @@ describe("PerimeterRuntime", () => {
     // Nothing prepared or started: skip is inert and the frame stays black.
     runtime.skipCue(1_000);
     runtime.render(1_000);
-    expect(render).toHaveBeenLastCalledWith({ base: {} });
+    expect(render).toHaveBeenLastCalledWith({
+      base: {},
+      overlayDynamic: false,
+    });
 
     await runtime.prepareBase(layout);
     runtime.activatePreparedBase(0);
@@ -412,6 +482,7 @@ describe("PerimeterRuntime", () => {
     expect(render).toHaveBeenLastCalledWith({
       base: { left: single.element },
       overlay: undefined,
+      overlayDynamic: false,
     });
     const renderCount = vi.mocked(render).mock.calls.length;
 
@@ -458,7 +529,7 @@ describe("PerimeterRuntime", () => {
     await runtime.setOverlay(overlay, 0);
     runtime.setPowered(false, 1_000);
     runtime.render(5_000);
-    expect(getLastFrame()).toEqual({ base: {} });
+    expect(getLastFrame()).toEqual({ base: {}, overlayDynamic: false });
 
     runtime.setPowered(true, 10_000);
     runtime.render(10_000);

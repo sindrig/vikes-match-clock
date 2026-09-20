@@ -284,6 +284,92 @@ describe("PerimeterControl", () => {
     ).toBeVisible();
   });
 
+  it("shows the scorer celebration selector on a web venue with the default style active", () => {
+    mockedUseListeners.mockReturnValue({
+      available: [],
+      screens: mockWebVenueScreens,
+    });
+    mockedUsePerimeter.mockReturnValue(
+      createMockPerimeterReturn({
+        perimeter: { enabled: true, state: "on" },
+        adLayout: webVenueAdLayout,
+        setPerimeterScorerCelebration: vi.fn().mockResolvedValue(undefined),
+      }),
+    );
+
+    render(<PerimeterControl standalone />);
+
+    const section = document.querySelector(".perimeter-scorer-celebration");
+    expect(section).not.toBeNull();
+    const ribbon = within(section as HTMLElement).getByRole("button", {
+      name: "Sjálfgefið",
+    });
+    expect(ribbon).toHaveAttribute("aria-pressed", "true");
+    expect(
+      within(section as HTMLElement).getByRole("button", { name: "Bylgja" }),
+    ).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("hides the scorer celebration selector on a Resolume venue", () => {
+    mockedUseListeners.mockReturnValue({
+      available: [],
+      screens: [
+        {
+          key: "test-location",
+          label: "Test location",
+          screen: {} as never,
+          perimeterDisplay: {
+            renderer: "resolume",
+            compatibilityKeys: {
+              base: { "1": "left" },
+              overlay: { "2": "left" },
+            },
+            logicalScreens: {
+              left: { id: "left", name: "Left", width: 4, height: 1 },
+            },
+          } as never,
+        },
+      ],
+    });
+    mockedUsePerimeter.mockReturnValue(
+      createMockPerimeterReturn({
+        perimeter: { enabled: true, state: "on" },
+      }),
+    );
+
+    render(<PerimeterControl standalone />);
+
+    expect(document.querySelector(".perimeter-scorer-celebration")).toBeNull();
+  });
+
+  it("writes the selected scorer celebration style", () => {
+    mockedUseListeners.mockReturnValue({
+      available: [],
+      screens: mockWebVenueScreens,
+    });
+    const setPerimeterScorerCelebration = vi
+      .fn<ReturnType<typeof usePerimeter>["setPerimeterScorerCelebration"]>()
+      .mockResolvedValue(undefined);
+    mockedUsePerimeter.mockReturnValue(
+      createMockPerimeterReturn({
+        perimeter: { enabled: true, state: "on" },
+        adLayout: webVenueAdLayout,
+        setPerimeterScorerCelebration,
+      }),
+    );
+
+    render(<PerimeterControl standalone />);
+
+    const section = document.querySelector(".perimeter-scorer-celebration");
+    expect(section).not.toBeNull();
+    fireEvent.click(
+      within(section as HTMLElement).getByRole("button", { name: "Bylgja" }),
+    );
+
+    expect(setPerimeterScorerCelebration).toHaveBeenCalledTimes(1);
+    expect(setPerimeterScorerCelebration).toHaveBeenCalledWith("wave");
+  });
+
   it("shows the configured goal-video files and edits them", async () => {
     const setPerimeterGoalVideo = vi
       .fn<ReturnType<typeof usePerimeter>["setPerimeterGoalVideo"]>()

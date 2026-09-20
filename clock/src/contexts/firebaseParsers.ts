@@ -11,6 +11,7 @@ import type {
   ViewPort,
   QueueState,
   PerimeterState,
+  ScorerCelebrationStyle,
   PerimeterPreview,
   PerimeterColumn,
   PerimeterClip,
@@ -649,13 +650,39 @@ export function parsePerimeterState(data: unknown): PerimeterState | undefined {
     typeof raw.refreshToken === "string" && raw.refreshToken.length > 0
       ? raw.refreshToken
       : undefined;
+  // Goal-scorer celebration style: only the known style names parse; absent
+  // or invalid values stay undefined so consumers fall back to the default.
+  const scorerCelebration = parseScorerCelebration(raw.scorerCelebration);
 
   return {
     enabled,
     state,
     ...(skipCue !== undefined ? { skipCue } : {}),
     ...(refreshToken !== undefined ? { refreshToken } : {}),
+    ...(scorerCelebration !== undefined ? { scorerCelebration } : {}),
   };
+}
+
+// Goal-scorer celebration presentation written by the perimeter admin view at
+// states/{location}/perimeter/scorerCelebration. Only the five known style
+// names are valid; anything else (missing, null, unknown string) parses to
+// undefined and the runtime falls back to the default style.
+export function parseScorerCelebration(
+  data: unknown,
+): ScorerCelebrationStyle | undefined {
+  const VALID_SCORER_CELEBRATION_STYLES: ScorerCelebrationStyle[] = [
+    "ribbon",
+    "tunnel",
+    "wave",
+    "procession",
+    "cutout",
+  ];
+  if (typeof data !== "string") return undefined;
+  return VALID_SCORER_CELEBRATION_STYLES.includes(
+    data as ScorerCelebrationStyle,
+  )
+    ? (data as ScorerCelebrationStyle)
+    : undefined;
 }
 
 // Strict, tolerant parse of the daemon-published composition preview. Clips

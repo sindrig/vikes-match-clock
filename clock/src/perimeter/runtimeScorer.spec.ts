@@ -9,6 +9,7 @@ import type { LoadedPerimeterMedia } from "./mediaLoader";
 import type { Mock } from "vitest";
 import type { PerimeterOverlayScorerDependencies } from "./runtime";
 import { PerimeterRuntime } from "./runtime";
+import type { ScorerPresentation } from "./scorerPresentation";
 import type { PerimeterRenderSources } from "./webglRenderer";
 
 const configuration: PerimeterDisplayConfig = {
@@ -91,6 +92,14 @@ function fakeCanvas(tag: string): HTMLCanvasElement {
   } as unknown as HTMLCanvasElement;
 }
 
+function fakePresentation(tag: string): ScorerPresentation {
+  const canvas = fakeCanvas(tag);
+  return {
+    canvas,
+    draw: vi.fn(),
+  };
+}
+
 type LoadSourceMock = Mock<PerimeterOverlayScorerDependencies["loadSource"]>;
 type ComposeMock = Mock<PerimeterOverlayScorerDependencies["compose"]>;
 
@@ -139,7 +148,7 @@ function createHarness(
     vi.fn(() => {
       const tag = `canvas-${canvases.length + 1}`;
       canvases.push(tag);
-      return Promise.resolve({ left: fakeCanvas(tag) });
+      return Promise.resolve({ left: fakePresentation(tag) });
     });
   const loadSource: LoadSourceMock =
     overrides.loadSource ??
@@ -191,14 +200,16 @@ describe("PerimeterRuntime semantic scorer overlays", () => {
     harness.runtime.render(1_000);
     const frame = harness.getLastFrame();
     expect(frame?.overlay?.left).toBeDefined();
+    expect(frame?.overlayDynamic).toBe(true);
     expect(harness.scorer.compose).toHaveBeenCalledWith(
+      "ribbon",
       scorerCommand,
       expect.anything(),
       [{ height: 1, id: "left", name: "Left", width: 2 }],
     );
   });
 
-  it("shows only the base while a scorer replacement is preparing", async () => {
+  it("retains the visible overlay while a replacement is preparing", async () => {
     const harness = createHarness();
     await prepareActiveBase(harness);
     await harness.runtime.setOverlay(scorerCommand, 1_000);
@@ -219,17 +230,16 @@ describe("PerimeterRuntime semantic scorer overlays", () => {
     );
     // The replacement's compose only runs after its source load resolves.
     await vi.waitFor(() => expect(resolveReplacement).toBeDefined());
-    // The previous band is dropped the moment its replacement is requested,
-    // so the base shows through instead of stale scorer content.
+    // A swap keeps the active band visible until its replacement commits.
     harness.runtime.render(2_000);
-    expect(harness.getLastFrame()?.overlay).toBeUndefined();
-    resolveReplacement?.({ left: fakeCanvas("replacement") });
+    expect(harness.getLastFrame()?.overlay?.left).toBeDefined();
+    resolveReplacement?.({ left: fakePresentation("replacement") });
     await replacement;
     harness.runtime.render(2_500);
     expect(harness.getLastFrame()?.overlay?.left).toBeDefined();
   });
 
-  it("clears the visible scorer overlay when a replacement fails", async () => {
+  it("keeps the visible overlay when scorer preparation fails", async () => {
     const harness = createHarness();
     await prepareActiveBase(harness);
     await harness.runtime.setOverlay(scorerCommand, 1_000);
@@ -240,10 +250,8 @@ describe("PerimeterRuntime semantic scorer overlays", () => {
       harness.runtime.setOverlay({ ...scorerCommand, id: "scorer-2" }, 2_000),
     ).rejects.toThrow("no sources");
     harness.runtime.render(2_000);
-    expect(harness.getLastFrame()?.overlay).toBeUndefined();
-    // Dropping the replaced band releases its source; the failed replacement
-    // itself loaded nothing, so nothing further is released.
-    expect(harness.releaseSource.mock.calls.length).toBe(releasesBefore + 1);
+    expect(harness.getLastFrame()?.overlay?.left).toBeDefined();
+    expect(harness.releaseSource.mock.calls.length).toBe(releasesBefore);
   });
 
   it("releases the loaded source when composition fails", async () => {
@@ -340,13 +348,87 @@ describe("PerimeterRuntime semantic scorer overlays", () => {
     await harness.runtime.setOverlay(scorerCommand, 1_000);
     harness.runtime.setPowered(false, 2_000);
     harness.runtime.render(2_000);
-    expect(harness.getLastFrame()).toEqual({ base: {} });
+    expect(harness.getLastFrame()).toEqual({ base: {}, overlayDynamic: false });
 
     harness.runtime.setPowered(true, 3_000);
     harness.runtime.render(3_000);
     const frame = harness.getLastFrame();
     expect(frame?.overlay?.left).toBeDefined();
     expect(frame?.base.left).toBeDefined();
+  });
+
+  it("composes with the selected celebration style", async () => {
+    const harness = createHarness();
+    harness.runtime.setScorerStyle("tunnel");
+    await prepareActiveBase(harness);
+    await harness.runtime.setOverlay(scorerCommand, 1_000);
+    harness.runtime.render(1_000);
+    expect(harness.scorer.compose).toHaveBeenCalledWith(
+      "tunnel",
+      scorerCommand,
+      expect.anything(),
+      [{ height: 1, id: "left", name: "Left", width: 2 }],
+    );
+  });
+
+  it("animates the presentation with elapsed time anchored at first render", async () => {
+    const draw = vi.fn();
+    const presentation: ScorerPresentation = {
+      canvas: fakeCanvas("animated"),
+      draw: (elapsed: number): void => {
+        draw(elapsed);
+      },
+    };
+    const harness = createHarness({
+      compose: vi.fn(() => Promise.resolve({ left: presentation })),
+    });
+    await prepareActiveBase(harness);
+    await harness.runtime.setOverlay(scorerCommand, 1_000);
+    // The first render after commit anchors the entrance at t=0.
+    harness.runtime.render(1_000);
+    expect(draw).toHaveBeenCalledWith(0);
+    harness.runtime.render(3_500);
+    expect(draw).toHaveBeenLastCalledWith(2_500);
+    // Negative or same-frame renders never rewind the animation.
+    harness.runtime.render(500);
+    expect(draw).toHaveBeenLastCalledWith(0);
+  });
+
+  it("recomposes an active scorer presentation when the style changes", async () => {
+    const harness = createHarness();
+    await prepareActiveBase(harness);
+    await harness.runtime.setOverlay(scorerCommand, 1_000);
+    harness.runtime.render(1_000);
+    const composeCallsBefore = harness.scorer.compose.mock.calls.length;
+    harness.runtime.setScorerStyle("wave");
+    await vi.waitFor(() => {
+      expect(harness.scorer.compose.mock.calls.length).toBe(
+        composeCallsBefore + 1,
+      );
+    });
+    // The recomposition used the new style for the still-active command.
+    const latestCall =
+      harness.scorer.compose.mock.calls[
+        harness.scorer.compose.mock.calls.length - 1
+      ];
+    expect(latestCall?.[0]).toBe("wave");
+    expect(latestCall?.[1]).toEqual(scorerCommand);
+    harness.runtime.render(2_000);
+    expect(harness.getLastFrame()?.overlay?.left).toBeDefined();
+  });
+
+  it("keeps the current scorer presentation when a style recomposition fails", async () => {
+    const harness = createHarness();
+    await prepareActiveBase(harness);
+    await harness.runtime.setOverlay(scorerCommand, 1_000);
+    harness.runtime.render(1_000);
+    harness.scorer.compose.mockRejectedValueOnce(new Error("style failed"));
+    harness.runtime.setScorerStyle("procession");
+    await vi.waitFor(() => {
+      expect(harness.scorer.compose).toHaveBeenCalledTimes(2);
+    });
+    harness.runtime.render(2_000);
+    expect(harness.getLastFrame()?.overlay?.left).toBeDefined();
   });
 
   it("keeps the base advancing underneath the scorer overlay", async () => {

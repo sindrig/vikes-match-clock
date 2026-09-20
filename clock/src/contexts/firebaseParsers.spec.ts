@@ -1435,6 +1435,42 @@ describe("firebaseParsers", () => {
         state: "off",
       });
     });
+
+    it("preserves a known scorerCelebration style", () => {
+      for (const style of [
+        "ribbon",
+        "tunnel",
+        "wave",
+        "procession",
+        "cutout",
+      ] as const) {
+        expect(
+          parsePerimeterState({
+            enabled: true,
+            state: "on",
+            scorerCelebration: style,
+          }),
+        ).toEqual({ enabled: true, state: "on", scorerCelebration: style });
+      }
+    });
+
+    it("drops unknown or malformed scorerCelebration values", () => {
+      expect(
+        parsePerimeterState({
+          enabled: true,
+          state: "on",
+          scorerCelebration: "nonsense",
+        }),
+      ).toEqual({ enabled: true, state: "on" });
+      expect(parsePerimeterState({ scorerCelebration: 7 })).toEqual({
+        enabled: false,
+        state: "off",
+      });
+      expect(parsePerimeterState({ scorerCelebration: null })).toEqual({
+        enabled: false,
+        state: "off",
+      });
+    });
   });
 
   describe("parsePerimeterPreview", () => {

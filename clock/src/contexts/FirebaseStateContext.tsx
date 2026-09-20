@@ -33,6 +33,7 @@ import {
   PerimeterOverlayStatus,
   PerimeterMediaPair,
   PerimeterGoalVideoConfig,
+  ScorerCelebrationStyle,
   PerimeterAdLayout,
   PerimeterAppliedAdLayout,
   AuditStateArea,
@@ -328,6 +329,9 @@ interface FirebaseStateContextType {
   deletePerimeterMediaPair: (pairId: string) => Promise<void>;
   setPerimeterGoalVideo: (
     config: PerimeterGoalVideoConfig | null,
+  ) => Promise<void>;
+  setPerimeterScorerCelebration: (
+    style: ScorerCelebrationStyle,
   ) => Promise<void>;
   mediaPairs: Record<string, PerimeterMediaPair>;
   perimeterGoalVideo: PerimeterGoalVideoConfig | null;
@@ -2603,6 +2607,25 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     [makeAudit, listenPrefix, writeEligible],
   );
 
+  // Goal-scorer celebration style for web perimeter displays. The write is a
+  // single desired-state child; displays fall back to the default style when
+  // the value is absent or invalid, and the Firebase subscription (not local
+  // state) is the source of the selected value.
+  const setPerimeterScorerCelebration = useCallback(
+    (style: ScorerCelebrationStyle): Promise<void> => {
+      if (!writeEligible) return Promise.resolve();
+      const audit = makeAudit("perimeter", "perimeter.set-scorer-celebration");
+      if (!audit) return Promise.resolve();
+      return firebaseDatabase.writeAudited(
+        listenPrefix,
+        "perimeter",
+        { scorerCelebration: style },
+        audit,
+      );
+    },
+    [makeAudit, listenPrefix, writeEligible],
+  );
+
   const setPerimeterBrightness = useCallback(
     (percent: number): Promise<void> => {
       if (!listenPrefix || !isAuthenticated || !writeEligible) {
@@ -2901,6 +2924,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       createPerimeterMediaPair,
       deletePerimeterMediaPair,
       setPerimeterGoalVideo,
+      setPerimeterScorerCelebration,
       perimeterGoalVideo,
       mediaPairs: perimeterMediaPairs,
       perimeterAdLayout,
@@ -3001,6 +3025,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       createPerimeterMediaPair,
       deletePerimeterMediaPair,
       setPerimeterGoalVideo,
+      setPerimeterScorerCelebration,
       perimeterGoalVideo,
       perimeterMediaPairs,
       perimeterAdLayout,
@@ -3215,6 +3240,7 @@ export const usePerimeter = () => {
     createPerimeterMediaPair,
     deletePerimeterMediaPair,
     setPerimeterGoalVideo,
+    setPerimeterScorerCelebration,
     mediaPairs,
     perimeterGoalVideo,
     perimeterOverlay,
@@ -3241,6 +3267,7 @@ export const usePerimeter = () => {
     setPerimeterOverlay,
     clearPerimeterOverlay,
     setPerimeterAdLayout,
+    setPerimeterScorerCelebration,
     createPerimeterMediaPair,
     deletePerimeterMediaPair,
     setPerimeterGoalVideo,
