@@ -9,6 +9,8 @@ import { validatePerimeterMapping } from "../perimeter/perimeterMapping";
 import {
   applyHorizontalSplitTemplate,
   applyIdentityTemplate,
+  applyStackedTemplate,
+  applyVikinOutdoorTemplate,
   calibrationLabels,
 } from "../perimeter/templates";
 import "./PerimeterMappingEditor.css";
@@ -492,6 +494,18 @@ export default function PerimeterMappingEditor({
           }}
         >
           Horizontal split
+        </Button>
+        <Button
+          size="sm"
+          onClick={() => applyTemplate(applyVikinOutdoorTemplate(draft))}
+        >
+          Víkin úti (sannreynt)
+        </Button>
+        <Button
+          size="sm"
+          onClick={() => applyTemplate(applyStackedTemplate(draft))}
+        >
+          Virkið (sannreynt)
         </Button>
       </div>
       {calibration && (

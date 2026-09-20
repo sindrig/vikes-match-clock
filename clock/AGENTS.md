@@ -1838,7 +1838,19 @@ preview, validates exact source coverage, and publishes a new revision as one
 complete Firebase document. Its Playback control edits the base-ads cue
 length in seconds (stored as `playback.cueDurationMs`, defaulting to 20 s
 when absent); validation rejects non-positive durations, and short videos
-loop while long ones speed up to fit the configured cue. See
+loop while long ones speed up to fit the configured cue. Besides the generic
+"Identity mapping" and "Horizontal split" templates, the editor offers two
+venue templates: "Víkin úti (sannreynt)" (`applyVikinOutdoorTemplate` in
+`perimeter/templates.ts`), which reproduces the physically verified
+Víkin-outdoor layout from the vikin-gateway handoff
+(`default-venue.json`) — a 3840x1080 framebuffer with screen-40 as one full
+strip at y=0 and screen-48 split into two stacked halves at y=192 (keeping
+the captured `x=-2`, width-2308 scaled/clipped calibration quirk, the only
+region with `allowScaling`/`allowClipping`) and y=384 — and
+"Virkið (sannreynt)" (`applyStackedTemplate`), a generic widest-first
+stacked layout that reproduces the published Virkið staging document
+(3648x384 framebuffer, screen-3648 at y=0, screen-3264 at y=192). Both are
+no-ops for drafts lacking the expected logical screens. See
 `perimeter-control/WEB_MAPPING_MEASUREMENT.md` and
 `perimeter-control/WEB_RENDERER_QUALIFICATION.md`. Keep Víkin's configuration
 at `renderer: "resolume"`; a second venue may use `web` independently.
