@@ -31,10 +31,12 @@ import {
   PerimeterAdLayoutFile,
   PerimeterAppliedAdFile,
 } from "../types";
-import { usePerimeter } from "../contexts/FirebaseStateContext";
+import { useListeners, usePerimeter } from "../contexts/FirebaseStateContext";
 import { useLocalState } from "../contexts/LocalStateContext";
 import { validateAdFileName } from "../contexts/firebaseParsers";
 import GoalScorerPreparation from "./GoalScorerPreparation";
+import PerimeterDisplayReports from "./PerimeterDisplayReports";
+import PerimeterFileThumb from "./PerimeterFileThumb";
 import {
   storageHelpers,
   ListResult,
@@ -137,17 +139,11 @@ const SortableColumn = ({
                 <div className="perimeter-file-lane-label">{lane.name}</div>
                 {file ? (
                   <>
-                    {applied?.thumbnail ? (
-                      <img
-                        className="perimeter-file-thumb"
-                        src={applied.thumbnail}
-                        alt={applied.name}
-                      />
-                    ) : (
-                      <div className="perimeter-file-thumb perimeter-thumb-unavailable">
-                        <span>Engin mynd</span>
-                      </div>
-                    )}
+                    <PerimeterFileThumb
+                      name={applied?.name ?? file.name}
+                      source={file.source}
+                      appliedThumbnail={applied?.thumbnail}
+                    />
                     <div
                       className="perimeter-file-name"
                       title={applied?.name ?? file.name}
@@ -182,7 +178,9 @@ const FilePicker = ({
   selectedFile,
   onSelect,
 }: FilePickerProps) => {
-  const [files, setFiles] = useState<{ name: string }[]>([]);
+  const [files, setFiles] = useState<
+    Array<{ name: string; generation?: string }>
+  >([]);
   const [listing, setListing] = useState(false);
   const [uploading, setUploading] = useState(false);
 
@@ -194,11 +192,22 @@ const FilePicker = ({
       const result: ListResult = await storageHelpers.listAll(storagePath);
       // The daemon and parsers enforce strict filename rules; hide objects
       // that could never be selected into a valid layout.
-      setFiles(
+      const listedFiles = await Promise.all(
         result.items
-          .map((item) => ({ name: item.name }))
-          .filter((f) => validateAdFileName(f.name)),
+          .filter((item) => validateAdFileName(item.name))
+          .map(async (item) => {
+            if (typeof storageHelpers.getMetadata !== "function") {
+              return { name: item.name };
+            }
+            try {
+              const metadata = await storageHelpers.getMetadata(item.fullPath);
+              return { name: item.name, generation: metadata.generation };
+            } catch {
+              return { name: item.name };
+            }
+          }),
       );
+      setFiles(listedFiles.sort((a, b) => a.name.localeCompare(b.name, "is")));
     } catch {
       setFiles([]);
     } finally {
@@ -264,10 +273,19 @@ const FilePicker = ({
                 selectedFile?.name === f.name ? " selected" : ""
               }`}
               onClick={() =>
-                onSelect({ name: f.name, source: makeGsUri(f.name) })
+                onSelect({
+                  name: f.name,
+                  source: makeGsUri(f.name),
+                  ...(f.generation ? { generation: f.generation } : {}),
+                })
               }
             >
-              {f.name}
+              <PerimeterFileThumb
+                name={f.name}
+                source={makeGsUri(f.name)}
+                variant="option"
+              />
+              <span className="perimeter-file-option-name">{f.name}</span>
             </button>
           ))
         )}
@@ -396,10 +414,13 @@ const BrightnessSection = () => {
   );
 };
 
-const PerimeterControl = () => {
+const PerimeterControl = ({ standalone = false }: { standalone?: boolean }) => {
   const {
     perimeter,
     getServerTime,
+    setPerimeterState,
+    skipPerimeterCue,
+    restartPerimeterDisplays,
     setPerimeterAdLayout,
     adLayout,
     appliedAdLayout,
@@ -407,6 +428,7 @@ const PerimeterControl = () => {
     appliedAdLayoutError,
   } = usePerimeter();
   const { listenPrefix } = useLocalState();
+  const { screens } = useListeners();
 
   const [open, setOpen] = useState(false);
   const [now, setNow] = useState(0);
@@ -420,7 +442,24 @@ const PerimeterControl = () => {
   const [writePending, setWritePending] = useState(false);
   const [writeError, setWriteError] = useState<string | null>(null);
 
-  const lanes = appliedAdLayout?.lanes ?? [];
+  const perimeterConfiguration = useMemo(
+    () =>
+      screens.find((screen) => screen.key === listenPrefix)?.perimeterDisplay,
+    [listenPrefix, screens],
+  );
+  const isWebVenue = perimeterConfiguration?.renderer === "web";
+  const webLanes = useMemo(
+    () =>
+      Object.entries(perimeterConfiguration?.compatibilityKeys.base ?? {}).map(
+        ([id, logicalScreenId]) => ({
+          id,
+          name:
+            perimeterConfiguration?.logicalScreens[logicalScreenId]?.name ?? id,
+        }),
+      ),
+    [perimeterConfiguration],
+  );
+  const lanes = appliedAdLayout?.lanes ?? (isWebVenue ? webLanes : []);
   const columns = useMemo(() => adLayout?.columns ?? [], [adLayout?.columns]);
   const appliedColumnsMap = useMemo(() => {
     const map: Record<
@@ -454,6 +493,7 @@ const PerimeterControl = () => {
   const beforeRevisionRef = useRef<string | null>(null);
 
   const revisionMismatch =
+    !isWebVenue &&
     adLayout?.revision !== undefined &&
     appliedAdLayout?.revision !== undefined &&
     adLayout.revision !== appliedAdLayout.revision;
@@ -528,6 +568,7 @@ const PerimeterControl = () => {
 
   const isStale =
     now > 0 &&
+    !isWebVenue &&
     appliedAdLayout?.updatedAt != null &&
     now - appliedAdLayout.updatedAt > STALE_MS;
 
@@ -589,6 +630,334 @@ const PerimeterControl = () => {
 
   if (!perimeter.enabled) return null;
 
+  const contents = (
+    <>
+      {isWebVenue && <PerimeterDisplayReports />}
+      <BrightnessSection />
+      {!isWebVenue && <GoalScorerPreparation />}
+      {!isWebVenue && !appliedAdLayoutLoaded ? (
+        <div className="perimeter-preview-state">
+          <Loader content="Sæki forskoðun..." />
+          <p className="perimeter-hint">
+            Forskoðunin er sjálfkrafa sótt þegar daemoninn ræsir og eftir að
+            jaðarskjárinn er kveiktur.
+          </p>
+        </div>
+      ) : !isWebVenue && appliedAdLayout === undefined ? (
+        appliedAdLayoutError ? (
+          <div className="perimeter-error-state">
+            <div className="perimeter-error-badge">Villa</div>
+            <p className="perimeter-error-message">{appliedAdLayoutError}</p>
+          </div>
+        ) : (
+          <div className="perimeter-preview-state">
+            <p className="perimeter-empty-text">
+              Engin forskoðun hefur verið birt enn.
+            </p>
+            <p className="perimeter-hint">
+              Forskoðunin er sjálfkrafa sótt þegar daemoninn ræsir og eftir að
+              jaðarskjárinn er kveiktur.
+            </p>
+          </div>
+        )
+      ) : (
+        <div className="perimeter-layout-board">
+          {/* Status Bar */}
+          <div className="perimeter-status-bar">
+            {isWebVenue ? (
+              <Badge
+                content="Web"
+                className="perimeter-phase-badge phase-playing"
+              />
+            ) : (
+              <Badge
+                content={
+                  PHASE_LABELS[appliedAdLayout?.phase ?? "idle"] ??
+                  appliedAdLayout?.phase
+                }
+                className={`perimeter-phase-badge phase-${appliedAdLayout?.phase ?? "idle"}`}
+              />
+            )}
+            {!isWebVenue && appliedAdLayout?.error && (
+              <span className="perimeter-status-error">
+                {appliedAdLayout?.error}
+              </span>
+            )}
+            {writeError && (
+              <span className="perimeter-status-error">
+                Ekki tókst að vista: {writeError}
+              </span>
+            )}
+            <span className="perimeter-lanes-count">
+              {lanes.length} {lanes.length === 1 ? "röð" : "raðir"}
+            </span>
+            {revisionMismatch && (
+              <span className="perimeter-revision-pending">
+                Uppfærslu beðið
+              </span>
+            )}
+            {!isWebVenue && !revisionMismatch && appliedAdLayout?.revision && (
+              <span className="perimeter-revision-live">Lifandi</span>
+            )}
+          </div>
+
+          {isStale && (
+            <div className="perimeter-stale">
+              Staða jaðarskjás er gömul (uppfærð kl.{" "}
+              {formatTimestamp(appliedAdLayout?.updatedAt ?? null)}).
+            </div>
+          )}
+
+          {!lanesConfigured ? (
+            <div className="perimeter-no-lanes">
+              <p className="perimeter-empty-text">
+                Engar raðir eru stilltar fyrir jaðarskjáinn.
+              </p>
+              <p className="perimeter-hint">
+                Raðir eru skilgreindar í stillingum daemonins.
+              </p>
+            </div>
+          ) : columns.length === 0 ? (
+            <div className="perimeter-empty-columns">
+              <p className="perimeter-empty-text">
+                Engir dálkar í jaðarskjánum.
+              </p>
+              <Button
+                appearance="primary"
+                onClick={() => {
+                  setAddSelections({});
+                  setShowAddDialog(true);
+                }}
+                disabled={busy}
+              >
+                Bæta við dálki
+              </Button>
+            </div>
+          ) : (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+            >
+              <div className="perimeter-columns-scroll">
+                <SortableContext
+                  items={columns.map((c) => c.id)}
+                  strategy={horizontalListSortingStrategy}
+                >
+                  {columns.map((column, idx) => {
+                    const appliedCol = appliedColumnsMap[column.id];
+                    return (
+                      <SortableColumn
+                        key={column.id}
+                        column={column}
+                        columnIndex={idx}
+                        lanes={lanes}
+                        appliedFiles={appliedCol?.files}
+                        onDelete={handleDeleteColumn}
+                        disabled={busy}
+                      />
+                    );
+                  })}
+                </SortableContext>
+              </div>
+              <DragOverlay
+                dropAnimation={{
+                  sideEffects: defaultDropAnimationSideEffects({}),
+                }}
+              >
+                {activeDragColumn ? (
+                  <div
+                    className="perimeter-sortable-column"
+                    style={{ opacity: 0.8 }}
+                  >
+                    <div className="perimeter-column-card">
+                      <div className="perimeter-column-header">
+                        <span className="perimeter-drag-handle">
+                          <DragIcon />
+                        </span>
+                        <span className="perimeter-column-index">
+                          Dálkur {columns.indexOf(activeDragColumn) + 1}
+                        </span>
+                      </div>
+                      <div className="perimeter-column-files">
+                        {lanes.map((lane) => {
+                          const file = activeDragColumn.files[lane.id];
+                          const appliedCol =
+                            appliedColumnsMap[activeDragColumn.id];
+                          const applied = appliedCol?.files?.[lane.id];
+                          return (
+                            <div key={lane.id} className="perimeter-file-card">
+                              <div className="perimeter-file-lane-label">
+                                {lane.name}
+                              </div>
+                              {file ? (
+                                <>
+                                  <PerimeterFileThumb
+                                    name={applied?.name ?? file.name}
+                                    source={file.source}
+                                    appliedThumbnail={applied?.thumbnail}
+                                  />
+                                  <div
+                                    className="perimeter-file-name"
+                                    title={applied?.name ?? file.name}
+                                  >
+                                    {applied?.name ?? file.name}
+                                  </div>
+                                </>
+                              ) : (
+                                <div className="perimeter-file-empty">
+                                  <span>Engin skrá</span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+              </DragOverlay>
+            </DndContext>
+          )}
+
+          {lanesConfigured && columns.length > 0 && (
+            <div className="perimeter-add-section">
+              <Button
+                appearance="ghost"
+                onClick={() => {
+                  setAddSelections({});
+                  setShowAddDialog(true);
+                }}
+                disabled={busy || columns.length >= MAX_AD_COLUMNS}
+              >
+                <PlusIcon /> Bæta við dálki
+              </Button>
+              {columns.length >= MAX_AD_COLUMNS && (
+                <span className="perimeter-add-limit">
+                  Hámark {MAX_AD_COLUMNS} dálka náð
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Add Column Dialog */}
+          <Modal
+            open={showAddDialog}
+            onClose={() => {
+              setShowAddDialog(false);
+              setAddSelections({});
+            }}
+            size="sm"
+            className="perimeter-add-dialog"
+          >
+            <Modal.Header>
+              <Modal.Title>Nýr dálkur</Modal.Title>
+            </Modal.Header>
+            <Modal.Body>
+              <p className="perimeter-add-hint">
+                Veldu skrá fyrir hverja röð úr listanum eða hlaðið upp nýrri
+                skrá.
+              </p>
+              <div className="perimeter-add-form">
+                {lanes.map((lane) => (
+                  <FilePicker
+                    key={lane.id}
+                    laneName={lane.name}
+                    listenPrefix={listenPrefix}
+                    selectedFile={addSelections[lane.id] ?? null}
+                    onSelect={(file) =>
+                      setAddSelections((prev) => ({
+                        ...prev,
+                        [lane.id]: file,
+                      }))
+                    }
+                  />
+                ))}
+              </div>
+            </Modal.Body>
+            <Modal.Footer>
+              <Button
+                appearance="primary"
+                onClick={() => {
+                  void handleAddColumn();
+                }}
+                disabled={
+                  busy ||
+                  columns.length >= MAX_AD_COLUMNS ||
+                  !lanes.every((lane) => addSelections[lane.id] !== undefined)
+                }
+              >
+                Vista
+              </Button>
+              <Button
+                onClick={() => {
+                  setShowAddDialog(false);
+                  setAddSelections({});
+                }}
+              >
+                Hætta við
+              </Button>
+            </Modal.Footer>
+          </Modal>
+        </div>
+      )}
+    </>
+  );
+
+  if (standalone) {
+    return (
+      <main className="perimeter-standalone perimeter-preview-modal">
+        <header className="perimeter-standalone-header">
+          <div>
+            <h1>Jaðarskjár</h1>
+            <p>Umsýsla auglýsinga og aflstýring</p>
+          </div>
+          <div className="perimeter-power-controls">
+            {isWebVenue && (
+              <Button
+                appearance="ghost"
+                color="blue"
+                aria-label="Fara á næsta dálk"
+                title="Fara á næsta dálk á öllum skjám"
+                onClick={skipPerimeterCue}
+                disabled={columns.length === 0 || perimeter.state !== "on"}
+              >
+                Næsti dálkur
+              </Button>
+            )}
+            {isWebVenue && (
+              <Button
+                appearance="ghost"
+                color="orange"
+                aria-label="Endurræsa alla jaðarskjá"
+                title="Endurræsa alla jaðarskjá (full endurhleðsla á skjánum)"
+                onClick={restartPerimeterDisplays}
+              >
+                Endurræsa skjá
+              </Button>
+            )}
+            <Button
+              appearance={perimeter.state === "on" ? "primary" : "ghost"}
+              color="green"
+              onClick={() => setPerimeterState("on")}
+            >
+              Kveikja
+            </Button>
+            <Button
+              appearance={perimeter.state === "off" ? "primary" : "ghost"}
+              color="red"
+              onClick={() => setPerimeterState("off")}
+            >
+              Slökkva
+            </Button>
+          </div>
+        </header>
+        {contents}
+      </main>
+    );
+  }
+
   return (
     <>
       <div className="theme-trigger-row">
@@ -611,278 +980,7 @@ const PerimeterControl = () => {
         <Modal.Header>
           <Modal.Title>Jaðarskjár — Umsýsla auglýsinga</Modal.Title>
         </Modal.Header>
-        <Modal.Body>
-          <BrightnessSection />
-          <GoalScorerPreparation />
-          {!appliedAdLayoutLoaded ? (
-            <div className="perimeter-preview-state">
-              <Loader content="Sæki forskoðun..." />
-              <p className="perimeter-hint">
-                Forskoðunin er sjálfkrafa sótt þegar daemoninn ræsir og eftir að
-                jaðarskjárinn er kveiktur.
-              </p>
-            </div>
-          ) : appliedAdLayout === undefined ? (
-            appliedAdLayoutError ? (
-              <div className="perimeter-error-state">
-                <div className="perimeter-error-badge">Villa</div>
-                <p className="perimeter-error-message">
-                  {appliedAdLayoutError}
-                </p>
-              </div>
-            ) : (
-              <div className="perimeter-preview-state">
-                <p className="perimeter-empty-text">
-                  Engin forskoðun hefur verið birt enn.
-                </p>
-                <p className="perimeter-hint">
-                  Forskoðunin er sjálfkrafa sótt þegar daemoninn ræsir og eftir
-                  að jaðarskjárinn er kveiktur.
-                </p>
-              </div>
-            )
-          ) : (
-            <div className="perimeter-layout-board">
-              {/* Status Bar */}
-              <div className="perimeter-status-bar">
-                <Badge
-                  content={
-                    PHASE_LABELS[appliedAdLayout.phase] ?? appliedAdLayout.phase
-                  }
-                  className={`perimeter-phase-badge phase-${appliedAdLayout.phase}`}
-                />
-                {appliedAdLayout.error && (
-                  <span className="perimeter-status-error">
-                    {appliedAdLayout.error}
-                  </span>
-                )}
-                {writeError && (
-                  <span className="perimeter-status-error">
-                    Ekki tókst að vista: {writeError}
-                  </span>
-                )}
-                <span className="perimeter-lanes-count">
-                  {lanes.length} {lanes.length === 1 ? "röð" : "raðir"}
-                </span>
-                {revisionMismatch && (
-                  <span className="perimeter-revision-pending">
-                    Uppfærslu beðið
-                  </span>
-                )}
-                {!revisionMismatch && appliedAdLayout.revision && (
-                  <span className="perimeter-revision-live">Lifandi</span>
-                )}
-              </div>
-
-              {isStale && (
-                <div className="perimeter-stale">
-                  Staða jaðarskjás er gömul (uppfærð kl.{" "}
-                  {formatTimestamp(appliedAdLayout.updatedAt ?? null)}).
-                </div>
-              )}
-
-              {!lanesConfigured ? (
-                <div className="perimeter-no-lanes">
-                  <p className="perimeter-empty-text">
-                    Engar raðir eru stilltar fyrir jaðarskjáinn.
-                  </p>
-                  <p className="perimeter-hint">
-                    Raðir eru skilgreindar í stillingum daemonins.
-                  </p>
-                </div>
-              ) : columns.length === 0 ? (
-                <div className="perimeter-empty-columns">
-                  <p className="perimeter-empty-text">
-                    Engir dálkar í jaðarskjánum.
-                  </p>
-                  <Button
-                    appearance="primary"
-                    onClick={() => {
-                      setAddSelections({});
-                      setShowAddDialog(true);
-                    }}
-                    disabled={busy}
-                  >
-                    Bæta við dálki
-                  </Button>
-                </div>
-              ) : (
-                <DndContext
-                  sensors={sensors}
-                  collisionDetection={closestCenter}
-                  onDragStart={handleDragStart}
-                  onDragEnd={handleDragEnd}
-                >
-                  <div className="perimeter-columns-scroll">
-                    <SortableContext
-                      items={columns.map((c) => c.id)}
-                      strategy={horizontalListSortingStrategy}
-                    >
-                      {columns.map((column, idx) => {
-                        const appliedCol = appliedColumnsMap[column.id];
-                        return (
-                          <SortableColumn
-                            key={column.id}
-                            column={column}
-                            columnIndex={idx}
-                            lanes={lanes}
-                            appliedFiles={appliedCol?.files}
-                            onDelete={handleDeleteColumn}
-                            disabled={busy}
-                          />
-                        );
-                      })}
-                    </SortableContext>
-                  </div>
-                  <DragOverlay
-                    dropAnimation={{
-                      sideEffects: defaultDropAnimationSideEffects({}),
-                    }}
-                  >
-                    {activeDragColumn ? (
-                      <div
-                        className="perimeter-sortable-column"
-                        style={{ opacity: 0.8 }}
-                      >
-                        <div className="perimeter-column-card">
-                          <div className="perimeter-column-header">
-                            <span className="perimeter-drag-handle">
-                              <DragIcon />
-                            </span>
-                            <span className="perimeter-column-index">
-                              Dálkur {columns.indexOf(activeDragColumn) + 1}
-                            </span>
-                          </div>
-                          <div className="perimeter-column-files">
-                            {lanes.map((lane) => {
-                              const file = activeDragColumn.files[lane.id];
-                              const appliedCol =
-                                appliedColumnsMap[activeDragColumn.id];
-                              const applied = appliedCol?.files?.[lane.id];
-                              return (
-                                <div
-                                  key={lane.id}
-                                  className="perimeter-file-card"
-                                >
-                                  <div className="perimeter-file-lane-label">
-                                    {lane.name}
-                                  </div>
-                                  {file ? (
-                                    <>
-                                      {applied?.thumbnail ? (
-                                        <img
-                                          className="perimeter-file-thumb"
-                                          src={applied.thumbnail}
-                                          alt={applied.name}
-                                        />
-                                      ) : (
-                                        <div className="perimeter-file-thumb perimeter-thumb-unavailable">
-                                          <span>Engin mynd</span>
-                                        </div>
-                                      )}
-                                      <div
-                                        className="perimeter-file-name"
-                                        title={applied?.name ?? file.name}
-                                      >
-                                        {applied?.name ?? file.name}
-                                      </div>
-                                    </>
-                                  ) : (
-                                    <div className="perimeter-file-empty">
-                                      <span>Engin skrá</span>
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      </div>
-                    ) : null}
-                  </DragOverlay>
-                </DndContext>
-              )}
-
-              {lanesConfigured && columns.length > 0 && (
-                <div className="perimeter-add-section">
-                  <Button
-                    appearance="ghost"
-                    onClick={() => {
-                      setAddSelections({});
-                      setShowAddDialog(true);
-                    }}
-                    disabled={busy || columns.length >= MAX_AD_COLUMNS}
-                  >
-                    <PlusIcon /> Bæta við dálki
-                  </Button>
-                  {columns.length >= MAX_AD_COLUMNS && (
-                    <span className="perimeter-add-limit">
-                      Hámark {MAX_AD_COLUMNS} dálka náð
-                    </span>
-                  )}
-                </div>
-              )}
-
-              {/* Add Column Dialog */}
-              <Modal
-                open={showAddDialog}
-                onClose={() => {
-                  setShowAddDialog(false);
-                  setAddSelections({});
-                }}
-                size="sm"
-                className="perimeter-add-dialog"
-              >
-                <Modal.Header>
-                  <Modal.Title>Nýr dálkur</Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                  <div className="perimeter-add-form">
-                    {lanes.map((lane) => (
-                      <FilePicker
-                        key={lane.id}
-                        laneName={lane.name}
-                        listenPrefix={listenPrefix}
-                        selectedFile={addSelections[lane.id] ?? null}
-                        onSelect={(file) =>
-                          setAddSelections((prev) => ({
-                            ...prev,
-                            [lane.id]: file,
-                          }))
-                        }
-                      />
-                    ))}
-                  </div>
-                </Modal.Body>
-                <Modal.Footer>
-                  <Button
-                    appearance="primary"
-                    onClick={() => {
-                      void handleAddColumn();
-                    }}
-                    disabled={
-                      busy ||
-                      columns.length >= MAX_AD_COLUMNS ||
-                      !lanes.every(
-                        (lane) => addSelections[lane.id] !== undefined,
-                      )
-                    }
-                  >
-                    Vista
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      setShowAddDialog(false);
-                      setAddSelections({});
-                    }}
-                  >
-                    Hætta við
-                  </Button>
-                </Modal.Footer>
-              </Modal>
-            </div>
-          )}
-        </Modal.Body>
+        <Modal.Body>{contents}</Modal.Body>
       </Modal>
     </>
   );
