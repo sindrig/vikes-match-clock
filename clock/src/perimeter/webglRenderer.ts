@@ -6,6 +6,10 @@ export interface PerimeterRenderSources {
   overlay?: Record<string, TexImageSource>;
 }
 
+export interface PerimeterRendererOptions {
+  onError?: (message: string) => void;
+}
+
 export function regionVertices(
   region: PerimeterRegion,
   framebufferWidth: number,
@@ -116,6 +120,36 @@ function shader(
   return result;
 }
 
+const downscaledSources = new WeakMap<TexImageSource, HTMLCanvasElement>();
+
+function downscaleInto(
+  source: HTMLImageElement | ImageBitmap,
+  dimensions: { width: number; height: number },
+  maxSize: number,
+): HTMLCanvasElement | null {
+  const scale = Math.min(
+    maxSize / dimensions.width,
+    maxSize / dimensions.height,
+  );
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(dimensions.width * scale));
+  canvas.height = Math.max(1, Math.round(dimensions.height * scale));
+  let context: CanvasRenderingContext2D | null;
+  try {
+    context = canvas.getContext("2d");
+  } catch {
+    context = null;
+  }
+  if (!context) return null;
+  try {
+    context.drawImage(source, 0, 0, canvas.width, canvas.height);
+  } catch {
+    return null;
+  }
+  downscaledSources.set(source, canvas);
+  return canvas;
+}
+
 export class PerimeterWebGLRenderer {
   private readonly gl: WebGLRenderingContext;
   private readonly program: WebGLProgram;
@@ -124,12 +158,17 @@ export class PerimeterWebGLRenderer {
   private readonly textures = new Map<string, WebGLTexture>();
   private readonly textureSources = new Map<string, TexImageSource>();
   private readonly oversizedLogged = new Set<string>();
+  private readonly oversizedErrors = new Map<string, string>();
+  private readonly onError?: (message: string) => void;
+  private downscaleUnavailable = false;
   private configuration: PerimeterDisplayConfig;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
     configuration: PerimeterDisplayConfig,
+    options: PerimeterRendererOptions = {},
   ) {
+    this.onError = options.onError;
     if (!validatePerimeterMapping(configuration).valid) {
       throw new Error("Invalid perimeter mapping cannot be rendered.");
     }
@@ -175,6 +214,7 @@ export class PerimeterWebGLRenderer {
     this.textures.clear();
     this.textureSources.clear();
     this.oversizedLogged.clear();
+    this.oversizedErrors.clear();
     this.canvas.width = configuration.framebuffer.width;
     this.canvas.height = configuration.framebuffer.height;
     this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
@@ -197,36 +237,101 @@ export class PerimeterWebGLRenderer {
       // A zero-size source would leave the texture incomplete forever.
       return;
     }
+    let effectiveSource = source;
     if (dimensions) {
       const maxSize = gl.getParameter(gl.MAX_TEXTURE_SIZE) as number;
       if (
         Number.isFinite(maxSize) &&
         (dimensions.width > maxSize || dimensions.height > maxSize)
       ) {
-        // texImage2D on an oversized source fails ("Requested size at this
-        // level is unsupported") and the region renders black permanently.
-        // Log once per texture so operators see the actionable cause.
-        if (!this.oversizedLogged.has(textureKey)) {
-          this.oversizedLogged.add(textureKey);
-          console.error(
-            `Perimeter media too large for this GPU: ${dimensions.width}x${dimensions.height} exceeds max texture size ${maxSize} (${textureKey}). Re-export the asset at a smaller size.`,
-          );
+        const scaled = this.downscaleSource(source, dimensions, maxSize);
+        if (!scaled) {
+          // texImage2D on an oversized source fails ("Requested size at this
+          // level is unsupported") and the region renders black permanently.
+          // Log once per texture; keep the error active until the source
+          // fits or the configuration is replaced so a later successful
+          // preparation cannot hide a still-broken texture.
+          const message = `Perimeter media too large for this GPU: ${dimensions.width}x${dimensions.height} exceeds max texture size ${maxSize} (${textureKey}). Re-export the asset at a smaller size.`;
+          if (!this.oversizedLogged.has(textureKey)) {
+            this.oversizedLogged.add(textureKey);
+            console.error(message);
+          }
+          if (!this.oversizedErrors.has(textureKey)) {
+            this.oversizedErrors.set(textureKey, message);
+            this.emitError();
+          }
+          return;
         }
-        return;
+        effectiveSource = scaled;
       }
     }
-    if (!isVideo && this.textureSources.get(textureKey) === source) return;
+    if (!isVideo && this.textureSources.get(textureKey) === effectiveSource)
+      return;
     const texture = this.textures.get(textureKey) ?? gl.createTexture();
     if (!texture) throw new Error("Unable to create perimeter texture.");
     this.textures.set(textureKey, texture);
-    this.textureSources.set(textureKey, source);
+    this.textureSources.set(textureKey, effectiveSource);
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 0);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
+    gl.texImage2D(
+      gl.TEXTURE_2D,
+      0,
+      gl.RGBA,
+      gl.RGBA,
+      gl.UNSIGNED_BYTE,
+      effectiveSource,
+    );
+    this.clearOversize(textureKey);
+  }
+
+  private clearOversize(textureKey: string): void {
+    if (this.oversizedErrors.delete(textureKey)) this.emitError();
+  }
+
+  private emitError(): void {
+    // Emits only when the set of oversized textures changes, so the display
+    // receives a stable message instead of per-frame churn.
+    this.onError?.([...this.oversizedErrors.values()].join(" "));
+  }
+
+  private downscaleSource(
+    source: TexImageSource,
+    dimensions: { width: number; height: number },
+    maxSize: number,
+  ): HTMLCanvasElement | null {
+    if (this.downscaleUnavailable) return null;
+    // Static images can be redrawn into a smaller offscreen canvas once;
+    // videos cannot (a per-frame drawImage of a 15k-wide frame is far too
+    // expensive), so they keep the skip-and-report behavior.
+    if (
+      typeof HTMLImageElement !== "undefined" &&
+      source instanceof HTMLImageElement
+    )
+      return this.drawDownscaled(source, dimensions, maxSize);
+    if (typeof ImageBitmap !== "undefined" && source instanceof ImageBitmap)
+      return this.drawDownscaled(source, dimensions, maxSize);
+    return null;
+  }
+
+  private drawDownscaled(
+    source: HTMLImageElement | ImageBitmap,
+    dimensions: { width: number; height: number },
+    maxSize: number,
+  ): HTMLCanvasElement | null {
+    const cached = downscaledSources.get(source);
+    if (cached) return cached;
+    const canvas = downscaleInto(source, dimensions, maxSize);
+    if (!canvas) {
+      // Remembered so a broken environment does not retry the allocation
+      // (and the oversized report) on every frame.
+      this.downscaleUnavailable = true;
+      return null;
+    }
+    return canvas;
   }
 
   render(sources: PerimeterRenderSources): void {
@@ -294,6 +399,7 @@ export class PerimeterWebGLRenderer {
     this.textures.clear();
     this.textureSources.clear();
     this.oversizedLogged.clear();
+    this.oversizedErrors.clear();
     this.gl.deleteBuffer(this.positionBuffer);
     this.gl.deleteBuffer(this.uvBuffer);
     this.gl.deleteProgram(this.program);

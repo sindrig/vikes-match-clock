@@ -462,6 +462,21 @@ publish a phantom missing-mapping error. Successful `prepareBase`/overlay
 preparation now **clears** a previously set error so recovered decks never
 leave a stale error on the display or in the controller.
 
+**Renderer-internal errors are propagated too.**
+`PerimeterWebGLRenderer` accepts `PerimeterRendererOptions.onError`; problems
+only detectable inside the render loop (a source larger than the GPU's
+`MAX_TEXTURE_SIZE`) are reported through it once per state change (joined
+message across affected texture keys) and re-reported after any change, so a
+successful `prepareBase` cannot hide a still-broken texture.
+`PerimeterDisplay` keeps this in a separate `textureError` state and joins it
+with `rendererError` for both the on-screen `<p>` below the canvas and the
+`reportError()` payload. Oversized **images** are recovered automatically:
+the renderer redraws them into an offscreen `<canvas>` scaled to fit
+`MAX_TEXTURE_SIZE` before `texImage2D` (no error, no black region);
+oversized **videos** cannot be downscaled per frame, so they keep
+skip-and-report behavior with the "Re-export the asset at a smaller size"
+message.
+
 **Admin side** — `hooks/useScreenReports.ts` subscribes to
 `presence/{listenPrefix}` and returns validated entries sorted by label.
 `controller/PerimeterDisplayReports.tsx` renders the **Skjáarvillur (jaðarskjáir)**
@@ -1826,8 +1841,13 @@ pair completeness, and retains the previous complete revision if a replacement
 or quota check fails. Media whose dimensions differ from the configured
 logical-screen dimensions only log a console warning — the WebGL renderer
 samples the full texture with normalized UVs, so such content is stretched
-(with skew) to fill the region instead of blocking playback. Videos shorter
-than the cue duration loop at natural rate; videos longer than the cue
+(with skew) to fill the region instead of blocking playback. Sources larger
+than the GPU's `MAX_TEXTURE_SIZE` (e.g. 8192 px on the venue GPUs) no longer
+black out their region: images are downscaled into an offscreen canvas that
+fits the limit before `texImage2D`, while oversized videos are skipped and
+reported through the renderer's `onError` (surfaced on the display and in the
+Skjáarvillur panel — see **Perimeter Display Diagnostics** above). Videos
+shorter than the cue duration loop at natural rate; videos longer than the cue
 duration play faster when the browser supports the required rate, otherwise
 they are cut at the cue boundary.
 

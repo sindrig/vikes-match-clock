@@ -26,6 +26,7 @@ export default function PerimeterDisplay() {
   const lastSkipCueRef = useRef<string | null>(null);
   const lastRefreshTokenRef = useRef<string | null>(null);
   const [rendererError, setRendererError] = useState<string | null>(null);
+  const [textureError, setTextureError] = useState<string | null>(null);
   const configuration = useMemo(
     () =>
       screens.find(
@@ -43,8 +44,9 @@ export default function PerimeterDisplay() {
   const reportedError = !ready
     ? null
     : configuration
-      ? rendererError
+      ? [rendererError, textureError].filter(Boolean).join(" ") || null
       : NO_CONFIGURATION_MESSAGE;
+  const displayError = ready && configuration ? reportedError : null;
 
   useEffect(() => {
     reportError(reportedError);
@@ -76,6 +78,14 @@ export default function PerimeterDisplay() {
       const renderer = new PerimeterWebGLRenderer(
         canvasRef.current,
         configuration,
+        {
+          // Renderer-internal problems (e.g. media larger than the GPU
+          // max texture size) are only detectable inside the render loop.
+          // They get their own state so a successful preparation can never
+          // hide a still-broken texture, and are joined into the reported
+          // error and the on-screen message below the canvas.
+          onError: (message) => setTextureError(message || null),
+        },
       );
       const loader = new PerimeterMediaLoader({
         bucket: FIREBASE_STORAGE_BUCKET,
@@ -239,9 +249,9 @@ export default function PerimeterDisplay() {
         height={configuration.framebuffer.height}
         aria-label="Perimeter display"
       />
-      {rendererError && (
+      {displayError && (
         <p className="perimeter-display-error" role="status">
-          {rendererError}
+          {displayError}
         </p>
       )}
     </div>

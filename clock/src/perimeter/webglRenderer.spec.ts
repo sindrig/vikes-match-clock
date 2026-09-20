@@ -275,8 +275,14 @@ describe("PerimeterWebGLRenderer", () => {
     const canvas = document.createElement("canvas");
     const gl = new FakeWebGLRenderingContext();
     Object.defineProperty(canvas, "getContext", { value: () => gl });
+    // jsdom has no 2D canvas context; keep its "Not implemented" noise out
+    // of the test output while forcing the downscale fallback path.
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
     const errorSpy = vi.spyOn(console, "error").mockImplementation(vi.fn());
-    const renderer = new PerimeterWebGLRenderer(canvas, identityConfiguration);
+    const onError = vi.fn();
+    const renderer = new PerimeterWebGLRenderer(canvas, identityConfiguration, {
+      onError,
+    });
     const image = new Image();
     Object.defineProperty(image, "naturalWidth", { value: 8192 });
     Object.defineProperty(image, "naturalHeight", { value: 512 });
@@ -287,6 +293,97 @@ describe("PerimeterWebGLRenderer", () => {
     expect(gl.texImage2D).not.toHaveBeenCalled();
     expect(errorSpy).toHaveBeenCalledTimes(1);
     expect(errorSpy.mock.calls[0]![0]).toContain("8192x512");
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(onError.mock.calls[0]![0]).toContain("8192x512");
+    errorSpy.mockRestore();
+    renderer.dispose();
+  });
+
+  it("downsizes oversized images into an offscreen canvas and uploads it", () => {
+    vi.stubGlobal("WebGLRenderingContext", FakeWebGLRenderingContext);
+    const canvas = document.createElement("canvas");
+    const gl = new FakeWebGLRenderingContext();
+    Object.defineProperty(canvas, "getContext", { value: () => gl });
+    const drawImage = vi.fn();
+    const offscreen = document.createElement("canvas");
+    Object.defineProperty(offscreen, "getContext", {
+      value: () => ({ drawImage }),
+    });
+    const originalCreateElement = document.createElement.bind(document);
+    const createElementSpy = vi
+      .spyOn(document, "createElement")
+      .mockImplementation(((tagName: string) =>
+        tagName === "canvas"
+          ? offscreen
+          : originalCreateElement(tagName)) as typeof document.createElement);
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(vi.fn());
+    const renderer = new PerimeterWebGLRenderer(canvas, identityConfiguration);
+    const image = new Image();
+    Object.defineProperty(image, "naturalWidth", { value: 8192 });
+    Object.defineProperty(image, "naturalHeight", { value: 512 });
+
+    renderer.render({ base: { screen: image } });
+    renderer.render({ base: { screen: image } });
+
+    expect(gl.texImage2D).toHaveBeenCalledTimes(1);
+    expect(gl.texImage2D.mock.calls[0]![5]).toBe(offscreen);
+    expect(offscreen.width).toBe(4096);
+    expect(offscreen.height).toBe(256);
+    expect(drawImage).toHaveBeenCalledWith(image, 0, 0, 4096, 256);
+    expect(errorSpy).not.toHaveBeenCalled();
+    errorSpy.mockRestore();
+    createElementSpy.mockRestore();
+    renderer.dispose();
+  });
+
+  it("reports oversized videos through onError because they cannot be downscaled", () => {
+    vi.stubGlobal("WebGLRenderingContext", FakeWebGLRenderingContext);
+    const canvas = document.createElement("canvas");
+    const gl = new FakeWebGLRenderingContext();
+    Object.defineProperty(canvas, "getContext", { value: () => gl });
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(vi.fn());
+    const onError = vi.fn();
+    const renderer = new PerimeterWebGLRenderer(canvas, identityConfiguration, {
+      onError,
+    });
+    const video = document.createElement("video");
+    Object.defineProperty(video, "readyState", { value: 2 });
+    Object.defineProperty(video, "videoWidth", { value: 15200 });
+    Object.defineProperty(video, "videoHeight", { value: 800 });
+
+    renderer.render({ base: { screen: video as unknown as TexImageSource } });
+
+    expect(gl.texImage2D).not.toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+    expect(onError.mock.calls[0]![0]).toContain("15200x800");
+    errorSpy.mockRestore();
+    renderer.dispose();
+  });
+
+  it("clears the oversized error once a source that fits is uploaded", () => {
+    vi.stubGlobal("WebGLRenderingContext", FakeWebGLRenderingContext);
+    const canvas = document.createElement("canvas");
+    const gl = new FakeWebGLRenderingContext();
+    Object.defineProperty(canvas, "getContext", { value: () => gl });
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(vi.fn());
+    const onError = vi.fn();
+    const renderer = new PerimeterWebGLRenderer(canvas, identityConfiguration, {
+      onError,
+    });
+    const oversized = new Image();
+    Object.defineProperty(oversized, "naturalWidth", { value: 8192 });
+    Object.defineProperty(oversized, "naturalHeight", { value: 512 });
+    const fits = new Image();
+    Object.defineProperty(fits, "naturalWidth", { value: 4 });
+    Object.defineProperty(fits, "naturalHeight", { value: 2 });
+
+    renderer.render({ base: { screen: oversized } });
+    expect(onError.mock.calls[0]![0]).toContain("8192x512");
+
+    renderer.render({ base: { screen: fits } });
+    expect(onError).toHaveBeenLastCalledWith("");
     errorSpy.mockRestore();
     renderer.dispose();
   });

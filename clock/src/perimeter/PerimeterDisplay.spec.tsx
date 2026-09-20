@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import PerimeterDisplay from "./PerimeterDisplay";
 import {
   useFirebaseState,
@@ -47,6 +47,12 @@ const rendererInstance = vi.hoisted(() => ({
   destroy: vi.fn(),
 }));
 
+// Captured from the latest constructor call so tests can emit renderer-
+// internal errors the way the real render loop would.
+const rendererHooks = vi.hoisted(() => ({
+  onError: null as ((message: string) => void) | null,
+}));
+
 vi.mock("./runtime", () => ({
   PerimeterRuntime: function PerimeterRuntimeMock() {
     return runtimeInstance;
@@ -54,7 +60,12 @@ vi.mock("./runtime", () => ({
 }));
 
 vi.mock("./webglRenderer", () => ({
-  PerimeterWebGLRenderer: function PerimeterWebGLRendererMock() {
+  PerimeterWebGLRenderer: function PerimeterWebGLRendererMock(
+    _canvas: unknown,
+    _configuration: unknown,
+    options?: { onError?: (message: string) => void },
+  ) {
+    rendererHooks.onError = options?.onError ?? null;
     return rendererInstance;
   },
 }));
@@ -111,6 +122,7 @@ const setupContexts = ({
 describe("PerimeterDisplay", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    rendererHooks.onError = null;
     runtimeInstance.prepareBase = vi.fn().mockResolvedValue(undefined);
     runtimeInstance.setOverlay = vi.fn().mockResolvedValue(undefined);
     setupContexts();
@@ -204,5 +216,37 @@ describe("PerimeterDisplay", () => {
       const calls = mockReportError.mock.calls;
       expect(calls[calls.length - 1]).toEqual([null]);
     });
+  });
+
+  it("surfaces renderer texture errors below the canvas and to the controller", async () => {
+    render(<PerimeterDisplay />);
+
+    await waitFor(() => expect(rendererHooks.onError).not.toBeNull());
+    const message =
+      "Perimeter media too large for this GPU: 15200x800 exceeds max texture size 8192 (base:screen-3264). Re-export the asset at a smaller size.";
+    act(() => rendererHooks.onError!(message));
+
+    await waitFor(() => expect(mockReportError).toHaveBeenCalledWith(message));
+    expect(screen.getByText(message)).toBeInTheDocument();
+  });
+
+  it("shows preparation and texture errors together instead of overwriting", async () => {
+    runtimeInstance.prepareBase = vi
+      .fn()
+      .mockRejectedValue(new Error("Column missing"));
+
+    render(<PerimeterDisplay />);
+
+    await waitFor(() => expect(rendererHooks.onError).not.toBeNull());
+    act(() => rendererHooks.onError!("texture problem"));
+
+    await waitFor(() =>
+      expect(mockReportError).toHaveBeenCalledWith(
+        "Column missing texture problem",
+      ),
+    );
+    expect(
+      screen.getByText("Column missing texture problem"),
+    ).toBeInTheDocument();
   });
 });
