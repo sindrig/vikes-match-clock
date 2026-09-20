@@ -8,6 +8,7 @@ import type {
 export interface MappingValidationError {
   code:
     | "invalid-geometry"
+    | "invalid-playback"
     | "source-out-of-bounds"
     | "source-gap"
     | "source-overlap"
@@ -141,6 +142,13 @@ export function validatePerimeterMapping(
     errors.push({
       code: "invalid-geometry",
       message: "Framebuffer dimensions must be positive integers.",
+    });
+  }
+
+  if (!isInteger(config.playback.cueDurationMs) || config.playback.cueDurationMs <= 0) {
+    errors.push({
+      code: "invalid-playback",
+      message: "Cue duration must be a positive number of milliseconds.",
     });
   }
 

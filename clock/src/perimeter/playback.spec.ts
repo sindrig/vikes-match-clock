@@ -16,7 +16,7 @@ const column = (durationMs: number, id: string): PerimeterOverlayColumn => ({
 });
 
 describe("perimeter playback primitives", () => {
-  it("fits supported videos and falls back to natural timing", () => {
+  it("loops short videos and speeds up long ones", () => {
     expect(
       pairedPlaybackPlan(
         { kind: "video", durationMs: 10_000 },
@@ -24,8 +24,8 @@ describe("perimeter playback primitives", () => {
         () => true,
       ),
     ).toEqual({
-      rate: 0.5,
-      loop: false,
+      rate: 1,
+      loop: true,
       cutAtCueBoundary: false,
     });
     expect(
@@ -43,9 +43,29 @@ describe("perimeter playback primitives", () => {
       pairedPlaybackPlan(
         { kind: "video", durationMs: 30_000 },
         20_000,
+        () => true,
+      ),
+    ).toEqual({
+      rate: 1.5,
+      loop: false,
+      cutAtCueBoundary: false,
+    });
+    expect(
+      pairedPlaybackPlan(
+        { kind: "video", durationMs: 30_000 },
+        20_000,
         () => false,
       ).cutAtCueBoundary,
     ).toBe(true);
+    expect(
+      pairedPlaybackPlan({ kind: "video", durationMs: 20_000 }, 20_000, () =>
+        true,
+      ),
+    ).toEqual({
+      rate: 1,
+      loop: false,
+      cutAtCueBoundary: false,
+    });
   });
 
   it("swaps only complete pair slots", () => {

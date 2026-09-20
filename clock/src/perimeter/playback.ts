@@ -23,14 +23,16 @@ export function pairedPlaybackPlan(
     return { rate: 1, loop: false, cutAtCueBoundary: false };
   }
   const requiredRate = asset.durationMs / cueDurationMs;
-  if (supportsPlaybackRate(requiredRate)) {
-    return { rate: requiredRate, loop: false, cutAtCueBoundary: false };
+  if (requiredRate > 1) {
+    if (supportsPlaybackRate(requiredRate)) {
+      return { rate: requiredRate, loop: false, cutAtCueBoundary: false };
+    }
+    return { rate: 1, loop: false, cutAtCueBoundary: true };
   }
-  return {
-    rate: 1,
-    loop: asset.durationMs < cueDurationMs,
-    cutAtCueBoundary: asset.durationMs > cueDurationMs,
-  };
+  if (requiredRate < 1) {
+    return { rate: 1, loop: true, cutAtCueBoundary: false };
+  }
+  return { rate: 1, loop: false, cutAtCueBoundary: false };
 }
 
 export class PairSlots<T> {

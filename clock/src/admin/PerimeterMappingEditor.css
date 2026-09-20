@@ -91,6 +91,16 @@
   width: 5rem;
 }
 
+.perimeter-mapping-playback-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.perimeter-mapping-playback-controls .rs-input-number {
+  width: 6rem;
+}
+
 @media (max-width: 700px) {
   .perimeter-mapping-canvas-row {
     grid-template-columns: 1fr;

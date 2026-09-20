@@ -88,6 +88,17 @@ export default function PerimeterMappingEditor({
     setError(null);
   };
 
+  const updateCueDuration = (value: number | string | null) => {
+    setDraft((current) => ({
+      ...current,
+      playback: {
+        ...current.playback,
+        cueDurationMs: Math.round(numericValue(value) * 1000),
+      },
+    }));
+    setError(null);
+  };
+
   const updateRegionGeometry = (
     region: PerimeterRegion,
     side: "source" | "destination",
@@ -212,6 +223,20 @@ export default function PerimeterMappingEditor({
             ))}
           </div>
         ))}
+        <div className="perimeter-mapping-playback-controls">
+          <strong>Playback</strong>
+          <label className="loc-label" htmlFor="cue-duration-seconds">
+            Cue length (s)
+          </label>
+          <InputNumber
+            size="sm"
+            id="cue-duration-seconds"
+            value={draft.playback.cueDurationMs / 1000}
+            min={0}
+            aria-label="cue duration seconds"
+            onChange={updateCueDuration}
+          />
+        </div>
       </div>
       <div className="perimeter-mapping-canvas-row">
         <div

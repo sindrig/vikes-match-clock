@@ -101,6 +101,39 @@ describe("validatePerimeterMapping", () => {
     expect(result.errors.some((error) => error.code === code)).toBe(true);
   });
 
+  it("rejects a non-positive or fractional cue duration", () => {
+    const config = baseConfig([
+      {
+        id: "identity",
+        logicalScreenId: "screen",
+        source: { x: 0, y: 0, width: 8, height: 4 },
+        destination: { x: 0, y: 0, width: 8, height: 4 },
+        transform: transform(),
+      },
+    ]);
+
+    config.playback = { ...config.playback, cueDurationMs: 0 };
+    expect(
+      validatePerimeterMapping(config).errors.some(
+        (error) => error.code === "invalid-playback",
+      ),
+    ).toBe(true);
+
+    config.playback = { ...config.playback, cueDurationMs: -5_000 };
+    expect(
+      validatePerimeterMapping(config).errors.some(
+        (error) => error.code === "invalid-playback",
+      ),
+    ).toBe(true);
+
+    config.playback = { ...config.playback, cueDurationMs: 20_000.5 };
+    expect(
+      validatePerimeterMapping(config).errors.some(
+        (error) => error.code === "invalid-playback",
+      ),
+    ).toBe(true);
+  });
+
   it("rejects gaps, duplicate source pixels, and ambiguous destination overlap", () => {
     const gap = validatePerimeterMapping(
       baseConfig([

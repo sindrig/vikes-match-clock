@@ -1756,15 +1756,19 @@ pair completeness, and retains the previous complete revision if a replacement
 or quota check fails. Media whose dimensions differ from the configured
 logical-screen dimensions only log a console warning — the WebGL renderer
 samples the full texture with normalized UVs, so such content is stretched
-(with skew) to fill the region instead of blocking playback. Video rate
-fitting is best effort and unsupported rates use natural playback with
-loop/cut behavior.
+(with skew) to fill the region instead of blocking playback. Videos shorter
+than the cue duration loop at natural rate; videos longer than the cue
+duration play faster when the browser supports the required rate, otherwise
+they are cut at the cue boundary.
 
 Administrators measure a packed framebuffer and logical strips, then edit the
 mapping under `Stjórnborð` → `Staðsetningar` → the venue's `Perimeter mapping`
 section. The editor keeps changes in a local draft, can show a calibration
 preview, validates exact source coverage, and publishes a new revision as one
-complete Firebase document. See
+complete Firebase document. Its Playback control edits the base-ads cue
+length in seconds (stored as `playback.cueDurationMs`, defaulting to 20 s
+when absent); validation rejects non-positive durations, and short videos
+loop while long ones speed up to fit the configured cue. See
 `perimeter-control/WEB_MAPPING_MEASUREMENT.md` and
 `perimeter-control/WEB_RENDERER_QUALIFICATION.md`. Keep Víkin's configuration
 at `renderer: "resolume"`; a second venue may use `web` independently.

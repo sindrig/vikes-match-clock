@@ -88,6 +88,50 @@ describe("PerimeterMappingEditor", () => {
     expect(onPublish.mock.calls[0]?.[0].revision).not.toBe("published");
   });
 
+  it("publishes an edited cue duration in milliseconds", () => {
+    const onPublish = vi.fn<(value: typeof configuration) => void>();
+    render(
+      <PerimeterMappingEditor
+        configuration={configuration}
+        onPublish={onPublish}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("cue duration seconds"), {
+      target: { value: "10" },
+    });
+    expect(screen.getByLabelText("cue duration seconds")).toHaveValue("10");
+    expect(onPublish).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Publish" }));
+
+    expect(onPublish).toHaveBeenCalledTimes(1);
+    expect(onPublish.mock.calls[0]?.[0].playback).toEqual({
+      cueDurationMs: 10_000,
+      videoPolicy: "fit-to-cue",
+    });
+  });
+
+  it("blocks publishing a non-positive cue duration", () => {
+    const onPublish = vi.fn<(value: typeof configuration) => void>();
+    render(
+      <PerimeterMappingEditor
+        configuration={configuration}
+        onPublish={onPublish}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("cue duration seconds"), {
+      target: { value: "0" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Publish" }));
+
+    expect(onPublish).not.toHaveBeenCalled();
+    expect(
+      screen.getByText(/positive number of milliseconds/),
+    ).toBeInTheDocument();
+  });
+
   it("shows identifiable calibration labels and supports templates", () => {
     render(
       <PerimeterMappingEditor
