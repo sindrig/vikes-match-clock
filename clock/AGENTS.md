@@ -741,9 +741,20 @@ refused with an `error` status (each ad needs its own deck column).
 **UI operations**:
 
 - **Add column**: Dialog with one file selector per lane. Lists existing files
-  from `{listenPrefix}/perimeter/` in Storage, permits upload. Saves only when
-  every lane has a selection. Sources are stored as `gs://` URIs. Adding is
-  disabled once the layout reaches 20 columns (the daemon/parser limit).
+  (sorted by name) from `{listenPrefix}/perimeter/` in Storage with a small
+  thumbnail preview per option, and permits upload. Saves only when every lane
+  has a selection. Sources are stored as `gs://` URIs. Adding is disabled once
+  the layout reaches 20 columns (the daemon/parser limit). The file-picker
+  styles in `PerimeterControl.css` are deliberately **not** scoped under
+  `.perimeter-preview-modal`: rsuite portals the add dialog to `document.body`,
+  so a preview-modal scope would never match and the dialog would render raw.
+- **Thumbnails**: `controller/PerimeterFileThumb.tsx` renders per-file previews
+  anywhere in the ad-layout UI. It prefers the daemon-published applied
+  thumbnail; when absent (e.g. web venues, freshly edited columns), it resolves
+  the Storage object itself via a cached `getDownloadURL` — images render as
+  `<img loading="lazy">`, videos as a first-frame `<video preload="metadata">`
+  — falling back to an "Engin mynd" placeholder. Resolution failures and media
+  errors degrade to the placeholder instead of breaking the card.
 - **Delete column**: Red X button with confirmation dialog
   (`Fjarlægja dálk? Skrárnar verða áfram í Firebase Storage.`). Removes only
   the layout reference, never deletes Storage objects.

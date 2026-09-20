@@ -35,6 +35,7 @@ import { useListeners, usePerimeter } from "../contexts/FirebaseStateContext";
 import { useLocalState } from "../contexts/LocalStateContext";
 import { validateAdFileName } from "../contexts/firebaseParsers";
 import GoalScorerPreparation from "./GoalScorerPreparation";
+import PerimeterFileThumb from "./PerimeterFileThumb";
 import {
   storageHelpers,
   ListResult,
@@ -137,17 +138,11 @@ const SortableColumn = ({
                 <div className="perimeter-file-lane-label">{lane.name}</div>
                 {file ? (
                   <>
-                    {applied?.thumbnail ? (
-                      <img
-                        className="perimeter-file-thumb"
-                        src={applied.thumbnail}
-                        alt={applied.name}
-                      />
-                    ) : (
-                      <div className="perimeter-file-thumb perimeter-thumb-unavailable">
-                        <span>Engin mynd</span>
-                      </div>
-                    )}
+                    <PerimeterFileThumb
+                      name={applied?.name ?? file.name}
+                      source={file.source}
+                      appliedThumbnail={applied?.thumbnail}
+                    />
                     <div
                       className="perimeter-file-name"
                       title={applied?.name ?? file.name}
@@ -211,7 +206,7 @@ const FilePicker = ({
             }
           }),
       );
-      setFiles(listedFiles);
+      setFiles(listedFiles.sort((a, b) => a.name.localeCompare(b.name, "is")));
     } catch {
       setFiles([]);
     } finally {
@@ -284,7 +279,12 @@ const FilePicker = ({
                 })
               }
             >
-              {f.name}
+              <PerimeterFileThumb
+                name={f.name}
+                source={makeGsUri(f.name)}
+                variant="option"
+              />
+              <span className="perimeter-file-option-name">{f.name}</span>
             </button>
           ))
         )}
@@ -793,17 +793,11 @@ const PerimeterControl = ({ standalone = false }: { standalone?: boolean }) => {
                               </div>
                               {file ? (
                                 <>
-                                  {applied?.thumbnail ? (
-                                    <img
-                                      className="perimeter-file-thumb"
-                                      src={applied.thumbnail}
-                                      alt={applied.name}
-                                    />
-                                  ) : (
-                                    <div className="perimeter-file-thumb perimeter-thumb-unavailable">
-                                      <span>Engin mynd</span>
-                                    </div>
-                                  )}
+                                  <PerimeterFileThumb
+                                    name={applied?.name ?? file.name}
+                                    source={file.source}
+                                    appliedThumbnail={applied?.thumbnail}
+                                  />
                                   <div
                                     className="perimeter-file-name"
                                     title={applied?.name ?? file.name}
@@ -861,6 +855,10 @@ const PerimeterControl = ({ standalone = false }: { standalone?: boolean }) => {
               <Modal.Title>Nýr dálkur</Modal.Title>
             </Modal.Header>
             <Modal.Body>
+              <p className="perimeter-add-hint">
+                Veldu skrá fyrir hverja röð úr listanum eða hlaðið upp nýrri
+                skrá.
+              </p>
               <div className="perimeter-add-form">
                 {lanes.map((lane) => (
                   <FilePicker
