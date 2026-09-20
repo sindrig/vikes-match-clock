@@ -1,0 +1,37 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`stable band snapshots > crest fallback: crest fixture + number + name at the Víkin web mapping 1`] = `
+"image crop=(0,0,8,8) dest=(0,0,108,108)
+text "7" at=157,54 font=700 30px "GT America"
+text "Jón Jónsson" at=243,54 font=700 30px "GT America"
+image crop=(0,0,8,8) dest=(497,0,108,108)
+text "7" at=654,54 font=700 30px "GT America"
+text "Jón Jónsson" at=740,54 font=700 30px "GT America""
+`;
+
+exports[`stable band snapshots > personalized: long name truncation stays deterministic 1`] = `
+"image crop=(0,0,4,8) dest=(0,0,96,192)
+text "10" at=182,96 font=700 32px "GT America"
+text "Jón Jónssonar Jónssonssonars…" at=399,96 font=700 32px "GT America"
+image crop=(0,0,4,8) dest=(1060,0,96,192)
+text "10" at=1242,96 font=700 32px "GT America"
+text "Jón Jónssonar Jónssonssonars…" at=1459,96 font=700 32px "GT America"
+image crop=(0,0,4,8) dest=(2120,0,96,192)
+text "10" at=2302,96 font=700 32px "GT America"
+text "Jón Jónssonar Jónssonssonars…" at=2519,96 font=700 32px "GT America"
+image crop=(0,0,4,8) dest=(3180,0,96,192)
+text "10" at=3362,96 font=700 32px "GT America"
+text "Jón Jónssonar Jónssonssonars…" at=3579,96 font=700 32px "GT America""
+`;
+
+exports[`stable band snapshots > personalized: portrait fixture + number + name at the Víkin web mapping 1`] = `
+"image crop=(0,0,4,8) dest=(0,0,54,108)
+text "7" at=103,54 font=700 30px "GT America"
+text "Jón Jónsson" at=189,54 font=700 30px "GT America"
+image crop=(0,0,4,8) dest=(443,0,54,108)
+text "7" at=546,54 font=700 30px "GT America"
+text "Jón Jónsson" at=632,54 font=700 30px "GT America"
+image crop=(0,0,4,8) dest=(886,0,54,108)
+text "7" at=989,54 font=700 30px "GT America"
+text "Jón Jónsson" at=1075,54 font=700 30px "GT America""
+`;
