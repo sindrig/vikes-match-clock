@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, afterEach } from "vitest";
 import type { PerimeterDisplayConfig } from "../types";
 import { capturedVikinConfiguration } from "./fixtures";
 import { validatePerimeterMapping } from "./perimeterMapping";
@@ -25,10 +25,14 @@ class FakeWebGLRenderingContext {
   readonly TRIANGLE_STRIP = 18;
   readonly COLOR_BUFFER_BIT = 19;
   readonly FLOAT = 20;
+  readonly MAX_TEXTURE_SIZE = 21;
   readonly clear = vi.fn();
   readonly clearColor = vi.fn();
   readonly drawArrays = vi.fn();
   readonly deleteTexture = vi.fn();
+  readonly getParameter = vi.fn((parameter: number) =>
+    parameter === 21 ? 4096 : 0,
+  );
 
   createShader() {
     return {} as WebGLShader;
@@ -81,9 +85,7 @@ class FakeWebGLRenderingContext {
   pixelStorei() {
     return undefined;
   }
-  texImage2D() {
-    return undefined;
-  }
+  texImage2D = vi.fn();
   getAttribLocation() {
     return 0;
   }
@@ -231,6 +233,84 @@ describe("PerimeterWebGLRenderer", () => {
     ).toBe(true);
     expect(gl.deleteTexture).toHaveBeenCalledTimes(2);
     renderer.dispose();
+    vi.unstubAllGlobals();
+  });
+
+  it("skips texImage2D for videos that have not decoded a frame yet", () => {
+    vi.stubGlobal("WebGLRenderingContext", FakeWebGLRenderingContext);
+    const canvas = document.createElement("canvas");
+    const gl = new FakeWebGLRenderingContext();
+    Object.defineProperty(canvas, "getContext", { value: () => gl });
+    const renderer = new PerimeterWebGLRenderer(canvas, identityConfiguration);
+    const video = document.createElement("video");
+    Object.defineProperty(video, "readyState", { value: 0 });
+    Object.defineProperty(video, "videoWidth", { value: 0 });
+    Object.defineProperty(video, "videoHeight", { value: 0 });
+
+    renderer.render({ base: { screen: video as unknown as TexImageSource } });
+
+    expect(gl.texImage2D).not.toHaveBeenCalled();
+    renderer.dispose();
+  });
+
+  it("uploads video frames once the video has decoded data", () => {
+    vi.stubGlobal("WebGLRenderingContext", FakeWebGLRenderingContext);
+    const canvas = document.createElement("canvas");
+    const gl = new FakeWebGLRenderingContext();
+    Object.defineProperty(canvas, "getContext", { value: () => gl });
+    const renderer = new PerimeterWebGLRenderer(canvas, identityConfiguration);
+    const video = document.createElement("video");
+    Object.defineProperty(video, "readyState", { value: 2 });
+    Object.defineProperty(video, "videoWidth", { value: 4 });
+    Object.defineProperty(video, "videoHeight", { value: 2 });
+
+    renderer.render({ base: { screen: video as unknown as TexImageSource } });
+
+    expect(gl.texImage2D).toHaveBeenCalledTimes(1);
+    renderer.dispose();
+  });
+
+  it("skips and logs sources larger than the GPU max texture size once", () => {
+    vi.stubGlobal("WebGLRenderingContext", FakeWebGLRenderingContext);
+    const canvas = document.createElement("canvas");
+    const gl = new FakeWebGLRenderingContext();
+    Object.defineProperty(canvas, "getContext", { value: () => gl });
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(vi.fn());
+    const renderer = new PerimeterWebGLRenderer(canvas, identityConfiguration);
+    const image = new Image();
+    Object.defineProperty(image, "naturalWidth", { value: 8192 });
+    Object.defineProperty(image, "naturalHeight", { value: 512 });
+
+    renderer.render({ base: { screen: image } });
+    renderer.render({ base: { screen: image } });
+
+    expect(gl.texImage2D).not.toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+    expect(errorSpy.mock.calls[0]![0]).toContain("8192x512");
+    errorSpy.mockRestore();
+    renderer.dispose();
+  });
+
+  it("skips zero-size sources without logging or uploading", () => {
+    vi.stubGlobal("WebGLRenderingContext", FakeWebGLRenderingContext);
+    const canvas = document.createElement("canvas");
+    const gl = new FakeWebGLRenderingContext();
+    Object.defineProperty(canvas, "getContext", { value: () => gl });
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(vi.fn());
+    const renderer = new PerimeterWebGLRenderer(canvas, identityConfiguration);
+    const image = new Image();
+    Object.defineProperty(image, "naturalWidth", { value: 0 });
+    Object.defineProperty(image, "naturalHeight", { value: 0 });
+
+    renderer.render({ base: { screen: image } });
+
+    expect(gl.texImage2D).not.toHaveBeenCalled();
+    expect(errorSpy).not.toHaveBeenCalled();
+    errorSpy.mockRestore();
+    renderer.dispose();
+  });
+
+  afterEach(() => {
     vi.unstubAllGlobals();
   });
 });

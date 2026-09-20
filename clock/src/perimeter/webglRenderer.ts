@@ -72,6 +72,35 @@ void main() {
   gl_FragColor = texture2D(image, textureUv);
 }`;
 
+function intrinsicDimensions(
+  source: TexImageSource,
+): { width: number; height: number } | null {
+  if (
+    typeof HTMLVideoElement !== "undefined" &&
+    source instanceof HTMLVideoElement
+  )
+    return { width: source.videoWidth, height: source.videoHeight };
+  if (
+    typeof HTMLImageElement !== "undefined" &&
+    source instanceof HTMLImageElement
+  )
+    return { width: source.naturalWidth, height: source.naturalHeight };
+  if (
+    typeof HTMLCanvasElement !== "undefined" &&
+    source instanceof HTMLCanvasElement
+  )
+    return { width: source.width, height: source.height };
+  if (typeof ImageBitmap !== "undefined" && source instanceof ImageBitmap)
+    return { width: source.width, height: source.height };
+  const candidate = source as { width?: unknown; height?: unknown };
+  if (
+    typeof candidate.width === "number" &&
+    typeof candidate.height === "number"
+  )
+    return { width: candidate.width, height: candidate.height };
+  return null;
+}
+
 function shader(
   gl: WebGLRenderingContext,
   type: number,
@@ -94,6 +123,7 @@ export class PerimeterWebGLRenderer {
   private readonly uvBuffer: WebGLBuffer;
   private readonly textures = new Map<string, WebGLTexture>();
   private readonly textureSources = new Map<string, TexImageSource>();
+  private readonly oversizedLogged = new Set<string>();
   private configuration: PerimeterDisplayConfig;
 
   constructor(
@@ -144,6 +174,7 @@ export class PerimeterWebGLRenderer {
       this.gl.deleteTexture(texture);
     this.textures.clear();
     this.textureSources.clear();
+    this.oversizedLogged.clear();
     this.canvas.width = configuration.framebuffer.width;
     this.canvas.height = configuration.framebuffer.height;
     this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
@@ -155,6 +186,35 @@ export class PerimeterWebGLRenderer {
     const isVideo =
       typeof HTMLVideoElement !== "undefined" &&
       source instanceof HTMLVideoElement;
+    if (isVideo && source.readyState < 2) {
+      // The video has not decoded its first frame yet; texImage2D would
+      // upload zeros (Firefox logs "Resource has no data (yet?)") and the
+      // texture would stay incomplete. Skip and keep the previous frame.
+      return;
+    }
+    const dimensions = intrinsicDimensions(source);
+    if (dimensions && (dimensions.width <= 0 || dimensions.height <= 0)) {
+      // A zero-size source would leave the texture incomplete forever.
+      return;
+    }
+    if (dimensions) {
+      const maxSize = gl.getParameter(gl.MAX_TEXTURE_SIZE) as number;
+      if (
+        Number.isFinite(maxSize) &&
+        (dimensions.width > maxSize || dimensions.height > maxSize)
+      ) {
+        // texImage2D on an oversized source fails ("Requested size at this
+        // level is unsupported") and the region renders black permanently.
+        // Log once per texture so operators see the actionable cause.
+        if (!this.oversizedLogged.has(textureKey)) {
+          this.oversizedLogged.add(textureKey);
+          console.error(
+            `Perimeter media too large for this GPU: ${dimensions.width}x${dimensions.height} exceeds max texture size ${maxSize} (${textureKey}). Re-export the asset at a smaller size.`,
+          );
+        }
+        return;
+      }
+    }
     if (!isVideo && this.textureSources.get(textureKey) === source) return;
     const texture = this.textures.get(textureKey) ?? gl.createTexture();
     if (!texture) throw new Error("Unable to create perimeter texture.");
@@ -233,6 +293,7 @@ export class PerimeterWebGLRenderer {
       this.gl.deleteTexture(texture);
     this.textures.clear();
     this.textureSources.clear();
+    this.oversizedLogged.clear();
     this.gl.deleteBuffer(this.positionBuffer);
     this.gl.deleteBuffer(this.uvBuffer);
     this.gl.deleteProgram(this.program);
