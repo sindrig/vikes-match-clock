@@ -1713,6 +1713,17 @@ denied. To roll back, remove or change the venue's web mapping so the selector
 stops offering Perimeter, then reconnect its prior playback path. Do not delete
 the prior cached revision until the replacement has been qualified.
 
+**Storage CORS (one-time bucket configuration)**: unlike `<img>` tags elsewhere
+in the app, the perimeter media loader downloads via `fetch()` into Cache
+Storage (`cache.ts`), which the browser blocks with
+"Cross-Origin Request Blocked … CORS header ‘Access-Control-Allow-Origin’
+missing" unless the bucket's CORS configuration allows the display origin. The
+Firebase-created buckets have no CORS configuration by default. Apply
+`scripts/storage-cors.json` with `scripts/set-storage-cors.sh` (requires
+`gcloud` authenticated with `storage.buckets.update` on both projects); it
+allows `GET`/`HEAD` from `klukka.irdn.is`, `staging-klukka.irdn.is`, and the
+localhost dev ports.
+
 - **`clock-api/`**: Python Lambda API for match data and weather
 
 ## Team ID System & Match Data Pipeline
