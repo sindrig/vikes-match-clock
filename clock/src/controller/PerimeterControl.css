@@ -791,3 +791,113 @@
   gap: 8px;
   flex-wrap: wrap;
 }
+
+/* ── Skjáarvillur (per-display screen reports) ── */
+
+.perimeter-preview-modal .perimeter-display-reports {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  background: #f7f9fb;
+  border: 1px solid #e0e3e7;
+  border-radius: 6px;
+}
+
+.perimeter-preview-modal .perimeter-display-reports-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.perimeter-preview-modal .perimeter-display-reports-title {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.perimeter-preview-modal .perimeter-display-reports-count {
+  font-size: 13px;
+  color: #666;
+}
+
+.perimeter-preview-modal .perimeter-display-reports-empty {
+  font-size: 13px;
+  color: #b88230;
+  background: #fdf6ec;
+  border: 1px solid #e6a23c;
+  border-radius: 5px;
+  padding: 8px 12px;
+}
+
+.perimeter-preview-modal .perimeter-display-report {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+}
+
+.perimeter-preview-modal .perimeter-display-report.status-error {
+  border-color: #f3b3b0;
+  background: #fdf1f0;
+}
+
+.perimeter-preview-modal .perimeter-display-report-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.perimeter-preview-modal .perimeter-display-report-name {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.perimeter-preview-modal .perimeter-display-report-resolution {
+  font-size: 12px;
+  color: #888;
+}
+
+.perimeter-preview-modal .perimeter-display-report-badge {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-left: auto;
+}
+
+.perimeter-preview-modal .perimeter-display-report-badge::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+.perimeter-preview-modal .perimeter-display-report-badge.status-ok::before {
+  background: #66bb6a;
+}
+
+.perimeter-preview-modal .perimeter-display-report-badge.status-stale::before {
+  background: #ffa726;
+}
+
+.perimeter-preview-modal .perimeter-display-report-badge.status-error::before {
+  background: #ef5350;
+}
+
+.perimeter-preview-modal .perimeter-display-report-error {
+  font-size: 12px;
+  color: #d32f2f;
+  overflow-wrap: anywhere;
+}
+
+.perimeter-preview-modal .perimeter-display-report-time {
+  color: #888;
+}

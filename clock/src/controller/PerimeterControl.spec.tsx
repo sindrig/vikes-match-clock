@@ -30,6 +30,7 @@ vi.mock("../contexts/LocalStateContext", () => ({
 
 vi.mock("../firebase", () => ({
   FIREBASE_STORAGE_BUCKET: "vikes-match-clock-staging.appspot.com",
+  database: {},
   storageHelpers: {
     listAll: vi.fn().mockResolvedValue({ items: [] }),
     uploadBytes: vi.fn().mockResolvedValue(undefined),

@@ -39,9 +39,7 @@
           ".write": "!data.exists() && newData.exists() && root.child('auth').child(auth.uid).child($location).val() == true",
           ".validate": "newData.hasChildren(['timestamp', 'uid', 'sessionId', 'action', 'stateArea', 'changes']) && newData.child('uid').val() == auth.uid && newData.child('timestamp').isNumber() && newData.child('sessionId').isString() && newData.child('action').isString() && (newData.child('stateArea').val() == 'match' || newData.child('stateArea').val() == 'controller' || newData.child('stateArea').val() == 'view' || newData.child('stateArea').val() == 'perimeter' || newData.child('stateArea').val() == 'clubOverrides') && newData.child('changes').val() != null"
         },
-        ".indexOn": [
-          "timestamp"
-        ]
+        ".indexOn": ["timestamp"]
       }
     },
     "perimeter": {
@@ -55,7 +53,28 @@
         ".read": true,
         "$connectionId": {
           ".write": true,
-          ".validate": "newData.hasChildren(['connectedAt']) && newData.child('connectedAt').isNumber()"
+          ".validate": "newData.hasChildren(['connectedAt']) && newData.child('connectedAt').isNumber()",
+          "connectedAt": {
+            ".validate": "newData.isNumber()"
+          },
+          "displayKind": {
+            ".validate": "newData.isString() && newData.val().length <= 20"
+          },
+          "label": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
+          },
+          "resolution": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
+          },
+          "error": {
+            ".validate": "newData.isString() && newData.val().length <= 300"
+          },
+          "errorAt": {
+            ".validate": "newData.isNumber()"
+          },
+          "lastHeartbeat": {
+            ".validate": "newData.isNumber()"
+          }
         }
       }
     }

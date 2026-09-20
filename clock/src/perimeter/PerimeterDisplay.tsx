@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useListeners, usePerimeter } from "../contexts/FirebaseStateContext";
+import {
+  useFirebaseState,
+  useListeners,
+  usePerimeter,
+} from "../contexts/FirebaseStateContext";
+import { useDisplayDiagnostics } from "../contexts/DisplayDiagnosticsContext";
 import { useLocalState } from "../contexts/LocalStateContext";
 import { FIREBASE_STORAGE_BUCKET, storageHelpers } from "../firebase";
 import { parseGsReference } from "./cache";
@@ -7,10 +12,14 @@ import { PerimeterMediaLoader } from "./mediaLoader";
 import { PerimeterWebGLRenderer } from "./webglRenderer";
 import { PerimeterRuntime } from "./runtime";
 
+const NO_CONFIGURATION_MESSAGE = "Engin gild perimeter stilling tiltæk.";
+
 export default function PerimeterDisplay() {
   const { listenPrefix } = useLocalState();
   const { screens } = useListeners();
+  const { ready } = useFirebaseState();
   const { perimeter, adLayout, overlay } = usePerimeter();
+  const { reportError } = useDisplayDiagnostics();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const runtimeRef = useRef<PerimeterRuntime | null>(null);
   const rendererRef = useRef<PerimeterWebGLRenderer | null>(null);
@@ -25,6 +34,27 @@ export default function PerimeterDisplay() {
           entry.perimeterDisplay?.renderer === "web",
       )?.perimeterDisplay,
     [listenPrefix, screens],
+  );
+
+  // Report display-side problems to the controller (Skjáarvillur). Reports
+  // are gated on `ready` so the brief window before the mapping subscription
+  // delivers cannot publish a phantom missing-configuration error, and a
+  // disconnect clears the report so a stale error never outlives the screen.
+  const reportedError = !ready
+    ? null
+    : configuration
+      ? rendererError
+      : NO_CONFIGURATION_MESSAGE;
+
+  useEffect(() => {
+    reportError(reportedError);
+  }, [reportedError, reportError]);
+
+  useEffect(
+    () => () => {
+      reportError(null);
+    },
+    [reportError],
   );
 
   useEffect(() => {
@@ -128,6 +158,10 @@ export default function PerimeterDisplay() {
           if (cancelled || runtimeRef.current !== runtime) return;
           runtime.activatePreparedBase(performance.now());
           runtime.render();
+          // A successful preparation clears any earlier failure report so a
+          // recovered deck never leaves a stale error on the display or in
+          // the controller's Skjáarvillur list.
+          setRendererError(null);
         })
         .catch((error: unknown) => {
           if (!cancelled) {
@@ -151,7 +185,10 @@ export default function PerimeterDisplay() {
     void runtime
       .setOverlay(overlay, performance.now())
       .then(() => {
-        if (!cancelled && runtimeRef.current === runtime) runtime.render();
+        if (!cancelled && runtimeRef.current === runtime) {
+          runtime.render();
+          setRendererError(null);
+        }
       })
       .catch((error: unknown) => {
         if (!cancelled) {
@@ -182,7 +219,7 @@ export default function PerimeterDisplay() {
   if (!configuration) {
     return (
       <div className="perimeter-display perimeter-display-error">
-        <p>Engin gild perimeter stilling tiltæk.</p>
+        <p>{NO_CONFIGURATION_MESSAGE}</p>
       </div>
     );
   }

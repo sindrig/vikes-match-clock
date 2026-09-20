@@ -413,6 +413,76 @@ Resolume-version-specific parsing is isolated in
 `resolume-preview.js`; see `perimeter-control/README.md` for installation and
 operation.
 
+#### Perimeter Display Diagnostics (Skjáarvillur)
+
+Web perimeter screens report renderer problems to the controller so an
+operator at the admin page can see a stuck/erroring screen without standing at
+the venue. Screens are unauthenticated and can write only to the presence
+path, so diagnostics ride along on each screen's existing presence record —
+no new writable path, no shared-state writes, and the display remains
+read-only.
+
+**Data**: `presence/{location}/{connectionId}` (one record per connected
+screen, auto-removed by `onDisconnect().remove()`):
+
+```json
+{
+  "connectedAt": 1723392000000,
+  "displayKind": "perimeter",
+  "label": "Skjár A7F3",
+  "resolution": "3840x1080",
+  "error": "Perimeter media column 1 is missing left.",
+  "errorAt": 1723392100000,
+  "lastHeartbeat": 1723392160000
+}
+```
+
+- `label` is a stable, human-readable per-browser label from
+  `getOrCreateDisplayLabel()` in `lib/displayIdentity.ts` (localStorage
+  `clock_displayLabel`, e.g. "Skjár A7F3"), so multiple venue screens are
+  distinguishable across reloads. `resolution` is `window.screen.width x
+window.screen.height`.
+- `error`/`errorAt` are written on every connect (so a reconnecting screen
+  re-reports immediately) and merged into the live record whenever the error
+  changes; a null error removes both fields (screen reports healthy). Error
+  text is truncated to 300 chars.
+- `lastHeartbeat` is a `serverTimestamp()` refreshed once per minute while
+  connected; a stale heartbeat (>3 min) flags a wedged browser tab even when
+  the presence record is still connected. A screen that disconnects
+  (crash/power loss/network drop) simply disappears from the list.
+
+**Display side** — `App.tsx` wraps the whole app tree in
+`DisplayDiagnosticsProvider` (`contexts/DisplayDiagnosticsContext.tsx`), which
+owns the `useScreenPresence` call (unauthenticated screens only) and exposes
+`reportError()` via `useDisplayDiagnostics()`. `PerimeterDisplay` reports its
+derived error state: `null` when healthy, the `rendererError` message on
+failure, and `"Engin gild perimeter stilling tiltæk."` when no published web
+mapping exists — gated on `ready` so the brief pre-subscription window cannot
+publish a phantom missing-mapping error. Successful `prepareBase`/overlay
+preparation now **clears** a previously set error so recovered decks never
+leave a stale error on the display or in the controller.
+
+**Admin side** — `hooks/useScreenReports.ts` subscribes to
+`presence/{listenPrefix}` and returns validated entries sorted by label.
+`controller/PerimeterDisplayReports.tsx` renders the **Skjáarvillur (jaðarskjáir)**
+panel at the top of the web-venue ad-layout board (standalone page and modal):
+one row per connected perimeter screen with label, resolution, a status badge
+(`Villa` red / `Ósvöruð` orange on stale heartbeat / `Í lagi` green), the error
+text with its time, and a warning when **zero** perimeter screens are
+connected (often the real cause of a stuck deck). Styles live in
+`PerimeterControl.css` under `.perimeter-display-reports*`.
+
+**Rules** (`firebase-rules.json`): presence writes stay `true` per connection;
+explicit `.validate` rules were added for the optional fields (`displayKind`,
+`label`, `resolution` ≤ 40 chars, `error` ≤ 300 chars, `errorAt` and
+`lastHeartbeat` numbers). Child-level rules only apply when the child exists,
+so clearing a field via a `null` update is allowed.
+
+**Known tradeoff**: diagnostics persist only while the screen process is
+alive and connected. True crash-surviving error history would need a trusted
+writer (e.g. a Cloud Function DB trigger copying errors into
+`perimeter/{location}/displayErrors`); that is deliberately out of scope.
+
 #### Perimeter Overlay (Goal-Triggered Video Sequences)
 
 When a **home goal** is scored, a Firebase-controlled perimeter overlay
