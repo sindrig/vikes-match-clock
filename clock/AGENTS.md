@@ -1001,9 +1001,13 @@ directly and never treats a Firebase write confirmation as a hardware result.
 
 **Operator behavior** (`PerimeterControl.tsx`):
 
-- The `Bjartleiki jaðarskjás` section renders above the ad-layout board and is
-  gated by the same `perimeter.enabled` feature flag (the whole modal is hidden
-  when disabled).
+- The `Bjartleiki jaðarskjás` section renders above the ad-layout board for
+  **both web and Resolume venues** (it is renderer-agnostic — brightness always
+  flows through a venue-local daemon, never the browser renderer) and is gated
+  by the same `perimeter.enabled` feature flag (the whole modal is hidden when
+  disabled). A web venue only sees the section take effect if its daemon has
+  brightness enabled (`PERIMETER_BRIGHTNESS_ENABLED=true`) with the venue's
+  Firebase path and Vnnox screen GUID configured.
 - It shows the Firebase-synchronized requested value, the daemon phase, the
   verified applied value, and any safe failure message.
 - Submitting is an explicit `Vista` action; the input is client-validated to a

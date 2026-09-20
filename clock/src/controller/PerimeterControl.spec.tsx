@@ -237,6 +237,27 @@ describe("PerimeterControl", () => {
     ).toBeDisabled();
   });
 
+  it("shows the brightness section on a web venue", () => {
+    mockedUseListeners.mockReturnValue({
+      available: [],
+      screens: mockWebVenueScreens,
+    });
+    mockedUsePerimeter.mockReturnValue(
+      createMockPerimeterReturn({
+        perimeter: { enabled: true, state: "on" },
+        adLayout: webVenueAdLayout,
+      }),
+    );
+
+    render(<PerimeterControl standalone />);
+
+    const section = document.querySelector(".perimeter-brightness");
+    expect(section).not.toBeNull();
+    expect(
+      within(section as HTMLElement).getByText("Bjartleiki jaðarskjás"),
+    ).toBeVisible();
+  });
+
   it("hides the skip-forward button on non-web venues", () => {
     mockedUsePerimeter.mockReturnValue(
       createMockPerimeterReturn({

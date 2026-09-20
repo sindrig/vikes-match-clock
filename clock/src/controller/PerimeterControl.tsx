@@ -633,12 +633,8 @@ const PerimeterControl = ({ standalone = false }: { standalone?: boolean }) => {
   const contents = (
     <>
       {isWebVenue && <PerimeterDisplayReports />}
-      {!isWebVenue && (
-        <>
-          <BrightnessSection />
-          <GoalScorerPreparation />
-        </>
-      )}
+      <BrightnessSection />
+      {!isWebVenue && <GoalScorerPreparation />}
       {!isWebVenue && !appliedAdLayoutLoaded ? (
         <div className="perimeter-preview-state">
           <Loader content="Sæki forskoðun..." />
