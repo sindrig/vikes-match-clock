@@ -635,8 +635,24 @@ export function parsePerimeterState(data: unknown): PerimeterState | undefined {
   const raw = data as Record<string, unknown>;
   const enabled = typeof raw.enabled === "boolean" ? raw.enabled : false;
   const state = raw.state === "on" || raw.state === "off" ? raw.state : "off";
+  // Tolerant skip token: any non-empty string is preserved verbatim; the
+  // value is opaque and its content is never interpreted by the parser.
+  const skipCue =
+    typeof raw.skipCue === "string" && raw.skipCue.length > 0
+      ? raw.skipCue
+      : undefined;
+  // Tolerant restart token, same semantics as skipCue: opaque and verbatim.
+  const refreshToken =
+    typeof raw.refreshToken === "string" && raw.refreshToken.length > 0
+      ? raw.refreshToken
+      : undefined;
 
-  return { enabled, state };
+  return {
+    enabled,
+    state,
+    ...(skipCue !== undefined ? { skipCue } : {}),
+    ...(refreshToken !== undefined ? { refreshToken } : {}),
+  };
 }
 
 // Strict, tolerant parse of the daemon-published composition preview. Clips

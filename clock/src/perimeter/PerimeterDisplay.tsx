@@ -14,6 +14,7 @@ export default function PerimeterDisplay() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const runtimeRef = useRef<PerimeterRuntime | null>(null);
   const rendererRef = useRef<PerimeterWebGLRenderer | null>(null);
+  const lastSkipCueRef = useRef<string | null>(null);
   const [rendererError, setRendererError] = useState<string | null>(null);
   const configuration = useMemo(
     () =>
@@ -81,6 +82,20 @@ export default function PerimeterDisplay() {
     if (!runtime) return;
     runtime.setPowered(perimeter.state === "on", performance.now());
   }, [perimeter.state, configuration]);
+
+  // The controller publishes a fresh `skipCue` token under the desired
+  // perimeter state to request an immediate advance to the next ad column
+  // on every display. The first observed token only initializes the
+  // baseline so a display that (re)connects never replays an old skip.
+  useEffect(() => {
+    const token = perimeter.skipCue ?? null;
+    const runtime = runtimeRef.current;
+    if (!runtime) return;
+    const previous = lastSkipCueRef.current;
+    lastSkipCueRef.current = token;
+    if (previous === null || token === null || token === previous) return;
+    runtime.skipCue(performance.now());
+  }, [perimeter.skipCue, perimeter.state, configuration]);
 
   useEffect(() => {
     const runtime = runtimeRef.current;

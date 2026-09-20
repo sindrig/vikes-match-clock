@@ -314,6 +314,8 @@ interface FirebaseStateContextType {
   deleteClubOverride: (id: string) => Promise<void>;
 
   setPerimeterState: (state: PerimeterState["state"]) => void;
+  skipPerimeterCue: () => void;
+  restartPerimeterDisplays: () => void;
   setPerimeterOverlay: (overlay: PerimeterOverlay) => void;
   clearPerimeterOverlay: () => void;
   setPerimeterAdLayout: (layout: PerimeterAdLayout | null) => Promise<void>;
@@ -2447,6 +2449,44 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     [makeAudit, listenPrefix, writeEligible],
   );
 
+  // Skip-forward command for web perimeter displays: a fresh opaque token
+  // under the desired perimeter state tells every subscribed display to
+  // advance its base timeline to the next ad column immediately. The token
+  // content is irrelevant — only that it differs from the previous value.
+  const skipPerimeterCue = useCallback(() => {
+    if (!writeEligible) return;
+    const audit = makeAudit("perimeter", "perimeter.skip-cue");
+    if (!audit) return;
+
+    firebaseDatabase
+      .writeAudited(
+        listenPrefix,
+        "perimeter",
+        { skipCue: crypto.randomUUID() },
+        audit,
+      )
+      .catch(console.error);
+  }, [makeAudit, listenPrefix, writeEligible]);
+
+  // Remote restart command for web perimeter displays: a fresh opaque token
+  // under the desired perimeter state tells every subscribed display to
+  // perform a full page reload. The token content is irrelevant — only that
+  // it differs from the previous value.
+  const restartPerimeterDisplays = useCallback(() => {
+    if (!writeEligible) return;
+    const audit = makeAudit("perimeter", "perimeter.restart-displays");
+    if (!audit) return;
+
+    firebaseDatabase
+      .writeAudited(
+        listenPrefix,
+        "perimeter",
+        { refreshToken: crypto.randomUUID() },
+        audit,
+      )
+      .catch(console.error);
+  }, [makeAudit, listenPrefix, writeEligible]);
+
   const setPerimeterOverlay = useCallback(
     (overlay: PerimeterOverlay) => {
       if (!writeEligible) return;
@@ -2772,6 +2812,8 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       saveClubOverride,
       deleteClubOverride,
       setPerimeterState,
+      skipPerimeterCue,
+      restartPerimeterDisplays,
       setPerimeterOverlay,
       clearPerimeterOverlay,
       perimeterOverlay,
@@ -2868,6 +2910,8 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       saveClubOverride,
       deleteClubOverride,
       setPerimeterState,
+      skipPerimeterCue,
+      restartPerimeterDisplays,
       setPerimeterOverlay,
       clearPerimeterOverlay,
       perimeterOverlay,
@@ -3080,6 +3124,7 @@ export const usePerimeter = () => {
     perimeterPreview,
     perimeterPreviewLoaded,
     setPerimeterState,
+    skipPerimeterCue,
     setPerimeterOverlay,
     clearPerimeterOverlay,
     setPerimeterAdLayout,
@@ -3105,6 +3150,7 @@ export const usePerimeter = () => {
     preview: perimeterPreview,
     previewLoaded: perimeterPreviewLoaded,
     setPerimeterState,
+    skipPerimeterCue,
     setPerimeterOverlay,
     clearPerimeterOverlay,
     setPerimeterAdLayout,

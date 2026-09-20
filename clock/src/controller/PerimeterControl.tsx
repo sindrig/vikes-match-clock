@@ -418,6 +418,7 @@ const PerimeterControl = ({ standalone = false }: { standalone?: boolean }) => {
     perimeter,
     getServerTime,
     setPerimeterState,
+    skipPerimeterCue,
     setPerimeterAdLayout,
     adLayout,
     appliedAdLayout,
@@ -914,6 +915,18 @@ const PerimeterControl = ({ standalone = false }: { standalone?: boolean }) => {
             <p>Umsýsla auglýsinga og aflstýring</p>
           </div>
           <div className="perimeter-power-controls">
+            {isWebVenue && (
+              <Button
+                appearance="ghost"
+                color="blue"
+                aria-label="Fara á næsta dálk"
+                title="Fara á næsta dálk á öllum skjám"
+                onClick={skipPerimeterCue}
+                disabled={columns.length === 0 || perimeter.state !== "on"}
+              >
+                Næsti dálkur
+              </Button>
+            )}
             <Button
               appearance={perimeter.state === "on" ? "primary" : "ghost"}
               color="green"

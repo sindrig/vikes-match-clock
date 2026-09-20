@@ -203,6 +203,18 @@ export class PerimeterRuntime {
     if (!powered) this.render();
   }
 
+  // Advances the base playback to the next ad column immediately. The next
+  // cue boundary is pulled to `now`, so the current cue ends and the
+  // following one starts with a fresh full duration. A prepared base
+  // revision waiting on a cue boundary commits with the skip. No-op when
+  // nothing is playing yet or the timeline is not running.
+  skipCue(now: number): void {
+    this.pendingBaseActivation = null;
+    if (!this.timeline.skipForward(now)) return;
+    this.currentBaseCue = null;
+    this.render(now);
+  }
+
   render(now = performance.now()): void {
     if (
       this.pendingBaseActivation !== null &&

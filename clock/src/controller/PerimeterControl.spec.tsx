@@ -101,6 +101,7 @@ const createMockPerimeterReturn = (
     preview: basePreview,
     previewLoaded: true,
     setPerimeterState: vi.fn(),
+    skipPerimeterCue: vi.fn(),
     setPerimeterOverlay: vi.fn(),
     clearPerimeterOverlay: vi.fn(),
     setPerimeterAdLayout: mockSetPerimeterAdLayout,
@@ -158,6 +159,95 @@ describe("PerimeterControl", () => {
     expect(screen.queryByRole("button", { name: "Opna" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Kveikja" }));
     expect(setPerimeterState).toHaveBeenCalledWith("on");
+  });
+
+  const mockWebVenueScreens = [
+    {
+      key: "test-location",
+      label: "Test location",
+      screen: {} as never,
+      perimeterDisplay: {
+        renderer: "web",
+        compatibilityKeys: {
+          base: { "1": "left" },
+          overlay: {},
+        },
+        logicalScreens: {
+          left: { id: "left", name: "Left", width: 4, height: 1 },
+        },
+      } as never,
+    },
+  ];
+
+  const webVenueAdLayout = {
+    version: 1,
+    revision: "revision",
+    columns: [
+      {
+        id: "column-1",
+        files: {
+          "1": { name: "left.png", source: "gs://bucket/left.png" },
+        },
+      },
+    ],
+  };
+
+  it("offers a skip-forward button on a web venue while playing", () => {
+    const skipPerimeterCue = vi.fn();
+    mockedUseListeners.mockReturnValue({
+      available: [],
+      screens: mockWebVenueScreens,
+    });
+    mockedUsePerimeter.mockReturnValue(
+      createMockPerimeterReturn({
+        perimeter: { enabled: true, state: "on" },
+        adLayout: webVenueAdLayout,
+        skipPerimeterCue,
+      }),
+    );
+
+    render(<PerimeterControl standalone />);
+
+    const skipButton = screen.getByRole("button", {
+      name: "Fara á næsta dálk",
+    });
+    expect(skipButton).toBeEnabled();
+    fireEvent.click(skipButton);
+    expect(skipPerimeterCue).toHaveBeenCalledTimes(1);
+  });
+
+  it("disables the skip-forward button while the perimeter is off", () => {
+    mockedUseListeners.mockReturnValue({
+      available: [],
+      screens: mockWebVenueScreens,
+    });
+    mockedUsePerimeter.mockReturnValue(
+      createMockPerimeterReturn({
+        perimeter: { enabled: true, state: "off" },
+        adLayout: webVenueAdLayout,
+      }),
+    );
+
+    render(<PerimeterControl standalone />);
+
+    expect(
+      screen.getByRole("button", { name: "Fara á næsta dálk" }),
+    ).toBeDisabled();
+  });
+
+  it("hides the skip-forward button on non-web venues", () => {
+    mockedUsePerimeter.mockReturnValue(
+      createMockPerimeterReturn({
+        perimeter: { enabled: true, state: "on" },
+        adLayout: webVenueAdLayout,
+      }),
+    );
+
+    render(<PerimeterControl standalone />);
+
+    expect(
+      screen.queryByRole("button", { name: "Fara á næsta dálk" }),
+    ).toBeNull();
   });
 
   it("derives editable lanes from a web venue mapping without daemon status", () => {

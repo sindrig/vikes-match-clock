@@ -19,4 +19,34 @@ describe("perimeter timeline", () => {
     expect(timeline.cueIndex(45_100)).toBeNull();
     expect(createBaseTimeline(20_000, 0).cueIndex(0)).toBeNull();
   });
+
+  it("skipForward ends the current cue immediately", () => {
+    const timeline = createBaseTimeline(20_000, 3);
+    timeline.start(0);
+    // 10s into cue 0
+    expect(timeline.skipForward(10_000)).toBe(true);
+    expect(timeline.cueIndex(10_000)).toBe(1);
+    // The next boundary is one full cue duration after the skip.
+    expect(timeline.cueIndex(29_999)).toBe(1);
+    expect(timeline.cueIndex(30_000)).toBe(2);
+    // Repeated skips wrap around through the cue count.
+    expect(timeline.skipForward(30_000)).toBe(true);
+    expect(timeline.cueIndex(30_000)).toBe(0);
+    expect(timeline.skipForward(35_000)).toBe(true);
+    expect(timeline.cueIndex(35_000)).toBe(1);
+  });
+
+  it("skipForward is a no-op before start, with one cue, or a zero duration", () => {
+    const unstarted = createBaseTimeline(20_000, 2);
+    expect(unstarted.skipForward(100)).toBe(false);
+
+    const singleCue = createBaseTimeline(20_000, 1);
+    singleCue.start(0);
+    expect(singleCue.skipForward(1_000)).toBe(false);
+    expect(singleCue.cueIndex(1_000)).toBe(0);
+
+    const zeroDuration = createBaseTimeline(0, 2);
+    zeroDuration.start(0);
+    expect(zeroDuration.skipForward(1_000)).toBe(false);
+  });
 });

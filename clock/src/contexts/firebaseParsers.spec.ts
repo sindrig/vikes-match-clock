@@ -1393,6 +1393,24 @@ describe("firebaseParsers", () => {
         state: "off",
       });
     });
+
+    it("preserves a non-empty skipCue token verbatim", () => {
+      const token = "550e8400-e29b-41d4-a716-446655440000";
+      expect(
+        parsePerimeterState({ enabled: true, state: "on", skipCue: token }),
+      ).toEqual({ enabled: true, state: "on", skipCue: token });
+    });
+
+    it("drops malformed skipCue values", () => {
+      expect(parsePerimeterState({ skipCue: 123 })).toEqual({
+        enabled: false,
+        state: "off",
+      });
+      expect(parsePerimeterState({ skipCue: "" })).toEqual({
+        enabled: false,
+        state: "off",
+      });
+    });
   });
 
   describe("parsePerimeterPreview", () => {

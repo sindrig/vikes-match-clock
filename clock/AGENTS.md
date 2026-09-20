@@ -214,7 +214,8 @@ audit record.
   `controller.select-view`, `view.set-theme`).
 - `updateMatch` uses `match.update`; a dedicated `resetMatch()` context action
   emits `match.reset` (used by the Reset button in `MatchActions.tsx`).
-- Perimeter actions use `perimeter.set-state`, `perimeter.set-overlay`,
+- Perimeter actions use `perimeter.set-state`, `perimeter.skip-cue`,
+  `perimeter.set-overlay`,
   `perimeter.clear-overlay`, `perimeter.set-ad-layout`,
   `perimeter.create-media-pair`, `perimeter.delete-media-pair`.
 - Club overrides use `clubOverrides.create|update|save|delete` (both the
@@ -777,6 +778,29 @@ refused with an `error` status (each ad needs its own deck column).
 If `adLayout.revision !== appliedAdLayout.revision`, the UI shows
 "Uppfærslu beðið" (update pending). When they match, it shows "Lifandi" (live)
 with the daemon phase.
+
+**Skip-forward command (web venues)**:
+
+- The standalone admin header offers a "Næsti dálkur" button (web venues only)
+  that advances every subscribed web perimeter display to the next ad column
+  immediately.
+- The write is an opaque `skipCue` token (a UUID) under the desired
+  `states/{location}/perimeter` path, audited as `perimeter.skip-cue`. Only a
+  change of the token value matters; its content is never interpreted.
+- `parsePerimeterState()` preserves `skipCue` verbatim when it is a non-empty
+  string and drops it otherwise (the field is optional, so absent tokens keep
+  the parsed shape unchanged).
+- `PerimeterDisplay` tracks the last observed token: the first delivery only
+  initializes the baseline (a display that reconnects never replays an old
+  skip), and every subsequent change calls `PerimeterRuntime.skipCue(now)`,
+  which re-anchors the base timeline so the next cue boundary is now — the
+  current cue ends and the following one starts with a full fresh duration. A
+  prepared base revision waiting on a cue boundary commits with the skip. The
+  button is disabled while the perimeter is off or no columns exist.
+- `createBaseTimeline()` stores `cueDurationMs` and `cueCount` in closure
+  variables exposed through accessor properties: the runtime mutates them
+  after construction (`commitPreparedBase`, `replaceConfiguration`), and plain
+  object property writes would never be seen by the timeline's closures.
 
 Types are defined in `types.ts`:
 

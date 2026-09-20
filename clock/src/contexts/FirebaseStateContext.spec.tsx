@@ -2767,6 +2767,24 @@ describe("FirebaseStateContext", () => {
       );
     });
 
+    it("skipPerimeterCue writes a fresh token to Firebase when authenticated", () => {
+      const perimeterApi = renderPerimeter("vikuti", true);
+
+      act(() => {
+        perimeterApi!.skipPerimeterCue();
+      });
+
+      const calls = vi
+        .mocked(firebaseDatabase.writeAudited)
+        .mock.calls.filter((call) => call[0] === "vikuti");
+      expect(calls).toHaveLength(1);
+      const [location, stateArea, diff] = calls[0]!;
+      expect(location).toBe("vikuti");
+      expect(stateArea).toBe("perimeter");
+      expect(typeof (diff as { skipCue?: unknown }).skipCue).toBe("string");
+      expect((diff as { skipCue: string }).skipCue.length).toBeGreaterThan(0);
+    });
+
     it("blocks setPerimeterState when not authenticated", () => {
       const perimeterApi = renderPerimeter("vikuti", false);
 

@@ -360,6 +360,14 @@ export type DisplayTarget =
 export interface PerimeterState {
   enabled: boolean;
   state: "on" | "off";
+  // Opaque token written by the controller to request that every web
+  // perimeter display immediately advances its base timeline to the next
+  // ad column. A new token value means "skip now"; absent/null is inert.
+  skipCue?: string | null;
+  // Opaque token written by the controller to request a full page reload of
+  // every web perimeter display (remote restart). A new token value means
+  // "restart now"; absent/null is inert.
+  refreshToken?: string | null;
 }
 
 // A single clip in the perimeter composition preview.

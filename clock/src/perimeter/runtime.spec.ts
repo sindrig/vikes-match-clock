@@ -257,6 +257,80 @@ describe("PerimeterRuntime", () => {
     expect(render).toHaveBeenLastCalledWith({ base: { left: second.element } });
   });
 
+  it("advances to the next cue immediately on skipCue", async () => {
+    const first = loadedMedia("image");
+    const second = loadedMedia("video");
+    const third = loadedMedia("image");
+    const render = vi.fn<(sources: PerimeterRenderSources) => void>();
+    const loadPair = vi
+      .fn<
+        (
+          files: Record<string, PerimeterOverlayFile>,
+        ) => Promise<Record<string, LoadedPerimeterMedia>>
+      >()
+      .mockResolvedValueOnce({ left: first })
+      .mockResolvedValueOnce({ left: second })
+      .mockResolvedValueOnce({ left: third });
+    const multiLayout = {
+      ...layout,
+      columns: [
+        layout.columns[0]!,
+        { ...layout.columns[0]!, id: "column-2" },
+        { ...layout.columns[0]!, id: "column-3" },
+      ],
+    };
+    const runtime = new PerimeterRuntime(configuration, {
+      renderer: { render },
+      loader: { loadPair },
+      now: () => 0,
+    });
+
+    await runtime.prepareBase(multiLayout);
+    runtime.activatePreparedBase(0);
+    runtime.setPowered(true, 0);
+    runtime.render(0);
+    expect(render).toHaveBeenLastCalledWith({ base: { left: first.element } });
+
+    // Halfway through cue 0, a skip lands on cue 1 and gives it a full
+    // fresh 20s duration.
+    runtime.skipCue(10_000);
+    expect(render).toHaveBeenLastCalledWith({ base: { left: second.element } });
+    runtime.render(29_000);
+    expect(render).toHaveBeenLastCalledWith({ base: { left: second.element } });
+    runtime.render(30_000);
+    expect(render).toHaveBeenLastCalledWith({ base: { left: third.element } });
+  });
+
+  it("does not skip when the timeline is not running or a single cue loops", async () => {
+    const single = loadedMedia("image");
+    const loadPair = vi.fn().mockResolvedValue({ left: single });
+    const render = vi.fn<(sources: PerimeterRenderSources) => void>();
+    const runtime = new PerimeterRuntime(configuration, {
+      renderer: { render },
+      loader: { loadPair },
+      now: () => 0,
+    });
+
+    // Nothing prepared or started: skip is inert and the frame stays black.
+    runtime.skipCue(1_000);
+    runtime.render(1_000);
+    expect(render).toHaveBeenLastCalledWith({ base: {} });
+
+    await runtime.prepareBase(layout);
+    runtime.activatePreparedBase(0);
+    runtime.setPowered(true, 0);
+    runtime.render(0);
+    expect(render).toHaveBeenLastCalledWith({
+      base: { left: single.element },
+      overlay: undefined,
+    });
+    const renderCount = vi.mocked(render).mock.calls.length;
+
+    // A single-cue playlist has no next cue; skip changes nothing.
+    runtime.skipCue(2_000);
+    expect(vi.mocked(render).mock.calls.length).toBe(renderCount);
+  });
+
   it("rejects incomplete pairs and media with incorrect logical dimensions", async () => {
     const { runtime, loadPair } = createRuntime();
     loadPair.mockRejectedValueOnce(new Error("download failed"));

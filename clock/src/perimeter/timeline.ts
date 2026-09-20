@@ -29,6 +29,10 @@ export interface BaseTimeline {
   stop: () => void;
   cueIndex: (now: number) => number | null;
   elapsed: (now: number) => number;
+  // Advances the timeline so the next cue boundary lands exactly at `now`,
+  // keeping the cue duration intact. No-op when the timeline is not running
+  // or has no cues. Returns whether the timeline moved.
+  skipForward: (now: number) => boolean;
 }
 
 export function createBaseTimeline(
@@ -36,12 +40,28 @@ export function createBaseTimeline(
   cueCount = 0,
 ): BaseTimeline {
   let origin: number | null = null;
+  // The mutable playback parameters live in closure variables with
+  // accessor properties: callers mutate `timeline.cueCount` /
+  // `timeline.cueDurationMs` after construction, and plain property writes
+  // would never be seen by the closures below.
+  let durationMs = cueDurationMs;
+  let count = cueCount;
   return {
     get origin() {
       return origin;
     },
-    cueDurationMs,
-    cueCount,
+    get cueDurationMs() {
+      return durationMs;
+    },
+    set cueDurationMs(value: number) {
+      durationMs = value;
+    },
+    get cueCount() {
+      return count;
+    },
+    set cueCount(value: number) {
+      count = value;
+    },
     start: (now) => {
       origin = now;
     },
@@ -49,9 +69,18 @@ export function createBaseTimeline(
       origin = null;
     },
     cueIndex: (now) =>
-      origin === null ? null : cueIndexAt(now, origin, cueDurationMs, cueCount),
+      origin === null ? null : cueIndexAt(now, origin, durationMs, count),
     elapsed: (now) =>
-      origin === null ? 0 : elapsedInCue(now, origin, cueDurationMs),
+      origin === null ? 0 : elapsedInCue(now, origin, durationMs),
+    skipForward: (now) => {
+      if (origin === null || durationMs <= 0 || count <= 1) return false;
+      // Re-anchor the origin so that the elapsed time lands exactly on the
+      // next multiple of the cue duration: the current cue ends now and
+      // the following cue starts with a full fresh duration.
+      const elapsed = Math.max(0, now - origin);
+      origin = now - (Math.floor(elapsed / durationMs) + 1) * durationMs;
+      return true;
+    },
   };
 }
 
