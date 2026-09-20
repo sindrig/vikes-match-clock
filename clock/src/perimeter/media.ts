@@ -2,6 +2,8 @@ import type {
   PerimeterAdLayout,
   PerimeterAdLayoutFile,
   PerimeterDisplayConfig,
+  PerimeterOverlay,
+  PerimeterOverlayFile,
 } from "../types";
 
 export interface WebMediaIdentityError {
@@ -68,6 +70,32 @@ export async function backfillStorageGenerations(
     columns.push({ ...column, files });
   }
   return { ...layout, columns };
+}
+
+// Overlay commands (goal celebrations and named media pairs) may have been
+// written by writers that could not know the immutable Storage generation
+// (legacy media pairs, goal-scorer preparation). Backfill it the same way the
+// base layout does so playback can activate immutable identity at load time.
+export async function backfillOverlayGenerations(
+  overlay: PerimeterOverlay,
+  resolveGeneration: (source: string) => Promise<string | null>,
+): Promise<PerimeterOverlay> {
+  const columns = [];
+  for (const column of overlay.columns) {
+    const files: Record<string, PerimeterOverlayFile> = {};
+    for (const [target, file] of Object.entries(column.files)) {
+      const generation =
+        file.generation ?? (await resolveGeneration(file.source));
+      if (!generation) {
+        throw new Error(
+          `Storage generation unavailable for overlay column (${file.name}).`,
+        );
+      }
+      files[target] = { ...file, generation };
+    }
+    columns.push({ ...column, files });
+  }
+  return { ...overlay, columns };
 }
 
 export const importStorageGenerations = backfillStorageGenerations;

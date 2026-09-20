@@ -227,6 +227,51 @@ describe("PerimeterRuntime", () => {
     expect(getLastFrame()?.overlay?.left).toBeDefined();
   });
 
+  it("backfills missing overlay generations before loading media", async () => {
+    const { runtime, loadPair, getLastFrame } = createRuntime();
+    await runtime.prepareBase(layout);
+    runtime.activatePreparedBase(0);
+    runtime.setPowered(true, 0);
+    const legacyOverlay: PerimeterOverlay = {
+      version: 1,
+      id: "overlay-legacy",
+      columns: [
+        {
+          durationMs: 10_000,
+          files: {
+            "2": { name: "legacy.png", source: "gs://bucket/legacy.png" },
+          },
+        },
+      ],
+    };
+    await runtime.setOverlay(legacyOverlay, 0, () => Promise.resolve("42"));
+    const loaded = loadPair.mock.lastCall?.[0];
+    expect(loaded?.left?.name).toBe("legacy.png");
+    expect(loaded?.left?.generation).toBe("42");
+    runtime.render(1);
+    expect(getLastFrame()?.overlay?.left).toBeDefined();
+  });
+
+  it("refuses an overlay whose generation cannot be resolved", async () => {
+    const { runtime, loadPair } = createRuntime();
+    const legacyOverlay: PerimeterOverlay = {
+      version: 1,
+      id: "overlay-legacy",
+      columns: [
+        {
+          durationMs: 10_000,
+          files: {
+            "2": { name: "legacy.png", source: "gs://bucket/legacy.png" },
+          },
+        },
+      ],
+    };
+    await expect(
+      runtime.setOverlay(legacyOverlay, 0, () => Promise.resolve(null)),
+    ).rejects.toThrow("Storage generation unavailable");
+    expect(loadPair).not.toHaveBeenCalled();
+  });
+
   it("waits for a cue boundary before replacing an active base revision", async () => {
     const first = loadedMedia("image");
     const second = loadedMedia("video");

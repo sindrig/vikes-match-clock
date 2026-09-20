@@ -925,7 +925,13 @@ export function parsePerimeterMediaPairs(
         valid = false;
         break;
       }
-      files[target.key] = { name: fileName, source };
+      files[target.key] = {
+        name: fileName,
+        source,
+        ...(typeof file.generation === "string" && file.generation.length > 0
+          ? { generation: file.generation }
+          : {}),
+      };
     }
     if (!valid) continue;
 

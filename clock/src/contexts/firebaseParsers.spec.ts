@@ -2132,6 +2132,22 @@ describe("firebaseParsers", () => {
       expect(result[pairId]?.files["4"]?.name).toBe("40-1-sindri.png");
     });
 
+    it("preserves an optional Storage generation on pair files", () => {
+      const withGeneration = validPair();
+      const pairFiles = withGeneration[pairId].files as Record<
+        string,
+        { generation?: string }
+      >;
+      pairFiles["2"]!.generation = "1700000000000000";
+      pairFiles["4"]!.generation = "1700000000000001";
+      const result = parsePerimeterMediaPairs(withGeneration, {
+        location,
+        bucket,
+      });
+      expect(result[pairId]?.files["2"]?.generation).toBe("1700000000000000");
+      expect(result[pairId]?.files["4"]?.generation).toBe("1700000000000001");
+    });
+
     it("returns an empty map for null/undefined/primitive input", () => {
       expect(parsePerimeterMediaPairs(null)).toEqual({});
       expect(parsePerimeterMediaPairs(undefined)).toEqual({});

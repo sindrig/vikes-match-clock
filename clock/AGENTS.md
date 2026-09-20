@@ -603,11 +603,13 @@ for the 40-screen target (layer `"4"`). Files may be images or videos.
   "files": {
     "2": {
       "name": "48-1723392000000-sindri.mp4",
-      "source": "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter-overlays/11111111-1111-4111-8111-111111111111/48/48-1723392000000-sindri.mp4"
+      "source": "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter-overlays/11111111-1111-4111-8111-111111111111/48/48-1723392000000-sindri.mp4",
+      "generation": "1700000000000000"
     },
     "4": {
       "name": "40-1723392000000-sindri.png",
-      "source": "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter-overlays/11111111-1111-4111-8111-111111111111/40/40-1723392000000-sindri.png"
+      "source": "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter-overlays/11111111-1111-4111-8111-111111111111/40/40-1723392000000-sindri.png",
+      "generation": "1700000000000001"
     }
   }
 }
@@ -616,6 +618,11 @@ for the 40-screen target (layer `"4"`). Files may be images or videos.
 - `pairId` is a UUID generated before upload and used as both the map key and
   the source-path segment.
 - `name` is required, trimmed, non-empty, and bounded (≤ 80 chars).
+- Each file record carries the object's immutable Storage `generation`, captured
+  from the upload result when the pair is created. Legacy records that omit it
+  are still playable: the web display backfills missing overlay generations
+  from Storage metadata before loading (`backfillOverlayGenerations`, shared
+  with the base-layout backfill).
 - Each pair has exactly the two targets `"2"` and `"4"`. Layer `"2"` files must
   live under `{location}/perimeter-overlays/{pairId}/48/`; layer `"4"` files
   under `.../40/`. A path/layer mismatch is rejected.

@@ -5,6 +5,7 @@ import type {
   PerimeterOverlayColumn,
 } from "../types";
 import {
+  backfillOverlayGenerations,
   backfillStorageGenerations,
   normalizeBaseLayout,
   validateWebMediaIdentity,
@@ -143,6 +144,7 @@ export class PerimeterRuntime {
   async setOverlay(
     overlay: PerimeterOverlay | null,
     now: number,
+    resolveGeneration?: (source: string) => Promise<string | null>,
   ): Promise<void> {
     const request = ++this.overlayRequest;
     if (!overlay) {
@@ -151,7 +153,10 @@ export class PerimeterRuntime {
       this.overlayPlayback.clear();
       return;
     }
-    const normalized = overlay.columns.map((column) =>
+    const complete = resolveGeneration
+      ? await backfillOverlayGenerations(overlay, resolveGeneration)
+      : overlay;
+    const normalized = complete.columns.map((column) =>
       normalizeOverlayColumn(column, this.configuration),
     );
     this.validateCompletePairs(
@@ -180,9 +185,9 @@ export class PerimeterRuntime {
     }
     const previousMedia = this.loadedOverlayMedia;
     this.loadedOverlayMedia = [];
-    this.overlayPlayback.set(overlay.id, normalized, now);
+    this.overlayPlayback.set(complete.id, normalized, now);
     this.overlayPlayback.prepareFirstPair(normalized[0]!);
-    this.overlayPlayback.activatePrepared(overlay.id, now);
+    this.overlayPlayback.activatePrepared(complete.id, now);
     for (const pair of prepared) {
       for (const [logicalScreenId, media] of Object.entries(pair.sources)) {
         const file = pair.column.files[logicalScreenId];

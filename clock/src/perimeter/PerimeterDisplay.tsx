@@ -14,6 +14,17 @@ import { PerimeterRuntime } from "./runtime";
 
 const NO_CONFIGURATION_MESSAGE = "Engin gild perimeter stilling tiltæk.";
 
+// Immutable Storage identity: both the base layout and overlay commands may
+// be written by writers that could not know the object generation (legacy
+// media pairs, goal-scorer preparation), so it is resolved from Storage at
+// preparation time — the same backfill for both channels.
+const resolveGeneration = async (source: string) => {
+  const reference = parseGsReference(source, FIREBASE_STORAGE_BUCKET);
+  if (!reference) return null;
+  const metadata = await storageHelpers.getMetadata(reference.objectPath);
+  return metadata.generation;
+};
+
 export default function PerimeterDisplay() {
   const { listenPrefix } = useLocalState();
   const { screens } = useListeners();
@@ -156,14 +167,7 @@ export default function PerimeterDisplay() {
     let cancelled = false;
     if (adLayout) {
       void runtime
-        .prepareBase(adLayout, async (source) => {
-          const reference = parseGsReference(source, FIREBASE_STORAGE_BUCKET);
-          if (!reference) return null;
-          const metadata = await storageHelpers.getMetadata(
-            reference.objectPath,
-          );
-          return metadata.generation;
-        })
+        .prepareBase(adLayout, resolveGeneration)
         .then(() => {
           if (cancelled || runtimeRef.current !== runtime) return;
           runtime.activatePreparedBase(performance.now());
@@ -193,7 +197,7 @@ export default function PerimeterDisplay() {
     if (!runtime) return undefined;
     let cancelled = false;
     void runtime
-      .setOverlay(overlay, performance.now())
+      .setOverlay(overlay, performance.now(), resolveGeneration)
       .then(() => {
         if (!cancelled && runtimeRef.current === runtime) {
           runtime.render();

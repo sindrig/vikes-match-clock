@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
-import type { PerimeterAdLayout } from "../types";
+import { describe, expect, it, vi } from "vitest";
+import type { PerimeterAdLayout, PerimeterOverlay } from "../types";
 import {
+  backfillOverlayGenerations,
   backfillStorageGenerations,
   normalizeBaseLayout,
   validateWebMediaIdentity,
@@ -54,6 +55,71 @@ describe("perimeter media identity", () => {
   it("refuses activation when a generation cannot be resolved", async () => {
     await expect(
       backfillStorageGenerations(layout, () => Promise.resolve(null)),
+    ).rejects.toThrow("Storage generation unavailable");
+  });
+
+  it("backfills overlay generations for legacy overlay commands", async () => {
+    const overlay: PerimeterOverlay = {
+      version: 1,
+      id: "overlay-1",
+      columns: [
+        {
+          durationMs: 10_000,
+          files: {
+            "2": { name: "left.png", source: "gs://bucket/location/left.png" },
+            "4": {
+              name: "right.png",
+              source: "gs://bucket/location/right.png",
+            },
+          },
+        },
+      ],
+    };
+    const result = await backfillOverlayGenerations(overlay, (source) =>
+      Promise.resolve(source.endsWith("left.png") ? "1" : "2"),
+    );
+    expect(result.columns[0]?.files["2"]?.generation).toBe("1");
+    expect(result.columns[0]?.files["4"]?.generation).toBe("2");
+  });
+
+  it("keeps an already-known overlay generation without resolving", async () => {
+    const overlay: PerimeterOverlay = {
+      version: 1,
+      id: "overlay-1",
+      columns: [
+        {
+          durationMs: 10_000,
+          files: {
+            "2": {
+              name: "left.png",
+              source: "gs://bucket/location/left.png",
+              generation: "7",
+            },
+          },
+        },
+      ],
+    };
+    const resolve = vi.fn(() => Promise.resolve("9"));
+    const result = await backfillOverlayGenerations(overlay, resolve);
+    expect(result.columns[0]?.files["2"]?.generation).toBe("7");
+    expect(resolve).not.toHaveBeenCalled();
+  });
+
+  it("refuses an overlay when a generation cannot be resolved", async () => {
+    const overlay: PerimeterOverlay = {
+      version: 1,
+      id: "overlay-1",
+      columns: [
+        {
+          durationMs: 10_000,
+          files: {
+            "2": { name: "left.png", source: "gs://bucket/location/left.png" },
+          },
+        },
+      ],
+    };
+    await expect(
+      backfillOverlayGenerations(overlay, () => Promise.resolve(null)),
     ).rejects.toThrow("Storage generation unavailable");
   });
 });
