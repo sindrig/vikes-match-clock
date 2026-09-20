@@ -1,0 +1,13 @@
+[
+  {
+    "origin": [
+      "https://klukka.irdn.is",
+      "https://staging-klukka.irdn.is",
+      "http://localhost:3000",
+      "http://localhost:8000"
+    ],
+    "method": ["GET", "HEAD"],
+    "responseHeader": ["Content-Type"],
+    "maxAgeSeconds": 3600
+  }
+]

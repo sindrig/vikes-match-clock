@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Vikes Match Clock</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        background: #000;
+      }
+    </style>
+  </head>
+  <body>
+    <script>
+      (function () {
+        var APP_URL = "https://klukka.irdn.is";
+        var RETRY_MS = 5000;
+
+        function probe() {
+          fetch(APP_URL + "/?kiosk-probe=" + Date.now(), {
+            cache: "no-store",
+            mode: "no-cors",
+          })
+            .then(function () {
+              location.replace(APP_URL);
+            })
+            .catch(function () {
+              setTimeout(probe, RETRY_MS);
+            });
+        }
+
+        probe();
+      })();
+    </script>
+  </body>
+</html>
