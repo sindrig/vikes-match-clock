@@ -145,7 +145,10 @@ export function validatePerimeterMapping(
     });
   }
 
-  if (!isInteger(config.playback.cueDurationMs) || config.playback.cueDurationMs <= 0) {
+  if (
+    !isInteger(config.playback.cueDurationMs) ||
+    config.playback.cueDurationMs <= 0
+  ) {
     errors.push({
       code: "invalid-playback",
       message: "Cue duration must be a positive number of milliseconds.",

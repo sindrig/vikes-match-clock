@@ -58,8 +58,10 @@ describe("perimeter playback primitives", () => {
       ).cutAtCueBoundary,
     ).toBe(true);
     expect(
-      pairedPlaybackPlan({ kind: "video", durationMs: 20_000 }, 20_000, () =>
-        true,
+      pairedPlaybackPlan(
+        { kind: "video", durationMs: 20_000 },
+        20_000,
+        () => true,
       ),
     ).toEqual({
       rate: 1,
