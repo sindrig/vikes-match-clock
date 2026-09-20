@@ -13,6 +13,10 @@ import {
 } from "./FirebaseStateContext";
 import { Asset, Roster, ViewPort } from "../types";
 import { Sports, DEFAULT_HALFSTOPS, VIEWS } from "../constants";
+import {
+  secondStadiumWebConfiguration,
+  capturedVikinConfiguration,
+} from "../perimeter/fixtures";
 
 import { firebaseDatabase } from "../firebaseDatabase";
 
@@ -316,6 +320,32 @@ describe("FirebaseStateContext", () => {
         expect(api?.writeFreshness).toBe("ready");
       });
       expect(api?.writeEligible).toBe(false);
+    });
+
+    it("subscribes to protected perimeter telemetry only after authentication", () => {
+      const renderProvider = (isAuthenticated: boolean) => (
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={isAuthenticated}
+          screenKey={null}
+        >
+          <TestFirebaseStateConsumer onMount={() => undefined} />
+        </FirebaseStateProvider>
+      );
+      const { rerender } = render(renderProvider(false));
+      const protectedPath = "perimeter/test-location";
+      const subscribedPaths = () =>
+        vi.mocked(onValue).mock.calls.map(([reference]) => String(reference));
+
+      expect(subscribedPaths()).not.toContain(protectedPath);
+      expect(subscribedPaths()).toContain("states/test-location/perimeter");
+
+      rerender(renderProvider(true));
+
+      expect(subscribedPaths()).toContain(protectedPath);
+      expect(subscribedPaths()).toContain(
+        "perimeter/test-location/brightnessStatus",
+      );
     });
 
     it("restores write eligibility immediately on tab resume when the Firebase connection never dropped", async () => {
@@ -2741,6 +2771,56 @@ describe("FirebaseStateContext", () => {
       );
     });
 
+    it("skipPerimeterCue writes a fresh token to Firebase when authenticated", () => {
+      const perimeterApi = renderPerimeter("vikuti", true);
+
+      act(() => {
+        perimeterApi!.skipPerimeterCue();
+      });
+
+      const calls = vi
+        .mocked(firebaseDatabase.writeAudited)
+        .mock.calls.filter((call) => call[0] === "vikuti");
+      expect(calls).toHaveLength(1);
+      const [location, stateArea, diff] = calls[0]!;
+      expect(location).toBe("vikuti");
+      expect(stateArea).toBe("perimeter");
+      expect(typeof (diff as { skipCue?: unknown }).skipCue).toBe("string");
+      expect((diff as { skipCue: string }).skipCue.length).toBeGreaterThan(0);
+    });
+
+    it("restartPerimeterDisplays writes a fresh token to Firebase when authenticated", () => {
+      const perimeterApi = renderPerimeter("vikuti", true);
+
+      act(() => {
+        perimeterApi!.restartPerimeterDisplays();
+      });
+
+      const calls = vi
+        .mocked(firebaseDatabase.writeAudited)
+        .mock.calls.filter((call) => call[0] === "vikuti");
+      expect(calls).toHaveLength(1);
+      const [location, stateArea, diff] = calls[0]!;
+      expect(location).toBe("vikuti");
+      expect(stateArea).toBe("perimeter");
+      expect(typeof (diff as { refreshToken?: unknown }).refreshToken).toBe(
+        "string",
+      );
+      expect(
+        (diff as { refreshToken: string }).refreshToken.length,
+      ).toBeGreaterThan(0);
+    });
+
+    it("blocks restartPerimeterDisplays when not authenticated", () => {
+      const perimeterApi = renderPerimeter("vikuti", false);
+
+      act(() => {
+        perimeterApi!.restartPerimeterDisplays();
+      });
+
+      expect(firebaseDatabase.writeAudited).not.toHaveBeenCalled();
+    });
+
     it("blocks setPerimeterState when not authenticated", () => {
       const perimeterApi = renderPerimeter("vikuti", false);
 
@@ -3241,6 +3321,16 @@ describe("goal scorer preparation", () => {
     ],
   };
 
+  // The goal-scorer machinery is Resolume-scoped; every test in this block
+  // publishes a Resolume venue mapping so its subscriptions start.
+  const resolumeVenue = (listenPrefix: string) => ({
+    [listenPrefix]: {
+      label: listenPrefix,
+      screens: [{ name: "Display 1" }],
+      perimeterDisplay: capturedVikinConfiguration,
+    },
+  });
+
   function renderPreparation(
     data: unknown,
     options: {
@@ -3257,6 +3347,9 @@ describe("goal scorer preparation", () => {
     let perimeterApi: ReturnType<typeof usePerimeter> | null = null;
     vi.mocked(onValue).mockImplementation(
       withConnectedInfo((path) => {
+        if (path === "locations") {
+          return resolumeVenue(listenPrefix);
+        }
         if (path.endsWith("/goalScorerPreparation")) {
           return data;
         }
@@ -3319,6 +3412,9 @@ describe("goal scorer preparation", () => {
     const httpsCallableMock = vi.mocked(httpsCallable);
     vi.mocked(onValue).mockImplementation(
       withConnectedInfo((path) => {
+        if (path === "locations") {
+          return resolumeVenue("vikuti");
+        }
         if (path.endsWith("/controller")) {
           return {
             queues: {},
@@ -3381,6 +3477,9 @@ describe("goal scorer preparation", () => {
     vi.mocked(set).mockClear();
     vi.mocked(onValue).mockImplementation(
       withConnectedInfo((path) => {
+        if (path === "locations") {
+          return resolumeVenue("vikuti");
+        }
         if (path.endsWith("/controller")) {
           return {
             queues: {},
@@ -3438,6 +3537,9 @@ describe("goal scorer preparation", () => {
     vi.mocked(set).mockClear();
     vi.mocked(onValue).mockImplementation(
       withConnectedInfo((path) => {
+        if (path === "locations") {
+          return resolumeVenue("vikuti");
+        }
         if (path.endsWith("/controller")) {
           return {
             queues: {},
@@ -3486,6 +3588,9 @@ describe("goal scorer preparation", () => {
     vi.mocked(set).mockClear();
     vi.mocked(onValue).mockImplementation(
       withConnectedInfo((path) => {
+        if (path === "locations") {
+          return resolumeVenue("vikuti");
+        }
         if (path.endsWith("/controller")) {
           return {
             queues: {},
@@ -3537,6 +3642,9 @@ describe("goal scorer preparation", () => {
     vi.mocked(set).mockClear();
     vi.mocked(onValue).mockImplementation(
       withConnectedInfo((path) => {
+        if (path === "locations") {
+          return resolumeVenue("vikuti");
+        }
         if (path.endsWith("/controller")) {
           return {
             queues: {},
@@ -3835,6 +3943,257 @@ describe("goal scorer preparation", () => {
         expect(committed).toBe(false);
       });
       expect(vi.mocked(firebaseDatabase.writeAuditOnly)).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("renderer-aware goal-scorer machinery", () => {
+    const GEOMETRY_PATH = "perimeter/test-location/overlayGeometry";
+    const STATUS_PATH = "perimeter/test-location/goalScorerPreparation";
+    const REQUEST_PATH = "states/test-location/perimeter/goalScorerPreparation";
+
+    const locationsFor = (renderer: "web" | "resolume") => ({
+      "test-location": {
+        label: "Test Location",
+        screens: [{ name: "Display 1" }],
+        perimeterDisplay:
+          renderer === "web"
+            ? secondStadiumWebConfiguration
+            : capturedVikinConfiguration,
+      },
+    });
+
+    const parsableGeometry = {
+      revision: "geom-1",
+      updatedAt: 1723392000000,
+      targets: [
+        {
+          layerId: "2",
+          label: "48",
+          targetFolder: "48",
+          width: 4608,
+          height: 192,
+        },
+        {
+          layerId: "4",
+          label: "40",
+          targetFolder: "40",
+          width: 3840,
+          height: 192,
+        },
+      ],
+    };
+
+    const seedVenueState = (renderer: "web" | "resolume") => {
+      mockDbState.set("locations", locationsFor(renderer));
+      mockDbState.set("states/test-location/perimeter", {
+        enabled: true,
+        state: "on",
+      });
+      mockDbState.set("states/test-location/controller", {
+        queues: {},
+        activeQueueId: null,
+        playing: false,
+        assetView: "assets",
+        view: "idle",
+        roster: {
+          home: [{ id: 10, name: "Jón", number: 7 }],
+          away: [],
+        },
+        currentAsset: null,
+        refreshToken: "",
+      });
+      mockDbState.set(GEOMETRY_PATH, parsableGeometry);
+      mockDbState.set(STATUS_PATH, null);
+      mockDbState.set(REQUEST_PATH, null);
+    };
+
+    beforeEach(() => {
+      vi.clearAllMocks();
+      mockDbState.clear();
+      mockOnValueCallbacks.clear();
+      vi.mocked(ref).mockImplementation((_, path) => path as never);
+      vi.mocked(onValue).mockImplementation((reference, callback) => {
+        const path = String(reference);
+        mockOnValueCallbacks.set(path, callback);
+        const state =
+          path === ".info/connected" ? true : (mockDbState.get(path) ?? null);
+        callback({ val: () => state } as never);
+        return vi.fn();
+      });
+    });
+
+    it("starts no daemon geometry or preparation subscriptions at a web venue", () => {
+      seedVenueState("web");
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+          screenKey={null}
+        >
+          <TestPerimeterConsumer onMount={() => undefined} />
+        </FirebaseStateProvider>,
+      );
+      const subscribedPaths = vi
+        .mocked(onValue)
+        .mock.calls.map(([reference]) => String(reference));
+      expect(subscribedPaths).not.toContain(GEOMETRY_PATH);
+      expect(subscribedPaths).not.toContain(STATUS_PATH);
+      expect(subscribedPaths).not.toContain(REQUEST_PATH);
+    });
+
+    it("never requests preparation for a web roster", async () => {
+      seedVenueState("web");
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+          screenKey={null}
+        >
+          <TestFirebaseStateConsumer onMount={() => undefined} />
+        </FirebaseStateProvider>,
+      );
+      await waitFor(() =>
+        expect(mockOnValueCallbacks.get("locations")).toBeDefined(),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(vi.mocked(httpsCallable)).not.toHaveBeenCalled();
+      expect(
+        vi
+          .mocked(set)
+          .mock.calls.some(([path]) => String(path).includes(REQUEST_PATH)),
+      ).toBe(false);
+    });
+
+    it("starts the daemon geometry and status subscriptions at a Resolume venue", () => {
+      seedVenueState("resolume");
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+          screenKey={null}
+        >
+          <TestPerimeterConsumer onMount={() => undefined} />
+        </FirebaseStateProvider>,
+      );
+      const subscribedPaths = vi
+        .mocked(onValue)
+        .mock.calls.map(([reference]) => String(reference));
+      expect(subscribedPaths).toContain(GEOMETRY_PATH);
+      expect(subscribedPaths).toContain(STATUS_PATH);
+      expect(subscribedPaths).toContain(REQUEST_PATH);
+    });
+
+    it("stops the preparation machinery when a venue switches to web", async () => {
+      seedVenueState("resolume");
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+          screenKey={null}
+        >
+          <TestFirebaseStateConsumer onMount={() => undefined} />
+        </FirebaseStateProvider>,
+      );
+      await waitFor(() =>
+        expect(mockOnValueCallbacks.get(GEOMETRY_PATH)).toBeDefined(),
+      );
+
+      // The published renderer changes to web (admin edit or reload with a
+      // changed mapping): the Resolume-only subscriptions stop.
+      seedVenueState("web");
+      act(() => {
+        const deliver = mockOnValueCallbacks.get("locations");
+        deliver?.({ val: () => mockDbState.get("locations") });
+      });
+      await waitFor(() => {
+        // The geometry subscription created for the Resolume venue was
+        // unsubscribed, and no new geometry subscription started for the
+        // web venue.
+        const geometryCalls = vi
+          .mocked(onValue)
+          .mock.calls.filter(
+            ([reference]) => String(reference) === GEOMETRY_PATH,
+          );
+        expect(geometryCalls).toHaveLength(1);
+        const geometryResultIndex = vi
+          .mocked(onValue)
+          .mock.calls.findIndex(
+            ([reference]) => String(reference) === GEOMETRY_PATH,
+          );
+        const geometryUnsub = vi.mocked(onValue).mock.results[
+          geometryResultIndex
+        ]?.value as () => void;
+        expect(geometryUnsub).toHaveBeenCalled();
+        // Same for the service status and request-document subscriptions.
+        const statusIndex = vi
+          .mocked(onValue)
+          .mock.calls.findIndex(
+            ([reference]) => String(reference) === STATUS_PATH,
+          );
+        const statusUnsub = vi.mocked(onValue).mock.results[statusIndex]
+          ?.value as () => void;
+        expect(statusUnsub).toHaveBeenCalled();
+        const requestIndex = vi
+          .mocked(onValue)
+          .mock.calls.findIndex(
+            ([reference]) => String(reference) === REQUEST_PATH,
+          );
+        const requestUnsub = vi.mocked(onValue).mock.results[requestIndex]
+          ?.value as () => void;
+        expect(requestUnsub).toHaveBeenCalled();
+      });
+    });
+
+    it("requests preparation automatically for an eligible Resolume roster", async () => {
+      seedVenueState("resolume");
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+          screenKey={null}
+        >
+          <TestFirebaseStateConsumer onMount={() => undefined} />
+        </FirebaseStateProvider>,
+      );
+      await waitFor(() => {
+        const requestWrite = vi
+          .mocked(set)
+          .mock.calls.find(([path]) => String(path) === REQUEST_PATH);
+        expect(requestWrite).toBeDefined();
+        const request = requestWrite![1] as { jobId: string };
+        expect(request.jobId).toBeTruthy();
+      });
+      expect(vi.mocked(httpsCallable)).toHaveBeenCalledWith(
+        expect.anything(),
+        "prepareGoalScorerMedia",
+      );
+    });
+
+    it("survives a reload without re-requesting an unchanged roster", async () => {
+      seedVenueState("resolume");
+      // The stored request signature matches the eligible roster (the same
+      // signature the controller derives), so no new preparation request is
+      // created.
+      mockDbState.set(REQUEST_PATH, {
+        jobId: "job-0",
+        rosterSignature: '["10:Jón:7"]',
+        players: [{ id: "10", name: "Jón", number: 7 }],
+      });
+      render(
+        <FirebaseStateProvider
+          listenPrefix="test-location"
+          isAuthenticated={true}
+          screenKey={null}
+        >
+          <TestFirebaseStateConsumer onMount={() => undefined} />
+        </FirebaseStateProvider>,
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      const storedRequests = vi
+        .mocked(set)
+        .mock.calls.filter(([path]) => String(path).includes(REQUEST_PATH));
+      expect(storedRequests).toHaveLength(0);
+      expect(vi.mocked(httpsCallable)).not.toHaveBeenCalled();
     });
   });
 });

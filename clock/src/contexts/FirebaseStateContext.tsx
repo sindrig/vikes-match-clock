@@ -314,6 +314,8 @@ interface FirebaseStateContextType {
   deleteClubOverride: (id: string) => Promise<void>;
 
   setPerimeterState: (state: PerimeterState["state"]) => void;
+  skipPerimeterCue: () => void;
+  restartPerimeterDisplays: () => void;
   setPerimeterOverlay: (overlay: PerimeterOverlay) => void;
   clearPerimeterOverlay: () => void;
   setPerimeterAdLayout: (layout: PerimeterAdLayout | null) => Promise<void>;
@@ -555,6 +557,17 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     setGoalScorerPreparationRequestLoaded,
   ] = useState(false);
   const [ready, setReady] = useState(!listenPrefix);
+
+  // The venue's published perimeter renderer decides which scorer path the
+  // controller exposes: Resolume venues keep the prepared-file pipeline
+  // (daemon geometry, preparation status, retry), web venues compose the
+  // scorer in the browser and create no generated-media dependency.
+  const venueRenderer = useMemo(
+    () =>
+      listeners.screens.find((entry) => entry.key === listenPrefix)
+        ?.perimeterDisplay?.renderer,
+    [listeners.screens, listenPrefix],
+  );
 
   // Freshness barrier: a browser may only submit shared-state mutations while
   // it has confirmed current Firebase state for the selected venue.
@@ -906,49 +919,58 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       // The preview snapshot is published by the perimeter-control daemon to
       // `perimeter/{location}`. It is deliberately NOT part of readiness:
       // absent metadata must not block the controller.
-      const unsubPerimeterPreview = onValue(
-        ref(database, perimeterPreviewPath),
-        (snapshot) => {
-          setPerimeterPreviewLoaded(true);
-          setPerimeterPreview(
-            parsePerimeterPreview(snapshot.val()) ?? defaultPerimeterPreview,
-          );
-        },
-        (error) =>
-          console.error(
-            "Firebase perimeter preview subscription error:",
-            error,
-          ),
-      );
+      const unsubPerimeterPreview = isAuthenticated
+        ? onValue(
+            ref(database, perimeterPreviewPath),
+            (snapshot) => {
+              setPerimeterPreviewLoaded(true);
+              setPerimeterPreview(
+                parsePerimeterPreview(snapshot.val()) ??
+                  defaultPerimeterPreview,
+              );
+            },
+            (error) =>
+              console.error(
+                "Firebase perimeter preview subscription error:",
+                error,
+              ),
+          )
+        : () => undefined;
 
       const overlayStatusPath = `perimeter/${listenPrefix}/overlayStatus`;
-      const unsubOverlayStatus = onValue(
-        ref(database, overlayStatusPath),
-        (snapshot) => {
-          const raw: unknown = snapshot.val();
-          if (!raw || typeof raw !== "object") {
-            setPerimeterOverlayStatus(null);
-            return;
-          }
-          const status = raw as Record<string, unknown>;
-          setPerimeterOverlayStatus({
-            commandId:
-              typeof status.commandId === "string" ? status.commandId : null,
-            phase:
-              typeof status.phase === "string"
-                ? (status.phase as PerimeterOverlayStatus["phase"])
-                : "error",
-            activeColumn:
-              typeof status.activeColumn === "number" ? status.activeColumn : 0,
-            error: typeof status.error === "string" ? status.error : null,
-          });
-        },
-        (error) =>
-          console.error(
-            "Firebase perimeter overlayStatus subscription error:",
-            error,
-          ),
-      );
+      const unsubOverlayStatus = isAuthenticated
+        ? onValue(
+            ref(database, overlayStatusPath),
+            (snapshot) => {
+              const raw: unknown = snapshot.val();
+              if (!raw || typeof raw !== "object") {
+                setPerimeterOverlayStatus(null);
+                return;
+              }
+              const status = raw as Record<string, unknown>;
+              setPerimeterOverlayStatus({
+                commandId:
+                  typeof status.commandId === "string"
+                    ? status.commandId
+                    : null,
+                phase:
+                  typeof status.phase === "string"
+                    ? (status.phase as PerimeterOverlayStatus["phase"])
+                    : "error",
+                activeColumn:
+                  typeof status.activeColumn === "number"
+                    ? status.activeColumn
+                    : 0,
+                error: typeof status.error === "string" ? status.error : null,
+              });
+            },
+            (error) =>
+              console.error(
+                "Firebase perimeter overlayStatus subscription error:",
+                error,
+              ),
+          )
+        : () => undefined;
 
       // Ad-layout subscriptions: desired (states/*/perimeter/adLayout) and
       // daemon-published applied (perimeter/*/adLayout).
@@ -972,29 +994,31 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       );
 
       const appliedAdLayoutPath = `perimeter/${listenPrefix}/adLayout`;
-      const unsubAppliedAdLayout = onValue(
-        ref(database, appliedAdLayoutPath),
-        (snapshot) => {
-          setPerimeterAppliedAdLayoutError(null);
-          setPerimeterAppliedAdLayoutLoaded(true);
-          setPerimeterAppliedAdLayout(
-            parsePerimeterAppliedAdLayout(snapshot.val()),
-          );
-        },
-        (error) => {
-          console.error(
-            "Firebase perimeter appliedAdLayout subscription error:",
-            error,
-          );
-          // Mark the initial load complete so the modal does not show an
-          // endless loading spinner; expose the failure so operators can
-          // distinguish a denied/failed subscription from a slow one.
-          setPerimeterAppliedAdLayoutError(
-            "Gat ekki sótt stöðu jaðarskjás (ábending gæti vantað heimildir).",
-          );
-          setPerimeterAppliedAdLayoutLoaded(true);
-        },
-      );
+      const unsubAppliedAdLayout = isAuthenticated
+        ? onValue(
+            ref(database, appliedAdLayoutPath),
+            (snapshot) => {
+              setPerimeterAppliedAdLayoutError(null);
+              setPerimeterAppliedAdLayoutLoaded(true);
+              setPerimeterAppliedAdLayout(
+                parsePerimeterAppliedAdLayout(snapshot.val()),
+              );
+            },
+            (error) => {
+              console.error(
+                "Firebase perimeter appliedAdLayout subscription error:",
+                error,
+              );
+              // Mark the initial load complete so the modal does not show an
+              // endless loading spinner; expose the failure so operators can
+              // distinguish a denied/failed subscription from a slow one.
+              setPerimeterAppliedAdLayoutError(
+                "Gat ekki sótt stöðu jaðarskjás (ábending gæti vantað heimildir).",
+              );
+              setPerimeterAppliedAdLayoutLoaded(true);
+            },
+          )
+        : () => undefined;
 
       // Named perimeter media pairs: an operator-curated library of overlay
       // pairs stored under states/{listenPrefix}/perimeter/mediaPairs.
@@ -1034,72 +1058,21 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       );
 
       const brightnessStatusPath = `perimeter/${listenPrefix}/brightnessStatus`;
-      const unsubBrightnessStatus = onValue(
-        ref(database, brightnessStatusPath),
-        (snapshot) => {
-          setPerimeterBrightnessStatus(
-            parsePerimeterBrightnessStatus(snapshot.val()),
-          );
-        },
-        (error) =>
-          console.error(
-            "Firebase perimeter brightnessStatus subscription error:",
-            error,
-          ),
-      );
-
-      // Daemon-published overlay target geometry and the service-owned
-      // goal-scorer preparation status. Both are read-only to clients and
-      // deliberately NOT part of readiness.
-      const overlayGeometryPath = `perimeter/${listenPrefix}/overlayGeometry`;
-      const unsubOverlayGeometry = onValue(
-        ref(database, overlayGeometryPath),
-        (snapshot) => {
-          setOverlayGeometry(parsePerimeterOverlayGeometry(snapshot.val()));
-        },
-        (error) =>
-          console.error(
-            "Firebase perimeter overlayGeometry subscription error:",
-            error,
-          ),
-      );
-
-      const goalScorerPreparationPath = `perimeter/${listenPrefix}/goalScorerPreparation`;
-      const unsubGoalScorerPreparation = onValue(
-        ref(database, goalScorerPreparationPath),
-        (snapshot) => {
-          setGoalScorerPreparationStatus(
-            parseGoalScorerPreparationStatus(snapshot.val(), {
-              location: listenPrefix,
-              bucket: FIREBASE_STORAGE_BUCKET,
-            }),
-          );
-        },
-        (error) =>
-          console.error(
-            "Firebase perimeter goalScorerPreparation subscription error:",
-            error,
-          ),
-      );
-
-      const goalScorerPreparationRequestPath = `states/${listenPrefix}/perimeter/goalScorerPreparation`;
-      const unsubGoalScorerPreparationRequest = onValue(
-        ref(database, goalScorerPreparationRequestPath),
-        (snapshot) => {
-          const request = snapshot.val() as Record<string, unknown> | null;
-          setGoalScorerPreparationRequestSignature(
-            typeof request?.rosterSignature === "string"
-              ? request.rosterSignature
-              : null,
-          );
-          setGoalScorerPreparationRequestLoaded(true);
-        },
-        (error) =>
-          console.error(
-            "Firebase perimeter goalScorerPreparation request subscription error:",
-            error,
-          ),
-      );
+      const unsubBrightnessStatus = isAuthenticated
+        ? onValue(
+            ref(database, brightnessStatusPath),
+            (snapshot) => {
+              setPerimeterBrightnessStatus(
+                parsePerimeterBrightnessStatus(snapshot.val()),
+              );
+            },
+            (error) =>
+              console.error(
+                "Firebase perimeter brightnessStatus subscription error:",
+                error,
+              ),
+          )
+        : () => undefined;
 
       return () => {
         unsubMatch();
@@ -1114,12 +1087,89 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         unsubMediaPairs();
         unsubBrightness();
         unsubBrightnessStatus();
-        unsubOverlayGeometry();
-        unsubGoalScorerPreparation();
-        unsubGoalScorerPreparationRequest();
       };
     }
-  }, [listenPrefix, markSubscriptionDelivered]);
+  }, [isAuthenticated, listenPrefix, markSubscriptionDelivered]);
+
+  // Goal-scorer preparation machinery exists only for Resolume venues: the
+  // daemon-published overlay geometry, the service-owned preparation status,
+  // and the desired request document. Web venues compose scorers in the
+  // browser and create no preparation request or generated output
+  // dependency, so these subscriptions (and the state behind them) stop for
+  // any venue whose published renderer is not "resolume".
+  useEffect(() => {
+    if (!isAuthenticated || !listenPrefix || venueRenderer !== "resolume") {
+      return undefined;
+    }
+
+    const overlayGeometryPath = `perimeter/${listenPrefix}/overlayGeometry`;
+    const unsubOverlayGeometry = onValue(
+      ref(database, overlayGeometryPath),
+      (snapshot) => {
+        setOverlayGeometry(parsePerimeterOverlayGeometry(snapshot.val()));
+      },
+      (error) =>
+        console.error(
+          "Firebase perimeter overlayGeometry subscription error:",
+          error,
+        ),
+    );
+
+    const goalScorerPreparationPath = `perimeter/${listenPrefix}/goalScorerPreparation`;
+    const unsubGoalScorerPreparation = onValue(
+      ref(database, goalScorerPreparationPath),
+      (snapshot) => {
+        setGoalScorerPreparationStatus(
+          parseGoalScorerPreparationStatus(snapshot.val(), {
+            location: listenPrefix,
+            bucket: FIREBASE_STORAGE_BUCKET,
+          }),
+        );
+      },
+      (error) =>
+        console.error(
+          "Firebase perimeter goalScorerPreparation subscription error:",
+          error,
+        ),
+    );
+
+    const goalScorerPreparationRequestPath = `states/${listenPrefix}/perimeter/goalScorerPreparation`;
+    const unsubGoalScorerPreparationRequest = onValue(
+      ref(database, goalScorerPreparationRequestPath),
+      (snapshot) => {
+        const request = snapshot.val() as Record<string, unknown> | null;
+        setGoalScorerPreparationRequestSignature(
+          typeof request?.rosterSignature === "string"
+            ? request.rosterSignature
+            : null,
+        );
+        setGoalScorerPreparationRequestLoaded(true);
+      },
+      (error) =>
+        console.error(
+          "Firebase perimeter goalScorerPreparation request subscription error:",
+          error,
+        ),
+    );
+
+    return () => {
+      unsubOverlayGeometry();
+      unsubGoalScorerPreparation();
+      unsubGoalScorerPreparationRequest();
+    };
+  }, [isAuthenticated, listenPrefix, venueRenderer]);
+
+  // The preparation state is only meaningful while the Resolume machinery is
+  // subscribed; non-Resolume venues expose nothing, so a renderer change
+  // drops the generated-media dependency without touching shared state.
+  const goalScorerMachineryActive =
+    isAuthenticated && venueRenderer === "resolume";
+  const publishedOverlayGeometry = goalScorerMachineryActive
+    ? overlayGeometry
+    : null;
+  const publishedGoalScorerPreparationStatus = goalScorerMachineryActive
+    ? goalScorerPreparationStatus
+    : null;
 
   const applyMatchUpdate = useCallback(
     (getNewState: (prev: Match) => Match, action: string) => {
@@ -2430,6 +2480,44 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     [makeAudit, listenPrefix, writeEligible],
   );
 
+  // Skip-forward command for web perimeter displays: a fresh opaque token
+  // under the desired perimeter state tells every subscribed display to
+  // advance its base timeline to the next ad column immediately. The token
+  // content is irrelevant — only that it differs from the previous value.
+  const skipPerimeterCue = useCallback(() => {
+    if (!writeEligible) return;
+    const audit = makeAudit("perimeter", "perimeter.skip-cue");
+    if (!audit) return;
+
+    firebaseDatabase
+      .writeAudited(
+        listenPrefix,
+        "perimeter",
+        { skipCue: crypto.randomUUID() },
+        audit,
+      )
+      .catch(console.error);
+  }, [makeAudit, listenPrefix, writeEligible]);
+
+  // Remote restart command for web perimeter displays: a fresh opaque token
+  // under the desired perimeter state tells every subscribed display to
+  // perform a full page reload. The token content is irrelevant — only that
+  // it differs from the previous value.
+  const restartPerimeterDisplays = useCallback(() => {
+    if (!writeEligible) return;
+    const audit = makeAudit("perimeter", "perimeter.restart-displays");
+    if (!audit) return;
+
+    firebaseDatabase
+      .writeAudited(
+        listenPrefix,
+        "perimeter",
+        { refreshToken: crypto.randomUUID() },
+        audit,
+      )
+      .catch(console.error);
+  }, [makeAudit, listenPrefix, writeEligible]);
+
   const setPerimeterOverlay = useCallback(
     (overlay: PerimeterOverlay) => {
       if (!writeEligible) return;
@@ -2634,16 +2722,19 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   // Boolean (not the geometry object) so a daemon re-publish of unchanged
   // geometry does not re-trigger a preparation request on every refresh.
   const hasOverlayGeometry = useMemo(
-    () => overlayGeometry !== null,
-    [overlayGeometry],
+    () => publishedOverlayGeometry !== null,
+    [publishedOverlayGeometry],
   );
   useEffect(() => {
     // Preparation needs a venue that has opted into the perimeter AND a
     // daemon that has published overlay geometry; a venue without either
     // would only produce a job that must fail, so no request is issued.
+    // Web venues are excluded entirely: browser composition needs no
+    // generated perimeter files, so web rosters create no preparation job.
     if (
       !ready ||
       !isAuthenticated ||
+      venueRenderer !== "resolume" ||
       !perimeter.enabled ||
       !hasOverlayGeometry ||
       !goalScorerPreparationRequestLoaded ||
@@ -2657,6 +2748,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     eligibleRosterSignature,
     ready,
     isAuthenticated,
+    venueRenderer,
     perimeter.enabled,
     hasOverlayGeometry,
     goalScorerPreparationRequestLoaded,
@@ -2755,6 +2847,8 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       saveClubOverride,
       deleteClubOverride,
       setPerimeterState,
+      skipPerimeterCue,
+      restartPerimeterDisplays,
       setPerimeterOverlay,
       clearPerimeterOverlay,
       perimeterOverlay,
@@ -2770,8 +2864,8 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       perimeterBrightness,
       perimeterBrightnessStatus,
       setPerimeterBrightness,
-      overlayGeometry,
-      goalScorerPreparationStatus,
+      overlayGeometry: publishedOverlayGeometry,
+      goalScorerPreparationStatus: publishedGoalScorerPreparationStatus,
       requestGoalScorerPreparation,
     }),
     [
@@ -2851,6 +2945,8 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       saveClubOverride,
       deleteClubOverride,
       setPerimeterState,
+      skipPerimeterCue,
+      restartPerimeterDisplays,
       setPerimeterOverlay,
       clearPerimeterOverlay,
       perimeterOverlay,
@@ -2866,8 +2962,8 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       perimeterBrightness,
       perimeterBrightnessStatus,
       setPerimeterBrightness,
-      overlayGeometry,
-      goalScorerPreparationStatus,
+      publishedOverlayGeometry,
+      publishedGoalScorerPreparationStatus,
       requestGoalScorerPreparation,
     ],
   );
@@ -3063,6 +3159,8 @@ export const usePerimeter = () => {
     perimeterPreview,
     perimeterPreviewLoaded,
     setPerimeterState,
+    skipPerimeterCue,
+    restartPerimeterDisplays,
     setPerimeterOverlay,
     clearPerimeterOverlay,
     setPerimeterAdLayout,
@@ -3078,8 +3176,8 @@ export const usePerimeter = () => {
     perimeterBrightness,
     perimeterBrightnessStatus,
     setPerimeterBrightness,
-    overlayGeometry,
-    goalScorerPreparationStatus,
+    overlayGeometry: publishedOverlayGeometry,
+    goalScorerPreparationStatus: publishedGoalScorerPreparationStatus,
     requestGoalScorerPreparation,
     getServerTime,
   } = useFirebaseState();
@@ -3088,6 +3186,8 @@ export const usePerimeter = () => {
     preview: perimeterPreview,
     previewLoaded: perimeterPreviewLoaded,
     setPerimeterState,
+    skipPerimeterCue,
+    restartPerimeterDisplays,
     setPerimeterOverlay,
     clearPerimeterOverlay,
     setPerimeterAdLayout,
@@ -3103,8 +3203,8 @@ export const usePerimeter = () => {
     brightness: perimeterBrightness,
     brightnessStatus: perimeterBrightnessStatus,
     setPerimeterBrightness,
-    overlayGeometry,
-    goalScorerPreparationStatus,
+    overlayGeometry: publishedOverlayGeometry,
+    goalScorerPreparationStatus: publishedGoalScorerPreparationStatus,
     requestGoalScorerPreparation,
     getServerTime,
   };

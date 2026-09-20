@@ -59,6 +59,7 @@ const ACTION_LABELS: Record<string, string> = {
   "view.save-custom-preset": "Þemaforstilling vistuð",
   "view.delete-custom-preset": "Þemaforstilling fjarlægð",
   "perimeter.set-state": "Jaðarskjár kveiktur/slökkt",
+  "perimeter.skip-cue": "Næsti dálkur valinn",
   "perimeter.set-overlay": "Jaðaroverlay sett",
   "perimeter.clear-overlay": "Jaðaroverlay hreinsað",
   "perimeter.set-ad-layout": "Jaðarútlit sett",

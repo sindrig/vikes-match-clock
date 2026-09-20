@@ -282,13 +282,92 @@ export interface ListenersState {
     key: string;
     pitchIds?: string[];
     teamId?: number;
+    perimeterDisplay?: PerimeterDisplayConfig;
   }>;
 }
+
+// Published venue geometry for a browser or Resolume perimeter installation.
+// This lives under locations/{location}/perimeterDisplay and is independent
+// from the desired runtime state under states/{location}.
+export type PerimeterRenderer = "web" | "resolume";
+export type PerimeterRotation = 0 | 90 | 180 | 270;
+
+export interface PerimeterRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface PerimeterFramebuffer {
+  width: number;
+  height: number;
+  background: "black";
+}
+
+export interface PerimeterLogicalScreen {
+  id: string;
+  name: string;
+  width: number;
+  height: number;
+}
+
+export interface PerimeterRegionTransform {
+  rotation: PerimeterRotation;
+  flipX: boolean;
+  flipY: boolean;
+  allowScaling: boolean;
+  allowClipping: boolean;
+  allowSourceOverlap: boolean;
+  allowDestinationOverlap: boolean;
+  zIndex: number;
+}
+
+export interface PerimeterRegion {
+  id: string;
+  logicalScreenId: string;
+  source: PerimeterRect;
+  destination: PerimeterRect;
+  transform: PerimeterRegionTransform;
+}
+
+export interface PerimeterCompatibilityKeys {
+  base: Record<string, string>;
+  overlay: Record<string, string>;
+}
+
+export interface PerimeterPlaybackDefaults {
+  cueDurationMs: number;
+  videoPolicy: "fit-to-cue";
+}
+
+export interface PerimeterDisplayConfig {
+  version: 1;
+  revision: string;
+  renderer: PerimeterRenderer;
+  framebuffer: PerimeterFramebuffer;
+  logicalScreens: Record<string, PerimeterLogicalScreen>;
+  compatibilityKeys: PerimeterCompatibilityKeys;
+  regions: PerimeterRegion[];
+  playback: PerimeterPlaybackDefaults;
+}
+
+export type DisplayTarget =
+  | { kind: "scoreboard"; screenKey: string }
+  | { kind: "perimeter" };
 
 // Perimeter LED (Resolume) state type
 export interface PerimeterState {
   enabled: boolean;
   state: "on" | "off";
+  // Opaque token written by the controller to request that every web
+  // perimeter display immediately advances its base timeline to the next
+  // ad column. A new token value means "skip now"; absent/null is inert.
+  skipCue?: string | null;
+  // Opaque token written by the controller to request a full page reload of
+  // every web perimeter display (remote restart). A new token value means
+  // "restart now"; absent/null is inert.
+  refreshToken?: string | null;
 }
 
 // A single clip in the perimeter composition preview.
@@ -317,6 +396,7 @@ export interface PerimeterPreview {
 export interface PerimeterOverlayFile {
   name: string;
   source: string;
+  generation?: string;
 }
 
 export interface PerimeterOverlayColumn {
@@ -324,11 +404,42 @@ export interface PerimeterOverlayColumn {
   files: Record<string, PerimeterOverlayFile>;
 }
 
-export interface PerimeterOverlay {
-  version: number;
+// Version-1 overlay command: timed columns of prepared media files (goal
+// videos, named media pairs, prepared scorer PNGs). Unchanged from the
+// original single overlay type; the active overlay channel is now a
+// discriminated union of this and GoalScorerOverlayCommand.
+export interface PerimeterFileOverlay {
+  version: 1;
   id: string;
   columns: PerimeterOverlayColumn[];
 }
+
+// Semantic player payload carried by a version-2 scorer command. Values are
+// display data only: no generated file references, download URLs, colors,
+// dimensions, or layout values. The active subscription scopes the location,
+// the deployment provides the bucket, and the published web mapping provides
+// the logical-screen dimensions.
+export interface GoalScorerOverlayPlayer {
+  // Safe KSI player identifier (also used to derive the approved Storage
+  // celebration-image path `{location}/players/{id}-fagn.png`).
+  id: string;
+  // Bounded, non-empty display name.
+  name: string;
+  // Shirt number normalized to a digit-only string.
+  number: string;
+}
+
+// Version-2 overlay command: semantic goal scorer composed by web perimeter
+// browsers. A fresh command instance per selection, so re-selecting the same
+// player is still a new replacement request.
+export interface GoalScorerOverlayCommand {
+  version: 2;
+  kind: "goal-scorer";
+  id: string;
+  player: GoalScorerOverlayPlayer;
+}
+
+export type PerimeterOverlay = PerimeterFileOverlay | GoalScorerOverlayCommand;
 
 export type PerimeterOverlayPhase =
   | "downloading"
@@ -358,6 +469,9 @@ export interface PerimeterMediaPair {
 export interface PerimeterAdLayoutFile {
   name: string;
   source: string; // gs:// URI
+  // Firebase Storage generation. Legacy Resolume records may omit it, but
+  // browser playback must not activate content without immutable identity.
+  generation?: string;
 }
 
 export interface PerimeterAdLayoutColumn {
