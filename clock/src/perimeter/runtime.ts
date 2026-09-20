@@ -349,9 +349,12 @@ export class PerimeterRuntime {
           media.kind === "video"
             ? (element as HTMLVideoElement).videoHeight
             : (element as HTMLImageElement).naturalHeight;
+        // Dimension mismatches never block playback: the renderer samples the
+        // whole texture with normalized UVs, so mismatched media stretches
+        // (with skew) to fill the region's destination rectangle.
         if (width !== screen.width || height !== screen.height) {
-          throw new Error(
-            `Perimeter media for ${logicalScreenId} is ${width}x${height}; expected ${screen.width}x${screen.height}.`,
+          console.warn(
+            `Perimeter media for ${logicalScreenId} is ${width}x${height}; expected ${screen.width}x${screen.height}. Content will be stretched to fit.`,
           );
         }
       }

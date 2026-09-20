@@ -331,7 +331,7 @@ describe("PerimeterRuntime", () => {
     expect(vi.mocked(render).mock.calls.length).toBe(renderCount);
   });
 
-  it("rejects incomplete pairs and media with incorrect logical dimensions", async () => {
+  it("rejects incomplete pairs", async () => {
     const { runtime, loadPair } = createRuntime();
     loadPair.mockRejectedValueOnce(new Error("download failed"));
     await expect(runtime.prepareBase(layout)).rejects.toThrow(
@@ -344,19 +344,21 @@ describe("PerimeterRuntime", () => {
         columns: [{ id: "incomplete", files: {} }],
       }),
     ).rejects.toThrow("missing left");
+  });
 
-    const loader = {
-      loadPair: vi.fn().mockResolvedValue({
-        left: loadedMedia("image", 3, 1),
-      }),
-    };
-    const invalidRuntime = new PerimeterRuntime(configuration, {
-      renderer: { render: vi.fn() },
-      loader,
-    });
-    await expect(invalidRuntime.prepareBase(layout)).rejects.toThrow(
-      "expected 2x1",
-    );
+  it("warns about mismatched media dimensions without blocking playback", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const { runtime, loadPair, getLastFrame } = createRuntime();
+    loadPair.mockResolvedValueOnce({ left: loadedMedia("image", 3, 1) });
+
+    await runtime.prepareBase(layout);
+    runtime.activatePreparedBase(0);
+    runtime.setPowered(true, 0);
+    runtime.render(0);
+
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("expected 2x1"));
+    expect(getLastFrame()?.base.left).toBeDefined();
+    warn.mockRestore();
   });
 
   it("keeps the base clock and overlay state independent while powered off", async () => {
