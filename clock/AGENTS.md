@@ -802,6 +802,30 @@ with the daemon phase.
   after construction (`commitPreparedBase`, `replaceConfiguration`), and plain
   object property writes would never be seen by the timeline's closures.
 
+**Display restart command (web venues)**:
+
+- The standalone admin header also offers an "Endurræsa skjá" button (web
+  venues only) that asks every subscribed web perimeter display to perform a
+  full page reload of itself — the remote equivalent of the manual hard
+  refresh, for when a display is stuck on stale media and the operator cannot
+  reach the venue computer.
+- The write is an opaque `refreshToken` token (a UUID) under the desired
+  `states/{location}/perimeter` path, audited as `perimeter.restart-displays`.
+  Only a change of the token value matters; its content is never interpreted.
+- `parsePerimeterState()` preserves `refreshToken` verbatim when it is a
+  non-empty string and drops it otherwise (same tolerant rules as `skipCue`).
+- `PerimeterDisplay` tracks the last observed token: the first delivery only
+  initializes the baseline (a display that reconnects never replays an old
+  restart), and every subsequent change calls `window.location.reload()`. The
+  effect runs before the runtime exists, so a restart is honored even while
+  the renderer is still initializing.
+- This is perimeter-scoped and independent of `controller.refreshToken`
+  (the "Endurræsa alla skjái" button in the scoreboard controller's
+  Stillingar dialog): the global button also reloads perimeter displays
+  because `RefreshHandler` is mounted in the perimeter display path, while
+  the perimeter button restarts perimeter screens without interrupting
+  scoreboard screens.
+
 Types are defined in `types.ts`:
 
 - `PerimeterAdLayout` — desired layout
@@ -1728,10 +1752,13 @@ Web playback requires a published `locations/{location}/perimeterDisplay` with
 `renderer: "web"`, validated geometry, and immutable Storage `generation`
 metadata on every referenced base or overlay object. The renderer downloads a
 complete base revision into persistent Cache Storage before playback, validates
-native dimensions and pair completeness, and retains the previous complete
-revision if a replacement or quota check fails. Images and videos must decode
-at their configured logical-screen dimensions; video rate fitting is best
-effort and unsupported rates use natural playback with loop/cut behavior.
+pair completeness, and retains the previous complete revision if a replacement
+or quota check fails. Media whose dimensions differ from the configured
+logical-screen dimensions only log a console warning — the WebGL renderer
+samples the full texture with normalized UVs, so such content is stretched
+(with skew) to fill the region instead of blocking playback. Video rate
+fitting is best effort and unsupported rates use natural playback with
+loop/cut behavior.
 
 Administrators measure a packed framebuffer and logical strips, then edit the
 mapping under `Stjórnborð` → `Staðsetningar` → the venue's `Perimeter mapping`

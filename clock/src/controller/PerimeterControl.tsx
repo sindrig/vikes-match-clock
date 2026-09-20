@@ -419,6 +419,7 @@ const PerimeterControl = ({ standalone = false }: { standalone?: boolean }) => {
     getServerTime,
     setPerimeterState,
     skipPerimeterCue,
+    restartPerimeterDisplays,
     setPerimeterAdLayout,
     adLayout,
     appliedAdLayout,
@@ -925,6 +926,17 @@ const PerimeterControl = ({ standalone = false }: { standalone?: boolean }) => {
                 disabled={columns.length === 0 || perimeter.state !== "on"}
               >
                 Næsti dálkur
+              </Button>
+            )}
+            {isWebVenue && (
+              <Button
+                appearance="ghost"
+                color="orange"
+                aria-label="Endurræsa alla jaðarskjá"
+                title="Endurræsa alla jaðarskjá (full endurhleðsla á skjánum)"
+                onClick={restartPerimeterDisplays}
+              >
+                Endurræsa skjá
               </Button>
             )}
             <Button

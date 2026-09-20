@@ -102,6 +102,7 @@ const createMockPerimeterReturn = (
     previewLoaded: true,
     setPerimeterState: vi.fn(),
     skipPerimeterCue: vi.fn(),
+    restartPerimeterDisplays: vi.fn(),
     setPerimeterOverlay: vi.fn(),
     clearPerimeterOverlay: vi.fn(),
     setPerimeterAdLayout: mockSetPerimeterAdLayout,
@@ -247,6 +248,45 @@ describe("PerimeterControl", () => {
 
     expect(
       screen.queryByRole("button", { name: "Fara á næsta dálk" }),
+    ).toBeNull();
+  });
+
+  it("offers a restart button on a web venue", () => {
+    const restartPerimeterDisplays = vi.fn();
+    mockedUseListeners.mockReturnValue({
+      available: [],
+      screens: mockWebVenueScreens,
+    });
+    mockedUsePerimeter.mockReturnValue(
+      createMockPerimeterReturn({
+        perimeter: { enabled: true, state: "on" },
+        adLayout: webVenueAdLayout,
+        restartPerimeterDisplays,
+      }),
+    );
+
+    render(<PerimeterControl standalone />);
+
+    const restartButton = screen.getByRole("button", {
+      name: "Endurræsa alla jaðarskjá",
+    });
+    expect(restartButton).toBeEnabled();
+    fireEvent.click(restartButton);
+    expect(restartPerimeterDisplays).toHaveBeenCalledTimes(1);
+  });
+
+  it("hides the restart button on non-web venues", () => {
+    mockedUsePerimeter.mockReturnValue(
+      createMockPerimeterReturn({
+        perimeter: { enabled: true, state: "on" },
+        adLayout: webVenueAdLayout,
+      }),
+    );
+
+    render(<PerimeterControl standalone />);
+
+    expect(
+      screen.queryByRole("button", { name: "Endurræsa alla jaðarskjá" }),
     ).toBeNull();
   });
 

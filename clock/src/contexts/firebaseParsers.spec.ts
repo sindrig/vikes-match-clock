@@ -1411,6 +1411,28 @@ describe("firebaseParsers", () => {
         state: "off",
       });
     });
+
+    it("preserves a non-empty refreshToken token verbatim", () => {
+      const token = "c9bf9e57-1685-4c89-bafb-ff5af830be8a";
+      expect(
+        parsePerimeterState({
+          enabled: true,
+          state: "on",
+          refreshToken: token,
+        }),
+      ).toEqual({ enabled: true, state: "on", refreshToken: token });
+    });
+
+    it("drops malformed refreshToken values", () => {
+      expect(parsePerimeterState({ refreshToken: 123 })).toEqual({
+        enabled: false,
+        state: "off",
+      });
+      expect(parsePerimeterState({ refreshToken: "" })).toEqual({
+        enabled: false,
+        state: "off",
+      });
+    });
   });
 
   describe("parsePerimeterPreview", () => {

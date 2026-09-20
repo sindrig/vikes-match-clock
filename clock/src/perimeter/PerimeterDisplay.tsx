@@ -15,6 +15,7 @@ export default function PerimeterDisplay() {
   const runtimeRef = useRef<PerimeterRuntime | null>(null);
   const rendererRef = useRef<PerimeterWebGLRenderer | null>(null);
   const lastSkipCueRef = useRef<string | null>(null);
+  const lastRefreshTokenRef = useRef<string | null>(null);
   const [rendererError, setRendererError] = useState<string | null>(null);
   const configuration = useMemo(
     () =>
@@ -96,6 +97,18 @@ export default function PerimeterDisplay() {
     if (previous === null || token === null || token === previous) return;
     runtime.skipCue(performance.now());
   }, [perimeter.skipCue, perimeter.state, configuration]);
+
+  // The controller publishes a fresh `refreshToken` token under the desired
+  // perimeter state to request a full page reload of every display (remote
+  // restart). The first observed token only initializes the baseline so a
+  // display that (re)connects never replays an old restart.
+  useEffect(() => {
+    const token = perimeter.refreshToken ?? null;
+    const previous = lastRefreshTokenRef.current;
+    lastRefreshTokenRef.current = token;
+    if (previous === null || token === null || token === previous) return;
+    window.location.reload();
+  }, [perimeter.refreshToken]);
 
   useEffect(() => {
     const runtime = runtimeRef.current;
