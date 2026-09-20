@@ -127,6 +127,7 @@ function loadedMedia(
     videoWidth: width,
     videoHeight: height,
     duration: 20,
+    readyState: 4,
     dataset: {},
     pause: vi.fn(),
     play: vi.fn(() => Promise.resolve()),
@@ -186,7 +187,28 @@ describe("PerimeterRuntime", () => {
     expect(overlayFrame?.overlay?.left).toBeDefined();
   });
 
-  it("keeps the visible overlay while a replacement is preparing", async () => {
+  it("holds an overlay slot on the base until its video has a decoded frame", async () => {
+    const { runtime, loadPair, getLastFrame } = createRuntime();
+    await runtime.prepareBase(layout);
+    runtime.activatePreparedBase(0);
+    runtime.setPowered(true, 0);
+    const unready = loadedMedia("video");
+    (unready.element as HTMLVideoElement).readyState = 1;
+    loadPair.mockResolvedValueOnce({ left: unready });
+
+    await runtime.setOverlay(overlay, 0);
+    runtime.render(1);
+    // The renderer would keep the previous generation's texture for a slot
+    // whose video has no decoded frame yet, so the runtime filters the
+    // source out and the base channel fills the region instead.
+    expect(getLastFrame()?.overlay).toEqual({});
+
+    (unready.element as HTMLVideoElement).readyState = 2;
+    runtime.render(1_000);
+    expect(getLastFrame()?.overlay?.left).toBeDefined();
+  });
+
+  it("shows only the base while a replacement is preparing", async () => {
     const { runtime, loadPair, getLastFrame } = createRuntime();
     await runtime.prepareBase(layout);
     runtime.activatePreparedBase(0);
@@ -206,13 +228,17 @@ describe("PerimeterRuntime", () => {
       { ...overlay, id: "overlay-2" },
       1_000,
     );
+    // The previous generation is dropped the moment its replacement is
+    // requested, so the base shows through instead of a stale overlay.
     runtime.render(1_000);
-    expect(getLastFrame()?.overlay?.left).toBeDefined();
+    expect(getLastFrame()?.overlay).toBeUndefined();
     resolveReplacement?.({ left: loadedMedia("image") });
     await replacement;
+    runtime.render(1_100);
+    expect(getLastFrame()?.overlay?.left).toBeDefined();
   });
 
-  it("keeps the visible overlay when a replacement fails", async () => {
+  it("clears the visible overlay when a replacement fails", async () => {
     const { runtime, loadPair, getLastFrame } = createRuntime();
     await runtime.prepareBase(layout);
     runtime.activatePreparedBase(0);
@@ -223,6 +249,24 @@ describe("PerimeterRuntime", () => {
     await expect(
       runtime.setOverlay({ ...overlay, id: "overlay-2" }, 1_000),
     ).rejects.toThrow("overlay decode failed");
+    runtime.render(1_000);
+    expect(getLastFrame()?.overlay).toBeUndefined();
+  });
+
+  it("ignores a re-delivery of the already-live overlay command", async () => {
+    const { runtime, loadPair, getLastFrame } = createRuntime();
+    await runtime.prepareBase(layout);
+    runtime.activatePreparedBase(0);
+    runtime.setPowered(true, 0);
+    await runtime.setOverlay(overlay, 0);
+    runtime.render(0);
+    expect(getLastFrame()?.overlay?.left).toBeDefined();
+    const loadCalls = loadPair.mock.calls.length;
+
+    // A snapshot re-delivery (reconnect) re-runs setOverlay with the same
+    // id: the live generation keeps playing instead of restarting.
+    await runtime.setOverlay(overlay, 1_000);
+    expect(loadPair).toHaveBeenCalledTimes(loadCalls);
     runtime.render(1_000);
     expect(getLastFrame()?.overlay?.left).toBeDefined();
   });

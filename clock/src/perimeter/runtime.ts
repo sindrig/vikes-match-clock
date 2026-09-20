@@ -109,6 +109,9 @@ export class PerimeterRuntime {
   // active overlay uses.
   private activeFileColumns: PerimeterOverlayColumn[] | null = null;
   private activeFileMedia: LoadedPerimeterMedia[] = [];
+  // Storage identity of the generation currently on screen, used to ignore
+  // re-deliveries of an already-live command.
+  private activeOverlayCommandId: string | null = null;
   // The active semantic scorer generation. Composed canvases stay in memory
   // until clear or replacement; released sources are re-decoded from the
   // persistent media cache when a mapping change requires recomposition.
@@ -229,6 +232,15 @@ export class PerimeterRuntime {
       this.overlayPlayback.clear();
       return;
     }
+    // The same command re-delivered (snapshot refresh, reconnect) is already
+    // live: re-preparing identical media would only restart its playback.
+    if (this.activeOverlayCommandId === overlay.id) return;
+    // A different command replaces the active one. The stale generation is
+    // dropped immediately instead of double-buffered: the base channel shows
+    // through until the replacement is fully prepared, so a previous goal's
+    // content never lingers on screen while new media loads.
+    this.releaseActiveOverlay();
+    this.overlayPlayback.clear();
     if (overlay.version === 2) {
       await this.prepareScorerOverlay(overlay, request);
       return;
@@ -240,6 +252,7 @@ export class PerimeterRuntime {
     for (const media of this.activeFileMedia) media.release();
     this.activeFileMedia = [];
     this.activeFileColumns = null;
+    this.activeOverlayCommandId = null;
     if (this.activeScorer) this.activeScorer.release();
     this.activeScorer = null;
   }
@@ -362,6 +375,7 @@ export class PerimeterRuntime {
     // show the base through the overlay channel.
     const previousFileMedia = this.activeFileMedia;
     const previousScorer = this.activeScorer;
+    this.activeOverlayCommandId = prepared.commandId;
 
     if (prepared.kind === "file") {
       const columns = prepared.columns ?? [];
@@ -466,7 +480,18 @@ export class PerimeterRuntime {
     const sources: Record<string, TexImageSource> = {};
     for (const [logicalScreenId, file] of Object.entries(column.files)) {
       const loaded = this.findLoadedMedia(file.source, file.generation);
-      if (loaded) sources[logicalScreenId] = loaded.element;
+      if (!loaded) continue;
+      // A video whose first frame is not decoded yet must not reach the
+      // renderer: uploadSource would skip the upload and the slot would keep
+      // sampling the previous generation's texture. The region falls back to
+      // the base channel until the frame is actually available.
+      if (
+        loaded.kind === "video" &&
+        (loaded.element as HTMLVideoElement).readyState < 2
+      ) {
+        continue;
+      }
+      sources[logicalScreenId] = loaded.element;
     }
     return sources;
   }

@@ -198,7 +198,7 @@ describe("PerimeterRuntime semantic scorer overlays", () => {
     );
   });
 
-  it("retains the visible overlay while a replacement is preparing", async () => {
+  it("shows only the base while a scorer replacement is preparing", async () => {
     const harness = createHarness();
     await prepareActiveBase(harness);
     await harness.runtime.setOverlay(scorerCommand, 1_000);
@@ -219,15 +219,17 @@ describe("PerimeterRuntime semantic scorer overlays", () => {
     );
     // The replacement's compose only runs after its source load resolves.
     await vi.waitFor(() => expect(resolveReplacement).toBeDefined());
+    // The previous band is dropped the moment its replacement is requested,
+    // so the base shows through instead of stale scorer content.
     harness.runtime.render(2_000);
-    expect(harness.getLastFrame()?.overlay?.left).toBeDefined();
+    expect(harness.getLastFrame()?.overlay).toBeUndefined();
     resolveReplacement?.({ left: fakeCanvas("replacement") });
     await replacement;
     harness.runtime.render(2_500);
     expect(harness.getLastFrame()?.overlay?.left).toBeDefined();
   });
 
-  it("keeps the visible overlay when scorer preparation fails", async () => {
+  it("clears the visible scorer overlay when a replacement fails", async () => {
     const harness = createHarness();
     await prepareActiveBase(harness);
     await harness.runtime.setOverlay(scorerCommand, 1_000);
@@ -238,8 +240,10 @@ describe("PerimeterRuntime semantic scorer overlays", () => {
       harness.runtime.setOverlay({ ...scorerCommand, id: "scorer-2" }, 2_000),
     ).rejects.toThrow("no sources");
     harness.runtime.render(2_000);
-    expect(harness.getLastFrame()?.overlay?.left).toBeDefined();
-    expect(harness.releaseSource.mock.calls.length).toBe(releasesBefore);
+    expect(harness.getLastFrame()?.overlay).toBeUndefined();
+    // Dropping the replaced band releases its source; the failed replacement
+    // itself loaded nothing, so nothing further is released.
+    expect(harness.releaseSource.mock.calls.length).toBe(releasesBefore + 1);
   });
 
   it("releases the loaded source when composition fails", async () => {

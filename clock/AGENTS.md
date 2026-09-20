@@ -303,11 +303,16 @@ Firebase Storage rules permit anonymous reads only below a venue's
 remain authenticated-only.
 
 Base ads use a monotonic cue timeline and complete-revision preparation before
-swapping pair slots. Overlays use the same two-target mapping, replace the
-active command only after preparation, and render above the base channel.
-Power-off clears the WebGL framebuffer to black. The renderer and runtime must
-remain read-only; Firebase continues to be the source of truth for desired
-layout, overlay, and power state.
+swapping pair slots. Overlays use the same two-target mapping and render above
+the base channel. A new overlay command **drops** the active generation
+immediately — the base channel shows through while the replacement prepares,
+so a previous goal's content never lingers on screen (re-delivery of the
+already-live command id is a no-op so a snapshot refresh never restarts
+playback). An overlay region renders only when its media is frame-ready
+(videos below `readyState 2` are held on the base instead of re-sampling the
+previous generation's texture). Power-off clears the WebGL framebuffer to
+black. The renderer and runtime must remain read-only; Firebase continues to
+be the source of truth for desired layout, overlay, and power state.
 
 The perimeter LED screens at the Víkin stadium are driven by a dedicated
 Resolume Arena composition. Control flows through the **fourth** Firebase
@@ -1311,7 +1316,11 @@ players for semantic submission.
   compose every overlay logical screen once, and hold one static source map
   until clear or replacement. Both branches share the prepared-generation
   lifecycle: atomic activation, stale-request invalidation (only the latest
-  command wins), and release of superseded resources. Replacing the published
+  command wins), and release of superseded resources. A replacement command
+  drops the active generation immediately, so the base channel shows through
+  while the new band prepares; only frame-ready media is handed to the
+  renderer, so an undecoded overlay video holds its region on the base instead
+  of re-sampling the previous generation's texture. Replacing the published
   mapping while a scorer is visible reruns composition at the new logical
   dimensions before swapping textures; a recomposition failure retains the
   current textures.
