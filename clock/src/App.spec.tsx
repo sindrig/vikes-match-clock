@@ -547,6 +547,33 @@ describe("App", () => {
       expect(screen.queryByTestId("idle")).not.toBeInTheDocument();
     });
 
+    it("shows the boot spinner on a black background", () => {
+      mockedUseLocalState.mockReturnValue({
+        auth: { isLoaded: true, isEmpty: true },
+        listenPrefix: "vikinni",
+        setListenPrefix: vi.fn(),
+        screenKey: null,
+        setScreenKey: vi.fn(),
+        available: [],
+        email: "",
+        setEmail: vi.fn(),
+        password: "",
+        setPassword: vi.fn(),
+        isAdmin: false,
+      });
+      mockedUseFirebaseState.mockReturnValue({
+        controller: { view: VIEWS.idle, currentAsset: null },
+        view: { vp: defaultViewport, background: "Default" },
+        ready: false,
+      } as unknown as ReturnType<typeof useFirebaseState>);
+
+      render(<App />);
+
+      const bootScreen = screen.getByTestId("ring-loader").parentElement;
+      expect(bootScreen).toHaveStyle({ background: "#000" });
+      expect(bootScreen).toHaveStyle({ height: "100vh" });
+    });
+
     it("shows spinner when auth is not yet loaded", () => {
       mockedUseLocalState.mockReturnValue({
         auth: { isLoaded: false, isEmpty: true },

@@ -249,7 +249,9 @@ function App() {
       return <Controller />;
     }
 
-    // Show spinner while waiting for auth state or Firebase data to load
+    // Show spinner while waiting for auth state or Firebase data to load.
+    // Black background: rsuite's bundled CSS repaints <body> white, so the
+    // index.html black boot background alone does not survive past mount.
     if ((listenPrefix || isAuthenticated) && (!auth.isLoaded || !ready)) {
       return (
         <div
@@ -258,6 +260,7 @@ function App() {
             justifyContent: "center",
             alignItems: "center",
             height: "100vh",
+            background: "#000",
           }}
         >
           <RingLoader color="#1675e0" size={80} />
