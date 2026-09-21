@@ -210,8 +210,11 @@ export const test = base.extend<{
 }>({
   clockPage: async ({ page }, use) => {
     await page.addInitScript(() => {
-      localStorage.clear();
-      localStorage.setItem("clock_sync", "true");
+      if (sessionStorage.getItem("e2e-clock-page-initialized") === null) {
+        localStorage.clear();
+        localStorage.setItem("clock_sync", "true");
+        sessionStorage.setItem("e2e-clock-page-initialized", "true");
+      }
     });
 
     await page.clock.setFixedTime(new Date(2025, 3, 10, 12, 0, 0));
