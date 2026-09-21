@@ -21,6 +21,7 @@ import AssetComponent, { useDeferredAsset } from "./controller/asset/Asset";
 import PlaybackBar from "./controller/asset/queue/PlaybackBar";
 import SubstitutionInfo from "./controller/asset/queue/SubstitutionInfo";
 import GoalScorerDialog from "./controller/GoalScorerDialog";
+import PerimeterControl from "./controller/PerimeterControl";
 
 import ScoreBoard from "./screens/ScoreBoard";
 import Idle from "./screens/Idle";
@@ -30,10 +31,12 @@ import { VIEWS, Sports, getBackground, DEFAULT_THEME } from "./constants";
 import MatchController from "./match-controller/MatchController";
 import useGlobalShortcuts from "./hooks/useGlobalShortcuts";
 import useNightBlackout from "./hooks/useNightBlackout";
-import useScreenPresence from "./hooks/useScreenPresence";
 import { useThemeCssVars, resolveTheme } from "./hooks/useThemeCssVars";
+import { DisplayDiagnosticsProvider } from "./contexts/DisplayDiagnosticsContext";
 import assetTypes from "./controller/asset/AssetTypes";
 import { isVideoUrl, resolveGoalBackground } from "./utils/matchUtils";
+import PerimeterDisplay from "./perimeter/PerimeterDisplay";
+import { FIREBASE_STORAGE_BUCKET } from "./firebase";
 
 import "./App.css";
 
@@ -43,7 +46,7 @@ const ScoreButtons = ({ side }: { side: "home" | "away" }) => {
     renderAsset,
     controller: { roster },
   } = useController();
-  const { setPerimeterOverlay } = usePerimeter();
+  const { setPerimeterOverlay, goalVideo } = usePerimeter();
   const { view } = useView();
   const { listenPrefix } = useLocalState();
   const scoreKeys = { home: "homeScore", away: "awayScore" } as const;
@@ -56,25 +59,28 @@ const ScoreButtons = ({ side }: { side: "home" | "away" }) => {
   const handleGoal = () => {
     addGoal(side);
     if (side === "home") {
-      const bucketName = "vikes-match-clock-firebase.appspot.com";
-      setPerimeterOverlay({
-        version: 1,
-        id: crypto.randomUUID(),
-        columns: [
-          {
-            durationMs: 10000,
-            files: {
+      // The goal video is operator-configured under
+      // states/{location}/perimeter/goalVideo; without a configuration the
+      // legacy goal-48/goal-40 pair from the active deployment's bucket is
+      // used (a stale production-bucket reference would be rejected by the
+      // environment-scoped overlay parser).
+      const goalFiles =
+        goalVideo && Object.keys(goalVideo.files).length > 0
+          ? goalVideo.files
+          : {
               "2": {
                 name: "goal-48.mp4",
-                source: `gs://${bucketName}/${listenPrefix}/perimeter/goal-48.mp4`,
+                source: `gs://${FIREBASE_STORAGE_BUCKET}/${listenPrefix}/perimeter/goal-48.mp4`,
               },
               "4": {
                 name: "goal-40.mp4",
-                source: `gs://${bucketName}/${listenPrefix}/perimeter/goal-40.mp4`,
+                source: `gs://${FIREBASE_STORAGE_BUCKET}/${listenPrefix}/perimeter/goal-40.mp4`,
               },
-            },
-          },
-        ],
+            };
+      setPerimeterOverlay({
+        version: 1,
+        id: crypto.randomUUID(),
+        columns: [{ durationMs: 10000, files: goalFiles }],
       });
       if (view.goalGif1) {
         renderAsset({
@@ -188,7 +194,14 @@ const ClearOverlayButton = () => {
 function App() {
   useGlobalShortcuts();
   const { controller, view: viewState, ready } = useFirebaseState();
-  const { auth, listenPrefix, setListenPrefix, setScreenKey } = useLocalState();
+  const {
+    auth,
+    listenPrefix,
+    setListenPrefix,
+    setScreenKey,
+    displayTarget,
+    setDisplayTarget,
+  } = useLocalState();
 
   const { view } = controller;
   const {
@@ -212,7 +225,12 @@ function App() {
 
   const isAuthenticated = auth.isLoaded && !auth.isEmpty;
 
-  useScreenPresence(isAuthenticated ? "" : listenPrefix);
+  // Presence reporting (with per-display error diagnostics) lives in the
+  // DisplayDiagnosticsProvider that wraps the whole app tree below; screens
+  // report their renderer errors through that context.
+  const presencePrefix = isAuthenticated ? "" : listenPrefix;
+  const displayKind =
+    displayTarget?.kind === "perimeter" ? "perimeter" : "scoreboard";
 
   // Apply viewport fontSize to the root <html> element so all rem-based
   // content (clocks, scores, etc.) scales to the physical screen config.
@@ -225,212 +243,281 @@ function App() {
     };
   }, [vp.fontSize]);
 
-  // State 1: no listenPrefix, not authenticated — Controller handles screen selector + login
-  if (!listenPrefix && !isAuthenticated) {
-    return <Controller />;
-  }
-
-  // Show spinner while waiting for auth state or Firebase data to load
-  if ((listenPrefix || isAuthenticated) && (!auth.isLoaded || !ready)) {
-    return (
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          height: "100vh",
-        }}
-      >
-        <RingLoader color="#1675e0" size={80} />
-      </div>
-    );
-  }
-
-  const renderAppContents = () => {
-    switch (view) {
-      case VIEWS.match:
-      case VIEWS.control:
-        return <ScoreBoard />;
-      case VIEWS.idle:
-      default:
-        if (isBlackedOut) return null;
-        if (background !== "Blackout") {
-          return <Idle />;
-        }
-        return null;
+  const renderAppTree = (): React.ReactNode => {
+    // State 1: no listenPrefix, not authenticated — Controller handles screen selector + login
+    if (!listenPrefix && !isAuthenticated) {
+      return <Controller />;
     }
-  };
 
-  /** Sanitize a URL for use inside CSS url() by encoding characters that could break out */
-  const sanitizeCssUrl = (url: string): string =>
-    url.replace(/[()'"\\]/g, (ch) => `\\${ch}`);
+    // Show spinner while waiting for auth state or Firebase data to load.
+    // Black background: rsuite's bundled CSS repaints <body> white, so the
+    // index.html black boot background alone does not survive past mount.
+    if ((listenPrefix || isAuthenticated) && (!auth.isLoaded || !ready)) {
+      return (
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            height: "100vh",
+            background: "#000",
+          }}
+        >
+          <RingLoader color="#1675e0" size={80} />
+        </div>
+      );
+    }
 
-  const style: React.CSSProperties = {
-    ...getBackground(isBlackedOut ? "Blackout" : background),
-    // Theme background image overrides the background selector when set
-    ...(effectiveTheme.backgroundImage && !isBlackedOut
-      ? {
-          backgroundImage: `url(${sanitizeCssUrl(effectiveTheme.backgroundImage)})`,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
+    const renderAppContents = () => {
+      switch (view) {
+        case VIEWS.match:
+        case VIEWS.control:
+          return <ScoreBoard />;
+        case VIEWS.idle:
+        default:
+          if (isBlackedOut) return null;
+          if (background !== "Blackout") {
+            return <Idle />;
+          }
+          return null;
+      }
+    };
+
+    /** Sanitize a URL for use inside CSS url() by encoding characters that could break out */
+    const sanitizeCssUrl = (url: string): string =>
+      url.replace(/[()'"\\]/g, (ch) => `\\${ch}`);
+
+    const style: React.CSSProperties = {
+      ...getBackground(isBlackedOut ? "Blackout" : background),
+      // Theme background image overrides the background selector when set
+      ...(effectiveTheme.backgroundImage && !isBlackedOut
+        ? {
+            backgroundImage: `url(${sanitizeCssUrl(effectiveTheme.backgroundImage)})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+          }
+        : {}),
+      ...vp.style,
+      ...themeCssVars,
+    };
+
+    // Static font-size overrides for the controller preview so that theme
+    // font-size edits don't break the small preview layout (issue #178).
+    // Font-family settings still apply — only sizes are pinned.
+    const previewFontSizeOverrides: React.CSSProperties = {
+      "--theme-score-font-size": DEFAULT_THEME.scoreBoxFontSize,
+      "--theme-clock-font-size-min": DEFAULT_THEME.clockFontSizeMin,
+      "--theme-clock-font-size-max": DEFAULT_THEME.clockFontSizeMax,
+      "--theme-injury-font-size": DEFAULT_THEME.injuryTimeFontSize,
+      "--theme-idle-text-font-size": DEFAULT_THEME.idleTextFontSize,
+    } as React.CSSProperties;
+
+    // State 2: listenPrefix set, not authenticated — display screen + disconnect button only
+    if (!isAuthenticated) {
+      const disconnectDisplay = () => {
+        if (setDisplayTarget) {
+          setDisplayTarget(null);
+        } else {
+          setScreenKey(null);
         }
-      : {}),
-    ...vp.style,
-    ...themeCssVars,
-  };
+        setListenPrefix("");
+      };
 
-  // Static font-size overrides for the controller preview so that theme
-  // font-size edits don't break the small preview layout (issue #178).
-  // Font-family settings still apply — only sizes are pinned.
-  const previewFontSizeOverrides: React.CSSProperties = {
-    "--theme-score-font-size": DEFAULT_THEME.scoreBoxFontSize,
-    "--theme-clock-font-size-min": DEFAULT_THEME.clockFontSizeMin,
-    "--theme-clock-font-size-max": DEFAULT_THEME.clockFontSizeMax,
-    "--theme-injury-font-size": DEFAULT_THEME.injuryTimeFontSize,
-    "--theme-idle-text-font-size": DEFAULT_THEME.idleTextFontSize,
-  } as React.CSSProperties;
+      if (displayTarget?.kind === "perimeter") {
+        return (
+          <div>
+            <PerimeterDisplay />
+            <RefreshHandler />
+            <Button
+              color="red"
+              appearance="primary"
+              size="lg"
+              onClick={disconnectDisplay}
+              style={{ position: "fixed", bottom: 16, right: 16, zIndex: 9999 }}
+            >
+              Aftengja skjá
+            </Button>
+          </div>
+        );
+      }
 
-  // State 2: listenPrefix set, not authenticated — display screen + disconnect button only
-  if (!isAuthenticated) {
+      return (
+        <div>
+          <div className="App" style={style}>
+            {renderAppContents()}
+            {asset ? (
+              <div className="overlay-container" style={vp.style}>
+                <AssetComponent asset={asset.asset} time={asset.time} />
+              </div>
+            ) : null}
+          </div>
+          <RefreshHandler />
+          <Button
+            color="red"
+            appearance="primary"
+            size="lg"
+            onClick={() => {
+              disconnectDisplay();
+            }}
+            style={{ position: "fixed", bottom: 16, right: 16, zIndex: 9999 }}
+          >
+            Aftengja skjá
+          </Button>
+        </div>
+      );
+    }
+
+    // State 3: authenticated, no listenPrefix — show ONLY screen selector
+    if (!listenPrefix) {
+      return <Controller />;
+    }
+
+    // State 4: authenticated + listenPrefix set — full UI with disconnect/logout buttons
+    const disconnectScreen = () => {
+      if (setDisplayTarget) {
+        setDisplayTarget(null);
+      } else {
+        setScreenKey(null);
+      }
+      setListenPrefix("");
+    };
+
+    const logout = () => {
+      disconnectScreen();
+      firebaseAuth.logout().catch(console.error);
+    };
+
+    if (displayTarget?.kind === "perimeter") {
+      return (
+        <div>
+          <PerimeterControl standalone />
+          <ButtonGroup
+            style={{ position: "fixed", bottom: 16, right: 16, zIndex: 9999 }}
+          >
+            <Button color="red" appearance="primary" size="lg" onClick={logout}>
+              Útskrá
+            </Button>
+            <Button
+              color="orange"
+              appearance="primary"
+              size="lg"
+              onClick={disconnectScreen}
+            >
+              Aftengjast skjá
+            </Button>
+          </ButtonGroup>
+        </div>
+      );
+    }
+
+    const showController = view === VIEWS.match || view === VIEWS.idle;
+    const showMatchControls = view !== VIEWS.idle;
+    const scoreButtonWidth = 44;
+    const sidebarWidth = 350;
+    const previewWidth = sidebarWidth - scoreButtonWidth * 2;
+    const vpWidth = vp.style.width || 960;
+    const vpHeight = vp.style.height || 540;
+    const previewScale = previewWidth / vpWidth;
+    const previewHeight = Math.ceil(vpHeight * previewScale);
+
     return (
       <div>
-        <div className="App" style={style}>
-          {renderAppContents()}
-          {asset ? (
-            <div className="overlay-container" style={vp.style}>
-              <AssetComponent asset={asset.asset} time={asset.time} />
+        <MatchLifecycle />
+        {view === VIEWS.control ? <MatchController /> : null}
+        {showController && (
+          <div className="controller-layout">
+            <div className="controller-sidebar">
+              <ResyncNotice />
+              <div className="preview-and-controls">
+                <div className="preview-with-scores">
+                  {showMatchControls ? (
+                    <ScoreButtons side="home" />
+                  ) : (
+                    <div style={{ width: scoreButtonWidth, flexShrink: 0 }} />
+                  )}
+                  <div
+                    className="scoreboard-preview"
+                    style={{ height: previewHeight }}
+                  >
+                    <div
+                      className="App"
+                      style={{
+                        ...style,
+                        ...previewFontSizeOverrides,
+                        transform: `scale(${previewScale})`,
+                        transformOrigin: "top left",
+                      }}
+                    >
+                      {renderAppContents()}
+                      {asset ? (
+                        <div className="overlay-container" style={vp.style}>
+                          <AssetComponent
+                            asset={asset.asset}
+                            time={asset.time}
+                          />
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                  {showMatchControls ? (
+                    <ScoreButtons side="away" />
+                  ) : (
+                    <div style={{ width: scoreButtonWidth, flexShrink: 0 }} />
+                  )}
+                </div>
+                <ViewModeButtons />
+              </div>
+              {controller.activeQueueId ? (
+                <PlaybackBar />
+              ) : (
+                asset && <ClearOverlayButton />
+              )}
+              <SubstitutionInfo />
+              {showMatchControls && <MatchActions />}
+              {showMatchControls && <MatchCountdownDisplay />}
+              {showMatchControls && <HomeTeamQuickActions />}
             </div>
-          ) : null}
-        </div>
-        <RefreshHandler />
-        <Button
-          color="red"
-          appearance="primary"
-          size="lg"
-          onClick={() => {
-            setScreenKey(null);
-            setListenPrefix("");
-          }}
+            <div className="controller-controls">
+              <Controller />
+            </div>
+          </div>
+        )}
+        {!showController && (
+          <div className="App" style={style}>
+            {renderAppContents()}
+            {asset ? (
+              <div className="overlay-container" style={vp.style}>
+                <AssetComponent asset={asset.asset} time={asset.time} />
+              </div>
+            ) : null}
+          </div>
+        )}
+        <ButtonGroup
           style={{ position: "fixed", bottom: 16, right: 16, zIndex: 9999 }}
         >
-          Aftengja skjá
-        </Button>
+          <Button color="red" appearance="primary" size="lg" onClick={logout}>
+            Útskrá
+          </Button>
+          <Button
+            color="orange"
+            appearance="primary"
+            size="lg"
+            onClick={disconnectScreen}
+          >
+            Aftengjast skjá
+          </Button>
+        </ButtonGroup>
       </div>
     );
-  }
-
-  // State 3: authenticated, no listenPrefix — show ONLY screen selector
-  if (!listenPrefix) {
-    return <Controller />;
-  }
-
-  // State 4: authenticated + listenPrefix set — full UI with disconnect/logout buttons
-  const disconnectScreen = () => {
-    setScreenKey(null);
-    setListenPrefix("");
   };
-
-  const logout = () => {
-    setScreenKey(null);
-    setListenPrefix("");
-    firebaseAuth.logout().catch(console.error);
-  };
-
-  const showController = view === VIEWS.match || view === VIEWS.idle;
-  const showMatchControls = view !== VIEWS.idle;
-  const scoreButtonWidth = 44;
-  const sidebarWidth = 350;
-  const previewWidth = sidebarWidth - scoreButtonWidth * 2;
-  const vpWidth = vp.style.width || 960;
-  const vpHeight = vp.style.height || 540;
-  const previewScale = previewWidth / vpWidth;
-  const previewHeight = Math.ceil(vpHeight * previewScale);
 
   return (
-    <div>
-      <MatchLifecycle />
-      {view === VIEWS.control ? <MatchController /> : null}
-      {showController && (
-        <div className="controller-layout">
-          <div className="controller-sidebar">
-            <ResyncNotice />
-            <div className="preview-and-controls">
-              <div className="preview-with-scores">
-                {showMatchControls ? (
-                  <ScoreButtons side="home" />
-                ) : (
-                  <div style={{ width: scoreButtonWidth, flexShrink: 0 }} />
-                )}
-                <div
-                  className="scoreboard-preview"
-                  style={{ height: previewHeight }}
-                >
-                  <div
-                    className="App"
-                    style={{
-                      ...style,
-                      ...previewFontSizeOverrides,
-                      transform: `scale(${previewScale})`,
-                      transformOrigin: "top left",
-                    }}
-                  >
-                    {renderAppContents()}
-                    {asset ? (
-                      <div className="overlay-container" style={vp.style}>
-                        <AssetComponent asset={asset.asset} time={asset.time} />
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-                {showMatchControls ? (
-                  <ScoreButtons side="away" />
-                ) : (
-                  <div style={{ width: scoreButtonWidth, flexShrink: 0 }} />
-                )}
-              </div>
-              <ViewModeButtons />
-            </div>
-            {controller.activeQueueId ? (
-              <PlaybackBar />
-            ) : (
-              asset && <ClearOverlayButton />
-            )}
-            <SubstitutionInfo />
-            {showMatchControls && <MatchActions />}
-            {showMatchControls && <MatchCountdownDisplay />}
-            {showMatchControls && <HomeTeamQuickActions />}
-          </div>
-          <div className="controller-controls">
-            <Controller />
-          </div>
-        </div>
-      )}
-      {!showController && (
-        <div className="App" style={style}>
-          {renderAppContents()}
-          {asset ? (
-            <div className="overlay-container" style={vp.style}>
-              <AssetComponent asset={asset.asset} time={asset.time} />
-            </div>
-          ) : null}
-        </div>
-      )}
-      <ButtonGroup
-        style={{ position: "fixed", bottom: 16, right: 16, zIndex: 9999 }}
-      >
-        <Button color="red" appearance="primary" size="lg" onClick={logout}>
-          Útskrá
-        </Button>
-        <Button
-          color="orange"
-          appearance="primary"
-          size="lg"
-          onClick={disconnectScreen}
-        >
-          Aftengjast skjá
-        </Button>
-      </ButtonGroup>
-    </div>
+    <DisplayDiagnosticsProvider
+      listenPrefix={presencePrefix}
+      displayKind={displayKind}
+    >
+      {renderAppTree()}
+    </DisplayDiagnosticsProvider>
   );
 }
 

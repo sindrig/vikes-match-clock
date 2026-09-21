@@ -11,6 +11,9 @@ import {
 import PlusIcon from "@rsuite/icons/Plus";
 import { ref, onValue, set } from "firebase/database";
 import { database } from "../firebase";
+import { parsePerimeterDisplay } from "../contexts/firebaseParsers";
+import type { PerimeterDisplayConfig } from "../types";
+import PerimeterMappingEditor from "./PerimeterMappingEditor";
 import "./LocationsManager.css";
 
 interface ScreenDef {
@@ -29,6 +32,7 @@ interface LocationData {
   pitchIds: number[];
   config?: LocationConfig;
   screens: ScreenDef[];
+  perimeterDisplay?: PerimeterDisplayConfig;
 }
 
 type LocationsMap = Record<string, LocationData>;
@@ -97,6 +101,9 @@ function useLocationsData(): {
                       return Object.keys(cfg).length > 0 ? cfg : undefined;
                     })()
                   : undefined;
+              const perimeterDisplay = parsePerimeterDisplay(
+                r.perimeterDisplay,
+              );
               parsed[key] = {
                 label:
                   typeof r.label === "string"
@@ -107,6 +114,7 @@ function useLocationsData(): {
                 pitchIds,
                 config,
                 screens,
+                perimeterDisplay,
               };
             }
           }
@@ -205,32 +213,41 @@ function LocationEditor({
     location.config?.homeTeam ?? null,
   );
   const [screens, setScreens] = useState<ScreenDef[]>(location.screens);
+  const [perimeterDisplay, setPerimeterDisplay] = useState(
+    location.perimeterDisplay,
+  );
   const [dirty, setDirty] = useState(false);
 
   const markDirty = useCallback(() => setDirty(true), []);
 
-  const save = useCallback(() => {
-    const pitchIds = pitchIdsStr
-      .split(",")
-      .map((s) => Number(s.trim()))
-      .filter((n) => !isNaN(n) && n > 0);
+  const save = useCallback(
+    (perimeterOverride = perimeterDisplay) => {
+      const pitchIds = pitchIdsStr
+        .split(",")
+        .map((s) => Number(s.trim()))
+        .filter((n) => !isNaN(n) && n > 0);
 
-    const config: LocationConfig = {};
-    if (homeTeam !== null && homeTeam > 0) config.homeTeam = homeTeam;
+      const config: LocationConfig = {};
+      if (homeTeam !== null && homeTeam > 0) config.homeTeam = homeTeam;
 
-    const data: Record<string, unknown> = {
-      label,
-      pitchIds,
-      screens,
-    };
-    if (Object.keys(config).length > 0) {
-      data.config = config;
-    }
+      const data: Record<string, unknown> = {
+        label,
+        pitchIds,
+        screens,
+      };
+      if (Object.keys(config).length > 0) {
+        data.config = config;
+      }
+      if (perimeterOverride) {
+        data.perimeterDisplay = perimeterOverride;
+      }
 
-    const locRef = ref(database, `locations/${venueKey}`);
-    void set(locRef, data);
-    setDirty(false);
-  }, [venueKey, label, pitchIdsStr, homeTeam, screens]);
+      const locRef = ref(database, `locations/${venueKey}`);
+      void set(locRef, data);
+      setDirty(false);
+    },
+    [venueKey, label, pitchIdsStr, homeTeam, screens, perimeterDisplay],
+  );
 
   const addScreen = () => {
     const newScreen: ScreenDef = {
@@ -248,6 +265,35 @@ function LocationEditor({
     next[index] = updated;
     setScreens(next);
     markDirty();
+  };
+
+  // Bootstrap a perimeter mapping draft for a venue that has none, so the
+  // mapping editor can be opened and published through the UI instead of a
+  // hand-written Firebase document. The draft starts from the venue's first
+  // screen as a single logical screen; admins adjust geometry, templates,
+  // and the cue duration in the editor before publishing.
+  const addPerimeterMapping = () => {
+    const first = screens[0];
+    const width = first?.style.width ?? 1024;
+    const height = first?.style.height ?? 256;
+    const screenId = first?.key.trim() || "skjar-1";
+    setPerimeterDisplay({
+      version: 1,
+      revision: crypto.randomUUID(),
+      renderer: "web",
+      framebuffer: { width, height, background: "black" },
+      logicalScreens: {
+        [screenId]: {
+          id: screenId,
+          name: first?.name.trim() || "Skjár",
+          width,
+          height,
+        },
+      },
+      compatibilityKeys: { base: {}, overlay: {} },
+      regions: [],
+      playback: { cueDurationMs: 20000, videoPolicy: "fit-to-cue" },
+    });
   };
 
   return (
@@ -343,11 +389,33 @@ function LocationEditor({
           />
         ))}
 
+        {!perimeterDisplay && (
+          <div className="loc-perimeter-add">
+            <Button size="sm" appearance="ghost" onClick={addPerimeterMapping}>
+              Nýtt perimeter mapping
+            </Button>
+            <small className="loc-hint">
+              Býr til uppkast fyrir völlinn svo jáðarskjárinn sé settur upp í
+              ritlinum og birt með „Vista breytingar“.
+            </small>
+          </div>
+        )}
+
+        {perimeterDisplay && (
+          <PerimeterMappingEditor
+            configuration={perimeterDisplay}
+            onPublish={(published) => {
+              setPerimeterDisplay(published);
+              save(published);
+            }}
+          />
+        )}
+
         {dirty && (
           <Button
             appearance="primary"
             size="sm"
-            onClick={save}
+            onClick={() => save()}
             style={{ marginTop: "0.75rem" }}
           >
             Vista breytingar

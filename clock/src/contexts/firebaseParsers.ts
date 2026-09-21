@@ -11,13 +11,17 @@ import type {
   ViewPort,
   QueueState,
   PerimeterState,
+  ScorerCelebrationStyle,
   PerimeterPreview,
   PerimeterColumn,
   PerimeterClip,
   PerimeterOverlay,
   PerimeterOverlayColumn,
   PerimeterOverlayFile,
+  GoalScorerOverlayCommand,
+  GoalScorerOverlayPlayer,
   PerimeterMediaPair,
+  PerimeterGoalVideoConfig,
   PerimeterAdLayout,
   PerimeterAdLayoutColumn,
   PerimeterAdLayoutFile,
@@ -36,8 +40,14 @@ import type {
   GoalScorerPreparationPhase,
   GoalScorerPlayerStatus,
   GoalScorerPreparationPlayerResult,
+  PerimeterDisplayConfig,
+  PerimeterLogicalScreen,
+  PerimeterRegion,
+  PerimeterRect,
+  PerimeterRegionTransform,
 } from "../types";
 import { Sports, DEFAULT_THEME } from "../constants";
+import { validatePerimeterMapping } from "../perimeter/perimeterMapping";
 
 interface LocationData {
   label: string;
@@ -48,6 +58,7 @@ interface LocationData {
     key: string;
   }>;
   pitchIds?: string[];
+  perimeterDisplay?: PerimeterDisplayConfig;
 }
 
 export interface ParsedScreen {
@@ -55,6 +66,186 @@ export interface ParsedScreen {
   label: string;
   key: string;
   pitchIds?: string[];
+  perimeterDisplay?: PerimeterDisplayConfig;
+}
+
+function parseRect(data: unknown): PerimeterRect | undefined {
+  if (!data || typeof data !== "object") return undefined;
+  const raw = data as Record<string, unknown>;
+  const values = [raw.x, raw.y, raw.width, raw.height];
+  if (!values.every((value) => typeof value === "number")) return undefined;
+  return {
+    x: raw.x as number,
+    y: raw.y as number,
+    width: raw.width as number,
+    height: raw.height as number,
+  };
+}
+
+function parseLogicalScreens(
+  data: unknown,
+): Record<string, PerimeterLogicalScreen> {
+  if (!data || typeof data !== "object") return {};
+  const result: Record<string, PerimeterLogicalScreen> = {};
+  const entries = Array.isArray(data)
+    ? data.map((entry) => {
+        if (!entry || typeof entry !== "object") return ["", entry] as const;
+        const raw = entry as Record<string, unknown>;
+        return [typeof raw.id === "string" ? raw.id : "", entry] as const;
+      })
+    : Object.entries(data as Record<string, unknown>);
+
+  for (const [key, value] of entries) {
+    if (!value || typeof value !== "object") continue;
+    const raw = value as Record<string, unknown>;
+    const id = typeof raw.id === "string" ? raw.id : key;
+    const name = typeof raw.name === "string" ? raw.name : id;
+    const width = raw.width;
+    const height = raw.height;
+    if (
+      !id ||
+      !name ||
+      typeof width !== "number" ||
+      typeof height !== "number"
+    ) {
+      continue;
+    }
+    result[id] = { id, name, width, height };
+  }
+  return result;
+}
+
+function parseCompatibilityKeys(data: unknown): {
+  base: Record<string, string>;
+  overlay: Record<string, string>;
+} {
+  if (!data || typeof data !== "object") return { base: {}, overlay: {} };
+  const raw = data as Record<string, unknown>;
+  const parseKeys = (value: unknown): Record<string, string> => {
+    if (!value || typeof value !== "object") return {};
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).filter(
+        ([key, screenId]) =>
+          typeof key === "string" && typeof screenId === "string",
+      ) as Array<[string, string]>,
+    );
+  };
+  return { base: parseKeys(raw.base), overlay: parseKeys(raw.overlay) };
+}
+
+function parseRegionTransform(
+  data: unknown,
+  index: number,
+): PerimeterRegionTransform | undefined {
+  const raw =
+    data && typeof data === "object" ? (data as Record<string, unknown>) : {};
+  const rotation = raw.rotation ?? 0;
+  if (
+    rotation !== 0 &&
+    rotation !== 90 &&
+    rotation !== 180 &&
+    rotation !== 270
+  ) {
+    return undefined;
+  }
+  const booleanValue = (value: unknown): boolean => value === true;
+  return {
+    rotation,
+    flipX: booleanValue(raw.flipX ?? raw.horizontalFlip),
+    flipY: booleanValue(raw.flipY ?? raw.verticalFlip),
+    allowScaling: booleanValue(raw.allowScaling ?? raw.scaling),
+    allowClipping: booleanValue(raw.allowClipping ?? raw.clipping),
+    allowSourceOverlap: booleanValue(raw.allowSourceOverlap),
+    allowDestinationOverlap: booleanValue(
+      raw.allowDestinationOverlap ?? raw.overlap,
+    ),
+    zIndex: typeof raw.zIndex === "number" ? raw.zIndex : index,
+  };
+}
+
+function parseRegions(data: unknown): PerimeterRegion[] | undefined {
+  if (!Array.isArray(data)) return undefined;
+  const regions: PerimeterRegion[] = [];
+  for (const [index, entry] of data.entries()) {
+    if (!entry || typeof entry !== "object") return undefined;
+    const raw = entry as Record<string, unknown>;
+    const id = typeof raw.id === "string" ? raw.id : `region-${index + 1}`;
+    const logicalScreenId =
+      typeof raw.logicalScreenId === "string"
+        ? raw.logicalScreenId
+        : typeof raw.screenId === "string"
+          ? raw.screenId
+          : "";
+    const source = parseRect(raw.source ?? raw.sourceRegion);
+    const destination = parseRect(raw.destination ?? raw.destinationRegion);
+    const transform = parseRegionTransform(raw.transform, index);
+    if (!logicalScreenId || !source || !destination || !transform)
+      return undefined;
+    regions.push({ id, logicalScreenId, source, destination, transform });
+  }
+  return regions;
+}
+
+export function parsePerimeterDisplay(
+  data: unknown,
+): PerimeterDisplayConfig | undefined {
+  if (!data || typeof data !== "object") return undefined;
+  const raw = data as Record<string, unknown>;
+  if (raw.version !== 1) return undefined;
+  const revision = typeof raw.revision === "string" ? raw.revision : "";
+  const renderer = raw.renderer;
+  if (!revision || (renderer !== "web" && renderer !== "resolume")) {
+    return undefined;
+  }
+
+  const framebufferRaw = raw.framebuffer;
+  if (!framebufferRaw || typeof framebufferRaw !== "object") return undefined;
+  const framebufferRecord = framebufferRaw as Record<string, unknown>;
+  const framebuffer = {
+    width: framebufferRecord.width,
+    height: framebufferRecord.height,
+    background:
+      framebufferRecord.background === undefined
+        ? "black"
+        : framebufferRecord.background,
+  };
+  if (
+    typeof framebuffer.width !== "number" ||
+    typeof framebuffer.height !== "number" ||
+    framebuffer.background !== "black"
+  ) {
+    return undefined;
+  }
+
+  const logicalScreens = parseLogicalScreens(raw.logicalScreens);
+  if (Object.keys(logicalScreens).length === 0) return undefined;
+  const compatibilityKeys = parseCompatibilityKeys(
+    raw.compatibilityKeys ?? raw.compatibility,
+  );
+  const regions = parseRegions(raw.regions);
+  if (!regions) return undefined;
+  const playbackRaw =
+    raw.playback && typeof raw.playback === "object"
+      ? (raw.playback as Record<string, unknown>)
+      : {};
+  const cueDurationMs =
+    typeof playbackRaw.cueDurationMs === "number"
+      ? playbackRaw.cueDurationMs
+      : 20_000;
+  const videoPolicy = playbackRaw.videoPolicy ?? "fit-to-cue";
+  if (videoPolicy !== "fit-to-cue" || cueDurationMs <= 0) return undefined;
+
+  const config: PerimeterDisplayConfig = {
+    version: 1,
+    revision,
+    renderer,
+    framebuffer: framebuffer as PerimeterDisplayConfig["framebuffer"],
+    logicalScreens,
+    compatibilityKeys,
+    regions,
+    playback: { cueDurationMs, videoPolicy },
+  };
+  return validatePerimeterMapping(config).valid ? config : undefined;
 }
 
 export function parseLocations(data: unknown): {
@@ -76,15 +267,18 @@ export function parseLocations(data: unknown): {
     const pitchIds = Array.isArray(loc.pitchIds)
       ? (loc.pitchIds as string[])
       : undefined;
+    const perimeterDisplay = parsePerimeterDisplay(loc.perimeterDisplay);
 
     for (const screen of locScreens) {
       if (screen && typeof screen === "object") {
-        screens.push({
+        const parsedScreen: ParsedScreen = {
           screen: screen as ParsedScreen["screen"],
           label,
           key,
           pitchIds,
-        });
+        };
+        if (perimeterDisplay) parsedScreen.perimeterDisplay = perimeterDisplay;
+        screens.push(parsedScreen);
       }
     }
   }
@@ -445,8 +639,50 @@ export function parsePerimeterState(data: unknown): PerimeterState | undefined {
   const raw = data as Record<string, unknown>;
   const enabled = typeof raw.enabled === "boolean" ? raw.enabled : false;
   const state = raw.state === "on" || raw.state === "off" ? raw.state : "off";
+  // Tolerant skip token: any non-empty string is preserved verbatim; the
+  // value is opaque and its content is never interpreted by the parser.
+  const skipCue =
+    typeof raw.skipCue === "string" && raw.skipCue.length > 0
+      ? raw.skipCue
+      : undefined;
+  // Tolerant restart token, same semantics as skipCue: opaque and verbatim.
+  const refreshToken =
+    typeof raw.refreshToken === "string" && raw.refreshToken.length > 0
+      ? raw.refreshToken
+      : undefined;
+  // Goal-scorer celebration style: only the known style names parse; absent
+  // or invalid values stay undefined so consumers fall back to the default.
+  const scorerCelebration = parseScorerCelebration(raw.scorerCelebration);
 
-  return { enabled, state };
+  return {
+    enabled,
+    state,
+    ...(skipCue !== undefined ? { skipCue } : {}),
+    ...(refreshToken !== undefined ? { refreshToken } : {}),
+    ...(scorerCelebration !== undefined ? { scorerCelebration } : {}),
+  };
+}
+
+// Goal-scorer celebration presentation written by the perimeter admin view at
+// states/{location}/perimeter/scorerCelebration. Only the five known style
+// names are valid; anything else (missing, null, unknown string) parses to
+// undefined and the runtime falls back to the default style.
+export function parseScorerCelebration(
+  data: unknown,
+): ScorerCelebrationStyle | undefined {
+  const VALID_SCORER_CELEBRATION_STYLES: ScorerCelebrationStyle[] = [
+    "ribbon",
+    "tunnel",
+    "wave",
+    "procession",
+    "cutout",
+  ];
+  if (typeof data !== "string") return undefined;
+  return VALID_SCORER_CELEBRATION_STYLES.includes(
+    data as ScorerCelebrationStyle,
+  )
+    ? (data as ScorerCelebrationStyle)
+    : undefined;
 }
 
 // Strict, tolerant parse of the daemon-published composition preview. Clips
@@ -500,11 +736,24 @@ export function parsePerimeterPreview(
 const MAX_OVERLAY_COLUMNS = 20;
 const MAX_OVERLAY_DURATION_MS = 120_000;
 const MIN_OVERLAY_DURATION_MS = 100;
-const VALID_OVERLAY_VERSIONS = new Set([1]);
+const VALID_OVERLAY_VERSIONS = new Set([1, 2]);
 const ALLOWED_OVERLAY_BUCKET = "vikes-match-clock-firebase.appspot.com";
 // \p{Cc} matches control characters (\x00-\x1f and \x7f-\x9f); written as a
 // property escape so the literal contains no raw control characters.
 const UNSAFE_FILENAME_RE = /["%\\/]|[\p{Cc}]/u;
+
+// -- Version-2 semantic scorer command bounds --------------------------------
+
+const MAX_OVERLAY_COMMAND_ID_LENGTH = 128;
+const MAX_SCORER_PLAYER_NAME_LENGTH = 80;
+// Safe player identifier: the KSI ids are numeric, but manual rosters can use
+// other opaque identifiers. The same shape is enforced by the RTDB rules and
+// the Storage rule for `{location}/players/{id}-fagn.png`.
+const SCORER_PLAYER_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+// Shirt numbers are digit-only, at most 4 digits, and never zero-length.
+const SCORER_PLAYER_NUMBER_RE = /^[0-9]{1,4}$/;
+
+export const GOAL_SCORER_OVERLAY_KIND = "goal-scorer" as const;
 
 function validateOverlayFileName(name: string): boolean {
   if (!name || name.length > 255) return false;
@@ -553,7 +802,11 @@ function parseOverlayFile(
   const source = typeof raw.source === "string" ? raw.source : "";
   if (!validateOverlayFileName(name)) return undefined;
   if (!validateOverlaySource(source, options)) return undefined;
-  return { name, source };
+  const generation =
+    typeof raw.generation === "string" && raw.generation.length > 0
+      ? raw.generation
+      : undefined;
+  return generation ? { name, source, generation } : { name, source };
 }
 
 function parseOverlayColumn(
@@ -596,7 +849,18 @@ export function parsePerimeterOverlay(
   const version = typeof raw.version === "number" ? raw.version : 0;
   if (!VALID_OVERLAY_VERSIONS.has(version)) return null;
   const id = typeof raw.id === "string" ? raw.id : "";
-  if (!id) return null;
+  if (!id || id.length > MAX_OVERLAY_COMMAND_ID_LENGTH) return null;
+
+  if (version === 2) {
+    // The discriminator is required; a version-2 document that also carries
+    // version-1 columns is a mixed shape and is rejected wholesale.
+    if (raw.kind !== GOAL_SCORER_OVERLAY_KIND) return null;
+    if ("columns" in raw) return null;
+    return parseGoalScorerCommand(raw, id);
+  }
+
+  // Version-1 file commands must not carry version-2 scorer fields.
+  if ("kind" in raw || "player" in raw) return null;
   const columnsRaw = raw.columns;
   if (!Array.isArray(columnsRaw) || columnsRaw.length === 0) return null;
   if (columnsRaw.length > MAX_OVERLAY_COLUMNS) return null;
@@ -606,7 +870,90 @@ export function parsePerimeterOverlay(
     if (!column) return null;
     columns.push(column);
   }
-  return { version, id, columns };
+  return { version: 1, id, columns };
+}
+
+// Strict parse of the version-2 semantic player payload. Every field must be
+// present, bounded, and safe: missing discriminator data, empty or overlong
+// text, unsafe player identifiers, and invalid shirt numbers reject the
+// whole command.
+function parseGoalScorerCommand(
+  raw: Record<string, unknown>,
+  id: string,
+): GoalScorerOverlayCommand | null {
+  const playerRaw = raw.player;
+  if (!playerRaw || typeof playerRaw !== "object") return null;
+  const player = playerRaw as Record<string, unknown>;
+
+  const playerId = typeof player.id === "string" ? player.id.trim() : "";
+  if (!SCORER_PLAYER_ID_RE.test(playerId)) return null;
+
+  const name = typeof player.name === "string" ? player.name.trim() : "";
+  if (!name || name.length > MAX_SCORER_PLAYER_NAME_LENGTH) return null;
+  if (/[\p{Cc}]/u.test(name)) return null;
+
+  const number =
+    typeof player.number === "number"
+      ? String(player.number)
+      : typeof player.number === "string"
+        ? player.number.trim()
+        : "";
+  if (!SCORER_PLAYER_NUMBER_RE.test(number)) return null;
+
+  return {
+    version: 2,
+    kind: GOAL_SCORER_OVERLAY_KIND,
+    id,
+    player: { id: playerId, name, number },
+  };
+}
+
+// Serialize a validated scorer selection as a fresh version-2 semantic
+// command. Every selection gets a new command id, so selecting the same
+// player again is still a new replacement request.
+export function buildGoalScorerOverlayCommand(
+  player: GoalScorerOverlayPlayer,
+): GoalScorerOverlayCommand {
+  return {
+    version: 2,
+    kind: GOAL_SCORER_OVERLAY_KIND,
+    id: crypto.randomUUID(),
+    player: {
+      id: player.id.trim(),
+      name: player.name.trim(),
+      number: String(player.number).trim(),
+    },
+  };
+}
+
+// Validates a roster player as semantic scorer display data and normalizes
+// it to the bounded command payload. Returns null when the identifier,
+// name, or shirt number is invalid, so the caller can keep the generic
+// perimeter overlay unchanged instead of writing a malformed command.
+export function goalScorerPlayerFromSelection(
+  player:
+    | {
+        id?: number | string | null;
+        name?: string;
+        number?: number | string | null;
+      }
+    | null
+    | undefined,
+): GoalScorerOverlayPlayer | null {
+  if (!player) return null;
+  const id =
+    player.id === undefined || player.id === null
+      ? ""
+      : String(player.id).trim();
+  if (!SCORER_PLAYER_ID_RE.test(id)) return null;
+  const name = (player.name ?? "").trim();
+  if (!name || name.length > MAX_SCORER_PLAYER_NAME_LENGTH) return null;
+  const number =
+    player.number === undefined || player.number === null
+      ? ""
+      : String(player.number).trim();
+  if (!SCORER_PLAYER_NUMBER_RE.test(number)) return null;
+  return { id, name, number };
 }
 
 // -- Named perimeter media pairs ----------------------------------------------
@@ -651,6 +998,40 @@ function validateMediaPairSource(
   if (filename.includes("/") || filename.includes("..")) return false;
   if (!MEDIA_PAIR_FILENAME_RE.test(filename)) return false;
   return true;
+}
+
+// Strict parse of the operator-configured home-goal overlay media under
+// `states/{location}/perimeter/goalVideo`. The config is optional (an absent
+// document is null, so the goal button falls back to the legacy pair); a
+// present document must carry exactly the two overlay target files ("2" and
+// "4"), parsed with the same file validation as overlay columns.
+export function parsePerimeterGoalVideo(
+  data: unknown,
+  options?: { location?: string; bucket?: string },
+): PerimeterGoalVideoConfig | null {
+  if (data === null || data === undefined) return null;
+  if (!data || typeof data !== "object") return null;
+  const raw = data as Record<string, unknown>;
+  const filesRaw = raw.files;
+  if (!filesRaw || typeof filesRaw !== "object") return null;
+  const filesMap = filesRaw as Record<string, unknown>;
+  const keys = Object.keys(filesMap);
+  if (
+    keys.length !== MEDIA_PAIR_TARGET_KEYS.length ||
+    !MEDIA_PAIR_TARGET_KEYS.every((key) => keys.includes(key))
+  ) {
+    return null;
+  }
+  const files: Record<string, PerimeterOverlayFile> = {};
+  const seenNames = new Set<string>();
+  for (const target of MEDIA_PAIR_TARGETS) {
+    const parsed = parseOverlayFile(filesMap[target.key], options);
+    if (!parsed) return null;
+    if (seenNames.has(parsed.name)) return null;
+    seenNames.add(parsed.name);
+    files[target.key] = parsed;
+  }
+  return { files };
 }
 
 export function parsePerimeterMediaPairs(
@@ -715,7 +1096,13 @@ export function parsePerimeterMediaPairs(
         valid = false;
         break;
       }
-      files[target.key] = { name: fileName, source };
+      files[target.key] = {
+        name: fileName,
+        source,
+        ...(typeof file.generation === "string" && file.generation.length > 0
+          ? { generation: file.generation }
+          : {}),
+      };
     }
     if (!valid) continue;
 
@@ -868,7 +1255,11 @@ function parseAdLayoutFile(
   const source = typeof raw.source === "string" ? raw.source : "";
   if (!validateAdFileName(name)) return undefined;
   if (!validateAdSource(source, options)) return undefined;
-  return { name, source };
+  const generation =
+    typeof raw.generation === "string" && raw.generation.length > 0
+      ? raw.generation
+      : undefined;
+  return generation ? { name, source, generation } : { name, source };
 }
 
 function parseAdLayoutColumn(

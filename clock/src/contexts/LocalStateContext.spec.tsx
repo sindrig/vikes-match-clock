@@ -155,6 +155,69 @@ describe("LocalStateContext", () => {
   });
 
   describe("localStorage persistence", () => {
+    it("migrates an existing scoreboard key to a display target", () => {
+      localStorage.setItem("clock_screenKey", "outside");
+
+      let api: ReturnType<typeof useLocalState> | null = null;
+      render(
+        <LocalStateProvider>
+          <TestLocalStateConsumer
+            onMount={(localStateApi) => (api = localStateApi)}
+          />
+        </LocalStateProvider>,
+      );
+
+      expect(api?.displayTarget).toEqual({
+        kind: "scoreboard",
+        screenKey: "outside",
+      });
+      expect(localStorage.getItem("clock_displayTarget")).toBe(
+        JSON.stringify({ kind: "scoreboard", screenKey: "outside" }),
+      );
+    });
+
+    it("persists perimeter targets and clears them on disconnect", () => {
+      let api: ReturnType<typeof useLocalState> | null = null;
+      render(
+        <LocalStateProvider>
+          <TestLocalStateConsumer
+            onMount={(localStateApi) => (api = localStateApi)}
+          />
+        </LocalStateProvider>,
+      );
+
+      act(() => {
+        api!.setDisplayTarget({ kind: "perimeter" });
+      });
+      expect(api?.displayTarget).toEqual({ kind: "perimeter" });
+      expect(api?.screenKey).toBeNull();
+
+      act(() => {
+        api!.setDisplayTarget(null);
+      });
+      expect(api?.displayTarget).toBeNull();
+      expect(localStorage.getItem("clock_displayTarget")).toBeNull();
+    });
+
+    it("reloads a persisted perimeter target", () => {
+      localStorage.setItem(
+        "clock_displayTarget",
+        JSON.stringify({ kind: "perimeter" }),
+      );
+
+      let api: ReturnType<typeof useLocalState> | null = null;
+      render(
+        <LocalStateProvider>
+          <TestLocalStateConsumer
+            onMount={(localStateApi) => (api = localStateApi)}
+          />
+        </LocalStateProvider>,
+      );
+
+      expect(api?.displayTarget).toEqual({ kind: "perimeter" });
+      expect(api?.screenKey).toBeNull();
+    });
+
     it("loads listenPrefix from localStorage on mount", () => {
       localStorage.setItem("clock_listenPrefix", "test-location");
 
