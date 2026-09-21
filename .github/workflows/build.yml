@@ -43,6 +43,12 @@ jobs:
           restore-keys: |
             pnpm-${{ runner.os }}-
 
+      - uses: actions/cache@v3
+        name: Cache Firebase emulator binaries
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ runner.os }}
+
       - name: Install dependencies
         working-directory: ./clock
         run: pnpm i
@@ -112,19 +118,24 @@ jobs:
 
       - name: Wait for Firebase Emulator
         run: |
-          echo "Waiting for database emulator on port 9000..."
-          timeout 120 bash -c 'until curl -sf "http://127.0.0.1:9000/.json" > /dev/null 2>&1; do sleep 1; done' || {
-            echo "=== Firebase Emulator failed to become ready. Full emulator log: ==="
-            cat /tmp/emulator.log
-            exit 1
+          wait_port() {
+            echo "Waiting for $2 on port $1..."
+            timeout 120 bash -c "until curl -s -o /dev/null http://127.0.0.1:$1; do sleep 1; done" || {
+              echo "=== $2 failed to become ready. Full emulator log: ==="
+              cat /tmp/emulator.log
+              exit 1
+            }
+            echo "$2 is ready"
           }
-          echo "Database emulator is ready"
+          wait_port 9000 "Database emulator"
+          wait_port 9099 "Auth emulator"
+          wait_port 9199 "Storage emulator"
 
       - name: Run Firebase Realtime Database rules tests
         working-directory: ./functions
         env:
           RUN_RULES_TESTS: "true"
-        run: npm exec vitest run src/__tests__/audit-rules.test.ts
+        run: npm exec vitest run src/__tests__/audit-rules.test.ts src/__tests__/perimeter-overlay-rules.test.ts src/__tests__/scorer-storage-rules.test.ts
 
       - name: Start Vite dev server
         working-directory: ./clock

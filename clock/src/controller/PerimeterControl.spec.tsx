@@ -9,13 +9,18 @@ import {
   within,
 } from "@testing-library/react";
 import PerimeterControl from "./PerimeterControl";
-import { usePerimeter, useController } from "../contexts/FirebaseStateContext";
+import {
+  useListeners,
+  usePerimeter,
+  useController,
+} from "../contexts/FirebaseStateContext";
 import { useLocalState } from "../contexts/LocalStateContext";
 import { closestCenter } from "@dnd-kit/core";
 import type { CollisionDetection, DragEndEvent } from "@dnd-kit/core";
 
 vi.mock("../contexts/FirebaseStateContext", () => ({
   usePerimeter: vi.fn(),
+  useListeners: vi.fn(),
   useController: vi.fn(),
 }));
 
@@ -25,6 +30,7 @@ vi.mock("../contexts/LocalStateContext", () => ({
 
 vi.mock("../firebase", () => ({
   FIREBASE_STORAGE_BUCKET: "vikes-match-clock-staging.appspot.com",
+  database: {},
   storageHelpers: {
     listAll: vi.fn().mockResolvedValue({ items: [] }),
     uploadBytes: vi.fn().mockResolvedValue(undefined),
@@ -51,6 +57,7 @@ vi.mock("@dnd-kit/core", async (importOriginal) => {
 });
 
 const mockedUsePerimeter = vi.mocked(usePerimeter);
+const mockedUseListeners = vi.mocked(useListeners);
 const mockedUseLocalState = vi.mocked(useLocalState);
 const mockedUseController = vi.mocked(useController);
 
@@ -95,6 +102,8 @@ const createMockPerimeterReturn = (
     preview: basePreview,
     previewLoaded: true,
     setPerimeterState: vi.fn(),
+    skipPerimeterCue: vi.fn(),
+    restartPerimeterDisplays: vi.fn(),
     setPerimeterOverlay: vi.fn(),
     clearPerimeterOverlay: vi.fn(),
     setPerimeterAdLayout: mockSetPerimeterAdLayout,
@@ -132,6 +141,7 @@ const createMockLocalState = (
 beforeEach(() => {
   vi.clearAllMocks();
   mockedUsePerimeter.mockReturnValue(createMockPerimeterReturn());
+  mockedUseListeners.mockReturnValue({ available: [], screens: [] });
   mockedUseLocalState.mockReturnValue(createMockLocalState());
   mockedUseController.mockReturnValue({
     controller: { roster: { home: [], away: [] } },
@@ -139,6 +149,522 @@ beforeEach(() => {
 });
 
 describe("PerimeterControl", () => {
+  it("renders standalone controls without an opener modal", () => {
+    const setPerimeterState = vi.fn();
+    mockedUsePerimeter.mockReturnValue(
+      createMockPerimeterReturn({ setPerimeterState }),
+    );
+
+    render(<PerimeterControl standalone />);
+
+    expect(screen.getByRole("heading", { name: "Jaðarskjár" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Opna" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Kveikja" }));
+    expect(setPerimeterState).toHaveBeenCalledWith("on");
+  });
+
+  const mockWebVenueScreens = [
+    {
+      key: "test-location",
+      label: "Test location",
+      screen: {} as never,
+      perimeterDisplay: {
+        renderer: "web",
+        compatibilityKeys: {
+          base: { "1": "left" },
+          overlay: {},
+        },
+        logicalScreens: {
+          left: { id: "left", name: "Left", width: 4, height: 1 },
+        },
+      } as never,
+    },
+  ];
+
+  const webVenueAdLayout = {
+    version: 1,
+    revision: "revision",
+    columns: [
+      {
+        id: "column-1",
+        files: {
+          "1": { name: "left.png", source: "gs://bucket/left.png" },
+        },
+      },
+    ],
+  };
+
+  it("offers a skip-forward button on a web venue while playing", () => {
+    const skipPerimeterCue = vi.fn();
+    mockedUseListeners.mockReturnValue({
+      available: [],
+      screens: mockWebVenueScreens,
+    });
+    mockedUsePerimeter.mockReturnValue(
+      createMockPerimeterReturn({
+        perimeter: { enabled: true, state: "on" },
+        adLayout: webVenueAdLayout,
+        skipPerimeterCue,
+      }),
+    );
+
+    render(<PerimeterControl standalone />);
+
+    const skipButton = screen.getByRole("button", {
+      name: "Fara á næsta dálk",
+    });
+    expect(skipButton).toBeEnabled();
+    fireEvent.click(skipButton);
+    expect(skipPerimeterCue).toHaveBeenCalledTimes(1);
+  });
+
+  it("disables the skip-forward button while the perimeter is off", () => {
+    mockedUseListeners.mockReturnValue({
+      available: [],
+      screens: mockWebVenueScreens,
+    });
+    mockedUsePerimeter.mockReturnValue(
+      createMockPerimeterReturn({
+        perimeter: { enabled: true, state: "off" },
+        adLayout: webVenueAdLayout,
+      }),
+    );
+
+    render(<PerimeterControl standalone />);
+
+    expect(
+      screen.getByRole("button", { name: "Fara á næsta dálk" }),
+    ).toBeDisabled();
+  });
+
+  it("shows the brightness section on a web venue", () => {
+    mockedUseListeners.mockReturnValue({
+      available: [],
+      screens: mockWebVenueScreens,
+    });
+    mockedUsePerimeter.mockReturnValue(
+      createMockPerimeterReturn({
+        perimeter: { enabled: true, state: "on" },
+        adLayout: webVenueAdLayout,
+      }),
+    );
+
+    render(<PerimeterControl standalone />);
+
+    const section = document.querySelector(".perimeter-brightness");
+    expect(section).not.toBeNull();
+    expect(
+      within(section as HTMLElement).getByText("Bjartleiki jaðarskjás"),
+    ).toBeVisible();
+  });
+
+  it("shows the unconfigured goal-video fallback state", () => {
+    mockedUsePerimeter.mockReturnValue(
+      createMockPerimeterReturn({
+        perimeter: { enabled: true, state: "on" },
+        adLayout: webVenueAdLayout,
+        goalVideo: null,
+        setPerimeterGoalVideo: vi.fn().mockResolvedValue(undefined),
+      }),
+    );
+
+    render(<PerimeterControl standalone />);
+
+    const section = document.querySelector(".perimeter-goal-video");
+    expect(section).not.toBeNull();
+    expect(
+      within(section as HTMLElement).getByText(
+        "Ekkert stillt — markið notar goal-48/goal-40 skrárnar",
+      ),
+    ).toBeVisible();
+    expect(
+      within(section as HTMLElement).getByRole("button", {
+        name: "Stilla markmyndband",
+      }),
+    ).toBeVisible();
+  });
+
+  it("shows the scorer celebration selector on a web venue with the default style active", () => {
+    mockedUseListeners.mockReturnValue({
+      available: [],
+      screens: mockWebVenueScreens,
+    });
+    mockedUsePerimeter.mockReturnValue(
+      createMockPerimeterReturn({
+        perimeter: { enabled: true, state: "on" },
+        adLayout: webVenueAdLayout,
+        setPerimeterScorerCelebration: vi.fn().mockResolvedValue(undefined),
+      }),
+    );
+
+    render(<PerimeterControl standalone />);
+
+    const section = document.querySelector(".perimeter-scorer-celebration");
+    expect(section).not.toBeNull();
+    const ribbon = within(section as HTMLElement).getByRole("button", {
+      name: "Sjálfgefið",
+    });
+    expect(ribbon).toHaveAttribute("aria-pressed", "true");
+    expect(
+      within(section as HTMLElement).getByRole("button", { name: "Bylgja" }),
+    ).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("hides the scorer celebration selector on a Resolume venue", () => {
+    mockedUseListeners.mockReturnValue({
+      available: [],
+      screens: [
+        {
+          key: "test-location",
+          label: "Test location",
+          screen: {} as never,
+          perimeterDisplay: {
+            renderer: "resolume",
+            compatibilityKeys: {
+              base: { "1": "left" },
+              overlay: { "2": "left" },
+            },
+            logicalScreens: {
+              left: { id: "left", name: "Left", width: 4, height: 1 },
+            },
+          } as never,
+        },
+      ],
+    });
+    mockedUsePerimeter.mockReturnValue(
+      createMockPerimeterReturn({
+        perimeter: { enabled: true, state: "on" },
+      }),
+    );
+
+    render(<PerimeterControl standalone />);
+
+    expect(document.querySelector(".perimeter-scorer-celebration")).toBeNull();
+  });
+
+  it("writes the selected scorer celebration style", () => {
+    mockedUseListeners.mockReturnValue({
+      available: [],
+      screens: mockWebVenueScreens,
+    });
+    const setPerimeterScorerCelebration = vi
+      .fn<ReturnType<typeof usePerimeter>["setPerimeterScorerCelebration"]>()
+      .mockResolvedValue(undefined);
+    mockedUsePerimeter.mockReturnValue(
+      createMockPerimeterReturn({
+        perimeter: { enabled: true, state: "on" },
+        adLayout: webVenueAdLayout,
+        setPerimeterScorerCelebration,
+      }),
+    );
+
+    render(<PerimeterControl standalone />);
+
+    const section = document.querySelector(".perimeter-scorer-celebration");
+    expect(section).not.toBeNull();
+    fireEvent.click(
+      within(section as HTMLElement).getByRole("button", { name: "Bylgja" }),
+    );
+
+    expect(setPerimeterScorerCelebration).toHaveBeenCalledTimes(1);
+    expect(setPerimeterScorerCelebration).toHaveBeenCalledWith("wave");
+  });
+
+  it("shows the configured goal-video files and edits them", async () => {
+    const setPerimeterGoalVideo = vi
+      .fn<ReturnType<typeof usePerimeter>["setPerimeterGoalVideo"]>()
+      .mockResolvedValue(undefined);
+    mockedUseListeners.mockReturnValue({
+      available: [],
+      screens: [
+        {
+          key: "test-location",
+          label: "Test location",
+          screen: {} as never,
+          perimeterDisplay: {
+            renderer: "web",
+            compatibilityKeys: {
+              base: { "1": "left" },
+              overlay: { "2": "screen-48", "4": "screen-40" },
+            },
+            logicalScreens: {
+              "screen-48": {
+                id: "screen-48",
+                name: "48 skjáir",
+                width: 100,
+                height: 10,
+              },
+              "screen-40": {
+                id: "screen-40",
+                name: "40 skjáir",
+                width: 90,
+                height: 10,
+              },
+            },
+          } as never,
+        },
+      ],
+    });
+    mockedUsePerimeter.mockReturnValue(
+      createMockPerimeterReturn({
+        perimeter: { enabled: true, state: "on" },
+        adLayout: webVenueAdLayout,
+        goalVideo: {
+          files: {
+            "2": {
+              name: "goal-48.mp4",
+              source: "gs://bucket/test-location/perimeter/goal-48.mp4",
+              generation: "1",
+            },
+            "4": {
+              name: "goal-40.mp4",
+              source: "gs://bucket/test-location/perimeter/goal-40.mp4",
+              generation: "2",
+            },
+          },
+        },
+        setPerimeterGoalVideo,
+      }),
+    );
+
+    render(<PerimeterControl standalone />);
+
+    const section = document.querySelector(".perimeter-goal-video");
+    expect(section).not.toBeNull();
+    expect(
+      within(section as HTMLElement).getByText("48 skjáir: goal-48.mp4"),
+    ).toBeVisible();
+    expect(
+      within(section as HTMLElement).getByText("40 skjáir: goal-40.mp4"),
+    ).toBeVisible();
+
+    fireEvent.click(
+      within(section as HTMLElement).getByRole("button", { name: "Breyta" }),
+    );
+    const modal = screen.getByRole("dialog");
+    // The edit modal opens with one picker per configured overlay target.
+    expect(
+      within(modal).getByRole("button", {
+        name: "Hreinsa stillingu",
+      }),
+    ).toBeEnabled();
+    const save = within(modal).getByRole("button", {
+      name: "Vista",
+    });
+    expect(save).toBeEnabled();
+    fireEvent.click(save);
+    await waitFor(() => {
+      expect(setPerimeterGoalVideo).toHaveBeenCalledTimes(1);
+    });
+    expect(setPerimeterGoalVideo).toHaveBeenCalledWith({
+      files: {
+        "2": {
+          name: "goal-48.mp4",
+          source: "gs://bucket/test-location/perimeter/goal-48.mp4",
+          generation: "1",
+        },
+        "4": {
+          name: "goal-40.mp4",
+          source: "gs://bucket/test-location/perimeter/goal-40.mp4",
+          generation: "2",
+        },
+      },
+    });
+  });
+
+  it("hides the skip-forward button on non-web venues", () => {
+    mockedUsePerimeter.mockReturnValue(
+      createMockPerimeterReturn({
+        perimeter: { enabled: true, state: "on" },
+        adLayout: webVenueAdLayout,
+      }),
+    );
+
+    render(<PerimeterControl standalone />);
+    expect(
+      screen.queryByRole("button", { name: "Fara á næsta dálk" }),
+    ).toBeNull();
+  });
+
+  it("offers a restart button on a web venue", () => {
+    const restartPerimeterDisplays = vi.fn();
+    mockedUseListeners.mockReturnValue({
+      available: [],
+      screens: mockWebVenueScreens,
+    });
+    mockedUsePerimeter.mockReturnValue(
+      createMockPerimeterReturn({
+        perimeter: { enabled: true, state: "on" },
+        adLayout: webVenueAdLayout,
+        restartPerimeterDisplays,
+      }),
+    );
+
+    render(<PerimeterControl standalone />);
+
+    const restartButton = screen.getByRole("button", {
+      name: "Endurræsa alla jaðarskjá",
+    });
+    expect(restartButton).toBeEnabled();
+    fireEvent.click(restartButton);
+    expect(restartPerimeterDisplays).toHaveBeenCalledTimes(1);
+  });
+
+  it("hides the restart button on non-web venues", () => {
+    mockedUsePerimeter.mockReturnValue(
+      createMockPerimeterReturn({
+        perimeter: { enabled: true, state: "on" },
+        adLayout: webVenueAdLayout,
+      }),
+    );
+
+    render(<PerimeterControl standalone />);
+
+    expect(
+      screen.queryByRole("button", { name: "Endurræsa alla jaðarskjá" }),
+    ).toBeNull();
+  });
+
+  it("hides the scorer preparation panel and retry control on a web venue", () => {
+    mockedUseListeners.mockReturnValue({
+      available: [],
+      screens: mockWebVenueScreens,
+    });
+    mockedUsePerimeter.mockReturnValue(
+      createMockPerimeterReturn({
+        perimeter: { enabled: true, state: "on" },
+        adLayout: webVenueAdLayout,
+        goalScorerPreparationStatus: {
+          jobId: "job-1",
+          phase: "preparing",
+          readyCount: 0,
+          fallbackCount: 0,
+          unavailableCount: 0,
+          failedCount: 0,
+          total: 2,
+          updatedAt: Date.now(),
+          error: null,
+          players: {},
+        } as never,
+      }),
+    );
+
+    render(<PerimeterControl standalone />);
+
+    expect(
+      screen.queryByText("Markaskorari — jaðarefni"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Endurtaka undirbúning" }),
+    ).toBeNull();
+  });
+
+  it("keeps the scorer preparation panel and retry control on a Resolume venue", () => {
+    const requestGoalScorerPreparation = vi.fn().mockResolvedValue(undefined);
+    mockedUseListeners.mockReturnValue({
+      available: [],
+      screens: [
+        {
+          key: "test-location",
+          label: "Test location",
+          screen: {} as never,
+          perimeterDisplay: {
+            renderer: "resolume",
+            compatibilityKeys: { base: {}, overlay: {} },
+            logicalScreens: {},
+          } as never,
+        },
+      ],
+    });
+    mockedUseController.mockReturnValue({
+      controller: {
+        roster: {
+          home: [{ id: 10, name: "Jón", number: 7, show: true, role: "FW" }],
+          away: [],
+        },
+      },
+    } as unknown as ReturnType<typeof useController>);
+    mockedUsePerimeter.mockReturnValue(
+      createMockPerimeterReturn({
+        perimeter: { enabled: true, state: "on" },
+        goalScorerPreparationStatus: {
+          jobId: "job-1",
+          phase: "ready",
+          readyCount: 1,
+          fallbackCount: 0,
+          unavailableCount: 0,
+          failedCount: 0,
+          total: 1,
+          updatedAt: Date.now(),
+          error: null,
+          players: {
+            "10": { status: "ready", error: null },
+          },
+        } as never,
+        requestGoalScorerPreparation,
+      }),
+    );
+
+    render(<PerimeterControl standalone />);
+
+    expect(screen.getByText("Markaskorari — jaðarefni")).toBeVisible();
+    expect(screen.getByTestId("goal-scorer-player-10")).toBeVisible();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Endurtaka undirbúning" }),
+    );
+    expect(requestGoalScorerPreparation).toHaveBeenCalledWith(true);
+  });
+
+  it("derives editable lanes from a web venue mapping without daemon status", () => {
+    mockedUseListeners.mockReturnValue({
+      available: [],
+      screens: [
+        {
+          key: "test-location",
+          label: "Test location",
+          screen: {} as never,
+          perimeterDisplay: {
+            renderer: "web",
+            compatibilityKeys: {
+              base: { "1": "left", "3": "right" },
+              overlay: {},
+            },
+            logicalScreens: {
+              left: { id: "left", name: "Left", width: 4, height: 1 },
+              right: { id: "right", name: "Right", width: 4, height: 1 },
+            },
+          } as never,
+        },
+      ],
+    });
+    mockedUsePerimeter.mockReturnValue(
+      createMockPerimeterReturn({
+        appliedAdLayout: undefined,
+        appliedAdLayoutLoaded: false,
+        adLayout: {
+          version: 1,
+          revision: "revision",
+          columns: [
+            {
+              id: "column",
+              files: {
+                "1": { name: "left.png", source: "gs://bucket/left.png" },
+                "3": { name: "right.png", source: "gs://bucket/right.png" },
+              },
+            },
+          ],
+        },
+      }),
+    );
+
+    render(<PerimeterControl />);
+    fireEvent.click(screen.getByRole("button", { name: "Opna" }));
+
+    expect(screen.getByText("2 raðir")).toBeInTheDocument();
+    expect(screen.getByText("Left")).toBeInTheDocument();
+    expect(screen.getByText("Right")).toBeInTheDocument();
+  });
+
   it("renders nothing when perimeter is not enabled", () => {
     mockedUsePerimeter.mockReturnValue(
       createMockPerimeterReturn({

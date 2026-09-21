@@ -16,7 +16,9 @@ vi.mock("../../contexts/LocalStateContext", () => ({
 vi.mock("../../firebase", () => ({
   FIREBASE_STORAGE_BUCKET: "vikes-match-clock-firebase.appspot.com",
   storageHelpers: {
-    uploadBytes: vi.fn().mockResolvedValue(undefined),
+    uploadBytes: vi.fn().mockResolvedValue({
+      metadata: { generation: "1700000000000000" },
+    }),
     deleteObject: vi.fn().mockResolvedValue(undefined),
   },
 }));
@@ -194,10 +196,15 @@ describe("PerimeterMediaPairs", () => {
 
     const created = mockCreatePair.mock.calls[0] as unknown as [
       string,
-      { name: string; files: Record<string, { name: string }> },
+      {
+        name: string;
+        files: Record<string, { name: string; generation?: string }>;
+      },
     ];
     expect(created[1].name).toBe("Sindri");
     expect(Object.keys(created[1].files)).toEqual(["2", "4"]);
+    expect(created[1].files["2"]?.generation).toBe("1700000000000000");
+    expect(created[1].files["4"]?.generation).toBe("1700000000000000");
   });
 
   it("does not write a record when an upload fails", async () => {
