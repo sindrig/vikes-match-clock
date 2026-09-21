@@ -16,8 +16,12 @@
 
 npm-debug.log*
 
+# Firebase emulator debug logs
+*-debug.log*
+
 /venv/
 /.direnv/
+/.secrets/
 
 /api/skyrsla/suds/
 

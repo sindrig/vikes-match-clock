@@ -114,18 +114,22 @@ const PerimeterMediaPairs: React.FC = () => {
         const ext = safeExtension(file.name);
         const generatedName = `${target.folder}-${stamp}-${slugify(trimmedName)}${ext}`;
         const storagePath = `${listenPrefix}/perimeter-overlays/${pairId}/${target.folder}/${generatedName}`;
-        files[target.key] = {
-          name: generatedName,
-          source: `gs://${FIREBASE_STORAGE_BUCKET}/${storagePath}`,
-        };
         return storageHelpers
           .uploadBytes(storagePath, file, {
             cacheControl: "public, max-age=604800",
           })
-          .then(() => {
+          .then((result) => {
             // Track every upload that actually landed so a later failure can
             // clean it up instead of orphaning multi-hundred-MB files.
             uploadedPaths.push(storagePath);
+            // Record the immutable Storage generation so the pair can be
+            // shown on web perimeter screens without a metadata lookup.
+            const generation = result.metadata.generation;
+            files[target.key] = {
+              name: generatedName,
+              source: `gs://${FIREBASE_STORAGE_BUCKET}/${storagePath}`,
+              generation,
+            };
           });
       });
 
