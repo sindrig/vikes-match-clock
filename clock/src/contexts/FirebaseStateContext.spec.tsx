@@ -4145,7 +4145,7 @@ describe("goal scorer preparation", () => {
       });
     });
 
-    it("starts no daemon geometry or preparation subscriptions at a web venue", () => {
+    it("starts no daemon geometry or preparation subscriptions at a web venue", async () => {
       seedVenueState("web");
       render(
         <FirebaseStateProvider
@@ -4156,12 +4156,31 @@ describe("goal scorer preparation", () => {
           <TestPerimeterConsumer onMount={() => undefined} />
         </FirebaseStateProvider>,
       );
-      const subscribedPaths = vi
-        .mocked(onValue)
-        .mock.calls.map(([reference]) => String(reference));
-      expect(subscribedPaths).not.toContain(GEOMETRY_PATH);
-      expect(subscribedPaths).not.toContain(STATUS_PATH);
-      expect(subscribedPaths).not.toContain(REQUEST_PATH);
+      // The subscriptions are gated on the parsed locations snapshot: while
+      // it has not delivered, the venue is treated as legacy Resolume and
+      // the machinery may start briefly; once the web mapping arrives the
+      // subscriptions must be gone.
+      await waitFor(() =>
+        expect(mockOnValueCallbacks.get("locations")).toBeDefined(),
+      );
+      await waitFor(() => {
+        const geometryCalls = vi
+          .mocked(onValue)
+          .mock.calls.filter(
+            ([reference]) => String(reference) === GEOMETRY_PATH,
+          );
+        // Any geometry subscription started during the unknown-venue window
+        // was unsubscribed, and no live geometry subscription remains.
+        expect(geometryCalls).toHaveLength(1);
+        const geometryUnsub = vi.mocked(onValue).mock.results[
+          vi
+            .mocked(onValue)
+            .mock.calls.findIndex(
+              ([reference]) => String(reference) === GEOMETRY_PATH,
+            )
+        ]?.value as () => void;
+        expect(geometryUnsub).toHaveBeenCalled();
+      });
     });
 
     it("never requests preparation for a web roster", async () => {

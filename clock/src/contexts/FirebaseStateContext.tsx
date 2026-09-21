@@ -575,13 +575,14 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   // composition; every known venue without one — including all existing
   // Resolume venues with no published mapping — keeps the prepared-file
   // pipeline (daemon geometry, preparation status, retry). While the
-  // locations snapshot has not delivered, the venue is unknown and no
-  // Resolume machinery starts.
+  // locations snapshot has not delivered (or the venue carries no screens),
+  // the venue is unknown and is treated as legacy Resolume so an
+  // unrecognized venue never silently loses the scorer machinery.
   const isResolumeVenue = useMemo(() => {
     const venueScreens = listeners.screens.filter(
       (entry) => entry.key === listenPrefix,
     );
-    if (venueScreens.length === 0) return false;
+    if (venueScreens.length === 0) return true;
     return venueScreens.every(
       (entry) => entry.perimeterDisplay?.renderer !== "web",
     );
