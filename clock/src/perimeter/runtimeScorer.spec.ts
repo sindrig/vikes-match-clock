@@ -389,9 +389,41 @@ describe("PerimeterRuntime semantic scorer overlays", () => {
     expect(draw).toHaveBeenCalledWith(0);
     harness.runtime.render(3_500);
     expect(draw).toHaveBeenLastCalledWith(2_500);
-    // Negative or same-frame renders never rewind the animation.
+    // A timestamp moving backwards cannot rewind the animation.
     harness.runtime.render(500);
+    expect(draw).toHaveBeenLastCalledWith(2_500);
+  });
+
+  it("caps scorer canvas redraws and texture uploads at 30 fps", async () => {
+    const draw = vi.fn();
+    const presentation: ScorerPresentation = {
+      canvas: fakeCanvas("capped"),
+      draw: (elapsed: number): void => {
+        draw(elapsed);
+      },
+    };
+    const harness = createHarness({
+      compose: vi.fn(() => Promise.resolve({ left: presentation })),
+    });
+    await prepareActiveBase(harness);
+    await harness.runtime.setOverlay(scorerCommand, 1_000);
+
+    harness.runtime.render(1_000);
     expect(draw).toHaveBeenLastCalledWith(0);
+    expect(harness.getLastFrame()?.overlayDynamic).toBe(true);
+
+    harness.runtime.render(1_016);
+    expect(draw).toHaveBeenCalledTimes(1);
+    expect(harness.getLastFrame()?.overlayDynamic).toBe(false);
+
+    harness.runtime.render(1_034);
+    expect(draw).toHaveBeenLastCalledWith(34);
+    expect(draw).toHaveBeenCalledTimes(2);
+    expect(harness.getLastFrame()?.overlayDynamic).toBe(true);
+
+    harness.runtime.render(1_050);
+    expect(draw).toHaveBeenCalledTimes(2);
+    expect(harness.getLastFrame()?.overlayDynamic).toBe(false);
   });
 
   it("recomposes an active scorer presentation when the style changes", async () => {

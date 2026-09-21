@@ -4,9 +4,9 @@ import { validatePerimeterMapping } from "./perimeterMapping";
 export interface PerimeterRenderSources {
   base: Record<string, TexImageSource>;
   overlay?: Record<string, TexImageSource>;
-  // Animated scorer presentations redraw their canvases every frame while
-  // keeping the same canvas identity, so the overlay channel re-uploads its
-  // textures even when the sources do not change.
+  // Animated scorer presentations keep the same canvas identity. Mark the
+  // refreshes where their capped animation advances so the overlay channel
+  // re-uploads only those changed canvases.
   overlayDynamic?: boolean;
 }
 

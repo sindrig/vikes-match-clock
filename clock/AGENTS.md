@@ -1333,12 +1333,13 @@ players for semantic submission.
 
 - The scorer band is animated by the display browser. Each logical screen
   gets a `ScorerPresentation` — a canvas plus `draw(elapsedMs)` — that the
-  runtime redraws every frame while the scorer command is active. The
-  elapsed time is anchored at the first visible render after activation, so
-  the entrance always plays from the moment the scorer appears. Because the
-  canvas identity never changes, the renderer receives
-  `overlayDynamic: true` so `PerimeterWebGLRenderer` re-uploads the overlay
-  textures each frame instead of its identity short-circuit.
+  runtime advances at a maximum of 30 fps while the scorer command is active.
+  The elapsed time is anchored at the first visible render after activation,
+  so the entrance always plays from the moment the scorer appears. Because
+  the canvas identity never changes, the renderer receives
+  `overlayDynamic: true` only when that capped animation frame advances;
+  intervening display refreshes reuse the existing WebGL texture while base
+  videos continue updating at the browser's render rate.
 - Every style shares one entrance language (constants in
   `SCORER_PRESENTATION_TIMELINE`): a ~140 ms white impact flash, a red wipe
   edge crossing the band, and a left-to-right foreground reveal ending

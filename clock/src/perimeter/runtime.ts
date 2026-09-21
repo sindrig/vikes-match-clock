@@ -27,6 +27,8 @@ import {
 import { createBaseTimeline, nextCueBoundary } from "./timeline";
 import type { PerimeterRenderSources } from "./webglRenderer";
 
+const SCORER_FRAME_DURATION_MS = 1000 / 30;
+
 type PreparedColumn = {
   id: string;
   sources: Record<string, LoadedPerimeterMedia>;
@@ -132,6 +134,7 @@ export class PerimeterRuntime {
     command: GoalScorerOverlayCommand;
     presentations: Record<string, ScorerPresentation>;
     startedAt: number | null;
+    lastFrameIndex: number | null;
     release: () => void;
   } | null = null;
   // The goal-scorer celebration style written by the perimeter admin view.
@@ -439,6 +442,7 @@ export class PerimeterRuntime {
         command: prepared.scorerCommand!,
         presentations: prepared.presentations ?? {},
         startedAt: null,
+        lastFrameIndex: null,
         release: prepared.release,
       };
       this.overlayPlayback.clear();
@@ -491,21 +495,26 @@ export class PerimeterRuntime {
     let overlay: Record<string, TexImageSource> | undefined;
     let overlayDynamic = false;
     if (this.activeScorer) {
-      // Animated scorer presentations redraw their canvases every frame. The
-      // entrance animation is anchored on the first visible render so the
-      // impact flash and reveal play from the frame the scorer appears.
+      // The entrance is anchored on the first visible render. Scorer canvases
+      // advance at no more than 30 fps; intervening display refreshes reuse
+      // the existing WebGL textures while base videos can keep updating.
       if (this.activeScorer.startedAt === null) {
         this.activeScorer.startedAt = now;
       }
       const elapsed = Math.max(0, now - this.activeScorer.startedAt);
+      const frameIndex = Math.floor(elapsed / SCORER_FRAME_DURATION_MS);
+      const shouldDraw =
+        this.activeScorer.lastFrameIndex === null ||
+        frameIndex > this.activeScorer.lastFrameIndex;
       overlay = {};
       for (const [screenId, presentation] of Object.entries(
         this.activeScorer.presentations,
       )) {
-        presentation.draw(elapsed);
+        if (shouldDraw) presentation.draw(elapsed);
         overlay[screenId] = presentation.canvas;
       }
-      overlayDynamic = true;
+      if (shouldDraw) this.activeScorer.lastFrameIndex = frameIndex;
+      overlayDynamic = shouldDraw;
     } else {
       const overlayColumn = this.overlayPlayback.visibleColumn(now);
       overlay = overlayColumn
