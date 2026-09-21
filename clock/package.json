@@ -42,6 +42,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
+    "@firebase/rules-unit-testing": "^5.0.2",
     "@hey-api/openapi-ts": "^0.93.0",
     "@playwright/test": "^1.57.0",
     "@testing-library/jest-dom": "^6.9.1",
