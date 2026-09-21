@@ -146,6 +146,19 @@ describe("PerimeterDisplay", () => {
     await waitFor(() => expect(mockReportError).toHaveBeenCalledWith(null));
   });
 
+  it("paints the display black from the first render so boot never flashes white", () => {
+    render(<PerimeterDisplay />);
+
+    expect(screen.getByTestId("perimeter-display")).toHaveStyle({
+      minHeight: "100vh",
+      background: "#000",
+    });
+    expect(screen.getByTestId("perimeter-canvas")).toHaveStyle({
+      display: "block",
+      background: "#000",
+    });
+  });
+
   it("reports a media preparation failure to the controller", async () => {
     runtimeInstance.prepareBase = vi
       .fn()
@@ -173,9 +186,14 @@ describe("PerimeterDisplay", () => {
         "Engin gild perimeter stilling tiltæk.",
       ),
     );
-    expect(
-      screen.getByText("Engin gild perimeter stilling tiltæk."),
-    ).toBeInTheDocument();
+    const noConfigurationScreen = screen
+      .getByText("Engin gild perimeter stilling tiltæk.")
+      .closest(".perimeter-display");
+    expect(noConfigurationScreen).toHaveStyle({
+      minHeight: "100vh",
+      background: "#000",
+      color: "#fff",
+    });
   });
 
   it("does not report before the venue state is ready", async () => {

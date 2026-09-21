@@ -308,7 +308,10 @@ export default function PerimeterDisplay() {
 
   if (!configuration) {
     return (
-      <div className="perimeter-display perimeter-display-error">
+      <div
+        className="perimeter-display perimeter-display-error"
+        style={{ minHeight: "100vh", background: "#000", color: "#fff" }}
+      >
         <p>{NO_CONFIGURATION_MESSAGE}</p>
       </div>
     );
@@ -320,6 +323,11 @@ export default function PerimeterDisplay() {
       data-testid="perimeter-display"
       data-renderer={configuration.renderer}
       data-state={perimeter.state}
+      // Black from the first paint: the wrapper chain is otherwise
+      // transparent and <body> is white (rsuite), so the frames before the
+      // WebGL context exists (created in a post-paint effect) would flash
+      // white. Never rely on CSS files or the renderer for this.
+      style={{ minHeight: "100vh", background: "#000" }}
     >
       <canvas
         ref={canvasRef}
@@ -328,6 +336,7 @@ export default function PerimeterDisplay() {
         width={configuration.framebuffer.width}
         height={configuration.framebuffer.height}
         aria-label="Perimeter display"
+        style={{ display: "block", background: "#000" }}
       />
       {displayError && (
         <p className="perimeter-display-error" role="status">
