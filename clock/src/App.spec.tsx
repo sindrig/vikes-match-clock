@@ -44,6 +44,11 @@ vi.mock("./controller/asset/Asset", () => ({
 vi.mock("./controller/GoalScorerDialog", () => ({
   default: () => <div data-testid="goal-scorer-dialog">GoalScorerDialog</div>,
 }));
+vi.mock("./controller/PerimeterControl", () => ({
+  default: ({ standalone }: { standalone?: boolean }) => (
+    <div data-testid="perimeter-control" data-standalone={standalone} />
+  ),
+}));
 vi.mock("./screens/ScoreBoard", () => ({
   default: () => <div data-testid="scoreboard">ScoreBoard</div>,
 }));
@@ -119,6 +124,8 @@ function setupState2(
   overrides?: {
     setListenPrefix?: (prefix: string) => void;
     setScreenKey?: (vp: unknown) => void;
+    displayTarget?: { kind: "perimeter" };
+    setDisplayTarget?: (target: unknown) => void;
   },
 ) {
   const setListenPrefix =
@@ -131,6 +138,8 @@ function setupState2(
     setListenPrefix,
     screenKey: null,
     setScreenKey,
+    displayTarget: overrides?.displayTarget,
+    setDisplayTarget: overrides?.setDisplayTarget ?? vi.fn(),
     available: [],
     email: "",
     setEmail: vi.fn(),
@@ -151,6 +160,8 @@ function setupState3(
   overrides?: {
     setListenPrefix?: (prefix: string) => void;
     setScreenKey?: (vp: unknown) => void;
+    displayTarget?: { kind: "perimeter" };
+    setDisplayTarget?: (target: unknown) => void;
   },
 ) {
   const setListenPrefix =
@@ -163,6 +174,8 @@ function setupState3(
     setListenPrefix,
     screenKey: null,
     setScreenKey,
+    displayTarget: overrides?.displayTarget,
+    setDisplayTarget: overrides?.setDisplayTarget,
     available: ["vikinni"],
     email: "test@test.com",
     setEmail: vi.fn(),
@@ -288,6 +301,18 @@ describe("App", () => {
   });
 
   describe("State 3: authenticated", () => {
+    it("renders the standalone perimeter controller for a perimeter target", () => {
+      setupState3(VIEWS.idle, { displayTarget: { kind: "perimeter" } });
+      render(<App />);
+
+      expect(screen.getByTestId("perimeter-control")).toHaveAttribute(
+        "data-standalone",
+        "true",
+      );
+      expect(screen.queryByTestId("controller")).toBeNull();
+      expect(screen.queryByTestId("idle")).toBeNull();
+    });
+
     it("renders Controller for idle view", () => {
       setupState3(VIEWS.idle);
       render(<App />);
@@ -520,6 +545,33 @@ describe("App", () => {
 
       expect(screen.getByTestId("ring-loader")).toBeInTheDocument();
       expect(screen.queryByTestId("idle")).not.toBeInTheDocument();
+    });
+
+    it("shows the boot spinner on a black background", () => {
+      mockedUseLocalState.mockReturnValue({
+        auth: { isLoaded: true, isEmpty: true },
+        listenPrefix: "vikinni",
+        setListenPrefix: vi.fn(),
+        screenKey: null,
+        setScreenKey: vi.fn(),
+        available: [],
+        email: "",
+        setEmail: vi.fn(),
+        password: "",
+        setPassword: vi.fn(),
+        isAdmin: false,
+      });
+      mockedUseFirebaseState.mockReturnValue({
+        controller: { view: VIEWS.idle, currentAsset: null },
+        view: { vp: defaultViewport, background: "Default" },
+        ready: false,
+      } as unknown as ReturnType<typeof useFirebaseState>);
+
+      render(<App />);
+
+      const bootScreen = screen.getByTestId("ring-loader").parentElement;
+      expect(bootScreen).toHaveStyle({ background: "#000" });
+      expect(bootScreen).toHaveStyle({ height: "100vh" });
     });
 
     it("shows spinner when auth is not yet loaded", () => {

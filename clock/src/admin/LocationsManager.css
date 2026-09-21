@@ -54,6 +54,17 @@
   margin-bottom: 0.4rem;
 }
 
+.loc-perimeter-add {
+  margin-top: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.loc-perimeter-add .loc-hint {
+  color: #888;
+}
+
 .loc-modal-fields {
   display: flex;
   flex-direction: column;
