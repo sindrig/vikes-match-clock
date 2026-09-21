@@ -435,11 +435,6 @@ const GoalVideoSection = () => {
             : "Breyta"}
         </Button>
       </div>
-      <p className="perimeter-hint">
-        Þegar mark er skorað spilar þetta efni á jaðarskjánum þar til
-        markaskorari er valinn. Skrárnar eru valdar úr sama myndefnisgeymi og
-        auglýsingadálkar.
-      </p>
       <Modal open={showEdit} onClose={closeEdit} size="sm">
         <Modal.Header>
           <Modal.Title>Markamyndband</Modal.Title>
@@ -597,10 +592,6 @@ const BrightnessSection = () => {
           </span>
         )}
       </div>
-      <p className="perimeter-hint">
-        Stillingin er send í gegnum Firebase og beitt af jaðartölvunni (Vnnox) á
-        jaðarskjáinn.
-      </p>
     </div>
   );
 };
@@ -670,12 +661,6 @@ const ScorerCelebrationSection = () => {
       {settling && (
         <span className="perimeter-scorer-celebration-status">Vistar…</span>
       )}
-      <p className="perimeter-hint">
-        Birtingin sem spilar á jaðarskjánum þegar markaskorari er valinn. Sem
-        sjálfgefið er rauða kraftborðið; hinar stílnir setja stóran MARK texta,
-        bylgjuáberingu, hreyfingu eða leikmannsáherslu í fokus. Breytingin
-        beitist strax á lífandi borðanum.
-      </p>
     </div>
   );
 };
