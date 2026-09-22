@@ -518,6 +518,57 @@ describe("App", () => {
       unmount();
       expect(document.documentElement.style.fontSize).toBe("");
     });
+
+    it("does not scale root font-size for the authenticated controller", () => {
+      // Controllers resolve a screen viewport (for the preview), but the
+      // operator UI must never inherit the physical screen's fontSize.
+      setupState3(VIEWS.idle);
+      mockedUseFirebaseState.mockReturnValue({
+        controller: { view: VIEWS.idle, currentAsset: null },
+        view: {
+          vp: { ...defaultViewport, fontSize: "290%" },
+          background: "Default",
+        },
+        ready: true,
+      } as unknown as ReturnType<typeof useFirebaseState>);
+
+      render(<App />);
+
+      expect(document.documentElement.style.fontSize).toBe("");
+    });
+
+    it("stops scaling root font-size when a display logs in", () => {
+      mockedUseLocalState.mockReturnValue({
+        auth: { isLoaded: true, isEmpty: true },
+        listenPrefix: "vikinni",
+        setListenPrefix: vi.fn(),
+        screenKey: null,
+        setScreenKey: vi.fn(),
+        available: [],
+        email: "",
+        setEmail: vi.fn(),
+        password: "",
+        setPassword: vi.fn(),
+        isAdmin: false,
+      });
+      mockedUseFirebaseState.mockReturnValue({
+        controller: { view: VIEWS.idle, currentAsset: null },
+        view: {
+          vp: { ...defaultViewport, fontSize: "200%" },
+          background: "Default",
+        },
+        ready: true,
+      } as unknown as ReturnType<typeof useFirebaseState>);
+
+      const { rerender } = render(<App />);
+      expect(document.documentElement.style.fontSize).toBe("200%");
+
+      // Same browser logs in (becomes a controller): scaling must be removed.
+      setupState3(VIEWS.idle);
+      rerender(<App />);
+
+      expect(document.documentElement.style.fontSize).toBe("");
+    });
   });
 
   describe("Loading spinner", () => {

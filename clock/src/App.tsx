@@ -234,14 +234,18 @@ function App() {
 
   // Apply viewport fontSize to the root <html> element so all rem-based
   // content (clocks, scores, etc.) scales to the physical screen config.
+  // Only stadium displays scale: they are unauthenticated and resolved a
+  // screen viewport. The authenticated controller also resolves a screen
+  // (for its preview), but scaling the root would resize every rsuite
+  // button and control in the operator UI, so it stays at the default size.
   useEffect(() => {
-    if (vp.fontSize) {
+    if (!isAuthenticated && vp.fontSize) {
       document.documentElement.style.fontSize = vp.fontSize;
     }
     return () => {
       document.documentElement.style.fontSize = "";
     };
-  }, [vp.fontSize]);
+  }, [isAuthenticated, vp.fontSize]);
 
   const renderAppTree = (): React.ReactNode => {
     // State 1: no listenPrefix, not authenticated — Controller handles screen selector + login
