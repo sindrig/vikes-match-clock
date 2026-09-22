@@ -7,8 +7,9 @@
 #      which is exactly the pre-rollout state. The public display selector
 #      stops offering Perimeter and the daemon/Resolume path resumes.
 #   2. Restores the pre-swap desired perimeter state snapshot (clears
-#      skipCue/refreshToken tokens left behind by web-venue testing) if the
-#      snapshot file exists.
+#      skipCue/refreshToken tokens left behind by web-venue testing and
+#      removes any generation backfill the swap added) if the snapshot
+#      file exists.
 #   3. Re-fetches and verifies.
 #
 # Prerequisites: same gcloud auth as vikuti-swap-to-web.sh.
