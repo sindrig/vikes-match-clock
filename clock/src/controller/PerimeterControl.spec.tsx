@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createElement } from "react";
 import type { ComponentProps } from "react";
 import {
+  act,
   render,
   screen,
   fireEvent,
@@ -1775,6 +1776,133 @@ describe("PerimeterControl", () => {
           "Ekki tókst að sækja skýjaspá — ferillinn sýnir klára himinn.",
         ),
       ).toBeInTheDocument();
+    });
+
+    it("drops a forecast that resolves after the panel unmounts", async () => {
+      let resolveFetch: (value: unknown) => void = () => undefined;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(
+          () =>
+            new Promise((resolve) => {
+              resolveFetch = resolve;
+            }),
+        ),
+      );
+      mockedUsePerimeter.mockReturnValue(
+        createMockPerimeterReturn({ brightnessAuto: autoConfig }),
+      );
+      const { unmount } = render(<PerimeterControl />);
+      fireEvent.click(screen.getByRole("button", { name: "Opna" }));
+
+      unmount();
+      // The in-flight fetch resolves after unmount; the panel must drop it
+      // without touching state.
+      resolveFetch({ ok: false, json: () => Promise.resolve({}) });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    it("polls the forecast every 15 minutes while the panel is open", async () => {
+      vi.useFakeTimers();
+      try {
+        const fetchMock = vi
+          .fn()
+          .mockResolvedValue({ ok: false, json: () => Promise.resolve({}) });
+        vi.stubGlobal("fetch", fetchMock);
+        mockedUsePerimeter.mockReturnValue(
+          createMockPerimeterReturn({ brightnessAuto: autoConfig }),
+        );
+        render(<PerimeterControl />);
+        fireEvent.click(screen.getByRole("button", { name: "Opna" }));
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(15 * 60 * 1000);
+        });
+
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("treats a cleared auto parameter as invalid and blocks Vista", () => {
+      const setAuto = vi
+        .fn<ReturnType<typeof usePerimeter>["setPerimeterBrightnessAuto"]>()
+        .mockResolvedValue(undefined);
+      mockedUsePerimeter.mockReturnValue(
+        createMockPerimeterReturn({
+          brightnessAuto: autoConfig,
+          setPerimeterBrightnessAuto: setAuto,
+        }),
+      );
+      openModal();
+
+      const inputs = getAutoInputs();
+      fireEvent.change(inputs.min, { target: { value: "" } });
+
+      expect(
+        screen.getByText("Allir reitir verða að vera með gildi."),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Vista" })).toBeDisabled();
+      fireEvent.click(screen.getByRole("button", { name: "Vista" }));
+      expect(setAuto).not.toHaveBeenCalled();
+
+      // Entering a value again restores a valid draft and a live button.
+      fireEvent.change(inputs.min, { target: { value: "5" } });
+      expect(
+        screen.queryByText("Allir reitir verða að vera með gildi."),
+      ).toBeNull();
+      expect(screen.getByRole("button", { name: "Vista" })).toBeEnabled();
+    });
+
+    it("restores the mode buttons and shows an error when the switch write fails", async () => {
+      const setAuto = vi
+        .fn<ReturnType<typeof usePerimeter>["setPerimeterBrightnessAuto"]>()
+        .mockRejectedValue(new Error("offline"));
+      mockedUsePerimeter.mockReturnValue(
+        createMockPerimeterReturn({ setPerimeterBrightnessAuto: setAuto }),
+      );
+      openModal();
+
+      fireEvent.click(screen.getByRole("button", { name: "Sjálfvirkt" }));
+
+      await waitFor(() =>
+        expect(
+          screen.getByText(
+            "Ekki tókst að breyta stjórnun bjartleika. Reyndu aftur.",
+          ),
+        ).toBeInTheDocument(),
+      );
+      expect(screen.getByRole("button", { name: "Sjálfvirkt" })).toBeEnabled();
+    });
+
+    it("shows an error and re-enables Vista when the auto save write fails", async () => {
+      const setAuto = vi
+        .fn<ReturnType<typeof usePerimeter>["setPerimeterBrightnessAuto"]>()
+        .mockRejectedValue(new Error("denied"));
+      mockedUsePerimeter.mockReturnValue(
+        createMockPerimeterReturn({
+          brightnessAuto: autoConfig,
+          setPerimeterBrightnessAuto: setAuto,
+        }),
+      );
+      openModal();
+
+      fireEvent.change(
+        screen.getByRole("textbox", { name: "Sjálfvirkt lágmark" }),
+        { target: { value: "7" } },
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Vista" }));
+
+      await waitFor(() =>
+        expect(
+          screen.getByText(
+            "Ekki tókst að vista sjálfvirka stillingu. Reyndu aftur.",
+          ),
+        ).toBeInTheDocument(),
+      );
+      expect(screen.getByRole("button", { name: "Vista" })).toBeEnabled();
     });
   });
 });

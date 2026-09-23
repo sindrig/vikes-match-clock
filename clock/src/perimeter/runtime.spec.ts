@@ -169,6 +169,23 @@ describe("PerimeterRuntime", () => {
     expect(getLastFrame()).toEqual({ base: {}, overlayDynamic: false });
   });
 
+  it("destroy drops the idle clocks and releases the runtime's resources", async () => {
+    const { runtime, render, getLastFrame } = createRuntime();
+    await runtime.prepareBase(layout);
+    await runtime.setOverlay(overlay, 0);
+
+    runtime.destroy();
+
+    // After destroy nothing is left to render: the base and overlay slots
+    // were released and the framebuffer goes black again on the next frame.
+    runtime.render(0);
+    expect(getLastFrame()).toEqual({ base: {}, overlayDynamic: false });
+    expect(render).toHaveBeenLastCalledWith({
+      base: {},
+      overlayDynamic: false,
+    });
+  });
+
   it("keeps the framebuffer black while off and starts cue zero on power on", async () => {
     const { runtime, render, getLastFrame } = createRuntime();
     await runtime.prepareBase(layout);

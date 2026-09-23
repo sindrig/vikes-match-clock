@@ -9,6 +9,13 @@ import {
 import { secondStadiumWebConfiguration } from "./fixtures";
 
 const mockReportError = vi.hoisted(() => vi.fn());
+const idleClockHooks = vi.hoisted(() => ({
+  createIdleClocks: vi.fn(),
+}));
+
+vi.mock("./idleClock", () => ({
+  createIdleClocks: idleClockHooks.createIdleClocks,
+}));
 
 vi.mock("../contexts/FirebaseStateContext", () => ({
   useFirebaseState: vi.fn(),
@@ -331,5 +338,98 @@ describe("PerimeterDisplay", () => {
     await waitFor(() =>
       expect(runtimeInstance.setScorerStyle).toHaveBeenCalledWith("ribbon"),
     );
+  });
+
+  describe("idle clock", () => {
+    const idlePresentation = {
+      canvas: document.createElement("canvas"),
+      draw: vi.fn(),
+    };
+
+    beforeEach(() => {
+      idleClockHooks.createIdleClocks.mockReset();
+    });
+
+    it("loads idle clock presentations while the perimeter is off", async () => {
+      idleClockHooks.createIdleClocks.mockResolvedValue({
+        strip: idlePresentation,
+      });
+      setupContexts({ perimeter: { state: "off", idleClock: true } });
+
+      render(<PerimeterDisplay />);
+
+      await waitFor(() =>
+        expect(runtimeInstance.setIdleClocks).toHaveBeenCalledWith({
+          strip: idlePresentation,
+        }),
+      );
+      expect(idleClockHooks.createIdleClocks).toHaveBeenCalledWith(
+        Object.values(configuration.logicalScreens),
+      );
+      await waitFor(() =>
+        expect(mockReportError).toHaveBeenLastCalledWith(null),
+      );
+    });
+
+    it("reports a failed idle clock load to the controller", async () => {
+      idleClockHooks.createIdleClocks.mockRejectedValue(
+        new Error("decode failed"),
+      );
+      setupContexts({ perimeter: { state: "off", idleClock: true } });
+
+      render(<PerimeterDisplay />);
+
+      await waitFor(() =>
+        expect(runtimeInstance.setIdleClocks).toHaveBeenLastCalledWith(null),
+      );
+      await waitFor(() =>
+        expect(mockReportError).toHaveBeenCalledWith(
+          "Idle clock could not load.",
+        ),
+      );
+      expect(
+        screen.getByText("Idle clock could not load."),
+      ).toBeInTheDocument();
+    });
+
+    it("clears the idle clock error when the toggle switches off", async () => {
+      idleClockHooks.createIdleClocks.mockRejectedValue(
+        new Error("decode failed"),
+      );
+      setupContexts({ perimeter: { state: "off", idleClock: true } });
+      const { rerender } = render(<PerimeterDisplay />);
+
+      await waitFor(() =>
+        expect(mockReportError).toHaveBeenCalledWith(
+          "Idle clock could not load.",
+        ),
+      );
+
+      setupContexts({ perimeter: { state: "off" } });
+      rerender(<PerimeterDisplay />);
+
+      await waitFor(() =>
+        expect(mockReportError).toHaveBeenLastCalledWith(null),
+      );
+    });
+
+    it("drops idle clock presentations that resolve after unmount", async () => {
+      let resolveCreate: (value: unknown) => void = () => undefined;
+      idleClockHooks.createIdleClocks.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolveCreate = resolve;
+          }),
+      );
+      setupContexts({ perimeter: { state: "off", idleClock: true } });
+      const { unmount } = render(<PerimeterDisplay />);
+
+      unmount();
+      // The late resolution must not touch the unmounted screen's state: the
+      // runtime was already told to clear its idle clocks on unmount.
+      resolveCreate({ strip: idlePresentation });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(runtimeInstance.setIdleClocks).toHaveBeenLastCalledWith(null);
+    });
   });
 });

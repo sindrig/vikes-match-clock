@@ -1,10 +1,11 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 import {
   DEFAULT_BRIGHTNESS_AUTO_CONFIG,
   applyCloud,
   buildTargetCurve,
   clearSkyLux,
   cloudCoverAtTime,
+  fetchCloudForecast,
   luxToPercent,
   parseCloudForecast,
   parseIsoUtc,
@@ -307,6 +308,21 @@ describe("validateBrightnessAutoConfig", () => {
       }),
     ).not.toBeNull();
   });
+
+  it("rejects non-numeric lux bounds", () => {
+    expect(
+      validateBrightnessAutoConfig({
+        ...DEFAULT_BRIGHTNESS_AUTO_CONFIG,
+        luxMin: Number.NaN,
+      }),
+    ).not.toBeNull();
+    expect(
+      validateBrightnessAutoConfig({
+        ...DEFAULT_BRIGHTNESS_AUTO_CONFIG,
+        luxMax: Number.POSITIVE_INFINITY,
+      }),
+    ).not.toBeNull();
+  });
 });
 
 describe("cloudCoverAtTime", () => {
@@ -344,6 +360,23 @@ describe("cloudCoverAtTime", () => {
     ).toBeNull();
     expect(
       cloudCoverAtTime([], [], Date.parse("2026-09-22T10:00:00Z")),
+    ).toBeNull();
+  });
+
+  it("returns null for sparse arrays with missing entries", () => {
+    const allSparse = new Array(2) as unknown as readonly number[];
+    expect(cloudCoverAtTime(allSparse, [0.1, 0.2], 0)).toBeNull();
+    const middleSparse = [
+      Date.parse("2026-09-22T10:00:00Z"),
+      undefined,
+      Date.parse("2026-09-22T12:00:00Z"),
+    ] as unknown as readonly number[];
+    expect(
+      cloudCoverAtTime(
+        middleSparse,
+        [0.1, 0.2, 0.3],
+        Date.parse("2026-09-22T11:00:00Z"),
+      ),
     ).toBeNull();
   });
 });
@@ -436,5 +469,49 @@ describe("parseCloudForecast", () => {
         0,
       ),
     ).toBeNull();
+  });
+
+  it("rejects empty hourly arrays", () => {
+    expect(
+      parseCloudForecast({ hourly: { time: [], cloud_cover: [] } }, 0),
+    ).toBeNull();
+  });
+});
+
+describe("fetchCloudForecast", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("returns null when the response is not ok", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve({ ok: false })),
+    );
+
+    await expect(fetchCloudForecast()).resolves.toBeNull();
+  });
+
+  it("returns null when the request fails", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.reject(new Error("offline"))),
+    );
+
+    await expect(fetchCloudForecast()).resolves.toBeNull();
+  });
+
+  it("returns null when the response body is not a forecast", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ hourly: null }),
+        }),
+      ),
+    );
+
+    await expect(fetchCloudForecast()).resolves.toBeNull();
   });
 });
