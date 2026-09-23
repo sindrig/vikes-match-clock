@@ -67,6 +67,11 @@ const STALE_MS = 15 * 60 * 1000;
 const MAX_UPLOAD_BYTES = 250 * 1024 * 1024;
 const MAX_AD_COLUMNS = 20;
 
+// Venues whose perimeter LED installation has no brightness controller (no
+// Vnnox/UCenter daemon applies or verifies the requested percentage), so the
+// Bjartleiki jaðarskjás section would be dead UI there.
+const VENUES_WITHOUT_BRIGHTNESS = new Set(["virkid"]);
+
 const PHASE_LABELS: Record<string, string> = {
   loading: "Hleður",
   playing: "Spilar",
@@ -1378,7 +1383,7 @@ const PerimeterControl = ({ standalone = false }: { standalone?: boolean }) => {
   const contents = (
     <>
       {isWebVenue && <PerimeterDisplayReports />}
-      <BrightnessSection />
+      {!VENUES_WITHOUT_BRIGHTNESS.has(listenPrefix) && <BrightnessSection />}
       <GoalVideoSection />
       {isWebVenue && <ScorerCelebrationSection />}
       {!isWebVenue && <GoalScorerPreparation />}

@@ -260,6 +260,27 @@ describe("PerimeterControl", () => {
     ).toBeVisible();
   });
 
+  it("hides the brightness section at venues without a brightness controller", () => {
+    mockedUseListeners.mockReturnValue({
+      available: [],
+      screens: mockWebVenueScreens,
+    });
+    mockedUseLocalState.mockReturnValue(
+      createMockLocalState({ listenPrefix: "virkid" }),
+    );
+    mockedUsePerimeter.mockReturnValue(
+      createMockPerimeterReturn({
+        perimeter: { enabled: true, state: "on" },
+        adLayout: webVenueAdLayout,
+      }),
+    );
+
+    render(<PerimeterControl standalone />);
+
+    expect(document.querySelector(".perimeter-brightness")).toBeNull();
+    expect(screen.queryByText("Bjartleiki jaðarskjás")).toBeNull();
+  });
+
   it("shows the unconfigured goal-video fallback state", () => {
     mockedUsePerimeter.mockReturnValue(
       createMockPerimeterReturn({
