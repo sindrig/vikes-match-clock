@@ -172,6 +172,9 @@ async function patch(
 async function readRtdb(path: string): Promise<Record<string, unknown>> {
   const response = await fetch(
     `http://127.0.0.1:9000/${path}.json?ns=vikes-match-clock-test`,
+    // The audit path is rules-protected; read as the emulator owner like the
+    // patch helper so the empty-audit assertion observes reality.
+    { headers: OWNER_HEADERS },
   );
   return (await response.json()) as Record<string, unknown>;
 }
