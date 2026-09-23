@@ -763,7 +763,8 @@
 }
 
 .perimeter-preview-modal .perimeter-brightness-curve-svg {
-  width: 100%;
+  width: 480px;
+  max-width: 100%;
   height: auto;
   background: #fff;
   border: 1px solid #e0e3e7;
