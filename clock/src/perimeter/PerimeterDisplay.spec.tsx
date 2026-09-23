@@ -40,6 +40,7 @@ const runtimeInstance = vi.hoisted(() => ({
   activatePreparedBase: vi.fn(),
   setOverlay: vi.fn(),
   setScorerStyle: vi.fn(),
+  setIdleClocks: vi.fn(),
 }));
 
 const rendererInstance = vi.hoisted(() => ({

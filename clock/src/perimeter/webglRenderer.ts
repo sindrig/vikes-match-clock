@@ -3,6 +3,7 @@ import { validatePerimeterMapping } from "./perimeterMapping";
 
 export interface PerimeterRenderSources {
   base: Record<string, TexImageSource>;
+  baseDynamic?: boolean;
   overlay?: Record<string, TexImageSource>;
   // Animated scorer presentations keep the same canvas identity. Mark the
   // refreshes where their capped animation advances so the overlay channel
@@ -369,7 +370,7 @@ export class PerimeterWebGLRenderer {
     gl.clearColor(0, 0, 0, 1);
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.useProgram(this.program);
-    this.drawChannel(sources.base, "base", false);
+    this.drawChannel(sources.base, "base", sources.baseDynamic === true);
     if (sources.overlay) {
       this.drawChannel(
         sources.overlay,

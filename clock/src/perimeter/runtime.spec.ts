@@ -144,6 +144,31 @@ function loadedMedia(
 }
 
 describe("PerimeterRuntime", () => {
+  it("shows idle content only while off, preserves overlays, and supports blackout", async () => {
+    const { runtime, getLastFrame } = createRuntime();
+    const canvas = document.createElement("canvas");
+    const draw = vi.fn();
+    runtime.setIdleClocks({ left: { canvas, draw } });
+    await runtime.setOverlay(overlay, 0);
+    runtime.render(100);
+    expect(getLastFrame()?.base.left).toBe(canvas);
+    expect(getLastFrame()?.overlay).toBeUndefined();
+    expect(getLastFrame()?.baseDynamic).toBe(true);
+    runtime.render(101);
+    expect(draw).toHaveBeenCalledTimes(1);
+    expect(getLastFrame()?.baseDynamic).toBe(false);
+    runtime.setPowered(true, 200);
+    runtime.render(200);
+    expect(getLastFrame()?.base.left).toBeUndefined();
+    expect(getLastFrame()?.overlay?.left).toBeDefined();
+    runtime.setPowered(false, 300);
+    runtime.render(300);
+    expect(getLastFrame()?.base.left).toBe(canvas);
+    runtime.setIdleClocks(null);
+    runtime.render(400);
+    expect(getLastFrame()).toEqual({ base: {}, overlayDynamic: false });
+  });
+
   it("keeps the framebuffer black while off and starts cue zero on power on", async () => {
     const { runtime, render, getLastFrame } = createRuntime();
     await runtime.prepareBase(layout);

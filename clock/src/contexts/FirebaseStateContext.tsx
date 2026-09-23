@@ -344,6 +344,7 @@ interface FirebaseStateContextType {
     style: ScorerCelebrationStyle,
   ) => Promise<void>;
   mediaPairs: Record<string, PerimeterMediaPair>;
+  setPerimeterIdleClock: (enabled: boolean) => Promise<void>;
   perimeterGoalVideo: PerimeterGoalVideoConfig | null;
   perimeterOverlay: PerimeterOverlay | null;
   perimeterOverlayStatus: PerimeterOverlayStatus | null;
@@ -2661,6 +2662,22 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     [makeAudit, listenPrefix, writeEligible],
   );
 
+  const setPerimeterIdleClock = useCallback(
+    (enabled: boolean): Promise<void> => {
+      if (!writeEligible)
+        return Promise.reject(new Error("State is not ready."));
+      const audit = makeAudit("perimeter", "perimeter.set-idle-clock");
+      if (!audit) return Promise.reject(new Error("Not authorized."));
+      return firebaseDatabase.writeAudited(
+        listenPrefix,
+        "perimeter",
+        { idleClock: enabled },
+        audit,
+      );
+    },
+    [makeAudit, listenPrefix, writeEligible],
+  );
+
   const setPerimeterBrightness = useCallback(
     (percent: number): Promise<void> => {
       if (!listenPrefix || !isAuthenticated || !writeEligible) {
@@ -2993,6 +3010,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       deletePerimeterMediaPair,
       setPerimeterGoalVideo,
       setPerimeterScorerCelebration,
+      setPerimeterIdleClock,
       perimeterGoalVideo,
       mediaPairs: perimeterMediaPairs,
       perimeterAdLayout,
@@ -3096,6 +3114,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       deletePerimeterMediaPair,
       setPerimeterGoalVideo,
       setPerimeterScorerCelebration,
+      setPerimeterIdleClock,
       perimeterGoalVideo,
       perimeterMediaPairs,
       perimeterAdLayout,
@@ -3313,6 +3332,7 @@ export const usePerimeter = () => {
     deletePerimeterMediaPair,
     setPerimeterGoalVideo,
     setPerimeterScorerCelebration,
+    setPerimeterIdleClock,
     mediaPairs,
     perimeterGoalVideo,
     perimeterOverlay,
@@ -3342,6 +3362,7 @@ export const usePerimeter = () => {
     clearPerimeterOverlay,
     setPerimeterAdLayout,
     setPerimeterScorerCelebration,
+    setPerimeterIdleClock,
     createPerimeterMediaPair,
     deletePerimeterMediaPair,
     setPerimeterGoalVideo,

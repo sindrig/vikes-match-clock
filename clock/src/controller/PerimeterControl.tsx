@@ -7,6 +7,7 @@ import {
   Badge,
   InputNumber,
   Slider,
+  Toggle,
 } from "rsuite";
 import CloseIcon from "@rsuite/icons/Close";
 import PlusIcon from "@rsuite/icons/Plus";
@@ -42,7 +43,11 @@ import {
   PerimeterBrightnessAutoConfig,
   ScorerCelebrationStyle,
 } from "../types";
-import { useListeners, usePerimeter } from "../contexts/FirebaseStateContext";
+import {
+  useFirebaseState,
+  useListeners,
+  usePerimeter,
+} from "../contexts/FirebaseStateContext";
 import { useLocalState } from "../contexts/LocalStateContext";
 import { validateAdFileName } from "../contexts/firebaseParsers";
 import {
@@ -1115,6 +1120,40 @@ const SCORER_CELEBRATION_ORDER: ScorerCelebrationStyle[] = [
   "cutout",
 ];
 
+const IdleClockSection = () => {
+  const { perimeter, setPerimeterIdleClock } = usePerimeter();
+  const { writeEligible } = useFirebaseState();
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState(false);
+  const change = (enabled: boolean) => {
+    setPending(true);
+    setError(false);
+    void setPerimeterIdleClock(enabled)
+      .catch(() => setError(true))
+      .finally(() => setPending(false));
+  };
+  return (
+    <div className="perimeter-scorer-celebration">
+      <div className="perimeter-brightness-header">
+        <span className="perimeter-brightness-title">Klukka í biðstöðu</span>
+        <Toggle
+          label="Sýna klukku og Víkingsmerki þegar slökkt er"
+          checked={perimeter.idleClock === true}
+          disabled={pending || !writeEligible}
+          onChange={change}
+        />
+      </div>
+      <p>
+        Klukka og Víkingsmerki færast til hægri þegar slökkt er á auglýsingum.
+        Slökktu á þessari stillingu fyrir svartan skjá.
+      </p>
+      {error && (
+        <p role="alert">Ekki tókst að vista stillingu. Reyndu aftur.</p>
+      )}
+    </div>
+  );
+};
+
 const ScorerCelebrationSection = () => {
   const { perimeter, setPerimeterScorerCelebration } = usePerimeter();
   const selected: ScorerCelebrationStyle =
@@ -1386,6 +1425,7 @@ const PerimeterControl = ({ standalone = false }: { standalone?: boolean }) => {
       {!VENUES_WITHOUT_BRIGHTNESS.has(listenPrefix) && <BrightnessSection />}
       <GoalVideoSection />
       {isWebVenue && <ScorerCelebrationSection />}
+      {isWebVenue && <IdleClockSection />}
       {!isWebVenue && <GoalScorerPreparation />}
       {!isWebVenue && !appliedAdLayoutLoaded ? (
         <div className="perimeter-preview-state">

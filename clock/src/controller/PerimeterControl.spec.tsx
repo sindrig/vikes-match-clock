@@ -19,6 +19,7 @@ import { closestCenter } from "@dnd-kit/core";
 import type { CollisionDetection, DragEndEvent } from "@dnd-kit/core";
 
 vi.mock("../contexts/FirebaseStateContext", () => ({
+  useFirebaseState: vi.fn(() => ({ writeEligible: true })),
   usePerimeter: vi.fn(),
   useListeners: vi.fn(),
   useController: vi.fn(),
@@ -102,6 +103,7 @@ const createMockPerimeterReturn = (
     preview: basePreview,
     previewLoaded: true,
     setPerimeterState: vi.fn(),
+    setPerimeterIdleClock: vi.fn().mockResolvedValue(undefined),
     skipPerimeterCue: vi.fn(),
     restartPerimeterDisplays: vi.fn(),
     setPerimeterOverlay: vi.fn(),
@@ -363,6 +365,41 @@ describe("PerimeterControl", () => {
     render(<PerimeterControl standalone />);
 
     expect(document.querySelector(".perimeter-scorer-celebration")).toBeNull();
+  });
+
+  it("saves the idle toggle without optimistic state and reports write failures", async () => {
+    mockedUseListeners.mockReturnValue({
+      available: [],
+      screens: mockWebVenueScreens,
+    });
+    const save = vi.fn().mockResolvedValue(undefined);
+    mockedUsePerimeter.mockReturnValue(
+      createMockPerimeterReturn({ setPerimeterIdleClock: save }),
+    );
+    const { rerender } = render(<PerimeterControl standalone />);
+    const toggle = screen.getByRole("switch", {
+      name: "Sýna klukku og Víkingsmerki þegar slökkt er",
+    });
+    expect(toggle).toHaveAttribute("aria-checked", "false");
+    fireEvent.click(toggle);
+    await waitFor(() => expect(toggle).not.toBeDisabled());
+    expect(save).toHaveBeenCalledWith(true);
+    expect(toggle).toHaveAttribute("aria-checked", "false");
+    mockedUsePerimeter.mockReturnValue(
+      createMockPerimeterReturn({
+        perimeter: { enabled: true, state: "off", idleClock: true },
+        setPerimeterIdleClock: save,
+      }),
+    );
+    rerender(<PerimeterControl standalone />);
+    expect(toggle).toHaveAttribute("aria-checked", "true");
+    save.mockRejectedValueOnce(new Error("denied"));
+    fireEvent.click(toggle);
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Ekki tókst að vista",
+    );
+    expect(save).toHaveBeenLastCalledWith(false);
+    expect(toggle).toHaveAttribute("aria-checked", "true");
   });
 
   it("writes the selected scorer celebration style", () => {

@@ -19,6 +19,7 @@ import {
 } from "./scorerPresentation";
 import type { ScorerCelebrationStyle } from "../types";
 import { defaultScorerBandDeps } from "./scorerCompositor";
+import { createIdleClocks } from "./idleClock";
 
 const NO_CONFIGURATION_MESSAGE = "Engin gild perimeter stilling tiltæk.";
 
@@ -50,6 +51,7 @@ export default function PerimeterDisplay() {
     perimeter.scorerCelebration ?? DEFAULT_SCORER_CELEBRATION_STYLE;
   const [rendererError, setRendererError] = useState<string | null>(null);
   const [textureError, setTextureError] = useState<string | null>(null);
+  const [idleClockError, setIdleClockError] = useState<string | null>(null);
   // The runtime (and its scorer source loader) is constructed once per
   // configuration, so the bundled-crest fallback resolves the home team's
   // club logo through this ref at load time instead of capturing state that
@@ -75,7 +77,9 @@ export default function PerimeterDisplay() {
   const reportedError = !ready
     ? null
     : configuration
-      ? [rendererError, textureError].filter(Boolean).join(" ") || null
+      ? [rendererError, textureError, idleClockError]
+          .filter(Boolean)
+          .join(" ") || null
       : NO_CONFIGURATION_MESSAGE;
   const displayError = ready && configuration ? reportedError : null;
 
@@ -210,6 +214,32 @@ export default function PerimeterDisplay() {
     if (!runtime) return;
     runtime.setPowered(perimeter.state === "on", performance.now());
   }, [perimeter.state, configuration]);
+
+  useEffect(() => {
+    const runtime = runtimeRef.current;
+    if (!runtime || !configuration) return undefined;
+    let cancelled = false;
+    runtime.setIdleClocks(null);
+    if (perimeter.idleClock === true && perimeter.state === "off") {
+      void createIdleClocks(Object.values(configuration.logicalScreens))
+        .then((presentations) => {
+          if (cancelled) return;
+          runtime.setIdleClocks(presentations);
+          setIdleClockError(null);
+        })
+        .catch(() => {
+          if (!cancelled) setIdleClockError("Idle clock could not load.");
+        });
+    } else {
+      queueMicrotask(() => {
+        if (!cancelled) setIdleClockError(null);
+      });
+    }
+    return () => {
+      cancelled = true;
+      runtime.setIdleClocks(null);
+    };
+  }, [configuration, listenPrefix, perimeter.idleClock, perimeter.state]);
 
   // The controller publishes a fresh `skipCue` token under the desired
   // perimeter state to request an immediate advance to the next ad column

@@ -663,6 +663,7 @@ export function parsePerimeterState(data: unknown): PerimeterState | undefined {
     ...(skipCue !== undefined ? { skipCue } : {}),
     ...(refreshToken !== undefined ? { refreshToken } : {}),
     ...(scorerCelebration !== undefined ? { scorerCelebration } : {}),
+    ...(typeof raw.idleClock === "boolean" ? { idleClock: raw.idleClock } : {}),
   };
 }
 
