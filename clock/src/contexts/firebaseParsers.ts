@@ -12,6 +12,8 @@ import type {
   QueueState,
   PerimeterState,
   ScorerCelebrationStyle,
+  PlayerBandStyle,
+  SubstitutionBandStyle,
   PerimeterPreview,
   PerimeterColumn,
   PerimeterClip,
@@ -653,6 +655,11 @@ export function parsePerimeterState(data: unknown): PerimeterState | undefined {
   // Goal-scorer celebration style: only the known style names parse; absent
   // or invalid values stay undefined so consumers fall back to the default.
   const scorerCelebration = parseScorerCelebration(raw.scorerCelebration);
+  // Player band presentation style: same strictness as scorerCelebration.
+  const playerDisplayStyle = parsePlayerDisplayStyle(raw.playerDisplayStyle);
+  // Substitution band presentation style: same strictness as the other
+  // style fields.
+  const substitutionStyle = parseSubstitutionStyle(raw.substitutionStyle);
 
   return {
     enabled,
@@ -660,6 +667,8 @@ export function parsePerimeterState(data: unknown): PerimeterState | undefined {
     ...(skipCue !== undefined ? { skipCue } : {}),
     ...(refreshToken !== undefined ? { refreshToken } : {}),
     ...(scorerCelebration !== undefined ? { scorerCelebration } : {}),
+    ...(playerDisplayStyle !== undefined ? { playerDisplayStyle } : {}),
+    ...(substitutionStyle !== undefined ? { substitutionStyle } : {}),
   };
 }
 
@@ -682,6 +691,41 @@ export function parseScorerCelebration(
     data as ScorerCelebrationStyle,
   )
     ? (data as ScorerCelebrationStyle)
+    : undefined;
+}
+
+// Player band presentation style written by the perimeter admin view at
+// states/{location}/perimeter/playerDisplayStyle. Same strictness as the
+// goal-scorer celebration field: only the known style names are valid;
+// anything else parses to undefined so consumers fall back to the default.
+export function parsePlayerDisplayStyle(
+  data: unknown,
+): PlayerBandStyle | undefined {
+  const VALID_PLAYER_BAND_STYLES: PlayerBandStyle[] = [
+    "plain",
+    "glow",
+    "streamer",
+  ];
+  if (typeof data !== "string") return undefined;
+  return VALID_PLAYER_BAND_STYLES.includes(data as PlayerBandStyle)
+    ? (data as PlayerBandStyle)
+    : undefined;
+}
+
+// Substitution band presentation style written by the perimeter admin view
+// at states/{location}/perimeter/substitutionStyle. Same strictness as the
+// other style fields.
+export function parseSubstitutionStyle(
+  data: unknown,
+): SubstitutionBandStyle | undefined {
+  const VALID_SUBSTITUTION_STYLES: SubstitutionBandStyle[] = [
+    "static",
+    "relay",
+    "flash",
+  ];
+  if (typeof data !== "string") return undefined;
+  return VALID_SUBSTITUTION_STYLES.includes(data as SubstitutionBandStyle)
+    ? (data as SubstitutionBandStyle)
     : undefined;
 }
 

@@ -1471,6 +1471,66 @@ describe("firebaseParsers", () => {
         state: "off",
       });
     });
+
+    it("preserves a known playerDisplayStyle value", () => {
+      for (const style of ["plain", "glow", "streamer"] as const) {
+        expect(
+          parsePerimeterState({
+            enabled: true,
+            state: "on",
+            playerDisplayStyle: style,
+          }),
+        ).toEqual({ enabled: true, state: "on", playerDisplayStyle: style });
+      }
+    });
+
+    it("drops unknown or malformed playerDisplayStyle values", () => {
+      expect(
+        parsePerimeterState({
+          enabled: true,
+          state: "on",
+          playerDisplayStyle: "nonsense",
+        }),
+      ).toEqual({ enabled: true, state: "on" });
+      expect(parsePerimeterState({ playerDisplayStyle: 7 })).toEqual({
+        enabled: false,
+        state: "off",
+      });
+      expect(parsePerimeterState({ playerDisplayStyle: null })).toEqual({
+        enabled: false,
+        state: "off",
+      });
+    });
+
+    it("preserves a known substitutionStyle value", () => {
+      for (const style of ["static", "relay", "flash"] as const) {
+        expect(
+          parsePerimeterState({
+            enabled: true,
+            state: "on",
+            substitutionStyle: style,
+          }),
+        ).toEqual({ enabled: true, state: "on", substitutionStyle: style });
+      }
+    });
+
+    it("drops unknown or malformed substitutionStyle values", () => {
+      expect(
+        parsePerimeterState({
+          enabled: true,
+          state: "on",
+          substitutionStyle: "nonsense",
+        }),
+      ).toEqual({ enabled: true, state: "on" });
+      expect(parsePerimeterState({ substitutionStyle: 7 })).toEqual({
+        enabled: false,
+        state: "off",
+      });
+      expect(parsePerimeterState({ substitutionStyle: null })).toEqual({
+        enabled: false,
+        state: "off",
+      });
+    });
   });
 
   describe("parsePerimeterPreview", () => {

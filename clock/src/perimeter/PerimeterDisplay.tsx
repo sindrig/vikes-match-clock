@@ -3,6 +3,7 @@ import {
   useFirebaseState,
   useListeners,
   usePerimeter,
+  useClubOverrides,
 } from "../contexts/FirebaseStateContext";
 import { useDisplayDiagnostics } from "../contexts/DisplayDiagnosticsContext";
 import { useLocalState } from "../contexts/LocalStateContext";
@@ -13,6 +14,14 @@ import { PerimeterMediaLoader } from "./mediaLoader";
 import { PerimeterWebGLRenderer } from "./webglRenderer";
 import { PerimeterRuntime } from "./runtime";
 import { ScorerSourceLoader } from "./scorerSource";
+import { PlayerBandSourceLoader } from "./bandSource";
+import {
+  DEFAULT_PLAYER_BAND_STYLE,
+  DEFAULT_SUBSTITUTION_BAND_STYLE,
+  createPlayerBandPresentations,
+  createSubstitutionBandPresentations,
+} from "./playerBandPresentation";
+import { deriveBandRequest } from "./bandDerivation";
 import {
   DEFAULT_SCORER_CELEBRATION_STYLE,
   createScorerPresentations,
@@ -36,8 +45,9 @@ const resolveGeneration = async (source: string) => {
 export default function PerimeterDisplay() {
   const { listenPrefix } = useLocalState();
   const { screens } = useListeners();
-  const { ready, match } = useFirebaseState();
+  const { ready, match, controller } = useFirebaseState();
   const { perimeter, adLayout, overlay } = usePerimeter();
+  const { clubOverrides } = useClubOverrides();
   const { reportError } = useDisplayDiagnostics();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const runtimeRef = useRef<PerimeterRuntime | null>(null);
@@ -48,6 +58,12 @@ export default function PerimeterDisplay() {
   // absent or invalid values fall back to the default presentation.
   const scorerCelebration: ScorerCelebrationStyle =
     perimeter.scorerCelebration ?? DEFAULT_SCORER_CELEBRATION_STYLE;
+  // The band presentation styles selected in the perimeter admin view;
+  // absent or invalid values fall back to the default presentations.
+  const playerBandStyle =
+    perimeter.playerDisplayStyle ?? DEFAULT_PLAYER_BAND_STYLE;
+  const substitutionStyle =
+    perimeter.substitutionStyle ?? DEFAULT_SUBSTITUTION_BAND_STYLE;
   const [rendererError, setRendererError] = useState<string | null>(null);
   const [textureError, setTextureError] = useState<string | null>(null);
   // The runtime (and its scorer source loader) is constructed once per
@@ -58,6 +74,12 @@ export default function PerimeterDisplay() {
   useEffect(() => {
     homeTeamRef.current = match.homeTeam;
   }, [match.homeTeam]);
+  // Club override logos are resolved at band-load time through this ref so
+  // the loader always sees the latest override without re-creating it.
+  const clubOverridesRef = useRef(clubOverrides);
+  useEffect(() => {
+    clubOverridesRef.current = clubOverrides;
+  }, [clubOverrides]);
   const configuration = useMemo(
     () =>
       screens.find(
@@ -153,6 +175,39 @@ export default function PerimeterDisplay() {
           });
         },
       });
+      // Player band source access extends the scorer chain: the card's own
+      // photo (a download URL) first, then the team logo for the asset's
+      // team name (club override `logoUrl`, then the bundled `clubLogos`
+      // crest — works for away teams), finally the venue crest chain.
+      const bandSourceLoader = new PlayerBandSourceLoader({
+        bucket: FIREBASE_STORAGE_BUCKET,
+        location: listenPrefix,
+        resolveGeneration: async (objectPath) => {
+          const metadata = await storageHelpers.getMetadata(objectPath);
+          return metadata.generation;
+        },
+        resolveDownloadUrl: (objectPath) =>
+          storageHelpers.getDownloadURL(objectPath),
+        clubOverrideLogoUrl: (teamName) => {
+          const override = Object.values(clubOverridesRef.current).find(
+            (entry) => entry.name === teamName,
+          );
+          return Promise.resolve(override?.logoUrl ?? null);
+        },
+        bundledCrestFor: (teamName) => {
+          const crestUrl = (clubLogos as Record<string, string>)[
+            teamName?.trim() ?? ""
+          ];
+          if (!crestUrl) return Promise.resolve(null);
+          return new Promise<HTMLImageElement | null>((resolve) => {
+            const image = new Image();
+            image.decoding = "async";
+            image.onload = () => resolve(image);
+            image.onerror = () => resolve(null);
+            image.src = crestUrl;
+          });
+        },
+      });
       runtime = new PerimeterRuntime(configuration, {
         renderer,
         loader,
@@ -169,6 +224,55 @@ export default function PerimeterDisplay() {
               screens,
               defaultScorerBandDeps,
             ),
+        },
+        playerBand: {
+          loadSource: async (request) => {
+            if (request.kind === "player") {
+              const loaded = await bandSourceLoader.load(request.identity);
+              return {
+                images: {
+                  player: loaded.image,
+                } as Record<string, HTMLImageElement>,
+                release: loaded.release,
+              };
+            }
+            const [off, on] = await Promise.all([
+              bandSourceLoader.load(request.off),
+              bandSourceLoader.load(request.on),
+            ]);
+            return {
+              images: {
+                off: off.image,
+                on: on.image,
+              } as Record<string, HTMLImageElement>,
+              release: () => {
+                off.release();
+                on.release();
+              },
+            };
+          },
+          compose: (
+            playerStyle,
+            substitutionStyle,
+            request,
+            images,
+            screens,
+          ) =>
+            request.kind === "player"
+              ? createPlayerBandPresentations(
+                  playerStyle,
+                  request.identity,
+                  images.player!,
+                  screens,
+                  defaultScorerBandDeps,
+                )
+              : createSubstitutionBandPresentations(
+                  substitutionStyle,
+                  { identity: request.off, source: images.off! },
+                  { identity: request.on, source: images.on! },
+                  screens,
+                  defaultScorerBandDeps,
+                ),
         },
       });
       rendererRef.current = renderer;
@@ -204,6 +308,46 @@ export default function PerimeterDisplay() {
   useEffect(() => {
     runtimeRef.current?.setScorerStyle(scorerCelebration);
   }, [scorerCelebration, configuration]);
+
+  // Both band styles are applied to the live runtime before the band effect
+  // below runs, so a commit that changes the style and the current asset
+  // prepares with the new presentation style. The runtime itself recomposes
+  // an active band when the style changes; failures keep the current
+  // textures on screen.
+  useEffect(() => {
+    runtimeRef.current?.setPlayerBandStyle(playerBandStyle);
+  }, [playerBandStyle, configuration]);
+
+  useEffect(() => {
+    runtimeRef.current?.setSubstitutionBandStyle(substitutionStyle);
+  }, [substitutionStyle, configuration]);
+
+  // The band is derived from the already-subscribed controller state
+  // (`controller.currentAsset`): player-like assets become a player band
+  // request, SUB assets become a substitution request, everything else
+  // drops the band. Read-only: no Firebase writes are involved.
+  useEffect(() => {
+    const runtime = runtimeRef.current;
+    if (!runtime) return undefined;
+    let cancelled = false;
+    const request = deriveBandRequest(controller?.currentAsset ?? null);
+    void runtime
+      .setPlayerBand(request, performance.now())
+      .then(() => {
+        if (!cancelled && runtimeRef.current === runtime) runtime.render();
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        setRendererError(
+          error instanceof Error
+            ? error.message
+            : "Perimeter player band could not be prepared.",
+        );
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [controller?.currentAsset, configuration]);
 
   useEffect(() => {
     const runtime = runtimeRef.current;

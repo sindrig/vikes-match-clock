@@ -14,6 +14,11 @@ vi.mock("../contexts/FirebaseStateContext", () => ({
   useFirebaseState: vi.fn(),
   useListeners: vi.fn(),
   usePerimeter: vi.fn(),
+  useClubOverrides: vi.fn(() => ({
+    clubOverrides: {},
+    saveClubOverride: vi.fn(),
+    deleteClubOverride: vi.fn(),
+  })),
 }));
 
 vi.mock("../contexts/LocalStateContext", () => ({
@@ -40,6 +45,9 @@ const runtimeInstance = vi.hoisted(() => ({
   activatePreparedBase: vi.fn(),
   setOverlay: vi.fn(),
   setScorerStyle: vi.fn(),
+  setPlayerBandStyle: vi.fn(),
+  setSubstitutionBandStyle: vi.fn(),
+  setPlayerBand: vi.fn().mockResolvedValue(undefined),
 }));
 
 const rendererInstance = vi.hoisted(() => ({
@@ -106,6 +114,7 @@ const setupContexts = ({
   overlay = null,
   homeTeam = "Víkingur R",
   perimeter = { state: "on" },
+  controller,
 }: {
   screens?: unknown[];
   ready?: boolean;
@@ -113,10 +122,12 @@ const setupContexts = ({
   overlay?: unknown;
   homeTeam?: string;
   perimeter?: unknown;
+  controller?: unknown;
 } = {}) => {
   mockedUseFirebaseState.mockReturnValue({
     ready,
     match: { homeTeam },
+    controller,
   } as unknown as ReturnType<typeof useFirebaseState>);
   mockedUseListeners.mockReturnValue({
     screens,
@@ -330,5 +341,256 @@ describe("PerimeterDisplay", () => {
     await waitFor(() =>
       expect(runtimeInstance.setScorerStyle).toHaveBeenCalledWith("ribbon"),
     );
+  });
+
+  it("applies both band styles to the runtime", async () => {
+    const { rerender } = render(<PerimeterDisplay />);
+    await waitFor(() => {
+      expect(runtimeInstance.setPlayerBandStyle).toHaveBeenCalledWith("plain");
+      expect(runtimeInstance.setSubstitutionBandStyle).toHaveBeenCalledWith(
+        "static",
+      );
+    });
+
+    setupContexts({
+      perimeter: {
+        state: "on",
+        playerDisplayStyle: "glow",
+        substitutionStyle: "relay",
+      },
+    });
+    rerender(<PerimeterDisplay />);
+    await waitFor(() => {
+      expect(runtimeInstance.setPlayerBandStyle).toHaveBeenCalledWith("glow");
+      expect(runtimeInstance.setSubstitutionBandStyle).toHaveBeenCalledWith(
+        "relay",
+      );
+    });
+    // Strict parsing of invalid values is covered by firebaseParsers.spec;
+    // an absent value falls back to the default presentation here.
+    setupContexts({ perimeter: { state: "on" } });
+    rerender(<PerimeterDisplay />);
+    await waitFor(() => {
+      expect(runtimeInstance.setPlayerBandStyle).toHaveBeenLastCalledWith(
+        "plain",
+      );
+      expect(runtimeInstance.setSubstitutionBandStyle).toHaveBeenLastCalledWith(
+        "static",
+      );
+    });
+  });
+
+  it("derives the player band from a lineup card's current asset", async () => {
+    setupContexts({
+      controller: {
+        currentAsset: {
+          asset: {
+            type: "PLAYER",
+            key: "https://example.com/photo.png",
+            name: "Jón",
+            fullName: "Jón Jónsson",
+            number: 7,
+            teamName: "Víkingur R",
+          },
+          time: null,
+        },
+      },
+    });
+    render(<PerimeterDisplay />);
+    await waitFor(() =>
+      expect(runtimeInstance.setPlayerBand).toHaveBeenCalledWith(
+        {
+          kind: "player",
+          identity: {
+            name: "Jón Jónsson",
+            number: "7",
+            teamName: "Víkingur R",
+            imageRef: "https://example.com/photo.png",
+          },
+        },
+        expect.any(Number),
+      ),
+    );
+  });
+
+  it("drops the band when the current asset is not a player", async () => {
+    setupContexts({
+      controller: {
+        currentAsset: {
+          asset: { type: "IMAGE", key: "https://example.com/ad.png" },
+          time: null,
+        },
+      },
+    });
+    render(<PerimeterDisplay />);
+    await waitFor(() =>
+      expect(runtimeInstance.setPlayerBand).toHaveBeenCalledWith(
+        null,
+        expect.any(Number),
+      ),
+    );
+  });
+
+  it("derives a substitution band from a valid SUB asset", async () => {
+    setupContexts({
+      controller: {
+        currentAsset: {
+          asset: {
+            type: "SUB",
+            key: "sub-key",
+            subIn: {
+              type: "PLAYER",
+              key: "https://example.com/on.png",
+              name: "Jón",
+              number: 7,
+              teamName: "Víkingur R",
+            },
+            subOut: {
+              type: "PLAYER",
+              key: "https://example.com/off.png",
+              name: "Siggi",
+              number: 12,
+              teamName: "Víkingur R",
+            },
+          },
+          time: null,
+        },
+      },
+    });
+    render(<PerimeterDisplay />);
+    await waitFor(() =>
+      expect(runtimeInstance.setPlayerBand).toHaveBeenCalledWith(
+        {
+          kind: "substitution",
+          off: {
+            name: "Siggi",
+            number: "12",
+            teamName: "Víkingur R",
+            imageRef: "https://example.com/off.png",
+          },
+          on: {
+            name: "Jón",
+            number: "7",
+            teamName: "Víkingur R",
+            imageRef: "https://example.com/on.png",
+          },
+        },
+        expect.any(Number),
+      ),
+    );
+  });
+
+  it("renders no band for an invalid SUB asset", async () => {
+    setupContexts({
+      controller: {
+        currentAsset: {
+          asset: {
+            type: "SUB",
+            key: "sub-key",
+            subIn: {
+              type: "PLAYER",
+              key: "https://example.com/on.png",
+              name: "Jón",
+              number: 7,
+              teamName: "Víkingur R",
+            },
+            subOut: {
+              type: "PLAYER",
+              key: "https://example.com/off.png",
+              name: "Siggi",
+              // A missing number fails the both-players-valid rule.
+            },
+          },
+          time: null,
+        },
+      },
+    });
+    render(<PerimeterDisplay />);
+    await waitFor(() =>
+      expect(runtimeInstance.setPlayerBand).toHaveBeenCalledWith(
+        null,
+        expect.any(Number),
+      ),
+    );
+  });
+
+  it("re-derives the band when a display reconnects mid-item", async () => {
+    const controllerState = {
+      currentAsset: {
+        asset: {
+          type: "PLAYER",
+          key: "https://example.com/photo.png",
+          name: "Jón",
+          number: 7,
+          teamName: "Víkingur R",
+        },
+        time: null,
+      },
+    };
+    setupContexts({ controller: controllerState });
+    const { unmount } = render(<PerimeterDisplay />);
+    await waitFor(() =>
+      expect(runtimeInstance.setPlayerBand).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: "player" }),
+        expect.any(Number),
+      ),
+    );
+    unmount();
+
+    setupContexts({ controller: controllerState });
+    render(<PerimeterDisplay />);
+    await waitFor(() =>
+      expect(runtimeInstance.setPlayerBand).toHaveBeenCalledTimes(2),
+    );
+    expect(runtimeInstance.setPlayerBand).toHaveBeenLastCalledWith(
+      expect.objectContaining({ kind: "player" }),
+      expect.any(Number),
+    );
+  });
+
+  it("performs no perimeter writes while deriving or rendering the band", async () => {
+    const setPerimeterState = vi.fn();
+    const skipPerimeterCue = vi.fn();
+    const restartPerimeterDisplays = vi.fn();
+    const setPerimeterPlayerDisplayStyle = vi.fn();
+    const setPerimeterSubstitutionStyle = vi.fn();
+    setupContexts({
+      controller: {
+        currentAsset: {
+          asset: {
+            type: "PLAYER",
+            key: "https://example.com/photo.png",
+            name: "Jón",
+            number: 7,
+            teamName: "Víkingur R",
+          },
+          time: null,
+        },
+      },
+    });
+    mockedUsePerimeter.mockReturnValue({
+      perimeter: { state: "on" },
+      adLayout: { version: 1, revision: "rev-1", columns: [] },
+      overlay: null,
+      setPerimeterState,
+      skipPerimeterCue,
+      restartPerimeterDisplays,
+      setPerimeterPlayerDisplayStyle,
+      setPerimeterSubstitutionStyle,
+    } as unknown as ReturnType<typeof usePerimeter>);
+    render(<PerimeterDisplay />);
+    await waitFor(() =>
+      expect(runtimeInstance.setPlayerBand).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: "player" }),
+        expect.any(Number),
+      ),
+    );
+    // The read-only guarantee: deriving and rendering the band never
+    // mutates the perimeter desired state.
+    expect(setPerimeterState).not.toHaveBeenCalled();
+    expect(skipPerimeterCue).not.toHaveBeenCalled();
+    expect(restartPerimeterDisplays).not.toHaveBeenCalled();
+    expect(setPerimeterPlayerDisplayStyle).not.toHaveBeenCalled();
+    expect(setPerimeterSubstitutionStyle).not.toHaveBeenCalled();
   });
 });

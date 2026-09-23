@@ -32,6 +32,8 @@ import {
   PerimeterAppliedAdFile,
   PerimeterOverlayFile,
   ScorerCelebrationStyle,
+  PlayerBandStyle,
+  SubstitutionBandStyle,
 } from "../types";
 import { useListeners, usePerimeter } from "../contexts/FirebaseStateContext";
 import { useLocalState } from "../contexts/LocalStateContext";
@@ -665,6 +667,122 @@ const ScorerCelebrationSection = () => {
   );
 };
 
+// Player-band presentation styles for web perimeter displays. The keys are
+// the PlayerBandStyle values; the default style is applied by the display
+// runtime whenever the field is absent or invalid.
+const PLAYER_BAND_LABELS: Record<PlayerBandStyle, string> = {
+  plain: "Default",
+  glow: "Glow",
+  streamer: "Streamer",
+};
+
+const PLAYER_BAND_ORDER: PlayerBandStyle[] = ["plain", "glow", "streamer"];
+
+const PlayerBandStyleSection = () => {
+  const { perimeter, setPerimeterPlayerDisplayStyle } = usePerimeter();
+  const selected: PlayerBandStyle = perimeter.playerDisplayStyle ?? "plain";
+  const [savingStyle, setSavingStyle] = useState<PlayerBandStyle | null>(null);
+  // The write settles once the perimeter subscription reflects the chosen
+  // style (no optimistic local state); a rejected write clears the pending
+  // flag so another selection is possible.
+  const settling = savingStyle !== null && selected !== savingStyle;
+
+  const handleSelect = (style: PlayerBandStyle) => {
+    if (settling) return;
+    setSavingStyle(style);
+    setPerimeterPlayerDisplayStyle(style)
+      .catch(() => setSavingStyle(null))
+      .finally(() => {
+        setSavingStyle((current) => (current === style ? null : current));
+      });
+  };
+
+  return (
+    <div className="perimeter-player-band-style">
+      <div className="perimeter-brightness-header">
+        <span className="perimeter-brightness-title">Leikmannaborði</span>
+      </div>
+      <div className="perimeter-scorer-celebration-options" role="radiogroup">
+        {PLAYER_BAND_ORDER.map((style) => (
+          <Button
+            key={style}
+            size="sm"
+            appearance={style === selected ? "primary" : "ghost"}
+            active={style === selected}
+            onClick={() => handleSelect(style)}
+            disabled={settling}
+            aria-pressed={style === selected}
+          >
+            {PLAYER_BAND_LABELS[style]}
+          </Button>
+        ))}
+      </div>
+      {settling && (
+        <span className="perimeter-scorer-celebration-status">Vistar…</span>
+      )}
+    </div>
+  );
+};
+
+// Substitution-band presentation styles for web perimeter displays.
+const SUBSTITUTION_LABELS: Record<SubstitutionBandStyle, string> = {
+  static: "Static",
+  relay: "Relay",
+  flash: "Flash",
+};
+
+const SUBSTITUTION_ORDER: SubstitutionBandStyle[] = [
+  "static",
+  "relay",
+  "flash",
+];
+
+const SubstitutionStyleSection = () => {
+  const { perimeter, setPerimeterSubstitutionStyle } = usePerimeter();
+  const selected: SubstitutionBandStyle =
+    perimeter.substitutionStyle ?? "static";
+  const [savingStyle, setSavingStyle] = useState<SubstitutionBandStyle | null>(
+    null,
+  );
+  const settling = savingStyle !== null && selected !== savingStyle;
+
+  const handleSelect = (style: SubstitutionBandStyle) => {
+    if (settling) return;
+    setSavingStyle(style);
+    setPerimeterSubstitutionStyle(style)
+      .catch(() => setSavingStyle(null))
+      .finally(() => {
+        setSavingStyle((current) => (current === style ? null : current));
+      });
+  };
+
+  return (
+    <div className="perimeter-substitution-style">
+      <div className="perimeter-brightness-header">
+        <span className="perimeter-brightness-title">Skiptingaborði</span>
+      </div>
+      <div className="perimeter-scorer-celebration-options" role="radiogroup">
+        {SUBSTITUTION_ORDER.map((style) => (
+          <Button
+            key={style}
+            size="sm"
+            appearance={style === selected ? "primary" : "ghost"}
+            active={style === selected}
+            onClick={() => handleSelect(style)}
+            disabled={settling}
+            aria-pressed={style === selected}
+          >
+            {SUBSTITUTION_LABELS[style]}
+          </Button>
+        ))}
+      </div>
+      {settling && (
+        <span className="perimeter-scorer-celebration-status">Vistar…</span>
+      )}
+    </div>
+  );
+};
+
 const PerimeterControl = ({ standalone = false }: { standalone?: boolean }) => {
   const {
     perimeter,
@@ -887,6 +1005,8 @@ const PerimeterControl = ({ standalone = false }: { standalone?: boolean }) => {
       <BrightnessSection />
       <GoalVideoSection />
       {isWebVenue && <ScorerCelebrationSection />}
+      {isWebVenue && <PlayerBandStyleSection />}
+      {isWebVenue && <SubstitutionStyleSection />}
       {!isWebVenue && <GoalScorerPreparation />}
       {!isWebVenue && !appliedAdLayoutLoaded ? (
         <div className="perimeter-preview-state">
