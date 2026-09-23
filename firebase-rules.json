@@ -61,6 +61,36 @@
           "substitutionStyle": {
             ".validate": "newData.val() == null || (newData.isString() && (newData.val() == 'static' || newData.val() == 'relay' || newData.val() == 'flash'))"
           },
+          "brightnessAuto": {
+            ".validate": "newData.val() == null || (newData.hasChildren(['enabled', 'min', 'max', 'exponent', 'cloudWeight', 'luxMin', 'luxMax', 'updatedAt']) && newData.child('enabled').isBoolean() && newData.child('min').isNumber() && newData.child('min').val() >= 0 && newData.child('max').isNumber() && newData.child('max').val() <= 100 && newData.child('min').val() <= newData.child('max').val() && newData.child('exponent').isNumber() && newData.child('exponent').val() >= 0.05 && newData.child('exponent').val() <= 2 && newData.child('cloudWeight').isNumber() && newData.child('cloudWeight').val() >= 0 && newData.child('cloudWeight').val() <= 1 && newData.child('luxMin').isNumber() && newData.child('luxMax').isNumber() && newData.child('luxMin').val() < newData.child('luxMax').val() && newData.child('updatedAt').isNumber() && newData.child('updatedAt').val() <= now)",
+            "enabled": {
+              ".validate": "newData.isBoolean()"
+            },
+            "min": {
+              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100"
+            },
+            "max": {
+              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100"
+            },
+            "exponent": {
+              ".validate": "newData.isNumber() && newData.val() >= 0.05 && newData.val() <= 2"
+            },
+            "cloudWeight": {
+              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1"
+            },
+            "luxMin": {
+              ".validate": "newData.isNumber()"
+            },
+            "luxMax": {
+              ".validate": "newData.isNumber()"
+            },
+            "updatedAt": {
+              ".validate": "newData.isNumber() && newData.val() <= now"
+            },
+            "$other": {
+              ".validate": false
+            }
+          },
           "overlay": {
             ".validate": "newData.val() == null || (newData.hasChildren(['version', 'id']) && newData.child('id').isString() && newData.child('id').val().length >= 1 && newData.child('id').val().length <= 128 && ((newData.child('version').val() == 1 && !newData.hasChild('kind') && !newData.hasChild('player') && newData.hasChildren(['columns'])) || (newData.child('version').val() == 2 && newData.child('kind').val() == 'goal-scorer' && !newData.hasChild('columns') && newData.hasChildren(['player']) && newData.child('player').hasChildren(['id', 'name', 'number']) && newData.child('player').child('id').val().matches(/^[A-Za-z0-9_-]{1,64}$/) && newData.child('player').child('name').isString() && newData.child('player').child('name').val().length >= 1 && newData.child('player').child('name').val().length <= 80 && newData.child('player').child('number').val().matches(/^[0-9]{1,4}$/))))",
             "$other": {

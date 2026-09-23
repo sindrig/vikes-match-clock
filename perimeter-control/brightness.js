@@ -34,6 +34,17 @@
  *   * Vnnox handling is disabled unless PERIMETER_BRIGHTNESS_ENABLED=true and
  *     the required configuration is present; otherwise requests fail with a
  *     configuration-caused error instead of touching hardware.
+ *   * Automatic mode (sun + weather prediction, `auto-brightness.js`): the
+ *     daemon-subscribed `states/{location}/perimeter/brightnessAuto` config
+ *     switches the AutoBrightnessScheduler between shadow mode (predict +
+ *     publish only) and live auto. Auto writes enter the same worker via
+ *     requestAuto(), bounded by hysteresis + slew + clamping in the
+ *     scheduler, so supersession/verify/restore behavior is untouched. A
+ *     manual command while auto is enabled disables auto (operator intent
+ *     wins) and applies the manual value. Daemon-owned outcomes are extended
+ *     with `mode` and the live `predicted` readout, and every applied auto
+ *     change (plus each manual override while auto is on) is appended to
+ *     `perimeter/{location}/brightnessCalibration` for offline fitting.
  */
 
 import { ServerValue } from "firebase-admin/database";
@@ -43,6 +54,11 @@ import {
   parseBrightnessCommand,
   VnnoxClient,
 } from "./vnnox.js";
+import {
+  calibrationEntry,
+  normalizeAutoConfig,
+  validateAutoBrightnessConfig,
+} from "./auto-brightness.js";
 
 export const BRIGHTNESS_PHASES = new Set(["pending", "applied", "failed"]);
 
@@ -94,13 +110,55 @@ export class BrightnessController {
     // worker has nothing to do). Worker pickup clears it; a command that
     // arrives mid-flight becomes the pending replacement.
     this._requested = null;
+    // Where the newest pending request came from ("manual" via the Firebase
+    // command listener or "auto" via the AutoBrightnessScheduler) plus the
+    // predicted model context captured at request time.
+    this._requestedMeta = null;
     this._current = null;
     this._stopping = false;
     this._notifier = new Notifier();
     this._workerPromise = null;
-    // Last published status, so a listener-refresh republish can self-heal a
-    // silently lost write (the same pattern the ad-layout controller uses).
+    // Worker-owned status block and the full merged payload (worker fields +
+    // auto mode/predicted blocks) cached so a listener-refresh republish can
+    // self-heal a silently lost write (the same pattern the ad-layout
+    // controller uses).
+    this._workerStatus = null;
     this._lastStatus = null;
+    // Automatic mode. The scheduler is attached only when the daemon-level
+    // auto feature is enabled; it publishes predictions and enqueues writes
+    // through requestAuto(). The serialized worker treats auto writes exactly
+    // like manual commands.
+    this._autoScheduler = null;
+    this._autoRef = null;
+    this._autoConfig = normalizeAutoConfig(null);
+    this._latestPrediction = null;
+    this._calibrationRef = null;
+    // Last verified applied percentage — the baseline for the scheduler's
+    // hysteresis/slew math. Seeded from the published status at attach.
+    this._lastAppliedPercent = null;
+    // The perimeter on/off desired state, used as an optional auto-write gate.
+    this._perimeterState = null;
+  }
+
+  attachAutoScheduler(scheduler) {
+    this._autoScheduler = scheduler;
+  }
+
+  // Current normalized `brightnessAuto` configuration (enabled flag plus the
+  // model parameters). Read by the scheduler every tick.
+  get autoConfig() {
+    return this._autoConfig;
+  }
+
+  // The last verified applied percentage, or null when unknown (fresh daemon,
+  // failed write) — the scheduler then writes the clamped target directly.
+  get lastAppliedPercent() {
+    return this._lastAppliedPercent;
+  }
+
+  // The perimeter on/off desired state mirrored by the daemon ("on"/"off").
+  get perimeterState() {
+    return this._perimeterState;
   }
 
   _safeError(err) {
@@ -125,11 +183,40 @@ export class BrightnessController {
       }
       console.log(`New brightness command: ${percent}%`);
       this._requested = percent;
+      this._requestedMeta = {
+        source: "manual",
+        prediction: this._latestPrediction,
+        // Operator intent wins: a manual command while auto is enabled
+        // disables auto and applies the manual value.
+        autoWasEnabled: this._autoConfig.enabled,
+      };
+      if (this._autoConfig.enabled) void this._disableAuto();
       this._notifier.notify();
     });
     console.log(
       `Brightness control listening on: ${this.config.brightnessPath}`,
     );
+    if (this.config.autoBrightnessEnabled) {
+      this._autoRef = db.ref(this.config.autoBrightnessPath);
+      this._autoRef.on("value", (snapshot) => {
+        const next = normalizeAutoConfig(snapshot.val());
+        const wasEnabled = this._autoConfig.enabled;
+        this._autoConfig = next;
+        console.log(
+          `Auto brightness config: ${next.enabled ? "enabled" : "disabled"} ` +
+            `(min ${next.min}, max ${next.max}, exponent ${next.exponent}, ` +
+            `cloudWeight ${next.cloudWeight})`,
+        );
+        // Enabling auto recomputes immediately instead of waiting a tick.
+        if (!wasEnabled && next.enabled) {
+          this._autoScheduler?.refresh();
+        }
+      });
+      this._calibrationRef = db.ref(this.config.brightnessCalibrationPath);
+      // Seed the hysteresis baseline from the daemon's own last published
+      // status so a fresh process does not treat the first tick as a jump.
+      void this._seedLastApplied();
+    }
     void this._notifyConfigurationIssue();
   }
 
@@ -145,6 +232,17 @@ export class BrightnessController {
         null,
         `Brightness not configured: ${issue}`,
       );
+      return;
+    }
+    if (this.config.autoBrightnessEnabled) {
+      const autoIssue = validateAutoBrightnessConfig(this.config);
+      if (autoIssue) {
+        await this._publishStatus(
+          "failed",
+          null,
+          `Auto brightness not configured: ${autoIssue}`,
+        );
+      }
     }
   }
 
@@ -162,9 +260,12 @@ export class BrightnessController {
     while (!this._stopping) {
       if (this._requested !== null) {
         const target = this._requested;
+        const meta =
+          this._requestedMeta ?? { source: "manual", prediction: null };
         this._requested = null;
+        this._requestedMeta = null;
         this._current = target;
-        await this._handleRequest(target);
+        await this._handleRequest(target, meta);
         this._current = null;
         continue;
       }
@@ -180,8 +281,10 @@ export class BrightnessController {
 
   // Process one request from snapshot through write and verification. Any
   // terminal failure after the write has been dispatched triggers a
-  // best-effort restore of the pre-write snapshot.
-  async _handleRequest(target) {
+  // best-effort restore of the pre-write snapshot. `meta` carries the request
+  // source ("manual"/"auto") and the predicted model context captured when
+  // the request was enqueued.
+  async _handleRequest(target, meta) {
     if (!this.config.brightnessEnabled) {
       console.log(`Brightness disabled; ignoring command ${target}%`);
       return;
@@ -267,6 +370,8 @@ export class BrightnessController {
       await this._verifyBrightness(target);
       console.log(`Brightness ${target}% applied and verified`);
       await this._publishStatus("applied", target, null, target);
+      this._lastAppliedPercent = target;
+      await this._appendCalibration(meta, target);
       return;
     } catch (err) {
       errorText = `Brightness ${target}% failed: ${this._safeError(err)}`;
@@ -350,6 +455,11 @@ export class BrightnessController {
   // write. Callers that treat persistence as a hardware precondition (the
   // `pending` phase) must check the return value; terminal phases are
   // best-effort and rely on `republishStatus` to self-heal a lost write.
+  // The payload is the worker-owned block (phase/requested/applied/error)
+  // merged with the auto mode block: `mode` is "auto" whenever the daemon
+  // auto feature is enabled, with the live `predicted` readout present once
+  // the scheduler has computed its first prediction. With the auto feature
+  // off the payload stays byte-compatible with the pre-auto schema.
   async _publishStatus(phase, requestedPercent, error, appliedPercent) {
     if (!this._statusRef) return false;
     if (!BRIGHTNESS_PHASES.has(phase)) {
@@ -360,18 +470,155 @@ export class BrightnessController {
       requestedPercent,
       phase,
       error: this._safeError(error),
-      updatedAt: ServerValue.TIMESTAMP,
     };
     if (appliedPercent !== undefined && appliedPercent !== null) {
       payload.appliedPercent = appliedPercent;
     }
-    this._lastStatus = { ...payload };
+    this._workerStatus = { ...payload };
+    this._rebuildLastStatus();
     try {
-      await this._statusRef.set(payload);
+      await this._statusRef.set({
+        ...this._lastStatus,
+        updatedAt: ServerValue.TIMESTAMP,
+      });
       return true;
     } catch (err) {
       console.error(`Failed to publish brightness status: ${err.message}`);
       return false;
+    }
+  }
+
+  // Re-merges the worker status block with the auto mode/predicted blocks
+  // into `_lastStatus`, the cached payload used for listener-refresh
+  // republishes.
+  _rebuildLastStatus() {
+    if (!this.config.autoBrightnessEnabled) {
+      this._lastStatus = this._workerStatus ? { ...this._workerStatus } : null;
+      return;
+    }
+    if (this._workerStatus) {
+      const merged = { ...this._workerStatus };
+      merged.mode = "auto";
+      if (this._latestPrediction) merged.predicted = this._latestPrediction;
+      this._lastStatus = merged;
+      return;
+    }
+    // No worker status yet (fresh daemon): publish the prediction readout as
+    // a `shadow` phase document so controllers can compare predicted values
+    // against their manual ones before auto is ever enabled.
+    const merged = { phase: "shadow", requestedPercent: null, error: null };
+    merged.mode = "auto";
+    if (this._latestPrediction) merged.predicted = this._latestPrediction;
+    this._lastStatus = merged;
+  }
+
+  // Publishes the scheduler's current prediction into the status document
+  // without touching the worker outcome fields (the scheduler calls this
+  // every tick — shadow mode included). Never throws.
+  async publishPrediction(prediction) {
+    this._latestPrediction = prediction;
+    this._rebuildLastStatus();
+    if (!this._statusRef || !this._lastStatus) return;
+    try {
+      await this._statusRef.set({
+        ...this._lastStatus,
+        updatedAt: ServerValue.TIMESTAMP,
+      });
+    } catch (err) {
+      console.error(`Failed to publish brightness prediction: ${err.message}`);
+    }
+  }
+
+  // Entry point for the AutoBrightnessScheduler: enqueues one auto-initiated
+  // write into the same serialized worker the manual command listener feeds.
+  // Returns whether the request was accepted for processing.
+  requestAuto(percent, prediction) {
+    if (!Number.isInteger(percent) || percent < 0 || percent > 100) {
+      console.warn(
+        `Auto scheduler produced an invalid percent: ${JSON.stringify(percent)}`,
+      );
+      return false;
+    }
+    console.log(`Auto brightness request: ${percent}%`);
+    this._requested = percent;
+    this._requestedMeta = { source: "auto", prediction: prediction ?? null };
+    this._notifier.notify();
+    return true;
+  }
+
+  // The perimeter on/off gate for auto writes: the scheduler skips writes
+  // while the state is off (avoiding pointless hardware writes on a dark
+  // screen) and recomputes immediately on off → on.
+  onPerimeterState(state) {
+    const previous = this._perimeterState;
+    this._perimeterState = state;
+    if (state === "on" && previous !== "on") {
+      this._autoScheduler?.refresh();
+    }
+  }
+
+  // Manual-operator override of the auto master switch: writes `enabled:
+  // false` back to `brightnessAuto` (the daemon owns this safety rule).
+  async _disableAuto() {
+    if (!this._autoRef) return;
+    try {
+      await this._autoRef.update({
+        enabled: false,
+        updatedAt: ServerValue.TIMESTAMP,
+      });
+      console.log("Auto brightness disabled by manual command");
+    } catch (err) {
+      console.error(`Failed to disable auto brightness: ${err.message}`);
+    }
+  }
+
+  // One entry per applied auto change and per manual override while auto was
+  // enabled, appended to `perimeter/{location}/brightnessCalibration` for
+  // the offline fitting loop. Manual overrides without captured prediction
+  // context (auto feature just attached) are skipped — they carry nothing to
+  // fit. Never throws.
+  async _appendCalibration(meta, percent) {
+    if (!this._calibrationRef) return;
+    if (meta.source === "auto") {
+      await this._pushCalibration(
+        calibrationEntry("auto", percent, meta.prediction, ServerValue.TIMESTAMP),
+      );
+      return;
+    }
+    if (meta.autoWasEnabled && meta.prediction) {
+      await this._pushCalibration(
+        calibrationEntry("manual", percent, meta.prediction, ServerValue.TIMESTAMP),
+      );
+    }
+  }
+
+  async _pushCalibration(entry) {
+    try {
+      await this._calibrationRef.push(entry);
+    } catch (err) {
+      console.error(
+        `Failed to append brightness calibration entry: ${err.message}`,
+      );
+    }
+  }
+
+  // Seeds `_lastAppliedPercent` from the daemon's own last published status
+  // so the scheduler's hysteresis/slew baseline survives a daemon restart.
+  async _seedLastApplied() {
+    if (!this._statusRef) return;
+    try {
+      const snapshot = await this._statusRef.get();
+      const applied = snapshot.val()?.appliedPercent;
+      if (
+        typeof applied === "number" &&
+        Number.isInteger(applied) &&
+        applied >= 0 &&
+        applied <= 100
+      ) {
+        this._lastAppliedPercent = applied;
+      }
+    } catch (err) {
+      console.warn(`Could not seed last applied brightness: ${err.message}`);
     }
   }
 
@@ -401,8 +648,12 @@ export class BrightnessController {
   // restoring before the worker loop observes `_stopping` and exits.
   shutdown() {
     this._stopping = true;
+    if (this._autoScheduler) this._autoScheduler.stop();
     if (this._commandRef) {
       this._commandRef.off("value");
+    }
+    if (this._autoRef) {
+      this._autoRef.off("value");
     }
     this._notifier.notify();
     return this._workerPromise;

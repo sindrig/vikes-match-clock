@@ -17,6 +17,7 @@ import {
   parsePerimeterAppliedAdLayout,
   parsePerimeterBrightness,
   parsePerimeterBrightnessStatus,
+  parsePerimeterBrightnessAuto,
   parsePerimeterOverlayGeometry,
   parseGoalScorerPreparationStatus,
   parsePerimeterDisplay,
@@ -2680,6 +2681,7 @@ describe("firebaseParsers", () => {
         phase: "applied",
         error: null,
         updatedAt: 1723392000000,
+        mode: "manual",
       });
     });
 
@@ -2696,6 +2698,7 @@ describe("firebaseParsers", () => {
         phase: "pending",
         error: null,
         updatedAt: 1723392000000,
+        mode: "manual",
       });
     });
 
@@ -2770,6 +2773,7 @@ describe("firebaseParsers", () => {
         phase: "failed",
         error: "Brightness not configured: Vnnox vnnoxSerial is not configured",
         updatedAt: 1723392000000,
+        mode: "manual",
       });
     });
 
@@ -2796,6 +2800,216 @@ describe("firebaseParsers", () => {
           phase: "applied",
           appliedPercent: 50,
           updatedAt: 1723392000000,
+        }),
+      ).toBeNull();
+    });
+
+    it("defaults an absent mode to manual (daemon without auto support)", () => {
+      const result = parsePerimeterBrightnessStatus({
+        requestedPercent: 50,
+        phase: "applied",
+        error: null,
+        updatedAt: 1723392000000,
+      });
+      expect(result?.mode).toBe("manual");
+      expect(result?.predicted).toBeUndefined();
+    });
+
+    it("parses an auto mode with a predicted payload", () => {
+      const result = parsePerimeterBrightnessStatus({
+        requestedPercent: 48,
+        appliedPercent: 48,
+        phase: "applied",
+        error: null,
+        updatedAt: 1723392000000,
+        mode: "auto",
+        predicted: {
+          lux: 10930.2,
+          sunElevationDeg: 24.6,
+          cloudCover: 1,
+          weatherAgeMin: 7,
+          weatherStale: false,
+        },
+      });
+      expect(result?.mode).toBe("auto");
+      expect(result?.predicted).toEqual({
+        lux: 10930.2,
+        sunElevationDeg: 24.6,
+        cloudCover: 1,
+        weatherAgeMin: 7,
+        weatherStale: false,
+      });
+    });
+
+    it("parses a stale-weather auto status", () => {
+      const result = parsePerimeterBrightnessStatus({
+        requestedPercent: 48,
+        phase: "applied",
+        error: null,
+        updatedAt: 1723392000000,
+        mode: "auto",
+        predicted: {
+          lux: 5000,
+          sunElevationDeg: 20,
+          cloudCover: 0.8,
+          weatherAgeMin: 190,
+          weatherStale: true,
+        },
+      });
+      expect(result?.predicted?.weatherStale).toBe(true);
+    });
+
+    it("drops a malformed predicted payload instead of rejecting the status", () => {
+      const base = {
+        requestedPercent: 48,
+        phase: "applied",
+        error: null,
+        updatedAt: 1723392000000,
+        mode: "auto",
+      };
+      expect(
+        parsePerimeterBrightnessStatus({
+          ...base,
+          predicted: { lux: "many" },
+        })?.predicted,
+      ).toBeUndefined();
+      expect(
+        parsePerimeterBrightnessStatus({
+          ...base,
+          predicted: {
+            lux: 1000,
+            sunElevationDeg: 5,
+            cloudCover: 0,
+            weatherAgeMin: 3,
+          },
+        })?.predicted,
+      ).toBeUndefined();
+      expect(
+        parsePerimeterBrightnessStatus({
+          ...base,
+          predicted: "not-an-object",
+        })?.predicted,
+      ).toBeUndefined();
+    });
+
+    it("treats an unrecognized mode as manual so future values cannot break the UI", () => {
+      const result = parsePerimeterBrightnessStatus({
+        requestedPercent: 50,
+        phase: "applied",
+        error: null,
+        updatedAt: 1723392000000,
+        mode: "turbo",
+      });
+      expect(result?.mode).toBe("manual");
+    });
+
+    it("accepts the shadow phase (prediction published without writes)", () => {
+      const result = parsePerimeterBrightnessStatus({
+        requestedPercent: null,
+        phase: "shadow",
+        error: null,
+        updatedAt: 1723392000000,
+        mode: "auto",
+        predicted: {
+          lux: 10930,
+          percent: 48,
+          sunElevationDeg: 24.6,
+          cloudCover: 1,
+          weatherAgeMin: 7,
+          weatherStale: false,
+        },
+      });
+      expect(result?.phase).toBe("shadow");
+      expect(result?.requestedPercent).toBeNull();
+      expect(result?.predicted?.percent).toBe(48);
+      expect(result?.predicted?.weatherAgeMin).toBe(7);
+    });
+
+    it("tolerates an optional weatherAgeMin in the predicted payload", () => {
+      const result = parsePerimeterBrightnessStatus({
+        requestedPercent: null,
+        phase: "shadow",
+        error: null,
+        updatedAt: 1723392000000,
+        mode: "auto",
+        predicted: {
+          lux: 10930,
+          sunElevationDeg: 24.6,
+          cloudCover: 1,
+          weatherStale: false,
+        },
+      });
+      expect(result?.predicted).toEqual({
+        lux: 10930,
+        sunElevationDeg: 24.6,
+        cloudCover: 1,
+        weatherStale: false,
+      });
+    });
+  });
+
+  describe("parsePerimeterBrightnessAuto", () => {
+    const validConfig = {
+      enabled: true,
+      min: 3,
+      max: 100,
+      exponent: 0.35,
+      cloudWeight: 1,
+      luxMin: 5,
+      luxMax: 100000,
+      updatedAt: 1723392000000,
+    };
+
+    it("parses a complete config", () => {
+      expect(parsePerimeterBrightnessAuto(validConfig)).toEqual(validConfig);
+    });
+
+    it("treats an absent node as auto disabled (null)", () => {
+      expect(parsePerimeterBrightnessAuto(null)).toBeNull();
+      expect(parsePerimeterBrightnessAuto(undefined)).toBeNull();
+    });
+
+    it("rejects payloads missing fields or with wrong types", () => {
+      expect(
+        parsePerimeterBrightnessAuto({ ...validConfig, enabled: "yes" }),
+      ).toBeNull();
+      expect(
+        parsePerimeterBrightnessAuto({ ...validConfig, min: 3.5 }),
+      ).toBeNull();
+      expect(
+        parsePerimeterBrightnessAuto({ ...validConfig, max: "100" }),
+      ).toBeNull();
+      expect(
+        parsePerimeterBrightnessAuto({ ...validConfig, exponent: null }),
+      ).toBeNull();
+      expect(
+        parsePerimeterBrightnessAuto({ ...validConfig, cloudWeight: "1" }),
+      ).toBeNull();
+      expect(
+        parsePerimeterBrightnessAuto({ ...validConfig, luxMin: null }),
+      ).toBeNull();
+      expect(
+        parsePerimeterBrightnessAuto({ ...validConfig, luxMax: "x" }),
+      ).toBeNull();
+      expect(
+        parsePerimeterBrightnessAuto({ ...validConfig, updatedAt: "x" }),
+      ).toBeNull();
+      expect(
+        parsePerimeterBrightnessAuto({ ...validConfig, updatedAt: null }),
+      ).toBeNull();
+      expect(parsePerimeterBrightnessAuto({ enabled: true })).toBeNull();
+      expect(parsePerimeterBrightnessAuto(42)).toBeNull();
+      expect(parsePerimeterBrightnessAuto("x")).toBeNull();
+    });
+
+    it("rejects non-finite numbers", () => {
+      expect(
+        parsePerimeterBrightnessAuto({ ...validConfig, exponent: Number.NaN }),
+      ).toBeNull();
+      expect(
+        parsePerimeterBrightnessAuto({
+          ...validConfig,
+          luxMax: Number.POSITIVE_INFINITY,
         }),
       ).toBeNull();
     });

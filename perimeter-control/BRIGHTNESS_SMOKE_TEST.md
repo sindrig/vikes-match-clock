@@ -78,6 +78,37 @@ perimeter screen GUID must ever be written.
       rejects it client-side without writing, and the daemon ignores any
       malformed value that reaches it.
 
+## 7. Automatic brightness (only when `PERIMETER_AUTO_BRIGHTNESS_ENABLED=true`)
+
+Run on a matchday with the sun up or during dusk so the prediction moves.
+
+- [ ] `journalctl -u perimeter-control -f` shows periodic
+      `Auto brightness config: ...` / prediction activity and **no** repeated
+      "Auto brightness tick failed" errors.
+- [ ] `perimeter/vikuti/brightnessStatus` gains `mode: "auto"` plus a
+      `predicted` block (`lux`, `percent`, `sunElevationDeg`, `cloudCover`,
+      `weatherAgeMin`, `weatherStale`) refreshed roughly every minute —
+      **before** any auto write is enabled (shadow mode: no `requestedPercent`
+      churn from auto).
+- [ ] Sanity-check the prediction against the design doc's reference table
+      (clear noon ≈ 76%, fully overcast noon ≈ 48%, night floor 3%).
+- [ ] With `brightnessAuto.enabled=false` (shadow mode) confirm **no**
+      `New brightness command:` lines appear from the scheduler.
+- [ ] Enable auto in the controller (`Sjálfvirkt`). Within one tick the
+      daemon logs `Auto brightness request: <pct>%` and the same
+      pending → applied sequence as a manual command; the written value is
+      within 15 points of the last applied value (slew limit) and inside
+      `[max(min,1), min(max,99)]`.
+- [ ] Submit a manual percentage while auto is enabled: the daemon logs
+      `Auto brightness disabled by manual command`, the `brightnessAuto`
+      document shows `enabled: false`, and the manual value applies.
+- [ ] `perimeter/vikuti/brightnessCalibration` has one entry per applied auto
+      change (and per manual override while auto was on) with
+      `source`, `percent`, `lux`, `sunElevationDeg`, `cloudCover`.
+- [ ] Block egress to `api.open-meteo.com` for a few minutes (optional):
+      predictions keep flowing using the cached cloud fraction, and
+      `weatherStale` flags `true` only after the 3 h staleness window.
+
 ## Rollback (if anything looks wrong)
 
 1. Disable the feature flag: set `PERIMETER_BRIGHTNESS_ENABLED=false` and
