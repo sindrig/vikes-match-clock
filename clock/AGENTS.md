@@ -1108,9 +1108,9 @@ server timestamp):
   (`src/lib/autoBrightness.ts` — unit-tested against the design-doc
   reference vectors) every 15 minutes with SunCalc v1 sun positions at
   Fossvogur (64.117 N, −21.91 E; Iceland is UTC year-round). Cloud cover
-  comes from an Open-Meteo forecast fetch (`fetchCloudForecast()`), labelled
-  in the UI as forecast ("Sól: nákvæm reikningur — ský: spá frá
-  Open-Meteo.com"); a failed fetch degrades to a clear-sky curve note. The
+  comes from an Open-Meteo forecast fetch (`fetchCloudForecast()`),
+  attributed in the UI as "Spá frá Open-Meteo.com"; a failed fetch degrades
+  to a clear-sky curve note. The
   daemon — not this preview — decides actual writes.
 
 **Operator behavior** (`PerimeterControl.tsx` — manual mode):

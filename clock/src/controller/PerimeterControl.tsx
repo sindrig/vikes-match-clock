@@ -587,8 +587,8 @@ const AutoBrightnessCurve = ({
   );
 
   const width = 480;
-  const height = 150;
-  const padding = { left: 26, right: 10, top: 10, bottom: 24 };
+  const height = 110;
+  const padding = { left: 36, right: 10, top: 8, bottom: 24 };
   const startTime = points[0]?.time ?? now;
   const totalMs = 24 * 60 * 60 * 1000;
   const toX = (time: number) =>
@@ -607,6 +607,9 @@ const AutoBrightnessCurve = ({
       return `${index === 0 ? "M" : "L"}${clampedX.toFixed(1)} ${y.toFixed(1)}`;
     })
     .join(" ");
+
+  // Y-axis labels at 0/50/100 (percent brightness).
+  const yMarks = [0, 50, 100];
 
   // Hour labels every 3 h (UTC — Iceland is UTC year-round).
   const hourMarks: Array<{ time: number; label: string }> = [];
@@ -628,7 +631,7 @@ const AutoBrightnessCurve = ({
           24 klst. markspá
         </span>
         <span className="perimeter-brightness-curve-legend">
-          Sól: nákvæm reikningur — ský: spá frá Open-Meteo.com
+          Spá frá Open-Meteo.com
         </span>
       </div>
       <svg
@@ -637,6 +640,18 @@ const AutoBrightnessCurve = ({
         role="img"
         aria-label="Markspá sjálfvirks bjartleika fyrir næstu 24 klukkustundir"
       >
+        {yMarks.map((mark) => (
+          <g key={mark}>
+            <text
+              x={padding.left - 5}
+              y={toY(mark) + 3}
+              textAnchor="end"
+              className="perimeter-brightness-curve-y-label"
+            >
+              {mark}
+            </text>
+          </g>
+        ))}
         <line
           x1={padding.left}
           y1={toY(0)}
@@ -794,11 +809,6 @@ const AutoBrightnessPanel = ({
       {draft !== null && validationError !== null && (
         <div className="perimeter-brightness-invalid">{validationError}</div>
       )}
-      <div className="perimeter-brightness-auto-hint">
-        Daemoninn reiknar markið af sólarstöðu og skýjaspá og þjáppar það í
-        bilinu [max(lágmark, 1), min(hámark, 99)] — 0 og 100 eru eingöngu
-        handvirkt.
-      </div>
       <Button
         size="sm"
         appearance="primary"

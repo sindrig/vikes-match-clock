@@ -721,11 +721,6 @@
   width: 96px;
 }
 
-.perimeter-preview-modal .perimeter-brightness-auto-hint {
-  color: #666;
-  font-size: 12px;
-}
-
 .perimeter-preview-modal .perimeter-brightness-auto-live {
   display: flex;
   align-items: center;
@@ -786,6 +781,10 @@
 }
 
 .perimeter-preview-modal .perimeter-brightness-curve-tick-label {
+  fill: #666;
+  font-size: 9px;
+}
+.perimeter-preview-modal .perimeter-brightness-curve-y-label {
   fill: #666;
   font-size: 9px;
 }

@@ -1687,11 +1687,7 @@ describe("PerimeterControl", () => {
       );
       openModal();
 
-      expect(
-        screen.getByText(
-          "Sól: nákvæm reikningur — ský: spá frá Open-Meteo.com",
-        ),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Spá frá Open-Meteo.com")).toBeInTheDocument();
       expect(
         document.querySelector(".perimeter-brightness-curve-svg"),
       ).not.toBeNull();
