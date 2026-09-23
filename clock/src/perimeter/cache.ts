@@ -82,6 +82,30 @@ export class PersistentMediaCache {
     await cache.put(key, response.clone());
     return response;
   }
+
+  // Fetches a full download URL (immutable per object version, so the URL
+  // alone is the cache identity) through the same persistent cache. Used by
+  // the player band loader for card photos and club override logos, whose
+  // references are download URLs rather than gs:// paths.
+  async getUrl(url: string): Promise<Response> {
+    if (!this.cacheStorage) throw new Error("Cache Storage is unavailable.");
+    const cache = await this.cacheStorage.open(this.cacheName);
+    const cached = await cache.match(url);
+    if (cached) {
+      try {
+        await cached.clone().arrayBuffer();
+        return cached;
+      } catch {
+        await cache.delete(url);
+      }
+    }
+    const response = await this.fetchImpl(url);
+    if (!response.ok) {
+      throw new Error(`Perimeter media download failed (${response.status}).`);
+    }
+    await cache.put(url, response.clone());
+    return response;
+  }
 }
 
 export interface StoragePersistenceResult {

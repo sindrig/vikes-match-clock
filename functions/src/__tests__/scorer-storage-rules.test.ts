@@ -67,7 +67,7 @@ describeRules("Firebase scorer source storage rules", () => {
     await assertSucceeds(storage.ref(`${LOCATION}/crest.png`).getMetadata());
   });
 
-  it("allows anonymous reads of approved player celebration images", async () => {
+  it("allows anonymous reads of approved player images", async () => {
     const storage = env.unauthenticatedContext().storage();
     await assertSucceeds(
       storage.ref(`${LOCATION}/players/2492-fagn.png`).getMetadata(),
@@ -75,15 +75,20 @@ describeRules("Firebase scorer source storage rules", () => {
     await assertSucceeds(
       storage.ref(`${LOCATION}/players/a_b-C-fagn.png`).getMetadata(),
     );
-  });
-
-  it("denies anonymous reads of unrelated player media", async () => {
-    const storage = env.unauthenticatedContext().storage();
-    await assertFails(
+    // Identifier-shaped card photos are readable by the player band.
+    await assertSucceeds(
       storage.ref(`${LOCATION}/players/2492-plain.png`).getMetadata(),
     );
+  });
+
+  it("denies anonymous reads of non-identifier player media", async () => {
+    const storage = env.unauthenticatedContext().storage();
     await assertFails(
       storage.ref(`${LOCATION}/players/portrait.jpg`).getMetadata(),
+    );
+    // Dots inside the name break the identifier convention.
+    await assertFails(
+      storage.ref(`${LOCATION}/players/2492.fagn.png`).getMetadata(),
     );
     await assertFails(
       storage.ref(`${LOCATION}/players/dir/2492-fagn.png`).getMetadata(),
@@ -157,13 +162,15 @@ describe("Scorer source storage rule structure", () => {
     expect(crest).not.toBeNull();
   });
 
-  it("restricts anonymous player reads to the safe fagn naming convention", () => {
+  it("restricts anonymous player reads to the safe identifier naming convention", () => {
     const players = rules.match(
       /match \/\{location\}\/players\/\{fileName\} \{[\s\S]*?allow read: if fileName\.matches\("([^"]*)"\);[\s\S]*?allow write: if request\.auth != null;/,
     );
     expect(players).not.toBeNull();
     expect(players![1]).toContain("-fagn");
-    expect(players![1]).toMatch(/^\^\[A-Za-z0-9_-]\{1,64\}-fagn/);
+    expect(players![1]).toMatch(
+      /^\^\[A-Za-z0-9_-]\{1,64\}\(-fagn\)\?\[\.\]png\$/,
+    );
   });
 
   it("keeps every other object authenticated-only", () => {

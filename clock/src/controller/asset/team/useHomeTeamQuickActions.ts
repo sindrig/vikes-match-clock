@@ -133,13 +133,15 @@ export function useHomeTeamQuickActions() {
     const subOnTrimmed = trimLastName(player);
 
     void (async () => {
+      // Corrected semantics: `subIn` carries the player coming on, `subOut`
+      // the player going off. Consumers render the pair in that order.
       const subInObj = await getPlayerAssetObject({
-        player: subOffTrimmed,
+        player: subOnTrimmed,
         teamName: actualTeamName,
         listenPrefix,
       });
       const subOutObj = await getPlayerAssetObject({
-        player: subOnTrimmed,
+        player: subOffTrimmed,
         teamName: actualTeamName,
         listenPrefix,
       });
@@ -156,8 +158,8 @@ export function useHomeTeamQuickActions() {
           : subOutObj;
       addSubToQueue({
         type: assetTypes.SUB,
-        subIn: { ...finalSubIn, fullName: subOffPlayer.name },
-        subOut: { ...finalSubOut, fullName: player.name },
+        subIn: { ...finalSubIn, fullName: player.name },
+        subOut: { ...finalSubOut, fullName: subOffPlayer.name },
         key: `sub-${subInObj.key}-${subOutObj.key}`,
       });
     })();

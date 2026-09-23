@@ -55,6 +55,12 @@
           "scorerCelebration": {
             ".validate": "newData.val() == null || (newData.isString() && (newData.val() == 'ribbon' || newData.val() == 'tunnel' || newData.val() == 'wave' || newData.val() == 'procession' || newData.val() == 'cutout'))"
           },
+          "playerDisplayStyle": {
+            ".validate": "newData.val() == null || (newData.isString() && (newData.val() == 'plain' || newData.val() == 'glow' || newData.val() == 'streamer'))"
+          },
+          "substitutionStyle": {
+            ".validate": "newData.val() == null || (newData.isString() && (newData.val() == 'static' || newData.val() == 'relay' || newData.val() == 'flash'))"
+          },
           "brightnessAuto": {
             ".validate": "newData.val() == null || (newData.hasChildren(['enabled', 'min', 'max', 'exponent', 'cloudWeight', 'luxMin', 'luxMax', 'updatedAt']) && newData.child('enabled').isBoolean() && newData.child('min').isNumber() && newData.child('min').val() >= 0 && newData.child('max').isNumber() && newData.child('max').val() <= 100 && newData.child('min').val() <= newData.child('max').val() && newData.child('exponent').isNumber() && newData.child('exponent').val() >= 0.05 && newData.child('exponent').val() <= 2 && newData.child('cloudWeight').isNumber() && newData.child('cloudWeight').val() >= 0 && newData.child('cloudWeight').val() <= 1 && newData.child('luxMin').isNumber() && newData.child('luxMax').isNumber() && newData.child('luxMin').val() < newData.child('luxMax').val() && newData.child('updatedAt').isNumber() && newData.child('updatedAt').val() <= now)",
             "enabled": {

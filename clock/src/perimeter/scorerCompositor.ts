@@ -212,6 +212,8 @@ export interface BandUnitMotion {
   portraitAlpha?: number;
   // Alpha multiplier for the number and name (0..1); defaults to 1.
   textAlpha?: number;
+  // Fill color for the number and name; defaults to the band's white.
+  textColor?: string;
   // Whole-unit alpha multiplier (0..1); defaults to 1.
   alpha?: number;
 }
@@ -256,7 +258,7 @@ export function drawBandUnit(
     );
   }
   let cursor = originX + unit.portraitWidth + unit.gap;
-  context.fillStyle = SCORER_BAND_STYLE.fillStyle;
+  context.fillStyle = motion.textColor ?? SCORER_BAND_STYLE.fillStyle;
   context.textBaseline = "middle";
   context.globalAlpha = textAlpha;
   if (unit.numberWidth > 0) {

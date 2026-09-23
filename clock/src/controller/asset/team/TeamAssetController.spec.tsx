@@ -643,8 +643,11 @@ describe("TeamAssetController", () => {
       expect(mockAddItemsToQueue).toHaveBeenCalledWith("new-queue-id", [
         expect.objectContaining({
           type: "SUB",
-          subIn: { ...subInAsset, fullName: "Jón Jónsson" },
-          subOut: { ...subOutAsset, fullName: "Siggi Bekkur" },
+          // Corrected semantics: subIn = coming on, subOut = going off.
+          // The first modal step picks the outgoing player (Jón Jónsson),
+          // the second the incoming player (Siggi Bekkur).
+          subIn: { ...subInAsset, fullName: "Siggi Bekkur" },
+          subOut: { ...subOutAsset, fullName: "Jón Jónsson" },
         }),
       ]);
       expect(mockActivateQueue).toHaveBeenCalledWith("new-queue-id");

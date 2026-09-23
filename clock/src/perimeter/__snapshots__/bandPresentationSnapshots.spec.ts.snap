@@ -1,0 +1,260 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`player band snapshots > glow: settled frame at the Víkin web logical-screen size 1`] = `
+"clearRect
+fillRect (0,0,960,108)
+fillRect (-270,-48.599999999999994,205.2,205.2)
+fillRect (172.99999999999997,-48.599999999999994,205.2,205.2)
+fillRect (615.9999999999999,-48.599999999999994,205.2,205.2)
+save
+save
+image dest=(-194.40000000000003,0,54,108)
+text "7" at=-91.40000000000003,54 font=700 30px "GT America"
+text "Jón Jónsson" at=-5.400000000000034,54 font=700 30px "GT America"
+restore
+save
+image dest=(248.59999999999997,0,54,108)
+text "7" at=351.59999999999997,54 font=700 30px "GT America"
+text "Jón Jónsson" at=437.59999999999997,54 font=700 30px "GT America"
+restore
+save
+image dest=(691.5999999999999,0,54,108)
+text "7" at=794.5999999999999,54 font=700 30px "GT America"
+text "Jón Jónsson" at=880.5999999999999,54 font=700 30px "GT America"
+restore
+restore"
+`;
+
+exports[`player band snapshots > plain: settled frame at the Víkin web logical-screen size 1`] = `
+"clearRect
+fillRect (0,0,960,108)
+save
+save
+image dest=(-194.40000000000003,0,54,108)
+text "7" at=-91.40000000000003,54 font=700 30px "GT America"
+text "Jón Jónsson" at=-5.400000000000034,54 font=700 30px "GT America"
+restore
+save
+image dest=(248.59999999999997,0,54,108)
+text "7" at=351.59999999999997,54 font=700 30px "GT America"
+text "Jón Jónsson" at=437.59999999999997,54 font=700 30px "GT America"
+restore
+save
+image dest=(691.5999999999999,0,54,108)
+text "7" at=794.5999999999999,54 font=700 30px "GT America"
+text "Jón Jónsson" at=880.5999999999999,54 font=700 30px "GT America"
+restore
+restore"
+`;
+
+exports[`player band snapshots > streamer: settled frame at the Víkin web logical-screen size 1`] = `
+"clearRect
+fillRect (0,0,960,108)
+fillRect (636,18,97.2,2)
+fillRect (474,54,97.2,2)
+fillRect (312,90,97.2,2)
+save
+save
+image dest=(-259.20000000000005,0,54,108)
+text "7" at=-156.20000000000005,54 font=700 30px "GT America"
+text "Jón Jónsson" at=-70.20000000000005,54 font=700 30px "GT America"
+restore
+save
+image dest=(183.79999999999995,0,54,108)
+text "7" at=286.79999999999995,54 font=700 30px "GT America"
+text "Jón Jónsson" at=372.79999999999995,54 font=700 30px "GT America"
+restore
+save
+image dest=(626.8,0,54,108)
+text "7" at=729.8,54 font=700 30px "GT America"
+text "Jón Jónsson" at=815.8,54 font=700 30px "GT America"
+restore
+restore"
+`;
+
+exports[`player band snapshots > streamer: settled frame at the stacked web logical-screen size 1`] = `
+"clearRect
+fillRect (0,0,3840,192)
+fillRect (3264,32,172.8,4)
+fillRect (2976,96,172.8,4)
+fillRect (2688,160,172.8,4)
+save
+save
+image dest=(-460.8,0,96,192)
+text "10" at=-278.8,96 font=700 54px "GT America"
+text "Jón Jónsson" at=-61.80000000000001,96 font=700 54px "GT America"
+restore
+save
+image dest=(392.2,0,96,192)
+text "10" at=574.2,96 font=700 54px "GT America"
+text "Jón Jónsson" at=791.2,96 font=700 54px "GT America"
+restore
+save
+image dest=(1245.2,0,96,192)
+text "10" at=1427.2,96 font=700 54px "GT America"
+text "Jón Jónsson" at=1644.2,96 font=700 54px "GT America"
+restore
+save
+image dest=(2098.2,0,96,192)
+text "10" at=2280.2,96 font=700 54px "GT America"
+text "Jón Jónsson" at=2497.2,96 font=700 54px "GT America"
+restore
+save
+image dest=(2951.2,0,96,192)
+text "10" at=3133.2,96 font=700 54px "GT America"
+text "Jón Jónsson" at=3350.2,96 font=700 54px "GT America"
+restore
+save
+image dest=(3804.2,0,96,192)
+text "10" at=3986.2,96 font=700 54px "GT America"
+text "Jón Jónsson" at=4203.2,96 font=700 54px "GT America"
+restore
+restore"
+`;
+
+exports[`substitution band snapshots > flash: settled frame at the Víkin web logical-screen size 1`] = `
+"clearRect
+fillRect (0,0,960,108)
+save
+beginPath
+rect
+clip
+save
+save
+image dest=(0,0,54,108)
+text "12" at=103,54 font=700 30px "GT America"
+text "Siggi Bekkur" at=225,54 font=700 30px "GT America"
+restore
+save
+image dest=(530,0,108,108)
+text "7" at=687,54 font=700 30px "GT America"
+text "Jón Jónsson" at=773,54 font=700 30px "GT America"
+restore
+restore
+restore"
+`;
+
+exports[`substitution band snapshots > lay outing is stable: the measured unit matches the drawn unit geometry 1`] = `1027`;
+
+exports[`substitution band snapshots > relay: settled frame at the Víkin web logical-screen size 1`] = `
+"clearRect
+fillRect (0,0,960,108)
+save
+save
+beginPath
+rect
+clip
+save
+save
+image dest=(-194.40000000000003,0,54,108)
+text "12" at=-91.40000000000003,54 font=700 30px "GT America"
+text "Siggi Bekkur" at=30.599999999999966,54 font=700 30px "GT America"
+restore
+save
+image dest=(335.59999999999997,0,108,108)
+text "7" at=492.59999999999997,54 font=700 30px "GT America"
+text "Jón Jónsson" at=578.5999999999999,54 font=700 30px "GT America"
+restore
+restore
+restore
+save
+beginPath
+rect
+clip
+save
+save
+image dest=(832.5999999999999,0,54,108)
+text "12" at=935.5999999999999,54 font=700 30px "GT America"
+text "Siggi Bekkur" at=1057.6,54 font=700 30px "GT America"
+restore
+save
+image dest=(1362.6,0,108,108)
+text "7" at=1519.6,54 font=700 30px "GT America"
+text "Jón Jónsson" at=1605.6,54 font=700 30px "GT America"
+restore
+restore
+restore
+restore"
+`;
+
+exports[`substitution band snapshots > static: settled frame at the Víkin web logical-screen size 1`] = `
+"clearRect
+fillRect (0,0,960,108)
+save
+save
+beginPath
+rect
+clip
+save
+save
+image dest=(0,0,54,108)
+text "12" at=103,54 font=700 30px "GT America"
+text "Siggi Bekkur" at=225,54 font=700 30px "GT America"
+restore
+save
+image dest=(530,0,108,108)
+text "7" at=687,54 font=700 30px "GT America"
+text "Jón Jónsson" at=773,54 font=700 30px "GT America"
+restore
+restore
+restore
+restore"
+`;
+
+exports[`substitution band snapshots > static: settled unit layout matches the measured substitution unit 1`] = `
+"clearRect
+fillRect (0,0,3840,192)
+save
+save
+beginPath
+rect
+clip
+save
+save
+image dest=(0,0,96,192)
+text "12" at=182,96 font=700 54px "GT America"
+text "Siggi Bekkur" at=399,96 font=700 54px "GT America"
+restore
+save
+image dest=(944,0,192,192)
+text "7" at=1222,96 font=700 54px "GT America"
+text "Jón Jónsson" at=1374,96 font=700 54px "GT America"
+restore
+restore
+restore
+save
+beginPath
+rect
+clip
+save
+save
+image dest=(1828,0,96,192)
+text "12" at=2010,96 font=700 54px "GT America"
+text "Siggi Bekkur" at=2227,96 font=700 54px "GT America"
+restore
+save
+image dest=(2772,0,192,192)
+text "7" at=3050,96 font=700 54px "GT America"
+text "Jón Jónsson" at=3202,96 font=700 54px "GT America"
+restore
+restore
+restore
+save
+beginPath
+rect
+clip
+save
+save
+image dest=(3656,0,96,192)
+text "12" at=3838,96 font=700 54px "GT America"
+text "Siggi Bekkur" at=4055,96 font=700 54px "GT America"
+restore
+save
+image dest=(4600,0,192,192)
+text "7" at=4878,96 font=700 54px "GT America"
+text "Jón Jónsson" at=5030,96 font=700 54px "GT America"
+restore
+restore
+restore
+restore"
+`;

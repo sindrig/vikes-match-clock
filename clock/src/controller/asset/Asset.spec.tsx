@@ -379,11 +379,10 @@ describe("AssetComponent", () => {
 
       render(<AssetComponent asset={asset} />);
 
-      const substitution = screen.getByTestId("substitution");
-      expect(substitution).toBeInTheDocument();
-
+      // renderSub emits [subOut, subIn]: the outgoing player stays left.
       const playerCards = screen.getAllByTestId("player-card");
       expect(playerCards).toHaveLength(2);
+      expect(playerCards[0]).toHaveTextContent("player-out.jpg");
     });
 
     it("returns null when subIn is missing", () => {

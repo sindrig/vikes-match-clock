@@ -372,7 +372,23 @@ export interface PerimeterState {
   // view. Absent/invalid values fall back to the default style in the
   // web runtime; the field only affects web-rendered scorer bands.
   scorerCelebration?: ScorerCelebrationStyle;
+  // Player band presentation selected in the perimeter admin view for web
+  // venues. Absent/invalid values fall back to the default band style.
+  playerDisplayStyle?: PlayerBandStyle;
+  // Substitution band presentation selected in the perimeter admin view for
+  // web venues. Absent/invalid values fall back to the default style.
+  substitutionStyle?: SubstitutionBandStyle;
 }
+
+// Visual presentation styles for the web perimeter player band. The band is
+// derived from the scoreboard's current player asset; the style only changes
+// how the display browser animates it.
+export type PlayerBandStyle = "plain" | "glow" | "streamer";
+
+// Visual presentation styles for the web perimeter substitution band. The
+// settled two-player unit layout is shared; the styles differ in their
+// entrance and post-entrance motion.
+export type SubstitutionBandStyle = "static" | "relay" | "flash";
 
 // Visual presentation styles for the web goal-scorer perimeter band. The
 // semantic version-2 command is unchanged by the style; it only changes how
