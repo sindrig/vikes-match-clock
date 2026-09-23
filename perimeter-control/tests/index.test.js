@@ -176,6 +176,105 @@ test("loadConfig invalid numerics fall back to defaults", () => {
   assert.equal(config.listenerRefreshMs, 300_000);
 });
 
+test("loadConfig Resolume is enabled by default and disabled by false", () => {
+  assert.equal(loadConfig({}).resolumeEnabled, true);
+  assert.equal(
+    loadConfig({ PERIMETER_RESOLUME_ENABLED: "true" }).resolumeEnabled,
+    true,
+  );
+  assert.equal(
+    loadConfig({ PERIMETER_RESOLUME_ENABLED: "false" }).resolumeEnabled,
+    false,
+  );
+});
+
+test("resolume disabled constructs no Resolume-backed controllers", () => {
+  const controller = makeController({
+    PERIMETER_RESOLUME_ENABLED: "false",
+    PERIMETER_BRIGHTNESS_ENABLED: "true",
+    PERIMETER_VNNOX_PERIMETER_GUID: "guid-1",
+    PERIMETER_VNNOX_SN: "sn-1",
+    PERIMETER_VNNOX_PASSWORD: "secret",
+  });
+  assert.equal(controller.resolume, null);
+  assert.equal(controller._overlayController, null);
+  assert.equal(controller._adLayoutController, null);
+  assert.equal(controller._importController, null);
+  assert.notEqual(controller._brightnessController, null);
+  controller.shutdown();
+});
+
+test("resolume disabled attaches only the state and brightness refs", () => {
+  const controller = makeController({
+    PERIMETER_RESOLUME_ENABLED: "false",
+    PERIMETER_BRIGHTNESS_ENABLED: "true",
+    PERIMETER_VNNOX_PERIMETER_GUID: "guid-1",
+    PERIMETER_VNNOX_SN: "sn-1",
+    PERIMETER_VNNOX_PASSWORD: "secret",
+  });
+  const db = new FakeDb();
+  controller.attach(db);
+  const paths = db.refs.map((r) => r.path);
+  assert.deepEqual(
+    paths.sort(),
+    [
+      controller.config.path,
+      controller.config.brightnessPath,
+      controller.config.brightnessStatusPath,
+    ].sort(),
+  );
+  controller.shutdown();
+});
+
+test("resolume disabled never applies a state change", async () => {
+  const controller = makeController({
+    PERIMETER_RESOLUME_ENABLED: "false",
+  });
+  let applied = false;
+  controller.resolume = {
+    applyState: async () => {
+      applied = true;
+    },
+  };
+  const db = new FakeDb();
+  controller.attach(db);
+  controller.startApplicator();
+  db.refs[0].emit("on");
+  await sleep(30);
+  assert.equal(applied, false);
+  assert.equal(controller._readDesired(), null);
+  controller.shutdown();
+});
+
+test("resolume disabled skips preview refresh", async () => {
+  const controller = makeController({
+    PERIMETER_RESOLUME_ENABLED: "false",
+  });
+  const db = new FakeDb();
+  controller.attach(db);
+  let read = false;
+  controller.previewReader.collectPreview = async () => {
+    read = true;
+    return { columns: [] };
+  };
+  await controller.refreshPreview();
+  assert.equal(read, false);
+  controller.shutdown();
+});
+
+test("resolume disabled skips the deck autopilot self-heal", async (t) => {
+  const controller = makeController({
+    PERIMETER_RESOLUME_ENABLED: "false",
+  });
+  const calls = mockAutopilotFetch(t);
+  await controller._ensureDeckAutopilot();
+  assert.equal(
+    calls.some((c) => c.method === "PUT"),
+    false,
+  );
+  controller.shutdown();
+});
+
 test("loadConfig automatic brightness defaults", () => {
   const config = loadConfig({});
   assert.equal(config.autoBrightnessEnabled, false);

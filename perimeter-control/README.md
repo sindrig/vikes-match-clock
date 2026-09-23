@@ -129,6 +129,7 @@ Edit `/etc/perimeter-control/perimeter-control.env`:
 | `PERIMETER_FIREBASE_PATH`            | `states/vikuti/perimeter/state`                         | Path of the state child to listen to                              |
 | `PERIMETER_SERVICE_ACCOUNT_FILE`     | `/etc/perimeter-control/perimeter-service-account.json` | Admin SDK credential file                                         |
 | `PERIMETER_RESOLUME_BASE_URL`        | `http://localhost:80/api/v1`                            | Resolume HTTP API base URL                                        |
+| `PERIMETER_RESOLUME_ENABLED`         | `true`                                                  | Set to `false` on a web-renderer venue (brightness-only gateway)   |
 | `PERIMETER_RESOLUME_COLUMN`          | `1`                                                     | Column started by `on`                                            |
 | `PERIMETER_REQUEST_TIMEOUT`          | `10`                                                    | HTTP timeout in seconds                                           |
 | `PERIMETER_LISTENER_REFRESH_SECONDS` | `300`                                                   | Listener refresh interval (0 disables)                            |
@@ -778,3 +779,15 @@ Storage rules permit anonymous reads only below the venue's `perimeter/` and
 performed by publishing/removing the venue's `web` mapping and reconnecting the
 previous output path; do not change the daemon's Resolume configuration for a
 venue that remains on `resolume`.
+
+A gateway serving a web venue still runs this daemon, but with Resolume control
+disabled:
+
+```ini
+PERIMETER_RESOLUME_ENABLED=false
+```
+
+The daemon then constructs no Resolume-backed controllers (applicator, preview,
+overlay, ad-layout, import, deck-autopilot self-heal) and never contacts the
+Resolume HTTP API — only the brightness (Vnnox) worker runs, so the gateway log
+stays free of Resolume timeouts from a host that no longer exists.

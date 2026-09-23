@@ -58,6 +58,12 @@ const DEFAULT_SERVICE_ACCOUNT_FILE =
   "/etc/perimeter-control/perimeter-service-account.json";
 const DEFAULT_RESOLUME_BASE_URL = "http://localhost:80/api/v1";
 const DEFAULT_RESOLUME_COLUMN = 1;
+// Resolume handling is enabled unless explicitly disabled — absent values keep
+// the legacy Resolume-backed behavior, matching the other feature flags that
+// default on. Set to "false" on a web-renderer venue: the applicator stops
+// driving the Resolume API and the Resolume-backed sub-controllers (preview,
+// overlay, ad-layout, import) are not constructed, leaving only brightness.
+const DEFAULT_RESOLUME_ENABLED = true;
 const DEFAULT_REQUEST_TIMEOUT_MS = 10_000;
 const DEFAULT_LISTENER_REFRESH_MS = 300_000;
 const DEFAULT_INITIAL_BACKOFF_MS = 1_000;
@@ -317,8 +323,15 @@ export function loadConfig(environ = process.env) {
     path: environ.PERIMETER_FIREBASE_PATH ?? DEFAULT_FIREBASE_PATH,
     serviceAccountFile:
       environ.PERIMETER_SERVICE_ACCOUNT_FILE ?? DEFAULT_SERVICE_ACCOUNT_FILE,
+    // Resolume Arena HTTP API base URL (reverse proxy on localhost:80).
     resolumeBaseUrl:
       environ.PERIMETER_RESOLUME_BASE_URL ?? DEFAULT_RESOLUME_BASE_URL,
+    // "false" converts the venue to a gateway that only controls brightness
+    // ("true" and absent keep the legacy Resolume-backed daemon).
+    resolumeEnabled:
+      environ.PERIMETER_RESOLUME_ENABLED === "false"
+        ? false
+        : DEFAULT_RESOLUME_ENABLED,
     resolumeColumn: positiveInt(
       environ.PERIMETER_RESOLUME_COLUMN,
       DEFAULT_RESOLUME_COLUMN,
@@ -613,7 +626,10 @@ export class PerimeterController {
   constructor(config) {
     assertNoSlotConflicts(config);
     this.config = config;
-    this.resolume = new ResolumeClient(config);
+    // A web-renderer venue (resolumeEnabled=false) runs only the brightness
+    // worker: the applicator and every Resolume-backed sub-controller are
+    // skipped so nothing ever contacts the Resolume HTTP API.
+    this.resolume = config.resolumeEnabled ? new ResolumeClient(config) : null;
     this.previewReader = new ResolumeCompositionReader(config);
     this._desired = null;
     this._lastSeen = null;
@@ -624,18 +640,18 @@ export class PerimeterController {
     this._geometryRef = null;
     this._refreshTimer = null;
     this._overlayController = null;
-    if (config.overlayEnabled) {
+    if (config.resolumeEnabled && config.overlayEnabled) {
       this._overlayController = new OverlayController(config);
     }
     this._adLayoutController = null;
-    if (config.adLayoutEnabled) {
+    if (config.resolumeEnabled && config.adLayoutEnabled) {
       this._adLayoutController = new AdLayoutController(
         config,
         config.adLaneIds,
       );
     }
     this._importController = null;
-    if (config.importEnabled) {
+    if (config.resolumeEnabled && config.importEnabled) {
       this._importController = new ResolumeImportController(config);
     }
     this._brightnessController = null;
@@ -685,11 +701,17 @@ export class PerimeterController {
     if (state === this._lastSeen) return;
     this._lastSeen = state;
     console.log(`New desired perimeter state: ${state}`);
-    this._desired = state;
-    // The brightness auto scheduler uses the on/off gate and recomputes
-    // immediately on off → on; manual/auto modes are unaffected.
+    if (this.config.resolumeEnabled) {
+      this._desired = state;
+      // The brightness auto scheduler uses the on/off gate and recomputes
+      // immediately on off → on; manual/auto modes are unaffected.
+      this._brightnessController?.onPerimeterState(state);
+      this._notifier.notify();
+      return;
+    }
+    // Brightness-only venue: the state gate still feeds the auto scheduler's
+    // off-skip logic, but no Resolume apply is queued.
     this._brightnessController?.onPerimeterState(state);
-    this._notifier.notify();
   }
 
   // -- firebase ------------------------------------------------------------
@@ -703,6 +725,21 @@ export class PerimeterController {
   attach(db) {
     this._ref = db.ref(this.config.path);
     this._ref.on("value", this._handleSnapshot);
+    if (!this.config.resolumeEnabled) {
+      // Brightness-only venue: attach the brightness controller and stop —
+      // no preview, geometry, overlay, ad-layout or import refs.
+      console.log(
+        "Resolume control disabled (PERIMETER_RESOLUME_ENABLED=false); " +
+          "running in brightness-only mode",
+      );
+      if (this._brightnessController) {
+        this._brightnessController.attach(db);
+        console.log(
+          `Brightness control listening on: ${this.config.brightnessPath}`,
+        );
+      }
+      return;
+    }
     this._previewRef = db.ref(this.config.previewPath);
     this._geometryRef = db.ref(this.config.overlayGeometryPath);
     console.log(`Listening on Firebase path: ${this.config.path}`);
@@ -787,6 +824,13 @@ export class PerimeterController {
   }
 
   async _applyWithRetries(target) {
+    if (!this.resolume) {
+      console.warn(
+        `Ignoring state ${target}: Resolume control is disabled ` +
+          `(PERIMETER_RESOLUME_ENABLED=false)`,
+      );
+      return;
+    }
     let backoff = this.config.initialBackoffMs;
     while (!this._stopping) {
       if (this._desired !== null) {
@@ -828,6 +872,7 @@ export class PerimeterController {
   // is actively freezing the deck (its restore record exists in the cache
   // dir) so a live celebration is never unpaused. Never throws.
   async _ensureDeckAutopilot() {
+    if (!this.config.resolumeEnabled) return;
     try {
       const base = this.config.resolumeBaseUrl.replace(/\/+$/, "");
       const composition = await this._getJson(`${base}/composition`);
@@ -941,7 +986,7 @@ export class PerimeterController {
   // is left intact; this method never throws. Concurrent refreshes are
   // serialized so an older collection can never overwrite a newer snapshot.
   async refreshPreview() {
-    if (!this.config.previewEnabled) return;
+    if (!this.config.previewEnabled || !this.config.resolumeEnabled) return;
     const previous = this._refreshPromise;
     const run = previous
       ? previous.then(() => this._doRefreshPreview())
@@ -981,7 +1026,7 @@ export class PerimeterController {
   // static daemon configuration; a write lost right after startup is
   // re-published on the listener refresh as a safety net. Never throws.
   async publishGeometry() {
-    if (!this._geometryRef) return;
+    if (!this._geometryRef || !this.config.resolumeEnabled) return;
     try {
       const geometry = buildOverlayGeometry(this.config);
       await this._geometryRef.set({
@@ -1068,6 +1113,9 @@ function main() {
   controller.startApplicator();
   controller.startBrightness();
   controller.startRefreshLoop();
+  // A brightness-only venue publishes neither a preview nor the overlay
+  // geometry (both are derived from the Resolume composition); refreshPreview
+  // and publishGeometry no-op when Resolume is disabled.
   controller.startPreview();
 
   // Waits up to SHUTDOWN_GRACE_MS for graceful drain (letting an in-flight
