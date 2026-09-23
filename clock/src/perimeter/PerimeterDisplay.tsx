@@ -65,6 +65,7 @@ export default function PerimeterDisplay() {
   const substitutionStyle =
     perimeter.substitutionStyle ?? DEFAULT_SUBSTITUTION_BAND_STYLE;
   const [rendererError, setRendererError] = useState<string | null>(null);
+  const [bandError, setBandError] = useState<string | null>(null);
   const [textureError, setTextureError] = useState<string | null>(null);
   // The runtime (and its scorer source loader) is constructed once per
   // configuration, so the bundled-crest fallback resolves the home team's
@@ -97,7 +98,8 @@ export default function PerimeterDisplay() {
   const reportedError = !ready
     ? null
     : configuration
-      ? [rendererError, textureError].filter(Boolean).join(" ") || null
+      ? [rendererError, bandError, textureError].filter(Boolean).join(" ") ||
+        null
       : NO_CONFIGURATION_MESSAGE;
   const displayError = ready && configuration ? reportedError : null;
 
@@ -334,11 +336,13 @@ export default function PerimeterDisplay() {
     void runtime
       .setPlayerBand(request, performance.now())
       .then(() => {
-        if (!cancelled && runtimeRef.current === runtime) runtime.render();
+        if (cancelled || runtimeRef.current !== runtime) return;
+        runtime.render();
+        setBandError(null);
       })
       .catch((error: unknown) => {
-        if (cancelled) return;
-        setRendererError(
+        if (cancelled || runtimeRef.current !== runtime) return;
+        setBandError(
           error instanceof Error
             ? error.message
             : "Perimeter player band could not be prepared.",

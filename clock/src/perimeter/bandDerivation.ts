@@ -1,4 +1,3 @@
-import type { CurrentAsset } from "../types";
 import assetTypes from "../controller/asset/AssetTypes";
 import type { BandIdentity } from "./playerBandPresentation";
 
@@ -18,36 +17,49 @@ const PLAYER_ASSET_TYPES: readonly string[] = [
   assetTypes.MOTM,
 ];
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
 // Validates one identity: bounded non-empty name, digit-only shirt number
 // (normalized to at most 4 digits), and a team name. Returns null when the
 // side cannot be rendered.
-function normalizeIdentity(asset: {
-  name?: string;
-  fullName?: string;
-  number?: number | string;
-  teamName?: string;
-  key?: string;
-  type?: string;
-}): BandIdentity | null {
-  const name = (asset.fullName ?? asset.name ?? "").trim();
+function normalizeIdentity(asset: unknown): BandIdentity | null {
+  if (!isRecord(asset)) return null;
+  // currentAsset is not deeply parsed by the controller subscription. Check
+  // its fields here before using string methods or coercing shirt numbers.
+  for (const field of ["name", "fullName", "teamName", "key"]) {
+    if (asset[field] != null && typeof asset[field] !== "string") return null;
+  }
+  const rawName = asset.fullName ?? asset.name;
+  if (typeof rawName !== "string") return null;
+  const name = rawName.trim();
   if (!name || name.length > 80) return null;
   // Digit-only normalization: the value must be purely numeric after
   // trimming, at most 4 digits — a mixed value ("12a") is invalid.
-  const number = String(asset.number ?? "").trim();
+  if (typeof asset.number !== "string" && typeof asset.number !== "number") {
+    return null;
+  }
+  const number = String(asset.number).trim();
   if (!/^[0-9]{1,4}$/.test(number)) return null;
-  const teamName = (asset.teamName ?? "").trim();
+  if (typeof asset.teamName !== "string") return null;
+  const teamName = asset.teamName.trim();
   if (!teamName) return null;
   const imageRef =
     asset.type === assetTypes.NO_IMAGE_PLAYER
       ? undefined
-      : asset.key && asset.key.trim().length > 0
+      : typeof asset.key === "string" && asset.key.trim().length > 0
         ? asset.key
         : undefined;
   return { name, number, teamName, imageRef };
 }
 
-function playerIdentity(asset: CurrentAsset["asset"]): BandIdentity | null {
-  if (!PLAYER_ASSET_TYPES.includes(asset.type)) return null;
+function playerIdentity(asset: Record<string, unknown>): BandIdentity | null {
+  if (
+    typeof asset.type !== "string" ||
+    !PLAYER_ASSET_TYPES.includes(asset.type)
+  )
+    return null;
   if (asset.isGoalCelebration) return null;
   return normalizeIdentity(asset);
 }
@@ -63,11 +75,11 @@ function playerIdentity(asset: CurrentAsset["asset"]): BandIdentity | null {
 //   sides must yield a valid identity, otherwise no band renders.
 // - Any other type, or any invalid identity, yields no band.
 export function deriveBandRequest(
-  currentAsset: CurrentAsset | null,
+  currentAsset: unknown,
 ): PlayerBandRequest | null {
-  if (!currentAsset) return null;
+  if (!isRecord(currentAsset)) return null;
   const asset = currentAsset.asset;
-  if (!asset) return null;
+  if (!isRecord(asset)) return null;
 
   if (asset.type === assetTypes.SUB) {
     if (!asset.subIn || !asset.subOut) return null;

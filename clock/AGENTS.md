@@ -1479,6 +1479,10 @@ token, or audit event is created by band behavior (regression e2e:
   yield a valid identity**, otherwise no band renders.
 - Any other type, `null` current asset, or any invalid identity drops the
   band and the base ad deck shows through.
+- Derivation validates runtime object and field types (including both SUB
+  sides) because the controller subscription does not deeply parse assets.
+  Malformed names, image keys, team names, or shirt numbers yield no band
+  rather than throwing from the display effect.
 
 **Image chain** (`perimeter/bandSource.ts`, `PlayerBandSourceLoader`): the
 identity's own image reference (a download URL, fetched through the
@@ -1502,6 +1506,11 @@ recompose the resident band while keeping current textures visible. The
 WebGL renderer composites `base < band < overlay` with an independent
 `bandDynamic` flag, and `clearChannel` accepts `"band"`.
 
+Band preparation errors are tracked separately from renderer/base/overlay
+and texture errors. A successful band replacement or removal clears only
+the band error in the display and Skjáarvillur diagnostics; a superseded
+preparation cannot overwrite the current band's error state.
+
 **Presentations** (`perimeter/playerBandPresentation.ts`): the player band
 repeats `[portrait | number | name]` units on a flat near-black field with
 a 600 ms alpha fade-in, drifting right-to-left at ~1.5× the scorer
@@ -1515,6 +1524,11 @@ main-screen substitution green — with entrances per style (`static`: fade
 then hold, `relay`: fade then drift at the player-band default speed,
 `flash`: impact flash + scale-down pop with the swap arrow stamping in
 last). Speeds are defined per style; there is no separate knob.
+
+Fade-in alpha is passed explicitly through the unit drawing helpers' motion
+arguments, including both identities and arrows for static/relay substitutions.
+Presentation tests record alpha at the actual draw calls with save/restore
+semantics so a helper cannot silently override the entrance opacity.
 
 **Style config** (parallel to `scorerCelebration`):
 

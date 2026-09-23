@@ -7,6 +7,60 @@ function assetOf(asset: CurrentAsset["asset"]): CurrentAsset {
 }
 
 describe("deriveBandRequest", () => {
+  const validPlayer = {
+    type: "PLAYER",
+    name: "Jón",
+    number: 7,
+    teamName: "Víkingur R",
+  };
+
+  it.each([
+    { name: 123 },
+    { fullName: false },
+    { teamName: [] },
+    { key: {} },
+    { number: [7] },
+    { number: true },
+  ])(
+    "rejects malformed identity fields in players and both SUB sides: %j",
+    (invalid) => {
+      const player = { ...validPlayer, ...invalid };
+      expect(deriveBandRequest({ asset: player })).toBeNull();
+      for (const side of ["subIn", "subOut"]) {
+        expect(
+          deriveBandRequest({
+            asset: {
+              type: "SUB",
+              subIn: validPlayer,
+              subOut: validPlayer,
+              [side]: player,
+            },
+          }),
+        ).toBeNull();
+      }
+    },
+  );
+
+  it.each([null, undefined, 123, "player", [], {}])(
+    "rejects malformed asset containers: %j",
+    (value) => {
+      expect(deriveBandRequest(value)).toBeNull();
+      expect(deriveBandRequest({ asset: value })).toBeNull();
+      for (const side of ["subIn", "subOut"]) {
+        expect(
+          deriveBandRequest({
+            asset: {
+              type: "SUB",
+              subIn: validPlayer,
+              subOut: validPlayer,
+              [side]: value,
+            },
+          }),
+        ).toBeNull();
+      }
+    },
+  );
+
   it("returns null without a current asset", () => {
     expect(deriveBandRequest(null)).toBeNull();
   });

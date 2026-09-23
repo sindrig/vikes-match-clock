@@ -40,6 +40,7 @@ interface FrameOp {
   args: number[];
   text?: string;
   style?: string;
+  alpha?: number;
 }
 
 interface Recording {
@@ -55,6 +56,7 @@ function readFillStyle(context: BandPresentationRenderingContext): string {
 
 function makeRecordingContext(): Recording {
   const ops: FrameOp[] = [];
+  const alphaStack: number[] = [];
   const context = {
     fillStyle: "",
     font: "",
@@ -68,14 +70,25 @@ function makeRecordingContext(): Recording {
         ),
       };
     },
-    save: vi.fn(() => ops.push({ op: "save", args: [] })),
-    restore: vi.fn(() => ops.push({ op: "restore", args: [] })),
+    save: vi.fn(() => {
+      alphaStack.push(context.globalAlpha);
+      ops.push({ op: "save", args: [] });
+    }),
+    restore: vi.fn(() => {
+      context.globalAlpha = alphaStack.pop() ?? 1;
+      ops.push({ op: "restore", args: [] });
+    }),
     beginPath: vi.fn(() => ops.push({ op: "beginPath", args: [] })),
     rect: (...args: number[]) => ops.push({ op: "rect", args }),
     clip: vi.fn(() => ops.push({ op: "clip", args: [] })),
     closePath: vi.fn(() => ops.push({ op: "closePath", args: [] })),
     fill: vi.fn(() =>
-      ops.push({ op: "fill", args: [], style: readFillStyle(context) }),
+      ops.push({
+        op: "fill",
+        args: [],
+        style: readFillStyle(context),
+        alpha: context.globalAlpha,
+      }),
     ),
     clearRect: (...args: number[]) => ops.push({ op: "clearRect", args }),
     fillRect: (...args: number[]) =>
@@ -97,10 +110,16 @@ function makeRecordingContext(): Recording {
         ops.push({
           op: "drawImage",
           args: [sx, sy, sw, sh, dx, dy, dw, dh],
+          alpha: context.globalAlpha,
         }),
     ),
     fillText: vi.fn((text: string, x: number, y: number) =>
-      ops.push({ op: "fillText", args: [x, y], text }),
+      ops.push({
+        op: "fillText",
+        args: [x, y],
+        text,
+        alpha: context.globalAlpha,
+      }),
     ),
     createLinearGradient: vi.fn((...args: number[]) => {
       ops.push({ op: "createLinearGradient", args });
@@ -302,21 +321,27 @@ describe("player band presentations", () => {
     },
   );
 
-  it("fades the band in over the entrance window", async () => {
-    const { presentation, recordings } = await createPlayerFor("plain");
-    presentation.draw(0);
-    const alphas = recordings.ops
-      .filter((entry) => entry.op === "globalAlpha")
-      .map((entry) => entry.args[0]!);
-    expect(Math.min(...alphas)).toBeCloseTo(0, 2);
-    const before = recordings.ops.length;
-    presentation.draw(10_000);
-    const settled = recordings.ops
-      .slice(before)
-      .filter((entry) => entry.op === "globalAlpha")
-      .map((entry) => entry.args[0]!);
-    expect(Math.min(...settled)).toBe(1);
-  });
+  it.each(PLAYER_STYLES)(
+    "fades portraits and text at draw time (%s)",
+    async (style) => {
+      const { presentation, recordings } = await createPlayerFor(style);
+      for (const [elapsed, alpha] of [
+        [0, 0],
+        [300, 0.875],
+        [600, 1],
+        [10_000, 1],
+      ] as const) {
+        recordings.ops.length = 0;
+        presentation.draw(elapsed);
+        for (const op of ["drawImage", "fillText"]) {
+          const draws = recordings.ops.filter((entry) => entry.op === op);
+          expect(draws.length).toBeGreaterThan(0);
+          for (const draw of draws) expect(draw.alpha).toBeCloseTo(alpha);
+        }
+        expect(recordings.context.globalAlpha).toBe(1);
+      }
+    },
+  );
 
   it("drifts the band units right-to-left faster than the procession", async () => {
     const { presentation, recordings } = await createPlayerFor("plain");
@@ -406,6 +431,28 @@ describe("player band presentations", () => {
 });
 
 describe("substitution band presentations", () => {
+  it.each<SubstitutionBandStyle>(["static", "relay"])(
+    "fades both identities and all arrows at draw time (%s)",
+    async (style) => {
+      const { presentation, recordings } = await createSubstitutionFor(style);
+      for (const [elapsed, alpha] of [
+        [0, 0],
+        [300, 0.875],
+        [600, 1],
+        [10_000, 1],
+      ] as const) {
+        recordings.ops.length = 0;
+        presentation.draw(elapsed);
+        for (const op of ["drawImage", "fillText", "fill"]) {
+          const draws = recordings.ops.filter((entry) => entry.op === op);
+          expect(draws.length).toBeGreaterThan(0);
+          for (const draw of draws) expect(draw.alpha).toBeCloseTo(alpha);
+        }
+        expect(recordings.context.globalAlpha).toBe(1);
+      }
+    },
+  );
+
   it.each(SUBSTITUTION_STYLES)(
     "creates a canvas at the logical screen dimensions and awaits band fonts (%s)",
     async (style) => {

@@ -107,6 +107,13 @@ const mockedUsePerimeter = vi.mocked(usePerimeter);
 
 const configuration = secondStadiumWebConfiguration;
 
+const playerController = (name: string) => ({
+  currentAsset: {
+    asset: { type: "PLAYER", name, number: 7, teamName: "Víkingur R" },
+    time: null,
+  },
+});
+
 const setupContexts = ({
   screens = [{ key: "vikuti", perimeterDisplay: configuration }],
   ready = true,
@@ -145,6 +152,7 @@ describe("PerimeterDisplay", () => {
     rendererHooks.onError = null;
     runtimeInstance.prepareBase = vi.fn().mockResolvedValue(undefined);
     runtimeInstance.setOverlay = vi.fn().mockResolvedValue(undefined);
+    runtimeInstance.setPlayerBand = vi.fn().mockResolvedValue(undefined);
     setupContexts();
   });
 
@@ -411,6 +419,97 @@ describe("PerimeterDisplay", () => {
         expect.any(Number),
       ),
     );
+  });
+
+  it.each(["replacement", "clear"])(
+    "clears a band error after successful %s",
+    async (recovery) => {
+      runtimeInstance.setPlayerBand.mockRejectedValueOnce(
+        new Error("Band source unavailable"),
+      );
+      setupContexts({ adLayout: null, controller: playerController("First") });
+      const { rerender } = render(<PerimeterDisplay />);
+      await waitFor(() =>
+        expect(mockReportError).toHaveBeenLastCalledWith(
+          "Band source unavailable",
+        ),
+      );
+
+      setupContexts({
+        adLayout: null,
+        controller:
+          recovery === "clear"
+            ? { currentAsset: null }
+            : playerController("Next"),
+      });
+      rerender(<PerimeterDisplay />);
+      await waitFor(() =>
+        expect(mockReportError).toHaveBeenLastCalledWith(null),
+      );
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+      expect(runtimeInstance.prepareBase).not.toHaveBeenCalled();
+      expect(runtimeInstance.setOverlay).toHaveBeenCalledTimes(1);
+      expect(runtimeInstance.replaceConfiguration).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(["prepareBase", "setOverlay"] as const)(
+    "preserves independent %s and texture errors when the band recovers",
+    async (method) => {
+      const adLayout = { version: 1, revision: "rev-1", columns: [] };
+      runtimeInstance[method].mockRejectedValue(
+        new Error("Independent preparation failure"),
+      );
+      runtimeInstance.setPlayerBand.mockRejectedValueOnce(
+        new Error("Band source unavailable"),
+      );
+      setupContexts({ adLayout, controller: playerController("First") });
+      const { rerender } = render(<PerimeterDisplay />);
+      await waitFor(() =>
+        expect(mockReportError).toHaveBeenLastCalledWith(
+          "Independent preparation failure Band source unavailable",
+        ),
+      );
+      act(() => rendererHooks.onError!("Texture failure"));
+
+      setupContexts({ adLayout, controller: playerController("Next") });
+      rerender(<PerimeterDisplay />);
+      await waitFor(() =>
+        expect(mockReportError).toHaveBeenLastCalledWith(
+          "Independent preparation failure Texture failure",
+        ),
+      );
+      expect(screen.getByRole("status")).toHaveTextContent(
+        "Independent preparation failure Texture failure",
+      );
+      expect(runtimeInstance[method]).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("does not clear a newer band error when a superseded preparation resolves", async () => {
+    let finishFirst: () => void = () => undefined;
+    runtimeInstance.setPlayerBand
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            finishFirst = resolve;
+          }),
+      )
+      .mockRejectedValueOnce(new Error("Latest band failed"));
+    setupContexts({ adLayout: null, controller: playerController("First") });
+    const { rerender } = render(<PerimeterDisplay />);
+    setupContexts({ adLayout: null, controller: playerController("Next") });
+    rerender(<PerimeterDisplay />);
+    await waitFor(() =>
+      expect(mockReportError).toHaveBeenLastCalledWith("Latest band failed"),
+    );
+
+    await act(async () => {
+      finishFirst();
+      await Promise.resolve();
+    });
+    expect(mockReportError).toHaveBeenLastCalledWith("Latest band failed");
+    expect(screen.getByRole("status")).toHaveTextContent("Latest band failed");
   });
 
   it("drops the band when the current asset is not a player", async () => {

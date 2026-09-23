@@ -203,11 +203,14 @@ function drawUnits(
   layout: PresentationLayout,
   slots: UnitSlot[],
   height: number,
+  alpha: number,
 ): void {
   for (const slot of slots) {
     const unit = layout.units[slot.index % layout.units.length];
     if (!unit) continue;
-    drawBandUnit(context, unit.image, unit.source, unit.unit, slot.x, height);
+    drawBandUnit(context, unit.image, unit.source, unit.unit, slot.x, height, {
+      alpha,
+    });
   }
 }
 
@@ -288,8 +291,7 @@ function drawPlayerFrame(
   // Soft alpha fade-in entrance, then steady drift.
   const entrance = easeOutCubic(elapsedMs / BAND_PRESENTATION_TIMELINE.fadeMs);
   context.save();
-  context.globalAlpha = entrance;
-  drawUnits(context, layout, slots, height);
+  drawUnits(context, layout, slots, height, entrance);
   context.restore();
 }
 
@@ -513,7 +515,6 @@ function drawSubstitutionFrame(
 
   const entrance = easeOutCubic(elapsedMs / BAND_PRESENTATION_TIMELINE.fadeMs);
   context.save();
-  context.globalAlpha = entrance;
   for (const slot of slots) {
     context.save();
     context.beginPath();
@@ -524,7 +525,9 @@ function drawSubstitutionFrame(
       height,
     );
     context.clip();
-    drawSubstitutionUnit(context, substitution, slot.x, height);
+    drawSubstitutionUnit(context, substitution, slot.x, height, {
+      alpha: entrance,
+    });
     context.restore();
   }
   context.restore();
