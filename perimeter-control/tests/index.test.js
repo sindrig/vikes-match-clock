@@ -176,6 +176,92 @@ test("loadConfig invalid numerics fall back to defaults", () => {
   assert.equal(config.listenerRefreshMs, 300_000);
 });
 
+test("loadConfig automatic brightness defaults", () => {
+  const config = loadConfig({});
+  assert.equal(config.autoBrightnessEnabled, false);
+  assert.equal(
+    config.autoBrightnessPath,
+    "states/vikuti/perimeter/brightnessAuto",
+  );
+  assert.equal(
+    config.brightnessCalibrationPath,
+    "perimeter/vikuti/brightnessCalibration",
+  );
+  // Location defaults to the Fossvogur perimeter screen.
+  assert.equal(config.autoBrightnessLat, 64.117);
+  assert.equal(config.autoBrightnessLng, -21.91);
+  assert.equal(config.autoTickMs, 60_000);
+  assert.equal(config.autoWeatherPollMs, 900_000);
+  assert.equal(config.autoMaxSlew, 15);
+  assert.equal(config.autoSkipWhenOff, true);
+  assert.equal(config.openMeteoUrl, "https://api.open-meteo.com/v1/forecast");
+  assert.equal(config.autoTimezone, "Atlantic/Reykjavik");
+});
+
+test("loadConfig automatic brightness overrides", () => {
+  const config = loadConfig({
+    PERIMETER_AUTO_BRIGHTNESS_ENABLED: "true",
+    PERIMETER_AUTO_BRIGHTNESS_PATH: "states/x/perimeter/brightnessAuto",
+    PERIMETER_BRIGHTNESS_CALIBRATION_PATH: "perimeter/x/brightnessCalibration",
+    PERIMETER_LAT: "64.5",
+    PERIMETER_LNG: "-22.5",
+    PERIMETER_AUTO_TICK_SECONDS: "30",
+    PERIMETER_AUTO_WEATHER_POLL_SECONDS: "60",
+    PERIMETER_AUTO_MAX_SLEW: "10",
+    PERIMETER_AUTO_SKIP_WHEN_OFF: "false",
+    PERIMETER_OPEN_METEO_URL: "https://example.com/v1/forecast",
+    PERIMETER_AUTO_TIMEZONE: "UTC",
+  });
+  assert.equal(config.autoBrightnessEnabled, true);
+  assert.equal(config.autoBrightnessPath, "states/x/perimeter/brightnessAuto");
+  assert.equal(
+    config.brightnessCalibrationPath,
+    "perimeter/x/brightnessCalibration",
+  );
+  assert.equal(config.autoBrightnessLat, 64.5);
+  assert.equal(config.autoBrightnessLng, -22.5);
+  assert.equal(config.autoTickMs, 30_000);
+  assert.equal(config.autoWeatherPollMs, 60_000);
+  assert.equal(config.autoMaxSlew, 10);
+  assert.equal(config.autoSkipWhenOff, false);
+  assert.equal(config.openMeteoUrl, "https://example.com/v1/forecast");
+  assert.equal(config.autoTimezone, "UTC");
+  // Blank and garbage location values fall back to the defaults instead of
+  // silently becoming 0 (Number("") is 0, which would put the screen at the
+  // equator).
+  const fallback = loadConfig({ PERIMETER_LAT: "", PERIMETER_LNG: "x" });
+  assert.equal(fallback.autoBrightnessLat, 64.117);
+  assert.equal(fallback.autoBrightnessLng, -21.91);
+});
+
+test("automatic brightness wires a scheduler through the brightness controller", () => {
+  const controller = makeController({
+    PERIMETER_BRIGHTNESS_ENABLED: "true",
+    PERIMETER_VNNOX_PERIMETER_GUID: "guid-1",
+    PERIMETER_VNNOX_SN: "sn-1",
+    PERIMETER_VNNOX_PASSWORD: "secret",
+    PERIMETER_AUTO_BRIGHTNESS_ENABLED: "true",
+    PERIMETER_AUTO_TICK_SECONDS: "30",
+    PERIMETER_AUTO_MAX_SLEW: "10",
+    PERIMETER_LAT: "64.5",
+  });
+  assert.ok(controller._autoScheduler);
+  assert.ok(controller._brightnessController._autoScheduler);
+  assert.equal(controller._autoScheduler._lat, 64.5);
+  assert.equal(controller._autoScheduler._tickMs, 30_000);
+  assert.equal(controller._autoScheduler._maxSlew, 10);
+  controller.shutdown();
+});
+
+test("the auto flag without the brightness worker stays unwired", () => {
+  const controller = makeController({
+    PERIMETER_AUTO_BRIGHTNESS_ENABLED: "true",
+  });
+  assert.equal(controller._autoScheduler, null);
+  assert.equal(controller._brightnessController, null);
+  controller.shutdown();
+});
+
 test("loadConfig refresh of 0 disables the refresh", () => {
   const config = loadConfig({ PERIMETER_LISTENER_REFRESH_SECONDS: "0" });
   assert.equal(config.listenerRefreshMs, 0);
@@ -388,6 +474,8 @@ class FakeRef {
     this.offCalls = 0;
     this.setCalls = [];
     this.updateCalls = [];
+    this.pushCalls = [];
+    this.getValue = null;
   }
 
   on(event, callback) {
@@ -413,6 +501,15 @@ class FakeRef {
   update(value) {
     this.updateCalls.push(value);
     return Promise.resolve();
+  }
+
+  push(value) {
+    this.pushCalls.push(value);
+    return Promise.resolve();
+  }
+
+  get() {
+    return Promise.resolve(new FakeSnapshot(this.getValue));
   }
 }
 

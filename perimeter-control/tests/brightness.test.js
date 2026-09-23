@@ -21,6 +21,9 @@ class FakeRef {
     this.path = path;
     this.handlers = new Map();
     this.setCalls = [];
+    this.updateCalls = [];
+    this.pushCalls = [];
+    this.getValue = null;
   }
   on(event, callback) {
     this.handlers.set(event, callback);
@@ -35,6 +38,17 @@ class FakeRef {
   set(value) {
     this.setCalls.push(value);
     return Promise.resolve();
+  }
+  update(value) {
+    this.updateCalls.push(value);
+    return Promise.resolve();
+  }
+  push(value) {
+    this.pushCalls.push(value);
+    return Promise.resolve();
+  }
+  get() {
+    return Promise.resolve(new FakeSnapshot(this.getValue));
   }
 }
 
@@ -81,6 +95,18 @@ function makeController(config = makeConfig()) {
   const db = new FakeDb();
   controller.attach(db);
   return { controller, refs: db.refs };
+}
+
+// Config for the automatic brightness feature (sun + weather prediction).
+function makeAutoConfig(overrides = {}) {
+  return makeConfig({
+    autoBrightnessEnabled: true,
+    autoBrightnessPath: `states/${LOCATION}/perimeter/brightnessAuto`,
+    brightnessCalibrationPath: `perimeter/${LOCATION}/brightnessCalibration`,
+    autoBrightnessLat: 64.117,
+    autoBrightnessLng: -21.91,
+    ...overrides,
+  });
 }
 
 // Override the client with a scripted double. `screenReads` is a queue of
@@ -152,6 +178,22 @@ const commandRef = (refs) => {
   );
   assert.ok(command, "brightness command ref attached");
   return command;
+};
+
+const autoRef = (refs) => {
+  const ref = refs.find(
+    (r) => r.path === `states/${LOCATION}/perimeter/brightnessAuto`,
+  );
+  assert.ok(ref, "brightnessAuto ref attached");
+  return ref;
+};
+
+const calibrationRef = (refs) => {
+  const ref = refs.find(
+    (r) => r.path === `perimeter/${LOCATION}/brightnessCalibration`,
+  );
+  assert.ok(ref, "brightnessCalibration ref attached");
+  return ref;
 };
 
 // -- attach paths ------------------------------------------------------------
@@ -546,4 +588,321 @@ test("shutdown lets an in-flight write finish verifying/restoring before drainin
   releaseWrite();
   await shutdownPromise;
   assert.ok(statusRef(refs).setCalls.some((s) => s.phase === "applied"));
+});
+
+// -- automatic brightness (sun + weather prediction) ---------------------------
+
+test("automatic refs attach only when the auto feature is enabled", () => {
+  const enabled = makeController(makeAutoConfig());
+  assert.ok(autoRef(enabled.refs).handlers.has("value"));
+  assert.ok(calibrationRef(enabled.refs));
+
+  const disabled = makeController();
+  assert.equal(
+    disabled.refs.some(
+      (r) => r.path === `states/${LOCATION}/perimeter/brightnessAuto`,
+    ),
+    false,
+  );
+  assert.equal(
+    disabled.refs.some(
+      (r) => r.path === `perimeter/${LOCATION}/brightnessCalibration`,
+    ),
+    false,
+  );
+});
+
+test("the hysteresis baseline seeds from the published status", async () => {
+  const { controller, refs } = makeController(makeAutoConfig());
+  statusRef(refs).getValue = { appliedPercent: 42, phase: "applied" };
+  await controller._seedLastApplied();
+  assert.equal(controller.lastAppliedPercent, 42);
+});
+
+test("requestAuto dispatches through the worker with auto mode and calibration", async (t) => {
+  const { controller, refs } = makeController(makeAutoConfig());
+  const calls = instrument(controller, { screenReads: [4.5, 65] });
+  controller.startWorker();
+  await controller.publishPrediction({
+    lux: 43721,
+    percent: 76,
+    sunElevationDeg: 24.6,
+    cloudCover: 0,
+    weatherStale: false,
+  });
+  const accepted = controller.requestAuto(65, {
+    lux: 43721,
+    percent: 76,
+    sunElevationDeg: 24.6,
+    cloudCover: 0,
+    weatherStale: false,
+  });
+  assert.equal(accepted, true);
+  await waitFor(() =>
+    statusRef(refs).setCalls.some((s) => s.phase === "applied"),
+  );
+  // Same worker path as manual commands: one scoped write, no restore.
+  assert.deepEqual(calls.writes, [65]);
+  assert.deepEqual(calls.restores, []);
+
+  const applied = statusRef(refs).setCalls.find((s) => s.phase === "applied");
+  assert.equal(applied.requestedPercent, 65);
+  assert.equal(applied.appliedPercent, 65);
+  assert.equal(applied.mode, "auto");
+  assert.deepEqual(applied.predicted, {
+    lux: 43721,
+    percent: 76,
+    sunElevationDeg: 24.6,
+    cloudCover: 0,
+    weatherStale: false,
+  });
+
+  // One calibration entry for the applied auto change.
+  const pushes = calibrationRef(refs).pushCalls;
+  assert.equal(pushes.length, 1);
+  assert.equal(pushes[0].source, "auto");
+  assert.equal(pushes[0].percent, 65);
+  assert.equal(pushes[0].lux, 43721);
+  assert.deepEqual(pushes[0].ts, ServerValue.TIMESTAMP);
+  assert.equal(controller.lastAppliedPercent, 65);
+});
+
+test("an invalid auto request is rejected without any worker activity", async () => {
+  const { controller, refs } = makeController(makeAutoConfig());
+  const calls = instrument(controller);
+  controller.startWorker();
+  assert.equal(controller.requestAuto(4.5, null), false);
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  assert.deepEqual(calls.writes, []);
+  assert.deepEqual(statusRef(refs).setCalls, []);
+});
+
+test("publishPrediction writes a shadow document before any worker status", async () => {
+  const { controller, refs } = makeController(makeAutoConfig());
+  instrument(controller);
+  const prediction = {
+    lux: 10930,
+    percent: 48,
+    sunElevationDeg: 24.6,
+    cloudCover: 1,
+    weatherAgeMin: 3,
+    weatherStale: false,
+  };
+  await controller.publishPrediction(prediction);
+  const st = statusRef(refs);
+  assert.deepEqual(st.setCalls[0], {
+    phase: "shadow",
+    requestedPercent: null,
+    error: null,
+    mode: "auto",
+    predicted: prediction,
+    updatedAt: ServerValue.TIMESTAMP,
+  });
+  // The cached status survives a listener-refresh republish.
+  await controller.republishStatus();
+  const last = st.setCalls[st.setCalls.length - 1];
+  assert.equal(last.phase, "shadow");
+  assert.deepEqual(last.predicted, prediction);
+});
+
+test("legacy (auto off) statuses carry no mode or predicted blocks", async (t) => {
+  const { controller, refs } = makeController();
+  const calls = instrument(controller, { screenReads: [4.5, 50] });
+  controller.startWorker();
+  commandRef(refs).emit(50);
+  await waitFor(() =>
+    statusRef(refs).setCalls.some((s) => s.phase === "applied"),
+  );
+  const applied = statusRef(refs).setCalls.find((s) => s.phase === "applied");
+  assert.equal("mode" in applied, false);
+  assert.equal("predicted" in applied, false);
+});
+
+test("auto-off status payloads are byte-identical to the pre-auto schema", async (t) => {
+  // A deployed daemon without the auto feature must produce exactly the same
+  // status documents as before (old controllers must keep parsing them).
+  const { controller, refs } = makeController();
+  const calls = instrument(controller, { screenReads: [4.5, 50] });
+  controller.startWorker();
+  commandRef(refs).emit(50);
+  await waitFor(() =>
+    statusRef(refs).setCalls.some((s) => s.phase === "applied"),
+  );
+  assert.deepEqual(statusRef(refs).setCalls, [
+    {
+      requestedPercent: 50,
+      phase: "pending",
+      error: null,
+      updatedAt: ServerValue.TIMESTAMP,
+    },
+    {
+      requestedPercent: 50,
+      phase: "applied",
+      appliedPercent: 50,
+      error: null,
+      updatedAt: ServerValue.TIMESTAMP,
+    },
+  ]);
+  // And the worker path is untouched: one write, no restore.
+  assert.deepEqual(calls.writes, [50]);
+  assert.deepEqual(calls.restores, []);
+});
+
+test("auto-off publishPrediction stays inert (no scheduler exists)", async () => {
+  const { controller, refs } = makeController();
+  const calls = instrument(controller, { screenReads: [4.5, 50] });
+  controller.startWorker();
+  commandRef(refs).emit(50);
+  await waitFor(() =>
+    statusRef(refs).setCalls.some((s) => s.phase === "applied"),
+  );
+  // Nothing in the daemon calls this without the auto feature, but a stray
+  // call must not publish a prediction-only or shadow document either.
+  await controller.publishPrediction({
+    lux: 10930,
+    percent: 48,
+    sunElevationDeg: 24.6,
+    cloudCover: 1,
+    weatherAgeMin: 3,
+    weatherStale: false,
+  });
+  const st = statusRef(refs);
+  const last = st.setCalls[st.setCalls.length - 1];
+  assert.equal(last.phase, "applied");
+  assert.equal("predicted" in last, false);
+  assert.equal("mode" in last, false);
+});
+
+test("a manual command while auto is enabled disables auto and logs the override", async (t) => {
+  const { controller, refs } = makeController(makeAutoConfig());
+  const calls = instrument(controller, { screenReads: [4.5, 50] });
+  controller.startWorker();
+  // A prediction must exist so the override is logged with model context.
+  await controller.publishPrediction({
+    lux: 10930,
+    percent: 48,
+    sunElevationDeg: 24.6,
+    cloudCover: 1,
+    weatherAgeMin: 3,
+    weatherStale: false,
+  });
+  // Auto is on in Firebase.
+  autoRef(refs).emit({ enabled: true, min: 3, max: 100 });
+  assert.equal(controller.autoConfig.enabled, true);
+
+  commandRef(refs).emit(50);
+  await waitFor(() =>
+    statusRef(refs).setCalls.some((s) => s.phase === "applied"),
+  );
+  // The daemon disabled auto in Firebase (operator intent wins).
+  assert.deepEqual(autoRef(refs).updateCalls, [
+    { enabled: false, updatedAt: ServerValue.TIMESTAMP },
+  ]);
+  assert.deepEqual(calls.writes, [50]);
+
+  // The applied manual override is logged for the calibration loop.
+  const pushes = calibrationRef(refs).pushCalls;
+  assert.equal(pushes.length, 1);
+  assert.equal(pushes[0].source, "manual");
+  assert.equal(pushes[0].percent, 50);
+  assert.equal(pushes[0].lux, 10930);
+  assert.deepEqual(pushes[0].ts, ServerValue.TIMESTAMP);
+});
+
+test("a manual command with auto disabled logs no calibration entry", async () => {
+  const { controller, refs } = makeController(makeAutoConfig());
+  const calls = instrument(controller, { screenReads: [4.5, 50] });
+  controller.startWorker();
+  await controller.publishPrediction({
+    lux: 10930,
+    percent: 48,
+    sunElevationDeg: 24.6,
+    cloudCover: 1,
+    weatherAgeMin: 3,
+    weatherStale: false,
+  });
+  // Auto stays off in Firebase.
+  autoRef(refs).emit({ enabled: false });
+  commandRef(refs).emit(50);
+  await waitFor(() =>
+    statusRef(refs).setCalls.some((s) => s.phase === "applied"),
+  );
+  assert.deepEqual(calls.writes, [50]);
+  assert.deepEqual(calibrationRef(refs).pushCalls, []);
+});
+
+test("a superseded auto write never reaches the calibration log", async (t) => {
+  const { controller, refs } = makeController(
+    makeAutoConfig({ initialBackoffMs: 50, maxBackoffMs: 100 }),
+  );
+  let firstFailure = true;
+  const calls = instrument(controller, {
+    screenReads: [4.5, 30],
+    screenReadError: () => {
+      if (firstFailure) {
+        firstFailure = false;
+        return new Error("transient");
+      }
+      return null;
+    },
+  });
+  controller.startWorker();
+  controller.requestAuto(65, {
+    lux: 43721,
+    percent: 76,
+    sunElevationDeg: 24.6,
+    cloudCover: 0,
+    weatherStale: false,
+  });
+  await waitFor(() => calls.screenReads.length >= 1);
+  // A manual command supersedes the auto request before the write dispatch.
+  commandRef(refs).emit(30);
+  await waitFor(() => calls.writes.includes(30));
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  const pushes = calibrationRef(refs).pushCalls;
+  assert.equal(pushes.length, 0);
+  const applied = statusRef(refs).setCalls.find((s) => s.phase === "applied");
+  assert.equal(applied.requestedPercent, 30);
+});
+
+test("onPerimeterState recomputes immediately on off -> on", () => {
+  const { controller } = makeController(makeAutoConfig());
+  let refreshes = 0;
+  controller.attachAutoScheduler({
+    refresh: () => {
+      refreshes += 1;
+    },
+    stop: () => {},
+  });
+  controller.onPerimeterState("off");
+  assert.equal(refreshes, 0);
+  controller.onPerimeterState("on");
+  assert.equal(refreshes, 1);
+  controller.onPerimeterState("on");
+  assert.equal(refreshes, 1);
+});
+
+test("shutdown stops the attached scheduler", () => {
+  const { controller } = makeController(makeAutoConfig());
+  let stopped = false;
+  controller.attachAutoScheduler({
+    refresh: () => {},
+    stop: () => {
+      stopped = true;
+    },
+  });
+  controller.shutdown();
+  assert.equal(stopped, true);
+});
+
+test("auto config failures publish a configuration-caused failed status", async () => {
+  const { controller, refs } = makeController(
+    makeAutoConfig({ autoBrightnessLat: undefined }),
+  );
+  controller.startWorker();
+  await waitFor(() =>
+    statusRef(refs).setCalls.some(
+      (s) => s.phase === "failed" && s.error.includes("Auto brightness not configured"),
+    ),
+  );
 });

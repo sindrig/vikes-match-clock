@@ -43,6 +43,11 @@ import { OverlayController } from "./overlay.js";
 import { AdLayoutController } from "./ad-layout.js";
 import { ResolumeImportController } from "./resolume-import.js";
 import { BrightnessController } from "./brightness.js";
+import {
+  AutoBrightnessScheduler,
+  buildOpenMeteoUrl,
+} from "./auto-brightness.js";
+import { OpenMeteoCloudCover } from "./weather.js";
 
 export const VALID_STATES = new Set(["on", "off"]);
 
@@ -127,6 +132,24 @@ const DEFAULT_BRIGHTNESS_MAX_RETRIES = 3;
 const DEFAULT_BRIGHTNESS_VERIFY_ATTEMPTS = 6;
 const DEFAULT_BRIGHTNESS_VERIFY_TOLERANCE = 1;
 const DEFAULT_BRIGHTNESS_VERIFY_INTERVAL_MS = 1_000;
+
+// Automatic brightness (sun + weather prediction) defaults. Auto writes go
+// through the same Vnnox brightness worker, so the feature additionally
+// requires PERIMETER_BRIGHTNESS_ENABLED=true. The location defaults to
+// Fossvogur, Reykjavík — a ±1 km error is < 0.01° of sun elevation, which is
+// irrelevant for brightness. Weather comes from Open-Meteo (no API key,
+// free for non-commercial use — attribution required:
+// "Weather data by Open-Meteo.com").
+const DEFAULT_AUTO_BRIGHTNESS_PATH = "states/vikuti/perimeter/brightnessAuto";
+const DEFAULT_BRIGHTNESS_CALIBRATION_PATH =
+  "perimeter/vikuti/brightnessCalibration";
+const DEFAULT_AUTO_LAT = 64.117;
+const DEFAULT_AUTO_LNG = -21.91;
+const DEFAULT_AUTO_TICK_MS = 60_000;
+const DEFAULT_AUTO_WEATHER_POLL_MS = 15 * 60_000;
+const DEFAULT_AUTO_MAX_SLEW = 15;
+const DEFAULT_OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast";
+const DEFAULT_AUTO_TIMEZONE = "Atlantic/Reykjavik";
 // Grace period for the process signal handler to await an in-flight
 // brightness write's verify/restore before exiting (see `main()`).
 const SHUTDOWN_GRACE_MS = 30_000;
@@ -177,6 +200,16 @@ const LEGACY_AUTOPILOT_FREEZE_FILE = "autopilot-freeze.json";
 function positiveInt(value, fallback) {
   const n = Number(value);
   return Number.isInteger(n) && n > 0 ? n : fallback;
+}
+
+// A finite number from an env var, falling back for absent/blank/garbage
+// values (Number("") is 0, so blank strings must be excluded explicitly).
+function finiteNumber(value, fallback) {
+  if (value === undefined || value === null || String(value).trim() === "") {
+    return fallback;
+  }
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
 }
 
 function positiveMs(value, fallback) {
@@ -454,6 +487,37 @@ export function loadConfig(environ = process.env) {
       environ.PERIMETER_BRIGHTNESS_VERIFY_INTERVAL_SECONDS,
       DEFAULT_BRIGHTNESS_VERIFY_INTERVAL_MS,
     ),
+    // Automatic brightness (sun + weather prediction) settings. The feature
+    // flag works together with PERIMETER_BRIGHTNESS_ENABLED: without the
+    // brightness worker there is nothing to dispatch auto writes through.
+    autoBrightnessEnabled:
+      environ.PERIMETER_AUTO_BRIGHTNESS_ENABLED === "true",
+    autoBrightnessPath:
+      environ.PERIMETER_AUTO_BRIGHTNESS_PATH ?? DEFAULT_AUTO_BRIGHTNESS_PATH,
+    brightnessCalibrationPath:
+      environ.PERIMETER_BRIGHTNESS_CALIBRATION_PATH ??
+      DEFAULT_BRIGHTNESS_CALIBRATION_PATH,
+    autoBrightnessLat: finiteNumber(environ.PERIMETER_LAT, DEFAULT_AUTO_LAT),
+    autoBrightnessLng: finiteNumber(environ.PERIMETER_LNG, DEFAULT_AUTO_LNG),
+    autoTickMs: positiveMs(
+      environ.PERIMETER_AUTO_TICK_SECONDS,
+      DEFAULT_AUTO_TICK_MS,
+    ),
+    autoWeatherPollMs: positiveMs(
+      environ.PERIMETER_AUTO_WEATHER_POLL_SECONDS,
+      DEFAULT_AUTO_WEATHER_POLL_MS,
+    ),
+    autoMaxSlew: positiveInt(
+      environ.PERIMETER_AUTO_MAX_SLEW,
+      DEFAULT_AUTO_MAX_SLEW,
+    ),
+    // Skip auto writes while the perimeter state is "off" (avoid pointless
+    // hardware writes on a dark screen); recompute immediately on off → on.
+    autoSkipWhenOff: environ.PERIMETER_AUTO_SKIP_WHEN_OFF !== "false",
+    openMeteoUrl: environ.PERIMETER_OPEN_METEO_URL ?? DEFAULT_OPEN_METEO_URL,
+    autoTimezone: (
+      environ.PERIMETER_AUTO_TIMEZONE || DEFAULT_AUTO_TIMEZONE
+    ).trim(),
   };
 }
 
@@ -575,8 +639,33 @@ export class PerimeterController {
       this._importController = new ResolumeImportController(config);
     }
     this._brightnessController = null;
+    this._autoScheduler = null;
     if (config.brightnessEnabled) {
       this._brightnessController = new BrightnessController(config);
+      if (config.autoBrightnessEnabled) {
+        // Open-Meteo cloud cover feeds the empirical brightness model. The
+        // fetcher caches its last good response and never blocks or throws
+        // on weather problems (worst case: a conservative fixed fraction).
+        const weather = new OpenMeteoCloudCover({
+          url: buildOpenMeteoUrl(
+            config.openMeteoUrl,
+            config.autoBrightnessLat,
+            config.autoBrightnessLng,
+            config.autoTimezone,
+          ),
+          pollMs: config.autoWeatherPollMs,
+        });
+        this._autoScheduler = new AutoBrightnessScheduler({
+          controller: this._brightnessController,
+          weather,
+          lat: config.autoBrightnessLat,
+          lng: config.autoBrightnessLng,
+          tickMs: config.autoTickMs,
+          maxSlew: config.autoMaxSlew,
+          skipWhenOff: config.autoSkipWhenOff,
+        });
+        this._brightnessController.attachAutoScheduler(this._autoScheduler);
+      }
     }
   }
 
@@ -597,6 +686,9 @@ export class PerimeterController {
     this._lastSeen = state;
     console.log(`New desired perimeter state: ${state}`);
     this._desired = state;
+    // The brightness auto scheduler uses the on/off gate and recomputes
+    // immediately on off → on; manual/auto modes are unaffected.
+    this._brightnessController?.onPerimeterState(state);
     this._notifier.notify();
   }
 
@@ -673,6 +765,10 @@ export class PerimeterController {
   startBrightness() {
     if (this._brightnessController) {
       this._brightnessController.startWorker();
+    }
+    if (this._autoScheduler) {
+      // Starts the Open-Meteo poll loop and the prediction tick timer.
+      this._autoScheduler.start();
     }
   }
 
@@ -953,6 +1049,13 @@ function main() {
       `Firebase service account file not found: ${config.serviceAccountFile}`,
     );
     process.exit(1);
+  }
+  if (config.autoBrightnessEnabled && !config.brightnessEnabled) {
+    console.warn(
+      "PERIMETER_AUTO_BRIGHTNESS_ENABLED=true but PERIMETER_BRIGHTNESS_ENABLED " +
+        "is not enabled; automatic brightness stays inert (auto writes are " +
+        "dispatched through the brightness worker)",
+    );
   }
 
   const app = initializeApp({
