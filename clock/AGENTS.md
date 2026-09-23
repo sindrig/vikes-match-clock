@@ -1121,7 +1121,10 @@ server timestamp):
   by the same `perimeter.enabled` feature flag (the whole modal is hidden when
   disabled). A web venue only sees the section take effect if its daemon has
   brightness enabled (`PERIMETER_BRIGHTNESS_ENABLED=true`) with the venue's
-  Firebase path and Vnnox screen GUID configured.
+  Firebase path and Vnnox screen GUID configured. Venues with no brightness
+  controller at all (no daemon can apply the percentage) are excluded via
+  `VENUES_WITHOUT_BRIGHTNESS` in `PerimeterControl.tsx` (currently `virkid`);
+  the section is not rendered for those keys.
 - It shows the Firebase-synchronized requested value, the daemon phase, the
   verified applied value, and any safe failure message.
 - Submitting is an explicit `Vista` action; the input is client-validated to a
