@@ -572,7 +572,58 @@ export interface AuditEvent {
 // percentage (0..100) at states/{location}/perimeter/brightness. Absent
 // (null) means "no command" and is inert; the parsed value is a bare number.
 
-export type PerimeterBrightnessPhase = "pending" | "applied" | "failed";
+// Daemon-published brightness status at perimeter/{location}/brightnessStatus.
+// `appliedPercent` is present only after the daemon verified the screen read.
+// `requestedPercent` is `null` only for a configuration-caused `failed`
+// status published before any command was ever requested (e.g. on daemon
+// startup when Vnnox is enabled but misconfigured) and for the `shadow`
+// phase (prediction published without writes); every other status
+// (including a command-caused `failed`) always carries the requested value.
+export type PerimeterBrightnessPhase =
+  | "pending"
+  | "applied"
+  | "failed"
+  | "shadow";
+
+// Brightness control mode reported by the daemon: "auto" while the
+// automatic sun/weather prediction drives writes, "manual" otherwise.
+// Older daemons publish neither `mode` nor `predicted`; the parser treats
+// an absent mode as "manual".
+export type PerimeterBrightnessAutoMode = "auto" | "manual";
+
+// Daemon-published prediction inside a `mode: "auto"` brightness status.
+// `cloudCover` is a fraction 0..1; `weatherAgeMin` is the age of the last
+// good Open-Meteo response (absent until the first forecast lands);
+// `weatherStale` is true once the weather is older than 3 h and the daemon
+// fell back to a fixed 0.8 cloud cover. `percent` is the model's target
+// percentage when the daemon publishes it.
+export interface PerimeterBrightnessPredicted {
+  lux: number;
+  percent?: number;
+  sunElevationDeg: number;
+  cloudCover: number;
+  weatherAgeMin?: number;
+  weatherStale: boolean;
+}
+
+// Controller-written auto-brightness config at
+// states/{location}/perimeter/brightnessAuto. Absent node = auto disabled.
+// The daemon clamps the auto target to [max(min, 1), min(max, 99)] — 0 and
+// 100 are manual-only values by design.
+export interface PerimeterBrightnessAutoConfig {
+  enabled: boolean; // auto master switch
+  min: number; // night floor (percent)
+  max: number; // ceiling (percent)
+  exponent: number; // "aggressiveness": lower = brighter earlier
+  cloudWeight: number; // 0 = ignore clouds, 1 = full Kasten-Czeplak
+  luxMin: number; // lux that maps onto min (night anchor)
+  luxMax: number; // lux that maps onto max (clear high-sun anchor)
+}
+
+// Stored node: config plus the Firebase server timestamp of the last write.
+export interface PerimeterBrightnessAuto extends PerimeterBrightnessAutoConfig {
+  updatedAt: number;
+}
 
 // Daemon-published brightness status at perimeter/{location}/brightnessStatus.
 // `appliedPercent` is present only after the daemon verified the screen read.
@@ -586,6 +637,10 @@ export interface PerimeterBrightnessStatus {
   phase: PerimeterBrightnessPhase;
   error: string | null;
   updatedAt: number; // Firebase server timestamp
+  // Present when the daemon supports automatic brightness; an absent field
+  // parses as "manual" for backward compatibility.
+  mode: PerimeterBrightnessAutoMode;
+  predicted?: PerimeterBrightnessPredicted;
 }
 
 // -- Perimeter overlay target geometry ---------------------------------------

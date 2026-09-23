@@ -668,6 +668,145 @@
   font-size: 12px;
 }
 
+/* Automatic brightness mode */
+.perimeter-preview-modal .perimeter-brightness-mode {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.perimeter-preview-modal .perimeter-brightness-mode-settling {
+  font-size: 12px;
+  color: #666;
+}
+
+.perimeter-preview-modal .perimeter-auto-badge {
+  margin-left: auto;
+}
+
+.perimeter-preview-modal .perimeter-brightness-auto {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.perimeter-preview-modal .perimeter-brightness-auto-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 24px;
+}
+
+@media (max-width: 760px) {
+  .perimeter-preview-modal .perimeter-brightness-auto-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.perimeter-preview-modal .perimeter-brightness-auto-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.perimeter-preview-modal .perimeter-brightness-auto-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.perimeter-preview-modal .perimeter-brightness-auto-label .rs-input-number {
+  width: 96px;
+}
+
+.perimeter-preview-modal .perimeter-brightness-auto-hint {
+  color: #666;
+  font-size: 12px;
+}
+
+.perimeter-preview-modal .perimeter-brightness-auto-live {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.perimeter-preview-modal .perimeter-brightness-auto-live-item {
+  font-weight: 600;
+}
+
+.perimeter-preview-modal .perimeter-weather-stale-badge .rs-badge-content {
+  background: #ef6c00;
+}
+
+/* 24 h target-curve preview (sun part exact, cloud part forecast) */
+.perimeter-preview-modal .perimeter-brightness-curve {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.perimeter-preview-modal .perimeter-brightness-curve-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.perimeter-preview-modal .perimeter-brightness-curve-title {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.perimeter-preview-modal .perimeter-brightness-curve-legend {
+  font-size: 12px;
+  color: #666;
+}
+
+.perimeter-preview-modal .perimeter-brightness-curve-svg {
+  width: 100%;
+  height: auto;
+  background: #fff;
+  border: 1px solid #e0e3e7;
+  border-radius: 4px;
+}
+
+.perimeter-preview-modal .perimeter-brightness-curve-axis {
+  stroke: #c9ced4;
+  stroke-width: 1;
+}
+
+.perimeter-preview-modal .perimeter-brightness-curve-tick {
+  stroke: #c9ced4;
+  stroke-width: 1;
+}
+
+.perimeter-preview-modal .perimeter-brightness-curve-tick-label {
+  fill: #666;
+  font-size: 9px;
+}
+
+.perimeter-preview-modal .perimeter-brightness-curve-line {
+  fill: none;
+  stroke: #1675e0;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.perimeter-preview-modal .perimeter-brightness-curve-now {
+  fill: #1675e0;
+}
+
+.perimeter-preview-modal .perimeter-brightness-curve-note {
+  color: #b26a00;
+  font-size: 12px;
+}
+
 .perimeter-preview-modal .phase-pending::before {
   background: #ffa726;
 }
@@ -678,6 +817,10 @@
 
 .perimeter-preview-modal .phase-failed::before {
   background: #ef5350;
+}
+
+.perimeter-preview-modal .phase-shadow::before {
+  background: #42a5f5;
 }
 
 /* Goal video (operator-configured home-goal overlay media) */

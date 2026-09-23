@@ -1012,39 +1012,108 @@ directly and never treats a Firebase write confirmation as a hardware result.
 
 **Data ownership:**
 
-| Path                                     | Writer     | Purpose                                                             |
-| ---------------------------------------- | ---------- | ------------------------------------------------------------------- |
-| `states/{location}/perimeter/brightness` | Controller | Requested brightness as a whole integer percentage (0–100)          |
-| `perimeter/{location}/brightnessStatus`  | Daemon     | `requestedPercent`, `appliedPercent`, `phase`, `error`, `updatedAt` |
+| Path                                            | Writer     | Purpose                                                             |
+| ----------------------------------------------- | ---------- | ------------------------------------------------------------------- |
+| `states/{location}/perimeter/brightness`        | Controller | Requested brightness as a whole integer percentage (0–100)          |
+| `states/{location}/perimeter/brightnessAuto`    | Controller | Automatic-brightness config (master switch + curve parameters)      |
+| `perimeter/{location}/brightnessStatus`         | Daemon     | `requestedPercent`, `appliedPercent`, `phase`, `error`, `updatedAt`, `mode`, `predicted` |
 
 - The requested value is a bare integer percentage. `null`/missing means "no
   command" and is inert; the daemon ignores anything that is not a whole
   percentage from 0 through 100.
 - `brightnessStatus.phase` is `pending` (before hardware I/O), `applied` (the
-  daemon verified the screen read within a small integer tolerance), or
-  `failed` (with a safe error description). `appliedPercent` is present only
-  after verification. `requestedPercent` is `null` only for a `failed` status
-  caused by configuration (e.g. Vnnox enabled but misconfigured at daemon
-  startup, published before any command was ever requested) — every other
-  status, including a command-caused `failed`, always carries the requested
-  percentage. `parsePerimeterBrightnessStatus()` enforces this: a `null`
-  `requestedPercent` on `pending`/`applied` is malformed and rejects the whole
-  document.
+  daemon verified the screen read within a small integer tolerance), `failed`
+  (with a safe error description), or `shadow` (automatic-brightness Phase 0:
+  the daemon publishes predictions without writing them). `appliedPercent` is
+  present only after verification. `requestedPercent` is `null` only for a
+  `failed` status caused by configuration (e.g. Vnnox enabled but
+  misconfigured at daemon startup, published before any command was ever
+  requested) and for the `shadow` phase — every other status, including a
+  command-caused `failed`, always carries the requested percentage.
+  `parsePerimeterBrightnessStatus()` enforces this: a `null` `requestedPercent`
+  on `pending`/`applied` is malformed and rejects the whole document.
 - The status path lives under `perimeter/{location}`, which the database rules
   make client-read-only; only the daemon's service account writes it.
 
+#### Perimeter Automatic Brightness (sun + weather prediction)
+
+The brightness card offers a mode control (`Handvirkt %` / `Sjálfvirkt`) that
+switches between the manual percentage flow and an **automatic** mode whose
+prediction math runs entirely in the daemon (see
+`docs/auto-brightness-design.md` at the repo root). The controller only
+edits the desired config; the daemon computes the sun position (SunCalc v1 —
+altitude in radians, the same conversion the controller's preview uses),
+polls Open-Meteo cloud cover, applies hysteresis/slew, and dispatches
+ordinary integer commands through the existing worker.
+
+**`states/{location}/perimeter/brightnessAuto`** (controller writes, daemon
+reads; the whole node is replaced by each save, and `updatedAt` is a Firebase
+server timestamp):
+
+```jsonc
+{
+  "enabled": true,   // auto master switch; absent node = auto disabled
+  "min": 3, "max": 100,      // percent bounds (sliders show 0..100; the
+                             // daemon clamps targets to [max(min,1), min(max,99)] —
+                             // 0 and 100 are manual-only by design)
+  "exponent": 0.35,          // "aggressiveness": lower = brighter earlier
+  "cloudWeight": 1.0,        // 0 = ignore clouds, 1 = full Kasten-Czeplak
+  "luxMin": 5, "luxMax": 100000,
+  "updatedAt": 1723392000000
+}
+```
+
+- Write validation (`validateBrightnessAutoConfig()` in
+  `src/lib/autoBrightness.ts`, mirrored by the `brightnessAuto` rules):
+  `min` 0..`max`, `max` `min`..100, `exponent` 0.05..2, `cloudWeight` 0..1,
+  `luxMin` < `luxMax`. The context action refuses out-of-bounds configs
+  without writing.
+- `parsePerimeterBrightnessAuto()` strictly parses the node (all fields, right
+  types); an absent node parses to `null` = auto disabled.
+- `brightnessStatus.mode` is `"auto" | "manual"` (absent from older daemons
+  parses as `"manual"`; unrecognized values also fall back to `manual`), and
+  `brightnessStatus.predicted` carries the daemon's live readout:
+  `{ lux, percent?, sunElevationDeg, cloudCover, weatherAgeMin?, weatherStale }`
+  (`percent`/`weatherAgeMin` are optional — the daemon omits them until its
+  first forecast lands / in the design-schema shape). A malformed `predicted`
+  payload is dropped, not fatal.
+
 **Context integration** (`usePerimeter()`):
 
-- `brightness` — `number | null`; the Firebase-synchronized requested
-  percentage (strictly parsed, so malformed values are `null`).
-- `brightnessStatus` — `PerimeterBrightnessStatus | null`; daemon-published
-  status (strictly parsed — an unknown phase or malformed value rejects the
-  whole document).
-- `setPerimeterBrightness(percent)` — authenticated write of the requested
-  percentage to `states/{listenPrefix}/perimeter/brightness`. Rejects
-  non-integer or out-of-range values locally without writing.
+- `brightnessAuto` — `PerimeterBrightnessAuto | null`; the Firebase-synced
+  desired auto config (`null` = disabled).
+- `setPerimeterBrightnessAuto(config)` — authenticated single-node write of
+  the whole config with `updatedAt: serverTimestamp()`; rejects invalid
+  configs locally without writing (rejections propagate so the UI can clear
+  its pending state).
 
-**Operator behavior** (`PerimeterControl.tsx`):
+**Operator behavior** (`PerimeterControl.tsx` `BrightnessSection`):
+
+- Mode buttons (`Handvirkt %` / `Sjálfvirkt`) use the settling-draft pattern:
+  the write settles once the `brightnessAuto` subscription reflects the
+  written `enabled` value. Switching to Automatic writes the current config
+  (or the documented defaults when none exists) with `enabled: true`;
+  switching back to Manual writes only `enabled: false` — a manual percentage
+  command additionally disables auto daemon-side (operator intent wins), and
+  the panel shows that rule as a hint instead of faking it.
+- In automatic mode the panel offers a Slider + InputNumber pair per
+  parameter (`Lágmark`, `Hámark`, `Ákeðni`, `Skýjaáhrif`); `Vista` commits a
+  single whole-node write. `min`/`max` sliders are range-constrained so
+  `min ≤ max` always; cleared inputs block `Vista` with an error message.
+- The live readout renders `brightnessStatus.predicted` (lux, sun elevation,
+  cloud cover, target %, weather age) with a `Gömul veðurgögn` warning badge
+  when `weatherStale` is true (weather older than 3 h; the daemon fell back
+  to cloud cover 0.8).
+- A 24 h target-curve preview (`AutoBrightnessCurve`) samples the pure model
+  (`src/lib/autoBrightness.ts` — unit-tested against the design-doc
+  reference vectors) every 15 minutes with SunCalc v1 sun positions at
+  Fossvogur (64.117 N, −21.91 E; Iceland is UTC year-round). Cloud cover
+  comes from an Open-Meteo forecast fetch (`fetchCloudForecast()`), labelled
+  in the UI as forecast ("Sól: nákvæm reikningur — ský: spá frá
+  Open-Meteo.com"); a failed fetch degrades to a clear-sky curve note. The
+  daemon — not this preview — decides actual writes.
+
+**Operator behavior** (`PerimeterControl.tsx` — manual mode):
 
 - The `Bjartleiki jaðarskjás` section renders above the ad-layout board for
   **both web and Resolume venues** (it is renderer-agnostic — brightness always
@@ -1059,10 +1128,10 @@ directly and never treats a Firebase write confirmation as a hardware result.
   whole percentage from 0 through 100 before any write. The `Vista` button is
   disabled while a submission is pending (until the `brightness` subscription
   reflects the submitted value) and while the daemon reports `pending` — there
-  are **no optimistic local updates**. A `useEffect` clears the pending
-  submission once the `brightness` subscription confirms it, so `Vista`
-  re-enables for the next request instead of staying permanently disabled
-  after the first submission.
+  are **no optimistic local updates**. The pending submission is tracked
+  against the subscription value (no effect needed), so `Vista` re-enables for
+  the next request once the `brightness` subscription confirms the write
+  instead of staying permanently disabled after the first submission.
 - The input tracks three local draft states: untouched (`null`, displays the
   synced `brightness` value), explicitly cleared (`""`, displays blank — kept
   distinct from "untouched" so clearing the field never silently reverts to

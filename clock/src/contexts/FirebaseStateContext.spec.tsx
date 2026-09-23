@@ -43,6 +43,7 @@ vi.mock("firebase/database", () => ({
   set: vi.fn(() => Promise.resolve()),
   remove: vi.fn(() => Promise.resolve()),
   runTransaction: vi.fn(),
+  serverTimestamp: vi.fn(() => "server-timestamp"),
 }));
 
 // In-memory authoritative database used to emulate compare-and-set
@@ -3041,6 +3042,7 @@ describe("FirebaseStateContext", () => {
       isAuthenticated: boolean,
       brightnessData: unknown = null,
       statusData: unknown = null,
+      brightnessAutoData: unknown = null,
     ): ReturnType<typeof usePerimeter> | null {
       vi.mocked(onValue).mockImplementation(
         withConnectedInfo((path) => {
@@ -3049,6 +3051,9 @@ describe("FirebaseStateContext", () => {
           }
           if (path.endsWith("/brightnessStatus")) {
             return statusData;
+          }
+          if (path.endsWith("/perimeter/brightnessAuto")) {
+            return brightnessAutoData;
           }
           return null;
         }),
@@ -3094,6 +3099,7 @@ describe("FirebaseStateContext", () => {
         phase: "applied",
         error: null,
         updatedAt: 1723392000000,
+        mode: "manual",
       };
       const perimeterApi = renderBrightness("vikuti", true, 50, status);
       expect(perimeterApi!.brightnessStatus).toEqual(status);
@@ -3149,6 +3155,157 @@ describe("FirebaseStateContext", () => {
 
       await act(async () => {
         await perimeterApi!.setPerimeterBrightness(150);
+      });
+
+      expect(set).not.toHaveBeenCalled();
+      warn.mockRestore();
+    });
+  });
+
+  describe("perimeter brightnessAuto", () => {
+    const autoConfig = {
+      enabled: true,
+      min: 3,
+      max: 100,
+      exponent: 0.35,
+      cloudWeight: 1,
+      luxMin: 5,
+      luxMax: 100000,
+      updatedAt: 1723392000000,
+    };
+
+    function renderBrightnessAuto(
+      listenPrefix: string,
+      isAuthenticated: boolean,
+      brightnessAutoData: unknown = null,
+    ): ReturnType<typeof usePerimeter> | null {
+      vi.mocked(onValue).mockImplementation(
+        withConnectedInfo((path) => {
+          if (path.endsWith("/perimeter/brightnessAuto")) {
+            return brightnessAutoData;
+          }
+          return null;
+        }),
+      );
+
+      let perimeterApi: ReturnType<typeof usePerimeter> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix={listenPrefix}
+          isAuthenticated={isAuthenticated}
+          screenKey={null}
+        >
+          <TestPerimeterConsumer
+            onMount={(api) => {
+              perimeterApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      return perimeterApi;
+    }
+
+    it("parses the desired brightnessAuto config from the subscription", () => {
+      const perimeterApi = renderBrightnessAuto("vikuti", true, autoConfig);
+      expect(perimeterApi!.brightnessAuto).toEqual(autoConfig);
+    });
+
+    it("treats an absent node as auto disabled (null)", () => {
+      const perimeterApi = renderBrightnessAuto("vikuti", true, null);
+      expect(perimeterApi!.brightnessAuto).toBeNull();
+    });
+
+    it("rejects a malformed brightnessAuto node as null", () => {
+      const perimeterApi = renderBrightnessAuto("vikuti", true, {
+        ...autoConfig,
+        enabled: "yes",
+      });
+      expect(perimeterApi!.brightnessAuto).toBeNull();
+    });
+
+    it("setPerimeterBrightnessAuto writes the whole node with a server timestamp", async () => {
+      const perimeterApi = renderBrightnessAuto("vikuti", true);
+
+      await act(async () => {
+        await perimeterApi!.setPerimeterBrightnessAuto({
+          enabled: true,
+          min: 3,
+          max: 100,
+          exponent: 0.35,
+          cloudWeight: 1,
+          luxMin: 5,
+          luxMax: 100000,
+        });
+      });
+
+      expect(set).toHaveBeenCalledWith(
+        "states/vikuti/perimeter/brightnessAuto",
+        {
+          enabled: true,
+          min: 3,
+          max: 100,
+          exponent: 0.35,
+          cloudWeight: 1,
+          luxMin: 5,
+          luxMax: 100000,
+          updatedAt: "server-timestamp",
+        },
+      );
+    });
+
+    it("blocks setPerimeterBrightnessAuto when not authenticated", async () => {
+      const perimeterApi = renderBrightnessAuto("vikuti", false);
+
+      await act(async () => {
+        await perimeterApi!.setPerimeterBrightnessAuto({
+          enabled: true,
+          min: 3,
+          max: 100,
+          exponent: 0.35,
+          cloudWeight: 1,
+          luxMin: 5,
+          luxMax: 100000,
+        });
+      });
+
+      expect(set).not.toHaveBeenCalled();
+    });
+
+    it("blocks setPerimeterBrightnessAuto when listenPrefix is empty", async () => {
+      const perimeterApi = renderBrightnessAuto("", true);
+
+      await act(async () => {
+        await perimeterApi!.setPerimeterBrightnessAuto({
+          enabled: true,
+          min: 3,
+          max: 100,
+          exponent: 0.35,
+          cloudWeight: 1,
+          luxMin: 5,
+          luxMax: 100000,
+        });
+      });
+
+      expect(set).not.toHaveBeenCalled();
+    });
+
+    it("rejects an out-of-bounds config without writing", async () => {
+      const warn = vi
+        .spyOn(console, "warn")
+        .mockImplementation(() => undefined);
+      const perimeterApi = renderBrightnessAuto("vikuti", true);
+
+      await act(async () => {
+        // min > max violates the write validation.
+        await perimeterApi!.setPerimeterBrightnessAuto({
+          enabled: true,
+          min: 90,
+          max: 50,
+          exponent: 0.35,
+          cloudWeight: 1,
+          luxMin: 5,
+          luxMax: 100000,
+        });
       });
 
       expect(set).not.toHaveBeenCalled();

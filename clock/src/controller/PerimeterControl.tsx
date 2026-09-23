@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Button, Loader, Modal, IconButton, Badge, InputNumber } from "rsuite";
+import {
+  Button,
+  Loader,
+  Modal,
+  IconButton,
+  Badge,
+  InputNumber,
+  Slider,
+} from "rsuite";
 import CloseIcon from "@rsuite/icons/Close";
 import PlusIcon from "@rsuite/icons/Plus";
 import DragIcon from "@rsuite/icons/Dragable";
@@ -31,11 +39,20 @@ import {
   PerimeterAdLayoutFile,
   PerimeterAppliedAdFile,
   PerimeterOverlayFile,
+  PerimeterBrightnessAutoConfig,
   ScorerCelebrationStyle,
 } from "../types";
 import { useListeners, usePerimeter } from "../contexts/FirebaseStateContext";
 import { useLocalState } from "../contexts/LocalStateContext";
 import { validateAdFileName } from "../contexts/firebaseParsers";
+import {
+  DEFAULT_BRIGHTNESS_AUTO_CONFIG,
+  buildTargetCurve,
+  cloudCoverAtTime,
+  fetchCloudForecast,
+  validateBrightnessAutoConfig,
+  CloudCoverForecast,
+} from "../lib/autoBrightness";
 import GoalScorerPreparation from "./GoalScorerPreparation";
 import PerimeterDisplayReports from "./PerimeterDisplayReports";
 import PerimeterFileThumb from "./PerimeterFileThumb";
@@ -61,6 +78,8 @@ const BRIGHTNESS_PHASE_LABELS: Record<string, string> = {
   pending: "Í bið",
   applied: "Vistað",
   failed: "Villa",
+  // Shadow mode: the daemon publishes predictions without writing them.
+  shadow: "Samanburður",
 };
 
 const formatTimestamp = (updatedAt: number | null): string => {
@@ -491,10 +510,326 @@ const GoalVideoSection = () => {
   );
 };
 
+const formatLux = (lux: number): string =>
+  Math.round(lux).toLocaleString("is-IS");
+
+// Auto-brightness parameter keys editable from the automatic panel.
+const AUTO_PARAM_KEYS = ["min", "max", "exponent", "cloudWeight"] as const;
+type AutoParamKey = (typeof AUTO_PARAM_KEYS)[number];
+// `""` means the user explicitly cleared the input (display blank, invalid
+// until refilled); a number is an in-progress edit; an absent key means
+// "untouched" (display the synced Firebase value).
+type AutoDraft = Partial<Record<AutoParamKey, number | "">>;
+
+const AUTO_PARAM_LABELS: Record<AutoParamKey, string> = {
+  min: "Lágmark",
+  max: "Hámark",
+  exponent: "Ákeðni",
+  cloudWeight: "Skýjaáhrif",
+};
+
+const AUTO_PARAM_ARIA: Record<AutoParamKey, string> = {
+  min: "Sjálfvirkt lágmark",
+  max: "Sjálfvirkt hámark",
+  exponent: "Sjálfvirkt ákeðni",
+  cloudWeight: "Sjálfvirkt skýjaáhrif",
+};
+
+const roundDraftValue = (key: AutoParamKey, value: number): number =>
+  key === "min" || key === "max"
+    ? Math.round(value)
+    : Math.round(value * 100) / 100;
+
+// 24 h target-curve preview for the automatic mode. The sun-position part is
+// exact offline math, so the curve shape at sunrise/sunset/dusk is honest;
+// the cloud term is hourly Open-Meteo forecast data and is labelled as such.
+const AutoBrightnessCurve = ({
+  config,
+}: {
+  config: PerimeterBrightnessAutoConfig;
+}) => {
+  const { getServerTime } = usePerimeter();
+  const [forecast, setForecast] = useState<CloudCoverForecast | null>(null);
+  const [forecastFailed, setForecastFailed] = useState(false);
+  const [now, setNow] = useState(() => getServerTime() || Date.now());
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      const result = await fetchCloudForecast();
+      if (cancelled) return;
+      if (result) {
+        setForecast(result);
+        setForecastFailed(false);
+      } else {
+        setForecastFailed(true);
+      }
+      setNow(getServerTime() || Date.now());
+    };
+    void load();
+    // Match the daemon's weather poll cadence so the preview keeps up with
+    // the freshest forecast while the panel stays open.
+    const interval = window.setInterval(() => void load(), 15 * 60 * 1000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [getServerTime]);
+
+  const points = useMemo(
+    () =>
+      buildTargetCurve(now, config, (time) =>
+        forecast
+          ? cloudCoverAtTime(forecast.times, forecast.cloudCover, time)
+          : null,
+      ),
+    [now, config, forecast],
+  );
+
+  const width = 480;
+  const height = 150;
+  const padding = { left: 26, right: 10, top: 10, bottom: 24 };
+  const startTime = points[0]?.time ?? now;
+  const totalMs = 24 * 60 * 60 * 1000;
+  const toX = (time: number) =>
+    padding.left +
+    ((time - startTime) / totalMs) * (width - padding.left - padding.right);
+  const toY = (percent: number) =>
+    height -
+    padding.bottom -
+    (percent / 100) * (height - padding.top - padding.bottom);
+
+  const path = points
+    .map((point, index) => {
+      const x = toX(point.time);
+      const y = toY(point.percent);
+      const clampedX = Number.isFinite(x) ? x : padding.left;
+      return `${index === 0 ? "M" : "L"}${clampedX.toFixed(1)} ${y.toFixed(1)}`;
+    })
+    .join(" ");
+
+  // Hour labels every 3 h (UTC — Iceland is UTC year-round).
+  const hourMarks: Array<{ time: number; label: string }> = [];
+  for (let offsetMs = 0; offsetMs <= totalMs; offsetMs += 3 * 60 * 60 * 1000) {
+    const time = startTime + offsetMs;
+    hourMarks.push({
+      time,
+      label: new Date(time).toLocaleTimeString("is-IS", {
+        hour: "2-digit",
+        timeZone: "UTC",
+      }),
+    });
+  }
+
+  return (
+    <div className="perimeter-brightness-curve">
+      <div className="perimeter-brightness-curve-header">
+        <span className="perimeter-brightness-curve-title">
+          24 klst. markspá
+        </span>
+        <span className="perimeter-brightness-curve-legend">
+          Sól: nákvæm reikningur — ský: spá frá Open-Meteo.com
+        </span>
+      </div>
+      <svg
+        className="perimeter-brightness-curve-svg"
+        viewBox={`0 0 ${width} ${height}`}
+        role="img"
+        aria-label="Markspá sjálfvirks bjartleika fyrir næstu 24 klukkustundir"
+      >
+        <line
+          x1={padding.left}
+          y1={toY(0)}
+          x2={width - padding.right}
+          y2={toY(0)}
+          className="perimeter-brightness-curve-axis"
+        />
+        <line
+          x1={padding.left}
+          y1={padding.top}
+          x2={padding.left}
+          y2={toY(0)}
+          className="perimeter-brightness-curve-axis"
+        />
+        {hourMarks.map((mark) => (
+          <g key={mark.time}>
+            <line
+              x1={toX(mark.time)}
+              y1={toY(0)}
+              x2={toX(mark.time)}
+              y2={toY(0) + 4}
+              className="perimeter-brightness-curve-tick"
+            />
+            <text
+              x={toX(mark.time)}
+              y={toY(0) + 14}
+              textAnchor="middle"
+              className="perimeter-brightness-curve-tick-label"
+            >
+              {mark.label}
+            </text>
+          </g>
+        ))}
+        <path d={path} className="perimeter-brightness-curve-line" />
+        <circle
+          cx={toX(startTime)}
+          cy={toY(points[0]?.percent ?? config.min)}
+          r={3}
+          className="perimeter-brightness-curve-now"
+        />
+      </svg>
+      {forecastFailed && (
+        <div className="perimeter-brightness-curve-note">
+          Ekki tókst að sækja skýjaspá — ferillinn sýnir klára himinn.
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Automatic panel: bounded sliders for min/max plus aggressiveness
+// (exponent) and cloud weight; Vista commits a single whole-node write to
+// states/{location}/perimeter/brightnessAuto.
+const AutoBrightnessPanel = ({
+  brightnessAuto,
+  onSave,
+  settling,
+}: {
+  brightnessAuto: PerimeterBrightnessAutoConfig | null;
+  onSave: (config: PerimeterBrightnessAutoConfig) => void;
+  settling: boolean;
+}) => {
+  // Local edit draft; Firebase is the only source of the displayed saved
+  // value (no optimistic local state) — the draft feeds the save action
+  // and client-side validation only.
+  const [draft, setDraft] = useState<AutoDraft | null>(null);
+
+  const base = brightnessAuto ?? DEFAULT_BRIGHTNESS_AUTO_CONFIG;
+  // Numerically-typed draft: entries the user explicitly cleared ("") fall
+  // back to the synced Firebase value for the slider/number display, while
+  // `draftIncomplete` keeps Vista disabled until every field has a value.
+  const numericDraft: Partial<Record<AutoParamKey, number>> = {};
+  if (draft !== null) {
+    for (const key of AUTO_PARAM_KEYS) {
+      const value = draft[key];
+      if (typeof value === "number") numericDraft[key] = value;
+    }
+  }
+  const merged = { ...base, ...numericDraft };
+  const draftIncomplete =
+    draft !== null && AUTO_PARAM_KEYS.some((key) => draft[key] === "");
+  const validationError = draftIncomplete
+    ? "Allir reitir verða að vera með gildi."
+    : validateBrightnessAutoConfig(merged);
+
+  const setParam = (key: AutoParamKey, value: number) => {
+    const rounded = roundDraftValue(key, value);
+    setDraft((prev) => ({ ...(prev ?? {}), [key]: rounded }));
+  };
+
+  const valueOf = (key: AutoParamKey): number | "" => {
+    const raw = draft?.[key];
+    if (raw === undefined) return base[key];
+    return raw;
+  };
+
+  return (
+    <div className="perimeter-brightness-auto">
+      <div className="perimeter-brightness-auto-grid">
+        {AUTO_PARAM_KEYS.map((key) => {
+          const value = valueOf(key);
+          return (
+            <div key={key} className="perimeter-brightness-auto-row">
+              <div className="perimeter-brightness-auto-label">
+                <span>{AUTO_PARAM_LABELS[key]}</span>
+                <InputNumber
+                  size="sm"
+                  step={
+                    key === "exponent" ? 0.05 : key === "cloudWeight" ? 0.05 : 1
+                  }
+                  aria-label={AUTO_PARAM_ARIA[key]}
+                  value={value === "" ? "" : value}
+                  onChange={(val) => {
+                    if (val === "" || val === null || val === undefined) {
+                      setDraft((prev) => ({ ...(prev ?? {}), [key]: "" }));
+                      return;
+                    }
+                    const next = typeof val === "number" ? val : Number(val);
+                    if (Number.isNaN(next)) return;
+                    setParam(key, next);
+                  }}
+                  disabled={settling}
+                />
+              </div>
+              <Slider
+                min={
+                  key === "min"
+                    ? 0
+                    : key === "max"
+                      ? merged.min
+                      : key === "exponent"
+                        ? 0.05
+                        : 0
+                }
+                max={
+                  key === "min"
+                    ? merged.max
+                    : key === "max"
+                      ? 100
+                      : key === "exponent"
+                        ? 2
+                        : 1
+                }
+                step={key === "exponent" || key === "cloudWeight" ? 0.05 : 1}
+                progress
+                value={value === "" ? base[key] : value}
+                aria-label={AUTO_PARAM_ARIA[key]}
+                onChange={(next) => setParam(key, next)}
+                disabled={settling}
+              />
+            </div>
+          );
+        })}
+      </div>
+      {draft !== null && validationError !== null && (
+        <div className="perimeter-brightness-invalid">{validationError}</div>
+      )}
+      <div className="perimeter-brightness-auto-hint">
+        Daemoninn reiknar markið af sólarstöðu og skýjaspá og þjáppar það í
+        bilinu [max(lágmark, 1), min(hámark, 99)] — 0 og 100 eru eingöngu
+        handvirkt.
+      </div>
+      <Button
+        size="sm"
+        appearance="primary"
+        onClick={() =>
+          onSave({
+            enabled: merged.enabled,
+            min: merged.min,
+            max: merged.max,
+            exponent: merged.exponent,
+            cloudWeight: merged.cloudWeight,
+            luxMin: merged.luxMin,
+            luxMax: merged.luxMax,
+          })
+        }
+        disabled={settling || validationError !== null}
+      >
+        Vista
+      </Button>
+    </div>
+  );
+};
+
 const BrightnessSection = () => {
-  const { brightness, brightnessStatus, setPerimeterBrightness } =
-    usePerimeter();
-  // Local edit draft: `null` means "untouched" (display the synced Firebase
+  const {
+    brightness,
+    brightnessStatus,
+    brightnessAuto,
+    setPerimeterBrightness,
+    setPerimeterBrightnessAuto,
+  } = usePerimeter();
+  // Manual edit draft: `null` means "untouched" (display the synced Firebase
   // value), `""` means the user explicitly cleared the input (display
   // blank, distinct from "untouched" so clearing never silently reverts to
   // showing the synced value again), and a number is an in-progress edit.
@@ -528,6 +863,77 @@ const BrightnessSection = () => {
     setPerimeterBrightness(draft).catch(() => setSubmittedValue(null));
   };
 
+  // Automatic mode is derived from the brightnessAuto master switch; an
+  // absent node means auto is disabled.
+  const autoEnabled = brightnessAuto?.enabled === true;
+
+  // Mode toggle uses the same settling-draft pattern: the write settles once
+  // the brightnessAuto subscription reflects the written enabled value (a
+  // node that did not exist before must appear).
+  const [modeTarget, setModeTarget] = useState<boolean | null>(null);
+  const [modeError, setModeError] = useState<string | null>(null);
+  const modeSettling =
+    modeTarget !== null && brightnessAuto?.enabled !== modeTarget;
+
+  const handleModeSelect = (enabled: boolean) => {
+    if (modeSettling || enabled === autoEnabled) return;
+    // Switching to Automatic stores the current config (or the defaults
+    // when none exists yet) with the auto master switch on. Switching back
+    // to Manual only flips `enabled: false` — the daemon applies the last
+    // value and disables auto on any manual command anyway; the UI never
+    // fakes that behavior.
+    const current = brightnessAuto ?? DEFAULT_BRIGHTNESS_AUTO_CONFIG;
+    const next: PerimeterBrightnessAutoConfig = {
+      enabled,
+      min: current.min,
+      max: current.max,
+      exponent: current.exponent,
+      cloudWeight: current.cloudWeight,
+      luxMin: current.luxMin,
+      luxMax: current.luxMax,
+    };
+    setModeTarget(enabled);
+    setModeError(null);
+    setPerimeterBrightnessAuto(next).catch(() => {
+      setModeTarget(null);
+      setModeError("Ekki tókst að breyta stjórnun bjartleika. Reyndu aftur.");
+    });
+  };
+
+  // Saved auto-config whose write is still settling. Settles once the
+  // brightnessAuto subscription reflects the submitted values; a rejected
+  // write clears it so the UI is not stuck disabled forever.
+  const [submittedAuto, setSubmittedAuto] =
+    useState<PerimeterBrightnessAutoConfig | null>(null);
+  const [autoError, setAutoError] = useState<string | null>(null);
+  const autoConfigEquals = (
+    a: PerimeterBrightnessAutoConfig,
+    b: PerimeterBrightnessAutoConfig,
+  ) =>
+    a.enabled === b.enabled &&
+    a.min === b.min &&
+    a.max === b.max &&
+    a.exponent === b.exponent &&
+    a.cloudWeight === b.cloudWeight &&
+    a.luxMin === b.luxMin &&
+    a.luxMax === b.luxMax;
+  const autoSettling =
+    submittedAuto !== null &&
+    (brightnessAuto === null ||
+      !autoConfigEquals(brightnessAuto, submittedAuto));
+
+  const handleAutoSave = (config: PerimeterBrightnessAutoConfig) => {
+    if (autoSettling) return;
+    setSubmittedAuto(config);
+    setAutoError(null);
+    setPerimeterBrightnessAuto(config).catch(() => {
+      setSubmittedAuto(null);
+      setAutoError("Ekki tókst að vista sjálfvirka stillingu. Reyndu aftur.");
+    });
+  };
+
+  const predicted = brightnessStatus?.predicted;
+
   return (
     <div className="perimeter-brightness">
       <div className="perimeter-brightness-header">
@@ -540,40 +946,84 @@ const BrightnessSection = () => {
             className={`perimeter-phase-badge phase-${phase}`}
           />
         )}
+        {autoEnabled && (
+          <Badge content="Sjálfvirkt" className="perimeter-auto-badge" />
+        )}
       </div>
-      <div className="perimeter-brightness-controls">
-        <InputNumber
-          size="sm"
-          step={1}
-          aria-label="Bjartleiki jaðarskjás"
-          // An absent brightness stays blank rather than defaulting to 0 —
-          // defaulting would make a cleared/unset input look like a valid 0%
-          // value and risk an accidental full-dim submission.
-          value={draft === null ? (brightness ?? "") : draft}
-          onChange={(val) => {
-            if (val === "" || val === null || val === undefined) {
-              setDraft("");
-              return;
-            }
-            const next = typeof val === "number" ? val : Number(val);
-            setDraft(Number.isNaN(next) ? null : next);
-          }}
-          disabled={busy}
-        />
+      <div
+        className="perimeter-brightness-mode"
+        role="radiogroup"
+        aria-label="Stjórnun bjartleika"
+      >
         <Button
           size="sm"
-          appearance="primary"
-          onClick={handleApply}
-          disabled={!valid || busy}
+          appearance={!autoEnabled ? "primary" : "ghost"}
+          active={!autoEnabled}
+          aria-pressed={!autoEnabled}
+          onClick={() => handleModeSelect(false)}
+          disabled={modeSettling}
         >
-          Vista
+          Handvirkt %
         </Button>
+        <Button
+          size="sm"
+          appearance={autoEnabled ? "primary" : "ghost"}
+          active={autoEnabled}
+          aria-pressed={autoEnabled}
+          onClick={() => handleModeSelect(true)}
+          disabled={modeSettling}
+        >
+          Sjálfvirkt
+        </Button>
+        {modeSettling && (
+          <span className="perimeter-brightness-mode-settling">Vistar…</span>
+        )}
       </div>
-      {draft !== null && !valid && (
-        <div className="perimeter-brightness-invalid">
-          Heiltala á milli 0 og 100 er leyfileg.
-        </div>
+      {modeError && <div className="perimeter-status-error">{modeError}</div>}
+      {autoEnabled ? (
+        <AutoBrightnessPanel
+          brightnessAuto={brightnessAuto}
+          onSave={handleAutoSave}
+          settling={autoSettling}
+        />
+      ) : (
+        <>
+          <div className="perimeter-brightness-controls">
+            <InputNumber
+              size="sm"
+              step={1}
+              aria-label="Bjartleiki jaðarskjás"
+              // An absent brightness stays blank rather than defaulting to 0 —
+              // defaulting would make a cleared/unset input look like a valid 0%
+              // value and risk an accidental full-dim submission.
+              value={draft === null ? (brightness ?? "") : draft}
+              onChange={(val) => {
+                if (val === "" || val === null || val === undefined) {
+                  setDraft("");
+                  return;
+                }
+                const next = typeof val === "number" ? val : Number(val);
+                setDraft(Number.isNaN(next) ? null : next);
+              }}
+              disabled={busy}
+            />
+            <Button
+              size="sm"
+              appearance="primary"
+              onClick={handleApply}
+              disabled={!valid || busy}
+            >
+              Vista
+            </Button>
+          </div>
+          {draft !== null && !valid && (
+            <div className="perimeter-brightness-invalid">
+              Heiltala á milli 0 og 100 er leyfileg.
+            </div>
+          )}
+        </>
       )}
+      {autoError && <div className="perimeter-status-error">{autoError}</div>}
       <div className="perimeter-brightness-status">
         {brightness !== null && (
           <span className="perimeter-brightness-requested">
@@ -592,6 +1042,40 @@ const BrightnessSection = () => {
           </span>
         )}
       </div>
+      {predicted && (
+        <div className="perimeter-brightness-auto-live">
+          <span className="perimeter-brightness-auto-live-item">
+            Ljós: {formatLux(predicted.lux)} lux
+          </span>
+          <span className="perimeter-brightness-auto-live-item">
+            Sól: {predicted.sunElevationDeg.toFixed(1)}°
+          </span>
+          <span className="perimeter-brightness-auto-live-item">
+            Ský: {Math.round(predicted.cloudCover * 100)}%
+          </span>
+          <span className="perimeter-brightness-auto-live-item">
+            Mark:{" "}
+            {predicted.percent ?? brightnessStatus?.requestedPercent ?? "—"}%
+          </span>
+          <span className="perimeter-brightness-auto-live-item">
+            Veður:{" "}
+            {predicted.weatherAgeMin !== undefined
+              ? `${Math.round(predicted.weatherAgeMin)} mín`
+              : "—"}
+          </span>
+          {predicted.weatherStale && (
+            <Badge
+              content="Gömul veðurgögn"
+              className="perimeter-weather-stale-badge"
+            />
+          )}
+        </div>
+      )}
+      {autoEnabled && (
+        <AutoBrightnessCurve
+          config={brightnessAuto ?? DEFAULT_BRIGHTNESS_AUTO_CONFIG}
+        />
+      )}
     </div>
   );
 };

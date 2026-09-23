@@ -11,7 +11,13 @@ import React, {
 import { database, storageHelpers, FIREBASE_STORAGE_BUCKET } from "../firebase";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "../firebase";
-import { ref, onValue, set, runTransaction } from "firebase/database";
+import {
+  ref,
+  onValue,
+  set,
+  runTransaction,
+  serverTimestamp,
+} from "firebase/database";
 import {
   Match,
   InjuryTimeDisplayMode,
@@ -38,6 +44,8 @@ import {
   PerimeterAppliedAdLayout,
   AuditStateArea,
   PerimeterBrightnessStatus,
+  PerimeterBrightnessAuto,
+  PerimeterBrightnessAutoConfig,
   PerimeterOverlayGeometry,
   GoalScorerPreparationStatus,
   GoalScorerPreparationRequest,
@@ -51,6 +59,7 @@ import {
   AuditEventPayload,
 } from "../firebaseDatabase";
 import { getOrCreateSessionId } from "../lib/sessionId";
+import { validateBrightnessAutoConfig } from "../lib/autoBrightness";
 import { Sports, DEFAULT_HALFSTOPS, VIEWS } from "../constants";
 import { msUntilMatchStart } from "../utils/timeUtils";
 import {
@@ -90,6 +99,7 @@ import {
   parsePerimeterAppliedAdLayout,
   parsePerimeterBrightness,
   parsePerimeterBrightnessStatus,
+  parsePerimeterBrightnessAuto,
   parsePerimeterOverlayGeometry,
   parseGoalScorerPreparationStatus,
 } from "./firebaseParsers";
@@ -344,6 +354,10 @@ interface FirebaseStateContextType {
   perimeterBrightness: number | null;
   perimeterBrightnessStatus: PerimeterBrightnessStatus | null;
   setPerimeterBrightness: (percent: number) => Promise<void>;
+  perimeterBrightnessAuto: PerimeterBrightnessAuto | null;
+  setPerimeterBrightnessAuto: (
+    config: PerimeterBrightnessAutoConfig,
+  ) => Promise<void>;
   overlayGeometry: PerimeterOverlayGeometry | null;
   goalScorerPreparationStatus: GoalScorerPreparationStatus | null;
   requestGoalScorerPreparation: (force?: boolean) => Promise<void>;
@@ -556,6 +570,8 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   >(null);
   const [perimeterBrightnessStatus, setPerimeterBrightnessStatus] =
     useState<PerimeterBrightnessStatus | null>(null);
+  const [perimeterBrightnessAuto, setPerimeterBrightnessAutoState] =
+    useState<PerimeterBrightnessAuto | null>(null);
   const [overlayGeometry, setOverlayGeometry] =
     useState<PerimeterOverlayGeometry | null>(null);
   const [goalScorerPreparationStatus, setGoalScorerPreparationStatus] =
@@ -1105,6 +1121,23 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
           )
         : () => undefined;
 
+      // Automatic-brightness desired config written by the controller and
+      // read by the perimeter-control daemon. Absent node = auto disabled.
+      const brightnessAutoPath = `states/${listenPrefix}/perimeter/brightnessAuto`;
+      const unsubBrightnessAuto = onValue(
+        ref(database, brightnessAutoPath),
+        (snapshot) => {
+          setPerimeterBrightnessAutoState(
+            parsePerimeterBrightnessAuto(snapshot.val()),
+          );
+        },
+        (error) =>
+          console.error(
+            "Firebase perimeter brightnessAuto subscription error:",
+            error,
+          ),
+      );
+
       return () => {
         unsubMatch();
         unsubController();
@@ -1118,6 +1151,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         unsubMediaPairs();
         unsubBrightness();
         unsubBrightnessStatus();
+        unsubBrightnessAuto();
       };
     }
   }, [isAuthenticated, listenPrefix, markSubscriptionDelivered]);
@@ -2647,6 +2681,39 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     [isAuthenticated, listenPrefix, writeEligible],
   );
 
+  // Writes the whole automatic-brightness desired config (single node write,
+  // the daemon's only source of auto parameters). Validation mirrors the
+  // brightnessAuto rules; rejections propagate so the controller can clear
+  // its pending state instead of waiting forever on the subscription.
+  const setPerimeterBrightnessAuto = useCallback(
+    (config: PerimeterBrightnessAutoConfig): Promise<void> => {
+      if (!listenPrefix || !isAuthenticated || !writeEligible) {
+        return Promise.resolve();
+      }
+      const validationError = validateBrightnessAutoConfig(config);
+      if (validationError) {
+        console.warn(
+          `Ignoring invalid brightnessAuto request: ${validationError}`,
+        );
+        return Promise.resolve();
+      }
+      return set(
+        ref(database, `states/${listenPrefix}/perimeter/brightnessAuto`),
+        {
+          enabled: config.enabled,
+          min: config.min,
+          max: config.max,
+          exponent: config.exponent,
+          cloudWeight: config.cloudWeight,
+          luxMin: config.luxMin,
+          luxMax: config.luxMax,
+          updatedAt: serverTimestamp(),
+        },
+      );
+    },
+    [isAuthenticated, listenPrefix, writeEligible],
+  );
+
   // Request background perimeter goal-scorer media preparation for the current
   // home roster. The controller writes the authoritative request (validated by
   // the RTDB rules) so the service-owned status stays tied to this roster, then
@@ -2935,6 +3002,8 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       perimeterBrightness,
       perimeterBrightnessStatus,
       setPerimeterBrightness,
+      perimeterBrightnessAuto,
+      setPerimeterBrightnessAuto,
       overlayGeometry: publishedOverlayGeometry,
       goalScorerPreparationStatus: publishedGoalScorerPreparationStatus,
       requestGoalScorerPreparation,
@@ -3036,6 +3105,8 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       perimeterBrightness,
       perimeterBrightnessStatus,
       setPerimeterBrightness,
+      perimeterBrightnessAuto,
+      setPerimeterBrightnessAuto,
       publishedOverlayGeometry,
       publishedGoalScorerPreparationStatus,
       requestGoalScorerPreparation,
@@ -3253,6 +3324,8 @@ export const usePerimeter = () => {
     perimeterBrightness,
     perimeterBrightnessStatus,
     setPerimeterBrightness,
+    perimeterBrightnessAuto,
+    setPerimeterBrightnessAuto,
     overlayGeometry: publishedOverlayGeometry,
     goalScorerPreparationStatus: publishedGoalScorerPreparationStatus,
     requestGoalScorerPreparation,
@@ -3283,6 +3356,8 @@ export const usePerimeter = () => {
     brightness: perimeterBrightness,
     brightnessStatus: perimeterBrightnessStatus,
     setPerimeterBrightness,
+    brightnessAuto: perimeterBrightnessAuto,
+    setPerimeterBrightnessAuto,
     overlayGeometry: publishedOverlayGeometry,
     goalScorerPreparationStatus: publishedGoalScorerPreparationStatus,
     requestGoalScorerPreparation,

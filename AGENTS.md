@@ -72,6 +72,18 @@ Common fixable patterns:
 - **No hydration guards**: 100% Firebase means no local state to hydrate
 - **Type-safe parsing**: All Firebase snapshots validated through `firebaseParsers.ts`
 
+### Automatic Perimeter Brightness (controller + daemon)
+- Design doc: `docs/auto-brightness-design.md` (authoritative for schema,
+  model formulas, and rollout phases)
+- Controller side (clock/): mode control + parameter editors + 24 h curve
+  preview in `clock/src/controller/PerimeterControl.tsx`, pure model in
+  `clock/src/lib/autoBrightness.ts` (SunCalc v1 + Open-Meteo), write path
+  `states/{location}/perimeter/brightnessAuto` via
+  `setPerimeterBrightnessAuto` in `FirebaseStateContext.tsx`
+- Daemon side (perimeter-control/): prediction, hysteresis/slew, weather
+  fetch, and the actual brightness writes — see `clock/AGENTS.md` and the
+  design doc for the division of responsibility
+
 ### Team ID System (club-ids.ts ↔ KSI Analyticom API)
 
 The match data pipeline depends on team IDs matching between the frontend and the KSI Analyticom API:
