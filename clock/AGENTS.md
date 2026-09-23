@@ -1502,15 +1502,21 @@ and reports through the Skjáarvillur path.
 **Runtime channel** (`perimeter/runtime.ts`): `setPlayerBand(band | null,
 now)` with scorer-style generation lifecycle (atomic activation, stale
 request invalidation, release of superseded sources, failure reporting). A
-new request **drops the active band immediately** (base shows through
-while the replacement prepares); a re-delivery of the active request is a
-no-op — requests are deduplicated with the shared `bandRequestKey()` from
-`bandDerivation.ts`. While an overlay generation is active the renderer
-receives **no band sources** (the band object stays resident so clearing
-the overlay restores it without re-preparation). Style changes
+new request **keeps the active band visible while the replacement
+prepares** and hands the fully prepared band to the renderer in one
+transition — the base ads never show through between two consecutive
+bands (e.g. queued substitutions); a failed preparation drops the held
+band to the base and reports through the band error path. Explicit clears
+(`null`) drop the band immediately. A re-delivery of the active or
+already-preparing request is a no-op — requests are deduplicated with the
+shared `bandRequestKey()` from `bandDerivation.ts`. While an overlay
+generation is active the renderer receives **no band sources** (the band
+object stays resident so clearing the overlay restores it without
+re-preparation). Style changes
 (`setPlayerBandStyle`/`setSubstitutionBandStyle`) and mapping replacements
-recompose the resident band while keeping current textures visible. The
-WebGL renderer composites `base < band < overlay` with an independent
+recompose the resident band while keeping current textures visible (and
+preserve the timeline anchor); a replacement swap starts a fresh entrance.
+The WebGL renderer composites `base < band < overlay` with an independent
 `bandDynamic` flag, and `clearChannel` accepts `"band"`.
 
 **MOTM sponsor lead-in** (web venues): the main screen's MOTM card cycles

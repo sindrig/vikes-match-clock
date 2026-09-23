@@ -279,17 +279,17 @@ describe("PerimeterRuntime band channel", () => {
     expect(clearChannel).toHaveBeenCalledWith("band");
   });
 
-  it("drops the active band immediately while a replacement prepares", async () => {
+  it("keeps the active band visible while a replacement prepares, then swaps atomically", async () => {
+    const firstRelease = vi.fn();
     const harness = createHarness({
       loadSource: vi
         .fn<PerimeterPlayerBandDependencies["loadSource"]>()
         .mockImplementationOnce(() =>
           Promise.resolve({
-            images: { player: fakeCanvas("a") } as Record<
-              string,
-              HTMLImageElement
-            >,
-            release: vi.fn(),
+            images: {
+              player: fakeCanvas("a") as unknown as HTMLImageElement,
+            },
+            release: firstRelease,
           }),
         )
         .mockImplementationOnce(
@@ -300,7 +300,9 @@ describe("PerimeterRuntime band channel", () => {
               setTimeout(
                 () =>
                   resolve({
-                    images: { player: fakeCanvas("b") },
+                    images: {
+                      player: fakeCanvas("b") as unknown as HTMLImageElement,
+                    },
                     release: vi.fn(),
                   }),
                 50,
@@ -310,6 +312,8 @@ describe("PerimeterRuntime band channel", () => {
     });
     await prepareActiveBase(harness);
     await harness.runtime.setPlayerBand(playerRequest, 1_000);
+    harness.runtime.render(1_000);
+    expect(harness.getLastFrame()?.band?.left).toBeDefined();
     const pending = harness.runtime.setPlayerBand(
       {
         kind: "player",
@@ -318,11 +322,169 @@ describe("PerimeterRuntime band channel", () => {
       2_000,
     );
     harness.runtime.render(2_000);
-    // The base shows through while the replacement prepares.
-    expect(harness.getLastFrame()?.band).toBeUndefined();
+    // The first band stays on screen while the replacement prepares — the
+    // base ads never show through between two bands.
+    expect(harness.getLastFrame()?.band?.left).toBeDefined();
+    expect(firstRelease).not.toHaveBeenCalled();
     await pending;
     harness.runtime.render(2_100);
+    // The swap was atomic: the fully prepared replacement is live and the
+    // previous generation's sources are released only after the swap.
+    expect(firstRelease).toHaveBeenCalled();
     expect(harness.getLastFrame()?.band?.left).toBeDefined();
+  });
+
+  it("starts a fresh entrance for a replacement band swap", async () => {
+    const elapsedDraws: number[] = [];
+    const compose = vi.fn<PerimeterPlayerBandDependencies["compose"]>(() =>
+      Promise.resolve({
+        left: {
+          canvas: fakeCanvas("band"),
+          draw: vi.fn((elapsed: number) => {
+            elapsedDraws.push(elapsed);
+          }),
+        },
+      }),
+    );
+    const harness = createHarness({ compose });
+    await prepareActiveBase(harness);
+    await harness.runtime.setPlayerBand(playerRequest, 1_000);
+    harness.runtime.render(1_000);
+    // The first band's entrance anchors on its first visible render.
+    expect(elapsedDraws).toEqual([0]);
+    await harness.runtime.setPlayerBand(
+      {
+        kind: "player",
+        identity: { ...playerRequest.identity, name: "Nýr leikmaður" },
+      },
+      2_000,
+    );
+    harness.runtime.render(3_000);
+    // The replacement's entrance is anchored on its own first visible
+    // render (elapsed 0 at now=3_000), not a continuation of the previous
+    // band's timeline (which would have elapsed 2_000).
+    expect(elapsedDraws).toEqual([0, 0]);
+  });
+
+  it("holds the band across rapid successive substitutions until the latest prepares", async () => {
+    type PendingSource = {
+      images: Record<string, HTMLImageElement>;
+      release: () => void;
+    };
+    // Resolvers of loadSource implementations that block until released
+    // explicitly; index 0 is the second (superseded) preparation.
+    const heldResolvers: Array<(value: PendingSource) => void> = [];
+    // Tag each composed presentation by the request's player name so the
+    // live band identity is observable in the rendered frame.
+    const compose = vi.fn<PerimeterPlayerBandDependencies["compose"]>(
+      (_playerStyle, _substitutionStyle, request) =>
+        Promise.resolve({
+          left: fakePresentation(
+            request.kind === "player" ? request.identity.name : "sub",
+          ),
+        }),
+    );
+    const harness = createHarness({
+      compose,
+      loadSource: vi
+        .fn<PerimeterPlayerBandDependencies["loadSource"]>()
+        .mockImplementationOnce(() =>
+          Promise.resolve({
+            images: {
+              player: fakeCanvas("first") as unknown as HTMLImageElement,
+            },
+            release: vi.fn(),
+          }),
+        )
+        .mockImplementationOnce(
+          () =>
+            new Promise<PendingSource>((resolve) => {
+              heldResolvers.push(resolve);
+            }),
+        )
+        .mockImplementationOnce(() =>
+          Promise.resolve({
+            images: {
+              player: fakeCanvas("third") as unknown as HTMLImageElement,
+            },
+            release: vi.fn(),
+          }),
+        ),
+    });
+    await prepareActiveBase(harness);
+    await harness.runtime.setPlayerBand(playerRequest, 1_000);
+    const pendingSecond = harness.runtime.setPlayerBand(
+      {
+        kind: "player",
+        identity: { ...playerRequest.identity, name: "Annað" },
+      },
+      2_000,
+    );
+    const pendingThird = harness.runtime.setPlayerBand(
+      {
+        kind: "player",
+        identity: { ...playerRequest.identity, name: "Þriðji" },
+      },
+      2_100,
+    );
+    harness.runtime.render(2_100);
+    // The first band stays visible while both preparations are in flight.
+    expect(
+      (harness.getLastFrame()?.band?.left as unknown as { tag?: string })?.tag,
+    ).toBe("Jón Jónsson");
+    await pendingThird;
+    harness.runtime.render(2_200);
+    // The latest request wins; the superseded second preparation never
+    // appears on screen.
+    expect(
+      (harness.getLastFrame()?.band?.left as unknown as { tag?: string })?.tag,
+    ).toBe("Þriðji");
+    // The superseded second preparation resolving late must not overwrite
+    // the live third band.
+    heldResolvers[0]?.({
+      images: {
+        player: fakeCanvas("second") as unknown as HTMLImageElement,
+      },
+      release: vi.fn(),
+    });
+    await pendingSecond;
+    harness.runtime.render(2_300);
+    expect(
+      (harness.getLastFrame()?.band?.left as unknown as { tag?: string })?.tag,
+    ).toBe("Þriðji");
+  });
+
+  it("drops the held band to the base and reports when a replacement fails", async () => {
+    const harness = createHarness({
+      loadSource: vi
+        .fn<PerimeterPlayerBandDependencies["loadSource"]>()
+        .mockImplementationOnce(() =>
+          Promise.resolve({
+            images: {
+              player: fakeCanvas("first") as unknown as HTMLImageElement,
+            },
+            release: vi.fn(),
+          }),
+        )
+        .mockRejectedValueOnce(new Error("source failed")),
+    });
+    await prepareActiveBase(harness);
+    await harness.runtime.setPlayerBand(playerRequest, 1_000);
+    harness.runtime.render(1_000);
+    expect(harness.getLastFrame()?.band?.left).toBeDefined();
+    await expect(
+      harness.runtime.setPlayerBand(
+        {
+          kind: "player",
+          identity: { ...playerRequest.identity, name: "Nýr leikmaður" },
+        },
+        2_000,
+      ),
+    ).rejects.toThrow("source failed");
+    // The stale held band returns to ads; the error surfaces through the
+    // band preparation path for the display to report.
+    harness.runtime.render(2_000);
+    expect(harness.getLastFrame()?.band).toBeUndefined();
   });
 
   it("supplies both side images for a substitution request", async () => {

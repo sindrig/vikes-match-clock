@@ -27,6 +27,10 @@ const BLUE = [0, 90, 255, 255] as const;
 // pass can identify which band content is live.
 const OFF_PHOTO_COLOR = [0, 200, 0] as const;
 const ON_PHOTO_COLOR = [240, 200, 0] as const;
+// The second substitution's outgoing-player photo: distinguishable from
+// every band-1 color so the swap between two queued substitutions is
+// observable on the canvas.
+const SECOND_OFF_PHOTO_COLOR = [200, 0, 200] as const;
 
 // Minimal valid PNG encoder (8-bit RGBA, no filtering) for colored fixtures.
 function crc32(buf: Buffer): number {
@@ -290,6 +294,11 @@ test.describe("Web perimeter player band", () => {
       storageEnv,
       `${TEST_LISTEN_PREFIX}/players/20.png`,
       pngBytes(128, 64, ON_PHOTO_COLOR),
+    );
+    await seedObject(
+      storageEnv,
+      `${TEST_LISTEN_PREFIX}/players/30.png`,
+      pngBytes(128, 64, SECOND_OFF_PHOTO_COLOR),
     );
 
     await patch(clockPage, `locations/${TEST_LISTEN_PREFIX}`, {
@@ -642,6 +651,156 @@ test.describe("Web perimeter player band", () => {
         await displayPage.waitForTimeout(200);
       }
       expect(deckSeen).toBe(true);
+    } finally {
+      await displayContext.close();
+    }
+  });
+
+  test("swaps between two queued substitutions without exposing the base deck", async ({
+    browser,
+    clockPage,
+  }) => {
+    const displayContext = await browser.newContext();
+    const displayPage = await displayContext.newPage();
+    try {
+      await displayPage.addInitScript(() => {
+        localStorage.setItem("clock_sync", "true");
+      });
+      await displayPage.goto("/");
+      await displayPage.locator(".initial-screen-select").selectOption({
+        label: `Test Location ${TEST_LISTEN_PREFIX.replace("test-location-", "")} Perimeter`,
+      });
+      await displayPage.getByRole("button", { name: "Birta skjá" }).click();
+      await expect(displayPage.getByTestId("perimeter-display")).toBeVisible();
+
+      // First queued substitution: the off player (green) and on player
+      // (yellow) portraits appear on the band canvas.
+      await patch(clockPage, `states/${TEST_LISTEN_PREFIX}/controller`, {
+        currentAsset: {
+          asset: {
+            type: "SUB",
+            key: "sub-key-1",
+            subIn: {
+              type: "PLAYER",
+              key: emulatorDownloadUrl(`${TEST_LISTEN_PREFIX}/players/20.png`),
+              name: "Jón",
+              number: 7,
+              teamName: "Víkingur R",
+            },
+            subOut: {
+              type: "PLAYER",
+              key: emulatorDownloadUrl(`${TEST_LISTEN_PREFIX}/players/10.png`),
+              name: "Siggi",
+              number: 12,
+              teamName: "Víkingur R",
+            },
+          },
+          time: null,
+        },
+        activeQueueId: "lineup",
+        playing: true,
+      });
+      await expect
+        .poll(async () => anyColor(displayPage, [OFF_PHOTO_COLOR]), {
+          timeout: 25_000,
+          intervals: [500, 800, 1_000, 1_500],
+        })
+        .toBe(true);
+
+      // Sample every animation frame in-page from here on and count frames
+      // where the whole strip is a solid ad-deck color (the base showing
+      // through). The band's opaque field means a deck-colored frame is
+      // only possible when no band is live.
+      await displayPage.evaluate(() => {
+        const recorder = window as typeof window & {
+          __bandSwapDeckFrames?: number;
+          __bandSwapStop?: boolean;
+        };
+        recorder.__bandSwapDeckFrames = 0;
+        recorder.__bandSwapStop = false;
+        const canvas = document.querySelector<HTMLCanvasElement>(
+          '[data-testid="perimeter-canvas"]',
+        );
+        const context = canvas?.getContext("webgl");
+        if (!canvas || !context) return;
+        const buffer = new Uint8Array(4);
+        const isDeck = (px: number) => {
+          context.readPixels(
+            px,
+            canvas.height - 1 - 54,
+            1,
+            1,
+            context.RGBA,
+            context.UNSIGNED_BYTE,
+            buffer,
+          );
+          return (
+            (Math.abs(buffer[0]! - RED[0]) <= 28 &&
+              buffer[1]! <= 28 &&
+              buffer[2]! <= 28) ||
+            (buffer[0]! <= 28 &&
+              Math.abs(buffer[1]! - BLUE[1]) <= 28 &&
+              Math.abs(buffer[2]! - BLUE[2]) <= 28)
+          );
+        };
+        const tick = () => {
+          if (recorder.__bandSwapStop) return;
+          if ([80, 530, 980, 1430, 1880].every(isDeck)) {
+            recorder.__bandSwapDeckFrames =
+              (recorder.__bandSwapDeckFrames ?? 0) + 1;
+          }
+          requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      });
+
+      // Second queued substitution while the first is live: the band swaps
+      // directly from one substitution to the other.
+      await patch(clockPage, `states/${TEST_LISTEN_PREFIX}/controller`, {
+        currentAsset: {
+          asset: {
+            type: "SUB",
+            key: "sub-key-2",
+            subIn: {
+              type: "PLAYER",
+              key: emulatorDownloadUrl(`${TEST_LISTEN_PREFIX}/players/10.png`),
+              name: "Jón",
+              number: 7,
+              teamName: "Víkingur R",
+            },
+            subOut: {
+              type: "PLAYER",
+              key: emulatorDownloadUrl(`${TEST_LISTEN_PREFIX}/players/30.png`),
+              name: "Stefán",
+              number: 5,
+              teamName: "Víkingur R",
+            },
+          },
+          time: null,
+        },
+        activeQueueId: "lineup",
+        playing: true,
+      });
+      // The second band is live once its distinctive magenta portrait shows.
+      await expect
+        .poll(async () => anyColor(displayPage, [SECOND_OFF_PHOTO_COLOR]), {
+          timeout: 25_000,
+          intervals: [500, 800, 1_000, 1_500],
+        })
+        .toBe(true);
+
+      // The full exposure window has passed: not one frame showed the ads.
+      await displayPage.evaluate(() => {
+        (
+          window as typeof window & { __bandSwapStop?: boolean }
+        ).__bandSwapStop = true;
+      });
+      const deckFrames = await displayPage.evaluate(
+        () =>
+          (window as typeof window & { __bandSwapDeckFrames?: number })
+            .__bandSwapDeckFrames ?? -1,
+      );
+      expect(deckFrames).toBe(0);
     } finally {
       await displayContext.close();
     }

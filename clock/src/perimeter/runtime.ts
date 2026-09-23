@@ -185,6 +185,10 @@ export class PerimeterRuntime {
     lastFrameIndex: number | null;
     release: () => void;
   } | null = null;
+  // The request whose preparation is in flight but not yet activated. Used
+  // to deduplicate re-deliveries of a request that is still preparing (the
+  // active-band dedup cannot see it yet).
+  private pendingBand: PlayerBandRequest | null = null;
   private bandRequest = 0;
   private bandStyle: PlayerBandStyle = DEFAULT_PLAYER_BAND_STYLE;
   private subStyle: SubstitutionBandStyle = DEFAULT_SUBSTITUTION_BAND_STYLE;
@@ -290,17 +294,22 @@ export class PerimeterRuntime {
 
   // Sets the band derived from the scoreboard's current asset. `null`
   // drops any active band (the base deck shows through again). A new
-  // request drops the active band immediately — the base shows through
-  // while the next band prepares — while a re-delivery of the already
-  // active request is a no-op. While an overlay generation is active the
-  // prepared band stays resident but the renderer receives no band
-  // sources, so clearing the overlay restores it without re-preparation.
+  // request keeps the active band visible while the replacement prepares
+  // and hands the fully prepared band to the renderer in one transition —
+  // the base ads never show through between two bands (a failed
+  // preparation reports through the band error path and leaves the
+  // previous band untouched). A re-delivery of the already-active or
+  // already-preparing request is a no-op. While an overlay generation is
+  // active the prepared band stays resident but the renderer receives no
+  // band sources, so clearing the overlay restores it without
+  // re-preparation.
   async setPlayerBand(
     band: PlayerBandRequest | null,
     now: number,
   ): Promise<void> {
     if (!band) {
       this.bandRequest += 1;
+      this.pendingBand = null;
       if (this.activeBand) {
         this.releaseActiveBand();
         this.options.renderer.clearChannel?.("band");
@@ -316,13 +325,33 @@ export class PerimeterRuntime {
     ) {
       return;
     }
+    if (
+      this.pendingBand &&
+      bandRequestKey(this.pendingBand) === bandRequestKey(band)
+    ) {
+      return;
+    }
     const request = ++this.bandRequest;
-    // Drop the active band immediately so the base shows through while the
-    // replacement prepares (mirroring overlay replacement).
-    this.releaseActiveBand();
-    this.options.renderer.clearChannel?.("band");
-    this.render(now);
-    await this.prepareBand(band, request);
+    this.pendingBand = band;
+    // The active band stays visible until the fully prepared replacement
+    // activates atomically in prepareBand; a new request starts a fresh
+    // entrance because the previous generation is released after the swap.
+    // A failed preparation reports through the band error path and drops
+    // the held band so a stale substitution never lingers on screen.
+    try {
+      await this.prepareBand(band, request);
+    } catch (error) {
+      if (request === this.bandRequest) {
+        this.pendingBand = null;
+        if (this.activeBand) {
+          this.releaseActiveBand();
+          this.options.renderer.clearChannel?.("band");
+          this.render(now);
+        }
+      }
+      throw error;
+    }
+    if (request === this.bandRequest) this.pendingBand = null;
   }
 
   private releaseActiveBand(): void {
@@ -368,15 +397,18 @@ export class PerimeterRuntime {
         return;
       }
       // Atomic activation: build the new active band completely before
-      // discarding the previous one. A style recomposition keeps the
-      // current textures (and timeline anchor) visible until the new
-      // presentations are ready; a new request starts a fresh entrance
-      // because the previous band was already dropped.
+      // discarding the previous one. A recomposition of the same request
+      // (style change or mapping replacement) keeps the current timeline
+      // anchor so the entrance does not replay; a genuinely new request
+      // starts a fresh entrance on its first visible render.
       const previous = this.activeBand;
+      const recomposition =
+        previous !== null &&
+        bandRequestKey(previous.request) === bandRequestKey(band);
       this.activeBand = {
         request: band,
         presentations,
-        startedAt: previous ? previous.startedAt : null,
+        startedAt: recomposition ? previous.startedAt : null,
         lastFrameIndex: null,
         release: loaded.release,
       };
@@ -764,6 +796,7 @@ export class PerimeterRuntime {
     }
     this.releaseActiveOverlay();
     this.releaseActiveBand();
+    this.pendingBand = null;
     this.baseColumns = [];
     this.baseSlots.clear();
     this.overlayPlayback.clear();
