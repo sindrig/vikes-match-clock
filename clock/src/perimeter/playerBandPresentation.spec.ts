@@ -54,6 +54,11 @@ function readFillStyle(context: BandPresentationRenderingContext): string {
   return typeof value === "string" ? value : "";
 }
 
+function readStrokeStyle(context: BandPresentationRenderingContext): string {
+  const value: unknown = context.strokeStyle;
+  return typeof value === "string" ? value : "";
+}
+
 function makeRecordingContext(): Recording {
   const ops: FrameOp[] = [];
   const alphaStack: number[] = [];
@@ -87,6 +92,14 @@ function makeRecordingContext(): Recording {
         op: "fill",
         args: [],
         style: readFillStyle(context),
+        alpha: context.globalAlpha,
+      }),
+    ),
+    stroke: vi.fn(() =>
+      ops.push({
+        op: "stroke",
+        args: [],
+        style: readStrokeStyle(context),
         alpha: context.globalAlpha,
       }),
     ),
@@ -443,7 +456,7 @@ describe("substitution band presentations", () => {
       ] as const) {
         recordings.ops.length = 0;
         presentation.draw(elapsed);
-        for (const op of ["drawImage", "fillText", "fill"]) {
+        for (const op of ["drawImage", "fillText", "stroke"]) {
           const draws = recordings.ops.filter((entry) => entry.op === op);
           expect(draws.length).toBeGreaterThan(0);
           for (const draw of draws) expect(draw.alpha).toBeCloseTo(alpha);
@@ -484,13 +497,18 @@ describe("substitution band presentations", () => {
     },
   );
 
-  it("draws the direction and swap arrows as vector triangles", async () => {
+  it("draws the direction and swap marks as stroked paths", async () => {
     const { presentation, recordings } = await createSubstitutionFor("static");
     presentation.draw(10_000);
-    // Per visible unit: one red down triangle, one green up triangle and
-    // one swap arrow, each a path fill.
-    const fills = recordings.ops.filter((entry) => entry.op === "fill");
-    expect(fills.length).toBeGreaterThanOrEqual(3);
+    // Per visible unit: one red down mark, one white connector and
+    // one green up mark, each a separate stroked path.
+    const strokes = recordings.ops.filter((entry) => entry.op === "stroke");
+    expect(strokes.length).toBeGreaterThanOrEqual(3);
+    expect(strokes.slice(0, 3).map((entry) => entry.style)).toEqual([
+      "#c8102e",
+      "#ffffff",
+      "#00a651",
+    ]);
   });
 
   it("keeps the static band in place after its entrance", async () => {
@@ -562,25 +580,29 @@ describe("substitution band presentations", () => {
 });
 
 describe("band arrow primitives", () => {
-  it("draws direction triangles with three path points", () => {
+  it("draws a round-capped directional shaft and chevron", () => {
     const recordings = makeRecordingContext();
     drawDirectionArrow(recordings.context, 50, 54, 30, "#c8102e", false);
     const moves = recordings.ops.filter((entry) => entry.op === "moveTo");
     const lines = recordings.ops.filter((entry) => entry.op === "lineTo");
-    expect(moves).toHaveLength(1);
-    expect(lines).toHaveLength(2);
-    expect(recordings.ops.some((entry) => entry.op === "closePath")).toBe(true);
-    expect(recordings.ops.some((entry) => entry.op === "fill")).toBe(true);
+    expect(moves).toHaveLength(2);
+    expect(lines).toHaveLength(3);
+    expect(recordings.ops.some((entry) => entry.op === "closePath")).toBe(
+      false,
+    );
+    expect(recordings.ops.some((entry) => entry.op === "stroke")).toBe(true);
+    expect(recordings.context.lineCap).toBe("round");
+    expect(recordings.context.lineJoin).toBe("round");
   });
 
-  it("draws upward and downward arrows with mirrored geometry", () => {
+  it("draws upward and downward marks with mirrored geometry", () => {
     const down = makeRecordingContext();
     drawDirectionArrow(down.context, 50, 54, 30, "#c8102e", false);
     const up = makeRecordingContext();
     drawDirectionArrow(up.context, 50, 54, 30, "#00a651", true);
-    // The apex y of the down arrow is below center; the up arrow above.
-    expect(down.ops.find((entry) => entry.op === "moveTo")!.args[1]).toBe(69);
-    expect(up.ops.find((entry) => entry.op === "moveTo")!.args[1]).toBe(39);
+    // The shaft starts opposite the direction of travel.
+    expect(down.ops.find((entry) => entry.op === "moveTo")!.args[1]).toBe(44.4);
+    expect(up.ops.find((entry) => entry.op === "moveTo")!.args[1]).toBe(63.6);
   });
 
   it("draws the swap arrow pointing right", () => {
@@ -589,9 +611,12 @@ describe("band arrow primitives", () => {
     const moveTo = recordings.ops.find((entry) => entry.op === "moveTo")!;
     // The shaft starts left of the arrowhead tip.
     expect(moveTo.args[0]).toBeLessThan(50);
-    expect(recordings.ops.filter((entry) => entry.op === "lineTo").length).toBe(
-      6,
-    );
+    expect(
+      recordings.ops.filter((entry) => entry.op === "lineTo"),
+    ).toHaveLength(3);
+    expect(
+      recordings.ops.filter((entry) => entry.op === "stroke"),
+    ).toHaveLength(1);
   });
 });
 
@@ -615,7 +640,7 @@ describe("layoutSubstitutionUnit", () => {
     expect(unit.unitWidth).toBeGreaterThan(
       unit.off.unitWidth + unit.on.unitWidth,
     );
-    expect(unit.arrowSize).toBe(Math.round(108 * 0.5));
-    expect(unit.swapSize).toBe(Math.round(108 * 0.45));
+    expect(unit.arrowSize).toBe(Math.round(108 * 0.4));
+    expect(unit.swapSize).toBe(Math.round(108 * 0.38));
   });
 });

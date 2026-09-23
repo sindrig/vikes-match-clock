@@ -25,7 +25,7 @@ export const DEFAULT_SUBSTITUTION_BAND_STYLE: SubstitutionBandStyle = "static";
 const PROCESSION_SPEED_PX_PER_MS_PER_HEIGHT = 0.00012;
 
 // Fixed palette for both band channels. The near-black field keeps white
-// text and photo contrast; the substitution arrows reuse the scorer accent
+// text and photo contrast; the substitution marks reuse the scorer accent
 // red and mirror the main-screen substitution green.
 export const BAND_PRESENTATION_COLORS = {
   background: "#0b0b10",
@@ -52,7 +52,8 @@ export const BAND_PRESENTATION_TIMELINE = {
 
 // The subset of the 2D context both band presentations use, narrowed so
 // tests can provide a recording context without DOM rasterization.
-export interface BandPresentationRenderingContext extends BandRenderingContext {
+export interface BandPresentationRenderingContext
+  extends BandRenderingContext, ArrowRenderingContext {
   globalCompositeOperation: string;
   clearRect(x: number, y: number, width: number, height: number): void;
   fillRect(x: number, y: number, width: number, height: number): void;
@@ -92,23 +93,24 @@ function withAlpha(hex: string, alpha: number): string {
   return `rgba(${r},${g},${b},${Math.round(clamp01(alpha) * 100) / 100})`;
 }
 
-// Minimal context shape for the vector arrows: path construction, fill,
-// and alpha control.
+// Minimal context shape for the vector substitution marks.
 interface ArrowRenderingContext {
-  fillStyle: string | CanvasGradient | CanvasPattern;
+  strokeStyle: string | CanvasGradient | CanvasPattern;
+  lineWidth: number;
+  lineCap: CanvasLineCap;
+  lineJoin: CanvasLineJoin;
   globalAlpha: number;
   save(): void;
   restore(): void;
   beginPath(): void;
   moveTo(x: number, y: number): void;
   lineTo(x: number, y: number): void;
-  closePath(): void;
-  fill(): void;
+  stroke(): void;
 }
 
-// Draws one direction triangle (the substitution arrows). Vector triangles
-// instead of font glyphs: glyph availability on venue browsers is not
-// guaranteed. `up` draws an upward arrow, otherwise downward.
+// Narrow, round-capped shaft and chevron rather than the oversized solid
+// triangles. Paths are used instead of glyphs so venue fonts cannot change
+// the marks. `up` points toward the pitch, otherwise away from it.
 export function drawDirectionArrow(
   context: ArrowRenderingContext,
   centerX: number,
@@ -117,25 +119,24 @@ export function drawDirectionArrow(
   color: string,
   up: boolean,
 ): void {
-  const half = size / 2;
+  const direction = up ? -1 : 1;
   context.save();
+  context.strokeStyle = color;
+  context.lineWidth = Math.max(2, size * 0.095);
+  context.lineCap = "round";
+  context.lineJoin = "round";
   context.beginPath();
-  if (up) {
-    context.moveTo(centerX, centerY - half);
-    context.lineTo(centerX + half, centerY + half);
-    context.lineTo(centerX - half, centerY + half);
-  } else {
-    context.moveTo(centerX, centerY + half);
-    context.lineTo(centerX + half, centerY - half);
-    context.lineTo(centerX - half, centerY - half);
-  }
-  context.closePath();
-  context.fillStyle = color;
-  context.fill();
+  context.moveTo(centerX, centerY - direction * size * 0.32);
+  context.lineTo(centerX, centerY + direction * size * 0.29);
+  context.moveTo(centerX - size * 0.2, centerY + direction * size * 0.09);
+  context.lineTo(centerX, centerY + direction * size * 0.29);
+  context.lineTo(centerX + size * 0.2, centerY + direction * size * 0.09);
+  context.stroke();
   context.restore();
 }
 
-// Draws a right-pointing swap arrow between the two substitution clusters.
+// A light directional connector between the two players, in the same
+// round-capped line language as the in/out marks.
 export function drawSwapArrow(
   context: ArrowRenderingContext,
   centerX: number,
@@ -143,20 +144,18 @@ export function drawSwapArrow(
   size: number,
   color: string,
 ): void {
-  const half = size / 2;
-  const shaft = size * 0.14;
   context.save();
+  context.strokeStyle = color;
+  context.lineWidth = Math.max(2, size * 0.085);
+  context.lineCap = "round";
+  context.lineJoin = "round";
   context.beginPath();
-  context.moveTo(centerX - half, centerY - shaft / 2);
-  context.lineTo(centerX + half * 0.4, centerY - shaft / 2);
-  context.lineTo(centerX + half * 0.4, centerY - half);
-  context.lineTo(centerX + half, centerY);
-  context.lineTo(centerX + half * 0.4, centerY + half);
-  context.lineTo(centerX + half * 0.4, centerY + shaft / 2);
-  context.lineTo(centerX - half, centerY + shaft / 2);
-  context.closePath();
-  context.fillStyle = color;
-  context.fill();
+  context.moveTo(centerX - size * 0.42, centerY);
+  context.lineTo(centerX + size * 0.34, centerY);
+  context.moveTo(centerX + size * 0.12, centerY - size * 0.22);
+  context.lineTo(centerX + size * 0.34, centerY);
+  context.lineTo(centerX + size * 0.12, centerY + size * 0.22);
+  context.stroke();
   context.restore();
 }
 
@@ -295,7 +294,7 @@ function drawPlayerFrame(
   context.restore();
 }
 
-// Substitution cluster geometry: [arrow | portrait | number | name] with a
+// Substitution cluster geometry: [direction mark | portrait | number | name] with a
 // swap arrow between the two clusters, matching the scoreboard's off-left /
 // on-right layout.
 export interface SubstitutionUnit {
@@ -345,8 +344,8 @@ export function layoutSubstitutionUnit(
     context,
   );
   const gap = offUnit.gap;
-  const arrowSize = Math.round(height * 0.5);
-  const swapSize = Math.round(height * 0.45);
+  const arrowSize = Math.round(height * 0.4);
+  const swapSize = Math.round(height * 0.38);
   const unitWidth =
     clusterWidth(offUnit, arrowSize, gap) +
     swapSize +
@@ -367,8 +366,8 @@ export function layoutSubstitutionUnit(
 }
 
 // Draws one settled two-player unit at originX: the outgoing player on the
-// left with a red down arrow, the incoming player on the right with a green
-// up arrow, and a swap arrow between them.
+// left with a red down mark, the incoming player on the right with a green
+// up mark, and a slim connector between them.
 export function drawSubstitutionUnit(
   context: BandPresentationRenderingContext,
   unit: SubstitutionUnit,
@@ -382,7 +381,7 @@ export function drawSubstitutionUnit(
   context.save();
   context.globalAlpha = alpha;
   let cursor = originX;
-  // Off cluster: red down arrow, portrait, number, name.
+  // Off cluster: red down mark, portrait, number, name.
   if (unit.off.portraitWidth > 0) {
     drawDirectionArrow(
       context,
@@ -404,7 +403,7 @@ export function drawSubstitutionUnit(
     { alpha, portraitScale: scale },
   );
   cursor += unit.off.unitWidth + unit.gap;
-  // Swap arrow between the clusters.
+  // Directional connector between the clusters.
   context.globalAlpha = swapAlpha;
   drawSwapArrow(
     context,
@@ -415,7 +414,7 @@ export function drawSubstitutionUnit(
   );
   context.globalAlpha = alpha;
   cursor += unit.swapSize + unit.gap;
-  // On cluster: green up arrow, portrait, number, name.
+  // On cluster: green up mark, portrait, number, name.
   if (unit.on.portraitWidth > 0) {
     drawDirectionArrow(
       context,
@@ -434,8 +433,8 @@ export function drawSubstitutionUnit(
   context.restore();
 }
 
-// The substitution band: repeated [red ▼ | off portrait | number | name]
-// [swap arrow] [green ▲ | on portrait | number | name] units, entrance per
+// The substitution band: repeated [red down mark | off portrait | number | name]
+// [right connector] [green up mark | on portrait | number | name] units, entrance per
 // style (static: fade then hold; relay: fade then drift right-to-left at
 // the player-band default speed; flash: impact flash + scale-down pop with
 // the swap arrow stamping last, then hold).

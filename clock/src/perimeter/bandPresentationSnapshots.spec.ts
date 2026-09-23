@@ -55,6 +55,7 @@ function makeRecordingContext() {
     clip: vi.fn(() => ops.push({ op: "clip", args: [] })),
     closePath: vi.fn(() => ops.push({ op: "closePath", args: [] })),
     fill: vi.fn(),
+    stroke: vi.fn(() => ops.push({ op: "stroke", args: [] })),
     clearRect: vi.fn((...args: number[]) =>
       ops.push({ op: "clearRect", args }),
     ),

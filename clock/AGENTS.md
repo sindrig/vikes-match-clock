@@ -1517,12 +1517,13 @@ a 600 ms alpha fade-in, drifting right-to-left at ~1.5× the scorer
 "procession" speed (`plain`/`glow`) or ~2× (`streamer`); `glow` adds a
 soft portrait glow pulse and `streamer` thin speed lines. The substitution
 band repeats
-`[red ▼ | off portrait | number | name] [swap arrow] [green ▲ | on
-portrait | number | name]` — vector triangles, red reusing
-`SCORER_PRESENTATION_COLORS.accent`, green a new constant mirroring the
-main-screen substitution green — with entrances per style (`static`: fade
+`[red down mark | off portrait | number | name] [right connector] [green up
+mark | on portrait | number | name]` — slim, round-capped stroked shafts and
+chevrons instead of solid triangles and block arrows, with red reusing
+`SCORER_PRESENTATION_COLORS.accent` and green mirroring the main-screen
+substitution green — with entrances per style (`static`: fade
 then hold, `relay`: fade then drift at the player-band default speed,
-`flash`: impact flash + scale-down pop with the swap arrow stamping in
+`flash`: impact flash + scale-down pop with the connector stamping in
 last). Speeds are defined per style; there is no separate knob.
 
 Fade-in alpha is passed explicitly through the unit drawing helpers' motion
