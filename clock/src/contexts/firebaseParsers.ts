@@ -33,6 +33,9 @@ import type {
   AuditEvent,
   AuditStateArea,
   PerimeterBrightnessStatus,
+  PerimeterBrightnessAuto,
+  PerimeterBrightnessAutoMode,
+  PerimeterBrightnessPredicted,
   PerimeterBrightnessPhase,
   PerimeterOverlayTarget,
   PerimeterOverlayGeometry,
@@ -1405,6 +1408,7 @@ const VALID_BRIGHTNESS_PHASES: PerimeterBrightnessPhase[] = [
   "pending",
   "applied",
   "failed",
+  "shadow",
 ];
 
 // Parse the controller's requested brightness at
@@ -1419,13 +1423,55 @@ export function parsePerimeterBrightness(data: unknown): number | null {
   return data;
 }
 
+// Parse the controller-written auto-brightness config at
+// states/{location}/perimeter/brightnessAuto. The node must carry every
+// field with the right type (bounds are validated on write); an absent node
+// parses to null, which the UI treats as "auto disabled".
+export function parsePerimeterBrightnessAuto(
+  data: unknown,
+): PerimeterBrightnessAuto | null {
+  if (!data || typeof data !== "object") return null;
+  const raw = data as Record<string, unknown>;
+
+  const enabled = raw.enabled;
+  if (typeof enabled !== "boolean") return null;
+  const min = raw.min;
+  if (typeof min !== "number" || !Number.isInteger(min)) return null;
+  const max = raw.max;
+  if (typeof max !== "number" || !Number.isInteger(max)) return null;
+  const exponent = raw.exponent;
+  if (typeof exponent !== "number" || !Number.isFinite(exponent)) return null;
+  const cloudWeight = raw.cloudWeight;
+  if (typeof cloudWeight !== "number" || !Number.isFinite(cloudWeight)) {
+    return null;
+  }
+  const luxMin = raw.luxMin;
+  if (typeof luxMin !== "number" || !Number.isFinite(luxMin)) return null;
+  const luxMax = raw.luxMax;
+  if (typeof luxMax !== "number" || !Number.isFinite(luxMax)) return null;
+  const updatedAt = typeof raw.updatedAt === "number" ? raw.updatedAt : null;
+  if (updatedAt === null) return null;
+
+  return {
+    enabled,
+    min,
+    max,
+    exponent,
+    cloudWeight,
+    luxMin,
+    luxMax,
+    updatedAt,
+  };
+}
+
 // Strict parse of the daemon-published brightness status at
 // perimeter/{location}/brightnessStatus. Malformed phases or values reject the
 // whole document (null) so the UI never trusts a partial status.
 // `requestedPercent` may be `null`, but ONLY for a `failed` status —
 // configuration failures (e.g. Vnnox misconfigured at startup) are published
-// before any command was ever requested, so there is no percentage to show. A
-// `null` requestedPercent on `pending`/`applied` is malformed and rejects the
+// before any command was ever requested, so there is no percentage to show —
+// and for the `shadow` phase (prediction published without writes). A `null`
+// requestedPercent on `pending`/`applied` is malformed and rejects the
 // document, since those phases always correspond to an actual command.
 export function parsePerimeterBrightnessStatus(
   data: unknown,
@@ -1444,9 +1490,10 @@ export function parsePerimeterBrightnessStatus(
   if (raw.requestedPercent !== null && raw.requestedPercent !== undefined) {
     requestedPercent = parsePerimeterBrightness(raw.requestedPercent);
     if (requestedPercent === null) return null;
-  } else if (phase !== "failed") {
+  } else if (phase !== "failed" && phase !== "shadow") {
     // Only a `failed` status may omit requestedPercent (configuration
-    // failure); a missing value on pending/applied is malformed.
+    // failure), and only a `shadow` status omits it (prediction published
+    // without writes); a missing value on pending/applied is malformed.
     return null;
   }
 
@@ -1461,12 +1508,56 @@ export function parsePerimeterBrightnessStatus(
   const updatedAt = typeof raw.updatedAt === "number" ? raw.updatedAt : null;
   if (updatedAt === null) return null;
 
+  // `mode` is optional for backward compatibility: an older daemon publishes
+  // no mode at all, which means it is driving brightness manually. Any
+  // unrecognized value is also treated as manual so a future enum value can
+  // never break the controller.
+  const mode: PerimeterBrightnessAutoMode =
+    raw.mode === "auto" ? "auto" : "manual";
+
+  // `predicted` is optional and only meaningful in auto (or shadow) mode. A
+  // malformed predicted object is dropped (not fatal) so the status phases
+  // keep rendering while the daemon rolls its prediction schema forward.
+  // `weatherAgeMin` and `percent` are optional (the daemon omits them when
+  // no forecast has landed yet / when it publishes the design-schema shape).
+  let predicted: PerimeterBrightnessPredicted | undefined;
+  if (raw.predicted !== null && raw.predicted !== undefined) {
+    if (raw.predicted && typeof raw.predicted === "object") {
+      const p = raw.predicted as Record<string, unknown>;
+      const isNumber = (v: unknown): v is number =>
+        typeof v === "number" && Number.isFinite(v);
+      if (
+        isNumber(p.lux) &&
+        isNumber(p.sunElevationDeg) &&
+        isNumber(p.cloudCover) &&
+        typeof p.weatherStale === "boolean" &&
+        (p.weatherAgeMin === undefined ||
+          p.weatherAgeMin === null ||
+          isNumber(p.weatherAgeMin)) &&
+        (p.percent === undefined || p.percent === null || isNumber(p.percent))
+      ) {
+        predicted = {
+          lux: p.lux,
+          sunElevationDeg: p.sunElevationDeg,
+          cloudCover: p.cloudCover,
+          weatherStale: p.weatherStale,
+          ...(isNumber(p.weatherAgeMin)
+            ? { weatherAgeMin: p.weatherAgeMin }
+            : {}),
+          ...(isNumber(p.percent) ? { percent: p.percent } : {}),
+        };
+      }
+    }
+  }
+
   return {
     requestedPercent,
     appliedPercent,
     phase,
     error,
     updatedAt,
+    mode,
+    ...(predicted ? { predicted } : {}),
   };
 }
 

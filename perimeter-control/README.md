@@ -651,6 +651,104 @@ is never committed: `PERIMETER_VNNOX_PASSWORD_SOURCE=env` reads
 `PERIMETER_VNNOX_PASSWORD`, `=file` reads the first line of
 `PERIMETER_VNNOX_PASSWORD_FILE` on the gateway.
 
+## Automatic brightness (sun + weather prediction)
+
+The brightness feature can run an `automatic` mode that replaces the operator's
+5–6 manual brightness changes per match with a prediction computed **in this
+daemon**: the sun's altitude at the screen's location (exact, offline math via
+SunCalc 1.9.0) and cloud cover at that location from **Open-Meteo**
+(free for non-commercial use — attribution required: *"Weather data by
+Open-Meteo.com"*). The controller UI only writes mode and parameters; predicted
+values flow through the same snapshot → write → verify → restore worker as
+manual commands. The model (empirical curve: clear-sky lux from elevation,
+Kasten & Czeplak cloud multiplier, power-law lux→percent mapping) is documented
+in `docs/auto-brightness-design.md` in the vikin-gateway repository; the
+reference test vectors in that doc are encoded in `tests/auto-brightness.test.js`.
+
+### Paths
+
+| Path                                                | Writer     | Purpose                                                                       |
+| --------------------------------------------------- | ---------- | ----------------------------------------------------------------------------- |
+| `states/{location}/perimeter/brightnessAuto`        | Controller | Auto mode config: `{ enabled, min, max, exponent, cloudWeight, luxMin, luxMax, updatedAt }` |
+| `perimeter/{location}/brightnessStatus`             | Daemon     | Extended with `mode` (`"auto"`) and a live `predicted` readout; a fresh daemon with no worker history publishes a `shadow`-phase prediction document |
+| `perimeter/{location}/brightnessCalibration`        | Daemon     | Append-only fit log: `{ ts, source: "auto"\|"manual", percent, lux, sunElevationDeg, cloudCover }` |
+| `states/{location}/perimeter/brightness`            | Controller + Daemon | Unchanged: auto writes are ordinary integer commands into this path    |
+
+The `predicted` block is `{ lux, percent, sunElevationDeg, cloudCover,
+weatherAgeMin, weatherStale }` — the live readout the controller shows. It is
+published every tick (60 s default), both when auto is **enabled** (live
+writes) and when it is disabled (shadow mode: predictions only, for comparing
+against the operator's manual values during rollout).
+
+### Safety rules
+
+- **Hysteresis:** an auto write is only enqueued when the target differs from
+  the last applied value by ≥ 2 percentage points.
+- **Slew limit:** each auto write moves at most
+  `PERIMETER_AUTO_MAX_SLEW` (default 15) points from the last applied value,
+  and at most one auto-initiated write happens per tick — no visible jumps
+  mid-match.
+- **Clamp:** auto output stays inside `[max(min, 1), min(max, 99)]` — 0 and
+  100 are manual-only (0 remains an explicit off).
+- **Manual wins:** a manual command while auto is enabled disables auto
+  (writes `enabled: false` into `brightnessAuto`) and applies the manual value.
+- **Off gate:** auto writes are skipped while the perimeter state is `off`
+  (avoiding pointless hardware writes on a dark screen); a transition to `on`
+  recomputes immediately (`PERIMETER_AUTO_SKIP_WHEN_OFF=false` disables the
+  gate).
+- **Errors are contained:** any internal tick failure holds the last applied
+  value; weather problems degrade to the last cached cloud fraction, and after
+  **3 h stale** to a conservative fixed fraction of 0.8 with `weatherStale:
+  true` in the status (dimming is safer than glaring over Reykjavík on an
+  overcast day). The daemon never blocks or throws on weather problems.
+- **Enabled but incomplete** (invalid `PERIMETER_LAT`/`PERIMETER_LNG`, or
+  `PERIMETER_BRIGHTNESS_ENABLED` not true) publishes a configuration-caused
+  `failed` status instead of a silent no-op.
+
+### Backward compatibility (regression safety)
+
+- With `PERIMETER_AUTO_BRIGHTNESS_ENABLED` unset/false the daemon publishes
+  **byte-identical** status documents to the pre-auto schema (no `mode`, no
+  `predicted`, no new Firebase reads or writes) — a test pins the exact
+  payload shapes, so manual-only operation cannot regress.
+- With the flag on, worker status documents gain extra fields (`mode`,
+  `predicted`) that older controllers ignore gracefully: the legacy parser
+  builds its own object and only rejects unknown *phases*. The one
+  not-parseable shape is the fresh-daemon `shadow` document (prediction
+  published before any write); it is inert for manual operation and the
+  updated controller renders it as the `Samanburður` badge. Enable the
+  daemon flag together with the controller update that knows the `shadow`
+  phase — both ship from this repository.
+
+### Calibration loop
+
+Every applied auto change and every manual override while auto is enabled is
+appended to `perimeter/{location}/brightnessCalibration`. Offline regression on
+those `(lux, percent − min)` pairs in log space fits the corrected `exponent`
+and `luxMax` (see the design doc); update the two values in `brightnessAuto`
+and defaults converge to house taste.
+
+### Requirement: keep `ambientLightCompensation` at 0
+
+Percent → actual brightness is 1:1 today because the cabinet's
+`ambientLightCompensation` is **0** (re-confirmed by the 2026-09-22 probe).
+If anyone enables Vnnox auto-compensation later, the mapping stops being 1:1
+and the auto mode's predictions would be wrong — leave it off.
+
+### Configuration
+
+Set `PERIMETER_AUTO_BRIGHTNESS_ENABLED=true` (with
+`PERIMETER_BRIGHTNESS_ENABLED=true`). Location defaults to Fossvogur
+(`PERIMETER_LAT=64.117`, `PERIMETER_LNG=-21.91`; a ±1 km error is < 0.01° of
+elevation and irrelevant). Tuning knobs — `PERIMETER_AUTO_TICK_SECONDS` (60),
+`PERIMETER_AUTO_WEATHER_POLL_SECONDS` (900), `PERIMETER_AUTO_MAX_SLEW` (15),
+`PERIMETER_AUTO_SKIP_WHEN_OFF` (true), `PERIMETER_OPEN_METEO_URL`,
+`PERIMETER_AUTO_TIMEZONE` (`Atlantic/Reykjavik`), plus the path overrides
+`PERIMETER_AUTO_BRIGHTNESS_PATH` and
+`PERIMETER_BRIGHTNESS_CALIBRATION_PATH` — are documented in
+`perimeter-control.env.example`. Venue egress to `api.open-meteo.com` must be
+reachable from the gateway box.
+
 ## Tests
 
 ```bash

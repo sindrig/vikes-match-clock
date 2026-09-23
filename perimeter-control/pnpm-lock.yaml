@@ -20,6 +20,9 @@ importers:
       pngjs:
         specifier: ^7.0.0
         version: 7.0.0
+      suncalc:
+        specifier: 1.9.0
+        version: 1.9.0
 
 packages:
 
@@ -702,6 +705,9 @@ packages:
 
   stubs@3.0.0:
     resolution: {integrity: sha512-PdHt7hHUJKxvTCgbKX9C1V/ftOcjJQgz8BZwNfV5c4B6dcGqlpelTbJ999jBGZ2jYiPAwcX5dP6oBwVlBlUbxw==}
+
+  suncalc@1.9.0:
+    resolution: {integrity: sha512-vMJ8Byp1uIPoj+wb9c1AdK4jpkSKVAywgHX0lqY7zt6+EWRRC3Z+0Ucfjy/0yxTVO1hwwchZe4uoFNqrIC24+A==}
 
   teeny-request@10.1.4:
     resolution: {integrity: sha512-R1Cg4Vu0UULeDfHL/kjABLaTW++9yD/B6n2g48y5dJ04hsEaxcfmAqbNDzNsbqAYJyIpZafjklLG9YxRu9uzOg==}
@@ -1634,6 +1640,8 @@ snapshots:
       anynum: 1.0.1
 
   stubs@3.0.0: {}
+
+  suncalc@1.9.0: {}
 
   teeny-request@10.1.4:
     dependencies:

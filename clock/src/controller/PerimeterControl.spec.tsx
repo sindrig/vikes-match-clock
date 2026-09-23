@@ -115,7 +115,9 @@ const createMockPerimeterReturn = (
     appliedAdLayoutError: null,
     brightness: null,
     brightnessStatus: null,
+    brightnessAuto: null,
     setPerimeterBrightness: vi.fn().mockResolvedValue(undefined),
+    setPerimeterBrightnessAuto: vi.fn().mockResolvedValue(undefined),
     getServerTime: () => Date.now(),
     ...overrides,
   }) as unknown as ReturnType<typeof usePerimeter>;
@@ -1263,6 +1265,7 @@ describe("PerimeterControl", () => {
             phase: "pending",
             error: null,
             updatedAt: Date.now(),
+            mode: "manual",
           },
         }),
       );
@@ -1284,6 +1287,7 @@ describe("PerimeterControl", () => {
             phase: "applied",
             error: null,
             updatedAt: Date.now(),
+            mode: "manual",
           },
         }),
       );
@@ -1307,6 +1311,7 @@ describe("PerimeterControl", () => {
             phase: "failed",
             error: "Vnnox ekki tiltækt",
             updatedAt: Date.now(),
+            mode: "manual",
           },
         }),
       );
@@ -1400,6 +1405,318 @@ describe("PerimeterControl", () => {
       fireEvent.change(input, { target: { value: "70" } });
       fireEvent.click(getApplyButton());
       expect(setBrightness).toHaveBeenCalledWith(70);
+    });
+  });
+
+  describe("BrightnessSection automatic mode", () => {
+    const autoConfig = {
+      enabled: true,
+      min: 3,
+      max: 100,
+      exponent: 0.35,
+      cloudWeight: 1,
+      luxMin: 5,
+      luxMax: 100000,
+      updatedAt: 1723392000000,
+    };
+
+    const autoStatus = (overrides: Record<string, unknown> = {}) =>
+      ({
+        requestedPercent: 48,
+        appliedPercent: 48,
+        phase: "applied",
+        error: null,
+        updatedAt: Date.now(),
+        mode: "auto",
+        predicted: {
+          lux: 10930.2,
+          sunElevationDeg: 24.6,
+          cloudCover: 1,
+          weatherAgeMin: 7,
+          weatherStale: false,
+        },
+        ...overrides,
+      }) as ReturnType<typeof usePerimeter>["brightnessStatus"];
+
+    const openModal = () => {
+      render(<PerimeterControl />);
+      fireEvent.click(screen.getByRole("button", { name: "Opna" }));
+    };
+
+    const getAutoInputs = () => ({
+      min: screen.getByRole("textbox", { name: "Sjálfvirkt lágmark" }),
+      max: screen.getByRole("textbox", { name: "Sjálfvirkt hámark" }),
+      exponent: screen.getByRole("textbox", { name: "Sjálfvirkt ákeðni" }),
+      cloudWeight: screen.getByRole("textbox", {
+        name: "Sjálfvirkt skýjaáhrif",
+      }),
+    });
+
+    beforeEach(() => {
+      // The 24 h curve preview fetches Open-Meteo on mount; by default the
+      // fetch never resolves so mounting produces no stray state updates.
+      // Tests that exercise fetch outcomes override this stub.
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockReturnValue(new Promise<never>(() => undefined)),
+      );
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it("switching to Automatic with no prior config writes the defaults enabled", () => {
+      const setAuto = vi
+        .fn<ReturnType<typeof usePerimeter>["setPerimeterBrightnessAuto"]>()
+        .mockResolvedValue(undefined);
+      mockedUsePerimeter.mockReturnValue(
+        createMockPerimeterReturn({ setPerimeterBrightnessAuto: setAuto }),
+      );
+      openModal();
+
+      fireEvent.click(screen.getByRole("button", { name: "Sjálfvirkt" }));
+
+      expect(setAuto).toHaveBeenCalledWith({
+        enabled: true,
+        min: 3,
+        max: 100,
+        exponent: 0.35,
+        cloudWeight: 1,
+        luxMin: 5,
+        luxMax: 100000,
+      });
+    });
+
+    it("switching to Automatic preserves an existing config's parameters", () => {
+      const setAuto = vi
+        .fn<ReturnType<typeof usePerimeter>["setPerimeterBrightnessAuto"]>()
+        .mockResolvedValue(undefined);
+      mockedUsePerimeter.mockReturnValue(
+        createMockPerimeterReturn({
+          brightnessAuto: { ...autoConfig, enabled: false },
+          setPerimeterBrightnessAuto: setAuto,
+        }),
+      );
+      openModal();
+
+      fireEvent.click(screen.getByRole("button", { name: "Sjálfvirkt" }));
+
+      expect(setAuto).toHaveBeenCalledWith({
+        enabled: true,
+        min: 3,
+        max: 100,
+        exponent: 0.35,
+        cloudWeight: 1,
+        luxMin: 5,
+        luxMax: 100000,
+      });
+    });
+
+    it("switching back to Manual only writes enabled: false", () => {
+      const setAuto = vi
+        .fn<ReturnType<typeof usePerimeter>["setPerimeterBrightnessAuto"]>()
+        .mockResolvedValue(undefined);
+      mockedUsePerimeter.mockReturnValue(
+        createMockPerimeterReturn({
+          brightnessAuto: autoConfig,
+          setPerimeterBrightnessAuto: setAuto,
+        }),
+      );
+      openModal();
+
+      fireEvent.click(screen.getByRole("button", { name: "Handvirkt %" }));
+
+      expect(setAuto).toHaveBeenCalledWith({
+        enabled: false,
+        min: 3,
+        max: 100,
+        exponent: 0.35,
+        cloudWeight: 1,
+        luxMin: 5,
+        luxMax: 100000,
+      });
+      // The manual InputNumber flow stays untouched.
+      expect(setAuto).toHaveBeenCalledTimes(1);
+    });
+
+    it("mode buttons stay disabled until the subscription reflects the switch", () => {
+      mockedUsePerimeter.mockReturnValue(createMockPerimeterReturn());
+      const { rerender } = render(<PerimeterControl />);
+      fireEvent.click(screen.getByRole("button", { name: "Opna" }));
+
+      fireEvent.click(screen.getByRole("button", { name: "Sjálfvirkt" }));
+      expect(screen.getByRole("button", { name: "Sjálfvirkt" })).toBeDisabled();
+
+      // Firebase now reflects the written node — Sjálfvirkt is active and
+      // the automatic panel replaces the manual input.
+      mockedUsePerimeter.mockReturnValue(
+        createMockPerimeterReturn({ brightnessAuto: autoConfig }),
+      );
+      rerender(<PerimeterControl />);
+
+      expect(
+        screen.getByRole("button", { name: "Sjálfvirkt" }),
+      ).not.toHaveAttribute("disabled");
+      expect(
+        screen.getByRole("textbox", { name: "Sjálfvirkt lágmark" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("textbox", { name: "Bjartleiki jaðarskjás" }),
+      ).toBeNull();
+    });
+
+    it("saves slider edits as a single whole-node write", () => {
+      const setAuto = vi
+        .fn<ReturnType<typeof usePerimeter>["setPerimeterBrightnessAuto"]>()
+        .mockResolvedValue(undefined);
+      mockedUsePerimeter.mockReturnValue(
+        createMockPerimeterReturn({
+          brightnessAuto: autoConfig,
+          setPerimeterBrightnessAuto: setAuto,
+        }),
+      );
+      openModal();
+
+      const inputs = getAutoInputs();
+      fireEvent.change(inputs.min, { target: { value: "5" } });
+      fireEvent.change(inputs.max, { target: { value: "95" } });
+      fireEvent.change(inputs.exponent, { target: { value: "0.5" } });
+      fireEvent.change(inputs.cloudWeight, { target: { value: "0.4" } });
+
+      const saveButton = screen.getByRole("button", { name: "Vista" });
+      expect(saveButton).toBeEnabled();
+      fireEvent.click(saveButton);
+
+      expect(setAuto).toHaveBeenCalledWith({
+        enabled: true,
+        min: 5,
+        max: 95,
+        exponent: 0.5,
+        cloudWeight: 0.4,
+        luxMin: 5,
+        luxMax: 100000,
+      });
+      expect(setAuto).toHaveBeenCalledTimes(1);
+    });
+
+    it("disables Vista while the auto write is settling", () => {
+      mockedUsePerimeter.mockReturnValue(
+        createMockPerimeterReturn({ brightnessAuto: autoConfig }),
+      );
+      openModal();
+
+      fireEvent.change(
+        screen.getByRole("textbox", { name: "Sjálfvirkt lágmark" }),
+        { target: { value: "7" } },
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Vista" }));
+
+      expect(screen.getByRole("button", { name: "Vista" })).toBeDisabled();
+      expect(
+        screen.getByRole("textbox", { name: "Sjálfvirkt lágmark" }),
+      ).toBeDisabled();
+    });
+
+    it("renders the daemon-predicted live readout", () => {
+      mockedUsePerimeter.mockReturnValue(
+        createMockPerimeterReturn({
+          brightness: 48,
+          brightnessAuto: autoConfig,
+          brightnessStatus: autoStatus(),
+        }),
+      );
+      openModal();
+
+      const live = document.querySelector(".perimeter-brightness-auto-live");
+      expect(live).not.toBeNull();
+      const liveText = (live as HTMLElement).textContent ?? "";
+      expect(liveText).toContain("Ljós:");
+      // Locale-formatted thousands separators (10.930 / 10 930) vary.
+      expect(liveText).toMatch(/10[.,\u00a0 ]930/);
+      expect(liveText).toContain("Mark: 48%");
+      expect(liveText).toContain("Veður: 7 mín");
+      expect(screen.queryByText("Gömul veðurgögn")).toBeNull();
+    });
+
+    it("flags stale weather data with a warning badge", () => {
+      mockedUsePerimeter.mockReturnValue(
+        createMockPerimeterReturn({
+          brightnessAuto: autoConfig,
+          brightnessStatus: autoStatus({
+            predicted: {
+              lux: 5000,
+              sunElevationDeg: 20,
+              cloudCover: 0.8,
+              weatherAgeMin: 190,
+              weatherStale: true,
+            },
+          }),
+        }),
+      );
+      openModal();
+
+      expect(screen.getByText("Gömul veðurgögn")).toBeInTheDocument();
+      const live = document.querySelector(".perimeter-brightness-auto-live");
+      expect((live as HTMLElement).textContent).toContain("Veður: 190 mín");
+    });
+
+    it("renders the 24 h target-curve preview with the forecast label", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              hourly: {
+                time: [
+                  "2026-09-22T00:00",
+                  "2026-09-22T12:00",
+                  "2026-09-23T00:00",
+                ],
+                cloud_cover: [50, 50, 50],
+              },
+            }),
+        }),
+      );
+      mockedUsePerimeter.mockReturnValue(
+        createMockPerimeterReturn({
+          brightnessAuto: autoConfig,
+          brightnessStatus: autoStatus(),
+        }),
+      );
+      openModal();
+
+      expect(screen.getByText("Spá frá Open-Meteo.com")).toBeInTheDocument();
+      expect(
+        document.querySelector(".perimeter-brightness-curve-svg"),
+      ).not.toBeNull();
+      // With a good forecast response the clear-sky fallback note stays hidden.
+      await waitFor(() => {
+        expect(screen.queryByText(/Ekki tókst að sækja skýjaspá/)).toBeNull();
+      });
+    });
+
+    it("falls back to a clear-sky curve note when the forecast fetch fails", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi
+          .fn()
+          .mockResolvedValue({ ok: false, json: () => Promise.resolve({}) }),
+      );
+      mockedUsePerimeter.mockReturnValue(
+        createMockPerimeterReturn({
+          brightnessAuto: autoConfig,
+          brightnessStatus: autoStatus(),
+        }),
+      );
+      openModal();
+
+      expect(
+        await screen.findByText(
+          "Ekki tókst að sækja skýjaspá — ferillinn sýnir klára himinn.",
+        ),
+      ).toBeInTheDocument();
     });
   });
 });
