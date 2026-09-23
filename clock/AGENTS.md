@@ -1517,19 +1517,20 @@ a 600 ms alpha fade-in, drifting right-to-left at ~1.5× the scorer
 "procession" speed (`plain`/`glow`) or ~2× (`streamer`); `glow` adds a
 soft portrait glow pulse and `streamer` thin speed lines. The substitution
 band repeats
-`[red down mark | off portrait | number | name] [right connector] [green up
-mark | on portrait | number | name]` — slim, round-capped stroked shafts and
-chevrons instead of solid triangles and block arrows, with red reusing
-`SCORER_PRESENTATION_COLORS.accent` and green mirroring the main-screen
-substitution green — with entrances per style (`static`: fade
-then hold, `relay`: fade then drift at the player-band default speed,
-`flash`: impact flash + scale-down pop with the connector stamping in
-last). Speeds are defined per style; there is no separate knob.
+`[off portrait | number | name] [gap] [on portrait | number | name]` with
+**no directional marks** — the outgoing player's number and name render in
+red (`SCORER_PRESENTATION_COLORS.accent`) and the incoming player's in
+green (the main-screen substitution green `#00a651`), the only in/out
+signal — with entrances per style (`static`: fade then hold, `relay`: fade
+then drift at the player-band default speed, `flash`: impact flash +
+scale-down pop). Speeds are defined per style; there is no separate knob.
 
-Fade-in alpha is passed explicitly through the unit drawing helpers' motion
-arguments, including both identities and arrows for static/relay substitutions.
-Presentation tests record alpha at the actual draw calls with save/restore
-semantics so a helper cannot silently override the entrance opacity.
+Fade-in alpha and substitution text colors are passed explicitly through
+the unit drawing helpers' motion arguments (`drawBandUnit` in
+`scorerCompositor.ts` accepts an optional `textColor`; the static band
+keeps its default white). Presentation tests record alpha and fillStyle at
+the actual draw calls with save/restore semantics so a helper cannot
+silently override the entrance opacity or palette.
 
 **Style config** (parallel to `scorerCelebration`):
 

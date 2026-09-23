@@ -7,8 +7,6 @@ import {
   createPlayerBandPresentations,
   createSubstitutionBandPresentation,
   createSubstitutionBandPresentations,
-  drawDirectionArrow,
-  drawSwapArrow,
   layoutSubstitutionUnit,
   type BandPresentationRenderingContext,
 } from "./playerBandPresentation";
@@ -54,11 +52,6 @@ function readFillStyle(context: BandPresentationRenderingContext): string {
   return typeof value === "string" ? value : "";
 }
 
-function readStrokeStyle(context: BandPresentationRenderingContext): string {
-  const value: unknown = context.strokeStyle;
-  return typeof value === "string" ? value : "";
-}
-
 function makeRecordingContext(): Recording {
   const ops: FrameOp[] = [];
   const alphaStack: number[] = [];
@@ -86,28 +79,9 @@ function makeRecordingContext(): Recording {
     beginPath: vi.fn(() => ops.push({ op: "beginPath", args: [] })),
     rect: (...args: number[]) => ops.push({ op: "rect", args }),
     clip: vi.fn(() => ops.push({ op: "clip", args: [] })),
-    closePath: vi.fn(() => ops.push({ op: "closePath", args: [] })),
-    fill: vi.fn(() =>
-      ops.push({
-        op: "fill",
-        args: [],
-        style: readFillStyle(context),
-        alpha: context.globalAlpha,
-      }),
-    ),
-    stroke: vi.fn(() =>
-      ops.push({
-        op: "stroke",
-        args: [],
-        style: readStrokeStyle(context),
-        alpha: context.globalAlpha,
-      }),
-    ),
     clearRect: (...args: number[]) => ops.push({ op: "clearRect", args }),
     fillRect: (...args: number[]) =>
       ops.push({ op: "fillRect", args, style: readFillStyle(context) }),
-    moveTo: (...args: number[]) => ops.push({ op: "moveTo", args }),
-    lineTo: (...args: number[]) => ops.push({ op: "lineTo", args }),
     drawImage: vi.fn(
       (
         _image: CanvasImageSource,
@@ -131,6 +105,7 @@ function makeRecordingContext(): Recording {
         op: "fillText",
         args: [x, y],
         text,
+        style: readFillStyle(context),
         alpha: context.globalAlpha,
       }),
     ),
@@ -264,13 +239,14 @@ function portraitDraws(
 
 function playerTextOps(
   ops: FrameOp[],
-): { text: string; x: number; y: number }[] {
+): { text: string; x: number; y: number; style: string }[] {
   return ops
     .filter((entry) => entry.op === "fillText")
     .map((entry) => ({
       text: entry.text!,
       x: entry.args[0]!,
       y: entry.args[1]!,
+      style: entry.style ?? "",
     }));
 }
 
@@ -445,7 +421,7 @@ describe("player band presentations", () => {
 
 describe("substitution band presentations", () => {
   it.each<SubstitutionBandStyle>(["static", "relay"])(
-    "fades both identities and all arrows at draw time (%s)",
+    "fades both identities at draw time (%s)",
     async (style) => {
       const { presentation, recordings } = await createSubstitutionFor(style);
       for (const [elapsed, alpha] of [
@@ -456,7 +432,7 @@ describe("substitution band presentations", () => {
       ] as const) {
         recordings.ops.length = 0;
         presentation.draw(elapsed);
-        for (const op of ["drawImage", "fillText", "stroke"]) {
+        for (const op of ["drawImage", "fillText"]) {
           const draws = recordings.ops.filter((entry) => entry.op === op);
           expect(draws.length).toBeGreaterThan(0);
           for (const draw of draws) expect(draw.alpha).toBeCloseTo(alpha);
@@ -485,30 +461,44 @@ describe("substitution band presentations", () => {
       presentation.draw(10_000);
       const texts = playerTextOps(recordings.ops);
       const numbers = texts.filter((entry) => ["7", "12"].includes(entry.text));
-      expect(numbers).toHaveLength(2);
       const names = texts.filter((entry) =>
         ["Jón Jónsson", "Siggi Bekkur"].includes(entry.text),
       );
-      expect(names).toHaveLength(2);
-      // The outgoing player's cluster sits left of the incoming one.
-      expect(numbers.find((entry) => entry.text === "12")!.x).toBeLessThan(
-        numbers.find((entry) => entry.text === "7")!.x,
+      expect(numbers.length).toBeGreaterThanOrEqual(2);
+      expect(names.length).toBeGreaterThanOrEqual(2);
+      // The outgoing player's cluster sits left of the incoming one in
+      // every drawn unit.
+      const offNumbers = numbers.filter((entry) => entry.text === "12");
+      const onNumbers = numbers.filter((entry) => entry.text === "7");
+      expect(offNumbers.length).toBe(onNumbers.length);
+      expect(offNumbers.length).toBeGreaterThan(0);
+      offNumbers.forEach((entry, index) =>
+        expect(entry.x).toBeLessThan(onNumbers[index]!.x),
+      );
+      const offNames = names.filter((entry) => entry.text === "Siggi Bekkur");
+      const onNames = names.filter((entry) => entry.text === "Jón Jónsson");
+      expect(offNames.length).toBe(onNames.length);
+      expect(offNames.length).toBeGreaterThan(0);
+      offNames.forEach((entry, index) =>
+        expect(entry.x).toBeLessThan(onNames[index]!.x),
       );
     },
   );
 
-  it("draws the direction and swap marks as stroked paths", async () => {
+  it("colors the outgoing text red and the incoming text green", async () => {
     const { presentation, recordings } = await createSubstitutionFor("static");
     presentation.draw(10_000);
-    // Per visible unit: one red down mark, one white connector and
-    // one green up mark, each a separate stroked path.
-    const strokes = recordings.ops.filter((entry) => entry.op === "stroke");
-    expect(strokes.length).toBeGreaterThanOrEqual(3);
-    expect(strokes.slice(0, 3).map((entry) => entry.style)).toEqual([
-      "#c8102e",
-      "#ffffff",
-      "#00a651",
-    ]);
+    const texts = playerTextOps(recordings.ops);
+    const offTexts = texts.filter((entry) =>
+      ["Siggi Bekkur", "12"].includes(entry.text),
+    );
+    const onTexts = texts.filter((entry) =>
+      ["Jón Jónsson", "7"].includes(entry.text),
+    );
+    expect(offTexts.length).toBeGreaterThanOrEqual(2);
+    expect(onTexts.length).toBeGreaterThanOrEqual(2);
+    for (const entry of offTexts) expect(entry.style).toBe("#c8102e");
+    for (const entry of onTexts) expect(entry.style).toBe("#00a651");
   });
 
   it("keeps the static band in place after its entrance", async () => {
@@ -531,7 +521,7 @@ describe("substitution band presentations", () => {
     expect(moved.dx).toBeLessThan(start.dx);
   });
 
-  it("flashes and pops the flash style, stamping the swap arrow last", async () => {
+  it("flashes and pops the flash style", async () => {
     const { presentation, recordings } = await createSubstitutionFor("flash");
     presentation.draw(0);
     // The impact flash covers the whole frame at t=0.
@@ -543,14 +533,13 @@ describe("substitution band presentations", () => {
         entry.style?.startsWith("rgba(255,255,255"),
     );
     expect(flash).toBeDefined();
-    // Early: the portraits pop at >1x scale.
+    // The portraits pop at >1x scale and settle by the pop end.
     const early = portraitDraws(recordings.ops)[0]!;
     expect(early.dh).toBeGreaterThan(108);
-    // The swap arrow is not stamped yet: swap draws (non-text path fills
-    // at the swap arrow position) are absent before the stamp window.
-    presentation.draw(BAND_PRESENTATION_TIMELINE.swapStampMs + 400);
-    const texts = playerTextOps(recordings.ops);
-    expect(texts.length).toBeGreaterThan(0);
+    recordings.ops.length = 0;
+    presentation.draw(BAND_PRESENTATION_TIMELINE.popMs + 400);
+    const settled = portraitDraws(recordings.ops)[0]!;
+    expect(settled.dh).toBe(108);
   });
 
   it("creates one presentation per configured logical screen", async () => {
@@ -579,49 +568,8 @@ describe("substitution band presentations", () => {
   });
 });
 
-describe("band arrow primitives", () => {
-  it("draws a round-capped directional shaft and chevron", () => {
-    const recordings = makeRecordingContext();
-    drawDirectionArrow(recordings.context, 50, 54, 30, "#c8102e", false);
-    const moves = recordings.ops.filter((entry) => entry.op === "moveTo");
-    const lines = recordings.ops.filter((entry) => entry.op === "lineTo");
-    expect(moves).toHaveLength(2);
-    expect(lines).toHaveLength(3);
-    expect(recordings.ops.some((entry) => entry.op === "closePath")).toBe(
-      false,
-    );
-    expect(recordings.ops.some((entry) => entry.op === "stroke")).toBe(true);
-    expect(recordings.context.lineCap).toBe("round");
-    expect(recordings.context.lineJoin).toBe("round");
-  });
-
-  it("draws upward and downward marks with mirrored geometry", () => {
-    const down = makeRecordingContext();
-    drawDirectionArrow(down.context, 50, 54, 30, "#c8102e", false);
-    const up = makeRecordingContext();
-    drawDirectionArrow(up.context, 50, 54, 30, "#00a651", true);
-    // The shaft starts opposite the direction of travel.
-    expect(down.ops.find((entry) => entry.op === "moveTo")!.args[1]).toBe(44.4);
-    expect(up.ops.find((entry) => entry.op === "moveTo")!.args[1]).toBe(63.6);
-  });
-
-  it("draws the swap arrow pointing right", () => {
-    const recordings = makeRecordingContext();
-    drawSwapArrow(recordings.context, 50, 54, 40, "#ffffff");
-    const moveTo = recordings.ops.find((entry) => entry.op === "moveTo")!;
-    // The shaft starts left of the arrowhead tip.
-    expect(moveTo.args[0]).toBeLessThan(50);
-    expect(
-      recordings.ops.filter((entry) => entry.op === "lineTo"),
-    ).toHaveLength(3);
-    expect(
-      recordings.ops.filter((entry) => entry.op === "stroke"),
-    ).toHaveLength(1);
-  });
-});
-
 describe("layoutSubstitutionUnit", () => {
-  it("measures a settled unit wide enough for both clusters and the swap", () => {
+  it("measures a settled unit wide enough for both clusters and the gap", () => {
     const recordings = makeRecordingContext();
     const unit = layoutSubstitutionUnit(
       {
@@ -637,10 +585,8 @@ describe("layoutSubstitutionUnit", () => {
       108,
       recordings.context,
     );
-    expect(unit.unitWidth).toBeGreaterThan(
-      unit.off.unitWidth + unit.on.unitWidth,
+    expect(unit.unitWidth).toBe(
+      unit.off.unitWidth + unit.gap + unit.on.unitWidth,
     );
-    expect(unit.arrowSize).toBe(Math.round(108 * 0.4));
-    expect(unit.swapSize).toBe(Math.round(108 * 0.38));
   });
 });

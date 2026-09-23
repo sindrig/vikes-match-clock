@@ -25,8 +25,8 @@ export const DEFAULT_SUBSTITUTION_BAND_STYLE: SubstitutionBandStyle = "static";
 const PROCESSION_SPEED_PX_PER_MS_PER_HEIGHT = 0.00012;
 
 // Fixed palette for both band channels. The near-black field keeps white
-// text and photo contrast; the substitution marks reuse the scorer accent
-// red and mirror the main-screen substitution green.
+// text and photo contrast; substitution identity text reuses the scorer
+// accent red (outgoing) and the main-screen substitution green (incoming).
 export const BAND_PRESENTATION_COLORS = {
   background: "#0b0b10",
   accent: SCORER_PRESENTATION_COLORS.accent,
@@ -45,7 +45,6 @@ export const BAND_PRESENTATION_TIMELINE = {
   // Entrance of the substitution flash style.
   flashMs: 260,
   popMs: 480,
-  swapStampMs: 650,
   // Period of the glow pulse behind the player-band portraits.
   pulsePeriodMs: 3000,
 } as const;
@@ -53,14 +52,10 @@ export const BAND_PRESENTATION_TIMELINE = {
 // The subset of the 2D context both band presentations use, narrowed so
 // tests can provide a recording context without DOM rasterization.
 export interface BandPresentationRenderingContext
-  extends BandRenderingContext, ArrowRenderingContext {
+  extends BandRenderingContext {
   globalCompositeOperation: string;
   clearRect(x: number, y: number, width: number, height: number): void;
   fillRect(x: number, y: number, width: number, height: number): void;
-  fill(): void;
-  moveTo(x: number, y: number): void;
-  lineTo(x: number, y: number): void;
-  closePath(): void;
   createRadialGradient(
     x0: number,
     y0: number,
@@ -91,72 +86,6 @@ function channel(hex: string): [number, number, number] {
 function withAlpha(hex: string, alpha: number): string {
   const [r, g, b] = channel(hex);
   return `rgba(${r},${g},${b},${Math.round(clamp01(alpha) * 100) / 100})`;
-}
-
-// Minimal context shape for the vector substitution marks.
-interface ArrowRenderingContext {
-  strokeStyle: string | CanvasGradient | CanvasPattern;
-  lineWidth: number;
-  lineCap: CanvasLineCap;
-  lineJoin: CanvasLineJoin;
-  globalAlpha: number;
-  save(): void;
-  restore(): void;
-  beginPath(): void;
-  moveTo(x: number, y: number): void;
-  lineTo(x: number, y: number): void;
-  stroke(): void;
-}
-
-// Narrow, round-capped shaft and chevron rather than the oversized solid
-// triangles. Paths are used instead of glyphs so venue fonts cannot change
-// the marks. `up` points toward the pitch, otherwise away from it.
-export function drawDirectionArrow(
-  context: ArrowRenderingContext,
-  centerX: number,
-  centerY: number,
-  size: number,
-  color: string,
-  up: boolean,
-): void {
-  const direction = up ? -1 : 1;
-  context.save();
-  context.strokeStyle = color;
-  context.lineWidth = Math.max(2, size * 0.095);
-  context.lineCap = "round";
-  context.lineJoin = "round";
-  context.beginPath();
-  context.moveTo(centerX, centerY - direction * size * 0.32);
-  context.lineTo(centerX, centerY + direction * size * 0.29);
-  context.moveTo(centerX - size * 0.2, centerY + direction * size * 0.09);
-  context.lineTo(centerX, centerY + direction * size * 0.29);
-  context.lineTo(centerX + size * 0.2, centerY + direction * size * 0.09);
-  context.stroke();
-  context.restore();
-}
-
-// A light directional connector between the two players, in the same
-// round-capped line language as the in/out marks.
-export function drawSwapArrow(
-  context: ArrowRenderingContext,
-  centerX: number,
-  centerY: number,
-  size: number,
-  color: string,
-): void {
-  context.save();
-  context.strokeStyle = color;
-  context.lineWidth = Math.max(2, size * 0.085);
-  context.lineCap = "round";
-  context.lineJoin = "round";
-  context.beginPath();
-  context.moveTo(centerX - size * 0.42, centerY);
-  context.lineTo(centerX + size * 0.34, centerY);
-  context.moveTo(centerX + size * 0.12, centerY - size * 0.22);
-  context.lineTo(centerX + size * 0.34, centerY);
-  context.lineTo(centerX + size * 0.12, centerY + size * 0.22);
-  context.stroke();
-  context.restore();
 }
 
 function drawFlatField(
@@ -294,9 +223,10 @@ function drawPlayerFrame(
   context.restore();
 }
 
-// Substitution cluster geometry: [direction mark | portrait | number | name] with a
-// swap arrow between the two clusters, matching the scoreboard's off-left /
-// on-right layout.
+// Substitution cluster geometry: [portrait | number | name] per player with
+// no directional marks — the outgoing player's number and name render in
+// red and the incoming player's in green, matching the scoreboard's
+// off-left / on-right layout.
 export interface SubstitutionUnit {
   off: BandUnit;
   on: BandUnit;
@@ -304,14 +234,8 @@ export interface SubstitutionUnit {
   onSource: { width: number; height: number };
   offImage: HTMLImageElement;
   onImage: HTMLImageElement;
-  arrowSize: number;
-  swapSize: number;
   gap: number;
   unitWidth: number;
-}
-
-function clusterWidth(unit: BandUnit, arrowSize: number, gap: number): number {
-  return (unit.portraitWidth > 0 ? arrowSize + gap : 0) + unit.unitWidth;
 }
 
 // Lays out the settled two-player substitution unit.
@@ -344,13 +268,7 @@ export function layoutSubstitutionUnit(
     context,
   );
   const gap = offUnit.gap;
-  const arrowSize = Math.round(height * 0.4);
-  const swapSize = Math.round(height * 0.38);
-  const unitWidth =
-    clusterWidth(offUnit, arrowSize, gap) +
-    swapSize +
-    gap * 2 +
-    clusterWidth(onUnit, arrowSize, gap);
+  const unitWidth = offUnit.unitWidth + gap + onUnit.unitWidth;
   return {
     off: offUnit,
     on: onUnit,
@@ -358,86 +276,57 @@ export function layoutSubstitutionUnit(
     onSource: on.source,
     offImage: off.image,
     onImage: on.image,
-    arrowSize,
-    swapSize,
     gap,
     unitWidth: Math.max(1, unitWidth),
   };
 }
 
 // Draws one settled two-player unit at originX: the outgoing player on the
-// left with a red down mark, the incoming player on the right with a green
-// up mark, and a slim connector between them.
+// left with red number and name, the incoming player on the right with
+// green number and name.
 export function drawSubstitutionUnit(
   context: BandPresentationRenderingContext,
   unit: SubstitutionUnit,
   originX: number,
   height: number,
-  motion: { alpha?: number; scale?: number; swapAlpha?: number } = {},
+  motion: { alpha?: number; scale?: number } = {},
 ): void {
   const alpha = motion.alpha ?? 1;
   const scale = motion.scale ?? 1;
-  const swapAlpha = alpha * (motion.swapAlpha ?? 1);
   context.save();
   context.globalAlpha = alpha;
-  let cursor = originX;
-  // Off cluster: red down mark, portrait, number, name.
-  if (unit.off.portraitWidth > 0) {
-    drawDirectionArrow(
-      context,
-      cursor + unit.arrowSize / 2,
-      height / 2,
-      unit.arrowSize,
-      BAND_PRESENTATION_COLORS.accent,
-      false,
-    );
-    cursor += unit.arrowSize + unit.gap;
-  }
+  // Off cluster: red number and name.
   drawBandUnit(
     context,
     unit.offImage,
     unit.offSource,
     unit.off,
-    cursor,
+    originX,
     height,
-    { alpha, portraitScale: scale },
+    { alpha, portraitScale: scale, textColor: BAND_PRESENTATION_COLORS.accent },
   );
-  cursor += unit.off.unitWidth + unit.gap;
-  // Directional connector between the clusters.
-  context.globalAlpha = swapAlpha;
-  drawSwapArrow(
+  // On cluster: green number and name.
+  drawBandUnit(
     context,
-    cursor + unit.swapSize / 2,
-    height / 2,
-    unit.swapSize,
-    BAND_PRESENTATION_COLORS.white,
+    unit.onImage,
+    unit.onSource,
+    unit.on,
+    originX + unit.off.unitWidth + unit.gap,
+    height,
+    {
+      alpha,
+      portraitScale: scale,
+      textColor: BAND_PRESENTATION_COLORS.substitutionGreen,
+    },
   );
-  context.globalAlpha = alpha;
-  cursor += unit.swapSize + unit.gap;
-  // On cluster: green up mark, portrait, number, name.
-  if (unit.on.portraitWidth > 0) {
-    drawDirectionArrow(
-      context,
-      cursor + unit.arrowSize / 2,
-      height / 2,
-      unit.arrowSize,
-      BAND_PRESENTATION_COLORS.substitutionGreen,
-      true,
-    );
-    cursor += unit.arrowSize + unit.gap;
-  }
-  drawBandUnit(context, unit.onImage, unit.onSource, unit.on, cursor, height, {
-    alpha,
-    portraitScale: scale,
-  });
   context.restore();
 }
 
-// The substitution band: repeated [red down mark | off portrait | number | name]
-// [right connector] [green up mark | on portrait | number | name] units, entrance per
-// style (static: fade then hold; relay: fade then drift right-to-left at
-// the player-band default speed; flash: impact flash + scale-down pop with
-// the swap arrow stamping last, then hold).
+// The substitution band: repeated [off portrait | number | name in red]
+// [gap] [on portrait | number | name in green] units, entrance per style
+// (static: fade then hold; relay: fade then drift right-to-left at the
+// player-band default speed; flash: impact flash + scale-down pop, then
+// hold). Speeds are defined per style; there is no separate knob.
 function drawSubstitutionFrame(
   context: BandPresentationRenderingContext,
   layout: PresentationLayout,
@@ -460,8 +349,7 @@ function drawSubstitutionFrame(
   }
 
   if (style === "flash") {
-    // White impact flash + scale-down pop; the swap arrow stamps in last
-    // (swapAlpha 0 while the clusters settle, then a quick stamp).
+    // White impact flash + scale-down pop, then hold.
     if (elapsedMs < BAND_PRESENTATION_TIMELINE.flashMs) {
       const progress = 1 - elapsedMs / BAND_PRESENTATION_TIMELINE.flashMs;
       context.fillStyle = withAlpha(
@@ -473,9 +361,6 @@ function drawSubstitutionFrame(
     const pop = easeOutCubic(elapsedMs / BAND_PRESENTATION_TIMELINE.popMs);
     const scale = 1.3 - 0.3 * pop;
     const alpha = clamp01(elapsedMs / (BAND_PRESENTATION_TIMELINE.popMs * 0.6));
-    const stamp = easeOutCubic(
-      (elapsedMs - BAND_PRESENTATION_TIMELINE.swapStampMs + 200) / 200,
-    );
     for (const slot of slots) {
       context.save();
       context.beginPath();
@@ -489,24 +374,7 @@ function drawSubstitutionFrame(
       drawSubstitutionUnit(context, substitution, slot.x, height, {
         alpha,
         scale,
-        swapAlpha: 0,
       });
-      if (stamp > 0) {
-        const swapOffset =
-          clusterWidth(
-            substitution.off,
-            substitution.arrowSize,
-            substitution.gap,
-          ) + substitution.gap;
-        context.globalAlpha = stamp;
-        drawSwapArrow(
-          context,
-          slot.x + swapOffset + substitution.swapSize / 2,
-          height / 2,
-          substitution.swapSize,
-          BAND_PRESENTATION_COLORS.white,
-        );
-      }
       context.restore();
     }
     return;

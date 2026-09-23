@@ -121,56 +121,20 @@ rect
 clip
 save
 save
-beginPath
-moveTo
-lineTo
-moveTo
-lineTo
-lineTo
-stroke
+image dest=(0,0,54,108)
+text "12" at=103,54 font=700 30px "GT America"
+text "Siggi Bekkur" at=225,54 font=700 30px "GT America"
 restore
 save
-image dest=(92,0,54,108)
-text "12" at=195,54 font=700 30px "GT America"
-text "Siggi Bekkur" at=317,54 font=700 30px "GT America"
+image dest=(530,0,108,108)
+text "7" at=687,54 font=700 30px "GT America"
+text "Jón Jónsson" at=773,54 font=700 30px "GT America"
 restore
-save
-beginPath
-moveTo
-lineTo
-moveTo
-lineTo
-lineTo
-stroke
-restore
-save
-beginPath
-moveTo
-lineTo
-moveTo
-lineTo
-lineTo
-stroke
-restore
-save
-image dest=(804,0,108,108)
-text "7" at=961,54 font=700 30px "GT America"
-text "Jón Jónsson" at=1047,54 font=700 30px "GT America"
-restore
-restore
-save
-beginPath
-moveTo
-lineTo
-moveTo
-lineTo
-lineTo
-stroke
 restore
 restore"
 `;
 
-exports[`substitution band snapshots > lay outing is stable: the measured unit matches the drawn unit geometry 1`] = `1301`;
+exports[`substitution band snapshots > lay outing is stable: the measured unit matches the drawn unit geometry 1`] = `1027`;
 
 exports[`substitution band snapshots > relay: settled frame at the Víkin web logical-screen size 1`] = `
 "clearRect
@@ -182,41 +146,31 @@ rect
 clip
 save
 save
-beginPath
-moveTo
-lineTo
-moveTo
-lineTo
-lineTo
-stroke
+image dest=(-194.40000000000003,0,54,108)
+text "12" at=-91.40000000000003,54 font=700 30px "GT America"
+text "Siggi Bekkur" at=30.599999999999966,54 font=700 30px "GT America"
 restore
 save
-image dest=(-102.40000000000003,0,54,108)
-text "12" at=0.5999999999999659,54 font=700 30px "GT America"
-text "Siggi Bekkur" at=122.59999999999997,54 font=700 30px "GT America"
+image dest=(335.59999999999997,0,108,108)
+text "7" at=492.59999999999997,54 font=700 30px "GT America"
+text "Jón Jónsson" at=578.5999999999999,54 font=700 30px "GT America"
 restore
-save
-beginPath
-moveTo
-lineTo
-moveTo
-lineTo
-lineTo
-stroke
+restore
 restore
 save
 beginPath
-moveTo
-lineTo
-moveTo
-lineTo
-lineTo
-stroke
+rect
+clip
+save
+save
+image dest=(832.5999999999999,0,54,108)
+text "12" at=935.5999999999999,54 font=700 30px "GT America"
+text "Siggi Bekkur" at=1057.6,54 font=700 30px "GT America"
 restore
 save
-image dest=(609.5999999999999,0,108,108)
-text "7" at=766.5999999999999,54 font=700 30px "GT America"
-text "Jón Jónsson" at=852.5999999999999,54 font=700 30px "GT America"
+image dest=(1362.6,0,108,108)
+text "7" at=1519.6,54 font=700 30px "GT America"
+text "Jón Jónsson" at=1605.6,54 font=700 30px "GT America"
 restore
 restore
 restore
@@ -233,41 +187,14 @@ rect
 clip
 save
 save
-beginPath
-moveTo
-lineTo
-moveTo
-lineTo
-lineTo
-stroke
+image dest=(0,0,54,108)
+text "12" at=103,54 font=700 30px "GT America"
+text "Siggi Bekkur" at=225,54 font=700 30px "GT America"
 restore
 save
-image dest=(92,0,54,108)
-text "12" at=195,54 font=700 30px "GT America"
-text "Siggi Bekkur" at=317,54 font=700 30px "GT America"
-restore
-save
-beginPath
-moveTo
-lineTo
-moveTo
-lineTo
-lineTo
-stroke
-restore
-save
-beginPath
-moveTo
-lineTo
-moveTo
-lineTo
-lineTo
-stroke
-restore
-save
-image dest=(804,0,108,108)
-text "7" at=961,54 font=700 30px "GT America"
-text "Jón Jónsson" at=1047,54 font=700 30px "GT America"
+image dest=(530,0,108,108)
+text "7" at=687,54 font=700 30px "GT America"
+text "Jón Jónsson" at=773,54 font=700 30px "GT America"
 restore
 restore
 restore
@@ -284,41 +211,14 @@ rect
 clip
 save
 save
-beginPath
-moveTo
-lineTo
-moveTo
-lineTo
-lineTo
-stroke
+image dest=(0,0,96,192)
+text "12" at=182,96 font=700 54px "GT America"
+text "Siggi Bekkur" at=399,96 font=700 54px "GT America"
 restore
 save
-image dest=(163,0,96,192)
-text "12" at=345,96 font=700 54px "GT America"
-text "Siggi Bekkur" at=562,96 font=700 54px "GT America"
-restore
-save
-beginPath
-moveTo
-lineTo
-moveTo
-lineTo
-lineTo
-stroke
-restore
-save
-beginPath
-moveTo
-lineTo
-moveTo
-lineTo
-lineTo
-stroke
-restore
-save
-image dest=(1429,0,192,192)
-text "7" at=1707,96 font=700 54px "GT America"
-text "Jón Jónsson" at=1859,96 font=700 54px "GT America"
+image dest=(944,0,192,192)
+text "7" at=1222,96 font=700 54px "GT America"
+text "Jón Jónsson" at=1374,96 font=700 54px "GT America"
 restore
 restore
 restore
@@ -328,41 +228,31 @@ rect
 clip
 save
 save
-beginPath
-moveTo
-lineTo
-moveTo
-lineTo
-lineTo
-stroke
+image dest=(1828,0,96,192)
+text "12" at=2010,96 font=700 54px "GT America"
+text "Siggi Bekkur" at=2227,96 font=700 54px "GT America"
 restore
 save
-image dest=(2476,0,96,192)
-text "12" at=2658,96 font=700 54px "GT America"
-text "Siggi Bekkur" at=2875,96 font=700 54px "GT America"
+image dest=(2772,0,192,192)
+text "7" at=3050,96 font=700 54px "GT America"
+text "Jón Jónsson" at=3202,96 font=700 54px "GT America"
 restore
-save
-beginPath
-moveTo
-lineTo
-moveTo
-lineTo
-lineTo
-stroke
+restore
 restore
 save
 beginPath
-moveTo
-lineTo
-moveTo
-lineTo
-lineTo
-stroke
+rect
+clip
+save
+save
+image dest=(3656,0,96,192)
+text "12" at=3838,96 font=700 54px "GT America"
+text "Siggi Bekkur" at=4055,96 font=700 54px "GT America"
 restore
 save
-image dest=(3742,0,192,192)
-text "7" at=4020,96 font=700 54px "GT America"
-text "Jón Jónsson" at=4172,96 font=700 54px "GT America"
+image dest=(4600,0,192,192)
+text "7" at=4878,96 font=700 54px "GT America"
+text "Jón Jónsson" at=5030,96 font=700 54px "GT America"
 restore
 restore
 restore
