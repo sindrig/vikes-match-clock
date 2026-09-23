@@ -4,8 +4,10 @@ import type { BandIdentity } from "./playerBandPresentation";
 // A derived band request for the perimeter band channel. Player-like
 // assets produce a single identity; SUB assets produce the two-player
 // substitution request. `null` means no band (base ad deck shows through).
+// MOTM requests carry `motm` so the presentation can lead with the sponsor
+// loop before the player reveal (see MotmLead in playerBandPresentation).
 export type PlayerBandRequest =
-  | { kind: "player"; identity: BandIdentity }
+  | { kind: "player"; identity: BandIdentity; motm?: boolean }
   | { kind: "substitution"; off: BandIdentity; on: BandIdentity };
 
 // The player-like asset types whose cards the band mirrors. NO_IMAGE_PLAYER
@@ -91,7 +93,11 @@ export function deriveBandRequest(
 
   const identity = playerIdentity(asset);
   if (!identity) return null;
-  return { kind: "player", identity };
+  return {
+    kind: "player",
+    identity,
+    ...(asset.type === assetTypes.MOTM ? { motm: true as const } : {}),
+  };
 }
 
 // Stable serialization of a band request so consumers (and the runtime) can
@@ -108,7 +114,10 @@ export function bandRequestKey(
       identity.imageRef ?? "",
     ].join("\u0000");
   if (request.kind === "player") {
-    return `player\u0000${identityKey(request.identity)}`;
+    // The MOTM flag is part of the key: the same player shown as a plain
+    // card and as man of the match are different band requests, so the
+    // MOTM sponsor lead-in always plays.
+    return `${request.motm ? "motm" : "player"}\u0000${identityKey(request.identity)}`;
   }
   return `substitution\u0000${identityKey(request.off)}\u0000${identityKey(request.on)}`;
 }

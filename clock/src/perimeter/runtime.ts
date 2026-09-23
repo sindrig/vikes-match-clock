@@ -30,7 +30,7 @@ import {
   DEFAULT_PLAYER_BAND_STYLE,
   DEFAULT_SUBSTITUTION_BAND_STYLE,
 } from "./playerBandPresentation";
-import type { PlayerBandRequest } from "./bandDerivation";
+import { bandRequestKey, type PlayerBandRequest } from "./bandDerivation";
 import { createBaseTimeline, nextCueBoundary } from "./timeline";
 import type { PerimeterRenderSources } from "./webglRenderer";
 
@@ -312,9 +312,7 @@ export class PerimeterRuntime {
     }
     if (
       this.activeBand &&
-      this.activeBand.request.kind === band.kind &&
-      this.bandIdentityKey(this.activeBand.request) ===
-        this.bandIdentityKey(band)
+      bandRequestKey(this.activeBand.request) === bandRequestKey(band)
     ) {
       return;
     }
@@ -325,25 +323,6 @@ export class PerimeterRuntime {
     this.options.renderer.clearChannel?.("band");
     this.render(now);
     await this.prepareBand(band, request);
-  }
-
-  private bandIdentityKey(request: PlayerBandRequest): string {
-    const identityKey = (identity: {
-      name: string;
-      number: string;
-      teamName?: string;
-      imageRef?: string;
-    }): string =>
-      [
-        identity.name,
-        identity.number,
-        identity.teamName ?? "",
-        identity.imageRef ?? "",
-      ].join("\u0000");
-    if (request.kind === "player") {
-      return `player\u0000${identityKey(request.identity)}`;
-    }
-    return `substitution\u0000${identityKey(request.off)}\u0000${identityKey(request.on)}`;
   }
 
   private releaseActiveBand(): void {

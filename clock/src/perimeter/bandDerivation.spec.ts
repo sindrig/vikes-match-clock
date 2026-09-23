@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deriveBandRequest } from "./bandDerivation";
+import { bandRequestKey, deriveBandRequest } from "./bandDerivation";
 import type { CurrentAsset } from "../types";
 
 function assetOf(asset: CurrentAsset["asset"]): CurrentAsset {
@@ -120,6 +120,7 @@ describe("deriveBandRequest", () => {
     );
     expect(request).toEqual({
       kind: "player",
+      motm: true,
       identity: {
         name: "Siggi",
         number: "4",
@@ -127,6 +128,48 @@ describe("deriveBandRequest", () => {
         imageRef: "https://example.com/motm.png",
       },
     });
+  });
+
+  it("does not flag plain player cards as MOTM", () => {
+    const request = deriveBandRequest(
+      assetOf({
+        type: "PLAYER",
+        key: "https://example.com/player.png",
+        name: "Siggi",
+        number: 4,
+        teamName: "Víkingur R",
+      }),
+    );
+    expect(request).toEqual({
+      kind: "player",
+      identity: {
+        name: "Siggi",
+        number: "4",
+        teamName: "Víkingur R",
+        imageRef: "https://example.com/player.png",
+      },
+    });
+  });
+
+  it("keys MOTM and plain player requests of the same player apart", () => {
+    const asset = {
+      key: "https://example.com/player.png",
+      name: "Siggi",
+      number: 4,
+      teamName: "Víkingur R",
+    };
+    const motmKey = bandRequestKey(
+      deriveBandRequest(assetOf({ ...asset, type: "MOTM" })),
+    );
+    const playerKey = bandRequestKey(
+      deriveBandRequest(assetOf({ ...asset, type: "PLAYER" })),
+    );
+    expect(motmKey).not.toBeNull();
+    expect(playerKey).not.toBeNull();
+    expect(motmKey).not.toEqual(playerKey);
+    expect(
+      bandRequestKey(deriveBandRequest(assetOf({ ...asset, type: "MOTM" }))),
+    ).toEqual(motmKey);
   });
 
   it("normalizes numeric and padded number values", () => {

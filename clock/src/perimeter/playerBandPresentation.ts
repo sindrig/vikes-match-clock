@@ -5,6 +5,7 @@ import {
   type ScorerBandDeps,
   drawBandUnit,
   layoutBandUnit,
+  portraitFitWidth,
   scorerBandFonts,
 } from "./scorerCompositor";
 import {
@@ -23,6 +24,24 @@ export const DEFAULT_SUBSTITUTION_BAND_STYLE: SubstitutionBandStyle = "static";
 // The player band drifts ~1.5x that, the streamer style ~2x. Speeds are
 // defined per style; there is no separate knob.
 const PROCESSION_SPEED_PX_PER_MS_PER_HEIGHT = 0.00012;
+
+// The MOTM lead-in pacing. The main screen's MOTM card cycles
+// "Maður leiksins í boði..." (2 s) → the Bombay sponsor logo (2 s) → the
+// player (MOTM.tsx `idxSeconds`), so the band holds its Bombay loop for
+// 1.5× the sponsor phase before revealing the player: the perimeter never
+// shows the man of the match before the main screen does.
+export const MOTM_BOMBAY_HOLD_MS = 3000;
+
+// The MOTM lead-in: repeated Bombay sponsor logos on the flat field,
+// [logo][gap as wide as the logo], held before the player band reveal. The
+// logo is contain-fitted to the band height — the actual rendered logo size
+// on the perimeter screens is unknown, so like every band measurement it
+// scales from the band height. After the hold the player band takes over
+// and the sponsor loop never returns.
+export interface MotmLead {
+  image: HTMLImageElement;
+  holdMs: number;
+}
 
 // Fixed palette for both band channels. The near-black field keeps white
 // text and photo contrast; substitution identity text reuses the scorer
@@ -51,8 +70,7 @@ export const BAND_PRESENTATION_TIMELINE = {
 
 // The subset of the 2D context both band presentations use, narrowed so
 // tests can provide a recording context without DOM rasterization.
-export interface BandPresentationRenderingContext
-  extends BandRenderingContext {
+export interface BandPresentationRenderingContext extends BandRenderingContext {
   globalCompositeOperation: string;
   clearRect(x: number, y: number, width: number, height: number): void;
   fillRect(x: number, y: number, width: number, height: number): void;
@@ -95,6 +113,44 @@ function drawFlatField(
 ): void {
   context.fillStyle = BAND_PRESENTATION_COLORS.background;
   context.fillRect(0, 0, width, height);
+}
+
+// The MOTM sponsor lead-in frame: the logo repeated
+// [logo][gap = logo width] across the flat field, faded in and held static.
+// The final repetition clips at the band edge like every other unit loop.
+function drawMotmLeadFrame(
+  context: BandPresentationRenderingContext,
+  layout: PresentationLayout,
+  lead: MotmLead,
+  elapsedMs: number,
+): void {
+  const { width, height } = layout;
+  drawFlatField(context, width, height);
+
+  const source = {
+    width: lead.image.naturalWidth,
+    height: lead.image.naturalHeight,
+  };
+  const logoWidth = portraitFitWidth(source.width, source.height, height);
+  if (logoWidth <= 0) return;
+  const unitWidth = logoWidth * 2;
+  const entrance = easeOutCubic(elapsedMs / BAND_PRESENTATION_TIMELINE.fadeMs);
+  context.save();
+  for (let x = 0; x < width; x += unitWidth) {
+    context.globalAlpha = entrance;
+    context.drawImage(
+      lead.image,
+      0,
+      0,
+      source.width,
+      source.height,
+      x,
+      0,
+      logoWidth,
+      height,
+    );
+  }
+  context.restore();
 }
 
 // One resolved band side (player band or one substitution side).
@@ -403,7 +459,9 @@ function drawSubstitutionFrame(
 // Creates one animated band presentation for a logical screen: a canvas
 // that can redraw the band at any elapsed time for the requested style.
 // The presentation anchors elapsed time at first visible render (the
-// runtime passes elapsed ms), exactly like the scorer presentations.
+// runtime passes elapsed ms), exactly like the scorer presentations. A
+// MOTM lead holds the sponsor loop until `holdMs` has elapsed, then hands
+// over to the player band with its entrance replaying from that moment.
 export async function createPlayerBandPresentation(
   style: PlayerBandStyle,
   identity: BandIdentity,
@@ -411,6 +469,7 @@ export async function createPlayerBandPresentation(
   width: number,
   height: number,
   deps: ScorerBandDeps = defaultBandDeps,
+  motmLead: MotmLead | null = null,
 ): Promise<ScorerPresentation> {
   await deps.loadFonts(scorerBandFonts(height));
   const canvas = deps.createCanvas(width, height);
@@ -439,7 +498,17 @@ export async function createPlayerBandPresentation(
   };
   const draw = (elapsedMs: number): void => {
     context.clearRect(0, 0, width, height);
-    drawPlayerFrame(context, layout, style, Math.max(0, elapsedMs));
+    const now = Math.max(0, elapsedMs);
+    if (motmLead && now < motmLead.holdMs) {
+      drawMotmLeadFrame(context, layout, motmLead, now);
+      return;
+    }
+    drawPlayerFrame(
+      context,
+      layout,
+      style,
+      Math.max(0, now - (motmLead?.holdMs ?? 0)),
+    );
   };
   return { canvas, draw };
 }
@@ -521,6 +590,7 @@ export async function createPlayerBandPresentations(
   source: HTMLImageElement,
   screens: readonly { id: string; width: number; height: number }[],
   deps: ScorerBandDeps = defaultBandDeps,
+  motmLead: MotmLead | null = null,
 ): Promise<Record<string, ScorerPresentation>> {
   const presentations: Record<string, ScorerPresentation> = {};
   for (const screen of screens) {
@@ -531,6 +601,7 @@ export async function createPlayerBandPresentations(
       screen.width,
       screen.height,
       deps,
+      motmLead,
     );
   }
   return presentations;

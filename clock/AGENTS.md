@@ -1015,11 +1015,11 @@ directly and never treats a Firebase write confirmation as a hardware result.
 
 **Data ownership:**
 
-| Path                                            | Writer     | Purpose                                                             |
-| ----------------------------------------------- | ---------- | ------------------------------------------------------------------- |
-| `states/{location}/perimeter/brightness`        | Controller | Requested brightness as a whole integer percentage (0–100)          |
-| `states/{location}/perimeter/brightnessAuto`    | Controller | Automatic-brightness config (master switch + curve parameters)      |
-| `perimeter/{location}/brightnessStatus`         | Daemon     | `requestedPercent`, `appliedPercent`, `phase`, `error`, `updatedAt`, `mode`, `predicted` |
+| Path                                         | Writer     | Purpose                                                                                  |
+| -------------------------------------------- | ---------- | ---------------------------------------------------------------------------------------- |
+| `states/{location}/perimeter/brightness`     | Controller | Requested brightness as a whole integer percentage (0–100)                               |
+| `states/{location}/perimeter/brightnessAuto` | Controller | Automatic-brightness config (master switch + curve parameters)                           |
+| `perimeter/{location}/brightnessStatus`      | Daemon     | `requestedPercent`, `appliedPercent`, `phase`, `error`, `updatedAt`, `mode`, `predicted` |
 
 - The requested value is a bare integer percentage. `null`/missing means "no
   command" and is inert; the daemon ignores anything that is not a whole
@@ -1055,14 +1055,16 @@ server timestamp):
 
 ```jsonc
 {
-  "enabled": true,   // auto master switch; absent node = auto disabled
-  "min": 3, "max": 100,      // percent bounds (sliders show 0..100; the
-                             // daemon clamps targets to [max(min,1), min(max,99)] —
-                             // 0 and 100 are manual-only by design)
-  "exponent": 0.35,          // "aggressiveness": lower = brighter earlier
-  "cloudWeight": 1.0,        // 0 = ignore clouds, 1 = full Kasten-Czeplak
-  "luxMin": 5, "luxMax": 100000,
-  "updatedAt": 1723392000000
+  "enabled": true, // auto master switch; absent node = auto disabled
+  "min": 3,
+  "max": 100, // percent bounds (sliders show 0..100; the
+  // daemon clamps targets to [max(min,1), min(max,99)] —
+  // 0 and 100 are manual-only by design)
+  "exponent": 0.35, // "aggressiveness": lower = brighter earlier
+  "cloudWeight": 1.0, // 0 = ignore clouds, 1 = full Kasten-Czeplak
+  "luxMin": 5,
+  "luxMax": 100000,
+  "updatedAt": 1723392000000,
 }
 ```
 
@@ -1472,7 +1474,11 @@ token, or audit event is created by band behavior (regression e2e:
   digit-only shirt number (`[0-9]{1,4}` after trimming), and a non-empty
   `teamName`; `imageRef` is the card's own `asset.key` (absent for
   `NO_IMAGE_PLAYER`). Assets flagged `isGoalCelebration` are skipped —
-  their perimeter twin is the goal-scorer overlay itself.
+  their perimeter twin is the goal-scorer overlay itself. MOTM cards add
+  `motm: true` so the presentation can lead with the sponsor loop (see
+  **MOTM sponsor lead-in** below); the flag is part of `bandRequestKey`,
+  so the same player shown as a plain card and as man of the match are
+  distinct band requests.
 - `SUB` → `{ kind: "substitution", off, on }` derived from `subOut`
   (off the pitch) and `subIn` (coming on) under the corrected field
   semantics (see **Shared Home-Team Player Actions**); **both sides must
@@ -1498,13 +1504,31 @@ now)` with scorer-style generation lifecycle (atomic activation, stale
 request invalidation, release of superseded sources, failure reporting). A
 new request **drops the active band immediately** (base shows through
 while the replacement prepares); a re-delivery of the active request is a
-no-op. While an overlay generation is active the renderer receives **no
-band sources** (the band object stays resident so clearing the overlay
-restores it without re-preparation). Style changes
+no-op — requests are deduplicated with the shared `bandRequestKey()` from
+`bandDerivation.ts`. While an overlay generation is active the renderer
+receives **no band sources** (the band object stays resident so clearing
+the overlay restores it without re-preparation). Style changes
 (`setPlayerBandStyle`/`setSubstitutionBandStyle`) and mapping replacements
 recompose the resident band while keeping current textures visible. The
 WebGL renderer composites `base < band < overlay` with an independent
 `bandDynamic` flag, and `clearChannel` accepts `"band"`.
+
+**MOTM sponsor lead-in** (web venues): the main screen's MOTM card cycles
+"Maður leiksins í boði..." (2 s) → the Bombay sponsor logo (2 s) → the
+player (MOTM.tsx `idxSeconds`), so a MOTM band must never show the player
+before the main screen does. MOTM requests lead with a sponsor loop frame:
+the bundled `images/bombay.png` repeated
+`[logo][gap as wide as the logo]` across the flat near-black field
+(logo contain-fitted to the band height — the rendered logo size on the
+LED screens is unknown, so every measurement scales from the band height),
+faded in like the band entrance and held static for
+`MOTM_BOMBAY_HOLD_MS` (3000 ms = 1.5× the main screen's sponsor phase),
+then the player band takes over with its entrance replaying and the loop
+never returns. `PerimeterDisplay` decodes the bundled logo once and passes
+a `MotmLead` (`{ image, holdMs }`) into `createPlayerBandPresentations`;
+a failed decode skips the lead-in. Style/mapping recomposition preserves
+the band's timeline anchor, so a recomposition after the hold draws the
+player phase directly without replaying the loop.
 
 Band preparation errors are tracked separately from renderer/base/overlay
 and texture errors. A successful band replacement or removal clears only

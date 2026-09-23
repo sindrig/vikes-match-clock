@@ -417,6 +417,98 @@ describe("player band presentations", () => {
     expect(typeof presentations.left!.draw).toBe("function");
     expect(typeof presentations.right!.draw).toBe("function");
   });
+
+  describe("MOTM sponsor lead-in", () => {
+    // The Bombay logo is nearly square (1336x1360); at a 108 px band height
+    // the contain fit is ~106 px wide, and the loop unit is [logo][gap =
+    // logo width] = 212 px.
+    async function createMotmFor(holdMs = 3000) {
+      const recordings = makeRecordingContext();
+      const deps = {
+        createCanvas: (width: number, height: number): HTMLCanvasElement =>
+          ({
+            width,
+            height,
+            getContext: (type: string) =>
+              type === "2d" ? recordings.context : null,
+          }) as unknown as HTMLCanvasElement,
+        loadFonts: () => Promise.resolve(),
+      };
+      const presentation = await createPlayerBandPresentation(
+        "plain",
+        IDENTITY,
+        imageOf(portraitBytes, 4, 8),
+        960,
+        108,
+        deps,
+        { image: imageOf(crestBytes, 1336, 1360), holdMs },
+      );
+      return { presentation, recordings };
+    }
+
+    it("loops the sponsor logo with a gap as wide as the logo during the hold", async () => {
+      const { presentation, recordings } = await createMotmFor();
+      presentation.draw(600);
+      const draws = portraitDraws(recordings.ops);
+      expect(draws.map((d) => d.dx)).toEqual([0, 212, 424, 636, 848]);
+      for (const draw of draws) {
+        expect(draw.dh).toBe(108);
+        expect(draw.dy).toBe(0);
+        expect(draw.dw).toBe(106);
+      }
+      // No player text during the sponsor hold.
+      expect(playerTextOps(recordings.ops)).toEqual([]);
+      const field = recordings.ops.find(
+        (entry) =>
+          entry.op === "fillRect" &&
+          entry.args[2] === 960 &&
+          entry.args[3] === 108 &&
+          entry.style === "#0b0b10",
+      );
+      expect(field).toBeDefined();
+    });
+
+    it("fades the sponsor loop in with the band entrance", async () => {
+      const { presentation, recordings } = await createMotmFor();
+      for (const [elapsed, alpha] of [
+        [0, 0],
+        [300, 0.875],
+        [600, 1],
+      ] as const) {
+        recordings.ops.length = 0;
+        presentation.draw(elapsed);
+        const draws = recordings.ops.filter(
+          (entry) => entry.op === "drawImage",
+        );
+        expect(draws.length).toBeGreaterThan(0);
+        for (const draw of draws) expect(draw.alpha).toBeCloseTo(alpha);
+        expect(recordings.context.globalAlpha).toBe(1);
+      }
+    });
+
+    it("reveals the player band after the hold with its entrance replaying", async () => {
+      const { presentation, recordings } = await createMotmFor();
+      // At the exact hold boundary the player band starts from elapsed 0
+      // (entrance alpha 0) with the portrait geometry, not the sponsor loop.
+      presentation.draw(3_000);
+      const draws = portraitDraws(recordings.ops);
+      expect(draws.length).toBeGreaterThan(0);
+      for (const draw of draws) {
+        expect(draw.dw).toBe(54);
+        expect(draw.dh).toBe(108);
+      }
+      expect(
+        recordings.ops.find((entry) => entry.op === "drawImage")!.alpha,
+      ).toBeCloseTo(0);
+      recordings.ops.length = 0;
+      presentation.draw(3_600);
+      const settled = portraitDraws(recordings.ops);
+      expect(settled.length).toBeGreaterThan(0);
+      expect(
+        recordings.ops.find((entry) => entry.op === "drawImage")!.alpha,
+      ).toBeCloseTo(1);
+    });
+  });
 });
 
 describe("substitution band presentations", () => {

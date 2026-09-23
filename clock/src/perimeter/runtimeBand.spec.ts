@@ -247,6 +247,22 @@ describe("PerimeterRuntime band channel", () => {
     expect(harness.band.loadSource).toHaveBeenCalledTimes(1);
   });
 
+  it("treats a MOTM request for the same player as a new band", async () => {
+    const harness = createHarness();
+    await prepareActiveBase(harness);
+    await harness.runtime.setPlayerBand(playerRequest, 1_000);
+    expect(harness.band.loadSource).toHaveBeenCalledTimes(1);
+    const motmRequest: PlayerBandRequest = {
+      ...playerRequest,
+      motm: true,
+    };
+    await harness.runtime.setPlayerBand(motmRequest, 2_000);
+    expect(harness.band.loadSource).toHaveBeenCalledTimes(2);
+    // And a re-delivery of the MOTM request is a no-op again.
+    await harness.runtime.setPlayerBand(motmRequest, 3_000);
+    expect(harness.band.loadSource).toHaveBeenCalledTimes(2);
+  });
+
   it("drops the band when the request becomes null", async () => {
     const harness = createHarness();
     await prepareActiveBase(harness);

@@ -8,6 +8,7 @@ import {
 import { useDisplayDiagnostics } from "../contexts/DisplayDiagnosticsContext";
 import { useLocalState } from "../contexts/LocalStateContext";
 import clubLogos from "../images/clubLogos";
+import bombayLogoUrl from "../images/bombay.png";
 import { FIREBASE_STORAGE_BUCKET, storageHelpers } from "../firebase";
 import { parseGsReference } from "./cache";
 import { PerimeterMediaLoader } from "./mediaLoader";
@@ -18,6 +19,7 @@ import { PlayerBandSourceLoader } from "./bandSource";
 import {
   DEFAULT_PLAYER_BAND_STYLE,
   DEFAULT_SUBSTITUTION_BAND_STYLE,
+  MOTM_BOMBAY_HOLD_MS,
   createPlayerBandPresentations,
   createSubstitutionBandPresentations,
 } from "./playerBandPresentation";
@@ -30,6 +32,21 @@ import type { ScorerCelebrationStyle } from "../types";
 import { defaultScorerBandDeps } from "./scorerCompositor";
 
 const NO_CONFIGURATION_MESSAGE = "Engin gild perimeter stilling tiltæk.";
+
+// The bundled Bombay sponsor logo backs the MOTM band's lead-in loop. It is
+// decoded once per display session and reused for every MOTM request; a
+// failed decode returns null so the reveal proceeds without the lead.
+let bombayLogoPromise: Promise<HTMLImageElement | null> | null = null;
+function loadBombayLogo(): Promise<HTMLImageElement | null> {
+  bombayLogoPromise ??= new Promise<HTMLImageElement | null>((resolve) => {
+    const image = new Image();
+    image.decoding = "async";
+    image.onload = () => resolve(image);
+    image.onerror = () => resolve(null);
+    image.src = bombayLogoUrl;
+  });
+  return bombayLogoPromise;
+}
 
 // Immutable Storage identity: both the base layout and overlay commands may
 // be written by writers that could not know the object generation (legacy
@@ -259,22 +276,34 @@ export default function PerimeterDisplay() {
             request,
             images,
             screens,
-          ) =>
-            request.kind === "player"
-              ? createPlayerBandPresentations(
-                  playerStyle,
-                  request.identity,
-                  images.player!,
-                  screens,
-                  defaultScorerBandDeps,
+          ) => {
+            if (request.kind !== "player") {
+              return createSubstitutionBandPresentations(
+                substitutionStyle,
+                { identity: request.off, source: images.off! },
+                { identity: request.on, source: images.on! },
+                screens,
+                defaultScorerBandDeps,
+              );
+            }
+            // MOTM requests lead with the Bombay sponsor loop before the
+            // player band reveal; a failed decode skips the lead-in.
+            const lead = request.motm
+              ? loadBombayLogo().then((image) =>
+                  image ? { image, holdMs: MOTM_BOMBAY_HOLD_MS } : null,
                 )
-              : createSubstitutionBandPresentations(
-                  substitutionStyle,
-                  { identity: request.off, source: images.off! },
-                  { identity: request.on, source: images.on! },
-                  screens,
-                  defaultScorerBandDeps,
-                ),
+              : Promise.resolve(null);
+            return lead.then((motmLead) =>
+              createPlayerBandPresentations(
+                playerStyle,
+                request.identity,
+                images.player!,
+                screens,
+                defaultScorerBandDeps,
+                motmLead,
+              ),
+            );
+          },
         },
       });
       rendererRef.current = renderer;
