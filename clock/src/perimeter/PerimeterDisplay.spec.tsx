@@ -130,6 +130,7 @@ const setupContexts = ({
   homeTeam = "Víkingur R",
   perimeter = { state: "on" },
   controller,
+  view = {},
 }: {
   screens?: unknown[];
   ready?: boolean;
@@ -138,11 +139,13 @@ const setupContexts = ({
   homeTeam?: string;
   perimeter?: unknown;
   controller?: unknown;
+  view?: unknown;
 } = {}) => {
   mockedUseFirebaseState.mockReturnValue({
     ready,
     match: { homeTeam },
     controller,
+    view,
   } as unknown as ReturnType<typeof useFirebaseState>);
   mockedUseListeners.mockReturnValue({
     screens,
@@ -449,6 +452,102 @@ describe("PerimeterDisplay", () => {
       resolveCreate({ strip: idlePresentation });
       await new Promise((resolve) => setTimeout(resolve, 0));
       expect(runtimeInstance.setIdleClocks).toHaveBeenLastCalledWith(null);
+    });
+  });
+
+  describe("night blackout", () => {
+    const idlePresentation = {
+      canvas: document.createElement("canvas"),
+      draw: vi.fn(),
+    };
+    const allDayWindow = {
+      view: { blackoutStart: "00:00", blackoutEnd: "24:00" },
+      controller: { view: "idle", currentAsset: null },
+    };
+
+    it("forces the strips black during the blackout window", async () => {
+      setupContexts({
+        ...allDayWindow,
+        perimeter: { state: "on", idleClock: true },
+      });
+      render(<PerimeterDisplay />);
+
+      // Ads are suppressed even though the desired perimeter state is "on",
+      // and the idle clock is never loaded.
+      await waitFor(() =>
+        expect(runtimeInstance.setPowered).toHaveBeenLastCalledWith(
+          false,
+          expect.any(Number),
+        ),
+      );
+      expect(idleClockHooks.createIdleClocks).not.toHaveBeenCalled();
+      expect(runtimeInstance.setIdleClocks).toHaveBeenLastCalledWith(null);
+    });
+
+    it("reloads the idle clock and restores ads when the window passes", async () => {
+      idleClockHooks.createIdleClocks.mockResolvedValue({
+        strip: idlePresentation,
+      });
+      setupContexts({
+        ...allDayWindow,
+        perimeter: { state: "off", idleClock: true },
+      });
+      const { rerender } = render(<PerimeterDisplay />);
+
+      await waitFor(() =>
+        expect(runtimeInstance.setPowered).toHaveBeenLastCalledWith(
+          false,
+          expect.any(Number),
+        ),
+      );
+      expect(idleClockHooks.createIdleClocks).not.toHaveBeenCalled();
+
+      // Without a blackout config the normal idle-clock and power behavior
+      // returns (state "off" shows the clock; a later "on" would power ads).
+      setupContexts({
+        controller: { view: "idle", currentAsset: null },
+        perimeter: { state: "off", idleClock: true },
+      });
+      rerender(<PerimeterDisplay />);
+      await waitFor(() =>
+        expect(idleClockHooks.createIdleClocks).toHaveBeenCalled(),
+      );
+      await waitFor(() =>
+        expect(runtimeInstance.setIdleClocks).toHaveBeenLastCalledWith({
+          strip: idlePresentation,
+        }),
+      );
+      setupContexts({
+        controller: { view: "idle", currentAsset: null },
+        perimeter: { state: "on", idleClock: true },
+      });
+      rerender(<PerimeterDisplay />);
+      await waitFor(() =>
+        expect(runtimeInstance.setPowered).toHaveBeenLastCalledWith(
+          true,
+          expect.any(Number),
+        ),
+      );
+    });
+
+    it("does not blackout during a match view", async () => {
+      idleClockHooks.createIdleClocks.mockResolvedValue({
+        strip: idlePresentation,
+      });
+      setupContexts({
+        view: { blackoutStart: "00:00", blackoutEnd: "24:00" },
+        controller: { view: "match", currentAsset: null },
+        perimeter: { state: "on" },
+      });
+      render(<PerimeterDisplay />);
+
+      await waitFor(() =>
+        expect(runtimeInstance.setPowered).toHaveBeenLastCalledWith(
+          true,
+          expect.any(Number),
+        ),
+      );
+      expect(idleClockHooks.createIdleClocks).not.toHaveBeenCalled();
     });
   });
 

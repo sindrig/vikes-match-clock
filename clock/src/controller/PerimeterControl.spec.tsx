@@ -14,6 +14,7 @@ import {
   useListeners,
   usePerimeter,
   useController,
+  useView,
 } from "../contexts/FirebaseStateContext";
 import { useLocalState } from "../contexts/LocalStateContext";
 import { closestCenter } from "@dnd-kit/core";
@@ -24,6 +25,7 @@ vi.mock("../contexts/FirebaseStateContext", () => ({
   usePerimeter: vi.fn(),
   useListeners: vi.fn(),
   useController: vi.fn(),
+  useView: vi.fn(),
 }));
 
 vi.mock("../contexts/LocalStateContext", () => ({
@@ -151,6 +153,11 @@ beforeEach(() => {
   mockedUseController.mockReturnValue({
     controller: { roster: { home: [], away: [] } },
   } as unknown as ReturnType<typeof useController>);
+  vi.mocked(useView).mockReturnValue({
+    view: { blackoutStart: undefined, blackoutEnd: undefined },
+    setBlackoutStart: vi.fn(),
+    setBlackoutEnd: vi.fn(),
+  } as unknown as ReturnType<typeof useView>);
 });
 
 describe("PerimeterControl", () => {
@@ -401,6 +408,39 @@ describe("PerimeterControl", () => {
     );
     expect(save).toHaveBeenLastCalledWith(false);
     expect(toggle).toHaveAttribute("aria-checked", "true");
+  });
+
+  it("exposes the shared night blackout config next to the clock", () => {
+    mockedUseListeners.mockReturnValue({
+      available: [],
+      screens: mockWebVenueScreens,
+    });
+    const setBlackoutStart = vi.fn();
+    const setBlackoutEnd = vi.fn();
+    vi.mocked(useView).mockReturnValue({
+      view: { blackoutStart: "23:00" },
+      setBlackoutStart,
+      setBlackoutEnd,
+    } as unknown as ReturnType<typeof useView>);
+    render(<PerimeterControl standalone />);
+
+    const start = screen.getByLabelText("Næturstilling byrjar");
+    const end = screen.getByLabelText("Næturstilling endar");
+    expect(start).toHaveValue("23:00");
+    expect(end).toHaveValue("");
+
+    fireEvent.change(start, { target: { value: "22:30" } });
+    expect(setBlackoutStart).toHaveBeenCalledWith("22:30");
+    fireEvent.change(end, { target: { value: "07:00" } });
+    expect(setBlackoutEnd).toHaveBeenCalledWith("07:00");
+    fireEvent.change(start, { target: { value: "" } });
+    expect(setBlackoutStart).toHaveBeenLastCalledWith(undefined);
+  });
+
+  it("hides the night blackout section for non-web venues", () => {
+    render(<PerimeterControl standalone />);
+
+    expect(screen.queryByLabelText("Næturstilling byrjar")).toBeNull();
   });
 
   it("writes the selected scorer celebration style", () => {

@@ -6,6 +6,7 @@ import {
   useClubOverrides,
 } from "../contexts/FirebaseStateContext";
 import { useDisplayDiagnostics } from "../contexts/DisplayDiagnosticsContext";
+import useNightBlackout from "../hooks/useNightBlackout";
 import { useLocalState } from "../contexts/LocalStateContext";
 import clubLogos from "../images/clubLogos";
 import bombayLogoUrl from "../images/bombay.png";
@@ -63,7 +64,7 @@ const resolveGeneration = async (source: string) => {
 export default function PerimeterDisplay() {
   const { listenPrefix } = useLocalState();
   const { screens } = useListeners();
-  const { ready, match, controller } = useFirebaseState();
+  const { ready, match, controller, view: viewState } = useFirebaseState();
   const { perimeter, adLayout, overlay } = usePerimeter();
   const { clubOverrides } = useClubOverrides();
   const { reportError } = useDisplayDiagnostics();
@@ -82,6 +83,15 @@ export default function PerimeterDisplay() {
     perimeter.playerDisplayStyle ?? DEFAULT_PLAYER_BAND_STYLE;
   const substitutionStyle =
     perimeter.substitutionStyle ?? DEFAULT_SUBSTITUTION_BAND_STYLE;
+  // The venue's night blackout window (Næturstilling) reuses the main
+  // scoreboard's config: while the controller view is idle and the local
+  // time is inside `blackoutStart`–`blackoutEnd`, every strip renders black
+  // — no idle clock, no ads, no bands or overlays.
+  const blackedOut = useNightBlackout(
+    viewState.blackoutStart,
+    viewState.blackoutEnd,
+    controller?.view ?? "idle",
+  );
   const [rendererError, setRendererError] = useState<string | null>(null);
   const [bandError, setBandError] = useState<string | null>(null);
   const [textureError, setTextureError] = useState<string | null>(null);
@@ -388,15 +398,22 @@ export default function PerimeterDisplay() {
   useEffect(() => {
     const runtime = runtimeRef.current;
     if (!runtime) return;
-    runtime.setPowered(perimeter.state === "on", performance.now());
-  }, [perimeter.state, configuration]);
+    runtime.setPowered(
+      perimeter.state === "on" && !blackedOut,
+      performance.now(),
+    );
+  }, [perimeter.state, blackedOut, configuration]);
 
   useEffect(() => {
     const runtime = runtimeRef.current;
     if (!runtime || !configuration) return undefined;
     let cancelled = false;
     runtime.setIdleClocks(null);
-    if (perimeter.idleClock === true && perimeter.state === "off") {
+    if (
+      perimeter.idleClock === true &&
+      perimeter.state === "off" &&
+      !blackedOut
+    ) {
       void createIdleClocks(Object.values(configuration.logicalScreens))
         .then((presentations) => {
           if (cancelled) return;
@@ -415,7 +432,13 @@ export default function PerimeterDisplay() {
       cancelled = true;
       runtime.setIdleClocks(null);
     };
-  }, [configuration, listenPrefix, perimeter.idleClock, perimeter.state]);
+  }, [
+    configuration,
+    listenPrefix,
+    perimeter.idleClock,
+    perimeter.state,
+    blackedOut,
+  ]);
 
   // The controller publishes a fresh `skipCue` token under the desired
   // perimeter state to request an immediate advance to the next ad column

@@ -49,6 +49,7 @@ import {
   useFirebaseState,
   useListeners,
   usePerimeter,
+  useView,
 } from "../contexts/FirebaseStateContext";
 import { useLocalState } from "../contexts/LocalStateContext";
 import { validateAdFileName } from "../contexts/firebaseParsers";
@@ -1156,6 +1157,45 @@ const IdleClockSection = () => {
   );
 };
 
+const NightBlackoutSection = () => {
+  const { view: viewState, setBlackoutStart, setBlackoutEnd } = useView();
+  const { writeEligible } = useFirebaseState();
+  return (
+    <div className="perimeter-scorer-celebration">
+      <div className="perimeter-brightness-header">
+        <span className="perimeter-brightness-title">Næturstilling</span>
+      </div>
+      <div className="perimeter-blackout-inputs">
+        <input
+          type="time"
+          className="blackout-time-selector"
+          aria-label="Næturstilling byrjar"
+          value={viewState.blackoutStart ?? ""}
+          disabled={!writeEligible}
+          onChange={({ target: { value } }) =>
+            setBlackoutStart(value || undefined)
+          }
+        />
+        <span>–</span>
+        <input
+          type="time"
+          className="blackout-time-selector"
+          aria-label="Næturstilling endar"
+          value={viewState.blackoutEnd ?? ""}
+          disabled={!writeEligible}
+          onChange={({ target: { value } }) =>
+            setBlackoutEnd(value || undefined)
+          }
+        />
+      </div>
+      <p>
+        Á tímabilinu er jaðarskjárinn alveg svartur — hvorki klukka né
+        auglýsingar. Sama stilling slökkvir á biðskjá aðalskjárins.
+      </p>
+    </div>
+  );
+};
+
 const ScorerCelebrationSection = () => {
   const { perimeter, setPerimeterScorerCelebration } = usePerimeter();
   const selected: ScorerCelebrationStyle =
@@ -1544,6 +1584,7 @@ const PerimeterControl = ({ standalone = false }: { standalone?: boolean }) => {
       <GoalVideoSection />
       {isWebVenue && <ScorerCelebrationSection />}
       {isWebVenue && <IdleClockSection />}
+      {isWebVenue && <NightBlackoutSection />}
       {isWebVenue && <PlayerBandStyleSection />}
       {isWebVenue && <SubstitutionStyleSection />}
       {!isWebVenue && <GoalScorerPreparation />}
