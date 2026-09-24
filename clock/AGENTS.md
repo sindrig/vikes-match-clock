@@ -218,7 +218,8 @@ audit record.
   `perimeter.set-overlay`,
   `perimeter.clear-overlay`, `perimeter.set-ad-layout`,
   `perimeter.set-goal-video`, `perimeter.create-media-pair`,
-  `perimeter.delete-media-pair`.
+  `perimeter.delete-media-pair`, `perimeter.set-scorer-celebration`,
+  `perimeter.set-player-display-style`, `perimeter.set-substitution-style`.
 - Club overrides use `clubOverrides.create|update|save|delete` (both the
   context actions and `ClubOverrideForm.tsx`, which builds its own audit
   payload).
@@ -304,7 +305,9 @@ remain authenticated-only.
 
 Base ads use a monotonic cue timeline and complete-revision preparation before
 swapping pair slots. Overlays use the same two-target mapping and render above
-the base channel. A new overlay command **drops** the active generation
+the base channel. A derived **band channel** (player/substitution band, see
+**Web Perimeter Player & Substitution Band** below) composites between the
+two: base < band < overlay. A new overlay command **drops** the active generation
 immediately — the base channel shows through while the replacement prepares,
 so a previous goal's content never lingers on screen (re-delivery of the
 already-live command id is a no-op so a snapshot refresh never restarts
@@ -1028,11 +1031,11 @@ directly and never treats a Firebase write confirmation as a hardware result.
 
 **Data ownership:**
 
-| Path                                            | Writer     | Purpose                                                             |
-| ----------------------------------------------- | ---------- | ------------------------------------------------------------------- |
-| `states/{location}/perimeter/brightness`        | Controller | Requested brightness as a whole integer percentage (0–100)          |
-| `states/{location}/perimeter/brightnessAuto`    | Controller | Automatic-brightness config (master switch + curve parameters)      |
-| `perimeter/{location}/brightnessStatus`         | Daemon     | `requestedPercent`, `appliedPercent`, `phase`, `error`, `updatedAt`, `mode`, `predicted` |
+| Path                                         | Writer     | Purpose                                                                                  |
+| -------------------------------------------- | ---------- | ---------------------------------------------------------------------------------------- |
+| `states/{location}/perimeter/brightness`     | Controller | Requested brightness as a whole integer percentage (0–100)                               |
+| `states/{location}/perimeter/brightnessAuto` | Controller | Automatic-brightness config (master switch + curve parameters)                           |
+| `perimeter/{location}/brightnessStatus`      | Daemon     | `requestedPercent`, `appliedPercent`, `phase`, `error`, `updatedAt`, `mode`, `predicted` |
 
 - The requested value is a bare integer percentage. `null`/missing means "no
   command" and is inert; the daemon ignores anything that is not a whole
@@ -1068,14 +1071,16 @@ server timestamp):
 
 ```jsonc
 {
-  "enabled": true,   // auto master switch; absent node = auto disabled
-  "min": 3, "max": 100,      // percent bounds (sliders show 0..100; the
-                             // daemon clamps targets to [max(min,1), min(max,99)] —
-                             // 0 and 100 are manual-only by design)
-  "exponent": 0.35,          // "aggressiveness": lower = brighter earlier
-  "cloudWeight": 1.0,        // 0 = ignore clouds, 1 = full Kasten-Czeplak
-  "luxMin": 5, "luxMax": 100000,
-  "updatedAt": 1723392000000
+  "enabled": true, // auto master switch; absent node = auto disabled
+  "min": 3,
+  "max": 100, // percent bounds (sliders show 0..100; the
+  // daemon clamps targets to [max(min,1), min(max,99)] —
+  // 0 and 100 are manual-only by design)
+  "exponent": 0.35, // "aggressiveness": lower = brighter earlier
+  "cloudWeight": 1.0, // 0 = ignore clouds, 1 = full Kasten-Czeplak
+  "luxMin": 5,
+  "luxMax": 100000,
+  "updatedAt": 1723392000000,
 }
 ```
 
@@ -1275,7 +1280,7 @@ the production bucket.
   write and the `prepareGoalScorerMedia` callable run fire-and-forget and never
   block the roster from becoming available. The request is gated on the venue
   being a Resolume venue (`locations/{location}/perimeterDisplay` `renderer:
-  "resolume"` **or the mapping absent** — every venue without a published
+"resolume"` **or the mapping absent** — every venue without a published
   mapping is treated as a legacy Resolume venue, so existing venues never
   silently lose the pipeline), having opted into the perimeter
   (`states/{location}/perimeter` `enabled: true`)
@@ -1310,7 +1315,7 @@ the production bucket.
     referencing generated media. A player with an invalid identifier, empty
     name, or missing shirt number still gets the main-screen reveal but never
     a malformed perimeter command, and shows no readiness label.
-  The main-screen reveal is always submitted before the perimeter command.
+    The main-screen reveal is always submitted before the perimeter command.
 - The existing clear action (`Hreinsa virkt overlay`) writes `overlay: null`,
   clearing both the main-screen reveal and the player perimeter pair and
   restoring the rotating perimeter content.
@@ -1461,10 +1466,138 @@ players for semantic submission.
   the current textures.
 
 **Public read access** (`storage.rules`): anonymous reads are permitted only
-for the exact `{location}/crest.png` object and `{location}/players/{id}-fagn.png`
-objects whose name matches the safe `[A-Za-z0-9_-]{1,64}-fagn.png`
-convention; writes stay authenticated-only, and all other player media
+for the exact `{location}/crest.png` object, `{location}/players/{id}-fagn.png`
+celebration objects, identifier-shaped `{location}/players/{id}.png` card
+photos (`[A-Za-z0-9_-]{1,64}(-fagn)?[.]png`), and `{location}/club-logos/**`
+override logos; writes stay authenticated-only, and all other player media
 remains private.
+
+#### Web Perimeter Player & Substitution Band
+
+The web perimeter mirrors the scoreboard's current asset on a dedicated
+**band channel** layered above the base ad deck and below the overlay
+channel. The band is **derived**, never commanded: `PerimeterDisplay` reads
+the already-subscribed public `controller.currentAsset` and calls
+`PerimeterRuntime.setPlayerBand()` — no new Firebase write path, command
+token, or audit event is created by band behavior (regression e2e:
+`e2e/perimeter-player-band.spec.ts` asserts the audit trail stays empty).
+
+**Request derivation** (`perimeter/bandDerivation.ts`,
+`deriveBandRequest(controller.currentAsset)`):
+
+- `PLAYER` / `NO_IMAGE_PLAYER` / `MOTM` → `{ kind: "player", identity }`:
+  bounded non-empty name (≤ 80 chars, `fullName` preferred over `name`),
+  digit-only shirt number (`[0-9]{1,4}` after trimming), and a non-empty
+  `teamName`; `imageRef` is the card's own `asset.key` (absent for
+  `NO_IMAGE_PLAYER`). Assets flagged `isGoalCelebration` are skipped —
+  their perimeter twin is the goal-scorer overlay itself. MOTM cards add
+  `motm: true` so the presentation can lead with the sponsor loop (see
+  **MOTM sponsor lead-in** below); the flag is part of `bandRequestKey`,
+  so the same player shown as a plain card and as man of the match are
+  distinct band requests.
+- `SUB` → `{ kind: "substitution", off, on }` derived from `subOut`
+  (off the pitch) and `subIn` (coming on) under the corrected field
+  semantics (see **Shared Home-Team Player Actions**); **both sides must
+  yield a valid identity**, otherwise no band renders.
+- Any other type, `null` current asset, or any invalid identity drops the
+  band and the base ad deck shows through.
+- Derivation validates runtime object and field types (including both SUB
+  sides) because the controller subscription does not deeply parse assets.
+  Malformed names, image keys, team names, or shirt numbers yield no band
+  rather than throwing from the display effect.
+
+**Image chain** (`perimeter/bandSource.ts`, `PlayerBandSourceLoader`): the
+identity's own image reference (a download URL, fetched through the
+persistent media cache's URL-keyed `getUrl`) → team logo resolved by the
+asset's team name (club override `logoUrl` first via the display's
+`clubOverrides` subscription, then the bundled `clubLogos` crest map —
+works for away teams) → the existing venue-crest chain
+(`{location}/crest.png`). Everything unusable retains the previous state
+and reports through the Skjáarvillur path.
+
+**Runtime channel** (`perimeter/runtime.ts`): `setPlayerBand(band | null,
+now)` with scorer-style generation lifecycle (atomic activation, stale
+request invalidation, release of superseded sources, failure reporting). A
+new request **keeps the active band visible while the replacement
+prepares** and hands the fully prepared band to the renderer in one
+transition — the base ads never show through between two consecutive
+bands (e.g. queued substitutions); a failed preparation drops the held
+band to the base and reports through the band error path. Explicit clears
+(`null`) drop the band immediately. A re-delivery of the active or
+already-preparing request is a no-op — requests are deduplicated with the
+shared `bandRequestKey()` from `bandDerivation.ts`. While an overlay
+generation is active the renderer receives **no band sources** (the band
+object stays resident so clearing the overlay restores it without
+re-preparation). Style changes
+(`setPlayerBandStyle`/`setSubstitutionBandStyle`) and mapping replacements
+recompose the resident band while keeping current textures visible (and
+preserve the timeline anchor); a replacement swap starts a fresh entrance.
+The WebGL renderer composites `base < band < overlay` with an independent
+`bandDynamic` flag, and `clearChannel` accepts `"band"`.
+
+**MOTM sponsor lead-in** (web venues): the main screen's MOTM card cycles
+"Maður leiksins í boði..." (2 s) → the Bombay sponsor logo (2 s) → the
+player (MOTM.tsx `idxSeconds`), so a MOTM band must never show the player
+before the main screen does. MOTM requests lead with a sponsor loop frame:
+the bundled `images/bombay.png` repeated
+`[logo][gap as wide as the logo]` across the flat near-black field
+(logo contain-fitted to the band height — the rendered logo size on the
+LED screens is unknown, so every measurement scales from the band height),
+faded in like the band entrance and held static for
+`MOTM_BOMBAY_HOLD_MS` (3000 ms = 1.5× the main screen's sponsor phase),
+then the player band takes over with its entrance replaying and the loop
+never returns. `PerimeterDisplay` decodes the bundled logo once and passes
+a `MotmLead` (`{ image, holdMs }`) into `createPlayerBandPresentations`;
+a failed decode skips the lead-in. Style/mapping recomposition preserves
+the band's timeline anchor, so a recomposition after the hold draws the
+player phase directly without replaying the loop.
+
+Band preparation errors are tracked separately from renderer/base/overlay
+and texture errors. A successful band replacement or removal clears only
+the band error in the display and Skjáarvillur diagnostics; a superseded
+preparation cannot overwrite the current band's error state.
+
+**Presentations** (`perimeter/playerBandPresentation.ts`): the player band
+repeats `[portrait | number | name]` units on a flat near-black field with
+a 600 ms alpha fade-in, drifting right-to-left at ~1.5× the scorer
+"procession" speed (`plain`/`glow`) or ~2× (`streamer`); `glow` adds a
+soft portrait glow pulse and `streamer` thin speed lines. The substitution
+band repeats
+`[off portrait | number | name] [gap] [on portrait | number | name]` with
+**no directional marks** — the outgoing player's number and name render in
+red (`SCORER_PRESENTATION_COLORS.accent`) and the incoming player's in
+green (the main-screen substitution green `#00a651`), the only in/out
+signal — with entrances per style (`static`: fade then hold, `relay`: fade
+then drift at the player-band default speed, `flash`: impact flash +
+scale-down pop). Speeds are defined per style; there is no separate knob.
+
+Fade-in alpha and substitution text colors are passed explicitly through
+the unit drawing helpers' motion arguments (`drawBandUnit` in
+`scorerCompositor.ts` accepts an optional `textColor`; the static band
+keeps its default white). Presentation tests record alpha and fillStyle at
+the actual draw calls with save/restore semantics so a helper cannot
+silently override the entrance opacity or palette.
+
+**Style config** (parallel to `scorerCelebration`):
+
+- `types.ts`: `PlayerBandStyle` ("plain" | "glow" | "streamer"),
+  `DEFAULT_PLAYER_BAND_STYLE = "plain"`, `playerDisplayStyle` on
+  `PerimeterState`; `SubstitutionBandStyle` ("static" | "relay" |
+  "flash"), `DEFAULT_SUBSTITUTION_BAND_STYLE = "static"`,
+  `substitutionStyle` on `PerimeterState`.
+- `firebaseParsers.ts` strict-parses both fields (`parsePlayerDisplayStyle`,
+  `parseSubstitutionStyle`); absent or invalid values fall back to the
+  defaults in the display. `firebase-rules.json` validates both children
+  under `states/$location/perimeter` with the same enum shape as
+  `scorerCelebration`.
+- `FirebaseStateContext.tsx`: `setPerimeterPlayerDisplayStyle` (audited
+  `perimeter.set-player-display-style`) and `setPerimeterSubstitutionStyle`
+  (audited `perimeter.set-substitution-style`), each writing only its own
+  field, gated on write eligibility, and exposed via `usePerimeter()`.
+- Admin UI: **Leikmannaborð** (Default/Glow/Streamer) and
+  **Skiptingaborði** (Static/Relay/Flash) picker sections in the
+  standalone perimeter manager (web venues only), adjacent to the
+  Markasvör section, with the same pending-write disable pattern.
 
 ### The `listenPrefix` System
 
@@ -1633,6 +1766,18 @@ Firebase-backed behavior.
   (`!show && number != null`) for the incoming step, `editPlayer` roster status
   updates, trimming of last names on the generated assets, `Skiptingar` queue
   creation/append/activation, and the home-team reveal background on assets.
+- **Corrected SUB field semantics**: `subIn` carries the player **coming
+  on** and `subOut` the player **going off** (the persisted fields were
+  previously inverted from their meaning). The creation site builds
+  `subIn` from the incoming player; consumers re-pair so the main-screen
+  visuals are unchanged — `Asset.tsx` `renderSub()` emits
+  `[subOut, subIn]` (outgoing player left, red number; incoming right,
+  green number), `SubstitutionInfo.tsx` labels read "Af velli: subOut" /
+  "Inn á: subIn", and `Substitution.css` nth-of-type rules keep red left /
+  green right. SUB assets already persisted in queues are transient
+  match-night data and are **discarded, not migrated** (no marker exists
+  to distinguish legacy shapes). The perimeter substitution band derives
+  from the corrected shape only.
 - Player-card and man-of-the-match pass the complete home roster (including
   substituted-off players) to `TeamPlayerSelectionModal`.
 
@@ -2198,8 +2343,9 @@ at `renderer: "resolume"`; a second venue may use `web` independently.
 
 Public Storage reads are limited to `{location}/perimeter/`,
 `{location}/perimeter-overlays/`, the venue crest (`{location}/crest.png`),
-and player celebration images matching the safe
-`{location}/players/{id}-fagn.png` convention; anonymous writes and unrelated
+identifier-shaped player media matching the safe
+`{location}/players/{id}[-fagn].png` convention, and the location's
+`{location}/club-logos/**` override logos; anonymous writes and unrelated
 reads remain denied.
 
 **Goal-scorer overlay rollout (two command forms):**
@@ -2208,7 +2354,7 @@ reads remain denied.
   command forms: the established version-1 file command and the version-2
   semantic goal-scorer command (schema in **Web Goal Scorer Overlay (Browser
   Composition)** above). All controllers can parse and clear both forms; only
-  the controller at a `web` venue *emits* version 2.
+  the controller at a `web` venue _emits_ version 2.
 - **Deployment order**: deploy the web display bundle (version-2 parser,
   runtime scorer branch, compositor, scoped Storage reads) and remotely
   restart the qualified web perimeter displays (`Endurræsa skjá`) BEFORE

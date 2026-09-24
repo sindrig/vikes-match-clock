@@ -3,11 +3,18 @@ import { validatePerimeterMapping } from "./perimeterMapping";
 
 export interface PerimeterRenderSources {
   base: Record<string, TexImageSource>;
+  // Idle-clock refreshes re-upload only the changed base canvases; every
+  // other base refresh uploads the whole current column.
   baseDynamic?: boolean;
+  // The band channel (player/substitution band) composites above the base
+  // deck and below the overlay channel.
+  band?: Record<string, TexImageSource>;
   overlay?: Record<string, TexImageSource>;
-  // Animated scorer presentations keep the same canvas identity. Mark the
-  // refreshes where their capped animation advances so the overlay channel
-  // re-uploads only those changed canvases.
+  // Animated scorer/band presentations keep the same canvas identity. Mark
+  // the refreshes where their capped animation advances so the channel
+  // re-uploads only those changed canvases. The flags are independent so
+  // band frames can refresh while base videos keep their own cadence.
+  bandDynamic?: boolean;
   overlayDynamic?: boolean;
 }
 
@@ -229,7 +236,7 @@ export class PerimeterWebGLRenderer {
   // Deletes every uploaded texture of a channel so content that is no longer
   // live can never be re-drawn: drawChannel binds `null` for a region without
   // a texture instead of the previous generation's pixels.
-  clearChannel(channel: "base" | "overlay"): void {
+  clearChannel(channel: "base" | "band" | "overlay"): void {
     const prefix = `${channel}:`;
     let emitted = false;
     for (const [key, texture] of [...this.textures]) {
@@ -371,6 +378,9 @@ export class PerimeterWebGLRenderer {
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.useProgram(this.program);
     this.drawChannel(sources.base, "base", sources.baseDynamic === true);
+    if (sources.band) {
+      this.drawChannel(sources.band, "band", sources.bandDynamic === true);
+    }
     if (sources.overlay) {
       this.drawChannel(
         sources.overlay,
@@ -382,7 +392,7 @@ export class PerimeterWebGLRenderer {
 
   private drawChannel(
     sources: Record<string, TexImageSource>,
-    channel: "base" | "overlay",
+    channel: "base" | "band" | "overlay",
     dynamic: boolean,
   ): void {
     const gl = this.gl;

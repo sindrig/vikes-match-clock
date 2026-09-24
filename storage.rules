@@ -1,9 +1,10 @@
 rules_version = '2';
 
 // Public display media is readable without auth. All writes and unrelated
-// objects remain authenticated-only. The goal-scorer browser compositor adds
-// two narrowly scoped anonymous-read exceptions: the venue crest and player
-// celebration images matching the safe `{playerId}-fagn.png` shape.
+// objects remain authenticated-only. The goal-scorer browser compositor and
+// the perimeter player band add narrowly scoped anonymous-read exceptions:
+// the venue crest, player photos matching the safe `{playerId}.png` /
+// `{playerId}-fagn.png` shapes, and club override logos.
 service firebase.storage {
   match /b/{bucket}/o {
     match /{location}/perimeter/{fileName} {
@@ -22,11 +23,19 @@ service firebase.storage {
       allow write: if request.auth != null;
     }
 
-    // Player celebration images. Read access is restricted to the exact
-    // `{playerId}-fagn.png` naming convention with a bounded safe player
-    // identifier, so unrelated player media stays private.
+    // Player media. Read access is restricted to the identifier naming
+    // conventions — `{playerId}-fagn.png` celebration images and
+    // `{playerId}.png` card photos — with bounded safe player identifiers,
+    // so unrelated player media stays private.
     match /{location}/players/{fileName} {
-      allow read: if fileName.matches("^[A-Za-z0-9_-]{1,64}-fagn[.]png$");
+      allow read: if fileName.matches("^[A-Za-z0-9_-]{1,64}(-fagn)?[.]png$");
+      allow write: if request.auth != null;
+    }
+
+    // Club override logos used as the team-logo fallback in the player band
+    // (and by scoreboard displays that cannot resolve custom crests).
+    match /{location}/club-logos/{allPaths=**} {
+      allow read: if true;
       allow write: if request.auth != null;
     }
 

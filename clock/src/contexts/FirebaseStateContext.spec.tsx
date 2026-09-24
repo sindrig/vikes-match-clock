@@ -2842,6 +2842,68 @@ describe("FirebaseStateContext", () => {
       expect(firebaseDatabase.writeAudited).not.toHaveBeenCalled();
     });
 
+    it("setPerimeterPlayerDisplayStyle writes only the band style, audited", () => {
+      const perimeterApi = renderPerimeter("vikuti", true);
+
+      act(() => {
+        void perimeterApi!.setPerimeterPlayerDisplayStyle("glow");
+      });
+
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
+        "vikuti",
+        "perimeter",
+        { playerDisplayStyle: "glow" },
+        expect.anything(),
+      );
+      const auditedCalls = vi.mocked(firebaseDatabase.writeAudited).mock
+        .calls as unknown as Array<
+        [string, string, unknown, { action?: string }]
+      >;
+      const styleCall = auditedCalls[auditedCalls.length - 1];
+      expect(styleCall?.[3].action).toBe("perimeter.set-player-display-style");
+    });
+
+    it("blocks setPerimeterPlayerDisplayStyle when not authenticated", () => {
+      const perimeterApi = renderPerimeter("vikuti", false);
+
+      act(() => {
+        void perimeterApi!.setPerimeterPlayerDisplayStyle("glow");
+      });
+
+      expect(firebaseDatabase.writeAudited).not.toHaveBeenCalled();
+    });
+
+    it("setPerimeterSubstitutionStyle writes only the substitution style", () => {
+      const perimeterApi = renderPerimeter("vikuti", true);
+
+      act(() => {
+        void perimeterApi!.setPerimeterSubstitutionStyle("flash");
+      });
+
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
+        "vikuti",
+        "perimeter",
+        { substitutionStyle: "flash" },
+        expect.anything(),
+      );
+      const auditedCalls = vi.mocked(firebaseDatabase.writeAudited).mock
+        .calls as unknown as Array<
+        [string, string, unknown, { action?: string }]
+      >;
+      const styleCall = auditedCalls[auditedCalls.length - 1];
+      expect(styleCall?.[3].action).toBe("perimeter.set-substitution-style");
+    });
+
+    it("blocks setPerimeterSubstitutionStyle when not authenticated", () => {
+      const perimeterApi = renderPerimeter("vikuti", false);
+
+      act(() => {
+        void perimeterApi!.setPerimeterSubstitutionStyle("relay");
+      });
+
+      expect(firebaseDatabase.writeAudited).not.toHaveBeenCalled();
+    });
+
     it("auto-turns the perimeter on when transitioning idle to match", () => {
       const { setView } = renderPerimeterViewTransitions({
         enabled: true,

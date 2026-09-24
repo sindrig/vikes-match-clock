@@ -5,6 +5,8 @@ import type {
   PerimeterOverlayColumn,
   PerimeterOverlay,
   ScorerCelebrationStyle,
+  PlayerBandStyle,
+  SubstitutionBandStyle,
 } from "../types";
 import {
   backfillOverlayGenerations,
@@ -24,6 +26,11 @@ import {
   DEFAULT_SCORER_CELEBRATION_STYLE,
   type ScorerPresentation,
 } from "./scorerPresentation";
+import {
+  DEFAULT_PLAYER_BAND_STYLE,
+  DEFAULT_SUBSTITUTION_BAND_STYLE,
+} from "./playerBandPresentation";
+import { bandRequestKey, type PlayerBandRequest } from "./bandDerivation";
 import { createBaseTimeline, nextCueBoundary } from "./timeline";
 import type { PerimeterRenderSources } from "./webglRenderer";
 import type { IdleClockPresentation } from "./idleClock";
@@ -94,16 +101,42 @@ export interface PerimeterOverlayScorerDependencies {
   ) => Promise<Record<string, ScorerPresentation>>;
 }
 
+export interface PerimeterPlayerBandDependencies {
+  // Loads the band source image(s) for the request through the band image
+  // chain (photo → team logo → venue crest). The returned handles must be
+  // released by the caller: one image for `player` requests, the two side
+  // images (`off`, `on`) for substitution requests.
+  loadSource: (request: PlayerBandRequest) => Promise<{
+    images: Record<string, HTMLImageElement>;
+    release: () => void;
+  }>;
+  // Awaits readiness of the fonts the band compositor will use.
+  ensureFonts?: (request: PlayerBandRequest) => Promise<void>;
+  // Creates one animated band presentation per logical screen for the
+  // request, using the active player/substitution presentation styles. The
+  // runtime passes the logical screens of its CURRENT configuration, so a
+  // mapping replacement or style change recreates the presentations at the
+  // new native dimensions.
+  compose: (
+    playerStyle: PlayerBandStyle,
+    substitutionStyle: SubstitutionBandStyle,
+    request: PlayerBandRequest,
+    sources: Record<string, HTMLImageElement>,
+    screens: readonly { id: string; width: number; height: number }[],
+  ) => Promise<Record<string, ScorerPresentation>>;
+}
+
 export interface PerimeterRuntimeOptions {
   renderer: {
     render: (sources: PerimeterRenderSources) => void;
     replaceConfiguration?: (configuration: PerimeterDisplayConfig) => boolean;
     // Forgets every uploaded texture of a channel so content that is no
     // longer live can never be re-drawn as a stale fallback.
-    clearChannel?: (channel: "base" | "overlay") => void;
+    clearChannel?: (channel: "base" | "band" | "overlay") => void;
   };
   loader: Pick<PerimeterMediaLoader, "loadPair">;
   scorer?: PerimeterOverlayScorerDependencies;
+  playerBand?: PerimeterPlayerBandDependencies;
   now?: () => number;
 }
 
@@ -144,6 +177,25 @@ export class PerimeterRuntime {
   // The goal-scorer celebration style written by the perimeter admin view.
   private scorerStyle: ScorerCelebrationStyle =
     DEFAULT_SCORER_CELEBRATION_STYLE;
+  // The active semantic band generation (player or substitution request).
+  // Presentations stay resident until clear or replacement, and while an
+  // overlay generation is active the renderer simply receives no band
+  // sources, so clearing the overlay restores the band without
+  // re-preparation. `startedAt` is anchored on the first visible render.
+  private activeBand: {
+    request: PlayerBandRequest;
+    presentations: Record<string, ScorerPresentation>;
+    startedAt: number | null;
+    lastFrameIndex: number | null;
+    release: () => void;
+  } | null = null;
+  // The request whose preparation is in flight but not yet activated. Used
+  // to deduplicate re-deliveries of a request that is still preparing (the
+  // active-band dedup cannot see it yet).
+  private pendingBand: PlayerBandRequest | null = null;
+  private bandRequest = 0;
+  private bandStyle: PlayerBandStyle = DEFAULT_PLAYER_BAND_STYLE;
+  private subStyle: SubstitutionBandStyle = DEFAULT_SUBSTITUTION_BAND_STYLE;
 
   constructor(
     private configuration: PerimeterDisplayConfig,
@@ -179,6 +231,22 @@ export class PerimeterRuntime {
         );
       });
     }
+    // A mapping replacement is a new band preparation too: recompose the
+    // active request at the new logical-screen dimensions while the current
+    // textures stay visible. Failures retain the current textures and
+    // surface through the band preparation error path.
+    const activeBandRequest = this.activeBand?.request;
+    if (activeBandRequest) {
+      const request = ++this.bandRequest;
+      void this.prepareBand(activeBandRequest, request).catch(
+        (error: unknown) => {
+          console.error(
+            "Band recomposition after mapping replacement failed:",
+            error,
+          );
+        },
+      );
+    }
     return true;
   }
 
@@ -198,6 +266,161 @@ export class PerimeterRuntime {
         console.error("Scorer recomposition after style change failed:", error);
       },
     );
+  }
+
+  // Applies the player-band presentation style chosen in the perimeter
+  // admin view. A style change while a player band is visible recomposes
+  // the active request's presentations; the current textures stay visible
+  // until the new ones are ready (mirroring the scorer style change).
+  setPlayerBandStyle(style: PlayerBandStyle): void {
+    if (style === this.bandStyle) return;
+    this.bandStyle = style;
+    this.recomposeActiveBand();
+  }
+
+  // Applies the substitution-band presentation style. Same recomposition
+  // semantics as the player-band style, but only substitution bands are
+  // affected.
+  setSubstitutionBandStyle(style: SubstitutionBandStyle): void {
+    if (style === this.subStyle) return;
+    this.subStyle = style;
+    this.recomposeActiveBand();
+  }
+
+  private recomposeActiveBand(): void {
+    const activeRequest = this.activeBand?.request;
+    if (!activeRequest) return;
+    const request = ++this.bandRequest;
+    void this.prepareBand(activeRequest, request).catch((error: unknown) => {
+      console.error("Band recomposition after style change failed:", error);
+    });
+  }
+
+  // Sets the band derived from the scoreboard's current asset. `null`
+  // drops any active band (the base deck shows through again). A new
+  // request keeps the active band visible while the replacement prepares
+  // and hands the fully prepared band to the renderer in one transition —
+  // the base ads never show through between two bands (a failed
+  // preparation reports through the band error path and leaves the
+  // previous band untouched). A re-delivery of the already-active or
+  // already-preparing request is a no-op. While an overlay generation is
+  // active the prepared band stays resident but the renderer receives no
+  // band sources, so clearing the overlay restores it without
+  // re-preparation.
+  async setPlayerBand(
+    band: PlayerBandRequest | null,
+    now: number,
+  ): Promise<void> {
+    if (!band) {
+      this.bandRequest += 1;
+      this.pendingBand = null;
+      if (this.activeBand) {
+        this.releaseActiveBand();
+        this.options.renderer.clearChannel?.("band");
+        // Refresh immediately so the base shows through without waiting
+        // for the next animation frame.
+        this.render(now);
+      }
+      return;
+    }
+    if (
+      this.activeBand &&
+      bandRequestKey(this.activeBand.request) === bandRequestKey(band)
+    ) {
+      return;
+    }
+    if (
+      this.pendingBand &&
+      bandRequestKey(this.pendingBand) === bandRequestKey(band)
+    ) {
+      return;
+    }
+    const request = ++this.bandRequest;
+    this.pendingBand = band;
+    // The active band stays visible until the fully prepared replacement
+    // activates atomically in prepareBand; a new request starts a fresh
+    // entrance because the previous generation is released after the swap.
+    // A failed preparation reports through the band error path and drops
+    // the held band so a stale substitution never lingers on screen.
+    try {
+      await this.prepareBand(band, request);
+    } catch (error) {
+      if (request === this.bandRequest) {
+        this.pendingBand = null;
+        if (this.activeBand) {
+          this.releaseActiveBand();
+          this.options.renderer.clearChannel?.("band");
+          this.render(now);
+        }
+      }
+      throw error;
+    }
+    if (request === this.bandRequest) this.pendingBand = null;
+  }
+
+  private releaseActiveBand(): void {
+    if (!this.activeBand) return;
+    this.activeBand.release();
+    this.activeBand = null;
+  }
+
+  private async prepareBand(
+    band: PlayerBandRequest,
+    request: number,
+  ): Promise<void> {
+    const playerBand = this.options.playerBand;
+    if (!playerBand) {
+      throw new Error("Player band is not configured.");
+    }
+    const loaded = await playerBand.loadSource(band);
+    try {
+      if (request !== this.bandRequest) {
+        loaded.release();
+        return;
+      }
+      if (playerBand.ensureFonts) await playerBand.ensureFonts(band);
+      if (request !== this.bandRequest) {
+        loaded.release();
+        return;
+      }
+      const presentations = await playerBand.compose(
+        this.bandStyle,
+        this.subStyle,
+        band,
+        loaded.images,
+        Object.values(this.configuration.logicalScreens),
+      );
+      const missing = Object.keys(this.configuration.logicalScreens).filter(
+        (screenId) => !presentations[screenId],
+      );
+      if (missing.length > 0) {
+        throw new Error(`Band composition is missing ${missing.join(", ")}.`);
+      }
+      if (request !== this.bandRequest) {
+        loaded.release();
+        return;
+      }
+      // Atomic activation: build the new active band completely before
+      // discarding the previous one. A recomposition of the same request
+      // (style change or mapping replacement) keeps the current timeline
+      // anchor so the entrance does not replay; a genuinely new request
+      // starts a fresh entrance on its first visible render.
+      const previous = this.activeBand;
+      const recomposition =
+        previous !== null &&
+        bandRequestKey(previous.request) === bandRequestKey(band);
+      this.activeBand = {
+        request: band,
+        presentations,
+        startedAt: recomposition ? previous.startedAt : null,
+        lastFrameIndex: null,
+        release: loaded.release,
+      };
+      if (previous) previous.release();
+    } catch (error) {
+      loaded.release();
+      throw error;
+    }
   }
 
   async prepareBase(
@@ -528,12 +751,43 @@ export class PerimeterRuntime {
       if (column) this.playPair(column.sources);
     }
     const base = this.baseColumns[this.currentBaseCue ?? 0]?.sources ?? {};
+    let band: Record<string, TexImageSource> | undefined;
+    let bandDynamic = false;
     let overlay: Record<string, TexImageSource> | undefined;
     let overlayDynamic = false;
+    // The overlay generation currently on screen (scorer or file command).
+    // While one is active the band channel is suppressed: the renderer
+    // receives no band sources, but the band object stays resident so
+    // clearing the overlay restores it without re-preparation.
+    const overlayActive =
+      this.activeScorer !== null || this.activeFileColumns !== null;
+    if (this.activeBand && !overlayActive) {
+      // Band canvases advance at no more than 30 fps; intervening display
+      // refreshes reuse the existing WebGL textures while base videos can
+      // keep updating. The elapsed anchor is the first visible render.
+      if (this.activeBand.startedAt === null) {
+        this.activeBand.startedAt = now;
+      }
+      const elapsed = Math.max(0, now - this.activeBand.startedAt);
+      const frameIndex = Math.floor(elapsed / SCORER_FRAME_DURATION_MS);
+      const shouldDraw =
+        this.activeBand.lastFrameIndex === null ||
+        frameIndex > this.activeBand.lastFrameIndex;
+      band = {};
+      for (const [screenId, presentation] of Object.entries(
+        this.activeBand.presentations,
+      )) {
+        if (shouldDraw) presentation.draw(elapsed);
+        band[screenId] = presentation.canvas;
+      }
+      if (shouldDraw) this.activeBand.lastFrameIndex = frameIndex;
+      bandDynamic = shouldDraw;
+    }
     if (this.activeScorer) {
       // The entrance is anchored on the first visible render. Scorer canvases
       // advance at no more than 30 fps; intervening display refreshes reuse
-      // the existing WebGL textures while base videos can keep updating.
+      // the existing WebGL textures while base videos continue updating at
+      // the browser's render rate.
       if (this.activeScorer.startedAt === null) {
         this.activeScorer.startedAt = now;
       }
@@ -559,6 +813,9 @@ export class PerimeterRuntime {
     }
     this.options.renderer.render({
       base: this.elements(base),
+      // The band keys are only sent while a band is live: an absent key
+      // keeps the payload shape unchanged for the base/overlay-only paths.
+      ...(band ? { band, bandDynamic } : {}),
       overlay,
       overlayDynamic,
     });
@@ -568,12 +825,15 @@ export class PerimeterRuntime {
     this.idleClocks = null;
     this.baseRequest += 1;
     this.overlayRequest += 1;
+    this.bandRequest += 1;
     this.releaseColumns(this.baseColumns);
     const prepared = this.baseSlots.preparedNext;
     if (prepared && prepared !== this.baseColumns) {
       this.releaseColumns(prepared);
     }
     this.releaseActiveOverlay();
+    this.releaseActiveBand();
+    this.pendingBand = null;
     this.baseColumns = [];
     this.baseSlots.clear();
     this.overlayPlayback.clear();

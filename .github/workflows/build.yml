@@ -152,7 +152,7 @@ jobs:
       - name: Run e2e tests
         working-directory: ./clock
         run: pnpm e2e --reporter=list
-        timeout-minutes: 5
+        timeout-minutes: 10
         env:
           VITE_USE_EMULATOR: "true"
           TEST_CREDENTIALS: ${{ secrets.TEST_CREDENTIALS }}

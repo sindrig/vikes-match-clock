@@ -431,6 +431,172 @@ describe("PerimeterControl", () => {
     expect(setPerimeterScorerCelebration).toHaveBeenCalledWith("wave");
   });
 
+  it("shows the player band style selector on a web venue with Default active", () => {
+    mockedUseListeners.mockReturnValue({
+      available: [],
+      screens: mockWebVenueScreens,
+    });
+    mockedUsePerimeter.mockReturnValue(
+      createMockPerimeterReturn({
+        perimeter: { enabled: true, state: "on" },
+        adLayout: webVenueAdLayout,
+        setPerimeterPlayerDisplayStyle: vi.fn().mockResolvedValue(undefined),
+      }),
+    );
+
+    render(<PerimeterControl standalone />);
+
+    const section = document.querySelector(".perimeter-player-band-style");
+    expect(section).not.toBeNull();
+    expect(
+      within(section as HTMLElement).getByRole("button", { name: "Default" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(
+      within(section as HTMLElement).getByRole("button", { name: "Glow" }),
+    ).toHaveAttribute("aria-pressed", "false");
+    expect(
+      within(section as HTMLElement).getByRole("button", { name: "Streamer" }),
+    ).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("hides the player band style selector on a Resolume venue", () => {
+    mockedUseListeners.mockReturnValue({
+      available: [],
+      screens: [
+        {
+          key: "test-location",
+          label: "Test location",
+          screen: {} as never,
+          perimeterDisplay: {
+            renderer: "resolume",
+            compatibilityKeys: {
+              base: { "1": "left" },
+              overlay: { "2": "left" },
+            },
+            logicalScreens: {
+              left: { id: "left", name: "Left", width: 4, height: 1 },
+            },
+          } as never,
+        },
+      ],
+    });
+    mockedUsePerimeter.mockReturnValue(
+      createMockPerimeterReturn({
+        perimeter: { enabled: true, state: "on" },
+      }),
+    );
+
+    render(<PerimeterControl standalone />);
+
+    expect(document.querySelector(".perimeter-player-band-style")).toBeNull();
+    expect(document.querySelector(".perimeter-substitution-style")).toBeNull();
+  });
+
+  it("writes the selected player band style and disables while settling", async () => {
+    mockedUseListeners.mockReturnValue({
+      available: [],
+      screens: mockWebVenueScreens,
+    });
+    const setPerimeterPlayerDisplayStyle = vi
+      .fn<ReturnType<typeof usePerimeter>["setPerimeterPlayerDisplayStyle"]>()
+      .mockImplementation(
+        () => new Promise((resolve) => setTimeout(resolve, 20)),
+      );
+    mockedUsePerimeter.mockReturnValue(
+      createMockPerimeterReturn({
+        perimeter: { enabled: true, state: "on" },
+        adLayout: webVenueAdLayout,
+        setPerimeterPlayerDisplayStyle,
+      }),
+    );
+
+    render(<PerimeterControl standalone />);
+
+    const section = document.querySelector(".perimeter-player-band-style");
+    expect(section).not.toBeNull();
+    fireEvent.click(
+      within(section as HTMLElement).getByRole("button", { name: "Glow" }),
+    );
+
+    expect(setPerimeterPlayerDisplayStyle).toHaveBeenCalledTimes(1);
+    expect(setPerimeterPlayerDisplayStyle).toHaveBeenCalledWith("glow");
+    // The controls stay disabled until the subscription reflects the write.
+    expect(
+      within(section as HTMLElement).getByRole("button", { name: "Glow" }),
+    ).toBeDisabled();
+    await waitFor(() =>
+      expect(
+        within(section as HTMLElement).getByRole("button", { name: "Glow" }),
+      ).toBeEnabled(),
+    );
+  });
+
+  it("shows the substitution style selector on a web venue with Static active", () => {
+    mockedUseListeners.mockReturnValue({
+      available: [],
+      screens: mockWebVenueScreens,
+    });
+    mockedUsePerimeter.mockReturnValue(
+      createMockPerimeterReturn({
+        perimeter: { enabled: true, state: "on" },
+        adLayout: webVenueAdLayout,
+        setPerimeterSubstitutionStyle: vi.fn().mockResolvedValue(undefined),
+      }),
+    );
+
+    render(<PerimeterControl standalone />);
+
+    const section = document.querySelector(".perimeter-substitution-style");
+    expect(section).not.toBeNull();
+    expect(
+      within(section as HTMLElement).getByRole("button", { name: "Static" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(
+      within(section as HTMLElement).getByRole("button", { name: "Relay" }),
+    ).toHaveAttribute("aria-pressed", "false");
+    expect(
+      within(section as HTMLElement).getByRole("button", { name: "Flash" }),
+    ).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("writes the selected substitution style and disables while settling", async () => {
+    mockedUseListeners.mockReturnValue({
+      available: [],
+      screens: mockWebVenueScreens,
+    });
+    const setPerimeterSubstitutionStyle = vi
+      .fn<ReturnType<typeof usePerimeter>["setPerimeterSubstitutionStyle"]>()
+      .mockImplementation(
+        () => new Promise((resolve) => setTimeout(resolve, 20)),
+      );
+    mockedUsePerimeter.mockReturnValue(
+      createMockPerimeterReturn({
+        perimeter: { enabled: true, state: "on" },
+        adLayout: webVenueAdLayout,
+        setPerimeterSubstitutionStyle,
+      }),
+    );
+
+    render(<PerimeterControl standalone />);
+
+    const section = document.querySelector(".perimeter-substitution-style");
+    expect(section).not.toBeNull();
+    fireEvent.click(
+      within(section as HTMLElement).getByRole("button", { name: "Flash" }),
+    );
+
+    expect(setPerimeterSubstitutionStyle).toHaveBeenCalledTimes(1);
+    expect(setPerimeterSubstitutionStyle).toHaveBeenCalledWith("flash");
+    expect(
+      within(section as HTMLElement).getByRole("button", { name: "Flash" }),
+    ).toBeDisabled();
+    await waitFor(() =>
+      expect(
+        within(section as HTMLElement).getByRole("button", { name: "Flash" }),
+      ).toBeEnabled(),
+    );
+  });
+
   it("shows the configured goal-video files and edits them", async () => {
     const setPerimeterGoalVideo = vi
       .fn<ReturnType<typeof usePerimeter>["setPerimeterGoalVideo"]>()

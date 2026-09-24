@@ -236,6 +236,82 @@ describe("PerimeterWebGLRenderer", () => {
     vi.unstubAllGlobals();
   });
 
+  it("composites base < band < overlay on independent dynamic flags", () => {
+    vi.stubGlobal("WebGLRenderingContext", FakeWebGLRenderingContext);
+    const canvas = document.createElement("canvas");
+    const gl = new FakeWebGLRenderingContext();
+    Object.defineProperty(canvas, "getContext", { value: () => gl });
+    const renderer = new PerimeterWebGLRenderer(canvas, identityConfiguration);
+    const base = {} as TexImageSource;
+    const band = {} as TexImageSource;
+    const overlay = {} as TexImageSource;
+    renderer.render({
+      base: { screen: base },
+      band: { screen: band },
+      bandDynamic: true,
+      overlay: { screen: overlay },
+      overlayDynamic: false,
+    });
+    // One draw per channel: three draws for the single region.
+    expect(gl.drawArrays).toHaveBeenCalledTimes(3);
+    // The band texture uploads on every dynamic refresh, the static base
+    // does not re-upload for the same source.
+    const bandUploads = gl.texImage2D.mock.calls.length;
+    renderer.render({
+      base: { screen: base },
+      band: { screen: band },
+      bandDynamic: true,
+      overlay: { screen: overlay },
+      overlayDynamic: false,
+    });
+    expect(gl.texImage2D.mock.calls.length).toBe(bandUploads + 1);
+    // Without a band key the renderer draws base and overlay only.
+    gl.drawArrays.mockClear();
+    renderer.render({
+      base: { screen: base },
+      overlay: { screen: overlay },
+    });
+    expect(gl.drawArrays).toHaveBeenCalledTimes(2);
+    renderer.dispose();
+    vi.unstubAllGlobals();
+  });
+
+  it("forgets band textures on clearChannel('band') only", () => {
+    vi.stubGlobal("WebGLRenderingContext", FakeWebGLRenderingContext);
+    const canvas = document.createElement("canvas");
+    const gl = new FakeWebGLRenderingContext();
+    Object.defineProperty(canvas, "getContext", { value: () => gl });
+    const renderer = new PerimeterWebGLRenderer(canvas, identityConfiguration);
+    const image = {} as TexImageSource;
+    renderer.render({
+      base: { screen: image },
+      band: { screen: image },
+      overlay: { screen: image },
+    });
+    const textureCountBefore = gl.texImage2D.mock.calls.length;
+
+    renderer.clearChannel("band");
+    renderer.render({
+      base: { screen: image },
+      band: { screen: image },
+      overlay: { screen: image },
+    });
+    // Band re-uploads (1) while base and overlay reuse their textures.
+    expect(gl.texImage2D.mock.calls.length - textureCountBefore).toBe(1);
+
+    gl.texImage2D.mockClear();
+    renderer.clearChannel("overlay");
+    renderer.render({
+      base: { screen: image },
+      band: { screen: image },
+      overlay: { screen: image },
+    });
+    // Only the overlay re-uploads; the band texture survived.
+    expect(gl.texImage2D.mock.calls.length).toBe(1);
+    renderer.dispose();
+    vi.unstubAllGlobals();
+  });
+
   it("skips texImage2D for videos that have not decoded a frame yet", () => {
     vi.stubGlobal("WebGLRenderingContext", FakeWebGLRenderingContext);
     const canvas = document.createElement("canvas");

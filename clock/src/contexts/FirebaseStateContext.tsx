@@ -40,6 +40,8 @@ import {
   PerimeterMediaPair,
   PerimeterGoalVideoConfig,
   ScorerCelebrationStyle,
+  PlayerBandStyle,
+  SubstitutionBandStyle,
   PerimeterAdLayout,
   PerimeterAppliedAdLayout,
   AuditStateArea,
@@ -342,6 +344,10 @@ interface FirebaseStateContextType {
   ) => Promise<void>;
   setPerimeterScorerCelebration: (
     style: ScorerCelebrationStyle,
+  ) => Promise<void>;
+  setPerimeterPlayerDisplayStyle: (style: PlayerBandStyle) => Promise<void>;
+  setPerimeterSubstitutionStyle: (
+    style: SubstitutionBandStyle,
   ) => Promise<void>;
   mediaPairs: Record<string, PerimeterMediaPair>;
   setPerimeterIdleClock: (enabled: boolean) => Promise<void>;
@@ -2678,6 +2684,43 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     [makeAudit, listenPrefix, writeEligible],
   );
 
+  // Player-band presentation style for web perimeter displays. Same
+  // audited single-child write semantics as the scorer celebration style.
+  const setPerimeterPlayerDisplayStyle = useCallback(
+    (style: PlayerBandStyle): Promise<void> => {
+      if (!writeEligible) return Promise.resolve();
+      const audit = makeAudit(
+        "perimeter",
+        "perimeter.set-player-display-style",
+      );
+      if (!audit) return Promise.resolve();
+      return firebaseDatabase.writeAudited(
+        listenPrefix,
+        "perimeter",
+        { playerDisplayStyle: style },
+        audit,
+      );
+    },
+    [makeAudit, listenPrefix, writeEligible],
+  );
+
+  // Substitution-band presentation style for web perimeter displays. Same
+  // audited single-child write semantics as the other style fields.
+  const setPerimeterSubstitutionStyle = useCallback(
+    (style: SubstitutionBandStyle): Promise<void> => {
+      if (!writeEligible) return Promise.resolve();
+      const audit = makeAudit("perimeter", "perimeter.set-substitution-style");
+      if (!audit) return Promise.resolve();
+      return firebaseDatabase.writeAudited(
+        listenPrefix,
+        "perimeter",
+        { substitutionStyle: style },
+        audit,
+      );
+    },
+    [makeAudit, listenPrefix, writeEligible],
+  );
+
   const setPerimeterBrightness = useCallback(
     (percent: number): Promise<void> => {
       if (!listenPrefix || !isAuthenticated || !writeEligible) {
@@ -3011,6 +3054,8 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       setPerimeterGoalVideo,
       setPerimeterScorerCelebration,
       setPerimeterIdleClock,
+      setPerimeterPlayerDisplayStyle,
+      setPerimeterSubstitutionStyle,
       perimeterGoalVideo,
       mediaPairs: perimeterMediaPairs,
       perimeterAdLayout,
@@ -3115,6 +3160,8 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       setPerimeterGoalVideo,
       setPerimeterScorerCelebration,
       setPerimeterIdleClock,
+      setPerimeterPlayerDisplayStyle,
+      setPerimeterSubstitutionStyle,
       perimeterGoalVideo,
       perimeterMediaPairs,
       perimeterAdLayout,
@@ -3333,6 +3380,8 @@ export const usePerimeter = () => {
     setPerimeterGoalVideo,
     setPerimeterScorerCelebration,
     setPerimeterIdleClock,
+    setPerimeterPlayerDisplayStyle,
+    setPerimeterSubstitutionStyle,
     mediaPairs,
     perimeterGoalVideo,
     perimeterOverlay,
@@ -3363,6 +3412,8 @@ export const usePerimeter = () => {
     setPerimeterAdLayout,
     setPerimeterScorerCelebration,
     setPerimeterIdleClock,
+    setPerimeterPlayerDisplayStyle,
+    setPerimeterSubstitutionStyle,
     createPerimeterMediaPair,
     deletePerimeterMediaPair,
     setPerimeterGoalVideo,
