@@ -372,6 +372,7 @@ export interface PerimeterState {
   // view. Absent/invalid values fall back to the default style in the
   // web runtime; the field only affects web-rendered scorer bands.
   scorerCelebration?: ScorerCelebrationStyle;
+  idleClock?: boolean;
   // Player band presentation selected in the perimeter admin view for web
   // venues. Absent/invalid values fall back to the default band style.
   playerDisplayStyle?: PlayerBandStyle;

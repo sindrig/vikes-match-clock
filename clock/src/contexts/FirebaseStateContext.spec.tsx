@@ -3613,6 +3613,135 @@ describe("FirebaseStateContext", () => {
       expect(firebaseDatabase.writeAudited).not.toHaveBeenCalled();
     });
   });
+
+  describe("perimeter idle clock", () => {
+    function renderIdleClock(
+      listenPrefix: string,
+      isAuthenticated: boolean,
+      perimeterData: unknown = null,
+    ): ReturnType<typeof usePerimeter> | null {
+      vi.mocked(onValue).mockImplementation(
+        withConnectedInfo((path) =>
+          path.endsWith(`${listenPrefix}/perimeter`) ? perimeterData : null,
+        ),
+      );
+
+      let perimeterApi: ReturnType<typeof usePerimeter> | null = null;
+      render(
+        <FirebaseStateProvider
+          listenPrefix={listenPrefix}
+          isAuthenticated={isAuthenticated}
+          screenKey={null}
+        >
+          <TestPerimeterConsumer
+            onMount={(api) => {
+              perimeterApi = api;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+      return perimeterApi;
+    }
+
+    it("setPerimeterIdleClock writes the audited toggle when authenticated", async () => {
+      const perimeterApi = renderIdleClock("vikuti", true);
+
+      await act(async () => {
+        await perimeterApi!.setPerimeterIdleClock(true);
+      });
+
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
+        "vikuti",
+        "perimeter",
+        expect.objectContaining({ idleClock: true }),
+        expect.anything(),
+      );
+
+      await act(async () => {
+        await perimeterApi!.setPerimeterIdleClock(false);
+      });
+
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
+        "vikuti",
+        "perimeter",
+        expect.objectContaining({ idleClock: false }),
+        expect.anything(),
+      );
+    });
+
+    it("blocks setPerimeterIdleClock when not write eligible", async () => {
+      const perimeterApi = renderIdleClock("vikuti", false);
+
+      await expect(
+        act(async () => {
+          await perimeterApi!.setPerimeterIdleClock(true);
+        }),
+      ).rejects.toThrow();
+
+      expect(firebaseDatabase.writeAudited).not.toHaveBeenCalled();
+    });
+
+    it("blocks setPerimeterIdleClock when listenPrefix is empty", async () => {
+      const perimeterApi = renderIdleClock("", true);
+
+      await expect(
+        act(async () => {
+          await perimeterApi!.setPerimeterIdleClock(true);
+        }),
+      ).rejects.toThrow();
+
+      expect(firebaseDatabase.writeAudited).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("perimeter subscription errors", () => {
+    it("logs an error when the brightnessAuto subscription fails", () => {
+      const errorSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => undefined);
+      const errorCallbacks: Array<(error: unknown) => void> = [];
+      vi.mocked(onValue).mockImplementation(
+        (
+          reference: unknown,
+          callback: (snapshot: unknown) => void,
+          errorCallback?: (error: unknown) => void,
+        ) => {
+          const path = String(reference);
+          if (path.endsWith("/perimeter/brightnessAuto") && errorCallback) {
+            errorCallbacks.push(errorCallback);
+          }
+          callback({
+            val: () => (path === ".info/connected" ? true : null),
+          } as never);
+          return vi.fn();
+        },
+      );
+
+      render(
+        <FirebaseStateProvider
+          listenPrefix="vikuti"
+          isAuthenticated={true}
+          screenKey={null}
+        >
+          <TestPerimeterConsumer
+            onMount={() => {
+              return undefined;
+            }}
+          />
+        </FirebaseStateProvider>,
+      );
+
+      act(() => {
+        for (const callback of errorCallbacks) callback(new Error("denied"));
+      });
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        "Firebase perimeter brightnessAuto subscription error:",
+        expect.anything(),
+      );
+      errorSpy.mockRestore();
+    });
+  });
 });
 
 describe("goal scorer preparation", () => {

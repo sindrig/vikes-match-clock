@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createElement } from "react";
 import type { ComponentProps } from "react";
 import {
+  act,
   render,
   screen,
   fireEvent,
@@ -13,15 +14,18 @@ import {
   useListeners,
   usePerimeter,
   useController,
+  useView,
 } from "../contexts/FirebaseStateContext";
 import { useLocalState } from "../contexts/LocalStateContext";
 import { closestCenter } from "@dnd-kit/core";
 import type { CollisionDetection, DragEndEvent } from "@dnd-kit/core";
 
 vi.mock("../contexts/FirebaseStateContext", () => ({
+  useFirebaseState: vi.fn(() => ({ writeEligible: true })),
   usePerimeter: vi.fn(),
   useListeners: vi.fn(),
   useController: vi.fn(),
+  useView: vi.fn(),
 }));
 
 vi.mock("../contexts/LocalStateContext", () => ({
@@ -102,6 +106,7 @@ const createMockPerimeterReturn = (
     preview: basePreview,
     previewLoaded: true,
     setPerimeterState: vi.fn(),
+    setPerimeterIdleClock: vi.fn().mockResolvedValue(undefined),
     skipPerimeterCue: vi.fn(),
     restartPerimeterDisplays: vi.fn(),
     setPerimeterOverlay: vi.fn(),
@@ -148,6 +153,11 @@ beforeEach(() => {
   mockedUseController.mockReturnValue({
     controller: { roster: { home: [], away: [] } },
   } as unknown as ReturnType<typeof useController>);
+  vi.mocked(useView).mockReturnValue({
+    view: { blackoutStart: undefined, blackoutEnd: undefined },
+    setBlackoutStart: vi.fn(),
+    setBlackoutEnd: vi.fn(),
+  } as unknown as ReturnType<typeof useView>);
 });
 
 describe("PerimeterControl", () => {
@@ -363,6 +373,74 @@ describe("PerimeterControl", () => {
     render(<PerimeterControl standalone />);
 
     expect(document.querySelector(".perimeter-scorer-celebration")).toBeNull();
+  });
+
+  it("saves the idle toggle without optimistic state and reports write failures", async () => {
+    mockedUseListeners.mockReturnValue({
+      available: [],
+      screens: mockWebVenueScreens,
+    });
+    const save = vi.fn().mockResolvedValue(undefined);
+    mockedUsePerimeter.mockReturnValue(
+      createMockPerimeterReturn({ setPerimeterIdleClock: save }),
+    );
+    const { rerender } = render(<PerimeterControl standalone />);
+    const toggle = screen.getByRole("switch", {
+      name: "Sýna klukku og Víkingsmerki þegar slökkt er",
+    });
+    expect(toggle).toHaveAttribute("aria-checked", "false");
+    fireEvent.click(toggle);
+    await waitFor(() => expect(toggle).not.toBeDisabled());
+    expect(save).toHaveBeenCalledWith(true);
+    expect(toggle).toHaveAttribute("aria-checked", "false");
+    mockedUsePerimeter.mockReturnValue(
+      createMockPerimeterReturn({
+        perimeter: { enabled: true, state: "off", idleClock: true },
+        setPerimeterIdleClock: save,
+      }),
+    );
+    rerender(<PerimeterControl standalone />);
+    expect(toggle).toHaveAttribute("aria-checked", "true");
+    save.mockRejectedValueOnce(new Error("denied"));
+    fireEvent.click(toggle);
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Ekki tókst að vista",
+    );
+    expect(save).toHaveBeenLastCalledWith(false);
+    expect(toggle).toHaveAttribute("aria-checked", "true");
+  });
+
+  it("exposes the shared night blackout config next to the clock", () => {
+    mockedUseListeners.mockReturnValue({
+      available: [],
+      screens: mockWebVenueScreens,
+    });
+    const setBlackoutStart = vi.fn();
+    const setBlackoutEnd = vi.fn();
+    vi.mocked(useView).mockReturnValue({
+      view: { blackoutStart: "23:00" },
+      setBlackoutStart,
+      setBlackoutEnd,
+    } as unknown as ReturnType<typeof useView>);
+    render(<PerimeterControl standalone />);
+
+    const start = screen.getByLabelText("Næturstilling byrjar");
+    const end = screen.getByLabelText("Næturstilling endar");
+    expect(start).toHaveValue("23:00");
+    expect(end).toHaveValue("");
+
+    fireEvent.change(start, { target: { value: "22:30" } });
+    expect(setBlackoutStart).toHaveBeenCalledWith("22:30");
+    fireEvent.change(end, { target: { value: "07:00" } });
+    expect(setBlackoutEnd).toHaveBeenCalledWith("07:00");
+    fireEvent.change(start, { target: { value: "" } });
+    expect(setBlackoutStart).toHaveBeenLastCalledWith(undefined);
+  });
+
+  it("hides the night blackout section for non-web venues", () => {
+    render(<PerimeterControl standalone />);
+
+    expect(screen.queryByLabelText("Næturstilling byrjar")).toBeNull();
   });
 
   it("writes the selected scorer celebration style", () => {
@@ -1904,6 +1982,133 @@ describe("PerimeterControl", () => {
           "Ekki tókst að sækja skýjaspá — ferillinn sýnir klára himinn.",
         ),
       ).toBeInTheDocument();
+    });
+
+    it("drops a forecast that resolves after the panel unmounts", async () => {
+      let resolveFetch: (value: unknown) => void = () => undefined;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(
+          () =>
+            new Promise((resolve) => {
+              resolveFetch = resolve;
+            }),
+        ),
+      );
+      mockedUsePerimeter.mockReturnValue(
+        createMockPerimeterReturn({ brightnessAuto: autoConfig }),
+      );
+      const { unmount } = render(<PerimeterControl />);
+      fireEvent.click(screen.getByRole("button", { name: "Opna" }));
+
+      unmount();
+      // The in-flight fetch resolves after unmount; the panel must drop it
+      // without touching state.
+      resolveFetch({ ok: false, json: () => Promise.resolve({}) });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    it("polls the forecast every 15 minutes while the panel is open", async () => {
+      vi.useFakeTimers();
+      try {
+        const fetchMock = vi
+          .fn()
+          .mockResolvedValue({ ok: false, json: () => Promise.resolve({}) });
+        vi.stubGlobal("fetch", fetchMock);
+        mockedUsePerimeter.mockReturnValue(
+          createMockPerimeterReturn({ brightnessAuto: autoConfig }),
+        );
+        render(<PerimeterControl />);
+        fireEvent.click(screen.getByRole("button", { name: "Opna" }));
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(15 * 60 * 1000);
+        });
+
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("treats a cleared auto parameter as invalid and blocks Vista", () => {
+      const setAuto = vi
+        .fn<ReturnType<typeof usePerimeter>["setPerimeterBrightnessAuto"]>()
+        .mockResolvedValue(undefined);
+      mockedUsePerimeter.mockReturnValue(
+        createMockPerimeterReturn({
+          brightnessAuto: autoConfig,
+          setPerimeterBrightnessAuto: setAuto,
+        }),
+      );
+      openModal();
+
+      const inputs = getAutoInputs();
+      fireEvent.change(inputs.min, { target: { value: "" } });
+
+      expect(
+        screen.getByText("Allir reitir verða að vera með gildi."),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Vista" })).toBeDisabled();
+      fireEvent.click(screen.getByRole("button", { name: "Vista" }));
+      expect(setAuto).not.toHaveBeenCalled();
+
+      // Entering a value again restores a valid draft and a live button.
+      fireEvent.change(inputs.min, { target: { value: "5" } });
+      expect(
+        screen.queryByText("Allir reitir verða að vera með gildi."),
+      ).toBeNull();
+      expect(screen.getByRole("button", { name: "Vista" })).toBeEnabled();
+    });
+
+    it("restores the mode buttons and shows an error when the switch write fails", async () => {
+      const setAuto = vi
+        .fn<ReturnType<typeof usePerimeter>["setPerimeterBrightnessAuto"]>()
+        .mockRejectedValue(new Error("offline"));
+      mockedUsePerimeter.mockReturnValue(
+        createMockPerimeterReturn({ setPerimeterBrightnessAuto: setAuto }),
+      );
+      openModal();
+
+      fireEvent.click(screen.getByRole("button", { name: "Sjálfvirkt" }));
+
+      await waitFor(() =>
+        expect(
+          screen.getByText(
+            "Ekki tókst að breyta stjórnun bjartleika. Reyndu aftur.",
+          ),
+        ).toBeInTheDocument(),
+      );
+      expect(screen.getByRole("button", { name: "Sjálfvirkt" })).toBeEnabled();
+    });
+
+    it("shows an error and re-enables Vista when the auto save write fails", async () => {
+      const setAuto = vi
+        .fn<ReturnType<typeof usePerimeter>["setPerimeterBrightnessAuto"]>()
+        .mockRejectedValue(new Error("denied"));
+      mockedUsePerimeter.mockReturnValue(
+        createMockPerimeterReturn({
+          brightnessAuto: autoConfig,
+          setPerimeterBrightnessAuto: setAuto,
+        }),
+      );
+      openModal();
+
+      fireEvent.change(
+        screen.getByRole("textbox", { name: "Sjálfvirkt lágmark" }),
+        { target: { value: "7" } },
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Vista" }));
+
+      await waitFor(() =>
+        expect(
+          screen.getByText(
+            "Ekki tókst að vista sjálfvirka stillingu. Reyndu aftur.",
+          ),
+        ).toBeInTheDocument(),
+      );
+      expect(screen.getByRole("button", { name: "Vista" })).toBeEnabled();
     });
   });
 });

@@ -3,6 +3,9 @@ import { validatePerimeterMapping } from "./perimeterMapping";
 
 export interface PerimeterRenderSources {
   base: Record<string, TexImageSource>;
+  // Idle-clock refreshes re-upload only the changed base canvases; every
+  // other base refresh uploads the whole current column.
+  baseDynamic?: boolean;
   // The band channel (player/substitution band) composites above the base
   // deck and below the overlay channel.
   band?: Record<string, TexImageSource>;
@@ -374,7 +377,7 @@ export class PerimeterWebGLRenderer {
     gl.clearColor(0, 0, 0, 1);
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.useProgram(this.program);
-    this.drawChannel(sources.base, "base", false);
+    this.drawChannel(sources.base, "base", sources.baseDynamic === true);
     if (sources.band) {
       this.drawChannel(sources.band, "band", sources.bandDynamic === true);
     }

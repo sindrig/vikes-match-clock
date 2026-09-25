@@ -430,6 +430,43 @@ Resolume-version-specific parsing is isolated in
 `resolume-preview.js`; see `perimeter-control/README.md` for installation and
 operation.
 
+#### Idle Perimeter Clock (web venues)
+
+The perimeter manager offers a venue-wide `Klukka í biðstöðu` toggle, persisted
+as `states/{location}/perimeter/idleClock` through the audited
+`perimeter.set-idle-clock` action. Only boolean `true` enables it; missing or
+invalid values are disabled. While the desired perimeter state is `off`, each
+logical strip shows one bundled Víkingur R crest followed by white Icelandic
+24-hour `HH:mm` time on black. `perimeter/idleClock.ts` composes native-size
+canvases, independently wrapping left-to-right once per 60 seconds per strip.
+The runtime refreshes their base-channel textures at up to 30 fps through
+`baseDynamic`; existing mapping handles physical splits. This presentation
+never changes overlay commands or their off/on lifecycle, and never activates
+for an empty ad deck while on. Disabling the toggle while off restores black.
+Loading is cancelled on state/location/mapping changes; canvases are released
+on exit. There are no operator-adjustable visual parameters.
+
+**Night blackout (`Næturstilling`) applies to the whole perimeter display**:
+`PerimeterDisplay` reuses the main scoreboard's blackout window
+(`states/{location}/view` `blackoutStart`/`blackoutEnd`, edited in
+`MatchActionSettings.tsx`) through `useNightBlackout` with the same semantics
+— the window only applies while `controller.view` is `idle` (a match or the
+control view keeps the screens live at night). While blacked out, the display
+forces the effective power off and never loads the idle clock, so every strip
+renders black: no clock, no ads, and no bands or overlays. No desired state
+(`perimeter.state`, `idleClock`) is written by the display; content returns
+automatically once the window passes, and a prepared ad revision stays
+resident underneath.
+
+The same two fields are also editable in the perimeter manager:
+`NightBlackoutSection` in `PerimeterControl.tsx` (web venues only, rendered
+directly below the `Klukka í biðstöðu` toggle) shows the two `type="time"`
+inputs bound to the shared `view.blackoutStart`/`blackoutEnd` fields through
+the existing `useView()` actions (`view.set-blackout-start`/`-end`, audited).
+There is no separate perimeter blackout config; both editors always write the
+same node, and styles live in `PerimeterControl.css`
+(`.perimeter-blackout-inputs`).
+
 #### Perimeter Display Diagnostics (Skjáarvillur)
 
 Web perimeter screens report renderer problems to the controller so an

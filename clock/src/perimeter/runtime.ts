@@ -33,6 +33,7 @@ import {
 import { bandRequestKey, type PlayerBandRequest } from "./bandDerivation";
 import { createBaseTimeline, nextCueBoundary } from "./timeline";
 import type { PerimeterRenderSources } from "./webglRenderer";
+import type { IdleClockPresentation } from "./idleClock";
 
 const SCORER_FRAME_DURATION_MS = 1000 / 30;
 
@@ -146,6 +147,9 @@ export class PerimeterRuntime {
   private readonly timeline;
   private readonly nowMs: () => number;
   private baseColumns: PreparedColumn[] = [];
+  private idleClocks: Record<string, IdleClockPresentation> | null = null;
+  private idleStartedAt: number | null = null;
+  private idleFrame: number | null = null;
   private currentBaseCue: number | null = null;
   private baseRequest = 0;
   private overlayRequest = 0;
@@ -678,6 +682,10 @@ export class PerimeterRuntime {
   }
 
   setPowered(powered: boolean, now: number): void {
+    if (this.power.isPowered !== powered) {
+      this.idleStartedAt = null;
+      this.idleFrame = null;
+    }
     if (this.power.setPowered(powered) && powered) {
       this.timeline.start(now);
       this.currentBaseCue = null;
@@ -697,6 +705,15 @@ export class PerimeterRuntime {
     this.render(now);
   }
 
+  setIdleClocks(
+    presentations: Record<string, IdleClockPresentation> | null,
+  ): void {
+    this.idleClocks = presentations;
+    this.idleStartedAt = null;
+    this.idleFrame = null;
+    this.options.renderer.clearChannel?.("base");
+  }
+
   render(now = performance.now()): void {
     if (
       this.pendingBaseActivation !== null &&
@@ -705,6 +722,25 @@ export class PerimeterRuntime {
       this.commitPreparedBase(now);
     }
     if (!this.power.isPowered) {
+      if (this.idleClocks) {
+        this.idleStartedAt ??= now;
+        const elapsed = Math.max(0, now - this.idleStartedAt);
+        const frame = Math.floor(elapsed / SCORER_FRAME_DURATION_MS);
+        const changed = frame !== this.idleFrame;
+        const date = new Date();
+        const base: Record<string, TexImageSource> = {};
+        for (const [id, presentation] of Object.entries(this.idleClocks)) {
+          if (changed) presentation.draw(elapsed, date);
+          base[id] = presentation.canvas;
+        }
+        this.idleFrame = frame;
+        this.options.renderer.render({
+          base,
+          baseDynamic: changed,
+          overlayDynamic: false,
+        });
+        return;
+      }
       this.options.renderer.render({ base: {}, overlayDynamic: false });
       return;
     }
@@ -786,6 +822,7 @@ export class PerimeterRuntime {
   }
 
   destroy(): void {
+    this.idleClocks = null;
     this.baseRequest += 1;
     this.overlayRequest += 1;
     this.bandRequest += 1;

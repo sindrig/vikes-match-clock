@@ -55,6 +55,9 @@
           "scorerCelebration": {
             ".validate": "newData.val() == null || (newData.isString() && (newData.val() == 'ribbon' || newData.val() == 'tunnel' || newData.val() == 'wave' || newData.val() == 'procession' || newData.val() == 'cutout'))"
           },
+          "idleClock": {
+            ".validate": "newData.isBoolean()"
+          },
           "playerDisplayStyle": {
             ".validate": "newData.val() == null || (newData.isString() && (newData.val() == 'plain' || newData.val() == 'glow' || newData.val() == 'streamer'))"
           },
