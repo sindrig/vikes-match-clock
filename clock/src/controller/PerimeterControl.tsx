@@ -1146,10 +1146,6 @@ const IdleClockSection = () => {
           onChange={change}
         />
       </div>
-      <p>
-        Klukka og Víkingsmerki færast til hægri þegar slökkt er á auglýsingum.
-        Slökktu á þessari stillingu fyrir svartan skjá.
-      </p>
       {error && (
         <p role="alert">Ekki tókst að vista stillingu. Reyndu aftur.</p>
       )}
@@ -1188,10 +1184,6 @@ const NightBlackoutSection = () => {
           }
         />
       </div>
-      <p>
-        Á tímabilinu er jaðarskjárinn alveg svartur — hvorki klukka né
-        auglýsingar. Sama stilling slökkvir á biðskjá aðalskjárins.
-      </p>
     </div>
   );
 };
