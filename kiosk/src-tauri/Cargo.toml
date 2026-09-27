@@ -1,6 +1,6 @@
 [package]
 name = "vikes-match-clock"
-version = "0.0.0"
+version = "0.1.2"
 description = "Kiosk wrapper for Vikes Match Clock stadium screens"
 authors = ["sindrig"]
 edition = "2021"

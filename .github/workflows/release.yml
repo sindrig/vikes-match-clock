@@ -27,6 +27,10 @@ jobs:
         with:
           workspaces: kiosk/src-tauri -> target
 
+      - name: Test kiosk
+        working-directory: kiosk/src-tauri
+        run: cargo test --locked
+
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
