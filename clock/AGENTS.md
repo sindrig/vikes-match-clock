@@ -1580,8 +1580,12 @@ preparation cannot overwrite the current band's error state.
 
 **Presentations** (`perimeter/playerBandPresentation.ts`): the player band
 repeats `[portrait | number | name]` units on a flat near-black field with
-a 600 ms alpha fade-in, drifting right-to-left at ~1.5× the scorer
-"procession" speed (`plain`/`glow`) or ~2× (`streamer`); `glow` adds a
+a 600 ms alpha fade-in, drifting right-to-left at ~1.5× the shared
+reference drift speed (`plain`/`glow`) or ~2× (`streamer`). All sliding
+presentations were doubled in speed (reference `height * 0.00024 px/ms`,
+2× the original 0.00012 "procession" pace) after operators found the slide
+too slow — the scorer `procession` style in `scorerPresentation.ts` uses
+the same doubled constant. `glow` adds a
 soft portrait glow pulse and `streamer` thin speed lines. The substitution
 band repeats
 `[off portrait | number | name] [gap] [on portrait | number | name]` with
