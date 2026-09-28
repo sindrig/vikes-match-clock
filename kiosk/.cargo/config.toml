@@ -1,0 +1,3 @@
+# Include the MSVC runtime so clean Windows PCs do not need VC++ Redistributable.
+[target.'cfg(all(target_os = "windows", target_env = "msvc"))']
+rustflags = ["-C", "target-feature=+crt-static"]

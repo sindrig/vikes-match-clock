@@ -14,6 +14,24 @@ display and retains the saved preference. Connect/power on the desired display
 before starting the kiosk. Moving the kiosk to another monitor saves a new choice
 immediately.
 
+## Windows runtime packaging
+
+Windows MSVC builds statically link the C/C++ runtime via `.cargo/config.toml`.
+Run Cargo/Tauri commands from `kiosk/` or `kiosk/src-tauri/` so Cargo picks up
+this configuration. Do not override it with `RUSTFLAGS` that omit `crt-static`.
+The kiosk should not require a separate Visual C++ Redistributable installation.
+WebView2 remains a prerequisite handled by the installer's embedded bootstrapper.
+
+The release workflow builds the installers, checks the release executable with
+Visual Studio's `dumpbin /DEPENDENTS`, and publishes only if it has no Visual C++
+runtime DLL imports (including `VCRUNTIME140_1.dll`). To repeat the check after a
+local Windows release build, run `./scripts/check-windows-runtime.ps1` in
+PowerShell from `kiosk/` with the Visual Studio C++ build tools installed.
+
+For release smoke testing, install on a clean Windows PC/VM without the Visual
+C++ Redistributable, then launch the kiosk. Also verify an upgrade from 0.0.0
+launches successfully and retains the saved monitor selection.
+
 ## Verification
 
 Run `cargo test --locked` in `src-tauri`. The release workflow runs these tests on

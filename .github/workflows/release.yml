@@ -37,8 +37,23 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           projectPath: kiosk
-          tagName: ${{ github.event_name == 'push' && github.ref_name || format('pr-{0}-{1}', github.event.pull_request.number, github.sha) }}
-          releaseName: ${{ github.event_name == 'push' && github.ref_name || format('PR {0} build', github.event.pull_request.number) }}
-          releaseBody: ${{ github.event_name == 'push' && 'Kiosk binary for stadium screens. Install the .msi or .exe on the target Windows machine.' || format('Pre-release kiosk build from PR {0}. For testing only.', github.event.pull_request.number) }}
-          releaseDraft: false
+          args: -- --locked
+
+      - name: Verify static Visual C++ runtime
+        shell: pwsh
+        run: ./kiosk/scripts/check-windows-runtime.ps1
+
+      # Publish only after checking the executable used in these installers.
+      - name: Publish installers
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event_name == 'push' && github.ref_name || format('pr-{0}-{1}', github.event.pull_request.number, github.sha) }}
+          target_commitish: ${{ github.sha }}
+          name: ${{ github.event_name == 'push' && github.ref_name || format('PR {0} build', github.event.pull_request.number) }}
+          body: ${{ github.event_name == 'push' && 'Kiosk binary for stadium screens. Install the .msi or .exe on the target Windows machine.' || format('Pre-release kiosk build from PR {0}. For testing only.', github.event.pull_request.number) }}
+          draft: false
           prerelease: ${{ github.event_name == 'pull_request' }}
+          fail_on_unmatched_files: true
+          files: |
+            kiosk/src-tauri/target/release/bundle/msi/*.msi
+            kiosk/src-tauri/target/release/bundle/nsis/*-setup.exe
