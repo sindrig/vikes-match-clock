@@ -20,10 +20,11 @@ export const DEFAULT_PLAYER_BAND_STYLE: PlayerBandStyle = "plain";
 // entrance; no drift.
 export const DEFAULT_SUBSTITUTION_BAND_STYLE: SubstitutionBandStyle = "static";
 
-// The scorer "procession" reference speed is `height * 0.00012 px/ms`.
+// The reference drift speed is `height * 0.00024 px/ms` (2x the original
+// 0.00012 "procession" pace after operators found the slide too slow).
 // The player band drifts ~1.5x that, the streamer style ~2x. Speeds are
 // defined per style; there is no separate knob.
-const PROCESSION_SPEED_PX_PER_MS_PER_HEIGHT = 0.00012;
+const PROCESSION_SPEED_PX_PER_MS_PER_HEIGHT = 0.00024;
 
 // The MOTM lead-in pacing. The main screen's MOTM card cycles
 // "Maður leiksins í boði..." (2 s) → the Bombay sponsor logo (2 s) → the

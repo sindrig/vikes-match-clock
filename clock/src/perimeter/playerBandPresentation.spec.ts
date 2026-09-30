@@ -338,11 +338,11 @@ describe("player band presentations", () => {
     const draws = portraitDraws(recordings.ops);
     expect(draws.length).toBeGreaterThan(1);
     expect(draws[0]!.dx).toBeLessThan(0);
-    // The player band is ~1.5x procession (height * 0.00012 * 1.5).
+    // The player band is ~1.5x the reference drift (height * 0.00024 * 1.5).
     const spacing = draws[1]!.dx - draws[0]!.dx;
     expect(spacing).toBeGreaterThan(draws[0]!.dw);
-    // The offset at 2000 ms moved by ~1.5x procession speed.
-    const expectedDrift = 2000 * 108 * 0.00012 * 1.5;
+    // The offset at 2000 ms moved by ~1.5x reference speed.
+    const expectedDrift = 2000 * 108 * 0.00024 * 1.5;
     expect(spacing).toBeGreaterThan(0);
     expect(draws[0]!.dx).toBeLessThan(0);
     expect(

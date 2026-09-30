@@ -11,13 +11,46 @@ on:
       - ".github/workflows/release.yml"
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: kiosk-${{ github.event_name == 'push' && 'release' || github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  build-kiosk:
-    runs-on: windows-latest
+  prepare-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      sha: ${{ steps.version.outputs.sha }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'push' && 'master' || github.sha }}
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Test release preparation
+        run: python kiosk/scripts/test-release.py
+
+      - name: Commit release version and update tag
+        if: github.event_name == 'push'
+        id: version
+        run: bash kiosk/scripts/prepare-release.sh
+
+  build-kiosk:
+    needs: prepare-release
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare-release.outputs.sha || github.sha }}
 
       - name: Install Node.js
         uses: actions/setup-node@v4
@@ -51,16 +84,27 @@ jobs:
         shell: pwsh
         run: ./kiosk/scripts/check-windows-runtime.ps1
 
+      - name: Upload PR installers
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: kiosk-installers
+          if-no-files-found: error
+          path: |
+            kiosk/src-tauri/target/release/bundle/msi/*.msi
+            kiosk/src-tauri/target/release/bundle/nsis/*-setup.exe
+
       # Publish only after checking the executable used in these installers.
       - name: Publish installers
+        if: github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event_name == 'push' && github.ref_name || format('pr-{0}-{1}', github.event.pull_request.number, github.sha) }}
-          target_commitish: ${{ github.sha }}
-          name: ${{ github.event_name == 'push' && github.ref_name || format('PR {0} build', github.event.pull_request.number) }}
-          body: ${{ github.event_name == 'push' && 'Kiosk binary for stadium screens. Install the .msi or .exe on the target Windows machine.' || format('Pre-release kiosk build from PR {0}. For testing only.', github.event.pull_request.number) }}
+          tag_name: ${{ github.ref_name }}
+          target_commitish: ${{ needs.prepare-release.outputs.sha }}
+          name: ${{ github.ref_name }}
+          body: Kiosk binary for stadium screens. Install the .msi or .exe on the target Windows machine.
           draft: false
-          prerelease: ${{ github.event_name == 'pull_request' }}
+          prerelease: false
           fail_on_unmatched_files: true
           files: |
             kiosk/src-tauri/target/release/bundle/msi/*.msi

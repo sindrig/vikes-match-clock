@@ -430,7 +430,7 @@ function drawProcession(
     { speedPxPerMs: 0.55, bandWidth: layout.height * 1.2, alpha: 0.12 },
   ]);
 
-  const speedPxPerMs = layout.height * 0.00012;
+  const speedPxPerMs = layout.height * 0.00024;
   const offset = -((elapsedMs * speedPxPerMs) % layout.unit.unitWidth);
   const entrance = easeOutCubic(elapsedMs / 600);
   drawRevealedUnits(context, layout, elapsedMs, offset, () => ({
