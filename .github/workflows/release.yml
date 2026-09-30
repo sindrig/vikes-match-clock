@@ -19,6 +19,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Test connectivity probe
+        run: node --test kiosk/scripts/probe.test.cjs
+
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
 
