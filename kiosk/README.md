@@ -14,6 +14,20 @@ display and retains the saved preference. Connect/power on the desired display
 before starting the kiosk. Moving the kiosk to another monitor saves a new choice
 immediately.
 
+## Network behavior
+
+The kiosk loads the clock from `https://klukka.irdn.is`. While the clock cannot
+be loaded — the kiosk starts without network, or the display falls back to a
+WebView error screen (for example a remote refresh firing while offline) — the
+kiosk retries every minute until the network connection is back and then loads
+the clock. Until then it shows a black screen, so recovery can take up to a
+minute after the connection returns.
+
+When the clock is already displayed and the connection is lost for at least two
+consecutive checks (roughly a minute or more), the kiosk reloads the clock once
+the connection returns so the display always runs with a fresh connection. A
+single failed check does not interrupt the display.
+
 ## Windows runtime packaging
 
 Windows MSVC builds statically link the C/C++ runtime via `.cargo/config.toml`.
@@ -47,3 +61,14 @@ For a Windows multi-monitor smoke test:
    saved choice is restored.
 5. Repeat with the secondary screen positioned left of the primary screen and
    with different display scaling settings.
+
+For a network recovery smoke test:
+
+1. Start the kiosk with the network disabled; verify it shows a black screen.
+   Enable the network; verify the clock appears within a minute.
+2. With the clock displayed, disable the network for about two minutes and
+   re-enable it; verify the display reloads within a minute of reconnecting.
+3. Disable the network and trigger "Endurræsa alla skjái" from the controller;
+   verify the kiosk falls back to the WebView error screen and the clock returns
+   within a minute of the network coming back.
+4. Restart with the network enabled; verify the clock appears immediately.
