@@ -14,26 +14,6 @@
     </style>
   </head>
   <body>
-    <script>
-      (function () {
-        var APP_URL = "https://klukka.irdn.is";
-        var RETRY_MS = 5000;
-
-        function probe() {
-          fetch(APP_URL + "/?kiosk-probe=" + Date.now(), {
-            cache: "no-store",
-            mode: "no-cors",
-          })
-            .then(function () {
-              location.replace(APP_URL);
-            })
-            .catch(function () {
-              setTimeout(probe, RETRY_MS);
-            });
-        }
-
-        probe();
-      })();
-    </script>
+    <script src="probe.js"></script>
   </body>
 </html>
