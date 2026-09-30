@@ -3,6 +3,7 @@ use tauri_plugin_autostart::MacosLauncher;
 use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_log::{Target, TargetKind};
 
+mod connectivity;
 mod monitor;
 
 pub fn run() {
@@ -19,11 +20,13 @@ pub fn run() {
             MacosLauncher::LaunchAgent,
             Some(vec![]),
         ))
+        .on_page_load(connectivity::on_page_load)
         .setup(|app| {
             log::info!("App setup started");
 
             if let Some(window) = app.get_webview_window("main") {
                 monitor::restore_and_track(&window)?;
+                connectivity::watch(&window);
             }
 
             #[cfg(debug_assertions)]
