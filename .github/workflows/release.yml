@@ -27,6 +27,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          token: ${{ github.event_name == 'push' && secrets.KIOSK_RELEASE_TOKEN || github.token }}
           ref: ${{ github.event_name == 'push' && 'master' || github.sha }}
           fetch-depth: 0
 
