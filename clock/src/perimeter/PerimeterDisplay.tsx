@@ -246,15 +246,16 @@ export default function PerimeterDisplay() {
         scorer: {
           loadSource: async (command) => {
             const loaded = await scorerSourceLoader.load(command.player);
-            return { image: loaded.image, release: loaded.release };
+            return loaded;
           },
-          compose: (style, command, source, screens) =>
+          compose: (style, command, source, screens, alternateImage) =>
             createScorerPresentations(
               style,
               command,
               source,
               screens,
               defaultScorerBandDeps,
+              alternateImage,
             ),
         },
         playerBand: {
@@ -264,6 +265,9 @@ export default function PerimeterDisplay() {
               return {
                 images: {
                   player: loaded.image,
+                  ...(loaded.alternateImage
+                    ? { playerAlternate: loaded.alternateImage }
+                    : {}),
                 } as Record<string, HTMLImageElement>,
                 release: loaded.release,
               };
@@ -276,6 +280,12 @@ export default function PerimeterDisplay() {
               images: {
                 off: off.image,
                 on: on.image,
+                ...(off.alternateImage
+                  ? { offAlternate: off.alternateImage }
+                  : {}),
+                ...(on.alternateImage
+                  ? { onAlternate: on.alternateImage }
+                  : {}),
               } as Record<string, HTMLImageElement>,
               release: () => {
                 off.release();
@@ -293,8 +303,16 @@ export default function PerimeterDisplay() {
             if (request.kind !== "player") {
               return createSubstitutionBandPresentations(
                 substitutionStyle,
-                { identity: request.off, source: images.off! },
-                { identity: request.on, source: images.on! },
+                {
+                  identity: request.off,
+                  source: images.off!,
+                  alternateImage: images.offAlternate,
+                },
+                {
+                  identity: request.on,
+                  source: images.on!,
+                  alternateImage: images.onAlternate,
+                },
                 screens,
                 defaultScorerBandDeps,
               );
@@ -314,6 +332,7 @@ export default function PerimeterDisplay() {
                 screens,
                 defaultScorerBandDeps,
                 motmLead,
+                images.playerAlternate,
               ),
             );
           },
