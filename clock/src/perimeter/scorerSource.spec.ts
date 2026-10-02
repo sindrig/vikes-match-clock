@@ -82,7 +82,10 @@ function createHarness(
     }),
     resolveGeneration:
       overrides.resolveGeneration ??
-      (() => Promise.resolve("1700000000000000")),
+      ((path) =>
+        Promise.resolve(
+          path === "vikuti/players/2492.png" ? null : "1700000000000000",
+        )),
     resolveDownloadUrl: () => Promise.resolve("https://dl.example/url"),
     bundledCrest: overrides.bundledCrest,
     createObjectUrl: (blob) => {
@@ -113,6 +116,51 @@ describe("scorerSourcePaths", () => {
 });
 
 describe("ScorerSourceLoader", () => {
+  it("preloads both portraits and releases both while keeping their generations cached", async () => {
+    const { loader, objectUrls, cacheStore, fetches } = createHarness({
+      resolveGeneration: () => Promise.resolve("42"),
+    });
+    const loaded = await loader.load(PLAYER);
+    expect(loaded.objectPath).toBe("vikuti/players/2492-fagn.png");
+    expect(loaded.alternateImage).toBeInstanceOf(FakeImage);
+    expect(objectUrls).toHaveLength(2);
+    loaded.release();
+    expect(objectUrls).toHaveLength(0);
+    const again = await loader.load(PLAYER);
+    expect(fetches()).toBe(2);
+    expect(cacheStore.size()).toBe(2);
+    again.release();
+    expect(objectUrls).toHaveLength(0);
+  });
+
+  it("holds the regular pose when the celebration image is missing", async () => {
+    const { loader } = createHarness({
+      resolveGeneration: (path) =>
+        Promise.resolve(path.endsWith("-fagn.png") ? null : "42"),
+    });
+    const loaded = await loader.load(PLAYER);
+    expect(loaded.kind).toBe("player");
+    expect(loaded.objectPath).toBe("vikuti/players/2492.png");
+    expect(loaded.alternateImage).toBeUndefined();
+    loaded.release();
+  });
+
+  it("holds the celebration pose when the regular image cannot decode", async () => {
+    decodeFailures.add(`blob:1-${PNG_BYTES.length}`);
+    try {
+      const { loader, objectUrls } = createHarness({
+        resolveGeneration: () => Promise.resolve("42"),
+      });
+      const loaded = await loader.load(PLAYER);
+      expect(loaded.objectPath).toBe("vikuti/players/2492-fagn.png");
+      expect(loaded.alternateImage).toBeUndefined();
+      expect(objectUrls).toHaveLength(1);
+      loaded.release();
+      expect(objectUrls).toHaveLength(0);
+    } finally {
+      decodeFailures.clear();
+    }
+  });
   it("loads the personalized celebration image first", async () => {
     const { loader, objectUrls } = createHarness();
     const loaded = await loader.load(PLAYER);

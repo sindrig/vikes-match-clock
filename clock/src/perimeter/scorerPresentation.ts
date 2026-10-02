@@ -11,6 +11,7 @@ import {
   defaultScorerBandDeps,
   drawBandUnit,
   layoutBandUnit,
+  portraitFrameAt,
   scorerBandFonts,
 } from "./scorerCompositor";
 
@@ -502,6 +503,7 @@ export async function createScorerPresentation(
   width: number,
   height: number,
   deps: ScorerBandDeps = defaultScorerBandDeps,
+  alternateImage?: HTMLImageElement,
 ): Promise<ScorerPresentation> {
   await deps.loadFonts(scorerBandFonts(height));
   const canvas = deps.createCanvas(width, height);
@@ -524,6 +526,9 @@ export async function createScorerPresentation(
       player.name,
       height,
       context,
+      alternateImage
+        ? portraitFrameAt(alternateImage, undefined, 0).source
+        : undefined,
     ),
     source: sourceSize,
     image: source,
@@ -535,6 +540,9 @@ export async function createScorerPresentation(
     Math.ceil(context.measureText("MARK").width) + Math.round(height * 0.35);
 
   const draw = (elapsedMs: number): void => {
+    const frame = portraitFrameAt(source, alternateImage, elapsedMs);
+    layout.image = frame.image;
+    layout.source = frame.source;
     context.clearRect(0, 0, width, height);
     switch (style) {
       case "tunnel":
@@ -567,6 +575,7 @@ export async function createScorerPresentations(
   source: HTMLImageElement,
   screens: readonly { id: string; width: number; height: number }[],
   deps: ScorerBandDeps = defaultScorerBandDeps,
+  alternateImage?: HTMLImageElement,
 ): Promise<Record<string, ScorerPresentation>> {
   const presentations: Record<string, ScorerPresentation> = {};
   for (const screen of screens) {
@@ -577,6 +586,7 @@ export async function createScorerPresentations(
       screen.width,
       screen.height,
       deps,
+      alternateImage,
     );
   }
   return presentations;

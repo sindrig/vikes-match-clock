@@ -1405,8 +1405,11 @@ players for semantic submission.
   `{location}/players/{playerId}-fagn.png` (celebration) and
   `{location}/crest.png` (fallback), resolves immutable Storage generation
   metadata, and loads through the persistent media cache. The celebration
-  image is tried first; the crest is used only when it is missing, unreadable,
-  or undecodable. When the Storage crest is also unusable, the loader falls
+  image and `{location}/players/{playerId}.png` regular portrait are preloaded
+  together. With both usable, scorer presentations alternate between them
+  every second, starting with the celebration pose; with only one usable,
+  that portrait stays visible. The crest is used only when both portraits
+  are missing, unreadable, or undecodable. When the Storage crest is also unusable, the loader falls
   back to the **bundled club crest** for the venue's home team (resolved via
   `match.homeTeam` → `images/clubLogos`), so the band always renders
   crest + number + name and a missing `crest.png` object never breaks the
@@ -1535,6 +1538,23 @@ asset's team name (club override `logoUrl` first via the display's
 works for away teams) → the existing venue-crest chain
 (`{location}/crest.png`). Everything unusable retains the previous state
 and reports through the Skjáarvillur path.
+
+**One-second portrait alternation** (web venues only): when the card's image
+is an identifier-shaped `{location}/players/{id}.png` or `{id}-fagn.png`
+Firebase download URL in the active bucket, the loader derives its sibling
+object path and independently resolves its metadata/download URL (never reuses
+the first object's token). Both poses are decoded before activation and cached;
+presentations alternate every 1000 ms, starting with the card's original pose.
+This applies to player cards, the player phase of MOTM (after the sponsor hold),
+both substitution sides, and the semantic goal-scorer overlay. The existing
+30 fps animation loop supplies elapsed time — no extra timers, downloads per
+swap, shared-state writes, or entrance restarts. Each portrait retains its
+aspect ratio within a slot reserved for the wider pose, keeping text and drift
+spacing steady. A missing/unreadable/undecodable pose leaves the usable portrait
+on screen; if neither works, the existing crest chain applies. Arbitrary,
+cross-bucket, and cross-venue card URLs do not get sibling lookups. Both decoded
+portraits are released on clear/replacement, including superseded preparations.
+Main-scoreboard cards and Resolume-generated media are unchanged.
 
 **Runtime channel** (`perimeter/runtime.ts`): `setPlayerBand(band | null,
 now)` with scorer-style generation lifecycle (atomic activation, stale

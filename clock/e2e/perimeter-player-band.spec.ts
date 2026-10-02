@@ -31,6 +31,7 @@ const ON_PHOTO_COLOR = [240, 200, 0] as const;
 // every band-1 color so the swap between two queued substitutions is
 // observable on the canvas.
 const SECOND_OFF_PHOTO_COLOR = [200, 0, 200] as const;
+const CELEBRATION_PHOTO_COLOR = [0, 200, 200] as const;
 
 // Minimal valid PNG encoder (8-bit RGBA, no filtering) for colored fixtures.
 function crc32(buf: Buffer): number {
@@ -273,6 +274,9 @@ test.describe("Web perimeter player band", () => {
 
   test.beforeEach(async ({ clockPage }) => {
     await clearEmulatorData();
+    // Another spec may have used this worker's venue for audited controls.
+    // Start the read-only display assertions with a clean emulator audit path.
+    await patch(clockPage, `audit/${TEST_LISTEN_PREFIX}`, null);
     redGeneration = await seedObject(
       storageEnv,
       `${TEST_LISTEN_PREFIX}/perimeter/band-e2e-red.png`,
@@ -395,6 +399,124 @@ test.describe("Web perimeter player band", () => {
     expect(clubLogo.status).toBe(200);
     const denied = await fetch(objectUrl("players/private-notes.txt"));
     expect(denied.status).toBe(403);
+  });
+
+  test("alternates regular and celebration portraits once per second in player and scorer displays", async ({
+    browser,
+    clockPage,
+  }) => {
+    await seedObject(
+      storageEnv,
+      `${TEST_LISTEN_PREFIX}/players/40.png`,
+      pngBytes(128, 64, OFF_PHOTO_COLOR),
+    );
+    await seedObject(
+      storageEnv,
+      `${TEST_LISTEN_PREFIX}/players/40-fagn.png`,
+      pngBytes(64, 64, CELEBRATION_PHOTO_COLOR),
+    );
+    const displayContext = await browser.newContext();
+    const displayPage = await displayContext.newPage();
+    try {
+      await displayPage.addInitScript(() =>
+        localStorage.setItem("clock_sync", "true"),
+      );
+      await displayPage.goto("/");
+      await displayPage.locator(".initial-screen-select").selectOption({
+        label: `Test Location ${TEST_LISTEN_PREFIX.replace("test-location-", "")} Perimeter`,
+      });
+      await displayPage.getByRole("button", { name: "Birta skjá" }).click();
+      await expect(displayPage.getByTestId("perimeter-display")).toBeVisible();
+      await patch(clockPage, `states/${TEST_LISTEN_PREFIX}/controller`, {
+        currentAsset: {
+          asset: {
+            type: "PLAYER",
+            key: emulatorDownloadUrl(`${TEST_LISTEN_PREFIX}/players/40.png`),
+            name: "Jón",
+            number: 7,
+            teamName: "Víkingur R",
+          },
+          time: null,
+        },
+      });
+      for (const channel of ["player", "scorer"]) {
+        if (channel === "scorer") {
+          await patch(
+            clockPage,
+            `states/${TEST_LISTEN_PREFIX}/perimeter/overlay`,
+            {
+              version: 2,
+              kind: "goal-scorer",
+              id: "alternating-scorer",
+              player: { id: "40", name: "Jón", number: "7" },
+            },
+          );
+        }
+        await expect
+          .poll(() => anyColor(displayPage, [CELEBRATION_PHOTO_COLOR]), {
+            timeout: 25000,
+          })
+          .toBe(true);
+        // Read the actual WebGL texture once per animation frame. Record only
+        // pose changes, not motion within a pose, so the cadence is observable.
+        const transitions = await displayPage.evaluate(
+          ({ regular, celebration }) =>
+            new Promise<Array<{ pose: string; at: number }>>((resolve) => {
+              const canvas = document.querySelector<HTMLCanvasElement>(
+                '[data-testid="perimeter-canvas"]',
+              )!;
+              const gl = canvas.getContext("webgl")!;
+              const buffer = new Uint8Array(4);
+              const changes: Array<{ pose: string; at: number }> = [];
+              const start = performance.now();
+              const tick = (now: number) => {
+                const found = new Set<string>();
+                for (let x = 40; x < canvas.width; x += 50) {
+                  gl.readPixels(
+                    x,
+                    canvas.height - 1 - 54,
+                    1,
+                    1,
+                    gl.RGBA,
+                    gl.UNSIGNED_BYTE,
+                    buffer,
+                  );
+                  for (const [pose, color] of [
+                    ["regular", regular],
+                    ["celebration", celebration],
+                  ] as const) {
+                    if (
+                      color.every(
+                        (value, index) => Math.abs(buffer[index]! - value) < 28,
+                      )
+                    )
+                      found.add(pose);
+                  }
+                }
+                if (found.size === 1) {
+                  const pose = [...found][0]!;
+                  if (changes.at(-1)?.pose !== pose)
+                    changes.push({ pose, at: now - start });
+                }
+                if (now - start >= 4500) resolve(changes);
+                else requestAnimationFrame(tick);
+              };
+              requestAnimationFrame(tick);
+            }),
+          { regular: OFF_PHOTO_COLOR, celebration: CELEBRATION_PHOTO_COLOR },
+        );
+        expect(transitions.length, channel).toBeGreaterThanOrEqual(4);
+        // The first partial second is arbitrary; full subsequent phases last 1 s.
+        for (let index = 2; index < transitions.length; index += 1) {
+          const interval = transitions[index]!.at - transitions[index - 1]!.at;
+          expect(interval, channel).toBeGreaterThan(800);
+          expect(interval, channel).toBeLessThan(1200);
+        }
+      }
+      expect(await readRtdb(`audit/${TEST_LISTEN_PREFIX}`)).toBeNull();
+    } finally {
+      await displayContext.close();
+    }
   });
 
   test("renders the lineup band, covers it with a goal overlay, and restores", async ({

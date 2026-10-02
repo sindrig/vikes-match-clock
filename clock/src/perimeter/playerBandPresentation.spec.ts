@@ -9,6 +9,7 @@ import {
   createSubstitutionBandPresentations,
   layoutSubstitutionUnit,
   type BandPresentationRenderingContext,
+  type MotmLead,
 } from "./playerBandPresentation";
 import type { PlayerBandStyle, SubstitutionBandStyle } from "../types";
 import { readFileSync } from "node:fs";
@@ -39,6 +40,7 @@ interface FrameOp {
   text?: string;
   style?: string;
   alpha?: number;
+  image?: CanvasImageSource;
 }
 
 interface Recording {
@@ -84,7 +86,7 @@ function makeRecordingContext(): Recording {
       ops.push({ op: "fillRect", args, style: readFillStyle(context) }),
     drawImage: vi.fn(
       (
-        _image: CanvasImageSource,
+        image: CanvasImageSource,
         sx: number,
         sy: number,
         sw: number,
@@ -98,6 +100,7 @@ function makeRecordingContext(): Recording {
           op: "drawImage",
           args: [sx, sy, sw, sh, dx, dy, dw, dh],
           alpha: context.globalAlpha,
+          image,
         }),
     ),
     fillText: vi.fn((text: string, x: number, y: number) =>
@@ -157,6 +160,8 @@ const IDENTITY = {
 async function createPlayerFor(
   style: PlayerBandStyle,
   recordings: Recording = makeRecordingContext(),
+  alternateImage?: HTMLImageElement,
+  motmLead: MotmLead | null = null,
 ) {
   const fonts: string[] = [];
   const canvases: { width: number; height: number }[] = [];
@@ -182,6 +187,8 @@ async function createPlayerFor(
     960,
     108,
     deps,
+    motmLead,
+    alternateImage,
   );
   return { presentation, recordings, fonts, canvases };
 }
@@ -189,6 +196,8 @@ async function createPlayerFor(
 async function createSubstitutionFor(
   style: SubstitutionBandStyle,
   recordings: Recording = makeRecordingContext(),
+  offAlternateImage?: HTMLImageElement,
+  onAlternateImage?: HTMLImageElement,
 ) {
   const fonts: string[] = [];
   const canvases: { width: number; height: number }[] = [];
@@ -212,10 +221,12 @@ async function createSubstitutionFor(
     {
       identity: { name: "Siggi Bekkur", number: "12" },
       source: imageOf(portraitBytes, 4, 8),
+      alternateImage: offAlternateImage,
     },
     {
       identity: { name: "Jón Jónsson", number: "7" },
       source: imageOf(crestBytes, 8, 8),
+      alternateImage: onAlternateImage,
     },
     960,
     108,
@@ -251,6 +262,74 @@ function playerTextOps(
 }
 
 describe("player band presentations", () => {
+  it.each(PLAYER_STYLES)(
+    "swaps all portraits exactly every second without stretching or moving the text (%s)",
+    async (style) => {
+      const alternate = imageOf(crestBytes, 8, 8);
+      const { presentation, recordings } = await createPlayerFor(
+        style,
+        undefined,
+        alternate,
+      );
+      const canvas = presentation.canvas;
+      for (const [elapsed, useAlternate] of [
+        [999, false],
+        [1000, true],
+        [1999, true],
+        [2000, false],
+        [3500, true],
+        [4000, false],
+      ] as const) {
+        recordings.ops.length = 0;
+        presentation.draw(elapsed);
+        const images = recordings.ops.filter(
+          (entry) => entry.op === "drawImage",
+        );
+        expect(images.length).toBeGreaterThan(0);
+        for (const draw of images) {
+          expect(draw.image === alternate).toBe(useAlternate);
+          expect(draw.args[6]).toBe(useAlternate ? 108 : 54);
+          expect(draw.args[7]).toBe(108);
+        }
+        // A wider shared slot keeps the number at slot edge + gap in both poses.
+        const portrait = images[0]!;
+        const number = playerTextOps(recordings.ops).find(
+          (entry) => entry.text === "7",
+        )!;
+        const slotLeft = portrait.args[4]! - (108 - portrait.args[6]!) / 2;
+        expect(number.x - slotLeft).toBeCloseTo(108 + 49);
+        expect(presentation.canvas).toBe(canvas);
+      }
+    },
+  );
+
+  it("starts portrait alternation at the MOTM player reveal, not the sponsor lead-in", async () => {
+    const alternate = imageOf(crestBytes, 8, 8);
+    const sponsor = imageOf(crestBytes, 1336, 1360);
+    const { presentation, recordings } = await createPlayerFor(
+      "plain",
+      undefined,
+      alternate,
+      { image: sponsor, holdMs: 3000 },
+    );
+    for (const [elapsed, expected] of [
+      [2999, sponsor],
+      [3999, null],
+      [4000, alternate],
+      [5000, null],
+    ] as const) {
+      recordings.ops.length = 0;
+      presentation.draw(elapsed);
+      const draws = recordings.ops.filter((entry) => entry.op === "drawImage");
+      for (const draw of draws) {
+        if (expected) expect(draw.image).toBe(expected);
+        else {
+          expect(draw.image).not.toBe(alternate);
+          expect(draw.image).not.toBe(sponsor);
+        }
+      }
+    }
+  });
   it.each(PLAYER_STYLES)(
     "creates a canvas at the logical screen dimensions and awaits band fonts (%s)",
     async (style) => {
@@ -512,6 +591,42 @@ describe("player band presentations", () => {
 });
 
 describe("substitution band presentations", () => {
+  it.each(SUBSTITUTION_STYLES)(
+    "swaps both substitution portraits in sync every second (%s)",
+    async (style) => {
+      const offAlternate = imageOf(crestBytes, 8, 8);
+      const onAlternate = imageOf(portraitBytes, 4, 8);
+      const { presentation, recordings } = await createSubstitutionFor(
+        style,
+        undefined,
+        offAlternate,
+        onAlternate,
+      );
+      for (const [elapsed, useAlternate] of [
+        [999, false],
+        [1000, true],
+        [2000, false],
+      ] as const) {
+        recordings.ops.length = 0;
+        presentation.draw(elapsed);
+        const images = recordings.ops.filter(
+          (entry) => entry.op === "drawImage",
+        );
+        expect(images.length).toBeGreaterThan(0);
+        images.forEach((draw, index) => {
+          expect(
+            draw.image === (index % 2 === 0 ? offAlternate : onAlternate),
+          ).toBe(useAlternate);
+          expect(draw.args[7]).toBe(108);
+        });
+        for (const text of playerTextOps(recordings.ops)) {
+          expect(text.style).toBe(
+            ["12", "Siggi Bekkur"].includes(text.text) ? "#c8102e" : "#00a651",
+          );
+        }
+      }
+    },
+  );
   it.each<SubstitutionBandStyle>(["static", "relay"])(
     "fades both identities at draw time (%s)",
     async (style) => {
