@@ -1825,6 +1825,10 @@ Firebase-backed behavior.
   from the corrected shape only.
 - Player-card and man-of-the-match pass the complete home roster (including
   substituted-off players) to `TeamPlayerSelectionModal`.
+- `assetHelpers.ts` omits missing optional `number` and `role` fields from
+  both photo and no-photo assets so coaches/officials can be shown without
+  Firebase rejecting `undefined` values. Supplied numbers and roles are
+  preserved; man-of-the-match assets inherit the same handling.
 
 **Consumers**:
 

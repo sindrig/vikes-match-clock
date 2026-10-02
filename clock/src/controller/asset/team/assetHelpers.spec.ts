@@ -87,6 +87,66 @@ describe("assetHelpers", () => {
       });
     });
 
+    it.each([
+      { imageExists: true, type: assetTypes.PLAYER },
+      { imageExists: false, type: assetTypes.NO_IMAGE_PLAYER },
+    ])(
+      "omits a coach's missing number from $type assets",
+      async ({ imageExists, type }) => {
+        if (imageExists) {
+          vi.mocked(storageHelpers.getDownloadURL).mockResolvedValue(
+            "https://storage.example.com/coach.png",
+          );
+        } else {
+          vi.mocked(storageHelpers.getDownloadURL).mockRejectedValue(
+            new Error("Not found"),
+          );
+        }
+
+        const result = await getPlayerAssetObject({
+          listenPrefix: "viken",
+          player: { name: "Test Coach", id: 456, role: "coach" },
+          teamName: "Víkingur R",
+        });
+
+        expect(result).toMatchObject({
+          type,
+          name: "Test Coach",
+          role: "coach",
+        });
+        expect(result).not.toHaveProperty("number");
+        expect(Object.values(result ?? {})).not.toContain(undefined);
+      },
+    );
+
+    it.each([
+      { imageExists: true, type: assetTypes.PLAYER },
+      { imageExists: false, type: assetTypes.NO_IMAGE_PLAYER },
+    ])(
+      "omits a missing role and preserves number zero in $type assets",
+      async ({ imageExists, type }) => {
+        if (imageExists) {
+          vi.mocked(storageHelpers.getDownloadURL).mockResolvedValue(
+            "https://storage.example.com/player.png",
+          );
+        } else {
+          vi.mocked(storageHelpers.getDownloadURL).mockRejectedValue(
+            new Error("Not found"),
+          );
+        }
+
+        const result = await getPlayerAssetObject({
+          listenPrefix: "viken",
+          player: { name: "Test Player", id: 123, number: 0 },
+          teamName: "Víkingur R",
+        });
+
+        expect(result).toMatchObject({ type, number: 0 });
+        expect(result).not.toHaveProperty("role");
+        expect(Object.values(result ?? {})).not.toContain(undefined);
+      },
+    );
+
     it("includes overlay when provided", async () => {
       (storageHelpers.getDownloadURL as Mock).mockResolvedValue(
         "https://storage.example.com/player.png",
