@@ -6,7 +6,41 @@ import { PersistentMediaCache } from "./cache";
 // so a later band request can re-decode without another download.
 export interface LoadedBandSource {
   image: HTMLImageElement;
+  alternateImage?: HTMLImageElement;
   release: () => void;
+}
+
+// Only derive a sibling portrait from this venue's identifier-shaped player
+// photo in the active bucket. Never rewrite arbitrary URLs or reuse their
+// download token for a different object.
+export function alternatePlayerPhotoPath(
+  imageRef: string,
+  bucket: string,
+  location: string,
+): string | null {
+  try {
+    const url = new URL(imageRef);
+    const firebaseHost =
+      url.protocol === "https:" &&
+      url.hostname === "firebasestorage.googleapis.com";
+    const emulatorHost =
+      url.protocol === "http:" &&
+      ["127.0.0.1", "localhost"].includes(url.hostname);
+    if (!firebaseHost && !emulatorHost) return null;
+    const match = /^\/v0\/b\/([^/]+)\/o\/([^/]+)$/.exec(url.pathname);
+    if (!match || decodeURIComponent(match[1]!) !== bucket) return null;
+    const path = decodeURIComponent(match[2]!);
+    const prefix = `${location}/players/`;
+    if (!path.startsWith(prefix)) return null;
+    const filename = path.slice(prefix.length);
+    const celebration = filename.endsWith("-fagn.png");
+    const id = filename.slice(0, celebration ? -9 : -4);
+    if (!filename.endsWith(".png") || !/^[A-Za-z0-9_-]{1,64}$/.test(id))
+      return null;
+    return `${prefix}${id}${celebration ? "" : "-fagn"}.png`;
+  } catch {
+    return null;
+  }
 }
 
 export interface PlayerBandSourceLoaderOptions {
@@ -14,7 +48,7 @@ export interface PlayerBandSourceLoaderOptions {
   location: string;
   cache?: PersistentMediaCache;
   // Resolves the Firebase Storage download URL for an approved object path
-  // (the venue crest fallback).
+  // (a sibling player portrait or the venue crest fallback).
   resolveDownloadUrl: (objectPath: string) => Promise<string>;
   resolveGeneration: (objectPath: string) => Promise<string | null>;
   // The club override logo download URL for a team name, or null when the
@@ -33,7 +67,8 @@ export interface PlayerBandSourceLoaderOptions {
 // URL) → team logo resolved by the asset's team name (club override
 // `logoUrl`, then the bundled `clubLogos` crest — works for away teams) →
 // the venue crest chain. Every hop is tried only when the previous one is
-// missing, unreadable, or undecodable.
+// missing, unreadable, or undecodable. Same-venue player photos additionally
+// preload their regular/celebration sibling for display-local alternation.
 export class PlayerBandSourceLoader {
   private readonly cache: PersistentMediaCache;
   private readonly createObjectUrl: (blob: Blob) => string;
@@ -53,11 +88,30 @@ export class PlayerBandSourceLoader {
   // currently visible band (or the base deck).
   async load(identity: BandIdentity): Promise<LoadedBandSource> {
     if (identity.imageRef) {
-      try {
-        return await this.loadFromUrl(identity.imageRef);
-      } catch {
-        // Fall through to the team-logo hop.
+      const alternatePath = alternatePlayerPhotoPath(
+        identity.imageRef,
+        this.options.bucket,
+        this.options.location,
+      );
+      const [primary, alternate] = await Promise.all([
+        this.loadFromUrl(identity.imageRef).catch(() => null),
+        alternatePath
+          ? this.loadObject(alternatePath).catch(() => null)
+          : Promise.resolve(null),
+      ]);
+      if (primary && alternate) {
+        return {
+          image: primary.image,
+          alternateImage: alternate.image,
+          release: () => {
+            primary.release();
+            alternate.release();
+          },
+        };
       }
+      if (primary) return primary;
+      if (alternate) return alternate;
+      // Fall through to the team-logo hop when neither portrait is usable.
     }
     const overrideUrl = this.options.clubOverrideLogoUrl
       ? await this.tryClubOverrideLogo(identity.teamName ?? "")
@@ -102,7 +156,10 @@ export class PlayerBandSourceLoader {
   }
 
   private async loadVenueCrest(): Promise<LoadedBandSource> {
-    const objectPath = `${this.options.location}/crest.png`;
+    return this.loadObject(`${this.options.location}/crest.png`);
+  }
+
+  private async loadObject(objectPath: string): Promise<LoadedBandSource> {
     const generation = await this.options.resolveGeneration(objectPath);
     if (!generation) {
       throw new Error(`Band source is unavailable: ${objectPath}`);

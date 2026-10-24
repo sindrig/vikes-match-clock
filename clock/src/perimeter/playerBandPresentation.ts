@@ -6,6 +6,7 @@ import {
   drawBandUnit,
   layoutBandUnit,
   portraitFitWidth,
+  portraitFrameAt,
   scorerBandFonts,
 } from "./scorerCompositor";
 import {
@@ -168,6 +169,7 @@ export interface BandUnitLayout {
   identity: BandIdentity;
   source: { width: number; height: number };
   image: HTMLImageElement;
+  alternateImage?: HTMLImageElement;
   unit: BandUnit;
 }
 
@@ -189,13 +191,23 @@ function drawUnits(
   slots: UnitSlot[],
   height: number,
   alpha: number,
+  elapsedMs: number,
 ): void {
   for (const slot of slots) {
     const unit = layout.units[slot.index % layout.units.length];
     if (!unit) continue;
-    drawBandUnit(context, unit.image, unit.source, unit.unit, slot.x, height, {
-      alpha,
-    });
+    const frame = portraitFrameAt(unit.image, unit.alternateImage, elapsedMs);
+    drawBandUnit(
+      context,
+      frame.image,
+      frame.source,
+      unit.unit,
+      slot.x,
+      height,
+      {
+        alpha,
+      },
+    );
   }
 }
 
@@ -276,7 +288,7 @@ function drawPlayerFrame(
   // Soft alpha fade-in entrance, then steady drift.
   const entrance = easeOutCubic(elapsedMs / BAND_PRESENTATION_TIMELINE.fadeMs);
   context.save();
-  drawUnits(context, layout, slots, height, entrance);
+  drawUnits(context, layout, slots, height, entrance, elapsedMs);
   context.restore();
 }
 
@@ -291,6 +303,8 @@ export interface SubstitutionUnit {
   onSource: { width: number; height: number };
   offImage: HTMLImageElement;
   onImage: HTMLImageElement;
+  offAlternateImage?: HTMLImageElement;
+  onAlternateImage?: HTMLImageElement;
   gap: number;
   unitWidth: number;
 }
@@ -301,11 +315,13 @@ export function layoutSubstitutionUnit(
     identity: BandIdentity;
     source: { width: number; height: number };
     image: HTMLImageElement;
+    alternateImage?: HTMLImageElement;
   },
   on: {
     identity: BandIdentity;
     source: { width: number; height: number };
     image: HTMLImageElement;
+    alternateImage?: HTMLImageElement;
   },
   height: number,
   context: BandRenderingContext,
@@ -316,6 +332,9 @@ export function layoutSubstitutionUnit(
     off.identity.name,
     height,
     context,
+    off.alternateImage
+      ? portraitFrameAt(off.alternateImage, undefined, 0).source
+      : undefined,
   );
   const onUnit = layoutBandUnit(
     on.source,
@@ -323,6 +342,9 @@ export function layoutSubstitutionUnit(
     on.identity.name,
     height,
     context,
+    on.alternateImage
+      ? portraitFrameAt(on.alternateImage, undefined, 0).source
+      : undefined,
   );
   const gap = offUnit.gap;
   const unitWidth = offUnit.unitWidth + gap + onUnit.unitWidth;
@@ -333,6 +355,8 @@ export function layoutSubstitutionUnit(
     onSource: on.source,
     offImage: off.image,
     onImage: on.image,
+    offAlternateImage: off.alternateImage,
+    onAlternateImage: on.alternateImage,
     gap,
     unitWidth: Math.max(1, unitWidth),
   };
@@ -346,17 +370,27 @@ export function drawSubstitutionUnit(
   unit: SubstitutionUnit,
   originX: number,
   height: number,
-  motion: { alpha?: number; scale?: number } = {},
+  motion: { alpha?: number; scale?: number; elapsedMs?: number } = {},
 ): void {
   const alpha = motion.alpha ?? 1;
   const scale = motion.scale ?? 1;
+  const offFrame = portraitFrameAt(
+    unit.offImage,
+    unit.offAlternateImage,
+    motion.elapsedMs ?? 0,
+  );
+  const onFrame = portraitFrameAt(
+    unit.onImage,
+    unit.onAlternateImage,
+    motion.elapsedMs ?? 0,
+  );
   context.save();
   context.globalAlpha = alpha;
   // Off cluster: red number and name.
   drawBandUnit(
     context,
-    unit.offImage,
-    unit.offSource,
+    offFrame.image,
+    offFrame.source,
     unit.off,
     originX,
     height,
@@ -365,8 +399,8 @@ export function drawSubstitutionUnit(
   // On cluster: green number and name.
   drawBandUnit(
     context,
-    unit.onImage,
-    unit.onSource,
+    onFrame.image,
+    onFrame.source,
     unit.on,
     originX + unit.off.unitWidth + unit.gap,
     height,
@@ -431,6 +465,7 @@ function drawSubstitutionFrame(
       drawSubstitutionUnit(context, substitution, slot.x, height, {
         alpha,
         scale,
+        elapsedMs,
       });
       context.restore();
     }
@@ -451,6 +486,7 @@ function drawSubstitutionFrame(
     context.clip();
     drawSubstitutionUnit(context, substitution, slot.x, height, {
       alpha: entrance,
+      elapsedMs,
     });
     context.restore();
   }
@@ -471,6 +507,7 @@ export async function createPlayerBandPresentation(
   height: number,
   deps: ScorerBandDeps = defaultBandDeps,
   motmLead: MotmLead | null = null,
+  alternateImage?: HTMLImageElement,
 ): Promise<ScorerPresentation> {
   await deps.loadFonts(scorerBandFonts(height));
   const canvas = deps.createCanvas(width, height);
@@ -490,12 +527,17 @@ export async function createPlayerBandPresentation(
     identity.name,
     height,
     context,
+    alternateImage
+      ? portraitFrameAt(alternateImage, undefined, 0).source
+      : undefined,
   );
   const layout: PresentationLayout = {
     width,
     height,
     unitWidth: unit.unitWidth,
-    units: [{ identity, source: sourceSize, image: source, unit }],
+    units: [
+      { identity, source: sourceSize, image: source, alternateImage, unit },
+    ],
   };
   const draw = (elapsedMs: number): void => {
     context.clearRect(0, 0, width, height);
@@ -519,10 +561,12 @@ export async function createSubstitutionBandPresentation(
   off: {
     identity: BandIdentity;
     source: HTMLImageElement;
+    alternateImage?: HTMLImageElement;
   },
   on: {
     identity: BandIdentity;
     source: HTMLImageElement;
+    alternateImage?: HTMLImageElement;
   },
   width: number,
   height: number,
@@ -545,8 +589,18 @@ export async function createSubstitutionBandPresentation(
     height: on.source.naturalHeight,
   };
   const substitution = layoutSubstitutionUnit(
-    { identity: off.identity, source: offSource, image: off.source },
-    { identity: on.identity, source: onSource, image: on.source },
+    {
+      identity: off.identity,
+      source: offSource,
+      image: off.source,
+      alternateImage: off.alternateImage,
+    },
+    {
+      identity: on.identity,
+      source: onSource,
+      image: on.source,
+      alternateImage: on.alternateImage,
+    },
     height,
     context,
   );
@@ -592,6 +646,7 @@ export async function createPlayerBandPresentations(
   screens: readonly { id: string; width: number; height: number }[],
   deps: ScorerBandDeps = defaultBandDeps,
   motmLead: MotmLead | null = null,
+  alternateImage?: HTMLImageElement,
 ): Promise<Record<string, ScorerPresentation>> {
   const presentations: Record<string, ScorerPresentation> = {};
   for (const screen of screens) {
@@ -603,6 +658,7 @@ export async function createPlayerBandPresentations(
       screen.height,
       deps,
       motmLead,
+      alternateImage,
     );
   }
   return presentations;
@@ -611,8 +667,16 @@ export async function createPlayerBandPresentations(
 // Creates one substitution-band presentation per configured logical screen.
 export async function createSubstitutionBandPresentations(
   style: SubstitutionBandStyle,
-  off: { identity: BandIdentity; source: HTMLImageElement },
-  on: { identity: BandIdentity; source: HTMLImageElement },
+  off: {
+    identity: BandIdentity;
+    source: HTMLImageElement;
+    alternateImage?: HTMLImageElement;
+  },
+  on: {
+    identity: BandIdentity;
+    source: HTMLImageElement;
+    alternateImage?: HTMLImageElement;
+  },
   screens: readonly { id: string; width: number; height: number }[],
   deps: ScorerBandDeps = defaultBandDeps,
 ): Promise<Record<string, ScorerPresentation>> {

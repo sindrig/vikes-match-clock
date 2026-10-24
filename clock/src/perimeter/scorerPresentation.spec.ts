@@ -37,6 +37,7 @@ interface FrameOp {
   args: number[];
   text?: string;
   style?: string;
+  image?: CanvasImageSource;
 }
 
 interface Recording {
@@ -81,7 +82,7 @@ function makeRecordingContext(): Recording {
     lineTo: (...args: number[]) => ops.push({ op: "lineTo", args }),
     drawImage: vi.fn(
       (
-        _image: CanvasImageSource,
+        image: CanvasImageSource,
         sx: number,
         sy: number,
         sw: number,
@@ -94,6 +95,7 @@ function makeRecordingContext(): Recording {
         ops.push({
           op: "drawImage",
           args: [sx, sy, sw, sh, dx, dy, dw, dh],
+          image,
         }),
     ),
     fillText: vi.fn((text: string, x: number, y: number) =>
@@ -142,6 +144,7 @@ const STYLES: ScorerCelebrationStyle[] = [
 async function createFor(
   style: ScorerCelebrationStyle,
   recordings: Recording = makeRecordingContext(),
+  alternateImage?: HTMLImageElement,
 ) {
   const fonts: string[] = [];
   const canvases: { width: number; height: number }[] = [];
@@ -167,6 +170,7 @@ async function createFor(
     960,
     108,
     deps,
+    alternateImage,
   );
   return { presentation, recordings, fonts, canvases };
 }
@@ -197,6 +201,36 @@ function playerTextOps(
 }
 
 describe("scorer presentations", () => {
+  it.each(STYLES)(
+    "alternates scorer portraits on one-second boundaries (%s)",
+    async (style) => {
+      const alternate = imageOf(portraitBytes, 8, 8);
+      const { presentation, recordings } = await createFor(
+        style,
+        undefined,
+        alternate,
+      );
+      for (const [elapsed, useAlternate] of [
+        [999, false],
+        [1000, true],
+        [1999, true],
+        [2000, false],
+        [3500, true],
+      ] as const) {
+        recordings.ops.length = 0;
+        presentation.draw(elapsed);
+        const images = recordings.ops.filter(
+          (entry) => entry.op === "drawImage",
+        );
+        expect(images.length).toBeGreaterThan(0);
+        for (const draw of images) {
+          expect(draw.image === alternate).toBe(useAlternate);
+          expect(draw.args[6]).toBe(useAlternate ? 108 : 54);
+          expect(draw.args[7]).toBe(108);
+        }
+      }
+    },
+  );
   it("defaults to the ribbon style", () => {
     expect(DEFAULT_SCORER_CELEBRATION_STYLE).toBe("ribbon");
   });

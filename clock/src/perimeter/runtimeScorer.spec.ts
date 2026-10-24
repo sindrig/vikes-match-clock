@@ -193,6 +193,29 @@ async function prepareActiveBase(harness: Harness): Promise<void> {
 }
 
 describe("PerimeterRuntime semantic scorer overlays", () => {
+  it("passes both portraits into composition and releases them on clear", async () => {
+    const image = { naturalWidth: 4, naturalHeight: 8 } as HTMLImageElement;
+    const alternateImage = {
+      naturalWidth: 8,
+      naturalHeight: 8,
+    } as HTMLImageElement;
+    const release = vi.fn();
+    const harness = createHarness({
+      loadSource: vi.fn(() =>
+        Promise.resolve({ image, alternateImage, release }),
+      ),
+    });
+    await harness.runtime.setOverlay(scorerCommand, 1000);
+    expect(harness.scorer.compose).toHaveBeenCalledWith(
+      "ribbon",
+      scorerCommand,
+      image,
+      Object.values(configuration.logicalScreens),
+      alternateImage,
+    );
+    await harness.runtime.setOverlay(null, 2000);
+    expect(release).toHaveBeenCalledOnce();
+  });
   it("composes every configured overlay logical screen and activates atomically", async () => {
     const harness = createHarness();
     await prepareActiveBase(harness);
@@ -206,6 +229,7 @@ describe("PerimeterRuntime semantic scorer overlays", () => {
       scorerCommand,
       expect.anything(),
       [{ height: 1, id: "left", name: "Left", width: 2 }],
+      undefined,
     );
   });
 
@@ -368,6 +392,7 @@ describe("PerimeterRuntime semantic scorer overlays", () => {
       scorerCommand,
       expect.anything(),
       [{ height: 1, id: "left", name: "Left", width: 2 }],
+      undefined,
     );
   });
 

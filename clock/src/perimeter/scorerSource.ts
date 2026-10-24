@@ -11,6 +11,7 @@ export interface LoadedScorerSource {
   objectPath: string;
   generation: string;
   image: HTMLImageElement;
+  alternateImage?: HTMLImageElement;
   release: () => void;
 }
 
@@ -52,9 +53,10 @@ export class ScorerSourceLoader {
       options.revokeObjectUrl ?? ((url) => URL.revokeObjectURL(url));
   }
 
-  // Loads the selected player's celebration image first and falls back to
-  // the venue crest only when the celebration image is missing, unreadable,
-  // or undecodable. When the Storage crest is also unusable, the optional
+  // Preloads both portraits, preferring the celebration pose for the first
+  // frame and holding whichever pose remains when only one is usable. The
+  // venue crest is used only when both portraits fail. If it also fails, the
+  // optional
   // bundled club crest keeps the band renderable (crest + number + name).
   // Throws only when every source is unusable so the caller can retain the
   // currently visible overlay.
@@ -63,24 +65,38 @@ export class ScorerSourceLoader {
       player,
       this.options.location,
     );
-    const celebrationError = await this.tryLoadCelebration(celebrationPath);
-    if (!(celebrationError instanceof Error)) return celebrationError;
+    const [celebration, regular] = await Promise.all([
+      this.tryLoadPortrait(celebrationPath),
+      this.tryLoadPortrait(`${this.options.location}/players/${player.id}.png`),
+    ]);
+    if (!(celebration instanceof Error)) {
+      if (regular instanceof Error) return celebration;
+      return {
+        ...celebration,
+        alternateImage: regular.image,
+        release: () => {
+          celebration.release();
+          regular.release();
+        },
+      };
+    }
+    if (!(regular instanceof Error)) return regular;
     try {
       return await this.loadObject(crestPath, "crest");
     } catch {
       const bundled = await this.tryLoadBundledCrest();
       if (bundled) return bundled;
       throw new Error(
-        `Scorer source could not be loaded (${celebrationError.message}).`,
+        `Scorer source could not be loaded (${celebration.message}).`,
       );
     }
   }
 
-  private async tryLoadCelebration(
-    celebrationPath: string,
+  private async tryLoadPortrait(
+    objectPath: string,
   ): Promise<LoadedScorerSource | Error> {
     try {
-      return await this.loadObject(celebrationPath, "player");
+      return await this.loadObject(objectPath, "player");
     } catch (error) {
       return error instanceof Error ? error : new Error(String(error));
     }

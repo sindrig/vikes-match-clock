@@ -3,6 +3,7 @@ import { PersistentMediaCache } from "./cache";
 import {
   PlayerBandSourceLoader,
   type PlayerBandSourceLoaderOptions,
+  alternatePlayerPhotoPath,
 } from "./bandSource";
 import type { BandIdentity } from "./playerBandPresentation";
 
@@ -74,6 +75,7 @@ function createHarness(
     clubOverrideLogoUrl?: (teamName: string) => Promise<string | null>;
     bundledCrestFor?: (teamName: string) => Promise<HTMLImageElement | null>;
     resolveGeneration?: (path: string) => Promise<string | null>;
+    resolveDownloadUrl?: (path: string) => Promise<string>;
     fetchResponses?: Map<string, Response>;
   } = {},
 ) {
@@ -94,7 +96,9 @@ function createHarness(
     resolveGeneration:
       overrides.resolveGeneration ??
       (() => Promise.resolve("1700000000000000")),
-    resolveDownloadUrl: () => Promise.resolve("https://dl.example/crest"),
+    resolveDownloadUrl:
+      overrides.resolveDownloadUrl ??
+      (() => Promise.resolve("https://dl.example/crest")),
     clubOverrideLogoUrl:
       overrides.clubOverrideLogoUrl ?? (() => Promise.resolve(null)),
     bundledCrestFor: overrides.bundledCrestFor ?? (() => Promise.resolve(null)),
@@ -121,6 +125,89 @@ afterEach(() => {
 });
 
 describe("PlayerBandSourceLoader", () => {
+  const photoUrl = (filename: string) =>
+    `https://firebasestorage.googleapis.com/v0/b/bucket/o/${encodeURIComponent(`vikuti/players/${filename}`)}?alt=media&token=primary-token`;
+
+  it("preloads both poses and releases both decoded images", async () => {
+    const resolveGeneration = vi.fn(() => Promise.resolve("42"));
+    const resolveDownloadUrl = vi.fn(() =>
+      Promise.resolve("https://dl.example/alternate"),
+    );
+    const { loader, objectUrls, fetches } = createHarness({
+      resolveGeneration,
+      resolveDownloadUrl,
+    });
+    const identity = { ...IDENTITY, imageRef: photoUrl("2492.png") };
+    const loaded = await loader.load(identity);
+    expect(loaded.alternateImage).toBeInstanceOf(FakeImage);
+    expect(loaded.alternateImage).not.toBe(loaded.image);
+    expect(resolveGeneration).toHaveBeenCalledWith(
+      "vikuti/players/2492-fagn.png",
+    );
+    expect(resolveDownloadUrl).toHaveBeenCalledWith(
+      "vikuti/players/2492-fagn.png",
+    );
+    expect(objectUrls).toHaveLength(2);
+    loaded.release();
+    expect(objectUrls).toHaveLength(0);
+    const again = await loader.load(identity);
+    expect(fetches()).toBe(2);
+    again.release();
+  });
+
+  it("loads the regular pose when the card already uses the celebration pose", async () => {
+    const resolveGeneration = vi.fn(() => Promise.resolve("42"));
+    const { loader } = createHarness({ resolveGeneration });
+    const loaded = await loader.load({
+      ...IDENTITY,
+      imageRef: photoUrl("2492-fagn.png"),
+    });
+    expect(resolveGeneration).toHaveBeenCalledWith("vikuti/players/2492.png");
+    expect(loaded.alternateImage).toBeDefined();
+    loaded.release();
+  });
+
+  it("holds the card portrait when the alternate is missing", async () => {
+    const { loader, objectUrls } = createHarness({
+      resolveGeneration: () => Promise.resolve(null),
+    });
+    const loaded = await loader.load({
+      ...IDENTITY,
+      imageRef: photoUrl("2492.png"),
+    });
+    expect(loaded.alternateImage).toBeUndefined();
+    expect(objectUrls).toHaveLength(1);
+    loaded.release();
+  });
+
+  it("holds the alternate portrait rather than a crest when the card photo fails", async () => {
+    const imageRef = photoUrl("2492.png");
+    const clubOverrideLogoUrl = vi.fn(() => Promise.resolve(null));
+    const { loader, objectUrls } = createHarness({
+      fetchResponses: new Map([
+        [imageRef, new Response(null, { status: 404 })],
+      ]),
+      clubOverrideLogoUrl,
+    });
+    const loaded = await loader.load({ ...IDENTITY, imageRef });
+    expect(loaded.alternateImage).toBeUndefined();
+    expect(clubOverrideLogoUrl).not.toHaveBeenCalled();
+    expect(objectUrls).toHaveLength(1);
+    loaded.release();
+  });
+
+  it("ignores an undecodable alternate and releases its object URL", async () => {
+    decodeFailures.add(`blob:1-${PNG_BYTES.length}`);
+    const { loader, objectUrls } = createHarness();
+    const loaded = await loader.load({
+      ...IDENTITY,
+      imageRef: photoUrl("2492.png"),
+    });
+    expect(loaded.alternateImage).toBeUndefined();
+    expect(objectUrls).toHaveLength(1);
+    loaded.release();
+    expect(objectUrls).toHaveLength(0);
+  });
   it("loads the card photo when its download URL fetches and decodes", async () => {
     const { loader, objectUrls } = createHarness();
     const loaded = await loader.load(IDENTITY);
@@ -245,4 +332,55 @@ describe("PlayerBandSourceLoader", () => {
     expect(cacheStore.size()).toBe(1);
     second.release();
   });
+});
+
+describe("alternatePlayerPhotoPath", () => {
+  const urlFor = (path: string, bucket = "bucket") =>
+    `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodeURIComponent(path)}?alt=media&token=token`;
+
+  it.each([
+    ["2492.png", "2492-fagn.png"],
+    ["2492-fagn.png", "2492.png"],
+    ["player_12.png", "player_12-fagn.png"],
+  ])("derives the sibling of %s", (filename, alternate) => {
+    expect(
+      alternatePlayerPhotoPath(
+        urlFor(`vikuti/players/${filename}`),
+        "bucket",
+        "vikuti",
+      ),
+    ).toBe(`vikuti/players/${alternate}`);
+  });
+
+  it("supports emulator download URLs", () => {
+    expect(
+      alternatePlayerPhotoPath(
+        `http://127.0.0.1:9199/v0/b/bucket/o/vikuti%2Fplayers%2F2492.png?alt=media`,
+        "bucket",
+        "vikuti",
+      ),
+    ).toBe("vikuti/players/2492-fagn.png");
+  });
+
+  it.each([
+    urlFor("other-venue/players/2492.png"),
+    urlFor("vikuti/players/2492.png", "other-bucket"),
+    urlFor("vikuti/club-logos/2492.png"),
+    urlFor("vikuti/players/nested/2492.png"),
+    urlFor("vikuti/players/../2492.png"),
+    urlFor("vikuti/players/2492.jpg"),
+    urlFor("vikuti/players/-fagn.png"),
+    urlFor(`vikuti/players/${"x".repeat(65)}.png`),
+    urlFor("vikuti/players/2492.png").replace(
+      "firebasestorage.googleapis.com",
+      "example.com",
+    ),
+    "not-a-url",
+    "https://firebasestorage.googleapis.com/v0/b/bucket/o/%invalid",
+  ])(
+    "does not derive a portrait from an unrelated or unsafe reference: %s",
+    (url) => {
+      expect(alternatePlayerPhotoPath(url, "bucket", "vikuti")).toBeNull();
+    },
+  );
 });

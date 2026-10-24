@@ -119,6 +119,24 @@ export interface BandUnit {
   unitWidth: number;
 }
 
+export const PLAYER_PORTRAIT_INTERVAL_MS = 1000;
+
+export function portraitFrameAt(
+  image: HTMLImageElement,
+  alternateImage: HTMLImageElement | undefined,
+  elapsedMs: number,
+): { image: HTMLImageElement; source: { width: number; height: number } } {
+  const selected =
+    alternateImage &&
+    Math.floor(Math.max(0, elapsedMs) / PLAYER_PORTRAIT_INTERVAL_MS) % 2 === 1
+      ? alternateImage
+      : image;
+  return {
+    image: selected,
+    source: { width: selected.naturalWidth, height: selected.naturalHeight },
+  };
+}
+
 // One repeating unit: [full portrait fitted to the band height] [gap] [number]
 // [gap] [name] [gap]. The name is measured at its nominal size, reduced toward
 // the defined minimum size, and only then truncated, so one unit can never
@@ -129,8 +147,15 @@ export function layoutBandUnit(
   name: string,
   height: number,
   context: BandRenderingContext,
+  alternateSource?: { width: number; height: number },
 ): BandUnit {
-  const portraitWidth = portraitFitWidth(source.width, source.height, height);
+  // Reserve the wider pose's slot once, so swaps never shift text or drift.
+  const portraitWidth = Math.max(
+    portraitFitWidth(source.width, source.height, height),
+    alternateSource
+      ? portraitFitWidth(alternateSource.width, alternateSource.height, height)
+      : 0,
+  );
   const gap = bandGap(height);
   const numberFontSize = bandNumberFontSize(height);
   context.font = scorerBandFontSpec(numberFontSize);
@@ -241,7 +266,8 @@ export function drawBandUnit(
     // Contain fit: the full source image is scaled to the slot, so nothing
     // is clipped away at the band's top or bottom edge. Scaling keeps the
     // slot's center fixed so repeated units never collide.
-    const drawWidth = unit.portraitWidth * portraitScale;
+    const drawWidth =
+      portraitFitWidth(source.width, source.height, height) * portraitScale;
     const drawHeight = height * portraitScale;
     const centerX = originX + unit.portraitWidth / 2;
     context.globalAlpha = portraitAlpha;

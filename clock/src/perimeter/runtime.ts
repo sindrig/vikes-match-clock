@@ -85,6 +85,7 @@ export interface PerimeterOverlayScorerDependencies {
   // order. The returned handle must be released by the caller.
   loadSource: (command: GoalScorerOverlayCommand) => Promise<{
     image: HTMLImageElement;
+    alternateImage?: HTMLImageElement;
     release: () => void;
   }>;
   // Awaits readiness of the fonts the compositor will use.
@@ -98,6 +99,7 @@ export interface PerimeterOverlayScorerDependencies {
     command: GoalScorerOverlayCommand,
     source: HTMLImageElement,
     screens: readonly { id: string; width: number; height: number }[],
+    alternateImage?: HTMLImageElement,
   ) => Promise<Record<string, ScorerPresentation>>;
 }
 
@@ -105,7 +107,8 @@ export interface PerimeterPlayerBandDependencies {
   // Loads the band source image(s) for the request through the band image
   // chain (photo → team logo → venue crest). The returned handles must be
   // released by the caller: one image for `player` requests, the two side
-  // images (`off`, `on`) for substitution requests.
+  // images (`off`, `on`) for substitution requests, plus optional
+  // `playerAlternate` / `offAlternate` / `onAlternate` portraits.
   loadSource: (request: PlayerBandRequest) => Promise<{
     images: Record<string, HTMLImageElement>;
     release: () => void;
@@ -607,6 +610,7 @@ export class PerimeterRuntime {
         command,
         loaded.image,
         Object.values(this.configuration.logicalScreens),
+        loaded.alternateImage,
       );
       const missing = Object.values(
         this.configuration.compatibilityKeys.overlay,
