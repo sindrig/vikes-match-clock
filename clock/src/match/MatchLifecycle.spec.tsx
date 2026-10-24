@@ -370,6 +370,43 @@ describe("MatchLifecycle", () => {
   });
 
   describe("timed asset completion", () => {
+    it("advances a looping video at the queue duration, not before", async () => {
+      const h = setup({
+        match: makeMatch(),
+        currentAsset: {
+          asset: { key: "ad.mp4", type: "VIDEO", loop: true },
+          time: 5,
+        },
+        activeQueueId: "q1",
+        playing: true,
+      });
+
+      advanceTicks(49);
+      expect(h.fns.completeAssetIfCurrent).not.toHaveBeenCalled();
+      advanceTicks(1);
+      expect(h.fns.completeAssetIfCurrent).toHaveBeenCalledExactlyOnceWith({
+        assetKey: "ad.mp4",
+        time: 5,
+        activeQueueId: "q1",
+        playing: true,
+      });
+      await flushPromises();
+      advanceTicks(20);
+      expect(h.fns.completeAssetIfCurrent).toHaveBeenCalledOnce();
+    });
+
+    it("leaves directly shown looping videos active without a duration", () => {
+      const h = setup({
+        match: makeMatch(),
+        currentAsset: {
+          asset: { key: "ad.mp4", type: "VIDEO", loop: true },
+          time: null,
+        },
+      });
+      advanceTicks(100);
+      expect(h.fns.completeAssetIfCurrent).not.toHaveBeenCalled();
+    });
+
     it("defers completion while an autoplay queue is stopped", () => {
       const now = Date.now();
       vi.setSystemTime(now);

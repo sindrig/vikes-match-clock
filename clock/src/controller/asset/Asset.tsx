@@ -146,6 +146,7 @@ interface AssetObject {
   type: string;
   key: string;
   url?: string;
+  loop?: boolean;
   background?: string;
   teamName?: string;
   overlay?: Overlay | null;
@@ -359,7 +360,7 @@ const AssetComponent = (props: AssetProps) => {
       return (
         <VideoPlayer
           asset={asset}
-          onEnded={handleMediaEnded}
+          onEnded={thumbnail || asset.loop ? undefined : handleMediaEnded}
           thumbnail={thumbnail}
         />
       );

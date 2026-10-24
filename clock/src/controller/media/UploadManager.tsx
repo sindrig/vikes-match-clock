@@ -13,39 +13,57 @@ const fileTypes = ["JPG", "PNG", "GIF"];
 interface UploadManagerProps {
   prefix: string;
   refresh: () => void;
+  allowVideo?: boolean;
 }
 
-const UploadManager: React.FC<UploadManagerProps> = ({ prefix, refresh }) => {
+const UploadManager: React.FC<UploadManagerProps> = ({
+  prefix,
+  refresh,
+  allowVideo = false,
+}) => {
   const [doCompress, setDoCompress] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState(false);
 
-  // react-drag-drop-files v3 with multiple prop passes FileList, not File[]
-  const insertImages = (fileOrFiles: File | FileList): void => {
+  // The uploader's types declare File[], but multiple uploads deliver FileList.
+  const insertMedia = (fileOrFiles: File | File[] | FileList): void => {
     const files: File[] =
-      fileOrFiles instanceof FileList ? Array.from(fileOrFiles) : [fileOrFiles];
+      fileOrFiles instanceof File ? [fileOrFiles] : Array.from(fileOrFiles);
 
-    void Promise.all(
-      files.map((file) =>
-        file.type !== "image/gif" && doCompress
-          ? compress.compress(file, {
+    setUploading(true);
+    setUploadError(false);
+
+    void Promise.allSettled(
+      files.map(async (file) => {
+        const isVideo = file.name.toLowerCase().endsWith(".mp4");
+        const shouldCompress =
+          doCompress &&
+          !isVideo &&
+          file.type.startsWith("image/") &&
+          file.type !== "image/gif";
+        const media = shouldCompress
+          ? await compress.compress(file, {
               quality: 1,
               maxWidth: 240,
               maxHeight: 176,
             })
-          : Promise.resolve(file),
-      ),
+          : file;
+
+        await storageHelpers.uploadBytes(
+          `/${String(prefix)}/${String(media.name)}`,
+          media,
+          {
+            cacheControl: "public, max-age=604800",
+            ...(isVideo ? { contentType: "video/mp4" } : {}),
+          },
+        );
+      }),
     )
-      .then((images) =>
-        Promise.all(
-          images.map((image) =>
-            storageHelpers.uploadBytes(
-              `/${String(prefix)}/${String(image.name)}`,
-              image,
-              { cacheControl: "public, max-age=604800" },
-            ),
-          ),
-        ),
-      )
-      .then(refresh);
+      .then((results) => {
+        setUploadError(results.some((result) => result.status === "rejected"));
+        refresh();
+      })
+      .finally(() => setUploading(false));
   };
 
   return (
@@ -59,11 +77,16 @@ const UploadManager: React.FC<UploadManagerProps> = ({ prefix, refresh }) => {
         Compress automatically
       </label>
       <FileUploader
-        handleChange={insertImages as (arg0: File | File[]) => void}
+        handleChange={insertMedia}
         name="file"
-        types={fileTypes}
+        types={allowVideo ? [...fileTypes, "MP4"] : fileTypes}
         multiple
+        disabled={uploading}
       />
+      {uploading && <p role="status">Hleð upp skrám…</p>}
+      {uploadError && (
+        <p role="alert">Ekki tókst að hlaða upp öllum skrám. Reyndu aftur.</p>
+      )}
       {prefix.startsWith("images") && (
         <CreateFolder prefix={prefix} refresh={refresh} />
       )}

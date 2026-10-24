@@ -82,6 +82,7 @@ const MediaManager: React.FC = () => {
             <UploadManager
               prefix={`${String(finalTab)}${String(prefix)}`}
               refresh={refresh}
+              allowVideo={tab === IMAGE_TYPES.images}
             />
           )}
           <ImageList

@@ -3,6 +3,7 @@ import { useRef, useEffect } from "react";
 interface VideoAsset {
   url?: string;
   key: string;
+  loop?: boolean;
 }
 
 interface VideoPlayerProps {
@@ -13,7 +14,7 @@ interface VideoPlayerProps {
 }
 
 const VideoPlayer = ({
-  asset: { url, key },
+  asset: { url, key, loop = false },
   thumbnail = false,
   playbackSpeed = 1,
   onEnded,
@@ -33,9 +34,11 @@ const VideoPlayer = ({
         ref={videoRef}
         src={videoSrc}
         autoPlay={!thumbnail}
-        loop={thumbnail}
-        muted={thumbnail}
-        onEnded={onEnded}
+        loop={thumbnail || loop}
+        muted={thumbnail || loop}
+        playsInline
+        preload={thumbnail ? "metadata" : "auto"}
+        onEnded={thumbnail || loop ? undefined : onEnded}
         style={{ height: "100%", width: "100%" }}
       />
     </div>

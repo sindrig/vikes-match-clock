@@ -100,7 +100,7 @@ const ImageList: React.FC<ImageListProps> = ({
               <div
                 onClick={() => {
                   const parts = name.split(".");
-                  const suffix = parts[parts.length - 1];
+                  const suffix = parts[parts.length - 1]?.toLowerCase();
                   const type = suffix
                     ? AssetTypeSuffixMap[suffix] || assetTypes.IMAGE
                     : assetTypes.IMAGE;
@@ -108,11 +108,22 @@ const ImageList: React.FC<ImageListProps> = ({
                     key: String(imageUrl) + String(Date.now()),
                     url: imageUrl,
                     type,
+                    ...(type === assetTypes.VIDEO ? { loop: true } : {}),
                   };
                   onAddAssets([asset]);
                 }}
               >
-                <img src={imageUrl} alt={name} />
+                {/\.mp4$/i.test(name) ? (
+                  <video
+                    src={imageUrl}
+                    aria-label={name}
+                    preload="metadata"
+                    muted
+                    playsInline
+                  />
+                ) : (
+                  <img src={imageUrl} alt={name} />
+                )}
                 <span>{name}</span>
               </div>
               {allowEdit ? (

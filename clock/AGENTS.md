@@ -1750,6 +1750,29 @@ flex layout.
 Media cards use 132px-high `object-fit: contain` thumbnails and truncate long
 filenames, so original upload dimensions cannot expand the controller view.
 
+#### Main-Screen MP4 Media
+
+The **Myndefni → Myndir** library accepts JPG, PNG, GIF, and MP4 uploads.
+The advertisement and player-photo tabs remain image-only because their
+separate sponsor slots and player-card consumers render images, not video.
+`UploadManager` accepts a single File, FileList, or File array, compresses
+only non-GIF images when enabled, and uploads MP4 bytes unchanged with an
+explicit `video/mp4` content type. It shows pending/error feedback and refreshes
+the listing after all uploads settle, including partial failures.
+
+`ImageList` recognizes `.mp4` case-insensitively, uses silent non-playing
+`<video preload="metadata">` thumbnails with the same fixed bounds as images,
+and adds `loop: true` to selected VIDEO assets. `VideoPlayer` uses this optional
+asset flag for muted, inline autoplay and native looping. Looping videos and
+thumbnails never submit natural-end completion observations. **Sýna** therefore
+holds a video until cleared/replaced; autoplay queues still advance at their
+configured duration through `MatchLifecycle` (a short video loops rather than
+advancing early). No renderer timer or new Firebase mutation is introduced.
+Legacy VIDEO assets without the flag, including goal celebrations, retain
+their natural-end completion behavior; YouTube and perimeter are unchanged.
+Only browser-compatible MP4 codecs are supported (H.264 recommended); there
+is no transcoding.
+
 #### Drag-and-Drop Collision Detection
 
 `@dnd-kit`'s default `closestCenter` collision detection doesn't work correctly with nested `SortableContext`s (queue columns containing sortable items). When dragging a column, `closestCenter` may match item droppables inside other columns instead of adjacent column droppables.

@@ -58,6 +58,7 @@ export interface Asset {
   key: string;
   type: string;
   url?: string;
+  loop?: boolean;
   background?: string;
   name?: string;
   number?: number | string;

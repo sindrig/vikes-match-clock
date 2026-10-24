@@ -492,6 +492,27 @@ describe("AssetComponent", () => {
   });
 
   describe("Media completion (video / YouTube end event)", () => {
+    it.each([null, 5])(
+      "does not complete a looping video on natural end (time %s)",
+      (time) => {
+        const asset = { type: assetTypes.VIDEO, key: "ad.mp4", loop: true };
+        render(<AssetComponent asset={asset} time={time} />);
+        fireEvent.click(screen.getByTestId("video-ended"));
+        expect(mockCompleteAssetIfCurrent).not.toHaveBeenCalled();
+      },
+    );
+
+    it("does not allow video thumbnails to complete the current asset", () => {
+      render(
+        <AssetComponent
+          asset={{ type: assetTypes.VIDEO, key: "ad.mp4" }}
+          thumbnail
+        />,
+      );
+      fireEvent.click(screen.getByTestId("video-ended"));
+      expect(mockCompleteAssetIfCurrent).not.toHaveBeenCalled();
+    });
+
     it("reports completion during active autoplay using the rendered controller's queue preconditions", () => {
       // The controller is actively autoplaying a queue (activeQueueId set,
       // playing true). The completion observation must carry these real
