@@ -1081,6 +1081,27 @@ describe("firebaseParsers", () => {
       expect(resultKeys).toEqual(defaultKeys);
     });
 
+    it.each([undefined, null, 2])(
+      "keeps idle outlines disabled for legacy or invalid stroke %s",
+      (idleTextStroke) => {
+        const result = parseTheme({
+          idleTextColor: "#b59b56",
+          idleTextStroke,
+        });
+        expect(result?.idleTextColor).toBe("#b59b56");
+        expect(result?.idleTextStroke).toBe("none");
+      },
+    );
+
+    it("preserves an explicitly configured idle outline", () => {
+      const result = parseTheme({
+        idleTextColor: "#ef9600",
+        idleTextStroke: "1px #000000",
+      });
+      expect(result?.idleTextColor).toBe("#ef9600");
+      expect(result?.idleTextStroke).toBe("1px #000000");
+    });
+
     it("uses provided string values", () => {
       const result = parseTheme({
         scoreBoxBg: "#ff0000",

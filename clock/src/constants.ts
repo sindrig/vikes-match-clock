@@ -190,6 +190,7 @@ export const DEFAULT_THEME: ThemeConfig = {
   // Idle screen
   idleTextColor: "#ffffff",
   idleTextFontSize: "40px",
+  idleTextStroke: "none",
   idleLogoTop: "5%",
   idleLogoLeft: "15%",
   idleLogoWidth: "30%",

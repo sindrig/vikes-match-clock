@@ -2049,6 +2049,14 @@ The bundled Keflavík crest has a team-specific `70%` image width in `ScoreBoard
 
 The `insidebig` and `insidesmall` CSS viewport variants (for indoor screens) still use hardcoded position overrides. Theme CSS vars apply to the default/outdoor layout. Converting indoor variants to use theme vars is a potential future enhancement.
 
+#### Idle Text Outline
+
+`idleTextStroke` is an opt-in CSS text stroke shared by the idle clock and
+temperature (`--theme-idle-text-stroke`). It defaults to `"none"`, including
+when parsing existing presets without the field, so existing themes retain
+their appearance. Edit it through **Ítarlegt → Idle skjár → Leturútlína**.
+The idle visual editor still exposes color and size only.
+
 #### Idle Screen Visual Editor
 
 `IdleVisualThemeEditor.tsx` provides a drag-and-drop visual editor for positioning idle screen elements, following the same pattern as `VisualThemeEditor.tsx` (scoreboard editor).

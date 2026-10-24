@@ -193,6 +193,7 @@ export interface ThemeConfig {
   // Idle screen
   idleTextColor: string;
   idleTextFontSize: string;
+  idleTextStroke: string;
   idleLogoTop: string;
   idleLogoLeft: string;
   idleLogoWidth: string;
