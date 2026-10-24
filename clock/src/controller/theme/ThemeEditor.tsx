@@ -620,6 +620,11 @@ const ThemeEditorPanels = ({
         defaultValue={DEFAULT_THEME.idleTextFontSize}
         onChange={(v) => onFieldChange("idleTextFontSize", v)}
       />
+      <StrokeField
+        label="Leturútlína"
+        value={effective.idleTextStroke}
+        onChange={(v) => onFieldChange("idleTextStroke", v)}
+      />
       <Divider className="theme-divider" />
       <PercentField
         label="Merki ofan"

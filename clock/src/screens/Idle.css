@@ -25,6 +25,7 @@ img.idle-ad {
   font-size: var(--theme-idle-text-font-size, 40px);
   font-weight: bold;
   color: var(--theme-idle-text-color, #ffffff);
+  -webkit-text-stroke: var(--theme-idle-text-stroke, none);
 }
 
 .idle .idle-clock .idle-clock-inner {
@@ -42,6 +43,7 @@ img.idle-ad {
   font-size: var(--theme-idle-text-font-size, 40px);
   font-weight: bold;
   color: var(--theme-idle-text-color, #ffffff);
+  -webkit-text-stroke: var(--theme-idle-text-stroke, none);
 }
 
 .idle .idle-temperature {

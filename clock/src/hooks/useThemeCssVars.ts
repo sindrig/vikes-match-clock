@@ -72,6 +72,7 @@ export const themeToCssVars = (theme: ThemeConfig): Record<string, string> => ({
   // Idle screen
   "--theme-idle-text-color": theme.idleTextColor,
   "--theme-idle-text-font-size": theme.idleTextFontSize,
+  "--theme-idle-text-stroke": theme.idleTextStroke,
   "--theme-idle-logo-top": theme.idleLogoTop,
   "--theme-idle-logo-left": theme.idleLogoLeft,
   "--theme-idle-logo-width": theme.idleLogoWidth,
