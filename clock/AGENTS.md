@@ -218,7 +218,8 @@ audit record.
   `perimeter.set-overlay`,
   `perimeter.clear-overlay`, `perimeter.set-ad-layout`,
   `perimeter.set-goal-video`, `perimeter.create-media-pair`,
-  `perimeter.delete-media-pair`, `perimeter.set-scorer-celebration`,
+  `perimeter.delete-media-pair`, `perimeter.set-media-pair-main-screen`,
+  `perimeter.set-scorer-celebration`,
   `perimeter.set-player-display-style`, `perimeter.set-substitution-style`.
 - Club overrides use `clubOverrides.create|update|save|delete` (both the
   context actions and `ClubOverrideForm.tsx`, which builds its own audit
@@ -681,8 +682,11 @@ These are exposed via `usePerimeter()` hook.
 
 An operator-curated library of **named overlay pairs** that share the same
 active overlay channel as the home-goal overlay. Each pair binds a required
-name to exactly two files: one for the 48-screen target (layer `"2"`) and one
-for the 40-screen target (layer `"4"`). Files may be images or videos.
+name to exactly two perimeter files: one for the 48-screen target (layer `"2"`)
+and one for the 40-screen target (layer `"4"`). Files may be images or videos.
+An optional `mainScreenAsset` links an existing ordinary image/video from the
+**Myndefni → Myndir** library, turning the pair into a three-screen set without
+uploading the main-screen media again. Existing pairs remain perimeter-only.
 
 **Firebase path**: `states/${listenPrefix}/perimeter/mediaPairs/{pairId}`
 
@@ -720,6 +724,10 @@ for the 40-screen target (layer `"4"`). Files may be images or videos.
 - Sources must use the approved Firebase bucket and the pair's own prefix, and
   the suffix after the target folder must be exactly one daemon-safe filename
   (no subdirectories and no `..`), matching the daemon's staging rules.
+- `mainScreenAsset`, when present, is a `MainScreenMediaAsset` with `key`,
+  `name`, `url`, and `type` (`IMAGE` or `VIDEO` only). Video assets include
+  `loop: true`, matching ordinary main-screen media playback. It is outside
+  the perimeter `files` map and never reaches the daemon or perimeter renderer.
 
 **Showing** a pair writes a fresh `PerimeterOverlay` to the existing command
 path `states/${listenPrefix}/perimeter/overlay` with a new command `id` and a
@@ -727,21 +735,35 @@ single column (`durationMs: 10000`) holding the pair's two files. Because the
 daemon holds the final column until clear, the pair loops until cleared. The
 overlay channel is single-writer: showing a pair replaces a home-goal overlay
 and a subsequent home goal replaces the pair (last command wins).
+If the entry has `mainScreenAsset`, the same **Sýna** click also calls the
+existing controller `showItemNow` with a fresh playback key: the main-screen
+queue stops, the image holds or video loops until cleared/replaced, and
+re-selecting the entry restarts its main-screen media. These use the existing
+audited main-screen and perimeter actions, not frame-synchronized playback.
+Perimeter-only entries leave the main screen unchanged.
 
 **Clearing** is available both in the new "Jaðarefni" media tab ("Hreinsa
 jaðarskjá") and via the existing global "Hreinsa virkt overlay" button. Both
 write `overlay: null`; either clears whichever overlay is active and restores
 the rotating base ad deck.
+The tab additionally offers **Hreinsa alla skjái**, which clears the main-screen
+asset (and stops its queue) as well as the perimeter overlay; **Hreinsa jaðarskjá**
+remains perimeter-only.
 
 Types in `types.ts`:
 
-- `PerimeterMediaPair` — name + per-target `PerimeterOverlayFile` map.
+- `PerimeterMediaPair` — name + per-target `PerimeterOverlayFile` map and an
+  optional `MainScreenMediaAsset`.
 
 Parsing in `firebaseParsers.ts`:
 
 - `parsePerimeterMediaPairs()` — validates the pair library (pair ID, name,
   exact `"2"`/`"4"` key set, safe distinct filenames, target-specific paths,
   pair-ID/source consistency, approved bucket + location).
+- `parseMainScreenMediaAsset()` restricts the optional link to ordinary
+  image/video assets with bounded non-empty key/name and an HTTP(S) URL,
+  normalizes video looping, and strips unrelated fields. Malformed optional
+  links are omitted without losing a valid perimeter pair.
 
 Context in `FirebaseStateContext.tsx`:
 
@@ -751,17 +773,33 @@ Context in `FirebaseStateContext.tsx`:
   UI uploads both files first, then writes the record).
 - `deletePerimeterMediaPair(pairId)` — removes only the library record;
   Firebase Storage assets are left in place.
+- `setPerimeterMediaPairMainScreenAsset(pairId, asset | null)` — audited
+  leaf-only update of an existing entry's optional main-screen link; never
+  replaces the pair's name/files or deletes media. Ineligible writes and
+  Firebase failures reject so the editor stays open with feedback.
 
 UI in `controller/media/PerimeterMediaPairs.tsx` (fifth "Jaðarefni" tab):
 
-- Text-only cards (name + both filenames), no thumbnails and no Storage
-  download-URL lookups.
+- Text-only cards (name + both filenames + linked main-screen filename), no
+  thumbnails and no Storage download-URL lookups.
 - `Nýtt jaðarefni` modal: name + required 48/40 file pickers (`image/*,video/*`).
   Uploads both files (waiting for both to settle), then writes the library
   record; if an upload or the record write fails, any files that already
   landed in Storage are best-effort deleted so nothing is orphaned.
+- The create modal includes an optional `MainScreenMediaPicker`; each existing
+  card's **Stórskjár** action opens the same picker to attach, change, or detach
+  the link without reuploading perimeter files. It reuses `ImageList` (selected
+  assets now carry their filename), browses nested `images/` folders, preserves
+  the `safamyri` → `fotbolti` library alias, and never offers deletion/upload.
+  **Vista** saves the draft; cancel leaves the saved entry unchanged.
 - Green **Sýna** action, red **Fjarlægja** (confirmation), tab-local
-  **Hreinsa jaðarskjá**, and the daemon `overlayStatus` (phase + error).
+  **Hreinsa jaðarskjá** / **Hreinsa alla skjái**, and the daemon `overlayStatus`
+  (phase + error). Mutations are disabled while Firebase write eligibility is
+  unavailable.
+
+`e2e/perimeter-media-pairs.spec.ts` covers selecting existing media when creating
+a triple, one-click main/perimeter commands, detaching without changing current
+playback, perimeter-only behavior, and clearing all screens using the emulator.
 
 This system is distinct from the rotating base ad-deck (`adLayout`) and never
 becomes selectable base-ad content. The three perimeter systems are:

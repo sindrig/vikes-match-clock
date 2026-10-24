@@ -1,14 +1,19 @@
 import React, { useCallback, useState } from "react";
 import { Button, Loader, Modal, Badge } from "rsuite";
 import PlusIcon from "@rsuite/icons/Plus";
-import { usePerimeter } from "../../contexts/FirebaseStateContext";
+import {
+  useController,
+  usePerimeter,
+} from "../../contexts/FirebaseStateContext";
 import { useLocalState } from "../../contexts/LocalStateContext";
 import {
   PerimeterMediaPair,
   PerimeterOverlayFile,
   PerimeterOverlayPhase,
+  MainScreenMediaAsset,
 } from "../../types";
 import { storageHelpers, FIREBASE_STORAGE_BUCKET } from "../../firebase";
+import MainScreenMediaPicker from "./MainScreenMediaPicker";
 
 import "./PerimeterMediaPairs.css";
 
@@ -58,22 +63,28 @@ const PerimeterMediaPairs: React.FC = () => {
   const {
     mediaPairs,
     createPerimeterMediaPair,
+    setPerimeterMediaPairMainScreenAsset,
     deletePerimeterMediaPair,
     setPerimeterOverlay,
     clearPerimeterOverlay,
     overlayStatus,
+    writeEligible,
   } = usePerimeter();
+  const { showItemNow, renderAsset } = useController();
   const { auth, listenPrefix } = useLocalState();
 
   const [showCreate, setShowCreate] = useState(false);
   const [name, setName] = useState("");
   const [file48, setFile48] = useState<File | null>(null);
   const [file40, setFile40] = useState<File | null>(null);
+  const [mainScreenAsset, setMainScreenAsset] =
+    useState<MainScreenMediaAsset | null>(null);
+  const [editingPairId, setEditingPairId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const canMutate = !auth.isEmpty && listenPrefix !== "";
+  const canMutate = !auth.isEmpty && listenPrefix !== "" && writeEligible;
   const pairs = Object.entries(mediaPairs);
 
   const openCreate = () => {
@@ -81,6 +92,7 @@ const PerimeterMediaPairs: React.FC = () => {
     setName("");
     setFile48(null);
     setFile40(null);
+    setMainScreenAsset(null);
     setShowCreate(true);
   };
 
@@ -147,12 +159,14 @@ const PerimeterMediaPairs: React.FC = () => {
       await createPerimeterMediaPair(pairId, {
         name: trimmedName,
         files,
+        ...(mainScreenAsset ? { mainScreenAsset } : {}),
       });
 
       setShowCreate(false);
       setName("");
       setFile48(null);
       setFile40(null);
+      setMainScreenAsset(null);
     } catch (err) {
       // Best-effort delete of the uploads that already landed in Storage so a
       // failed create never leaves unreachable files behind (a retry uploads
@@ -172,6 +186,10 @@ const PerimeterMediaPairs: React.FC = () => {
 
   const showPair = (pair: PerimeterMediaPair) => {
     if (!canMutate) return;
+    if (pair.mainScreenAsset) {
+      // A new playback identity restarts even the same video on repeated Sýna.
+      showItemNow({ ...pair.mainScreenAsset, key: crypto.randomUUID() });
+    }
     setPerimeterOverlay({
       version: 1,
       id: crypto.randomUUID(),
@@ -187,6 +205,29 @@ const PerimeterMediaPairs: React.FC = () => {
   const clearOverlay = () => {
     if (!canMutate) return;
     clearPerimeterOverlay();
+  };
+
+  const openMainScreenEdit = (pairId: string, pair: PerimeterMediaPair) => {
+    setError(null);
+    setMainScreenAsset(pair.mainScreenAsset ?? null);
+    setEditingPairId(pairId);
+  };
+
+  const saveMainScreen = async () => {
+    if (!canMutate || !editingPairId || uploading) return;
+    setUploading(true);
+    setError(null);
+    try {
+      await setPerimeterMediaPairMainScreenAsset(
+        editingPairId,
+        mainScreenAsset,
+      );
+      setEditingPairId(null);
+    } catch {
+      setError("Ekki tókst að vista stórskjárefni. Reyndu aftur.");
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleDelete = useCallback(
@@ -237,6 +278,19 @@ const PerimeterMediaPairs: React.FC = () => {
         >
           Hreinsa jaðarskjá
         </Button>
+        <Button
+          size="sm"
+          appearance="ghost"
+          color="red"
+          disabled={!canMutate}
+          onClick={() => {
+            if (!canMutate) return;
+            renderAsset(null);
+            clearPerimeterOverlay();
+          }}
+        >
+          Hreinsa alla skjái
+        </Button>
       </div>
 
       {overlayStatus && (
@@ -253,7 +307,11 @@ const PerimeterMediaPairs: React.FC = () => {
         </div>
       )}
 
-      {error && <div className="media-pairs-error">{error}</div>}
+      {error && !showCreate && editingPairId === null && (
+        <div className="media-pairs-error" role="alert">
+          {error}
+        </div>
+      )}
 
       {pairs.length === 0 ? (
         <div className="media-pairs-empty">Engin jaðarefni skráð.</div>
@@ -268,6 +326,11 @@ const PerimeterMediaPairs: React.FC = () => {
               <div className="media-pair-file">
                 40 skjáir: {pair.files["4"]?.name ?? "—"}
               </div>
+              {pair.mainScreenAsset && (
+                <div className="media-pair-file">
+                  Stórskjár: {pair.mainScreenAsset.name}
+                </div>
+              )}
               <div className="media-pair-actions">
                 <Button
                   size="sm"
@@ -277,6 +340,14 @@ const PerimeterMediaPairs: React.FC = () => {
                   disabled={!canMutate}
                 >
                   Sýna
+                </Button>
+                <Button
+                  size="sm"
+                  appearance="ghost"
+                  onClick={() => openMainScreenEdit(pairId, pair)}
+                  disabled={!canMutate}
+                >
+                  Stórskjár
                 </Button>
                 <Button
                   size="sm"
@@ -293,7 +364,12 @@ const PerimeterMediaPairs: React.FC = () => {
         </div>
       )}
 
-      <Modal open={showCreate} onClose={closeCreate} size="sm">
+      <Modal
+        open={showCreate}
+        onClose={closeCreate}
+        size="sm"
+        className="media-pair-modal"
+      >
         <Modal.Header>
           <Modal.Title>Nýtt jaðarefni</Modal.Title>
         </Modal.Header>
@@ -307,6 +383,7 @@ const PerimeterMediaPairs: React.FC = () => {
                 id="media-pair-name"
                 className="media-pair-input"
                 value={name}
+                disabled={uploading}
                 maxLength={MAX_NAME_LENGTH}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="t.d. Sindri"
@@ -338,6 +415,13 @@ const PerimeterMediaPairs: React.FC = () => {
                 </div>
               );
             })}
+            <MainScreenMediaPicker
+              key={showCreate ? "create-open" : "create-closed"}
+              value={mainScreenAsset}
+              onChange={setMainScreenAsset}
+              disabled={uploading}
+            />
+            {error && <div role="alert">{error}</div>}
             {uploading && (
               <div className="media-pair-uploading">
                 <Loader size="sm" content="Hleður upp..." />
@@ -356,6 +440,43 @@ const PerimeterMediaPairs: React.FC = () => {
             Vista
           </Button>
           <Button onClick={closeCreate} disabled={uploading}>
+            Hætta við
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      <Modal
+        open={editingPairId !== null}
+        onClose={() => {
+          if (!uploading) setEditingPairId(null);
+        }}
+        size="sm"
+        className="media-pair-modal"
+      >
+        <Modal.Header>
+          <Modal.Title>
+            Stórskjár — {editingPairId ? mediaPairs[editingPairId]?.name : ""}
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <MainScreenMediaPicker
+            key={editingPairId}
+            value={mainScreenAsset}
+            onChange={setMainScreenAsset}
+            disabled={uploading}
+          />
+          {error && <div role="alert">{error}</div>}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button
+            appearance="primary"
+            loading={uploading}
+            disabled={!canMutate || uploading}
+            onClick={() => void saveMainScreen()}
+          >
+            Vista
+          </Button>
+          <Button disabled={uploading} onClick={() => setEditingPairId(null)}>
             Hætta við
           </Button>
         </Modal.Footer>

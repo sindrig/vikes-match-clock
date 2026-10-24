@@ -106,6 +106,7 @@ const ImageList: React.FC<ImageListProps> = ({
                     : assetTypes.IMAGE;
                   const asset = {
                     key: String(imageUrl) + String(Date.now()),
+                    name,
                     url: imageUrl,
                     type,
                     ...(type === assetTypes.VIDEO ? { loop: true } : {}),

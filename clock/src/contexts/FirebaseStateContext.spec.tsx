@@ -3472,6 +3472,77 @@ describe("FirebaseStateContext", () => {
       expect(firebaseDatabase.writeAudited).toHaveBeenCalledTimes(1);
     });
 
+    it("updates only the optional main-screen link, preserving the perimeter files", async () => {
+      const perimeterApi = renderMediaPairs("vikuti", true, { [pairId]: pair });
+      const asset = {
+        key: "photo-1",
+        type: "IMAGE" as const,
+        name: "photo.jpg",
+        url: "https://example.com/photo.jpg",
+      };
+      await act(async () => {
+        await perimeterApi!.setPerimeterMediaPairMainScreenAsset(pairId, asset);
+      });
+
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
+        "vikuti",
+        "perimeter",
+        { [`mediaPairs/${pairId}/mainScreenAsset`]: asset },
+        expect.objectContaining({
+          action: "perimeter.set-media-pair-main-screen",
+        }),
+      );
+      // Only the Firebase subscription can update the library seen by clients.
+      expect(perimeterApi!.mediaPairs[pairId]).toEqual(pair);
+    });
+
+    it("removes a main-screen link with an audited null write", async () => {
+      const perimeterApi = renderMediaPairs("vikuti", true, { [pairId]: pair });
+      await act(async () => {
+        await perimeterApi!.setPerimeterMediaPairMainScreenAsset(pairId, null);
+      });
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
+        "vikuti",
+        "perimeter",
+        { [`mediaPairs/${pairId}/mainScreenAsset`]: null },
+        expect.anything(),
+      );
+    });
+
+    it("refuses to attach media to a missing pair", async () => {
+      const perimeterApi = renderMediaPairs("vikuti", true);
+      await expect(
+        perimeterApi!.setPerimeterMediaPairMainScreenAsset(pairId, null),
+      ).rejects.toThrow();
+      expect(firebaseDatabase.writeAudited).not.toHaveBeenCalled();
+    });
+
+    it("propagates failures when saving the optional link", async () => {
+      const perimeterApi = renderMediaPairs("vikuti", true, { [pairId]: pair });
+      vi.mocked(firebaseDatabase.writeAudited).mockRejectedValueOnce(
+        new Error("denied"),
+      );
+      await expect(
+        perimeterApi!.setPerimeterMediaPairMainScreenAsset(pairId, null),
+      ).rejects.toThrow("denied");
+    });
+
+    it.each([
+      { location: "vikuti", authenticated: false },
+      { location: "", authenticated: true },
+    ])(
+      "blocks optional-link edits for an ineligible controller: %j",
+      async ({ location, authenticated }) => {
+        const perimeterApi = renderMediaPairs(location, authenticated, {
+          [pairId]: pair,
+        });
+        await expect(
+          perimeterApi!.setPerimeterMediaPairMainScreenAsset(pairId, null),
+        ).rejects.toThrow();
+        expect(firebaseDatabase.writeAudited).not.toHaveBeenCalled();
+      },
+    );
+
     it("blocks createPerimeterMediaPair when not authenticated", async () => {
       const perimeterApi = renderMediaPairs("vikuti", false);
 

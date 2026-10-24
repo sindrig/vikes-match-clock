@@ -497,12 +497,21 @@ export interface PerimeterOverlayStatus {
   error: string | null;
 }
 
-// A named, operator-created pair of perimeter overlay files (one per target).
+// An ordinary image/video selected from the main-screen media library.
+export interface MainScreenMediaAsset extends Asset {
+  type: "IMAGE" | "VIDEO";
+  name: string;
+  url: string;
+}
+
+// A named, operator-created pair of perimeter overlay files (one per target),
+// optionally linked to an ordinary main-screen image/video.
 // Stored under states/{location}/perimeter/mediaPairs/{pairId}; reused by the
 // single active overlay channel via PerimeterOverlay.
 export interface PerimeterMediaPair {
   name: string;
   files: Record<string, PerimeterOverlayFile>;
+  mainScreenAsset?: MainScreenMediaAsset;
 }
 
 // -- Perimeter ad layout (Firebase-controlled column-based ads) -------------

@@ -28,6 +28,7 @@ import {
   ThemeConfig,
   CustomPreset,
   Asset,
+  MainScreenMediaAsset,
   Player,
   Roster,
   TwoMinPenalty,
@@ -96,6 +97,7 @@ import {
   parsePerimeterPreview,
   parsePerimeterOverlay,
   parsePerimeterMediaPairs,
+  parseMainScreenMediaAsset,
   parsePerimeterGoalVideo,
   parsePerimeterAdLayout,
   parsePerimeterAppliedAdLayout,
@@ -339,6 +341,10 @@ interface FirebaseStateContextType {
     pair: PerimeterMediaPair,
   ) => Promise<void>;
   deletePerimeterMediaPair: (pairId: string) => Promise<void>;
+  setPerimeterMediaPairMainScreenAsset: (
+    pairId: string,
+    asset: MainScreenMediaAsset | null,
+  ) => Promise<void>;
   setPerimeterGoalVideo: (
     config: PerimeterGoalVideoConfig | null,
   ) => Promise<void>;
@@ -2856,6 +2862,32 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     [makeAudit, listenPrefix, writeEligible],
   );
 
+  const setPerimeterMediaPairMainScreenAsset = useCallback(
+    (pairId: string, asset: MainScreenMediaAsset | null): Promise<void> => {
+      if (!writeEligible)
+        return Promise.reject(new Error("State is not ready."));
+      if (!Object.prototype.hasOwnProperty.call(perimeterMediaPairs, pairId)) {
+        return Promise.reject(new Error("Jaðarefni fannst ekki."));
+      }
+      const parsed = asset === null ? null : parseMainScreenMediaAsset(asset);
+      if (parsed === undefined) {
+        return Promise.reject(new Error("Ógilt myndefni fyrir stórskjá."));
+      }
+      const audit = makeAudit(
+        "perimeter",
+        "perimeter.set-media-pair-main-screen",
+      );
+      if (!audit) return Promise.reject(new Error("Not authorized."));
+      return firebaseDatabase.writeAudited(
+        listenPrefix,
+        "perimeter",
+        { [`mediaPairs/${pairId}/mainScreenAsset`]: parsed },
+        audit,
+      );
+    },
+    [listenPrefix, makeAudit, perimeterMediaPairs, writeEligible],
+  );
+
   const deletePerimeterMediaPair = useCallback(
     (pairId: string): Promise<void> => {
       if (!writeEligible) return Promise.resolve();
@@ -3050,6 +3082,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       perimeterOverlayStatus,
       setPerimeterAdLayout,
       createPerimeterMediaPair,
+      setPerimeterMediaPairMainScreenAsset,
       deletePerimeterMediaPair,
       setPerimeterGoalVideo,
       setPerimeterScorerCelebration,
@@ -3156,6 +3189,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       perimeterOverlayStatus,
       setPerimeterAdLayout,
       createPerimeterMediaPair,
+      setPerimeterMediaPairMainScreenAsset,
       deletePerimeterMediaPair,
       setPerimeterGoalVideo,
       setPerimeterScorerCelebration,
@@ -3376,6 +3410,7 @@ export const usePerimeter = () => {
     clearPerimeterOverlay,
     setPerimeterAdLayout,
     createPerimeterMediaPair,
+    setPerimeterMediaPairMainScreenAsset,
     deletePerimeterMediaPair,
     setPerimeterGoalVideo,
     setPerimeterScorerCelebration,
@@ -3399,6 +3434,7 @@ export const usePerimeter = () => {
     goalScorerPreparationStatus: publishedGoalScorerPreparationStatus,
     requestGoalScorerPreparation,
     getServerTime,
+    writeEligible,
   } = useFirebaseState();
   return {
     perimeter,
@@ -3415,6 +3451,7 @@ export const usePerimeter = () => {
     setPerimeterPlayerDisplayStyle,
     setPerimeterSubstitutionStyle,
     createPerimeterMediaPair,
+    setPerimeterMediaPairMainScreenAsset,
     deletePerimeterMediaPair,
     setPerimeterGoalVideo,
     mediaPairs,
@@ -3434,5 +3471,6 @@ export const usePerimeter = () => {
     goalScorerPreparationStatus: publishedGoalScorerPreparationStatus,
     requestGoalScorerPreparation,
     getServerTime,
+    writeEligible,
   };
 };

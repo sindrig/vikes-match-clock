@@ -1,12 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import PerimeterMediaPairs from "./PerimeterMediaPairs";
-import { usePerimeter } from "../../contexts/FirebaseStateContext";
+import {
+  useController,
+  usePerimeter,
+} from "../../contexts/FirebaseStateContext";
 import { useLocalState } from "../../contexts/LocalStateContext";
-import { storageHelpers } from "../../firebase";
+import { ListResult, storageHelpers } from "../../firebase";
+import { Asset, MainScreenMediaAsset, PerimeterMediaPair } from "../../types";
 
 vi.mock("../../contexts/FirebaseStateContext", () => ({
   usePerimeter: vi.fn(),
+  useController: vi.fn(),
 }));
 
 vi.mock("../../contexts/LocalStateContext", () => ({
@@ -20,10 +25,13 @@ vi.mock("../../firebase", () => ({
       metadata: { generation: "1700000000000000" },
     }),
     deleteObject: vi.fn().mockResolvedValue(undefined),
+    listAll: vi.fn(),
+    getDownloadURL: vi.fn(),
   },
 }));
 
 const mockedUsePerimeter = vi.mocked(usePerimeter);
+const mockedUseController = vi.mocked(useController);
 const mockedUseLocalState = vi.mocked(useLocalState);
 const mockedUpload = vi.mocked(storageHelpers.uploadBytes);
 const mockedDelete = vi.mocked(storageHelpers.deleteObject);
@@ -45,8 +53,20 @@ const pair = {
 
 const mockSetPerimeterOverlay = vi.fn();
 const mockClearPerimeterOverlay = vi.fn();
-const mockCreatePair = vi.fn().mockResolvedValue(undefined);
+const mockCreatePair = vi
+  .fn<(pairId: string, pair: PerimeterMediaPair) => Promise<void>>()
+  .mockResolvedValue(undefined);
 const mockDeletePair = vi.fn().mockResolvedValue(undefined);
+const mockSetMainScreen = vi.fn().mockResolvedValue(undefined);
+const mockShowItemNow = vi.fn<(asset: Asset) => void>();
+const mockRenderAsset = vi.fn();
+
+const mainScreenAsset: MainScreenMediaAsset = {
+  key: "library-photo",
+  name: "sindri.jpg",
+  url: "https://example.com/vikuti/images/sindri.jpg",
+  type: "IMAGE",
+};
 
 const createMockPerimeterReturn = (
   overrides: Partial<ReturnType<typeof usePerimeter>> = {},
@@ -61,6 +81,8 @@ const createMockPerimeterReturn = (
     setPerimeterAdLayout: vi.fn(),
     createPerimeterMediaPair: mockCreatePair,
     deletePerimeterMediaPair: mockDeletePair,
+    setPerimeterMediaPairMainScreenAsset: mockSetMainScreen,
+    writeEligible: true,
     mediaPairs: { [pairId]: pair },
     overlay: null,
     overlayStatus: null,
@@ -83,7 +105,21 @@ const createMockLocalState = (
 beforeEach(() => {
   vi.clearAllMocks();
   mockedUsePerimeter.mockReturnValue(createMockPerimeterReturn());
+  mockedUseController.mockReturnValue({
+    showItemNow: mockShowItemNow,
+    renderAsset: mockRenderAsset,
+  } as unknown as ReturnType<typeof useController>);
   mockedUseLocalState.mockReturnValue(createMockLocalState());
+  vi.mocked(storageHelpers.listAll).mockResolvedValue({
+    items: ["sindri.jpg", "celebration.MP4"].map((name) => ({
+      name,
+      fullPath: `vikuti/images/${name}`,
+    })),
+    prefixes: [],
+  } as unknown as ListResult);
+  vi.mocked(storageHelpers.getDownloadURL).mockImplementation((path) =>
+    Promise.resolve(`https://example.com/${path}`),
+  );
 });
 
 describe("PerimeterMediaPairs", () => {
@@ -122,8 +158,50 @@ describe("PerimeterMediaPairs", () => {
       durationMs: 10000,
       files: pair.files,
     });
-    expect(Object.keys(overlay.columns[0].files as object)).toEqual(["2", "4"]);
+    expect(Object.keys(overlay.columns[0]!.files as object)).toEqual([
+      "2",
+      "4",
+    ]);
+    expect(mockShowItemNow).not.toHaveBeenCalled();
   });
+
+  it.each(["IMAGE", "VIDEO"] as const)(
+    "shows the linked %s and both perimeter files with one click",
+    (type) => {
+      const asset = {
+        ...mainScreenAsset,
+        type,
+        ...(type === "VIDEO" ? { loop: true } : {}),
+      };
+      mockedUsePerimeter.mockReturnValue(
+        createMockPerimeterReturn({
+          mediaPairs: { [pairId]: { ...pair, mainScreenAsset: asset } },
+        }),
+      );
+      render(<PerimeterMediaPairs />);
+
+      expect(screen.getByText("Stórskjár: sindri.jpg")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Sýna" }));
+
+      const shown = mockShowItemNow.mock.calls[0]?.[0];
+      expect(shown).toMatchObject({
+        name: asset.name,
+        type,
+        url: asset.url,
+        ...(type === "VIDEO" ? { loop: true } : {}),
+      });
+      expect(shown?.key).toBeTypeOf("string");
+      expect(shown?.key).not.toBe(asset.key);
+      expect(mockSetPerimeterOverlay).toHaveBeenCalledWith(
+        expect.objectContaining({
+          columns: [{ durationMs: 10000, files: pair.files }],
+        }),
+      );
+      const firstKey: unknown = mockShowItemNow.mock.calls[0]?.[0];
+      fireEvent.click(screen.getByRole("button", { name: "Sýna" }));
+      expect(mockShowItemNow.mock.calls[1]?.[0]).not.toEqual(firstKey);
+    },
+  );
 
   it("calls clearPerimeterOverlay from the tab-local clear control", () => {
     render(<PerimeterMediaPairs />);
@@ -131,6 +209,81 @@ describe("PerimeterMediaPairs", () => {
     fireEvent.click(screen.getByRole("button", { name: "Hreinsa jaðarskjá" }));
 
     expect(mockClearPerimeterOverlay).toHaveBeenCalledTimes(1);
+    expect(mockRenderAsset).not.toHaveBeenCalled();
+  });
+
+  it("clears all three screens with the explicit all-screens control", () => {
+    render(<PerimeterMediaPairs />);
+    fireEvent.click(screen.getByRole("button", { name: "Hreinsa alla skjái" }));
+    expect(mockRenderAsset).toHaveBeenCalledWith(null);
+    expect(mockClearPerimeterOverlay).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([false, true])(
+    "disables mutations when unavailable (authenticated: %s)",
+    (authenticated) => {
+      mockedUseLocalState.mockReturnValue(createMockLocalState(authenticated));
+      mockedUsePerimeter.mockReturnValue(
+        createMockPerimeterReturn({ writeEligible: false }),
+      );
+      render(<PerimeterMediaPairs />);
+      for (const button of screen.getAllByRole("button")) {
+        expect(button).toBeDisabled();
+      }
+      fireEvent.click(screen.getByRole("button", { name: "Sýna" }));
+      expect(mockShowItemNow).not.toHaveBeenCalled();
+      expect(mockSetPerimeterOverlay).not.toHaveBeenCalled();
+    },
+  );
+
+  it("links existing media to a pair without reuploading perimeter files", async () => {
+    render(<PerimeterMediaPairs />);
+    fireEvent.click(screen.getByRole("button", { name: "Stórskjár" }));
+    fireEvent.click(screen.getByRole("button", { name: "Velja úr myndefni" }));
+    fireEvent.click(await screen.findByAltText("sindri.jpg"));
+    fireEvent.click(screen.getByRole("button", { name: "Vista" }));
+
+    await waitFor(() =>
+      expect(mockSetMainScreen).toHaveBeenCalledWith(
+        pairId,
+        expect.objectContaining({
+          name: "sindri.jpg",
+          url: "https://example.com/vikuti/images/sindri.jpg",
+          type: "IMAGE",
+        }),
+      ),
+    );
+    expect(mockedUpload).not.toHaveBeenCalled();
+    expect(mockCreatePair).not.toHaveBeenCalled();
+  });
+
+  it("can remove the optional main-screen link without deleting any media", async () => {
+    mockedUsePerimeter.mockReturnValue(
+      createMockPerimeterReturn({
+        mediaPairs: { [pairId]: { ...pair, mainScreenAsset } },
+      }),
+    );
+    render(<PerimeterMediaPairs />);
+    fireEvent.click(screen.getByRole("button", { name: "Stórskjár" }));
+    fireEvent.click(screen.getByRole("button", { name: "Aftengja stórskjá" }));
+    fireEvent.click(screen.getByRole("button", { name: "Vista" }));
+
+    await waitFor(() =>
+      expect(mockSetMainScreen).toHaveBeenCalledWith(pairId, null),
+    );
+    expect(mockedDelete).not.toHaveBeenCalled();
+  });
+
+  it("leaves the main-screen editor open when saving fails", async () => {
+    mockSetMainScreen.mockRejectedValueOnce(new Error("permission denied"));
+    render(<PerimeterMediaPairs />);
+    fireEvent.click(screen.getByRole("button", { name: "Stórskjár" }));
+    fireEvent.click(screen.getByRole("button", { name: "Vista" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Ekki tókst að vista stórskjárefni",
+    );
+    expect(screen.getByRole("button", { name: "Vista" })).toBeEnabled();
   });
 
   it("deletes only the library record, never the Storage assets", () => {
@@ -205,6 +358,33 @@ describe("PerimeterMediaPairs", () => {
     expect(Object.keys(created[1].files)).toEqual(["2", "4"]);
     expect(created[1].files["2"]?.generation).toBe("1700000000000000");
     expect(created[1].files["4"]?.generation).toBe("1700000000000000");
+    expect(created[1]).not.toHaveProperty("mainScreenAsset");
+  });
+
+  it("creates a triple using an existing looping MP4 from the media library", async () => {
+    render(<PerimeterMediaPairs />);
+    fireEvent.click(screen.getByRole("button", { name: "Nýtt jaðarefni" }));
+    fireEvent.change(screen.getByLabelText("Nafn"), {
+      target: { value: "Sindri" },
+    });
+    fireEvent.change(screen.getByLabelText("48 skjáir"), {
+      target: { files: [new File(["v"], "48.mp4", { type: "video/mp4" })] },
+    });
+    fireEvent.change(screen.getByLabelText("40 skjáir"), {
+      target: { files: [new File(["i"], "40.png", { type: "image/png" })] },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Velja úr myndefni" }));
+    fireEvent.click(await screen.findByLabelText("celebration.MP4"));
+    fireEvent.click(screen.getByRole("button", { name: "Vista" }));
+
+    await waitFor(() => expect(mockCreatePair).toHaveBeenCalledTimes(1));
+    expect(mockCreatePair.mock.calls[0]?.[1].mainScreenAsset).toMatchObject({
+      name: "celebration.MP4",
+      type: "VIDEO",
+      loop: true,
+      url: "https://example.com/vikuti/images/celebration.MP4",
+    });
+    expect(mockedUpload).toHaveBeenCalledTimes(2);
   });
 
   it("does not write a record when an upload fails", async () => {

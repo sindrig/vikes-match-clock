@@ -8,6 +8,7 @@ import type {
   ClubOverride,
   TwoMinPenalty,
   Asset,
+  MainScreenMediaAsset,
   ViewPort,
   QueueState,
   PerimeterState,
@@ -1082,6 +1083,45 @@ export function parsePerimeterGoalVideo(
   return { files };
 }
 
+// Only ordinary media belongs in a perimeter triple, never player cards,
+// substitutions, or nested assets. Rebuild the record instead of retaining
+// arbitrary fields from Firebase. Videos use the library's hold-until-clear
+// playback semantics.
+export function parseMainScreenMediaAsset(
+  data: unknown,
+): MainScreenMediaAsset | undefined {
+  if (!data || typeof data !== "object") return undefined;
+  const raw = data as Record<string, unknown>;
+  if (raw.type !== "IMAGE" && raw.type !== "VIDEO") return undefined;
+  if (
+    typeof raw.key !== "string" ||
+    !raw.key.trim() ||
+    raw.key.length > 4096 ||
+    typeof raw.name !== "string" ||
+    !raw.name.trim() ||
+    raw.name.length > 255 ||
+    typeof raw.url !== "string" ||
+    raw.url.length > 4096
+  ) {
+    return undefined;
+  }
+  try {
+    const url = new URL(raw.url);
+    if (url.protocol !== "https:" && url.protocol !== "http:") {
+      return undefined;
+    }
+  } catch {
+    return undefined;
+  }
+  return {
+    key: raw.key,
+    type: raw.type,
+    name: raw.name.trim(),
+    url: raw.url,
+    ...(raw.type === "VIDEO" ? { loop: true } : {}),
+  };
+}
+
 export function parsePerimeterMediaPairs(
   data: unknown,
   options?: { location?: string; bucket?: string },
@@ -1154,7 +1194,12 @@ export function parsePerimeterMediaPairs(
     }
     if (!valid) continue;
 
-    result[pairId] = { name, files };
+    const mainScreenAsset = parseMainScreenMediaAsset(entry.mainScreenAsset);
+    result[pairId] = {
+      name,
+      files,
+      ...(mainScreenAsset ? { mainScreenAsset } : {}),
+    };
   }
 
   return result;

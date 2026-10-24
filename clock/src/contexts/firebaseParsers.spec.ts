@@ -12,6 +12,7 @@ import {
   parsePerimeterOverlay,
   buildGoalScorerOverlayCommand,
   parsePerimeterMediaPairs,
+  parseMainScreenMediaAsset,
   parsePerimeterGoalVideo,
   parsePerimeterAdLayout,
   parsePerimeterAppliedAdLayout,
@@ -2381,6 +2382,45 @@ describe("firebaseParsers", () => {
     });
   });
 
+  describe("parseMainScreenMediaAsset", () => {
+    const asset = {
+      key: "photo-1",
+      type: "IMAGE",
+      name: "photo.jpg",
+      url: "https://example.com/photo.jpg",
+    };
+
+    it("accepts ordinary media and strips unrelated fields", () => {
+      expect(
+        parseMainScreenMediaAsset({ ...asset, subIn: asset, loop: true }),
+      ).toEqual(asset);
+    });
+
+    it("makes videos loop until explicitly cleared", () => {
+      expect(
+        parseMainScreenMediaAsset({ ...asset, type: "VIDEO", loop: false }),
+      ).toEqual({
+        ...asset,
+        type: "VIDEO",
+        loop: true,
+      });
+    });
+
+    it.each([
+      null,
+      "photo.jpg",
+      { ...asset, type: "PLAYER" },
+      { ...asset, key: "" },
+      { ...asset, name: " " },
+      { ...asset, name: "x".repeat(256) },
+      { ...asset, url: "javascript:alert(1)" },
+      { ...asset, url: "not-a-url" },
+      { ...asset, url: 5 },
+    ])("ignores invalid optional media: %j", (data) => {
+      expect(parseMainScreenMediaAsset(data)).toBeUndefined();
+    });
+  });
+
   describe("parsePerimeterMediaPairs", () => {
     const bucket = "vikes-match-clock-firebase.appspot.com";
     const location = "vikuti";
@@ -2410,6 +2450,32 @@ describe("firebaseParsers", () => {
       expect(result[pairId]?.name).toBe("Sindri");
       expect(result[pairId]?.files["2"]?.name).toBe("48-1-sindri.mp4");
       expect(result[pairId]?.files["4"]?.name).toBe("40-1-sindri.png");
+    });
+
+    it("preserves an optional main-screen asset on a triple", () => {
+      const mainScreenAsset = {
+        key: "video-1",
+        type: "VIDEO",
+        name: "sindri.mp4",
+        url: "https://example.com/sindri.mp4",
+        loop: true,
+      };
+      const data = { [pairId]: { ...validPair()[pairId], mainScreenAsset } };
+      expect(
+        parsePerimeterMediaPairs(data, { location, bucket })[pairId],
+      ).toEqual(data[pairId]);
+    });
+
+    it("keeps valid perimeter files when optional main-screen media is malformed", () => {
+      const data = {
+        [pairId]: {
+          ...validPair()[pairId],
+          mainScreenAsset: { type: "PLAYER" },
+        },
+      };
+      expect(parsePerimeterMediaPairs(data, { location, bucket })).toEqual(
+        validPair(),
+      );
     });
 
     it("preserves an optional Storage generation on pair files", () => {

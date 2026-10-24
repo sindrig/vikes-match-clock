@@ -65,6 +65,7 @@ const ACTION_LABELS: Record<string, string> = {
   "perimeter.set-ad-layout": "Jaðarútlit sett",
   "perimeter.set-goal-video": "Markamyndband stillt",
   "perimeter.create-media-pair": "Jaðarefni búið til",
+  "perimeter.set-media-pair-main-screen": "Stórskjárefni tengt jaðarefni",
   "perimeter.delete-media-pair": "Jaðarefni fjarlægt",
   "clubOverrides.save": "Liðoverride vistað",
   "clubOverrides.update": "Liðoverride uppfært",
