@@ -1,10 +1,19 @@
+import asyncio
+import logging
+from collections.abc import AsyncIterator
 from functools import cache
 
+import anyio
 import boto3
 from fastapi import Path
 from fastapi.exceptions import HTTPException
 
 from app.services.ksi import KsiClient
+
+KSI_REQUEST_TIMEOUT_SECONDS = 10.0
+KSI_CLEANUP_TIMEOUT_SECONDS = 1.0
+
+logger = logging.getLogger(__name__)
 
 
 @cache
@@ -34,6 +43,26 @@ def get_weather_api_key() -> str:
     return response["Parameter"]["Value"]
 
 
-def get_ksi_client(team_id: int = Path(alias="teamId")) -> KsiClient:
-    api_key = get_ksi_api_key(team_id)
-    return KsiClient(api_key=api_key, team_id=team_id)
+async def get_ksi_client(
+    team_id: int = Path(alias="teamId"),
+) -> AsyncIterator[KsiClient]:
+    client = None
+    try:
+        async with asyncio.timeout(KSI_REQUEST_TIMEOUT_SECONDS):
+            api_key = await anyio.to_thread.run_sync(
+                get_ksi_api_key, team_id, cancellable=True
+            )
+            client = KsiClient(api_key=api_key, team_id=team_id)
+            yield client
+    except TimeoutError as error:
+        raise HTTPException(
+            status_code=504, detail="KSI request timed out"
+        ) from error
+    finally:
+        if client is not None:
+            with anyio.move_on_after(
+                KSI_CLEANUP_TIMEOUT_SECONDS, shield=True
+            ) as cleanup:
+                await client.close()
+            if cleanup.cancel_called:
+                logger.warning("KSI client cleanup timed out")
