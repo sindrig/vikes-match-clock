@@ -1841,9 +1841,9 @@ When a team side has no players loaded, `TeamAssetController.tsx` shows a **"Bú
 1. User clicks "Búa til leikmannahóp" for home or away side
 2. `ResolveRosterModal` opens with two sections: **Byrjunarlið** (11 required number inputs) and **Varamenn** (12 optional number inputs)
 3. Client-side validation enforces: all 11 starters filled, positive integers only, no duplicate numbers across both groups
-4. On submit, sends `POST ${apiConfig.gateWayUrl}v3/{teamId}/resolve-roster` with body `{ starters: number[], substitutes: number[] }`
+4. On submit, calls the generated `resolveRoster` SDK operation with `path: { teamId }` and body `{ starters: number[], substitutes: number[] }`, using `api/clientConfig.ts` for the gateway URL and `throwOnError: true` for request failures
 5. API returns `{ players: TeamPlayer[], officials: [] }` (TeamLineup shape) for the requested side
-6. Response is transformed using the same `mapRole` semantics as `transformLineups()` in `lib/matchUtils.ts`
+6. Response is transformed with `transformSingleLineup()` in `lib/matchUtils.ts`, the same adapter used by `transformLineups()`: goalkeeper roles take precedence over captain, missing flags default to false, absent shirt numbers are omitted, and hidden coaches follow players
 7. A preview shows player numbers, names, and roles grouped by starters/substitutes
 8. On confirm, the generated roster merges into the existing roster via `setRoster({ ...roster, [side]: generatedPlayers })`
 
@@ -2215,6 +2215,8 @@ The exported `FONT_OPTIONS` array in `ThemeEditor.tsx` defines the available fon
 - **Bundler**: Vite (migrated from Create React App) - config in `vite.config.ts`
 - **Testing**: Vitest for unit tests, Playwright for e2e
 - **Linting**: ESLint (airbnb-style) + Prettier
+- **API client preparation**: `pnpm start` and `pnpm build` explicitly run `generate-api-client` from the committed `clock-api/v3/openapi.json` before Vite/TypeScript. This also covers `scripts/deploy-prod.sh`; CI retains its explicit `make generate-ts-client` step before lint/tests. For standalone checks on a fresh checkout, run `pnpm run generate-api-client` first. Frontend preparation needs Node/pnpm only.
+- **Contract changes**: Export and commit OpenAPI before regenerating the ignored SDK. Never hand-edit or commit `src/api/client/`. See [API client preparation](../docs/api-client-preparation.md) for setup and offline verification.
 
 ### ESLint Policy (MANDATORY)
 

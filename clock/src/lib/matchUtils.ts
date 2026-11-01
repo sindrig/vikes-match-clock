@@ -1,10 +1,10 @@
-import { ListenersState, Player, Roster } from "../types";
-import {
+import type {
   LineupsResponse,
+  MatchAndTeamOfficial,
   TeamLineup,
   TeamPlayer,
-  MatchAndTeamOfficial,
 } from "../api/client";
+import type { ListenersState, Player, Roster } from "../types";
 
 export const getTeamId = (
   screens: ListenersState["screens"],
@@ -22,35 +22,35 @@ function mapRole(tp: TeamPlayer): string {
   return "Varamáður";
 }
 
+export function transformSingleLineup(lineup: TeamLineup): Player[] {
+  const players: Player[] = (lineup.players ?? []).map((tp) => {
+    const player: Player = {
+      name: tp.person.name,
+      id: tp.person.id,
+      role: mapRole(tp),
+      show: tp.startingLineup ?? false,
+    };
+    if (tp.shirtNumber != null) {
+      player.number = tp.shirtNumber;
+    }
+    return player;
+  });
+
+  const officials: Player[] = (lineup.officials ?? []).map(
+    (official: MatchAndTeamOfficial) => ({
+      name: official.person.name,
+      id: official.person.id,
+      role: "Þjálfari",
+      show: false,
+    }),
+  );
+
+  return [...players, ...officials];
+}
+
 export function transformLineups(lineups: LineupsResponse): Roster {
-  const mapPlayers = (lineup: TeamLineup): Player[] => {
-    const players: Player[] = (lineup.players ?? []).map((tp) => {
-      const player: Player = {
-        name: tp.person.name,
-        id: tp.person.id,
-        role: mapRole(tp),
-        show: tp.startingLineup,
-      };
-      if (tp.shirtNumber != null) {
-        player.number = tp.shirtNumber;
-      }
-      return player;
-    });
-
-    const officials: Player[] = (lineup.officials ?? []).map(
-      (official: MatchAndTeamOfficial) => ({
-        name: official.person.name,
-        id: official.person.id,
-        role: "Þjálfari",
-        show: false,
-      }),
-    );
-
-    return [...players, ...officials];
-  };
-
   return {
-    home: mapPlayers(lineups.home),
-    away: mapPlayers(lineups.away),
+    home: transformSingleLineup(lineups.home),
+    away: transformSingleLineup(lineups.away),
   };
 }
