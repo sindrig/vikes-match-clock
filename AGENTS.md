@@ -116,7 +116,7 @@ The match data pipeline depends on team IDs matching between the frontend and th
 - Playwright for browser automation
 - `TEST_CREDENTIALS` env var for authentication (format: `EMAIL;PASSWORD`)
 - **Credentials location**: The main worktree's `.envrc-local` contains `TEST_CREDENTIALS` for staging login. Source this file or extract the email/password from it.
-- Multi-session testing requires manual testing or Playwright test runner (Playwright MCP limitations)
+- For independent sessions, use separate browser contexts/profiles (Playwright runner or context APIs exposed by the available browser tool). Same-origin tabs in one context share storage/auth; see `clock/AGENTS.md`.
 
 ## Taking Screenshots for PRs
 
@@ -124,14 +124,14 @@ The local dev server connects to the **staging Firebase database** by default (n
 
 ### Workflow
 
-1. **Start the dev server** using the `dev-server` skill (defaults to port 8000). This runs Vite via tmux so it persists.
-2. **Log in via Playwright**: Navigate to `http://localhost:8000`, enter credentials from `/home/dev/vikes-match-clock/.envrc-local` (`TEST_CREDENTIALS` format: `EMAIL;PASSWORD`), click "Innskrá", then select a screen (e.g., "Víkin úti Skjár").
-3. **Take a screenshot** of the relevant element using `playwright_browser_take_screenshot` with a `target` ref from a snapshot. Save to the project root (e.g., `my-screenshot.png`).
+1. **Start the dev server** using the `dev-server` skill (defaults to port 8000): `bash scripts/dev-server.sh start 8000` from this worktree's root. Vite persists in a dedicated tmux session for this physical worktree and port. Use `status 8000` to see the handle/PID and `.dev-server/8000.log`; use `stop 8000` to stop only that session. An occupied port fails; choose another explicit port. The helper needs Bash, Git, Node, tmux and installed clock dependencies; follow the skill's API-client preparation and browser verification steps.
+2. **Log in using available browser tooling** (Playwright runner, Playwright tools or Paseo): Navigate to `http://localhost:8000`, enter credentials from the main worktree's `.envrc-local` (`TEST_CREDENTIALS` format: `EMAIL;PASSWORD`) without printing them, click "Innskrá", then select a screen (e.g., "Víkin úti Skjár"). Inspect rendered content, console errors and failed requests; an HTML title alone only verifies the shell. Coordinate authenticated shared-staging actions with other users.
+3. **Take a screenshot** using the available tool's actual API or Playwright's page/locator screenshot API. Save locally under the gitignored `screenshots/` directory (e.g., `screenshots/my-screenshot.png`).
 4. **Upload to the staging S3 bucket** for hosting (GitHub doesn't support programmatic image uploads):
    ```bash
    source /home/dev/vikes-creds.txt
    TIMESTAMP=$(date +%s)
-   aws s3 cp my-screenshot.png "s3://$STAGING_BUCKET/pr-images/<ISSUE>-<name>-${TIMESTAMP}.png" --region eu-west-1
+   aws s3 cp screenshots/my-screenshot.png "s3://$STAGING_BUCKET/pr-images/<ISSUE>-<name>-${TIMESTAMP}.png" --region eu-west-1
    ```
 5. **Reference in PR body or comment**:
    ```
@@ -142,5 +142,5 @@ The local dev server connects to the **staging Firebase database** by default (n
 
 - **NEVER commit screenshots or images to the git repository.** Always upload to the staging S3 bucket and reference via URL. The `screenshots/` directory is gitignored.
 - Always include a timestamp in the filename — CloudFront caches aggressively and will serve stale images if you reuse a path.
-- The `pr-images/` prefix is excluded from `aws s3 rm` during staging deploys, so screenshots persist.
+- The manual staging skill's root `aws s3 rm` excludes `pr-images/`. CI's root deployment uses `delete-removed: true` without that exclusion configured, so image persistence is not guaranteed. Root deployments can also remove subpath bundles; subpaths share staging Firebase and same-origin browser storage (see `.opencode/skills/deploy-staging/SKILL.md`).
 - The dev server uses Vite HMR, so CSS/JS changes are reflected immediately without restart — just take a new screenshot after editing.
