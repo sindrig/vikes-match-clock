@@ -1,16 +1,20 @@
-import boto3
 from functools import cache
 
-from app.services.ksi import KsiClient
+import boto3
 from fastapi import Path
 from fastapi.exceptions import HTTPException
 
-ssm_client = boto3.client("ssm", region_name="eu-west-1")
+from app.services.ksi import KsiClient
+
+
+@cache
+def get_ssm_client():
+    return boto3.client("ssm", region_name="eu-west-1")
 
 
 @cache
 def get_ksi_api_key(team_id: int) -> str:
-    response = ssm_client.get_parameter(
+    response = get_ssm_client().get_parameter(
         Name=f"/vikes-match-clock/ksi-api-key/{team_id}", WithDecryption=True
     )
     try:
@@ -24,7 +28,7 @@ def get_ksi_api_key(team_id: int) -> str:
 
 @cache
 def get_weather_api_key() -> str:
-    response = ssm_client.get_parameter(
+    response = get_ssm_client().get_parameter(
         Name="/vikes-match-clock/weather-api", WithDecryption=True
     )
     return response["Parameter"]["Value"]
