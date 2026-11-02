@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { Player, GoalScorerPlayerStatus, PerimeterFileOverlay } from "../types";
+import { Player } from "../types";
 import { getPlayerAssetObject } from "./asset/team/assetHelpers";
 import {
   useController,
@@ -22,17 +22,6 @@ interface GoalScorerDialogProps {
   onClose: () => void;
 }
 
-// Build a perimeter overlay command from the player's prepared file pair. The
-// pair's `files` map is keyed by the overlay layer IDs ("2" and "4") and is
-// directly usable as an overlay column.
-const buildScorerOverlay = (
-  files: Record<string, { name: string; source: string }>,
-): PerimeterFileOverlay => ({
-  version: 1,
-  id: crypto.randomUUID(),
-  columns: [{ durationMs: 10000, files }],
-});
-
 const GoalScorerDialog = ({
   open,
   players,
@@ -41,16 +30,13 @@ const GoalScorerDialog = ({
   onClose,
 }: GoalScorerDialogProps) => {
   const { renderAsset } = useController();
-  const { goalScorerPreparationStatus, setPerimeterOverlay } = usePerimeter();
+  const { setPerimeterOverlay } = usePerimeter();
   const { venues } = useListeners();
   const { listenPrefix } = useRemoteSettings();
 
-  // The venue's published renderer selects the overlay path: only an
-  // explicit "web" mapping composes the scorer in the browser from semantic
-  // data. Every other venue — including one with no published mapping
-  // (all existing Resolume venues) — keeps the prepared-PNG workflow.
-  const renderer = venues[listenPrefix]?.perimeterDisplay?.renderer;
-  const isWebVenue = renderer === "web";
+  // Missing or invalid mappings leave the perimeter unconfigured. The
+  // main-screen reveal remains available independently of that mapping.
+  const isWebVenue = venues[listenPrefix]?.perimeterDisplay?.renderer === "web";
 
   const selectPlayer = useCallback(
     (player: Player) => {
@@ -58,35 +44,12 @@ const GoalScorerDialog = ({
       // player reveal. Large videos can take several seconds to buffer.
       if (goalGif2) void preloadMedia(goalGif2);
 
-      let perimeterFiles:
-        | Record<string, { name: string; source: string }>
-        | undefined;
-      let semanticCommand:
-        | ReturnType<typeof buildGoalScorerOverlayCommand>
-        | undefined;
-      if (isWebVenue) {
-        // Web venues compose the scorer in the browser from semantic data;
-        // generated perimeter media is neither required nor referenced.
-        const scorerPlayer = goalScorerPlayerFromSelection(player);
-        if (scorerPlayer) {
-          semanticCommand = buildGoalScorerOverlayCommand(scorerPlayer);
-        }
-      } else {
-        // Retain the prepared-file workflow for Resolume venues (including
-        // venues without a published mapping): only a ready personalized or
-        // crest-fallback result replaces the generic goal overlay.
-        const result =
-          player.id !== undefined && player.id !== null
-            ? goalScorerPreparationStatus?.players[String(player.id)]
-            : undefined;
-        perimeterFiles =
-          result &&
-          (result.status === "ready" || result.status === "fallback") &&
-          result.files?.["2"] &&
-          result.files["4"]
-            ? result.files
-            : undefined;
-      }
+      const scorerPlayer = isWebVenue
+        ? goalScorerPlayerFromSelection(player)
+        : undefined;
+      const semanticCommand = scorerPlayer
+        ? buildGoalScorerOverlayCommand(scorerPlayer)
+        : undefined;
 
       void getPlayerAssetObject({
         player,
@@ -106,9 +69,6 @@ const GoalScorerDialog = ({
         if (semanticCommand) {
           setPerimeterOverlay(semanticCommand);
         }
-        if (perimeterFiles) {
-          setPerimeterOverlay(buildScorerOverlay(perimeterFiles));
-        }
       });
 
       onClose();
@@ -120,22 +80,9 @@ const GoalScorerDialog = ({
       renderAsset,
       onClose,
       goalGif2,
-      goalScorerPreparationStatus,
       setPerimeterOverlay,
     ],
   );
-
-  // Per-player readiness for the selection dialog. Web venues do not use
-  // roster-wide generated media: absent preparation status must never mark
-  // players unavailable, so web readiness stays unlabeled.
-  const readiness: Record<string, GoalScorerPlayerStatus> = {};
-  if (!isWebVenue) {
-    for (const [playerId, result] of Object.entries(
-      goalScorerPreparationStatus?.players ?? {},
-    )) {
-      readiness[playerId] = result.status;
-    }
-  }
 
   return (
     <TeamPlayerSelectionModal
@@ -145,7 +92,6 @@ const GoalScorerDialog = ({
       instruction="Veldu leikmann sem skoraði"
       players={players}
       onSelect={selectPlayer}
-      readiness={readiness}
     />
   );
 };

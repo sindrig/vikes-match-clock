@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from "react";
-import { Button, Loader, Modal, Badge } from "rsuite";
+import { Button, Loader, Modal } from "rsuite";
 import PlusIcon from "@rsuite/icons/Plus";
 import {
   useController,
@@ -9,7 +9,6 @@ import { useLocalState } from "../../contexts/LocalStateContext";
 import {
   PerimeterMediaPair,
   PerimeterOverlayFile,
-  PerimeterOverlayPhase,
   MainScreenMediaAsset,
 } from "../../types";
 import { storageHelpers, FIREBASE_STORAGE_BUCKET } from "../../firebase";
@@ -25,14 +24,6 @@ const TARGETS = [
 const MAX_NAME_LENGTH = 80;
 const MAX_UPLOAD_BYTES = 250 * 1024 * 1024;
 const OVERLAY_DURATION_MS = 10000;
-
-const PHASE_LABELS: Record<PerimeterOverlayPhase, string> = {
-  downloading: "Sækir",
-  copying: "Afritar",
-  loading: "Hleður",
-  playing: "Spilar",
-  error: "Villa",
-};
 
 const slugify = (value: string): string => {
   const slug = value
@@ -67,7 +58,6 @@ const PerimeterMediaPairs: React.FC = () => {
     deletePerimeterMediaPair,
     setPerimeterOverlay,
     clearPerimeterOverlay,
-    overlayStatus,
     writeEligible,
   } = usePerimeter();
   const { showItemNow, renderAsset } = useController();
@@ -292,20 +282,6 @@ const PerimeterMediaPairs: React.FC = () => {
           Hreinsa alla skjái
         </Button>
       </div>
-
-      {overlayStatus && (
-        <div className="media-pairs-status">
-          <Badge
-            content={PHASE_LABELS[overlayStatus.phase]}
-            className={`media-pairs-phase phase-${overlayStatus.phase}`}
-          />
-          {overlayStatus.error && (
-            <span className="media-pairs-status-error">
-              {overlayStatus.error}
-            </span>
-          )}
-        </div>
-      )}
 
       {error && !showCreate && editingPairId === null && (
         <div className="media-pairs-error" role="alert">

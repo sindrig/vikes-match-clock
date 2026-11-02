@@ -433,9 +433,8 @@ const Controller = () => {
           <MatchActionSettings />
           {/* Venues with a published perimeter mapping manage the perimeter
           through the standalone perimeter manager (offered on the screen
-          selector); legacy venues without a mapping keep the
-          settings-embedded control so their brightness, ad layout, media
-          pairs, and preparation controls stay reachable. */}
+          selector); unconfigured venues keep the settings control so
+          hardware brightness remains reachable without a web mapping. */}
           {!venues[listenPrefix]?.perimeterDisplay && <PerimeterControl />}
           <div className="theme-trigger-row">
             <div className="theme-trigger-info">
