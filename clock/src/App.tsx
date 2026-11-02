@@ -10,7 +10,6 @@ import {
   usePerimeter,
 } from "./contexts/FirebaseStateContext";
 import { useLocalState } from "./contexts/LocalStateContext";
-import { firebaseAuth } from "./firebaseAuth";
 import Controller from "./controller/Controller";
 import ResyncNotice from "./controller/ResyncNotice";
 import MatchActions from "./controller/MatchActions";
@@ -77,13 +76,13 @@ const ScoreButtons = ({ side }: { side: "home" | "away" }) => {
                 source: `gs://${FIREBASE_STORAGE_BUCKET}/${listenPrefix}/perimeter/goal-40.mp4`,
               },
             };
-      setPerimeterOverlay({
+      void setPerimeterOverlay({
         version: 1,
         id: crypto.randomUUID(),
         columns: [{ durationMs: 10000, files: goalFiles }],
       });
       if (view.goalGif1) {
-        renderAsset({
+        void renderAsset({
           key: view.goalGif1,
           type: isVideoUrl(view.goalGif1) ? assetTypes.VIDEO : assetTypes.IMAGE,
         });
@@ -180,7 +179,7 @@ const ClearOverlayButton = () => {
         appearance="primary"
         size="sm"
         onClick={() => {
-          renderAsset(null);
+          void renderAsset(null);
           clearPerimeterOverlay();
         }}
         block
@@ -198,6 +197,7 @@ function App() {
     auth,
     listenPrefix,
     setListenPrefix,
+    logout: logoutSession,
     setScreenKey,
     displayTarget,
     setDisplayTarget,
@@ -388,7 +388,7 @@ function App() {
 
     const logout = () => {
       disconnectScreen();
-      firebaseAuth.logout().catch(console.error);
+      logoutSession().catch(console.error);
     };
 
     if (displayTarget?.kind === "perimeter") {

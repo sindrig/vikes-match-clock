@@ -780,6 +780,7 @@ const ThemeEditorModal = ({ open, onClose }: ThemeEditorModalProps) => {
 
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  const [renameError, setRenameError] = useState<string | null>(null);
   const [editorTab, setEditorTab] = useState<
     "visual" | "idle-visual" | "advanced"
   >("visual");
@@ -820,7 +821,7 @@ const ThemeEditorModal = ({ open, onClose }: ThemeEditorModalProps) => {
         };
         const copyName = `${activePresetId} (breytt)`;
         const newId = `custom-${crypto.randomUUID()}`;
-        saveCustomPreset(newId, {
+        void saveCustomPreset(newId, {
           name: copyName,
           theme: newTheme,
         });
@@ -831,7 +832,7 @@ const ThemeEditorModal = ({ open, onClose }: ThemeEditorModalProps) => {
         const customPreset = customPresets?.[activePresetId];
         if (customPreset) {
           const newTheme = { ...customPreset.theme, ...changes };
-          saveCustomPreset(activePresetId, {
+          void saveCustomPreset(activePresetId, {
             ...customPreset,
             theme: newTheme,
           });
@@ -867,7 +868,7 @@ const ThemeEditorModal = ({ open, onClose }: ThemeEditorModalProps) => {
       name: "Nýtt þema",
       theme: { ...DEFAULT_THEME },
     };
-    saveCustomPreset(newId, newPreset);
+    void saveCustomPreset(newId, newPreset);
     setThemePreset(newId);
     setTheme(undefined);
   }, [saveCustomPreset, setThemePreset, setTheme]);
@@ -887,6 +888,7 @@ const ThemeEditorModal = ({ open, onClose }: ThemeEditorModalProps) => {
 
   // Start renaming
   const startRename = useCallback((id: string, currentName: string) => {
+    setRenameError(null);
     setRenamingId(id);
     setRenameValue(currentName);
   }, []);
@@ -899,9 +901,22 @@ const ThemeEditorModal = ({ open, onClose }: ThemeEditorModalProps) => {
     }
     const preset = customPresets?.[renamingId];
     if (preset) {
-      saveCustomPreset(renamingId, { ...preset, name: renameValue.trim() });
+      void saveCustomPreset(renamingId, {
+        ...preset,
+        name: renameValue.trim(),
+      }).then(
+        () => {
+          setRenamingId(null);
+          setRenameError(null);
+        },
+        (error: unknown) =>
+          setRenameError(
+            error instanceof Error
+              ? error.message
+              : "Ekki tókst að vista heiti.",
+          ),
+      );
     }
-    setRenamingId(null);
   }, [renamingId, renameValue, customPresets, saveCustomPreset]);
 
   return (
@@ -910,6 +925,7 @@ const ThemeEditorModal = ({ open, onClose }: ThemeEditorModalProps) => {
         <Modal.Title>Klukku þema</Modal.Title>
       </Modal.Header>
       <Modal.Body className="theme-modal-body">
+        {renameError && <p role="alert">{renameError}</p>}
         <div className="theme-preset-section">
           <div className="theme-preset-section-header">
             <span className="theme-section-label">Forstillingar</span>

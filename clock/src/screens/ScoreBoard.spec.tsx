@@ -10,6 +10,7 @@ const renderWithProviders = () => {
   return render(
     <LocalStateProvider>
       <FirebaseStateProvider
+        uid="operator"
         listenPrefix=""
         isAuthenticated={false}
         screenKey={null}
@@ -178,6 +179,7 @@ describe("ScoreBoard component", () => {
       rerender(
         <LocalStateProvider>
           <FirebaseStateProvider
+            uid="operator"
             listenPrefix=""
             isAuthenticated={false}
             screenKey={null}

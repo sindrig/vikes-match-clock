@@ -39,13 +39,13 @@ This architecture eliminates several classes of bugs:
 
 When an authenticated controller calls an action (e.g., `startMatch()`):
 
-1. Action computes new state from current `ref.current`
-2. Action writes to Firebase via `firebaseDatabase.syncState()`
+1. The render-bound command checks its current session/venue/freshness epoch before reading subscription refs
+2. `executeCommand` checks again immediately before an atomic `firebaseDatabase.writeAudited()` submission
 3. Firebase triggers `onValue()` callback
 4. React state updates from Firebase snapshot
 5. UI re-renders with new state
 
-**Important**: Unauthenticated clients are read-only. All write operations check `isAuthenticated` before proceeding.
+**Important**: Unauthenticated clients are read-only. Ordinary commands require a current Auth SDK UID, ready freshness, and the same command-origin epoch. Ref values change only on Firebase subscription deliveries. See [the command contract and complete mutation inventory](../docs/session-mutation-boundary.md).
 
 ### Multi-Controller Behavior
 
@@ -84,9 +84,13 @@ core subscription delivers a post-resume/reconnect snapshot. A resume whose
 Firebase connection never dropped (no `/.info/connected` false observed while
 suspended and still connected on return) restores `ready` immediately, because
 the existing subscription epoch is still current and no `onValue` delivery
-would otherwise fire when no data changed. Eligibility is gated on
-`writeEligible` (`writeFreshness === "ready"`); `navigator.onLine` is never
-consulted — `/.info/connected` is the authoritative connectivity signal. Stale
+would otherwise fire when no data changed. Rendering exposes
+`writeEligible`; submission also checks the synchronously updated `MutationSession`
+and its render-bound origin. Hide/resume, venue changes (including A → B → A),
+and logout/login permanently obsolete retained callbacks. The Auth SDK UID is
+read at submission; React callback/effect updates are not a safety gate.
+Repeated suspension signals preserve an observed Firebase disconnect until
+resynchronization. `navigator.onLine` is never consulted — `/.info/connected` is the authoritative connectivity signal. Stale
 attempts are dropped, never queued for replay. The UI surfaces this via
 `ResyncNotice` (`controller/ResyncNotice.tsx`) and disables primary match
 controls while resyncing.
@@ -187,7 +191,8 @@ an `update()` value object cannot contain keys with `/`, so writing the diff as
 a whole node value would be rejected or clobber sibling state.
 
 **Conditional (CAS) transitions** — automatic lifecycle transitions
-(`MatchLifecycle`) and generation-conditional explicit commands do NOT use
+(`MatchLifecycle`) and generation-conditional explicit commands share current-session
+eligibility (also checked on transaction retries) but do NOT use
 `writeAudited`. They run a `runTransaction` on the state subtree to atomically
 re-validate the observed generation precondition and commit the mutation, then
 append exactly one audit record via `firebaseDatabase.writeAuditOnly` (audit
@@ -222,15 +227,18 @@ audit record.
   `perimeter.set-scorer-celebration`,
   `perimeter.set-player-display-style`, `perimeter.set-substitution-style`.
 - Club overrides use `clubOverrides.create|update|save|delete` (both the
-  context actions and `ClubOverrideForm.tsx`, which builds its own audit
-  payload).
+  context actions and `ClubOverrideForm.tsx`, through `commitClubOverride`).
+- Brightness/config use `perimeter.set-brightness` and
+  `perimeter.set-brightness-auto`; auto config retains its server timestamp.
 
 **Identity** — `FirebaseStateProvider` accepts a `uid` prop (passed from
 `index.tsx` as `auth.uid`) for the accountable operator. `getOrCreateSessionId()`
 in `lib/sessionId.ts` returns one opaque UUID per browser session, stored in
 `sessionStorage` (regenerated per session, survives reloads, never an identity
-substitute). `makeAudit()` builds the payload and skips the write entirely when
-the provider cannot write.
+substitute). `MutationSession.audit()` owns that identity and validates the
+current command origin. `executeCommand` rejects obsolete/ineligible commands before any writer
+call; save APIs propagate rejection and keep drafts open. Void button adapters
+explicitly discard the centrally reported promise without unhandled rejections.
 
 **Firebase rules** (`firebase-rules.json`) — `audit/{location}` reads require
 venue authorization; event creation requires the same authorization, all
@@ -827,7 +835,7 @@ server timestamp):
 
 - `brightnessAuto` — `PerimeterBrightnessAuto | null`; the Firebase-synced
   desired auto config (`null` = disabled).
-- `setPerimeterBrightnessAuto(config)` — authenticated single-node write of
+- `setPerimeterBrightnessAuto(config)` — authenticated, audited whole-node write of
   the whole config with `updatedAt: serverTimestamp()`; rejects invalid
   configs locally without writing (rejections propagate so the UI can clear
   its pending state).

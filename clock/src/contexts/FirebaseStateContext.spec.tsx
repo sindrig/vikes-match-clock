@@ -1,7 +1,13 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, act, waitFor } from "@testing-library/react";
-import { onValue, ref, set, runTransaction } from "firebase/database";
+import {
+  onValue,
+  ref,
+  set,
+  runTransaction,
+  type DataSnapshot,
+} from "firebase/database";
 import {
   FirebaseStateProvider,
   useMatch,
@@ -46,7 +52,10 @@ vi.mock("firebase/database", () => ({
 const mockDbState = new Map<string, unknown>();
 // Captured `onValue` callbacks keyed by path, so tests can drive Firebase
 // connectivity (`.info/connected`) and post-resume subscription deliveries.
-const mockOnValueCallbacks = new Map<string, unknown>();
+const mockOnValueCallbacks = new Map<
+  string,
+  (snapshot: DataSnapshot) => unknown
+>();
 
 const TestMatchConsumer = ({
   onMount,
@@ -139,9 +148,10 @@ const withConnectedInfo =
   (resolve: (path: string, callback: (snapshot: unknown) => void) => unknown) =>
   (reference: unknown, callback: (snapshot: unknown) => void) => {
     const path = String(reference);
-    callback({
-      val: () => (path === ".info/connected" ? true : resolve(path, callback)),
-    } as never);
+    const value = path === ".info/connected" ? true : resolve(path, callback);
+    mockOnValueCallbacks.set(path, (snapshot) => callback(snapshot));
+    mockDbState.set(path, value);
+    callback({ val: () => value } as DataSnapshot);
     return vi.fn();
   };
 
@@ -164,6 +174,36 @@ describe("FirebaseStateContext", () => {
       } as never);
       return vi.fn();
     });
+
+    // Ordinary commands only advance observed refs through subscriptions,
+    // just like the SDK. Model that delivery instead of relying on shadow
+    // state changes inside the provider's write functions.
+    vi.mocked(firebaseDatabase.writeAudited).mockImplementation(
+      (prefix, area, diff) => {
+        const path = `states/${prefix}/${area}`;
+        const current = mockDbState.get(path);
+        const next: Record<string, unknown> =
+          current && typeof current === "object"
+            ? structuredClone(current as Record<string, unknown>)
+            : {};
+        for (const [key, value] of Object.entries(diff)) {
+          const parts = key.split("/");
+          const leaf = parts.pop();
+          if (!leaf) throw new Error("Missing update leaf");
+          let node = next;
+          for (const part of parts) {
+            const child = node[part];
+            if (!child || typeof child !== "object") node[part] = {};
+            node = node[part] as Record<string, unknown>;
+          }
+          if (value === null) delete node[leaf];
+          else node[leaf] = value;
+        }
+        mockDbState.set(path, next);
+        mockOnValueCallbacks.get(path)?.({ val: () => next } as DataSnapshot);
+        return Promise.resolve();
+      },
+    );
 
     // Emulate a compare-and-set transaction against the in-memory
     // authoritative state. Returning `undefined` from the update function
@@ -190,6 +230,7 @@ describe("FirebaseStateContext", () => {
 
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix=""
           isAuthenticated={true}
           screenKey={null}
@@ -217,6 +258,7 @@ describe("FirebaseStateContext", () => {
 
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix=""
           isAuthenticated={true}
           screenKey={null}
@@ -246,6 +288,7 @@ describe("FirebaseStateContext", () => {
 
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -277,6 +320,7 @@ describe("FirebaseStateContext", () => {
 
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -300,6 +344,7 @@ describe("FirebaseStateContext", () => {
 
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={false}
           screenKey={null}
@@ -321,6 +366,7 @@ describe("FirebaseStateContext", () => {
     it("subscribes only to protected brightness telemetry after authentication", () => {
       const renderProvider = (isAuthenticated: boolean) => (
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={isAuthenticated}
           screenKey={null}
@@ -349,6 +395,7 @@ describe("FirebaseStateContext", () => {
 
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -386,6 +433,7 @@ describe("FirebaseStateContext", () => {
 
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -448,6 +496,7 @@ describe("FirebaseStateContext", () => {
 
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -493,11 +542,12 @@ describe("FirebaseStateContext", () => {
       expect(api?.writeEligible).toBe(true);
     });
 
-    it("allows rapid sequential goal additions (updates ref immediately)", () => {
+    it("uses subscription deliveries between rapid sequential goal additions", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
 
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -548,6 +598,7 @@ describe("FirebaseStateContext", () => {
 
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -579,6 +630,7 @@ describe("FirebaseStateContext", () => {
 
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test"
           isAuthenticated={false}
           screenKey={null}
@@ -611,6 +663,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -648,6 +701,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -670,6 +724,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -696,6 +751,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -722,6 +778,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -748,6 +805,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -769,6 +827,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -798,6 +857,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -827,6 +887,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -848,6 +909,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -874,6 +936,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -904,6 +967,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -938,6 +1002,7 @@ describe("FirebaseStateContext", () => {
       let controllerApi: ReturnType<typeof useController> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -964,6 +1029,7 @@ describe("FirebaseStateContext", () => {
       let controllerApi: ReturnType<typeof useController> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -990,6 +1056,7 @@ describe("FirebaseStateContext", () => {
       let controllerApi: ReturnType<typeof useController> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -1003,7 +1070,7 @@ describe("FirebaseStateContext", () => {
       );
       const asset = { type: "image", key: "asset-1" };
       act(() => {
-        controllerApi!.renderAsset(asset as unknown as Asset);
+        void controllerApi!.renderAsset(asset as unknown as Asset);
       });
       expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
@@ -1021,6 +1088,7 @@ describe("FirebaseStateContext", () => {
       let controllerApi: ReturnType<typeof useController> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -1033,7 +1101,7 @@ describe("FirebaseStateContext", () => {
         </FirebaseStateProvider>,
       );
       act(() => {
-        controllerApi!.renderAsset(null);
+        void controllerApi!.renderAsset(null);
       });
       expect(firebaseDatabase.writeAudited).not.toHaveBeenCalled();
     });
@@ -1042,6 +1110,7 @@ describe("FirebaseStateContext", () => {
       let controllerApi: ReturnType<typeof useController> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -1068,6 +1137,7 @@ describe("FirebaseStateContext", () => {
       let controllerApi: ReturnType<typeof useController> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -1096,6 +1166,7 @@ describe("FirebaseStateContext", () => {
       let controllerApi: ReturnType<typeof useController> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -1124,6 +1195,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -1150,6 +1222,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -1176,6 +1249,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -1202,6 +1276,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -1243,6 +1318,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -1286,6 +1362,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -1314,6 +1391,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -1340,6 +1418,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -1366,6 +1445,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -1394,6 +1474,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -1423,6 +1504,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -1456,6 +1538,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -1481,6 +1564,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -1506,6 +1590,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -1531,6 +1616,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -1553,6 +1639,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -1579,6 +1666,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -1605,6 +1693,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -1627,6 +1716,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -1649,6 +1739,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -1685,6 +1776,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -1724,6 +1816,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -1755,6 +1848,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -1776,6 +1870,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -1801,6 +1896,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -1836,6 +1932,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -2008,6 +2105,7 @@ describe("FirebaseStateContext", () => {
       let controllerApi: ReturnType<typeof useController> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -2020,7 +2118,7 @@ describe("FirebaseStateContext", () => {
         </FirebaseStateProvider>,
       );
       act(() => {
-        controllerApi!.renderAsset({ type: "IMAGE", key: "img-1" });
+        void controllerApi!.renderAsset({ type: "IMAGE", key: "img-1" });
       });
       vi.clearAllMocks();
       act(() => {
@@ -2038,6 +2136,7 @@ describe("FirebaseStateContext", () => {
       let controllerApi: ReturnType<typeof useController> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -2069,6 +2168,7 @@ describe("FirebaseStateContext", () => {
       };
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -2110,6 +2210,7 @@ describe("FirebaseStateContext", () => {
       let controllerApi: ReturnType<typeof useController> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -2182,6 +2283,7 @@ describe("FirebaseStateContext", () => {
       let viewApi: ReturnType<typeof useView> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -2213,6 +2315,7 @@ describe("FirebaseStateContext", () => {
       let viewApi: ReturnType<typeof useView> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -2239,6 +2342,7 @@ describe("FirebaseStateContext", () => {
       let viewApi: ReturnType<typeof useView> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -2267,6 +2371,7 @@ describe("FirebaseStateContext", () => {
       let viewApi: ReturnType<typeof useView> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -2295,6 +2400,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -2329,6 +2435,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -2355,6 +2462,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -2376,6 +2484,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -2402,6 +2511,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -2423,6 +2533,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -2463,6 +2574,7 @@ describe("FirebaseStateContext", () => {
       let controllerApi: ReturnType<typeof useController> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -2497,6 +2609,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -2517,6 +2630,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -2538,6 +2652,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -2566,6 +2681,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -2601,6 +2717,7 @@ describe("FirebaseStateContext", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -2652,6 +2769,7 @@ describe("FirebaseStateContext", () => {
       let perimeterApi: ReturnType<typeof usePerimeter> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix={listenPrefix}
           isAuthenticated={isAuthenticated}
           screenKey={null}
@@ -2686,6 +2804,7 @@ describe("FirebaseStateContext", () => {
       let perimeterApi: ReturnType<typeof usePerimeter> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="vikuti"
           isAuthenticated={isAuthenticated}
           screenKey={null}
@@ -3009,6 +3128,7 @@ describe("FirebaseStateContext", () => {
 
       const { rerender } = render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="venue-a"
           isAuthenticated={true}
           screenKey={null}
@@ -3020,6 +3140,7 @@ describe("FirebaseStateContext", () => {
       currentControllerView = VIEWS.match;
       rerender(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="venue-b"
           isAuthenticated={true}
           screenKey={null}
@@ -3058,6 +3179,7 @@ describe("FirebaseStateContext", () => {
       let perimeterApi: ReturnType<typeof usePerimeter> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix={listenPrefix}
           isAuthenticated={isAuthenticated}
           screenKey={null}
@@ -3117,17 +3239,25 @@ describe("FirebaseStateContext", () => {
         await perimeterApi!.setPerimeterBrightness(42);
       });
 
-      expect(set).toHaveBeenCalledWith(
-        "states/vikuti/perimeter/brightness",
-        42,
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
+        "vikuti",
+        "perimeter",
+        { brightness: 42 },
+        expect.objectContaining({
+          uid: "operator",
+          action: "perimeter.set-brightness",
+        }),
       );
+      expect(set).not.toHaveBeenCalled();
     });
 
     it("blocks setPerimeterBrightness when not authenticated", async () => {
       const perimeterApi = renderBrightness("vikuti", false);
 
       await act(async () => {
-        await perimeterApi!.setPerimeterBrightness(50);
+        await expect(
+          perimeterApi!.setPerimeterBrightness(50),
+        ).rejects.toThrow();
       });
 
       expect(set).not.toHaveBeenCalled();
@@ -3137,7 +3267,9 @@ describe("FirebaseStateContext", () => {
       const perimeterApi = renderBrightness("", true);
 
       await act(async () => {
-        await perimeterApi!.setPerimeterBrightness(50);
+        await expect(
+          perimeterApi!.setPerimeterBrightness(50),
+        ).rejects.toThrow();
       });
 
       expect(set).not.toHaveBeenCalled();
@@ -3150,7 +3282,9 @@ describe("FirebaseStateContext", () => {
       const perimeterApi = renderBrightness("vikuti", true);
 
       await act(async () => {
-        await perimeterApi!.setPerimeterBrightness(150);
+        await expect(
+          perimeterApi!.setPerimeterBrightness(150),
+        ).rejects.toThrow();
       });
 
       expect(set).not.toHaveBeenCalled();
@@ -3187,6 +3321,7 @@ describe("FirebaseStateContext", () => {
       let perimeterApi: ReturnType<typeof usePerimeter> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix={listenPrefix}
           isAuthenticated={isAuthenticated}
           screenKey={null}
@@ -3234,18 +3369,25 @@ describe("FirebaseStateContext", () => {
         });
       });
 
-      expect(set).toHaveBeenCalledWith(
-        "states/vikuti/perimeter/brightnessAuto",
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
+        "vikuti",
+        "perimeter",
         {
-          enabled: true,
-          min: 3,
-          max: 100,
-          exponent: 0.35,
-          cloudWeight: 1,
-          luxMin: 5,
-          luxMax: 100000,
-          updatedAt: "server-timestamp",
+          brightnessAuto: {
+            enabled: true,
+            min: 3,
+            max: 100,
+            exponent: 0.35,
+            cloudWeight: 1,
+            luxMin: 5,
+            luxMax: 100000,
+            updatedAt: "server-timestamp",
+          },
         },
+        expect.objectContaining({
+          uid: "operator",
+          action: "perimeter.set-brightness-auto",
+        }),
       );
     });
 
@@ -3253,15 +3395,17 @@ describe("FirebaseStateContext", () => {
       const perimeterApi = renderBrightnessAuto("vikuti", false);
 
       await act(async () => {
-        await perimeterApi!.setPerimeterBrightnessAuto({
-          enabled: true,
-          min: 3,
-          max: 100,
-          exponent: 0.35,
-          cloudWeight: 1,
-          luxMin: 5,
-          luxMax: 100000,
-        });
+        await expect(
+          perimeterApi!.setPerimeterBrightnessAuto({
+            enabled: true,
+            min: 3,
+            max: 100,
+            exponent: 0.35,
+            cloudWeight: 1,
+            luxMin: 5,
+            luxMax: 100000,
+          }),
+        ).rejects.toThrow();
       });
 
       expect(set).not.toHaveBeenCalled();
@@ -3271,15 +3415,17 @@ describe("FirebaseStateContext", () => {
       const perimeterApi = renderBrightnessAuto("", true);
 
       await act(async () => {
-        await perimeterApi!.setPerimeterBrightnessAuto({
-          enabled: true,
-          min: 3,
-          max: 100,
-          exponent: 0.35,
-          cloudWeight: 1,
-          luxMin: 5,
-          luxMax: 100000,
-        });
+        await expect(
+          perimeterApi!.setPerimeterBrightnessAuto({
+            enabled: true,
+            min: 3,
+            max: 100,
+            exponent: 0.35,
+            cloudWeight: 1,
+            luxMin: 5,
+            luxMax: 100000,
+          }),
+        ).rejects.toThrow();
       });
 
       expect(set).not.toHaveBeenCalled();
@@ -3293,15 +3439,17 @@ describe("FirebaseStateContext", () => {
 
       await act(async () => {
         // min > max violates the write validation.
-        await perimeterApi!.setPerimeterBrightnessAuto({
-          enabled: true,
-          min: 90,
-          max: 50,
-          exponent: 0.35,
-          cloudWeight: 1,
-          luxMin: 5,
-          luxMax: 100000,
-        });
+        await expect(
+          perimeterApi!.setPerimeterBrightnessAuto({
+            enabled: true,
+            min: 90,
+            max: 50,
+            exponent: 0.35,
+            cloudWeight: 1,
+            luxMin: 5,
+            luxMax: 100000,
+          }),
+        ).rejects.toThrow();
       });
 
       expect(set).not.toHaveBeenCalled();
@@ -3341,6 +3489,7 @@ describe("FirebaseStateContext", () => {
       let perimeterApi: ReturnType<typeof usePerimeter> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix={listenPrefix}
           isAuthenticated={isAuthenticated}
           screenKey={null}
@@ -3481,7 +3630,9 @@ describe("FirebaseStateContext", () => {
       const perimeterApi = renderMediaPairs("vikuti", false);
 
       await act(async () => {
-        await perimeterApi!.createPerimeterMediaPair(pairId, pair);
+        await expect(
+          perimeterApi!.createPerimeterMediaPair(pairId, pair),
+        ).rejects.toThrow();
       });
 
       expect(firebaseDatabase.writeAudited).not.toHaveBeenCalled();
@@ -3491,7 +3642,9 @@ describe("FirebaseStateContext", () => {
       const perimeterApi = renderMediaPairs("", true);
 
       await act(async () => {
-        await perimeterApi!.deletePerimeterMediaPair(pairId);
+        await expect(
+          perimeterApi!.deletePerimeterMediaPair(pairId),
+        ).rejects.toThrow();
       });
 
       expect(firebaseDatabase.writeAudited).not.toHaveBeenCalled();
@@ -3528,6 +3681,7 @@ describe("FirebaseStateContext", () => {
       let perimeterApi: ReturnType<typeof usePerimeter> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix={listenPrefix}
           isAuthenticated={isAuthenticated}
           screenKey={null}
@@ -3612,7 +3766,9 @@ describe("FirebaseStateContext", () => {
       const perimeterApi = renderGoalVideo("vikuti", false);
 
       await act(async () => {
-        await perimeterApi!.setPerimeterGoalVideo(goalVideoConfig);
+        await expect(
+          perimeterApi!.setPerimeterGoalVideo(goalVideoConfig),
+        ).rejects.toThrow();
       });
 
       expect(firebaseDatabase.writeAudited).not.toHaveBeenCalled();
@@ -3634,6 +3790,7 @@ describe("FirebaseStateContext", () => {
       let perimeterApi: ReturnType<typeof usePerimeter> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix={listenPrefix}
           isAuthenticated={isAuthenticated}
           screenKey={null}
@@ -3724,6 +3881,7 @@ describe("FirebaseStateContext", () => {
 
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="vikuti"
           isAuthenticated={true}
           screenKey={null}
@@ -3781,6 +3939,7 @@ describe("FirebaseStateContext integration", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -3848,6 +4007,7 @@ describe("FirebaseStateContext integration", () => {
       let controllerApi: ReturnType<typeof useController> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -3903,6 +4063,7 @@ describe("FirebaseStateContext integration", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}
@@ -3986,6 +4147,7 @@ describe("FirebaseStateContext integration", () => {
       let matchApi: ReturnType<typeof useMatch> | null = null;
       render(
         <FirebaseStateProvider
+          uid="operator"
           listenPrefix="test-location"
           isAuthenticated={true}
           screenKey={null}

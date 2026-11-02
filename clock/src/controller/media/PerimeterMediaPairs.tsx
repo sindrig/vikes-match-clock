@@ -180,7 +180,7 @@ const PerimeterMediaPairs: React.FC = () => {
       // A new playback identity restarts even the same video on repeated Sýna.
       showItemNow({ ...pair.mainScreenAsset, key: crypto.randomUUID() });
     }
-    setPerimeterOverlay({
+    void setPerimeterOverlay({
       version: 1,
       id: crypto.randomUUID(),
       columns: [
@@ -275,7 +275,7 @@ const PerimeterMediaPairs: React.FC = () => {
           disabled={!canMutate}
           onClick={() => {
             if (!canMutate) return;
-            renderAsset(null);
+            void renderAsset(null);
             clearPerimeterOverlay();
           }}
         >

@@ -79,6 +79,7 @@ const Controller = () => {
     setPassword,
     listenPrefix,
     setListenPrefix,
+    logout,
     available,
     setScreenKey,
     displayTarget,
@@ -350,7 +351,7 @@ const Controller = () => {
         <button
           type="button"
           className="screen-selector-logout"
-          onClick={() => void firebaseAuth.logout()}
+          onClick={() => void logout().catch(console.error)}
         >
           Útskrá
         </button>

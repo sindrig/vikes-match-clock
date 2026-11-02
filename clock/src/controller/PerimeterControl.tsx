@@ -426,7 +426,7 @@ const GoalVideoSection = () => {
           ))
         )}
       </div>
-      {error && (
+      {error && !showEdit && (
         <span className="perimeter-status-error">
           Ekki tókst að vista: {error}
         </span>
@@ -443,6 +443,7 @@ const GoalVideoSection = () => {
           <Modal.Title>Markamyndband</Modal.Title>
         </Modal.Header>
         <Modal.Body>
+          {error && <p role="alert">{error}</p>}
           <p className="perimeter-add-hint">
             Veldu skrá fyrir hvern jaðarskjá úr listanum eða hlaðið upp nýrri
             skrá.
@@ -1684,6 +1685,7 @@ const PerimeterControl = ({ standalone = false }: { standalone?: boolean }) => {
               <Modal.Title>Nýr dálkur</Modal.Title>
             </Modal.Header>
             <Modal.Body>
+              {writeError && <p role="alert">{writeError}</p>}
               <p className="perimeter-add-hint">
                 Veldu skrá fyrir hverja röð úr listanum eða hlaðið upp nýrri
                 skrá.

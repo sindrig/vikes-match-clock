@@ -348,7 +348,7 @@ describe("web-only perimeter integration", () => {
     );
     expect(api().perimeterOverlay?.id).not.toBe(first);
     act(() => {
-      api().renderAsset(null);
+      void api().renderAsset(null);
       api().clearPerimeterOverlay();
     });
     expect(api().controller.currentAsset).toBeNull();
