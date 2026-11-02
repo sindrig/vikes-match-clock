@@ -36,10 +36,12 @@ function fixture(t) {
   const app = path.join(root, "app");
   const etc = path.join(root, "etc");
   const unit = path.join(root, "systemd", "perimeter-control.service");
-  const bin = path.join(root, "bin");
+  // Selected executables must stay outside ProtectHome paths even when the
+  // caller's TMPDIR places fixture data in a home directory.
+  const bin = fs.mkdtempSync("/tmp/perimeter-install-bin-");
+  t.after(() => fs.rmSync(bin, { recursive: true, force: true }));
   const log = path.join(root, "commands.jsonl");
   fs.mkdirSync(sourceDir);
-  fs.mkdirSync(bin);
   fs.mkdirSync(path.dirname(unit));
   for (const file of files)
     fs.copyFileSync(path.join(gateway, file), path.join(sourceDir, file));
