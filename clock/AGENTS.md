@@ -925,6 +925,16 @@ invalid mappings, unsafe player identifiers, missing numbers, and empty names
 never produce a perimeter scorer command; the independent main-screen reveal
 continues through the existing player/portrait fallback path.
 
+Scorer selection remains open until the main-screen and applicable perimeter
+writes acknowledge success. A rejection keeps the current dialog open with an
+error for explicit retry. Each selection owns its asynchronous continuation:
+dismissal, unmounting, or a newer selection retires the old continuation, so
+late media/write results cannot submit further commands, close a reopened
+dialog, or replace its error. Already-submitted writes remain irrevocable.
+Browser journeys must wait for the completed selection's dialog to disappear
+before adding another goal, and use normal button actionability; a forced
+click can hit the still-visible modal during its exit animation.
+
 The dialog and shared `TeamPlayerSelectionModal` have no generated-media
 readiness labels. There is no preparation panel, roster-signature effect,
 retry action, request write, geometry/status subscriber, or callable trigger.
