@@ -13,6 +13,8 @@ from app import dependencies
 from app.main import app
 from tests.roster_data import lineup, match, player, roster_cases
 
+pytestmark = pytest.mark.usefixtures("app_lifespan")
+
 BASELINE = json.loads(
     (Path(__file__).parent / "fixtures" / "roster_baseline.json").read_text()
 )

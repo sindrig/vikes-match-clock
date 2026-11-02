@@ -7,11 +7,17 @@ from unittest.mock import ANY, AsyncMock, Mock, call, patch
 import anyio
 import pytest
 from botocore.exceptions import ClientError, NoCredentialsError
-from fastapi import HTTPException
+from fastapi import HTTPException, Request
 from httpx import AsyncClient
 
 from app import dependencies
 from app.main import app
+
+pytestmark = pytest.mark.usefixtures("app_lifespan")
+
+
+def queued_count(lookups):
+    return len(lookups.semaphore._waiters or ())
 
 
 @pytest.fixture(autouse=True)
@@ -71,13 +77,13 @@ async def test_ksi_clients_remain_request_scoped_with_cached_key():
         ) as factory,
     ):
         async with asynccontextmanager(dependencies.get_ksi_client)(
-            2492
+            Request({"type": "http", "app": app}), 2492
         ) as one:
             assert one is first
             first.close.assert_not_awaited()
         first.close.assert_awaited_once()
         async with asynccontextmanager(dependencies.get_ksi_client)(
-            2492
+            Request({"type": "http", "app": app}), 2492
         ) as two:
             assert two is second
             second.close.assert_not_awaited()
@@ -220,11 +226,11 @@ async def test_cold_secret_lookups_overlap_without_blocking_health():
     "end", ["timeout", "cancellation", "anyio_cancellation"]
 )
 async def test_slow_secret_lookup_is_bounded_without_late_http_client(
-    monkeypatch, end
+    monkeypatch, end, app_lifespan
 ):
     monkeypatch.setattr(dependencies, "KSI_REQUEST_TIMEOUT_SECONDS", 0.05)
     limiter = anyio.to_thread.current_default_thread_limiter()
-    initial_borrowed = limiter.borrowed_tokens
+    lookups = app_lifespan
     started, release, finished = Event(), Event(), Event()
     scopes = []
     ssm = Mock()
@@ -267,17 +273,15 @@ async def test_slow_secret_lookup_is_bounded_without_late_http_client(
                     }
                 assert not release.is_set()
                 assert not finished.is_set()
-                assert limiter.borrowed_tokens == initial_borrowed + 1
+                assert sum(lookups.tasks.values()) == 1
+                assert limiter.borrowed_tokens == 0
                 factory.assert_not_called()
                 assert (await client.get("/v3/health")).status_code == 200
             finally:
                 release.set()
                 assert await asyncio.to_thread(finished.wait, 0.5)
                 await asyncio.gather(request, return_exceptions=True)
-            await wait_until(
-                lambda: limiter.borrowed_tokens == initial_borrowed
-                and not getattr(dependencies, "_ksi_key_lookups", ())
-            )
+            await wait_until(lambda: not lookups.tasks)
             factory.assert_not_called()
 
 
@@ -289,13 +293,13 @@ async def wait_until(predicate):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("late_failure", [False, True])
+@pytest.mark.parametrize("ksi_capacity", [2])
 async def test_ssm_capacity_survives_timeout_waves_and_queued_cancellation(
-    monkeypatch, record_property, late_failure
+    monkeypatch, record_property, late_failure, ksi_capacity, app_lifespan
 ):
     monkeypatch.setattr(dependencies, "KSI_REQUEST_TIMEOUT_SECONDS", 0.1)
     limiter = anyio.to_thread.current_default_thread_limiter()
-    original_tokens = limiter.total_tokens
-    limiter.total_tokens = 2
+    lookups = app_lifespan
     release = Event()
     lock = Lock()
     active = 0
@@ -376,7 +380,9 @@ async def test_ssm_capacity_survives_timeout_waves_and_queued_cancellation(
                 record_property("ssm_workers_per_wave", workers_per_wave)
                 record_property("wave_elapsed_seconds", elapsed_per_wave)
                 assert workers_per_wave == [2, 2, 2]
-                assert limiter.borrowed_tokens == 2
+                assert limiter.borrowed_tokens == 0
+                assert sum(lookups.tasks.values()) == 2
+                await wait_until(lambda: queued_count(lookups) == 0)
                 factory.assert_not_called()
 
                 monkeypatch.setattr(
@@ -386,16 +392,15 @@ async def test_ssm_capacity_survives_timeout_waves_and_queued_cancellation(
                     asyncio.create_task(load(api, team)) for team in (7, 8)
                 ]
                 requests.extend(queued)
-                await wait_until(
-                    lambda: limiter.statistics().tasks_waiting == 2
-                )
+                await wait_until(lambda: queued_count(lookups) == 2)
                 queued[0].cancel()
                 with pytest.raises(asyncio.CancelledError):
                     await asyncio.wait_for(queued[0], 0.5)
                 scopes[1].cancel()
                 assert await asyncio.wait_for(queued[1], 0.5) is None
-                assert limiter.statistics().tasks_waiting == 0
-                assert limiter.borrowed_tokens == 2
+                await wait_until(lambda: queued_count(lookups) == 0)
+                assert sum(lookups.tasks.values()) == 2
+                assert limiter.borrowed_tokens == 0
                 assert not release.is_set()
                 factory.assert_not_called()
 
@@ -403,9 +408,7 @@ async def test_ssm_capacity_survives_timeout_waves_and_queued_cancellation(
                     api.get("/v3/9/matches/2026-06-15")
                 )
                 requests.append(recovery)
-                await wait_until(
-                    lambda: limiter.statistics().tasks_waiting == 1
-                )
+                await wait_until(lambda: queued_count(lookups) == 1)
                 release.set()
                 assert (
                     await asyncio.wait_for(recovery, 0.5)
@@ -433,12 +436,13 @@ async def test_ssm_capacity_survives_timeout_waves_and_queued_cancellation(
             await wait_until(
                 lambda: active == 0
                 and limiter.borrowed_tokens == 0
-                and not getattr(dependencies, "_ksi_key_lookups", ())
+                and not lookups.tasks
             )
+            assert queued_count(lookups) == 0
+            assert lookups.semaphore._value == ksi_capacity
             assert limiter.statistics().tasks_waiting == 0
             gc.collect()
             await asyncio.sleep(0)
         finally:
-            limiter.total_tokens = original_tokens
             loop.set_exception_handler(original_handler)
     assert unhandled == []

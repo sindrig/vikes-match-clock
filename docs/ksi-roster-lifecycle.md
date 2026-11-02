@@ -9,8 +9,8 @@ roster cache is shared between requests.
 
 ## Budget and failure behavior
 
-The dependency starts one 10-second work timer before looking up the
-team's key. That timer covers the key lookup and all endpoint work,
+The dependency starts one absolute 10-second work deadline before
+admission. That deadline covers admission, key lookup and all endpoint work,
 including every history/lineup request and response-body read. It does
 not reset for each upstream call. HTTPX also retains its 10-second
 per-operation timeout. Cleanup has a separate one-second limit and is
@@ -33,17 +33,45 @@ and validation errors retain their existing error behavior, with client
 cleanup still performed.
 
 The synchronous, cached SSM lookup runs in an AnyIO worker thread and
-does not block the event loop. A separate task acquires the default
-AnyIO thread limiter before submitting work and keeps that capacity
-until the worker finishes. Its private one-token limiter lets `run_sync`
-use the reserved capacity without acquiring a second default token.
-The caller awaits this task through `asyncio.shield`, so its deadline or
-cancellation stops waiting promptly without releasing running work's
-capacity. A lookup still waiting for default capacity is cancelled before
-worker submission. Thus only live callers wait in the capacity queue;
-timed-out requests cannot accumulate abandoned workers or queued work.
-Pending tasks are retained until completion, then removed and their
-exceptions retrieved even when their callers have left.
+does not block the event loop. The application lifespan explicitly owns
+one `KsiKeyLookups` on its serving asyncio loop. A child task acquires its
+`asyncio.BoundedSemaphore`, checks closure and absolute expiry, then marks
+itself admitted without suspending between these steps. Python 3.12's
+semaphore reserves capacity for notified waiters, forwards reservations
+on cancellation and keeps surviving waiters in FIFO order. Each admitted
+child uses a private, uncontended one-token AnyIO limiter for physical
+worker offload and keeps its semaphore permit until that offload finishes
+or raises. Submission failure also returns the permit.
+
+The caller awaits the child through `asyncio.shield`. Caller timeout or
+cancellation removes unadmitted children promptly without cancelling
+admitted owners or releasing their capacity. Strong task references and
+completion callbacks cover cancellation before the coroutine starts and
+retrieve late exceptions. After the key result, a cancellation checkpoint
+and explicit absolute-expiry check precede HTTP construction. The deadline
+never resets and a background lookup never constructs an HTTP client.
+
+Shutdown closes admission before suspending, cancels queued children and
+drains admitted owners on their loop. AnyIO shielding plus a retrying
+`asyncio.shield` wait defers repeated native `Task.cancel()` until the
+drain completes, then propagates that cancellation. The owner stays in
+application state during drain; overlapping lifespans are rejected. A
+subsequent lifespan creates fresh state, including on a new TestClient
+loop. Tests enter the actual lifespan because HTTPX ASGI transport alone
+does not run it.
+
+### Deliberate capacity contract
+
+KSI SSM admission has fixed capacity **C=40 per serving loop**, initially
+matching the former nominal default limit. Tests configure C directly to
+one or two. KSI offloads no longer borrow default AnyIO tokens. Changing
+the default limit **G** does not resize C: unrelated default-limited work
+retains G and combined nominal admission is **C+G**. This is not a proven
+global thread bound. The pinned default AnyIO limiter's inherited races
+remain outside this scoped repair, and weather's synchronous key lookup
+is outside the KSI gate. Multiple loops, processes and Lambda instances
+multiply capacity. No framework upgrade, private AnyIO patch or new cache
+is involved.
 
 Python cannot stop a synchronous SSM call already running. It may finish
 and populate the existing successful-key cache, but no HTTP client is
@@ -53,7 +81,9 @@ total attempts (the first call and at most one retry). This leaves room
 within the ten-second work budget for normal SDK connection/read waits
 and retry backoff. These are per-operation limits, not a hard wall-clock
 bound on DNS, credential discovery, or trickling response bodies;
-capacity stays occupied if synchronous work outlasts the caller. No new
+capacity stays occupied if synchronous work outlasts the caller. A
+permanently stuck call permanently holds a slot and can prevent graceful
+drain; process termination is the final boundary. No new
 single-flight or cross-request cache semantics are introduced.
 
 The timer begins when FastAPI enters the KSI dependency. Request upload,
@@ -132,7 +162,7 @@ overlapping cold lookups, concurrent health requests, cached keys,
 failure retries, and timeout/cancellation without late HTTP allocation.
 
 The SSM capacity regression uses three waves of two cold requests with
-the default AnyIO limiter set to two tokens and blocked mock SSM calls.
+KSI capacity C=2 and blocked mock SSM calls.
 On `2eed63fc`, actual active workers grow **2 → 4 → 6** while every
 request returns 504. With the repair, workers stay **2 → 2 → 2** and
 every wave still completes at its shortened deadline. It also cancels
@@ -142,10 +172,47 @@ Both late success and late failure are covered: successful keys remain
 cached, failures allow retry, no late HTTP client is allocated, all
 capacity and retained tasks are released, and no background exception
 is left unhandled. JUnit output records worker counts and wave timings.
-The repaired Python 3.12 suite passes **93 tests**, preserving the
-original 91 passes and one existing placeholder skip, with resource and
-runtime warnings treated as errors. In that run, each shortened
-100-millisecond wave completed in 102–105 milliseconds.
+The R1 repair passed 93 tests, but R2 exposed a separate handoff defect in
+the pinned AnyIO 3.7.1 limiter: a cancelled notified child could strand a
+live waiter with zero workers. A real-worker completion probe on
+`d1d732f7` returned 504 for that survivor; the repaired ordering returns
+200 without another release or waiting for the queue to expire. R2 also
+demonstrated an inherited fresh-arrival reservation race on both baseline
+and that head (two actual workers at nominal capacity one). It was not
+introduced by this PR. The new KSI gate prevents that ordering from
+oversubscribing C; unrelated default-limited work retains the inherited
+limitation.
+
+`test_ssm_admission.py` ports the real-worker delivery ordering and tests
+both cancellation/release callback orders at C=1/2, the actual deadline
+callback, FIFO with head/middle/tail cancellation and multiple releases,
+newcomer reservation, cancellation before child start and after admission
+before submission, key-result/cancellation and absolute-expiry boundaries,
+task/submission failures, independent KSI/default budgets, shutdown with
+blocked workers and queued children, repeated native/AnyIO shutdown
+cancellation, overlapping lifecycle rejection and fresh TestClient loops.
+It asserts actual worker entries and peaks, retained tasks, waiters,
+HTTP allocations, same-loop closure and retrieved background failures.
+The existing late-success/failure waves also verify retry and successful
+key-cache behavior. The repaired Python 3.12 suite passes **123 tests**
+with one existing placeholder skipped and resource/runtime warnings
+treated as errors. The real-worker handoff survivor completes in 2.8 ms
+within its 250 ms budget; peak KSI workers remain one, and active workers,
+waiters and retained tasks all drain to zero. The independent-pool test
+holds one actual KSI worker and one actual default-limited worker
+simultaneously at C=G=1. These are controlled local interleavings, not a
+measurement of production race frequency.
+
+The local uvicorn/TCP matrix also covers success, upstream status failure,
+dropped connections, stalled headers, trickling bodies and malformed JSON
+on all five KSI routes, plus asyncio/AnyIO cancellation on each route.
+All 43 created HTTP clients and upstream connections close on their
+creation loop. The unshortened request deadline returns 504 in 10.042 s.
+A real botocore client against a loopback mock server retains two-second
+connect/read limits, two total attempts, failure retry and separate
+KSI/weather success caches. Four fixtures plus 1,000 seeded generated
+rosters still match the baseline in every serialized field. No external
+services are contacted by these checks.
 
 `test_default_budget_closes_real_loopback_connection_before_gateway`
 also opens a local TCP server on an ephemeral loopback port, accepts a
@@ -153,7 +220,7 @@ request without replying, and uses the unchanged production deadline.
 It requires a 504 in under 12 seconds and observes the peer connection
 closing. JUnit output records elapsed time and closure evidence. All
 external services are mocked; the only TCP connection is loopback. The
-repaired suite recorded a 504 after 10.013 seconds with the connection
+repaired suite recorded a 504 after 10.014 seconds with the connection
 closed.
 
 Run from `clock-api/v3` with Python 3.12 and the development dependencies:
@@ -161,8 +228,10 @@ Run from `clock-api/v3` with Python 3.12 and the development dependencies:
 ```bash
 python -m pytest tests -q -W error::ResourceWarning -W error::RuntimeWarning
 python -m black --check --line-length 79 --skip-string-normalization \
-  app/dependencies.py app/services/ksi.py tests/test_dependencies.py \
-  tests/roster_data.py tests/test_roster_resolution.py tests/test_ksi_lifecycle.py
+  app/dependencies.py app/main.py app/services/ksi.py tests/conftest.py \
+  tests/test_dependencies.py tests/test_handler.py tests/test_integration.py \
+  tests/test_openapi.py tests/roster_data.py tests/test_roster_resolution.py \
+  tests/test_ksi_lifecycle.py tests/test_ssm_admission.py
 ```
 
 Black 26.10.1 passes for all changed Python files. Checking the entire API

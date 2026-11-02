@@ -6,16 +6,16 @@ from functools import cache
 import anyio
 import boto3
 from botocore.config import Config
-from fastapi import Path
+from fastapi import Path, Request
 from fastapi.exceptions import HTTPException
 
 from app.services.ksi import KsiClient
 
 KSI_REQUEST_TIMEOUT_SECONDS = 10.0
 KSI_CLEANUP_TIMEOUT_SECONDS = 1.0
+KSI_KEY_LOOKUP_CAPACITY = 40
 
 logger = logging.getLogger(__name__)
-_ksi_key_lookups: set[asyncio.Task[str]] = set()
 
 
 @cache
@@ -53,39 +53,88 @@ def get_weather_api_key() -> str:
     return response["Parameter"]["Value"]
 
 
-async def lookup_ksi_api_key(team_id: int) -> str:
-    started = False
+class KsiKeyLookups:
+    def __init__(self, capacity: int):
+        self.loop = asyncio.get_running_loop()
+        self.semaphore = asyncio.BoundedSemaphore(capacity)
+        self.tasks: dict[asyncio.Task[str], bool] = {}
+        self.closing = False
 
-    async def lookup():
-        nonlocal started
-        async with anyio.to_thread.current_default_thread_limiter():
-            started = True
-            return await anyio.to_thread.run_sync(
-                get_ksi_api_key, team_id, limiter=anyio.CapacityLimiter(1)
-            )
+    def check_loop(self):
+        if asyncio.get_running_loop() is not self.loop:
+            raise RuntimeError("KSI key lookups belong to another event loop")
 
-    def finished(task: asyncio.Task[str]):
-        _ksi_key_lookups.discard(task)
+    def finished(self, task: asyncio.Task[str]):
+        self.tasks.pop(task)
         if not task.cancelled():
             task.exception()
 
-    task = asyncio.create_task(lookup())
-    _ksi_key_lookups.add(task)
-    task.add_done_callback(finished)
-    try:
-        return await asyncio.shield(task)
-    finally:
-        if not started:
-            task.cancel()
+    async def lookup(self, team_id: int, deadline: float) -> str:
+        self.check_loop()
+        if self.closing:
+            raise asyncio.CancelledError
+        if self.loop.time() >= deadline:
+            raise TimeoutError
+
+        async def lookup():
+            async with self.semaphore:
+                if self.closing:
+                    raise asyncio.CancelledError
+                if self.loop.time() >= deadline:
+                    raise TimeoutError
+                self.tasks[asyncio.current_task()] = True
+                return await anyio.to_thread.run_sync(
+                    get_ksi_api_key, team_id, limiter=anyio.CapacityLimiter(1)
+                )
+
+        coroutine = lookup()
+        try:
+            task = asyncio.create_task(coroutine)
+        except BaseException:
+            coroutine.close()
+            raise
+        self.tasks.setdefault(task, False)
+        task.add_done_callback(self.finished)
+        try:
+            return await asyncio.shield(task)
+        finally:
+            if not self.tasks.get(task, False):
+                task.cancel()
+
+    async def close(self):
+        self.check_loop()
+        self.closing = True
+        for task, admitted in self.tasks.items():
+            if not admitted:
+                task.cancel()
+        cancellation = None
+        with anyio.CancelScope(shield=True):
+            draining = asyncio.gather(*self.tasks, return_exceptions=True)
+            while not draining.done():
+                try:
+                    await asyncio.shield(draining)
+                except asyncio.CancelledError as error:
+                    cancellation = error
+            draining.result()
+        if cancellation is not None:
+            raise cancellation
 
 
 async def get_ksi_client(
+    request: Request,
     team_id: int = Path(alias="teamId"),
 ) -> AsyncIterator[KsiClient]:
     client = None
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + KSI_REQUEST_TIMEOUT_SECONDS
     try:
-        async with asyncio.timeout(KSI_REQUEST_TIMEOUT_SECONDS):
-            api_key = await lookup_ksi_api_key(team_id)
+        async with asyncio.timeout_at(deadline):
+            api_key = await request.app.state.ksi_key_lookups.lookup(
+                team_id, deadline
+            )
+            await anyio.lowlevel.checkpoint()
+            if loop.time() >= deadline:
+                raise TimeoutError
             client = KsiClient(api_key=api_key, team_id=team_id)
             yield client
     except TimeoutError as error:
