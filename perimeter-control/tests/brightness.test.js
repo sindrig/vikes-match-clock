@@ -4,6 +4,7 @@ import test from "node:test";
 import { ServerValue } from "firebase-admin/database";
 
 import { BrightnessController } from "../brightness.js";
+import { settle } from "./helpers/gateway.js";
 
 const LOCATION = "vikuti";
 
@@ -94,6 +95,10 @@ function makeController(config = makeConfig()) {
   const controller = new BrightnessController(config);
   const db = new FakeDb();
   controller.attach(db);
+  if (config.autoBrightnessEnabled) {
+    commandRef(db.refs).emit(null);
+    autoRef(db.refs).emit({ enabled: false });
+  }
   return { controller, refs: db.refs };
 }
 
@@ -630,13 +635,18 @@ test("requestAuto dispatches through the worker with auto mode and calibration",
     cloudCover: 0,
     weatherStale: false,
   });
-  const accepted = controller.requestAuto(65, {
-    lux: 43721,
-    percent: 76,
-    sunElevationDeg: 24.6,
-    cloudCover: 0,
-    weatherStale: false,
-  });
+  autoRef(refs).emit({ enabled: true });
+  const accepted = controller.requestAuto(
+    65,
+    {
+      lux: 43721,
+      percent: 76,
+      sunElevationDeg: 24.6,
+      cloudCover: 0,
+      weatherStale: false,
+    },
+    controller.autoRevision,
+  );
   assert.equal(accepted, true);
   await waitFor(() =>
     statusRef(refs).setCalls.some((s) => s.phase === "applied"),
@@ -671,7 +681,12 @@ test("an invalid auto request is rejected without any worker activity", async ()
   const { controller, refs } = makeController(makeAutoConfig());
   const calls = instrument(controller);
   controller.startWorker();
-  assert.equal(controller.requestAuto(4.5, null), false);
+  autoRef(refs).emit({ enabled: true });
+  await settle();
+  assert.equal(
+    controller.requestAuto(4.5, null, controller.autoRevision),
+    false,
+  );
   await new Promise((resolve) => setTimeout(resolve, 30));
   assert.deepEqual(calls.writes, []);
   assert.deepEqual(statusRef(refs).setCalls, []);
@@ -847,13 +862,19 @@ test("a superseded auto write never reaches the calibration log", async (t) => {
     },
   });
   controller.startWorker();
-  controller.requestAuto(65, {
-    lux: 43721,
-    percent: 76,
-    sunElevationDeg: 24.6,
-    cloudCover: 0,
-    weatherStale: false,
-  });
+  autoRef(refs).emit({ enabled: true });
+  await settle(); // Initial status seed completes before auto admission.
+  controller.requestAuto(
+    65,
+    {
+      lux: 43721,
+      percent: 76,
+      sunElevationDeg: 24.6,
+      cloudCover: 0,
+      weatherStale: false,
+    },
+    controller.autoRevision,
+  );
   await waitFor(() => calls.screenReads.length >= 1);
   // A manual command supersedes the auto request before the write dispatch.
   commandRef(refs).emit(30);
@@ -902,7 +923,9 @@ test("auto config failures publish a configuration-caused failed status", async 
   controller.startWorker();
   await waitFor(() =>
     statusRef(refs).setCalls.some(
-      (s) => s.phase === "failed" && s.error.includes("Auto brightness not configured"),
+      (s) =>
+        s.phase === "failed" &&
+        s.error.includes("Auto brightness not configured"),
     ),
   );
 });

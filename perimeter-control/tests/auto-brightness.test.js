@@ -272,6 +272,12 @@ class FakeAutoController {
   get autoConfig() {
     return this._config;
   }
+  get autoReady() {
+    return true;
+  }
+  get autoRevision() {
+    return 0;
+  }
   get lastAppliedPercent() {
     return 50;
   }

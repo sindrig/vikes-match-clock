@@ -54,7 +54,8 @@ class FakeRef {
 
   async get() {
     this.db.trace.push(["get", this.path]);
-    return { val: () => this.value };
+    const value = this.value;
+    return { val: () => value };
   }
 }
 

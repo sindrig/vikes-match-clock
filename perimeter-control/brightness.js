@@ -106,14 +106,10 @@ export class BrightnessController {
     this.client = new VnnoxClient(config);
     this._commandRef = null;
     this._statusRef = null;
-    // The newest valid requested percentage awaiting processing (null when the
-    // worker has nothing to do). Worker pickup clears it; a command that
-    // arrives mid-flight becomes the pending replacement.
-    this._requested = null;
-    // Where the newest pending request came from ("manual" via the Firebase
-    // command listener or "auto" via the AutoBrightnessScheduler) plus the
-    // predicted model context captured at request time.
-    this._requestedMeta = null;
+    // Identity, percentage and source travel together. Even an equal-valued
+    // replacement is new intent (e.g. auto 65% yielding to manual 65%).
+    this._pendingRequest = null;
+    this._latestRequest = null;
     this._current = null;
     this._stopping = false;
     this._notifier = new Notifier();
@@ -131,6 +127,16 @@ export class BrightnessController {
     this._autoScheduler = null;
     this._autoRef = null;
     this._autoConfig = normalizeAutoConfig(null);
+    // A tick must present the generation it predicted against at admission.
+    // Manual intent and effective config changes invalidate outstanding auto
+    // ticks as well as queued/active auto requests before dispatch.
+    this._autoRevision = 0;
+    this._commandReceived = false;
+    this._autoConfigReceived = !config.autoBrightnessEnabled;
+    this._startupReady = !config.autoBrightnessEnabled;
+    this._seedReady = !config.autoBrightnessEnabled;
+    this._initialCommand = null;
+    this._manualBeforeAutoConfig = false;
     this._latestPrediction = null;
     this._calibrationRef = null;
     // Last verified applied percentage — the baseline for the scheduler's
@@ -148,6 +154,16 @@ export class BrightnessController {
   // model parameters). Read by the scheduler every tick.
   get autoConfig() {
     return this._autoConfig;
+  }
+
+  get autoRevision() {
+    return this._autoRevision;
+  }
+
+  // Both subscriptions and the prior applied baseline must settle before
+  // scheduler predictions can replace the persisted status at startup.
+  get autoReady() {
+    return !this._stopping && this._startupReady && this._seedReady;
   }
 
   // The last verified applied percentage, or null when unknown (fresh daemon,
@@ -175,49 +191,125 @@ export class BrightnessController {
   attach(db) {
     this._commandRef = db.ref(this.config.brightnessPath);
     this._statusRef = db.ref(this.config.brightnessStatusPath);
+    if (this.config.autoBrightnessEnabled) {
+      this._autoRef = db.ref(this.config.autoBrightnessPath);
+      this._calibrationRef = db.ref(this.config.brightnessCalibrationPath);
+      // Read the prior status before any subscription-triggered prediction
+      // can replace it. Auto admission waits for this baseline; manual writes
+      // need not wait for it, and a late seed cannot replace a verified value.
+      void this._seedLastApplied().then(() => {
+        this._seedReady = true;
+        this._refreshAuto();
+      });
+    }
     this._commandRef.on("value", (snapshot) => {
-      const percent = parseBrightnessCommand(snapshot.val());
-      if (percent === null) {
-        console.log("Brightness command cleared or invalid; staying inert");
-        return;
-      }
-      console.log(`New brightness command: ${percent}%`);
-      this._requested = percent;
-      this._requestedMeta = {
-        source: "manual",
-        prediction: this._latestPrediction,
-        // Operator intent wins: a manual command while auto is enabled
-        // disables auto and applies the manual value.
-        autoWasEnabled: this._autoConfig.enabled,
-      };
-      if (this._autoConfig.enabled) void this._disableAuto();
-      this._notifier.notify();
+      this._receiveCommand(snapshot.val());
     });
     console.log(
       `Brightness control listening on: ${this.config.brightnessPath}`,
     );
-    if (this.config.autoBrightnessEnabled) {
-      this._autoRef = db.ref(this.config.autoBrightnessPath);
+    if (this._autoRef) {
       this._autoRef.on("value", (snapshot) => {
-        const next = normalizeAutoConfig(snapshot.val());
-        const wasEnabled = this._autoConfig.enabled;
-        this._autoConfig = next;
-        console.log(
-          `Auto brightness config: ${next.enabled ? "enabled" : "disabled"} ` +
-            `(min ${next.min}, max ${next.max}, exponent ${next.exponent}, ` +
-            `cloudWeight ${next.cloudWeight})`,
-        );
-        // Enabling auto recomputes immediately instead of waiting a tick.
-        if (!wasEnabled && next.enabled) {
-          this._autoScheduler?.refresh();
-        }
+        this._receiveAutoConfig(snapshot.val());
       });
-      this._calibrationRef = db.ref(this.config.brightnessCalibrationPath);
-      // Seed the hysteresis baseline from the daemon's own last published
-      // status so a fresh process does not treat the first tick as a jump.
-      void this._seedLastApplied();
     }
     void this._notifyConfigurationIssue();
+  }
+
+  _receiveCommand(raw) {
+    if (this._stopping) return;
+    const first = !this._commandReceived;
+    this._commandReceived = true;
+    const percent = parseBrightnessCommand(raw);
+    if (first && this.config.autoBrightnessEnabled) {
+      // The first callback is retained state, not a new manual override.
+      // Wait for both subscriptions: persisted auto mode governs startup;
+      // otherwise replay the retained valid manual percentage once.
+      this._initialCommand = percent;
+      this._finishStartup();
+      return;
+    }
+    if (percent === null) {
+      console.log("Brightness command cleared or invalid; staying inert");
+      return;
+    }
+    this._initialCommand = null;
+    this._requestManual(percent);
+  }
+
+  _receiveAutoConfig(raw) {
+    if (this._stopping) return;
+    const next = normalizeAutoConfig(raw);
+    const disableInitial =
+      !this._autoConfigReceived && this._manualBeforeAutoConfig;
+    this._autoConfigReceived = true;
+    if (disableInitial && next.enabled) {
+      next.enabled = false;
+      void this._disableAuto();
+    }
+    const changed = Object.keys(next).some(
+      (key) => next[key] !== this._autoConfig[key],
+    );
+    if (changed) this._invalidateAuto();
+    this._autoConfig = next;
+    console.log(
+      `Auto brightness config: ${next.enabled ? "enabled" : "disabled"} ` +
+        `(min ${next.min}, max ${next.max}, exponent ${next.exponent}, ` +
+        `cloudWeight ${next.cloudWeight})`,
+    );
+    if (!this._finishStartup() && changed) this._refreshAuto();
+  }
+
+  _finishStartup() {
+    if (
+      this._startupReady ||
+      !this._commandReceived ||
+      !this._autoConfigReceived
+    ) {
+      return false;
+    }
+    this._startupReady = true;
+    const percent = this._initialCommand;
+    this._initialCommand = null;
+    if (!this._autoConfig.enabled && percent !== null)
+      this._requestManual(percent);
+    this._refreshAuto();
+    return true;
+  }
+
+  _refreshAuto() {
+    if (this.autoReady) {
+      this._autoScheduler?.refresh();
+    }
+  }
+
+  _invalidateAuto() {
+    this._autoRevision += 1;
+    if (this._pendingRequest?.source === "auto") this._pendingRequest = null;
+  }
+
+  _enqueueRequest(request) {
+    this._latestRequest = request;
+    this._pendingRequest = request;
+    this._notifier.notify();
+  }
+
+  _requestManual(percent) {
+    const autoWasEnabled = this._autoConfig.enabled;
+    this._invalidateAuto();
+    this._manualBeforeAutoConfig = !this._autoConfigReceived;
+    // Suppress locally before awaiting the Firebase disable round trip.
+    // A failed disable write must not give a suspended tick priority over it.
+    if (autoWasEnabled)
+      this._autoConfig = { ...this._autoConfig, enabled: false };
+    console.log(`New brightness command: ${percent}%`);
+    this._enqueueRequest({
+      percent,
+      source: "manual",
+      prediction: this._latestPrediction,
+      autoWasEnabled,
+    });
+    if (autoWasEnabled) void this._disableAuto();
   }
 
   // If the feature is enabled but the configuration is unusable, publish a
@@ -255,36 +347,41 @@ export class BrightnessController {
 
   async _worker() {
     // The loop picks up the newest pending command one at a time. When a new
-    // command arrives during processing, _requested is set and the finished
+    // command arrives during processing, _pendingRequest is set and the finished
     // iteration lets the loop process it next.
     while (!this._stopping) {
-      if (this._requested !== null) {
-        const target = this._requested;
-        const meta =
-          this._requestedMeta ?? { source: "manual", prediction: null };
-        this._requested = null;
-        this._requestedMeta = null;
-        this._current = target;
-        await this._handleRequest(target, meta);
+      if (this._pendingRequest !== null) {
+        const request = this._pendingRequest;
+        this._pendingRequest = null;
+        this._current = request;
+        await this._handleRequest(request);
         this._current = null;
         continue;
       }
       const wait = this._notifier.wait();
-      if (this._requested !== null) continue;
+      if (this._pendingRequest !== null) continue;
       await wait;
     }
   }
 
-  _supersededBy(target) {
-    return this._requested !== null && this._requested !== target;
+  _canDispatch(request) {
+    return (
+      !this._stopping &&
+      request === this._latestRequest &&
+      (request.source === "manual" ||
+        (this._autoConfig.enabled &&
+          request.autoRevision === this._autoRevision))
+    );
   }
 
   // Process one request from snapshot through write and verification. Any
   // terminal failure after the write has been dispatched triggers a
-  // best-effort restore of the pre-write snapshot. `meta` carries the request
+  // best-effort restore of the pre-write snapshot. The request carries its
   // source ("manual"/"auto") and the predicted model context captured when
   // the request was enqueued.
-  async _handleRequest(target, meta) {
+  async _handleRequest(request) {
+    if (!this._canDispatch(request)) return;
+    const { percent: target } = request;
     if (!this.config.brightnessEnabled) {
       console.log(`Brightness disabled; ignoring command ${target}%`);
       return;
@@ -319,22 +416,12 @@ export class BrightnessController {
     // retried here — once writeBrightness is invoked below, the sequence is
     // irreversible and never re-enters this loop.
     while (!this._stopping) {
-      if (this._supersededBy(target)) {
-        console.log(
-          `Brightness ${target}% superseded by ${this._requested}% before write`,
-        );
-        return;
-      }
+      if (!this._canDispatch(request)) return;
       try {
         snapshot = await this._snapshotBrightness();
         break;
       } catch (err) {
-        if (this._supersededBy(target)) {
-          console.log(
-            `Brightness ${target}% superseded by ${this._requested}% during snapshot retry`,
-          );
-          return;
-        }
+        if (!this._canDispatch(request)) return;
         const retriesLeft = this.config.brightnessMaxRetries;
         if (backoffIteration >= retriesLeft) {
           await this._publishStatus(
@@ -352,7 +439,10 @@ export class BrightnessController {
         backoffIteration += 1;
       }
     }
-    if (this._stopping) return;
+    // The successful snapshot awaited both screen and cabinet reads. Recheck
+    // identity and auto generation here, with no await before dispatch. An
+    // obsolete snapshot must never authorize an obsolete hardware write.
+    if (!this._canDispatch(request)) return;
 
     // Irreversible stage: the write is about to be dispatched. `writeStarted`
     // is set before the call resolves (or even throws) because a write call
@@ -371,7 +461,7 @@ export class BrightnessController {
       console.log(`Brightness ${target}% applied and verified`);
       await this._publishStatus("applied", target, null, target);
       this._lastAppliedPercent = target;
-      await this._appendCalibration(meta, target);
+      await this._appendCalibration(request, target);
       return;
     } catch (err) {
       errorText = `Brightness ${target}% failed: ${this._safeError(err)}`;
@@ -384,9 +474,7 @@ export class BrightnessController {
       }
     } catch (restoreErr) {
       errorText += `; snapshot restore failed: ${this._safeError(restoreErr)}`;
-      console.error(
-        `Brightness restore failed after ${target}% failure`,
-      );
+      console.error(`Brightness restore failed after ${target}% failure`);
     }
     await this._publishStatus("failed", target, errorText);
   }
@@ -532,7 +620,18 @@ export class BrightnessController {
   // Entry point for the AutoBrightnessScheduler: enqueues one auto-initiated
   // write into the same serialized worker the manual command listener feeds.
   // Returns whether the request was accepted for processing.
-  requestAuto(percent, prediction) {
+  requestAuto(percent, prediction, autoRevision) {
+    if (
+      !this.autoReady ||
+      !this.config.brightnessEnabled ||
+      !this.config.autoBrightnessEnabled ||
+      !this._autoConfig.enabled ||
+      autoRevision !== this._autoRevision ||
+      this._pendingRequest?.source === "manual" ||
+      this._current?.source === "manual"
+    ) {
+      return false;
+    }
     if (!Number.isInteger(percent) || percent < 0 || percent > 100) {
       console.warn(
         `Auto scheduler produced an invalid percent: ${JSON.stringify(percent)}`,
@@ -540,9 +639,12 @@ export class BrightnessController {
       return false;
     }
     console.log(`Auto brightness request: ${percent}%`);
-    this._requested = percent;
-    this._requestedMeta = { source: "auto", prediction: prediction ?? null };
-    this._notifier.notify();
+    this._enqueueRequest({
+      percent,
+      source: "auto",
+      prediction: prediction ?? null,
+      autoRevision,
+    });
     return true;
   }
 
@@ -581,13 +683,23 @@ export class BrightnessController {
     if (!this._calibrationRef) return;
     if (meta.source === "auto") {
       await this._pushCalibration(
-        calibrationEntry("auto", percent, meta.prediction, ServerValue.TIMESTAMP),
+        calibrationEntry(
+          "auto",
+          percent,
+          meta.prediction,
+          ServerValue.TIMESTAMP,
+        ),
       );
       return;
     }
     if (meta.autoWasEnabled && meta.prediction) {
       await this._pushCalibration(
-        calibrationEntry("manual", percent, meta.prediction, ServerValue.TIMESTAMP),
+        calibrationEntry(
+          "manual",
+          percent,
+          meta.prediction,
+          ServerValue.TIMESTAMP,
+        ),
       );
     }
   }
@@ -613,7 +725,8 @@ export class BrightnessController {
         typeof applied === "number" &&
         Number.isInteger(applied) &&
         applied >= 0 &&
-        applied <= 100
+        applied <= 100 &&
+        this._lastAppliedPercent === null
       ) {
         this._lastAppliedPercent = applied;
       }
@@ -648,6 +761,8 @@ export class BrightnessController {
   // restoring before the worker loop observes `_stopping` and exits.
   shutdown() {
     this._stopping = true;
+    this._invalidateAuto();
+    this._pendingRequest = null;
     if (this._autoScheduler) this._autoScheduler.stop();
     if (this._commandRef) {
       this._commandRef.off("value");
