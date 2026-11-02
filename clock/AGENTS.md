@@ -2292,7 +2292,12 @@ For a persistent workspace-owned server, use `bash scripts/dev-server.sh start 8
 For isolated local development and CI, use Firebase Emulator:
 
 No live credentials or Firebase login are required. Pass `VITE_USE_EMULATOR=true`
-explicitly to Vite/Playwright; local Vite otherwise uses shared staging Firebase.
+explicitly at Vite startup/build time or to Playwright. The default development
+server otherwise uses shared staging Firebase. A default production build
+previewed on localhost uses production Firebase unless emulator mode was
+compiled in; changing preview mode/environment cannot change that bundle.
+See [Firebase selection](../docs/environment.md#firebase-selection) for the
+mode/hostname precedence and restart/rebuild boundary.
 See [the environment contract](../docs/environment.md) for loaders and the
 separate match/weather API routing (the emulator flag changes Firebase only).
 
@@ -2386,7 +2391,7 @@ The asset E2E tests (`e2e/assets.spec.ts`) use these selectors for the multi-que
 
 ### Independent Browser Sessions
 
-Controller/display tests may need two independent browser sessions. Tabs on the same origin within one context/profile share localStorage and Firebase auth persistence; opening another ordinary window in the same profile does not isolate them. Different staging URL subpaths also share these keys. Separate local ports have distinct origins but still default to the same staging Firebase project.
+Controller/display tests may need two independent browser sessions. Tabs on the same origin within one context/profile share localStorage and Firebase auth persistence; opening another ordinary window in the same profile does not isolate them. Different staging URL subpaths also share these keys. Separate local ports have distinct origins; default Vite development servers on those ports still use the same staging Firebase project. Production builds previewed locally follow the [mode/hostname selection](../docs/environment.md#firebase-selection) instead.
 
 Use Playwright's test runner with a separate context per role:
 

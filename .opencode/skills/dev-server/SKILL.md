@@ -47,7 +47,7 @@ The helper identifies the physical worktree and port, uses a dedicated tmux sock
 bash scripts/dev-server.sh start 8000
 ```
 
-The current environment is inherited when starting a new session, including `VITE_USE_EMULATOR=true` when requested. An existing session keeps its original environment; stop/start it to change settings. Do not assume a worktree or port isolates Firebase: development defaults to shared staging Firebase. Avoid authenticated actions against shared state unless authorized.
+The current environment is inherited when starting a new session, including `VITE_USE_EMULATOR=true` when requested. An existing session keeps its original environment; stop/start it to change settings. Do not assume a worktree or port isolates Firebase: the default development server uses shared staging Firebase. Production builds previewed locally use production Firebase unless emulator mode was compiled in; changing preview mode/environment requires rebuilding to change compiled selection. See [Firebase selection](../../../docs/environment.md#firebase-selection). Avoid authenticated actions against shared state unless authorized.
 
 ### 5. Check the HTTP shell
 

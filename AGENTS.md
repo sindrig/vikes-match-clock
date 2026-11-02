@@ -124,7 +124,7 @@ The match data pipeline depends on team IDs matching between the frontend and th
 
 ## Taking Screenshots for PRs
 
-The local dev server connects to the **staging Firebase database** by default (no emulator flag needed), so you can log in with real credentials and see real match state — making it ideal for capturing screenshots of UI changes.
+The default Vite development server connects to **staging Firebase** unless emulator mode is enabled at startup. A default production build served on localhost with `pnpm preview` connects to **production Firebase** unless emulator mode was compiled in. Check [Firebase selection](docs/environment.md#firebase-selection) before authenticated screenshot work; changing preview mode or environment requires rebuilding to change compiled selection.
 
 ### Workflow
 

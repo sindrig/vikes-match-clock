@@ -3,7 +3,9 @@
 # The root .envrc loads it through direnv's dotenv_if_exists after direnv allow.
 # Without direnv, use the explicit Bash environment examples in docs/environment.md.
 
-# Firebase emulator mode (Vite reads this when starting/building).
+# Firebase emulator mode (Vite reads this at dev-server startup or build time).
+# Restart the dev server after changing it; rebuild already-built assets.
+# Setting this only when running pnpm preview does not change the bundle.
 # VITE_USE_EMULATOR=true
 
 # Authorized staging browser login only; retrieve access from a maintainer.

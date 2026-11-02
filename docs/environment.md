@@ -5,15 +5,15 @@ or missing credential file does not authorize provisioning infrastructure or
 accessing shared services. Paths below are relative to the current worktree
 unless explicitly chosen by the operator.
 
-| Task                                            | Credentials and loader                                                                                    | Boundary                                                                                                                                  |
-| ----------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| Frontend generation, build, lint and unit tests | None; Node/pnpm read the committed OpenAPI schema                                                         | See [API preparation](api-client-preparation.md). Starting the browser app defaults to shared staging Firebase; building does not log in. |
-| Local Firebase emulator development/E2E         | None; pass `VITE_USE_EMULATOR=true` to Vite/Playwright                                                    | Uses the test Firebase project and local services. Fixtures create synthetic test accounts.                                               |
-| Shared staging browser login                    | Maintainer-provided staging account; browser tooling may read shell `TEST_CREDENTIALS` (`EMAIL;PASSWORD`) | Separate permission from AWS/API access. Coordinate venue and `listenPrefix` before authenticated actions.                                |
-| API schema export, health and mocked tests      | None; isolated Python environment                                                                         | Real match/weather requests require the API access described below.                                                                       |
-| Live API match/weather requests                 | AWS SDK credential chain with access to the required SSM parameters                                       | The API process fetches keys lazily from SSM; it does not load keys from dotenv.                                                          |
-| AWS staging upload/deployment                   | Approved AWS CLI credentials plus staging bucket/distribution metadata                                    | CI uses OIDC. A manual operator supplies an existing session/profile or approved credential file.                                         |
-| Gateway daemon/hardware                         | Operator-supplied Firebase service account, optional overlay SSH key and Vnnox credential                 | Separate host installation and hardware authorization; never required for frontend/emulator work.                                         |
+| Task                                            | Credentials and loader                                                                                    | Boundary                                                                                                                                                 |
+| ----------------------------------------------- | --------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Frontend generation, build, lint and unit tests | None; Node/pnpm read the committed OpenAPI schema                                                         | See [API preparation](api-client-preparation.md). Building does not log in; browser targets depend on [compiled mode and hostname](#firebase-selection). |
+| Local Firebase emulator development/E2E         | None; pass `VITE_USE_EMULATOR=true` at Vite startup/build time or to Playwright                           | Uses the test Firebase project and local services. Fixtures create synthetic test accounts.                                                              |
+| Shared staging browser login                    | Maintainer-provided staging account; browser tooling may read shell `TEST_CREDENTIALS` (`EMAIL;PASSWORD`) | Separate permission from AWS/API access. Coordinate venue and `listenPrefix` before authenticated actions.                                               |
+| API schema export, health and mocked tests      | None; isolated Python environment                                                                         | Real match/weather requests require the API access described below.                                                                                      |
+| Live API match/weather requests                 | AWS SDK credential chain with access to the required SSM parameters                                       | The API process fetches keys lazily from SSM; it does not load keys from dotenv.                                                                         |
+| AWS staging upload/deployment                   | Approved AWS CLI credentials plus staging bucket/distribution metadata                                    | CI uses OIDC. A manual operator supplies an existing session/profile or approved credential file.                                                        |
+| Gateway daemon/hardware                         | Operator-supplied Firebase service account, optional overlay SSH key and Vnnox credential                 | Separate host installation and hardware authorization; never required for frontend/emulator work.                                                        |
 
 ## Loaders and file formats
 
@@ -30,8 +30,11 @@ unless explicitly chosen by the operator.
 - **Vite:** inherits shell variables and automatically loads `.env` / `.env.local`
   and mode-specific dotenv files from `clock/`. `VITE_*` values are public
   browser build inputs; never put credentials there. Vite does not load the
-  root `.envrc-local`. Restart/rebuild after changing environment selection;
-  an existing tmux dev-server session retains its startup environment.
+  root `.envrc-local`. Mode and environment values are compiled into built
+  assets. Restart the development server after changing selection; an existing
+  tmux dev-server session retains its startup environment. Rebuild assets to
+  change their compiled selection: `pnpm preview`, its `--mode` option, and
+  environment variables set only at preview time do not rewrite the bundle.
 - **AWS:** CLI and boto3 use their standard credential chains (for example
   `AWS_PROFILE` referring to an already configured profile, or approved
   exported session credentials). Terraform configuration is not a credential
@@ -61,6 +64,26 @@ only when that action is intended. Portable tasks need neither helper.
 Use [API preparation](api-client-preparation.md) for dependency/tool setup;
 Python and AWS are unnecessary for the frontend. No credential file or direnv
 is required for generation/build/lint/unit tests.
+
+### Firebase selection
+
+[firebase.ts](../clock/src/firebase.ts) selects Firebase in this order:
+
+| Compiled input                                         | Browser hostname                                          | Firebase target                            |
+| ------------------------------------------------------ | --------------------------------------------------------- | ------------------------------------------ |
+| `VITE_USE_EMULATOR` is exactly `true`                  | Any                                                       | Local emulators (`vikes-match-clock-test`) |
+| Otherwise, Vite `MODE` is anything except `production` | Any                                                       | Shared staging                             |
+| Otherwise, Vite `MODE` is `production`                 | `staging-klukka.irdn.is`                                  | Shared staging                             |
+| Otherwise, Vite `MODE` is `production`                 | Any other hostname, including `localhost` and `127.0.0.1` | Production                                 |
+
+The default `pnpm start` development server uses mode `development`, so it
+targets shared staging unless emulator mode is enabled at startup. Default
+`pnpm build` uses mode `production`: serving that build locally with
+`pnpm preview` targets production Firebase unless emulator mode was compiled
+in. Build with `VITE_USE_EMULATOR=true pnpm build` for an emulator preview;
+setting the flag or changing `--mode` only when starting preview is too late.
+The hostname check happens in the browser; the mode and emulator flag come
+from development-server startup or the build, not the preview environment.
 
 For Firebase emulator work, start the required local services with the test
 project `vikes-match-clock-test`, then start Vite from `clock/`:
@@ -104,8 +127,10 @@ in Bash without exposing the value:
 
 This checks only that the variable is nonempty, not credential validity.
 Use separate browser contexts/profiles for independent sessions; staging
-subpaths share Firebase and same-origin storage. Local Vite defaults to
-staging Firebase unless emulator mode is enabled.
+subpaths share Firebase and same-origin storage. The default Vite development
+server targets shared staging unless emulator mode is enabled at startup;
+a production build previewed locally targets production unless emulator mode
+was compiled in. Check [Firebase selection](#firebase-selection) before login.
 
 ## API secrets
 

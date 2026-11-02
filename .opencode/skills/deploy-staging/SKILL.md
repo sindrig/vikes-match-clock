@@ -11,7 +11,7 @@ Supports **subpath bundle locations** (e.g. `staging-klukka.irdn.is/my-feature/`
 
 ## Shared staging boundaries
 
-- On `staging-klukka.irdn.is`, `clock/src/firebase.ts` selects the same staging Firebase project for root and every subpath. Auth, Realtime Database, Storage and Functions are shared; controllers using the same `listenPrefix` can change each other's state. A subpath does not create a Firebase namespace.
+- On `staging-klukka.irdn.is`, `clock/src/firebase.ts` selects the same staging Firebase project for root and every subpath unless emulator mode was compiled into the build. See [Firebase selection](../../../docs/environment.md#firebase-selection) for mode/hostname precedence. Auth, Realtime Database, Storage and Functions are shared; controllers using the same `listenPrefix` can change each other's state. A subpath does not create a Firebase namespace.
 - Subpaths share an origin. Within one browser context/profile they share localStorage keys (including screen selection and `listenPrefix`) and Firebase auth persistence. Use separate browser contexts/profiles for independent sessions; these still use shared backend data. Separate same-origin tabs or ordinary windows in the same profile do not isolate sessions.
 - `VITE_BASE_PATH` sets Vite's public asset base; it does not configure React Router. `clock/src/index.tsx` uses `BrowserRouter` without a `basename`; the admin route and navigation remain root-relative (`/admin`). A subpath bundle is not a fully namespaced application, and an HTML 200 at a subpath does not verify routing or application startup.
 - Coordinate bundle prefixes and shared staging state with other users. For isolated state testing, use the emulator setup in `clock/AGENTS.md` with deliberately separate test data. Do not treat subpaths as disposable independent environments.
@@ -170,7 +170,7 @@ aws s3 rm "s3://$STAGING_BUCKET/<subpath>/" --recursive --region eu-west-1
 ## Important notes
 
 - This deploys ONLY the frontend. Backend/API changes require a separate deployment.
-- The staging hostname selects staging Firebase, shared by all staging bundles. Verify the target and current users before interacting; a frontend build or subpath alone does not establish backend isolation.
+- The staging hostname selects shared staging Firebase unless emulator mode was compiled in at build time. Previewing the default production build on localhost selects production Firebase unless emulator mode was compiled in; changing preview mode/environment does not rewrite the bundle. Verify the target and current users before interacting; a frontend build or subpath alone does not establish backend isolation.
 - CloudFront caches aggressively; without invalidation, changes may take up to 24h to appear.
 - Only `/index.html` is invalidated for root deploys because asset files are content-hashed (unique filenames on each build).
 - For subpath deploys, `/<subpath>/*` is invalidated to cover all files under that path.
