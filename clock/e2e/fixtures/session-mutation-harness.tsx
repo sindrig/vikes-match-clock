@@ -59,8 +59,11 @@ let connected = false;
 onValue(ref(database, ".info/connected"), (snapshot) => {
   connected = snapshot.val() === true;
 });
-let mediaGate: Promise<void> | null = null;
-let releaseMedia: () => void = () => undefined;
+const mediaGates = new Map<
+  string,
+  { promise: Promise<void>; release: () => void }
+>();
+let activeMediaGate = "default";
 const originalAudited = firebaseDatabase.writeAudited;
 const originalAuditOnly = firebaseDatabase.writeAuditOnly;
 firebaseDatabase.writeAudited = (...args) => {
@@ -104,13 +107,11 @@ storageHelpers.getDownloadURL = (path) => {
     failPreparation = false;
     throw new Error("Injected media preparation failure");
   }
+  const gate = mediaGates.get(activeMediaGate);
   return originalDownload(path).then(async (result) => {
-    if (
-      mediaGate &&
-      (/\/players\//.test(path) || /\/club-logos\//.test(path))
-    ) {
+    if (gate && (/\/players\//.test(path) || /\/club-logos\//.test(path))) {
       counts.mediaWaiting++;
-      await mediaGate;
+      await gate.promise;
     }
     return result;
   });
@@ -183,14 +184,17 @@ export const harness = {
   // Pure SDK disconnect/reconnect, without browser offline/online events.
   disconnect: () => goOffline(database),
   reconnect: () => goOnline(database),
-  armMedia: () => {
-    mediaGate = new Promise((resolve) => {
-      releaseMedia = resolve;
+  armMedia: (id = "default") => {
+    let release: () => void = () => undefined;
+    const promise = new Promise<void>((resolve) => {
+      release = resolve;
     });
+    mediaGates.set(id, { promise, release });
+    activeMediaGate = id;
   },
-  releaseMedia: () => {
-    releaseMedia();
-    mediaGate = null;
+  releaseMedia: (id = "default") => {
+    mediaGates.get(id)?.release();
+    mediaGates.delete(id);
   },
   retain: () => {
     retained = api;
@@ -254,6 +258,16 @@ export const harness = {
     api.completeCountdownIfCurrent(observed),
   rawWrite: (path: string, value: unknown) =>
     set(ref(database, path), value).then(
+      () => "accepted",
+      () => "denied",
+    ),
+  storageRead: (path: string) =>
+    storageHelpers.getDownloadURL(path).then(
+      () => "accepted",
+      () => "denied",
+    ),
+  storageWrite: (path: string) =>
+    storageHelpers.uploadBytes(path, new Uint8Array([1])).then(
       () => "accepted",
       () => "denied",
     ),

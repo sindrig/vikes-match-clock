@@ -1868,7 +1868,16 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
             );
           const offIdx = findPlayer(outgoing);
           const onIdx = findPlayer(incoming);
-          if (offIdx === -1 || onIdx === -1 || offIdx === onIdx) {
+          // Another substitution can finish while these cards prepare. Match
+          // the picker's eligibility against current subscription values.
+          if (
+            offIdx === -1 ||
+            onIdx === -1 ||
+            offIdx === onIdx ||
+            !players[offIdx]?.show ||
+            players[onIdx]?.show ||
+            players[onIdx]?.number == null
+          ) {
             throw new Error(
               "Leikmannahópur hefur breyst. Veldu skiptingu aftur.",
             );

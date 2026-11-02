@@ -1668,6 +1668,46 @@ describe("atomic queue intent regressions", () => {
     expect(data).toEqual(before);
   });
 
+  it.each([
+    ["0/show", false],
+    ["0/show", null],
+    ["1/show", true],
+    ["1/number", null],
+  ])(
+    "rejects changed substitution eligibility at %s=%s before any writer",
+    async (path, value) => {
+      write("states/A/controller/roster/home", [player, benchPlayer]);
+      mount();
+      const commit = currentApi.appendSubstitutionAndActivate;
+      act(() => {
+        write(`states/A/controller/roster/home/${String(path)}`, value);
+        emit("states/A/controller");
+      });
+      clearAttempts();
+      const before = structuredClone(data);
+      await act(async () => {
+        await expect(commit(substitution)).rejects.toThrow("Leikmannahópur");
+      });
+      noAttempts();
+      expect(data).toEqual(before);
+    },
+  );
+
+  it("accepts an eligible numbered incoming player whose current show flag is absent", async () => {
+    write("states/A/controller/roster/home", [player, benchPlayer]);
+    write("states/A/controller/roster/home/1/show", null);
+    mount();
+    clearAttempts();
+    await act(async () =>
+      currentApi.appendSubstitutionAndActivate(substitution),
+    );
+    expect(firebaseDatabase.writeAudited).toHaveBeenCalledTimes(1);
+    expect(currentApi.controller.roster.home.map((p) => p.show)).toEqual([
+      false,
+      true,
+    ]);
+  });
+
   it("keeps both roster flags and the old queue when the substitution save fails", async () => {
     write("states/A/controller/roster/home", [player, benchPlayer]);
     mount();
@@ -1691,6 +1731,8 @@ describe("atomic queue intent regressions", () => {
       const subOne = api.appendSubstitutionAndActivate(substitution);
       const subTwo = api.appendSubstitutionAndActivate({
         ...substitution,
+        outgoing: benchPlayer,
+        incoming: player,
         asset: { ...substitution.asset, key: "sub-two" },
       });
       await Promise.all([first, second, subOne, subTwo]);

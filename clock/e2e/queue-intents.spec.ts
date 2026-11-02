@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import { minimalPerimeterDisplay } from "../src/lib/venue.fixtures";
-import type { ControllerState, Asset } from "../src/types";
+import type { ControllerState, Asset, Player } from "../src/types";
 
 test.describe.configure({ mode: "default", timeout: 60000 });
 const ns = "vikes-match-clock-test";
@@ -23,6 +23,12 @@ const crest = readFileSync(
 const starter = { id: 10, name: "Jón Jónsson", number: 7, show: true };
 const secondStarter = { id: 12, name: "Kári Kárason", number: 9, show: true };
 const bench = { id: 11, name: "Óli Ólason", number: 8, show: false };
+const secondBench = {
+  id: 13,
+  name: "Bjarni Bjarnason",
+  number: 10,
+  show: false,
+};
 const oldAsset: Asset = {
   type: "NO_IMAGE_PLAYER",
   key: "old-player",
@@ -160,10 +166,23 @@ async function noAttempts(page: Page, before: unknown, otherBefore: unknown) {
   expect(await audits()).toEqual([]);
   expect(await rest("GET", `audit/${other}`)).toBeNull();
 }
-async function pickSub(page: Page) {
-  await page.getByRole("button", { name: "Skipting", exact: true }).click();
-  await page.getByRole("button", { name: "7 Jón Jónsson" }).click();
-  await page.getByRole("button", { name: "8 Óli Ólason" }).click();
+async function pickSub(
+  page: Page,
+  outgoing: Player = starter,
+  incoming: Player = bench,
+  side: "home" | "away" = "home",
+) {
+  await page
+    .getByRole("button", { name: "Skipting", exact: true })
+    .nth(side === "home" ? 0 : 1)
+    .click();
+  for (const player of [outgoing, incoming])
+    await page
+      .getByRole("button", {
+        name: `${String(player.number)} ${player.name}`,
+        exact: true,
+      })
+      .click();
 }
 async function pickAsset(page: Page, mode: string) {
   if (mode === "asset") {
@@ -205,6 +224,7 @@ test.beforeAll(async () => {
     "players/10.png",
     "players/11.png",
     "players/12.png",
+    "players/13.png",
     "images/selection.png",
     "perimeter/left.png",
     "perimeter/right.png",
@@ -329,6 +349,31 @@ test("real SDK denial controls reject anonymous, wrong-venue and forged audit wr
   page,
 }) => {
   await bootstrap(page, "prepared", false);
+  expect(
+    await page.evaluate(
+      (venue) =>
+        window.sessionMutationHarness.storageRead(
+          `${venue}/unrelated/keep.png`,
+        ),
+      venue,
+    ),
+  ).toBe("denied");
+  expect(
+    await page.evaluate(
+      (venue) =>
+        window.sessionMutationHarness.storageWrite(
+          `${venue}/images/denied.png`,
+        ),
+      venue,
+    ),
+  ).toBe("denied");
+  expect(
+    await page.evaluate(
+      (venue) =>
+        window.sessionMutationHarness.storageRead(`${venue}/players/10.png`),
+      venue,
+    ),
+  ).toBe("accepted");
   expect(
     await page.evaluate(
       (path) => window.sessionMutationHarness.rawWrite(path, 99),
@@ -627,6 +672,269 @@ test("substitution publishes the queue, activation and both roster flags togethe
   ]);
 });
 
+for (const side of ["home", "away"] as const) {
+  for (const firstToFinish of ["first", "second"] as const) {
+    for (const conflicting of [true, false]) {
+      test(`${side} pending ${conflicting ? "conflicting" : "independent"} substitutions complete ${firstToFinish} first`, async ({
+        page,
+        browser,
+      }) => {
+        await rest("PUT", `states/${venue}/controller/roster/${side}`, [
+          starter,
+          secondStarter,
+          bench,
+          secondBench,
+        ]);
+        await bootstrap(page, side === "home" ? "sub" : "team");
+        const observerContext = await browser.newContext();
+        try {
+          const observer = await observerContext.newPage();
+          await bootstrap(observer, "prepared", false);
+          await expect
+            .poll(() =>
+              observer.evaluate(
+                () => window.sessionMutationHarness.observations.length,
+              ),
+            )
+            .toBe(1);
+          const before = await rest("GET", `states/${venue}`);
+          const otherBefore = await rest("GET", `states/${other}`);
+          await page.evaluate(() =>
+            window.sessionMutationHarness.armMedia("first"),
+          );
+          await pickSub(page, starter, bench, side);
+          await expect
+            .poll(() =>
+              page.evaluate(
+                () => window.sessionMutationHarness.counts.mediaWaiting,
+              ),
+            )
+            .toBe(2);
+          await page.evaluate(() =>
+            window.sessionMutationHarness.armMedia("second"),
+          );
+          const secondOutgoing = conflicting ? starter : secondStarter;
+          await pickSub(page, secondOutgoing, secondBench, side);
+          await expect
+            .poll(() =>
+              page.evaluate(
+                () => window.sessionMutationHarness.counts.mediaWaiting,
+              ),
+            )
+            .toBe(4);
+          await noAttempts(page, before, otherBefore);
+          await page.evaluate(
+            (id) => window.sessionMutationHarness.releaseMedia(id),
+            firstToFinish,
+          );
+          await oneAudit(page, "controller.append-substitution-and-activate");
+          const afterFirst = await controller();
+          const firstCounts = await page.evaluate(
+            () => window.sessionMutationHarness.counts,
+          );
+          const firstAudits = await audits();
+          await page.evaluate(
+            (id) => window.sessionMutationHarness.releaseMedia(id),
+            firstToFinish === "first" ? "second" : "first",
+          );
+          if (conflicting) {
+            await expect(page.getByRole("alert")).toContainText(
+              "Leikmannahópur hefur breyst",
+            );
+            expect(await controller()).toEqual(afterFirst);
+            expect(await audits()).toEqual(firstAudits);
+            expect(
+              await page.evaluate(() => window.sessionMutationHarness.counts),
+            ).toEqual(firstCounts);
+          } else {
+            await expect.poll(async () => (await audits()).length).toBe(2);
+            await expect
+              .poll(() =>
+                page.evaluate(
+                  () => window.sessionMutationHarness.counts.succeeded,
+                ),
+              )
+              .toBe(2);
+            expect(
+              await page.evaluate(() => window.sessionMutationHarness.counts),
+            ).toMatchObject({
+              ordinary: 2,
+              auditOnly: 0,
+              sdk: ["merge:/", "merge:/"],
+              failed: 0,
+            });
+            await expect(page.getByRole("alert")).toHaveCount(0);
+          }
+          const successful = conflicting ? 1 : 2;
+          await expect
+            .poll(() =>
+              observer.evaluate(
+                () => window.sessionMutationHarness.observations.length,
+              ),
+            )
+            .toBe(successful + 1);
+          const observations = (await observer.evaluate(
+            () => window.sessionMutationHarness.observations,
+          )) as Array<{ controller: ControllerState }>;
+          const completed =
+            firstToFinish === "first"
+              ? [bench, secondBench]
+              : [secondBench, bench];
+          for (const [index, { controller: state }] of observations.entries()) {
+            expect(state.roster[side].filter((p) => p.show)).toHaveLength(2);
+            const queue = Object.values(state.queues).find(
+              (q) => q.name === "Skiptingar",
+            );
+            expect(
+              queue?.items.map((asset) => asset.subIn?.fullName) ?? [],
+            ).toEqual(completed.slice(0, index).map((p) => p.name));
+            if (index > 0) {
+              expect(state.activeQueueId).toBe(queue?.id);
+              expect(queue?.cycle).toBe(false);
+            }
+            expect(state.currentAsset).toEqual(afterFirst.currentAsset);
+            expect(state.playing).toBe(true);
+          }
+          const final = await controller();
+          expect(
+            final.roster[side].filter((p) => p.show).map((p) => p.id),
+          ).toEqual(
+            conflicting
+              ? [secondStarter.id, completed[0]?.id]
+              : [bench.id, secondBench.id],
+          );
+          expect(await rest("GET", `states/${other}`)).toEqual(otherBefore);
+          await test.info().attach("independent-substitution-observer", {
+            contentType: "application/json",
+            body: JSON.stringify(observations, null, 2),
+          });
+        } finally {
+          await observerContext.close();
+        }
+      });
+    }
+  }
+  for (const changed of ["outgoing", "incoming", "number"] as const) {
+    test(`${side} substitution rejects current ${changed} eligibility changed during preparation without any write`, async ({
+      page,
+    }) => {
+      await rest("PUT", `states/${venue}/controller/roster/${side}`, [
+        starter,
+        bench,
+      ]);
+      await bootstrap(page, side === "home" ? "sub" : "team");
+      await page.evaluate(() => window.sessionMutationHarness.armMedia());
+      await pickSub(page, starter, bench, side);
+      await expect
+        .poll(() =>
+          page.evaluate(
+            () => window.sessionMutationHarness.counts.mediaWaiting,
+          ),
+        )
+        .toBe(2);
+      const path =
+        changed === "outgoing"
+          ? "0/show"
+          : changed === "incoming"
+            ? "1/show"
+            : "1/number";
+      await rest(
+        "PUT",
+        `states/${venue}/controller/roster/${side}/${path}`,
+        changed === "incoming" ? true : changed === "outgoing" ? false : null,
+      );
+      await expect
+        .poll(() =>
+          page.evaluate(
+            ({ side, changed }) => {
+              const players =
+                window.sessionMutationHarness.snapshot().controller.roster[
+                  side
+                ];
+              if (changed === "outgoing") return players[0]?.show;
+              if (changed === "incoming") return players[1]?.show;
+              return players[1]?.number ?? null;
+            },
+            { side, changed },
+          ),
+        )
+        .toBe(
+          changed === "incoming" ? true : changed === "outgoing" ? false : null,
+        );
+      const before = await rest("GET", `states/${venue}`);
+      const otherBefore = await rest("GET", `states/${other}`);
+      await page.evaluate(() => window.sessionMutationHarness.releaseMedia());
+      await expect(page.getByRole("alert")).toContainText(
+        "Leikmannahópur hefur breyst",
+      );
+      await noAttempts(page, before, otherBefore);
+    });
+  }
+}
+
+test("same-turn SDK echoes reject reused outgoing and incoming players while independent and ordered substitutions commit", async ({
+  page,
+}) => {
+  await rest("PUT", `states/${venue}/controller/roster/home`, [
+    starter,
+    secondStarter,
+    bench,
+    secondBench,
+  ]);
+  await bootstrap(page);
+  const results = await page.evaluate(
+    async ({ starter, secondStarter, bench, secondBench, subAsset }) => {
+      const api = window.sessionMutationHarness.commands;
+      const submit = (outgoing: Player, incoming: Player, key: string) =>
+        api.appendSubstitutionAndActivate({
+          side: "home",
+          outgoing,
+          incoming,
+          asset: { ...subAsset, key },
+        });
+      return (
+        await Promise.allSettled([
+          submit(starter, bench, "first"),
+          submit(starter, secondBench, "reused-outgoing"),
+          submit(secondStarter, bench, "reused-incoming"),
+          submit(secondStarter, secondBench, "independent"),
+          submit(bench, starter, "ordered"),
+        ])
+      ).map((result) => result.status);
+    },
+    { starter, secondStarter, bench, secondBench, subAsset },
+  );
+  expect(results).toEqual([
+    "fulfilled",
+    "rejected",
+    "rejected",
+    "fulfilled",
+    "fulfilled",
+  ]);
+  expect(await audits()).toHaveLength(3);
+  expect(
+    await page.evaluate(() => window.sessionMutationHarness.counts),
+  ).toMatchObject({
+    ordinary: 3,
+    auditOnly: 0,
+    sdk: ["merge:/", "merge:/", "merge:/"],
+    succeeded: 3,
+    failed: 0,
+  });
+  const final = await controller();
+  expect(final.roster.home.map((p) => p.show)).toEqual([
+    true,
+    false,
+    false,
+    true,
+  ]);
+  expect(
+    Object.values(final.queues)
+      .find((q) => q.name === "Skiptingar")
+      ?.items.map((a) => a.key),
+  ).toEqual(["first", "independent", "ordered"]);
+});
+
 test("rename, settings and ordering preserve remote items/autoplay not yet delivered to the writer", async ({
   page,
 }) => {
@@ -727,9 +1035,14 @@ test("rapid same-turn creates and substitutions use real synchronous SDK echoes"
       });
       const subTwo = api.appendSubstitutionAndActivate({
         side: "home",
-        outgoing: starter,
-        incoming: bench,
-        asset: { ...subAsset, key: "sub-two" },
+        outgoing: bench,
+        incoming: starter,
+        asset: {
+          ...subAsset,
+          key: "sub-two",
+          subIn: subAsset.subOut,
+          subOut: subAsset.subIn,
+        },
       });
       await Promise.all([subOne, subTwo]);
       return Promise.all([first, second]);
@@ -748,6 +1061,11 @@ test("rapid same-turn creates and substitutions use real synchronous SDK echoes"
     "sub-two",
   ]);
   expect(await audits()).toHaveLength(4);
+  expect((await controller()).roster.home).toEqual([
+    starter,
+    secondStarter,
+    bench,
+  ]);
   expect(
     await page.evaluate(() => window.sessionMutationHarness.counts.ordinary),
   ).toBe(4);

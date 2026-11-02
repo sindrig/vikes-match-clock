@@ -92,7 +92,14 @@ submission failure leaves the previous backend queue and playback intact.
 
 `appendSubstitutionAndActivate({ side, outgoing, incoming, asset })` resolves
 both selected players against the current subscribed roster and rejects if
-either is absent or both resolve to the same player. It creates or appends to
+either is absent, both resolve to the same player, the outgoing player is no
+longer on the pitch (`show`), or the incoming player is no longer eligible
+(`!show && number != null`). These checks run at submission, after media
+preparation, using current subscription values rather than the selected copies.
+A rejected intent makes no queue, roster or audit submission. Overlapping
+preparations cannot reuse an outgoing or incoming player after an accepted
+command's SDK echo; independent and ordered substitutions still use those
+echoes before React rerenders. It creates or appends to
 `Skiptingar`, activates it, and writes both roster `show` leaves in one
 `controller.append-substitution-and-activate` update/audit. It retains an
 existing queue's settings, order and items and does not advance, clear or

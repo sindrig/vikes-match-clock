@@ -1473,7 +1473,12 @@ Firebase-backed behavior.
   the generated assets and the home-team reveal background. Both cards prepare
   before the retained `appendSubstitutionAndActivate` command submits the
   `Skiptingar` queue creation/append/activation and both roster status leaves
-  together. An absent selected roster member rejects the entire intent. The
+  together. At submission, both players are resolved from the current subscribed
+  roster: outgoing must still have `show`, and incoming must still satisfy
+  `!show && number != null`. An absent, identical or ineligible selection rejects
+  the entire intent before any queue, roster or audit write. This also rejects
+  overlapping preparations that reuse a player after another substitution's
+  SDK echo, while independent and ordered substitutions remain eligible. The
   existing current asset and playing flag are preserved; failures are shown
   in the team/shortcut box. Player-card and MOTM operations await their retained
   `renderAsset` command before reporting success.
