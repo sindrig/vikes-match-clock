@@ -1371,8 +1371,14 @@ Special case: **0 queues** → auto-creates "Biðröð 1" and adds the item (no 
 before asynchronous preparation. Rerenders cannot give an old draft a newer
 venue/session origin. Create-with-items and append are awaited; rejected
 saves retain the draft and display an error. A failed automatic create on an
-empty board opens the dialog for explicit retry. An older completion cannot
-close a newer draft.
+empty board opens the dialog for explicit retry. Each draft has a unique
+`draftId`; `QueuePicker` keys its inner component by that ID so pending/error
+feedback, the immediate submission guard and automatic-create tracking belong
+only to that draft, including identical-assets A → B → A selections. An older
+completion cannot close or unlock a newer draft or replace its error. A ready
+draft remains usable while a newer selection prepares; once the newer media
+is ready, an older preparation cannot replace that draft. Newer selections
+and unmounting also retire obsolete preparation errors.
 
 The old "Birta strax" / "Setja í biðröð" radio buttons in MediaManager were removed. `ImageList` no longer has a `displayNow` prop — it always calls `onAddAssets`, which opens QueuePicker.
 
@@ -1441,6 +1447,8 @@ creates/replaces the complete queue in one update. Preparation failure leaves
 the old queue intact. Submission failure is shown without leaving the team
 view. Replacement retains the old delete/create placement (new ID, after the
 remaining queues) and clears playback only if the replaced queue was active.
+Successful navigation runs directly after acknowledgement while the initiating
+action still owns the team view, without a deferred navigation timer.
 
 #### Manual Roster Creation (Resolve Roster)
 
@@ -1491,7 +1499,14 @@ Firebase-backed behavior.
   SDK echo, while independent and ordered substitutions remain eligible. The
   existing current asset and playing flag are preserved; failures are shown
   in the team/shortcut box. Player-card and MOTM operations await their retained
-  `renderAsset` command before reporting success.
+  `renderAsset` command before reporting success. Each player selection owns its
+  media and UI continuation: dismissal, replacement, a newer selection or
+  unmounting retires it. Submitted acknowledgements can close or report errors
+  only for that selection in its original mutation session (including venue or
+  auth A → B → A). Already-submitted writes remain irrevocable. An origin
+  rejection before submission still explains why the current draft could not
+  save. The Lið tab applies the same ownership checks to its inline player/MOTM
+  selection and to navigation/error feedback after a lineup replacement.
 - **Corrected SUB field semantics**: `subIn` carries the player **coming
   on** and `subOut` the player **going off** (the persisted fields were
   previously inverted from their meaning). The creation site builds

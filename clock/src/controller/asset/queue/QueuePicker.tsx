@@ -1,9 +1,16 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { Modal, Button, Divider } from "rsuite";
 import { QueueState, Asset } from "../../../types";
 import "./QueuePicker.css";
 
 export interface QueuePickerProps {
+  draftId: string;
   queues: Record<string, QueueState>;
   assets: Asset[];
   onShowNow: (assets: Asset[]) => void | Promise<void>;
@@ -12,7 +19,7 @@ export interface QueuePickerProps {
   onClose: () => void;
 }
 
-const QueuePicker: React.FC<QueuePickerProps> = ({
+const QueuePickerDraft: React.FC<QueuePickerProps> = ({
   queues,
   assets,
   onShowNow,
@@ -24,16 +31,24 @@ const QueuePicker: React.FC<QueuePickerProps> = ({
   const queueCount = queueIds.length;
   const prevAssetsRef = useRef<Record<string, boolean>>({});
   const submitting = useRef(false);
+  const active = useRef(true);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  useLayoutEffect(() => {
+    active.current = true;
+    return () => {
+      active.current = false;
+    };
+  }, []);
   const submit = useCallback(async (action: () => void | Promise<void>) => {
-    if (submitting.current) return;
+    if (!active.current || submitting.current) return;
     submitting.current = true;
     setPending(true);
     setError("");
     try {
       await action();
     } catch (failure) {
+      if (!active.current) return;
       setError(
         failure instanceof Error
           ? failure.message
@@ -41,7 +56,7 @@ const QueuePicker: React.FC<QueuePickerProps> = ({
       );
     } finally {
       submitting.current = false;
-      setPending(false);
+      if (active.current) setPending(false);
     }
   }, []);
 
@@ -120,5 +135,11 @@ const QueuePicker: React.FC<QueuePickerProps> = ({
     </Modal>
   );
 };
+
+// Pending state, feedback and the synchronous click guard belong to one
+// selection, even when another draft contains the exact same asset objects.
+const QueuePicker: React.FC<QueuePickerProps> = (props) => (
+  <QueuePickerDraft key={props.draftId} {...props} />
+);
 
 export default QueuePicker;

@@ -1,11 +1,12 @@
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 
 import {
   useController,
   useMatch,
   useView,
 } from "../../../contexts/FirebaseStateContext";
-import { useRemoteSettings } from "../../../contexts/LocalStateContext";
+import { useLocalState } from "../../../contexts/LocalStateContext";
+import { MutationRejectedError } from "../../../lib/mutationSession";
 import assetTypes from "../AssetTypes";
 import { Player } from "../../../types";
 import { getMOTMAsset, getPlayerAssetObject } from "./assetHelpers";
@@ -26,7 +27,7 @@ export function useHomeTeamQuickActions() {
   const { controller, appendSubstitutionAndActivate, renderAsset } =
     useController();
   const { view } = useView();
-  const { listenPrefix } = useRemoteSettings();
+  const { listenPrefix, mutationSession } = useLocalState();
   const { roster } = controller;
 
   const [error, setError] = useState("");
@@ -34,8 +35,24 @@ export function useHomeTeamQuickActions() {
   const [modalMode, setModalMode] = useState<QuickActionMode>(null);
   const [subSide, setSubSide] = useState<"home" | "away">("home");
   const [subOffPlayer, setSubOffPlayer] = useState<Player | null>(null);
+  const currentSelection = useRef<symbol | null>(null);
+  useLayoutEffect(
+    () => () => {
+      currentSelection.current = null;
+    },
+    [],
+  );
 
-  const showPlayerCard = (player: Player, teamKey: TeamKey): Promise<void> => {
+  const retireSelection = (): void => {
+    currentSelection.current = null;
+    setError("");
+  };
+
+  const showPlayerCard = (
+    player: Player,
+    teamKey: TeamKey,
+    isSelected = () => true,
+  ): Promise<void> => {
     const actualTeamName =
       teamKey === "homeTeam" ? match.homeTeam : match.awayTeam;
     return (async () => {
@@ -44,7 +61,7 @@ export function useHomeTeamQuickActions() {
         teamName: actualTeamName,
         listenPrefix,
       });
-      if (!playerAsset) return;
+      if (!playerAsset || !isSelected()) return;
       const homeRevealBg = view.homeTeamRevealBackground;
       const assetWithBg =
         teamKey === "homeTeam" && homeRevealBg
@@ -54,7 +71,11 @@ export function useHomeTeamQuickActions() {
     })();
   };
 
-  const showMOTM = (player: Player, teamKey: TeamKey): Promise<void> => {
+  const showMOTM = (
+    player: Player,
+    teamKey: TeamKey,
+    isSelected = () => true,
+  ): Promise<void> => {
     const actualTeamName =
       teamKey === "homeTeam" ? match.homeTeam : match.awayTeam;
     return (async () => {
@@ -63,7 +84,7 @@ export function useHomeTeamQuickActions() {
         teamName: actualTeamName,
         listenPrefix,
       });
-      if (!motmAsset) return;
+      if (!motmAsset || !isSelected()) return;
       const homeRevealBg = view.homeTeamRevealBackground;
       const assetWithBg =
         teamKey === "homeTeam" && homeRevealBg
@@ -74,18 +95,20 @@ export function useHomeTeamQuickActions() {
   };
 
   const openSubModal = (side: "home" | "away"): void => {
-    setError("");
+    retireSelection();
     setSubSide(side);
     setSubOffPlayer(null);
     setModalMode("subOff");
   };
 
   const openPlayerCardModal = (): void => {
+    retireSelection();
     setSubOffPlayer(null);
     setModalMode("playerCard");
   };
 
   const openMOTMModal = (): void => {
+    retireSelection();
     setSubOffPlayer(null);
     setModalMode("motm");
   };
@@ -189,14 +212,27 @@ export function useHomeTeamQuickActions() {
       handleSubOffSelect(player);
     } else if (modalMode === "subOn") {
       handleSubOnSelect(player);
-    } else if (modalMode === "playerCard") {
-      void showPlayerCard(player, "homeTeam")
-        .then(() => closeModal())
-        .catch(reportError);
-    } else if (modalMode === "motm") {
-      void showMOTM(player, "homeTeam")
-        .then(() => closeModal())
-        .catch(reportError);
+    } else if (modalMode === "playerCard" || modalMode === "motm") {
+      const selection = Symbol();
+      currentSelection.current = selection;
+      const origin = mutationSession.getSnapshot();
+      const isSelected = () => currentSelection.current === selection;
+      const ownsUI = () => isSelected() && mutationSession.isCurrent(origin);
+      const show = modalMode === "playerCard" ? showPlayerCard : showMOTM;
+      setError("");
+      void show(player, "homeTeam", isSelected)
+        .then(() => {
+          if (ownsUI()) closeModal();
+        })
+        .catch((failure: unknown) => {
+          // A current draft can explain an origin rejection before submission.
+          // A submitted write's late feedback belongs only to its old session.
+          if (
+            isSelected() &&
+            (failure instanceof MutationRejectedError || ownsUI())
+          )
+            reportError(failure);
+        });
     }
   };
 
@@ -209,6 +245,7 @@ export function useHomeTeamQuickActions() {
   };
 
   const closeModal = (): void => {
+    retireSelection();
     setModalMode(null);
     setSubOffPlayer(null);
   };

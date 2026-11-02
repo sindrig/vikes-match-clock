@@ -85,9 +85,7 @@ const AssetController = () => {
       {assetView === ASSET_VIEWS.assets && renderAssetController()}
       {assetView === ASSET_VIEWS.teams && (
         <TeamAssetController
-          previousView={() =>
-            setTimeout(() => selectAssetView(ASSET_VIEWS.assets), 500)
-          }
+          previousView={() => selectAssetView(ASSET_VIEWS.assets)}
         />
       )}
     </div>

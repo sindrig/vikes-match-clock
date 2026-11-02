@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { useController } from "../../../contexts/FirebaseStateContext";
 import type { Asset } from "../../../types";
 import type { QueuePickerProps } from "./QueuePicker";
@@ -11,11 +11,23 @@ export function useQueuePickerActions() {
   const { createQueue, addItemsToQueue, renderAsset } = useController();
   const [pending, setPending] = useState<PickerDraft | null>(null);
   const [error, setError] = useState("");
+  const active = useRef(true);
+  const currentPreparation = useRef(0);
+  const latestPrepared = useRef(0);
+  useLayoutEffect(() => {
+    active.current = true;
+    return () => {
+      active.current = false;
+    };
+  }, []);
 
   const selectAssets = (
     inputs: (Asset | Promise<Asset | null>)[],
     { showNow = false }: { showNow?: boolean } = {},
   ): void => {
+    const preparation = ++currentPreparation.current;
+    const isCurrent = () =>
+      active.current && currentPreparation.current === preparation;
     setError("");
     void (async () => {
       try {
@@ -24,6 +36,10 @@ export function useQueuePickerActions() {
         );
         const assets = results.filter((asset) => asset !== null);
         if (assets.length === 0) return;
+        // A ready draft remains usable while a later selection prepares. Once
+        // that later selection is ready, an older result cannot replace it.
+        if (!active.current || latestPrepared.current > preparation) return;
+        latestPrepared.current = preparation;
         if (showNow && assets[0]) {
           await renderAsset(assets[0]);
           return;
@@ -31,6 +47,7 @@ export function useQueuePickerActions() {
         const close = () =>
           setPending((current) => (current === draft ? null : current));
         const draft: PickerDraft = {
+          draftId: crypto.randomUUID(),
           assets,
           onClose: close,
           onShowNow: async (items) => {
@@ -48,6 +65,7 @@ export function useQueuePickerActions() {
         };
         setPending(draft);
       } catch (failure) {
+        if (!isCurrent()) return;
         setError(
           failure instanceof Error
             ? failure.message

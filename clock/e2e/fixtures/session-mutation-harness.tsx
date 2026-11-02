@@ -44,6 +44,7 @@ const counts = {
   mediaWaiting: 0,
   succeeded: 0,
   failed: 0,
+  navigated: 0,
 };
 let api: Api;
 let local: LocalApi;
@@ -62,6 +63,19 @@ onValue(ref(database, ".info/connected"), (snapshot) => {
 const mediaGates = new Map<
   string,
   { promise: Promise<void>; release: () => void }
+>();
+let holdAcknowledgements = false;
+const acknowledgements: {
+  received: boolean;
+  delivered: boolean;
+  status: string;
+  release?: () => void;
+}[] = [];
+const playlistResponses = new Map<
+  string,
+  (response: {
+    result: { items: { contentDetails: { videoId: string } }[] };
+  }) => void
 >();
 let activeMediaGate = "default";
 const originalAudited = firebaseDatabase.writeAudited;
@@ -96,6 +110,29 @@ for (const name of ["put", "merge"] as const) {
   const original = server[name].bind(server);
   server[name] = (...args) => {
     counts.sdk.push(`${name}:${String(args[0])}`);
+    const callback = args[2] as ((...result: unknown[]) => void) | undefined;
+    if (
+      holdAcknowledgements &&
+      name === "merge" &&
+      typeof callback === "function"
+    ) {
+      const acknowledgement: (typeof acknowledgements)[number] = {
+        received: false,
+        delivered: false,
+        status: "pending",
+      };
+      acknowledgements.push(acknowledgement);
+      // Delay only delivery to the SDK. The real emulator still decides the
+      // outcome, commits state/audit atomically and delivers subscription echoes.
+      args[2] = (...result: unknown[]) => {
+        acknowledgement.received = true;
+        acknowledgement.status = String(result[0]);
+        acknowledgement.release = () => {
+          acknowledgement.delivered = true;
+          callback(...result);
+        };
+      };
+    }
     return original(...args);
   };
 }
@@ -133,6 +170,42 @@ export const harness = {
     connected,
   }),
   counts,
+  holdAcknowledgements: () => {
+    holdAcknowledgements = true;
+  },
+  acknowledgements: () =>
+    acknowledgements.map(({ received, delivered, status }) => ({
+      received,
+      delivered,
+      status,
+    })),
+  releaseAcknowledgement: (index: number) => {
+    const acknowledgement = acknowledgements[index];
+    if (!acknowledgement?.release || acknowledgement.delivered)
+      throw new Error(`Acknowledgement ${String(index)} is not held.`);
+    acknowledgement.release();
+  },
+  installPlaylists: () => {
+    window.gapi = {
+      load: (_api, callback) => callback(),
+      client: {
+        init: () => Promise.resolve(),
+        request: ({ params }) =>
+          new Promise((resolve) => {
+            const id = params.playlistId;
+            if (!id) throw new Error("Missing playlist ID.");
+            playlistResponses.set(id, resolve);
+          }),
+      },
+    };
+  },
+  pendingPlaylists: () => [...playlistResponses.keys()],
+  releasePlaylist: (id: string, videoId: string) => {
+    const resolve = playlistResponses.get(id);
+    if (!resolve) throw new Error(`Playlist ${id} was not requested.`);
+    playlistResponses.delete(id);
+    resolve({ result: { items: [{ contentDetails: { videoId } }] } });
+  },
   get commands() {
     return api;
   },
@@ -158,6 +231,7 @@ export const harness = {
     counts.mediaWaiting = 0;
     counts.succeeded = 0;
     counts.failed = 0;
+    counts.navigated = 0;
   },
   login: (email: string, password: string) =>
     signInWithEmailAndPassword(auth, email, password).then(() => undefined),
@@ -319,7 +393,11 @@ function Controls() {
         <output data-testid="eligibility">{String(value.writeEligible)}</output>
         <ResyncNotice />
         {queueFixture === "team" && (
-          <TeamAssetController previousView={() => undefined} />
+          <TeamAssetController
+            previousView={() => {
+              counts.navigated++;
+            }}
+          />
         )}
         {queueFixture === "sub" && <HomeTeamQuickActions />}
         {queueFixture === "asset" && <AssetController />}

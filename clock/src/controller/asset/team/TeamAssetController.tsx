@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useLayoutEffect, useRef, useState } from "react";
 
 import { RingLoader } from "react-spinners";
 
@@ -14,7 +14,8 @@ import {
   useListeners,
   useView,
 } from "../../../contexts/FirebaseStateContext";
-import { useRemoteSettings } from "../../../contexts/LocalStateContext";
+import { useLocalState } from "../../../contexts/LocalStateContext";
+import { MutationRejectedError } from "../../../lib/mutationSession";
 import "../../../api/clientConfig";
 import { getLineups } from "../../../api/client";
 import { transformLineups, getTeamId } from "../../../lib/matchUtils";
@@ -32,7 +33,7 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
   const { roster } = controller;
   const { venues } = useListeners();
   const { view } = useView();
-  const { listenPrefix } = useRemoteSettings();
+  const { listenPrefix, mutationSession } = useLocalState();
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -42,6 +43,38 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
   const [resolveRosterSide, setResolveRosterSide] = useState<
     "home" | "away" | null
   >(null);
+  const currentAction = useRef<symbol | null>(null);
+  useLayoutEffect(
+    () => () => {
+      currentAction.current = null;
+    },
+    [],
+  );
+
+  const retireAction = (): void => {
+    currentAction.current = null;
+    setError("");
+  };
+
+  const beginAction = () => {
+    const action = Symbol();
+    currentAction.current = action;
+    const origin = mutationSession.getSnapshot();
+    const isSelected = () => currentAction.current === action;
+    const ownsUI = () => isSelected() && mutationSession.isCurrent(origin);
+    return {
+      isSelected,
+      ownsUI,
+      canReport: (failure: unknown) =>
+        isSelected() && (failure instanceof MutationRejectedError || ownsUI()),
+    };
+  };
+
+  const setPlayerAction = (action: "playerCard" | "motm" | null): void => {
+    retireAction();
+    setSelectPlayerAsset(action === "playerCard");
+    setSelectMOTM(action === "motm");
+  };
 
   const {
     error: quickActionsError,
@@ -58,6 +91,7 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
 
   const refetchRoster = (): void => {
     if (!match.ksiMatchId) return;
+    retireAction();
     setLoading(true);
     const teamId = getTeamId(venues, listenPrefix);
     void getLineups({
@@ -83,6 +117,7 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
   };
 
   const addTeamToQueue = async (side: "home" | "away"): Promise<void> => {
+    const action = beginAction();
     const players = roster[side];
     const teamName = side === "home" ? match.homeTeam : match.awayTeam;
 
@@ -111,8 +146,9 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
           ? validAssets.map((asset) => ({ ...asset, background: homeRevealBg }))
           : validAssets;
       await commit(teamName, assetsWithBg, { cycle: false });
-      previousView();
+      if (action.ownsUI()) previousView();
     } catch (failure) {
+      if (!action.canReport(failure)) return;
       setError(
         failure instanceof Error
           ? failure.message
@@ -125,36 +161,40 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
     player: Player,
     teamName: "homeTeam" | "awayTeam",
   ): void => {
-    void showPlayerCard(player, teamName)
+    const action = beginAction();
+    setError("");
+    void showPlayerCard(player, teamName, action.isSelected)
       .then(() => {
-        setSelectPlayerAsset(false);
-        setSelectMOTM(false);
+        if (action.ownsUI()) setPlayerAction(null);
       })
-      .catch((failure: unknown) =>
+      .catch((failure: unknown) => {
+        if (!action.canReport(failure)) return;
         setError(
           failure instanceof Error
             ? failure.message
             : "Ekki tókst að birta leikmann.",
-        ),
-      );
+        );
+      });
   };
 
   const selectMOTMAction = (
     player: Player,
     teamName: "homeTeam" | "awayTeam",
   ): void => {
-    void showMOTM(player, teamName)
+    const action = beginAction();
+    setError("");
+    void showMOTM(player, teamName, action.isSelected)
       .then(() => {
-        setSelectPlayerAsset(false);
-        setSelectMOTM(false);
+        if (action.ownsUI()) setPlayerAction(null);
       })
-      .catch((failure: unknown) =>
+      .catch((failure: unknown) => {
+        if (!action.canReport(failure)) return;
         setError(
           failure instanceof Error
             ? failure.message
             : "Ekki tókst að birta leikmann.",
-        ),
-      );
+        );
+      });
   };
 
   const handleGoalScorerModalSelect = (player: Player): void => {
@@ -184,10 +224,7 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
         <button
           type="button"
           className="cancel-btn"
-          onClick={() => {
-            setSelectPlayerAsset(false);
-            setSelectMOTM(false);
-          }}
+          onClick={() => setPlayerAction(null)}
         >
           Hætta við birtingu
         </button>
@@ -204,13 +241,19 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
           renderCancelButton()
         ) : (
           <div className="button-row">
-            <button type="button" onClick={() => setSelectPlayerAsset(true)}>
+            <button type="button" onClick={() => setPlayerAction("playerCard")}>
               Birta leikmann
             </button>
-            <button type="button" onClick={() => setGoalScorerOpen(true)}>
+            <button
+              type="button"
+              onClick={() => {
+                retireAction();
+                setGoalScorerOpen(true);
+              }}
+            >
               Birta markaskorara
             </button>
-            <button type="button" onClick={() => setSelectMOTM(true)}>
+            <button type="button" onClick={() => setPlayerAction("motm")}>
               Birta mann leiksins
             </button>
           </div>
@@ -234,9 +277,12 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
             {hasPlayers ? (
               <button
                 type="button"
-                onClick={() =>
-                  window.confirm("Ertu alveg viss?") && clearRoster()
-                }
+                onClick={() => {
+                  if (window.confirm("Ertu alveg viss?")) {
+                    retireAction();
+                    clearRoster();
+                  }
+                }}
               >
                 Hreinsa lið
               </button>
@@ -275,7 +321,10 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
             <button
               type="button"
               className="queue-team-btn"
-              onClick={() => openSubModal(side)}
+              onClick={() => {
+                retireAction();
+                openSubModal(side);
+              }}
             >
               Skipting
             </button>
@@ -286,7 +335,10 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
           <button
             type="button"
             className="queue-team-btn"
-            onClick={() => setResolveRosterSide(side)}
+            onClick={() => {
+              retireAction();
+              setResolveRosterSide(side);
+            }}
           >
             Búa til leikmannahóp
           </button>

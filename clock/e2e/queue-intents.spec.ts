@@ -196,6 +196,50 @@ async function pickAsset(page: Page, mode: string) {
   await expect(page.getByRole("dialog")).toBeVisible();
 }
 
+async function heldAck(page: Page, index: number, status = "ok") {
+  await expect
+    .poll(() =>
+      page.evaluate(
+        (index) => window.sessionMutationHarness.acknowledgements()[index],
+        index,
+      ),
+    )
+    .toEqual({ received: true, delivered: false, status });
+}
+
+async function releaseAck(page: Page, index: number, completed = index + 1) {
+  await page.evaluate(
+    (index) => window.sessionMutationHarness.releaseAcknowledgement(index),
+    index,
+  );
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const { succeeded, failed } = window.sessionMutationHarness.counts;
+        return succeeded + failed;
+      }),
+    )
+    .toBe(completed);
+}
+
+async function requestPlaylists(page: Page, ids: string[]) {
+  await page.evaluate(() => {
+    window.sessionMutationHarness.installPlaylists();
+    window.sessionMutationHarness.holdAcknowledgements();
+  });
+  for (const id of ids) {
+    await page
+      .locator('.controls input[type="text"]')
+      .fill(`https://www.youtube.com/playlist?list=${id}`);
+    await page.getByRole("button", { name: "Bæta við", exact: true }).click();
+  }
+  await expect
+    .poll(() =>
+      page.evaluate(() => window.sessionMutationHarness.pendingPlaylists()),
+    )
+    .toEqual(ids);
+}
+
 test.beforeAll(async () => {
   // Explicitly load/read rules in the actual app namespace, then exercise SDK denials.
   await rest("PUT", ".settings/rules", rules);
@@ -322,6 +366,11 @@ test.afterEach(async ({ page }, info) => {
         counts: await page
           .evaluate(() => window.sessionMutationHarness?.counts ?? null)
           .catch(() => null),
+        acknowledgements: await page
+          .evaluate(() => window.sessionMutationHarness?.acknowledgements())
+          .catch(() => []),
+        dialogs: await page.getByRole("dialog").allTextContents(),
+        alerts: await page.getByRole("alert").allTextContents(),
         observations: await page
           .evaluate(() => window.sessionMutationHarness?.observations ?? [])
           .catch(() => []),
@@ -343,6 +392,317 @@ test.afterEach(async ({ page }, info) => {
   expect(
     await rest("GET", `states/${venue}/perimeter/mediaPairs/saved/files`),
   ).toEqual(files);
+});
+
+for (const action of ["Birta leikmann", "Maður leiksins"]) {
+  test(`player UI ownership: ${action} acknowledgement cannot close a reopened dialog`, async ({
+    page,
+  }) => {
+    await bootstrap(page, "sub");
+    await page.evaluate(() =>
+      window.sessionMutationHarness.holdAcknowledgements(),
+    );
+    await page.getByRole("button", { name: action, exact: true }).click();
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "7 Jón Jónsson", exact: true })
+      .click();
+    await heldAck(page, 0);
+    expect((await controller()).currentAsset?.asset.name).toBe("Jón Jónsson");
+    expect((await audits()).length).toBe(1);
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Close", exact: true })
+      .click();
+    await expect(page.getByRole("dialog")).toBeHidden();
+    const replacement =
+      action === "Birta leikmann" ? "Maður leiksins" : "Birta leikmann";
+    await page.getByRole("button", { name: replacement, exact: true }).click();
+    await releaseAck(page, 0);
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await expect(page.getByRole("dialog")).toContainText(replacement);
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "9 Kári Kárason", exact: true })
+      .click();
+    await heldAck(page, 1);
+    await releaseAck(page, 1);
+    await expect(page.getByRole("dialog")).toBeHidden();
+    expect((await controller()).currentAsset?.asset.name).toBe("Kári Kárason");
+    expect((await audits()).length).toBe(2);
+  });
+}
+
+test("picker UI ownership: actual overlapping playlists keep the newer draft enabled and free of an older denial", async ({
+  page,
+}) => {
+  await bootstrap(page, "asset");
+  await page.evaluate(() => {
+    window.sessionMutationHarness.installPlaylists();
+    window.sessionMutationHarness.holdAcknowledgements();
+  });
+  for (const id of ["draft-a", "draft-b"]) {
+    await page
+      .locator('.controls input[type="text"]')
+      .fill(`https://www.youtube.com/playlist?list=${id}`);
+    await page.getByRole("button", { name: "Bæta við", exact: true }).click();
+  }
+  await expect
+    .poll(() =>
+      page.evaluate(() => window.sessionMutationHarness.pendingPlaylists()),
+    )
+    .toEqual(["draft-a", "draft-b"]);
+  await page.evaluate(() =>
+    window.sessionMutationHarness.releasePlaylist("draft-a", "video-a"),
+  );
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await rest("PUT", `auth/${uid}/${venue}`, false);
+  await page.getByRole("button", { name: "Ný biðröð", exact: true }).click();
+  await heldAck(page, 0, "permission_denied");
+  expect((await audits()).length).toBe(0);
+  await page.evaluate(() =>
+    window.sessionMutationHarness.releasePlaylist("draft-b", "video-b"),
+  );
+  await expect(
+    page.getByRole("dialog").getByRole("button", { name: "Sýna", exact: true }),
+  ).toBeEnabled();
+  await releaseAck(page, 0);
+  await expect(page.getByRole("dialog").getByRole("alert")).toHaveCount(0);
+  await rest("PUT", `auth/${uid}/${venue}`, true);
+  await page.getByRole("button", { name: "Ný biðröð", exact: true }).click();
+  await heldAck(page, 1);
+  await releaseAck(page, 1);
+  await expect(page.getByRole("dialog")).toBeHidden();
+  const created = Object.values((await controller()).queues).find(
+    (q) => !["old", "sponsor"].includes(q.id),
+  );
+  expect(created?.items).toEqual([
+    { type: "URL", key: "https://www.youtube.com/watch?v=video-b" },
+  ]);
+  expect((await audits()).length).toBe(1);
+});
+
+test("player UI ownership: a newer denial survives an older success and retries in the same dialog", async ({
+  page,
+}) => {
+  await bootstrap(page, "sub");
+  await page.evaluate(() =>
+    window.sessionMutationHarness.holdAcknowledgements(),
+  );
+  await page
+    .getByRole("button", { name: "Birta leikmann", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog");
+  await dialog
+    .getByRole("button", { name: "7 Jón Jónsson", exact: true })
+    .click();
+  await heldAck(page, 0);
+  await rest("PUT", `auth/${uid}/${venue}`, false);
+  await dialog
+    .getByRole("button", { name: "9 Kári Kárason", exact: true })
+    .click();
+  await heldAck(page, 1, "permission_denied");
+  await releaseAck(page, 1, 1);
+  const error = page.locator(".home-team-quick-actions [role=alert]");
+  await expect(error).toContainText("PERMISSION_DENIED");
+  await releaseAck(page, 0, 2);
+  await expect(dialog).toContainText("Birta leikmann");
+  await expect(error).toContainText("PERMISSION_DENIED");
+  expect((await audits()).length).toBe(1);
+  await rest("PUT", `auth/${uid}/${venue}`, true);
+  await dialog
+    .getByRole("button", { name: "9 Kári Kárason", exact: true })
+    .click();
+  await heldAck(page, 2);
+  await expect(error).toHaveCount(0);
+  await releaseAck(page, 2);
+  await expect(dialog).toBeHidden();
+  expect((await audits()).length).toBe(2);
+  expect((await controller()).currentAsset?.asset.name).toBe("Kári Kárason");
+});
+
+test("player UI ownership: submitted feedback cannot cross a venue ABA", async ({
+  page,
+}) => {
+  await bootstrap(page, "sub");
+  await page.evaluate(() =>
+    window.sessionMutationHarness.holdAcknowledgements(),
+  );
+  await page
+    .getByRole("button", { name: "Maður leiksins", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog");
+  await dialog
+    .getByRole("button", { name: "7 Jón Jónsson", exact: true })
+    .click();
+  await heldAck(page, 0);
+  await page.evaluate(
+    (other) => window.sessionMutationHarness.aba(other),
+    other,
+  );
+  await eligible(page);
+  await releaseAck(page, 0);
+  await expect(dialog).toContainText("Maður leiksins");
+  await dialog
+    .getByRole("button", { name: "9 Kári Kárason", exact: true })
+    .click();
+  await heldAck(page, 1);
+  await releaseAck(page, 1);
+  await expect(dialog).toBeHidden();
+  expect((await audits()).length).toBe(2);
+  expect(await rest("GET", `audit/${other}`)).toBeNull();
+});
+
+test("player UI ownership: a team-list acknowledgement cannot cancel a newer MOTM selection", async ({
+  page,
+}) => {
+  await bootstrap(page, "team");
+  await page.evaluate(() =>
+    window.sessionMutationHarness.holdAcknowledgements(),
+  );
+  await page
+    .getByRole("button", { name: "Birta leikmann", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "#7 - Jón Jónsson", exact: true })
+    .click();
+  await heldAck(page, 0);
+  await page
+    .getByRole("button", { name: "Hætta við birtingu", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Birta mann leiksins", exact: true })
+    .click();
+  await releaseAck(page, 0);
+  await expect(
+    page.getByRole("button", { name: "Hætta við birtingu", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "#9 - Kári Kárason", exact: true })
+    .click();
+  await heldAck(page, 1);
+  await releaseAck(page, 1);
+  await expect(
+    page.getByRole("button", { name: "Hætta við birtingu", exact: true }),
+  ).toBeHidden();
+  expect((await controller()).currentAsset?.asset).toMatchObject({
+    type: "MOTM",
+    name: "Kári Kárason",
+  });
+});
+
+test("player UI ownership: an older lineup completion keeps a newer team selection in view", async ({
+  page,
+}) => {
+  await bootstrap(page, "team");
+  await page.evaluate(() =>
+    window.sessionMutationHarness.holdAcknowledgements(),
+  );
+  await page
+    .getByRole("button", { name: "Setja lið í biðröð", exact: true })
+    .first()
+    .click();
+  await heldAck(page, 0);
+  await page
+    .getByRole("button", { name: "Birta leikmann", exact: true })
+    .click();
+  await releaseAck(page, 0);
+  expect(
+    await page.evaluate(() => window.sessionMutationHarness.counts.navigated),
+  ).toBe(0);
+  await expect(
+    page.getByRole("button", { name: "Hætta við birtingu", exact: true }),
+  ).toBeVisible();
+  const lineup = Object.values((await controller()).queues).find(
+    (q) => q.name === "Víkingur R",
+  );
+  expect(lineup?.items).toHaveLength(2);
+  expect((await audits()).length).toBe(1);
+});
+
+test("picker UI ownership: an older rejection cannot unlock a newer submitted playlist", async ({
+  page,
+}) => {
+  await bootstrap(page, "asset");
+  await requestPlaylists(page, ["a", "b"]);
+  await page.evaluate(() =>
+    window.sessionMutationHarness.releasePlaylist("a", "a"),
+  );
+  await rest("PUT", `auth/${uid}/${venue}`, false);
+  await page.getByRole("button", { name: "Ný biðröð", exact: true }).click();
+  await heldAck(page, 0, "permission_denied");
+  await page.evaluate(() =>
+    window.sessionMutationHarness.releasePlaylist("b", "b"),
+  );
+  const show = page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Sýna", exact: true });
+  await expect(show).toBeEnabled();
+  await rest("PUT", `auth/${uid}/${venue}`, true);
+  await page.getByRole("button", { name: "Ný biðröð", exact: true }).click();
+  await heldAck(page, 1);
+  await expect(show).toBeDisabled();
+  await releaseAck(page, 0);
+  await expect(show).toBeDisabled();
+  await expect(page.getByRole("dialog").getByRole("alert")).toHaveCount(0);
+  expect((await audits()).length).toBe(1);
+  await releaseAck(page, 1);
+  await expect(page.getByRole("dialog")).toBeHidden();
+  expect(
+    Object.values((await controller()).queues)
+      .flatMap((q) => q.items)
+      .filter((item) => item.key.includes("watch?v=")),
+  ).toEqual([{ type: "URL", key: "https://www.youtube.com/watch?v=b" }]);
+});
+
+test("picker UI ownership: identical-assets ABA retains the current error after an older success, then retries", async ({
+  page,
+}) => {
+  await bootstrap(page, "asset");
+  await requestPlaylists(page, ["a1", "b", "a2"]);
+  await page.evaluate(() =>
+    window.sessionMutationHarness.releasePlaylist("a1", "same"),
+  );
+  await page.getByRole("button", { name: "Ný biðröð", exact: true }).click();
+  await heldAck(page, 0);
+  for (const id of ["b", "a2"]) {
+    await page.evaluate(
+      (id) =>
+        window.sessionMutationHarness.releasePlaylist(
+          id,
+          id === "a2" ? "same" : "b",
+        ),
+      id,
+    );
+    await expect(
+      page
+        .getByRole("dialog")
+        .getByRole("button", { name: "Sýna", exact: true }),
+    ).toBeEnabled();
+  }
+  await rest("PUT", `auth/${uid}/${venue}`, false);
+  await page.getByRole("button", { name: "Ný biðröð", exact: true }).click();
+  await heldAck(page, 1, "permission_denied");
+  await releaseAck(page, 1, 1);
+  const alert = page.getByRole("dialog").getByRole("alert");
+  await expect(alert).toContainText("PERMISSION_DENIED");
+  await releaseAck(page, 0, 2);
+  await expect(alert).toContainText("PERMISSION_DENIED");
+  await rest("PUT", `auth/${uid}/${venue}`, true);
+  await page.getByRole("button", { name: "Ný biðröð", exact: true }).click();
+  await heldAck(page, 2);
+  await releaseAck(page, 2);
+  await expect(page.getByRole("dialog")).toBeHidden();
+  const selected = Object.values((await controller()).queues)
+    .flatMap((q) => q.items)
+    .filter((item) => item.key.includes("watch?v="));
+  expect(selected).toEqual(
+    Array.from({ length: 2 }, () => ({
+      type: "URL",
+      key: "https://www.youtube.com/watch?v=same",
+    })),
+  );
+  expect((await audits()).length).toBe(2);
 });
 
 test("real SDK denial controls reject anonymous, wrong-venue and forged audit writes", async ({

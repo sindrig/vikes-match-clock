@@ -7,7 +7,13 @@ import {
   afterEach,
   type Mock,
 } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import {
+  act,
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+} from "@testing-library/react";
 import TeamAssetController from "./TeamAssetController";
 import { Player, Roster } from "../../../types";
 import {
@@ -16,7 +22,11 @@ import {
   useListeners,
   useView,
 } from "../../../contexts/FirebaseStateContext";
-import { useRemoteSettings } from "../../../contexts/LocalStateContext";
+import {
+  useLocalState,
+  useRemoteSettings,
+} from "../../../contexts/LocalStateContext";
+import { MutationSession } from "../../../lib/mutationSession";
 import { transformLineups } from "../../../lib/matchUtils";
 import { getLineups } from "../../../api/client";
 import { parseLocations } from "../../../contexts/firebaseParsers";
@@ -29,6 +39,7 @@ vi.mock("../../../contexts/FirebaseStateContext", () => ({
 }));
 
 vi.mock("../../../contexts/LocalStateContext", () => ({
+  useLocalState: vi.fn(),
   useRemoteSettings: vi.fn(),
 }));
 
@@ -269,6 +280,16 @@ function setupMocks(overrides?: {
   mockedUseRemoteSettings.mockReturnValue({
     listenPrefix: "vikinni",
   } as unknown as ReturnType<typeof useRemoteSettings>);
+  const mutationSession = new MutationSession({
+    location: "vikinni",
+    authenticated: true,
+    uid: "local-user",
+  });
+  mutationSession.setFreshness("ready");
+  vi.mocked(useLocalState).mockReturnValue({
+    listenPrefix: "vikinni",
+    mutationSession,
+  } as unknown as ReturnType<typeof useLocalState>);
 
   mockedUseListeners.mockReturnValue({
     venues: {
@@ -283,6 +304,7 @@ function setupMocks(overrides?: {
   } as unknown as ReturnType<typeof useView>);
 
   return {
+    mutationSession,
     mockClearRoster,
     mockSetRoster,
     mockShowItemNow,
@@ -296,6 +318,24 @@ function setupMocks(overrides?: {
   };
 }
 
+function deferred() {
+  let resolve!: () => void;
+  let reject!: (failure: Error) => void;
+  const promise = new Promise<void>((done, fail) => {
+    resolve = done;
+    reject = fail;
+  });
+  return { promise, resolve, reject };
+}
+
+const preparedPlayer = {
+  type: "NO_IMAGE_PLAYER",
+  key: "prepared",
+  name: "Jón Jónsson",
+  overlay: { text: "" },
+  teamName: "Víkingur R",
+};
+
 describe("TeamAssetController", () => {
   let mockPreviousView: Mock<() => void>;
 
@@ -306,6 +346,92 @@ describe("TeamAssetController", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  describe("acknowledgement ownership", () => {
+    it.each(["Birta leikmann", "Birta mann leiksins"])(
+      "keeps a newer list selection after cancelling a pending %s",
+      async (action) => {
+        const { mockShowItemNow } = setupMocks({ roster: mockRoster });
+        const acknowledgement = deferred();
+        mockShowItemNow.mockReturnValue(acknowledgement.promise);
+        mockedGetPlayerAssetObject.mockResolvedValue(preparedPlayer);
+        mockedGetMOTMAsset.mockResolvedValue(preparedPlayer);
+        render(<TeamAssetController previousView={mockPreviousView} />);
+        fireEvent.click(screen.getByRole("button", { name: action }));
+        fireEvent.click(screen.getByTestId("select-player-homeTeam"));
+        await waitFor(() => expect(mockShowItemNow).toHaveBeenCalledTimes(1));
+        fireEvent.click(
+          screen.getByRole("button", { name: "Hætta við birtingu" }),
+        );
+        fireEvent.click(screen.getByRole("button", { name: action }));
+        await act(async () => {
+          acknowledgement.resolve();
+          await acknowledgement.promise;
+        });
+        expect(
+          screen.getByTestId("select-player-homeTeam"),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: "Hætta við birtingu" }),
+        ).toBeInTheDocument();
+      },
+    );
+
+    it("keeps a newer selection's error when an older failure arrives", async () => {
+      const { mockShowItemNow } = setupMocks({ roster: mockRoster });
+      const older = deferred();
+      mockShowItemNow
+        .mockReturnValueOnce(older.promise)
+        .mockRejectedValueOnce(new Error("Current denied"));
+      mockedGetPlayerAssetObject.mockResolvedValue(preparedPlayer);
+      render(<TeamAssetController previousView={mockPreviousView} />);
+      fireEvent.click(screen.getByRole("button", { name: "Birta leikmann" }));
+      fireEvent.click(screen.getByTestId("select-player-homeTeam"));
+      await waitFor(() => expect(mockShowItemNow).toHaveBeenCalledTimes(1));
+      fireEvent.click(screen.getByTestId("select-player-awayTeam"));
+      expect(await screen.findByText("Current denied")).toBeInTheDocument();
+      await act(async () => {
+        older.reject(new Error("Older denied"));
+        await older.promise.catch(() => undefined);
+      });
+      expect(screen.getByText("Current denied")).toBeInTheDocument();
+      expect(screen.queryByText("Older denied")).not.toBeInTheDocument();
+    });
+
+    it.each(["new selection", "unmount", "session ABA"])(
+      "does not navigate away after a lineup acknowledgement outlives %s",
+      async (boundary) => {
+        const { mockReplaceQueue, mutationSession } = setupMocks({
+          roster: mockRoster,
+        });
+        const acknowledgement = deferred();
+        mockReplaceQueue.mockReturnValue(acknowledgement.promise);
+        mockedGetPlayerAssetObject.mockResolvedValue(preparedPlayer);
+        const { unmount } = render(
+          <TeamAssetController previousView={mockPreviousView} />,
+        );
+        fireEvent.click(
+          screen.getAllByRole("button", { name: "Setja lið í biðröð" })[0]!,
+        );
+        await waitFor(() => expect(mockReplaceQueue).toHaveBeenCalledTimes(1));
+        if (boundary === "unmount") unmount();
+        else if (boundary === "new selection")
+          fireEvent.click(
+            screen.getByRole("button", { name: "Birta leikmann" }),
+          );
+        else {
+          mutationSession.setLocation("other");
+          mutationSession.setLocation("vikinni");
+          mutationSession.setFreshness("ready");
+        }
+        await act(async () => {
+          acknowledgement.resolve();
+          await acknowledgement.promise;
+        });
+        expect(mockPreviousView).not.toHaveBeenCalled();
+      },
+    );
   });
 
   describe("initial render", () => {
