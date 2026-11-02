@@ -1,10 +1,11 @@
 import React, { useState } from "react";
-import { Modal } from "rsuite";
 import { RingLoader } from "react-spinners";
+import { Modal } from "rsuite";
 
-import { Player } from "../../../types";
-import { TeamPlayer } from "../../../api/client";
-import apiConfig from "../../../apiConfig";
+import "../../../api/clientConfig";
+import { resolveRoster } from "../../../api/client";
+import { transformSingleLineup } from "../../../lib/matchUtils";
+import type { Player } from "../../../types";
 
 const STARTER_COUNT = 11;
 const SUB_COUNT = 12;
@@ -21,41 +22,6 @@ const isPositiveIntegerText = (v: string): boolean =>
   /^[1-9]\d*$/.test(v.trim());
 
 const toNum = (v: string): number => Number(v.trim());
-
-function mapRole(tp: TeamPlayer): string {
-  if (tp.goalkeeper && tp.startingLineup) return "Markmaður";
-  if (tp.goalkeeper && !tp.startingLineup) return "Varamarkmaður";
-  if (tp.captain) return "Fyrirliði";
-  if (tp.startingLineup && !tp.goalkeeper) return "Leikmaður";
-  return "Varamáður";
-}
-
-function transformSingleLineup(
-  players: TeamPlayer[],
-  officials: { person: { name: string; id: number } }[],
-): Player[] {
-  const mappedPlayers: Player[] = players.map((tp) => {
-    const player: Player = {
-      name: tp.person.name,
-      id: tp.person.id,
-      role: mapRole(tp),
-      show: tp.startingLineup ?? false,
-    };
-    if (tp.shirtNumber != null) {
-      player.number = tp.shirtNumber;
-    }
-    return player;
-  });
-
-  const mappedOfficials: Player[] = officials.map((o) => ({
-    name: o.person.name,
-    id: o.person.id,
-    role: "Þjálfari",
-    show: false,
-  }));
-
-  return [...mappedPlayers, ...mappedOfficials];
-}
 
 const ResolveRosterModal: React.FC<ResolveRosterModalProps> = ({
   open,
@@ -119,24 +85,15 @@ const ResolveRosterModal: React.FC<ResolveRosterModalProps> = ({
       const filledSubs = subs
         .filter((v) => v.trim() !== "")
         .map((v) => toNum(v));
-      const res = await fetch(
-        `${apiConfig.gateWayUrl}v3/${String(teamId)}/resolve-roster`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            starters: starters.map(toNum),
-            substitutes: filledSubs,
-          }),
+      const { data } = await resolveRoster({
+        path: { teamId },
+        body: {
+          starters: starters.map(toNum),
+          substitutes: filledSubs,
         },
-      );
-      if (!res.ok) throw new Error("API error");
-      const data = (await res.json()) as {
-        players: TeamPlayer[];
-        officials: [];
-      };
-      const players = transformSingleLineup(data.players, data.officials);
-      setPreview(players);
+        throwOnError: true,
+      });
+      setPreview(transformSingleLineup(data));
     } catch {
       setError("Error fetching roster");
     } finally {

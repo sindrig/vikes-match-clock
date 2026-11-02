@@ -74,8 +74,8 @@
   },
   "scripts": {
     "preinstall": "npx only-allow pnpm",
-    "start": "vite",
-    "build": "tsc -p tsconfig.build.json --noEmit && vite build",
+    "start": "pnpm run generate-api-client && vite",
+    "build": "pnpm run generate-api-client && tsc -p tsconfig.build.json --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
