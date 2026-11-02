@@ -56,17 +56,19 @@ Node executable is >= 22 as described in the [gateway README](README.md).
 Populate placeholders and inject credentials using the approved operator
 loader for the **selected Firebase project and Vnnox device**. Keep shell
 tracing off. Do not paste tokens/passwords into commands, logs, tickets or
-captured HTTP responses. A Firebase **ID token** (not a service account or an
-AWS token), its actual UID, and `auth/{uid}/{location} == true` are required.
+captured HTTP responses. Firebase actions require a Firebase **ID token** (not
+a service account or an AWS token), its actual UID, and
+`auth/{uid}/{location} == true`.
 Admin membership alone does not grant venue state writes. Refresh an expired
 ID token through the approved login flow; do not weaken rules or retry writes
 blindly after an ambiguous response.
+
+<!-- brightness-session: environment -->
 
 ```bash
 set +x
 export FIREBASE_DATABASE_URL="https://REPLACE_WITH_DATABASE_HOST"
 export FIREBASE_LOCATION="REPLACE_WITH_VENUE_KEY"
-export FIREBASE_UID="REPLACE_WITH_AUTHENTICATED_UID"
 export BRIGHTNESS_SESSION_DIR="/REPLACE_WITH_PRIVATE_SESSION_DIRECTORY"
 export SMOKE_PERCENT="REPLACE_WITH_APPROVED_INTEGER_0_TO_100"
 export PERIMETER_VNNOX_BASE_URL="http://REPLACE_WITH_UCENTER_HOST_AND_PORT"
@@ -77,10 +79,26 @@ export PERIMETER_VNNOX_SN="REPLACE_WITH_DEVICE_SERIAL"
 export PERIMETER_VNNOX_PROJECT_ID="REPLACE_WITH_PROJECT_ID"
 export PERIMETER_VNNOX_PERIMETER_GUID="REPLACE_WITH_PERIMETER_SCREEN_GUID"
 export PERIMETER_VNNOX_USERNAME="REPLACE_WITH_RETRIEVED_DEVICE_USERNAME"
-# These two exported secrets must already be supplied by the approved loader.
-: "${FIREBASE_ID_TOKEN:?Load an operator ID token for the selected Firebase project securely.}"
+# This secret must already be supplied by the approved device loader.
 : "${PERIMETER_VNNOX_PASSWORD:?Load the selected device password securely.}"
-export FIREBASE_ID_TOKEN PERIMETER_VNNOX_PASSWORD
+export PERIMETER_VNNOX_PASSWORD
+```
+
+This environment setup also supports hardware-only recovery in a new shell.
+Keep the original database, venue, device selection and saved session directory
+even when Firebase is unavailable: they must match the saved scope exactly.
+It requires the device credentials, but no Firebase token or UID.
+
+For `snapshot`, `prepare`, `command`, `verify-command` and `restore-intent`,
+add the following Firebase identity setup after securely loading the token.
+Skip this block for hardware-only recovery.
+
+<!-- brightness-session: firebase-credentials -->
+
+```bash
+export FIREBASE_UID="REPLACE_WITH_AUTHENTICATED_UID"
+: "${FIREBASE_ID_TOKEN:?Load an operator ID token for the selected Firebase project securely.}"
+export FIREBASE_ID_TOKEN
 ```
 
 Use a fresh private session directory outside tracked files. `snapshot.json`
@@ -220,8 +238,11 @@ On success **or any failure**, stop/drain first and resolve uncertain shutdown
 as in step 2. Disabling only auto, hiding the UI with `perimeter.enabled`, or
 setting the browser power state `off` does not stop manual hardware commands.
 If a failing block exited the Bash shell under `set -e`, repeat the environment
-and shell-helper setup in a new shell, reuse the saved session directory, and
-run this section. Do not take a new snapshot over the pre-test baseline.
+and shell-helper setup in a new shell and reuse the saved session directory.
+If Firebase credentials are unavailable, skip the Firebase identity setup and
+`restore-intent`: run stop/drain and `restore-hardware` below directly. Otherwise
+run both restoration commands. Do not take a new snapshot over the pre-test
+baseline.
 
 <!-- brightness-session: stop-before-restore -->
 
@@ -254,6 +275,11 @@ nit fields. It does not round, call `writeBrightness(percent)`, or depend on a
 Firebase command/subscription. A successful Vnnox response alone is insufficient;
 readback must match. The worker's own failure restoration is best-effort and
 does not perform this additional exact restoration readback.
+
+Device failures report a fixed operation context (screen read/login, target
+brightness validation, or exact restore write/login) without raw transport
+errors, response bodies, assertion values or nested causes. A failed operation
+exits immediately with no automatic retry; an ambiguous write may have applied.
 
 If `restore-intent` fails, still perform `restore-hardware` independently while
 the worker is stopped. That command makes **no Firebase request** and does not
@@ -309,11 +335,15 @@ From `perimeter-control/`, no credentials, dependencies or services required:
 node --test --test-concurrency=1 tests/brightness-runbook.test.js
 ```
 
-The test extracts and executes the marked Bash commands above, with the real
-reference helper and Vnnox client. Synthetic authenticated REST/device and
+The test executes the marked Bash commands and substituted environment setup
+with the real reference helper and Vnnox client, including recovery from a
+clean shell with Firebase credentials unset. Synthetic authenticated REST/device and
 systemctl doubles deny unexpected network requests. It checks integer and
 fractional restoration, raw nit/scale preservation, scoped GUIDs, non-target
 isolation, audit/null semantics, auth failures and stopped/disabled ordering.
+Device failure cases include the actual native fetch header validator rejecting
+a synthetic login token before any connection, plus transport/body failures
+and credential-bearing readback mismatches without printing their values.
 This is mock evidence; rule-expression checks are not an emulator or deployed
 rules qualification. See [the README](README.md#tests) for runtime regressions.
 

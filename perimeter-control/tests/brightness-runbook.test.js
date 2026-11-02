@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import {
   mkdir,
   mkdtemp,
@@ -27,6 +28,15 @@ const blocks = Object.fromEntries(
     ),
   ].map((match) => [match[1], match[2]]),
 );
+const environmentSetup = blocks.environment;
+
+function selectEnvironment(block, environment) {
+  return block.replace(
+    /export (\w+)="[^"]*REPLACE_WITH_[^"]*"/gu,
+    (_, name) =>
+      `export ${name}='${(environment[name] ?? "").replaceAll("'", "'\\''")}'`,
+  );
+}
 const sequence = [
   "stop-before-snapshot",
   "snapshot",
@@ -40,7 +50,7 @@ const sequence = [
 ];
 assert.deepEqual(
   Object.keys(blocks),
-  ["shell", ...sequence],
+  ["environment", "firebase-credentials", "shell", ...sequence],
   "Every marked command must be exercised",
 );
 
@@ -63,7 +73,7 @@ const defaultHardware = {
 
 test("every documented Bash block parses, including the placeholder setup", () => {
   const fences = [...guide.matchAll(/```bash\n([\s\S]*?)```/gu)];
-  assert.equal(fences.length, 12);
+  assert.equal(fences.length, 13);
   for (const [, block] of fences) {
     const result = spawnSync("/bin/bash", ["-n"], {
       input: block,
@@ -169,6 +179,7 @@ async function fixture(
     PATH: `${bin}:${process.env.PATH}`,
     NODE_OPTIONS: `${process.env.NODE_OPTIONS || ""} --import=${mockModule}`,
     RUNBOOK_MOCK_STATE: stateFile,
+    RUNBOOK_PRIVATE_MARKER: randomUUID(),
     FIREBASE_DATABASE_URL: "https://firebase.invalid",
     FIREBASE_LOCATION: "test-venue",
     FIREBASE_UID: "operator",
@@ -191,13 +202,23 @@ async function fixture(
     mutate(current);
     await writeFile(stateFile, JSON.stringify(current));
   };
-  async function execute(script, overrides = {}) {
+  async function execute(script, overrides = {}, clean = false) {
     const state = await read();
     const result = spawnSync("/bin/bash", ["-c", script], {
       cwd: root,
       env: {
-        ...environment,
-        BRIGHTNESS_WORKER_STOPPED: String(!state.workerRunning),
+        ...(clean
+          ? {
+              PATH: environment.PATH,
+              NODE_OPTIONS: environment.NODE_OPTIONS,
+              RUNBOOK_MOCK_STATE: stateFile,
+              RUNBOOK_PRIVATE_MARKER: environment.RUNBOOK_PRIVATE_MARKER,
+              PERIMETER_VNNOX_PASSWORD: environment.PERIMETER_VNNOX_PASSWORD,
+            }
+          : {
+              ...environment,
+              BRIGHTNESS_WORKER_STOPPED: String(!state.workerRunning),
+            }),
         ...overrides,
       },
       encoding: "utf8",
@@ -210,6 +231,8 @@ async function fixture(
       "synthetic-operator-token",
       "synthetic-device-password",
       "synthetic-device-token",
+      environment.RUNBOOK_PRIVATE_MARKER,
+      Buffer.from(environment.PERIMETER_VNNOX_PASSWORD).toString("base64"),
       overrides.FIREBASE_ID_TOKEN,
       overrides.PERIMETER_VNNOX_PASSWORD,
     ]) {
@@ -219,7 +242,12 @@ async function fixture(
           "Command output exposed a synthetic credential",
         );
     }
-    for (const privateContent of ["private-response-body", "?auth=", "<html>"])
+    for (const privateContent of [
+      "private-response-body",
+      "private-device-response",
+      "?auth=",
+      "<html>",
+    ])
       assert(
         !output.includes(privateContent),
         "Command output exposed a Firebase response body or URL",
@@ -241,6 +269,48 @@ async function fixture(
       ].join("\n"),
       overrides,
     );
+  const runSetup = (names, overrides = {}, clean = false) => {
+    const needsFirebase = names.some((name) =>
+      [
+        "snapshot",
+        "prepare",
+        "command",
+        "verify-command",
+        "restore-intent",
+      ].includes(name),
+    );
+    return execute(
+      [
+        "set -euo pipefail",
+        ...(clean
+          ? [
+              'test "${FIREBASE_ID_TOKEN+x}" != x',
+              'test "${FIREBASE_UID+x}" != x',
+              'test "${BRIGHTNESS_WORKER_STOPPED+x}" != x',
+            ]
+          : []),
+        selectEnvironment(environmentSetup, { ...environment, ...overrides }),
+        ...(needsFirebase
+          ? [
+              selectEnvironment(blocks["firebase-credentials"], {
+                ...environment,
+                ...overrides,
+              }),
+            ]
+          : []),
+        ...(clean && !needsFirebase
+          ? [
+              'test "${FIREBASE_ID_TOKEN+x}" != x',
+              'test "${FIREBASE_UID+x}" != x',
+            ]
+          : []),
+        blocks.shell,
+        ...names.map((name) => blocks[name]),
+      ].join("\n"),
+      overrides,
+      clean,
+    );
+  };
   t.after(async () => {
     if (artifacts) {
       const state = await read();
@@ -258,6 +328,9 @@ async function fixture(
           },
           null,
           2,
+        ).replaceAll(
+          environment.RUNBOOK_PRIVATE_MARKER,
+          "[redacted synthetic credential]",
         ),
       );
     }
@@ -265,11 +338,13 @@ async function fixture(
   });
   return {
     run,
+    runSetup,
     execute,
     read,
     edit,
     original: structuredClone(original),
     session,
+    privateMarker: environment.RUNBOOK_PRIVATE_MARKER,
   };
 }
 
@@ -281,6 +356,261 @@ function failure(result, pattern) {
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, pattern);
 }
+
+test("new-shell recovery executes the full documented setup without Firebase credentials", async (t) => {
+  const f = await fixture(t, { disabled: true });
+  success(await f.run(["stop-before-snapshot", "snapshot"]));
+  await f.edit((state) => {
+    state.screens[0].brightness.ratio = 7700;
+  });
+  const before = await f.read();
+  success(
+    await f.runSetup(["stop-before-restore", "restore-hardware"], {}, true),
+  );
+  const state = await f.read();
+  assert.deepEqual(state.screens, f.original.screens);
+  assert.deepEqual(state.db, f.original.db);
+  assert.equal(state.workerRunning, false);
+  assert(
+    !state.events
+      .slice(before.events.length)
+      .some((e) => e.type.startsWith("firebase-")),
+  );
+  assert.equal(
+    state.events[before.events.length].type,
+    "service-stop-and-simulated-drain",
+  );
+});
+
+test("documented Firebase identity setup requires a token for every Firebase action before I/O", async (t) => {
+  const f = await fixture(t);
+  for (const action of [
+    "snapshot",
+    "prepare",
+    "command",
+    "verify-command",
+    "restore-intent",
+  ])
+    failure(await f.runSetup([action], {}, true), /FIREBASE_ID_TOKEN/u);
+  assert.deepEqual((await f.read()).events, []);
+});
+
+for (const action of ["snapshot", "verify-command", "restore-hardware"]) {
+  test(`${action} sanitizes real native header rejection with no connection or retry`, async (t) => {
+    const f = await fixture(t);
+    if (action === "snapshot") success(await f.run(["stop-before-snapshot"]));
+    else if (action === "verify-command")
+      success(await f.run(sequence.slice(0, 5)));
+    else success(await f.run(["stop-before-snapshot", "snapshot"]));
+    await f.edit((state) => {
+      state.nativeHeaderValidation = true;
+    });
+    const before = await f.read();
+    const result = await f.run([action]);
+    failure(
+      result,
+      action === "restore-hardware"
+        ? /Vnnox exact hardware restore write\/login failed; no automatic retry/u
+        : /Vnnox screen read\/login failed; no automatic retry/u,
+    );
+    assert.equal(result.stdout, "");
+    const state = await f.read();
+    const events = state.events.slice(before.events.length);
+    assert.equal(events.filter((e) => e.type === "device-request").length, 1);
+    assert.equal(
+      events.filter((e) => e.type === "native-header-validation").length,
+      1,
+    );
+    assert.deepEqual(
+      events.find((e) => e.type === "native-header-rejection"),
+      {
+        type: "native-header-rejection",
+        invalidHeader: true,
+        reflectedCredential: true,
+        connectionAttempts: 0,
+      },
+    );
+    assert(
+      !events.some(
+        (e) =>
+          e.type === "socket-connect-denied" ||
+          e.type === "direct-restore" ||
+          e.type === "firebase-patch",
+      ),
+    );
+    assert.deepEqual(state.screens, before.screens);
+    assert.deepEqual(state.db, before.db);
+  });
+}
+
+test("native fetch with valid headers reaches the connection denial counter", async (t) => {
+  const f = await fixture(t);
+  success(await f.run(["stop-before-snapshot"]));
+  await f.edit((state) => {
+    state.nativeHeaderValidation = true;
+    state.validNativeHeader = true;
+  });
+  failure(
+    await f.run(["snapshot"]),
+    /Vnnox screen read\/login failed; no automatic retry/u,
+  );
+  const rejection = (await f.read()).events.find(
+    (e) => e.type === "native-header-rejection",
+  );
+  assert.equal(rejection.invalidHeader, false);
+  assert.equal(rejection.reflectedCredential, false);
+  assert(
+    rejection.connectionAttempts > 0,
+    "Native connection attempts must be observable, never swallowed by fixture state saves",
+  );
+  await assert.rejects(stat(f.session), { code: "ENOENT" });
+});
+
+for (const [action, stages] of [
+  ["snapshot", ["login", "read"]],
+  ["verify-command", ["login", "read"]],
+  ["restore-hardware", ["login", "write", "read"]],
+]) {
+  for (const stage of stages) {
+    for (const kind of [
+      "transport",
+      "malformed-json",
+      "body-read-rejection",
+      "http",
+      "auth-code",
+      ...(stage === "login" ? ["missing-token"] : []),
+    ]) {
+      test(`${action} safely fails once on ${stage} ${kind}`, async (t) => {
+        const f = await fixture(t);
+        if (action === "verify-command")
+          success(await f.run(sequence.slice(0, 5)));
+        else if (action === "restore-hardware")
+          success(await f.run(["stop-before-snapshot", "snapshot"]));
+        else success(await f.run(["stop-before-snapshot"]));
+        const resource = {
+          login: "/unico/v1/system/auth/login",
+          read: "/unico/v1/ucenter/screen/normal-screen",
+          write: "/unico/v1/ucenter/cabinet/brightness",
+        }[stage];
+        await f.edit((state) => {
+          state.deviceResponseFailure = { resource, kind };
+          if (action === "restore-hardware")
+            state.screens[0].brightness.ratio = 7700;
+        });
+        const before = await f.read();
+        const result = await f.run([action]);
+        failure(
+          result,
+          action === "restore-hardware" && stage !== "read"
+            ? /Vnnox exact hardware restore write\/login failed; no automatic retry/u
+            : /Vnnox screen read\/login failed; no automatic retry/u,
+        );
+        assert.equal(result.stdout, "");
+        const state = await f.read();
+        const events = state.events.slice(before.events.length);
+        assert.deepEqual(
+          events
+            .filter((e) => e.type === "device-request")
+            .map((e) => e.resource),
+          [
+            "/unico/v1/system/auth/login",
+            ...(stage === "login"
+              ? []
+              : [
+                  ...(action === "restore-hardware"
+                    ? ["/unico/v1/ucenter/cabinet/brightness"]
+                    : []),
+                  ...(stage === "write"
+                    ? []
+                    : ["/unico/v1/ucenter/screen/normal-screen"]),
+                ]),
+          ],
+          "Stop at the failed operation; no retry or downstream device I/O",
+        );
+        assert.equal(
+          events.filter((e) => e.type === "device-response-failure").length,
+          1,
+        );
+        assert.equal(
+          events.filter(
+            (e) => e.type === "device-request" && e.resource === resource,
+          ).length,
+          1,
+        );
+        assert.equal(
+          events.filter((e) => e.type === "direct-restore").length,
+          action === "restore-hardware" && stage !== "login" ? 1 : 0,
+        );
+        assert(
+          !events.some(
+            (e) => e.type === "firebase-patch" || e.type === "service-start",
+          ),
+        );
+        assert.deepEqual(state.db, before.db);
+        if (action === "snapshot")
+          await assert.rejects(stat(f.session), { code: "ENOENT" });
+        if (action === "restore-hardware") {
+          // An ambiguous committed write is never resent automatically. The
+          // saved snapshot remains usable for a separately initiated recovery.
+          await f.edit((current) => {
+            delete current.deviceResponseFailure;
+          });
+          success(
+            await f.runSetup(
+              ["stop-before-restore", "restore-hardware"],
+              {},
+              true,
+            ),
+          );
+          assert.deepEqual((await f.read()).screens, f.original.screens);
+        }
+      });
+    }
+  }
+}
+
+for (const field of ["ratio", "ratioScale", "nit", "nitType"]) {
+  test(`snapshot rejects credential-bearing ${field} without echoing readback`, async (t) => {
+    const f = await fixture(t);
+    await f.edit((state) => {
+      state.screens[0].brightness[field] = f.privateMarker;
+    });
+    failure(
+      await f.run(["stop-before-snapshot", "snapshot"]),
+      /Vnnox|Cannot preserve nonnumeric/u,
+    );
+    await assert.rejects(stat(f.session), { code: "ENOENT" });
+  });
+}
+
+for (const target of [true, false]) {
+  test(`restore mismatch on ${target ? "target" : "non-target"} never prints credential-bearing response values`, async (t) => {
+    const f = await fixture(t);
+    success(await f.run(["stop-before-snapshot", "snapshot"]));
+    await f.edit((state) => {
+      if (target) {
+        state.ignoreRestore = true;
+        state.screens[0].brightness.ratio = f.privateMarker;
+      } else state.screens[1].brightness.ratio = f.privateMarker;
+    });
+    failure(
+      await f.run(["restore-hardware"]),
+      /Vnnox|Non-target screens changed/u,
+    );
+    assert.equal((await f.read()).workerRunning, false);
+  });
+}
+
+test("scope rejection never includes credential-bearing header values", async (t) => {
+  const f = await fixture(t);
+  success(await f.run(["stop-before-snapshot", "snapshot"]));
+  const before = await f.read();
+  failure(
+    await f.run(["restore-hardware"], { PERIMETER_VNNOX_IP: f.privateMarker }),
+    /Snapshot environment\/device scope differs/u,
+  );
+  assert.deepEqual((await f.read()).events, before.events);
+});
 
 for (const [label, hardware, automatic, missing] of [
   [
@@ -306,7 +636,7 @@ for (const [label, hardware, automatic, missing] of [
 ]) {
   test(`documented full sequence: ${label}`, async (t) => {
     const f = await fixture(t, { hardware, automatic, missing });
-    success(await f.run(sequence));
+    success(await f.runSetup(sequence));
     const state = await f.read();
     assert.equal(state.workerRunning, false);
     assert.deepEqual(
@@ -636,7 +966,12 @@ test("snapshot scope rejects another database, venue, serial or GUID before rest
   for (const [name, value] of Object.entries({
     FIREBASE_DATABASE_URL: "https://other.invalid",
     FIREBASE_LOCATION: "other-venue",
+    PERIMETER_VNNOX_BASE_URL: "http://other.invalid",
+    PERIMETER_VNNOX_IP: "192.0.2.11",
+    PERIMETER_VNNOX_PORT: "8089",
+    PERIMETER_VNNOX_PROTOCOL: "https",
     PERIMETER_VNNOX_SN: "other-serial",
+    PERIMETER_VNNOX_PROJECT_ID: "other-project",
     PERIMETER_VNNOX_PERIMETER_GUID: "mvr-guid",
   })) {
     failure(
@@ -694,10 +1029,16 @@ test("old applied status is not accepted as a current hardware verification", as
 });
 
 for (const [flag, expected] of [
-  ["ignoreRestore", /Expected values to be strictly deep-equal/u],
+  ["ignoreRestore", /Vnnox exact target brightness readback differs/u],
   ["changeOtherScreen", /Non-target screens changed/u],
-  ["ambiguousRestore", /Synthetic ambiguous response after write/u],
-  ["rejectDeviceAuth", /code 8273/u],
+  [
+    "ambiguousRestore",
+    /Vnnox exact hardware restore write\/login failed; no automatic retry/u,
+  ],
+  [
+    "rejectDeviceAuth",
+    /Vnnox exact hardware restore write\/login failed; no automatic retry/u,
+  ],
 ]) {
   test(`restoration failure cannot claim success or retry dispatch: ${flag}`, async (t) => {
     const f = await fixture(t);

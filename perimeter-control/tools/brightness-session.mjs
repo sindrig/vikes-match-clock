@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { isDeepStrictEqual } from "node:util";
 
 import { normalizeBrightness, VnnoxClient } from "../vnnox.js";
 
@@ -112,9 +113,8 @@ async function intent() {
 
 async function loadSnapshot() {
   const saved = JSON.parse(await readFile(snapshotFile, "utf8"));
-  assert.deepEqual(
-    saved.scope,
-    scope,
+  assert(
+    isDeepStrictEqual(saved.scope, scope),
     "Snapshot environment/device scope differs",
   );
   return saved;
@@ -160,8 +160,21 @@ function raw(brightness) {
   return { ratio, ratioScale, nit, nitType };
 }
 
+async function deviceOperation(operation, perform) {
+  try {
+    return await perform();
+  } catch {
+    // Context is a fixed label from this helper, never input or response data.
+    // Client errors (including native header validation and decode failures)
+    // can contain credentials. Do not forward their message, body or cause.
+    throw new Error(`Vnnox ${operation} failed; no automatic retry`);
+  }
+}
+
 async function readHardware() {
-  const screens = await client.readScreens();
+  const screens = await deviceOperation("screen read/login", () =>
+    client.readScreens(),
+  );
   const target = screens.find((s) => s.guid === device.vnnoxPerimeterGuid);
   assert(target, "Vnnox perimeter screen GUID not found");
   for (const field of ["nit", "nitType"]) {
@@ -172,18 +185,24 @@ async function readHardware() {
     );
   }
   return {
-    hardware: raw(normalizeBrightness(target.brightness)),
+    hardware: await deviceOperation("target brightness validation", () =>
+      raw(normalizeBrightness(target.brightness)),
+    ),
     otherScreens: screens.filter((s) => s.guid !== device.vnnoxPerimeterGuid),
   };
 }
 
 async function verifyHardware(saved, expected) {
   const actual = await readHardware();
-  assert.deepEqual(actual.hardware, expected);
-  assert.deepEqual(
-    actual.otherScreens,
-    saved.otherScreens,
-    "Non-target screens changed",
+  // Boolean assertions preserve exact equality without printing response data
+  // (screen metadata can reflect a credential even when JSON decoding succeeds).
+  assert(
+    isDeepStrictEqual(actual.hardware, expected),
+    "Vnnox exact target brightness readback differs; no automatic retry",
+  );
+  assert(
+    isDeepStrictEqual(actual.otherScreens, saved.otherScreens),
+    "Non-target screens changed; no automatic retry",
   );
 }
 
@@ -315,7 +334,9 @@ switch (action) {
     stopped();
     const saved = await loadSnapshot();
     // Works for integer AND fractional percentages, without a Firebase request.
-    await client.restoreBrightness(saved.hardware);
+    await deviceOperation("exact hardware restore write/login", () =>
+      client.restoreBrightness(saved.hardware),
+    );
     await verifyHardware(saved, saved.hardware);
     console.log(
       "Exact ratio/ratioScale/nit/nitType restored and read back; worker stays stopped",

@@ -12,6 +12,9 @@ const rules = JSON.parse(
 ).rules;
 const filename = process.env.RUNBOOK_MOCK_STATE;
 assert(filename, "Runbook I/O mock needs its owned fixture file");
+const nativeFetch = globalThis.fetch;
+const privateMarker = process.env.RUNBOOK_PRIVATE_MARKER;
+let connectionAttempts = 0;
 
 export function load() {
   return JSON.parse(readFileSync(filename, "utf8"));
@@ -251,7 +254,12 @@ function vnnox(state, url, init) {
     });
     return Response.json({
       code: 0,
-      data: { token: "synthetic-device-token" },
+      data: {
+        token:
+          state.nativeHeaderValidation && !state.validNativeHeader
+            ? `${privateMarker}\n${privateMarker}`
+            : "synthetic-device-token",
+      },
     });
   }
   assert.equal(headers.Authorization, "synthetic-device-token");
@@ -302,6 +310,7 @@ function vnnox(state, url, init) {
 }
 
 function deniedNetwork() {
+  connectionAttempts += 1;
   throw new Error("Unexpected network access denied by runbook fixture");
 }
 http.request = http.get = https.request = https.get = deniedNetwork;
@@ -347,7 +356,55 @@ globalThis.fetch = async (input, init = {}) => {
         { status: response.status },
       );
     }
-    if (url.origin === "http://vnnox.invalid") return vnnox(state, url, init);
+    if (url.origin === "http://vnnox.invalid") {
+      // Exercise the real native header validator, not a simulated exception.
+      // Only login is doubled; an invalid token fails before any connection.
+      if (
+        state.nativeHeaderValidation &&
+        url.pathname !== "/unico/v1/system/auth/login"
+      ) {
+        state.events.push({
+          type: "native-header-validation",
+          resource: url.pathname,
+        });
+        try {
+          return await nativeFetch(input, init);
+        } catch (error) {
+          state.events.push({
+            type: "native-header-rejection",
+            invalidHeader: error.message.includes("invalid header value"),
+            reflectedCredential: error.message.includes(privateMarker),
+            connectionAttempts,
+          });
+          throw error;
+        }
+      }
+      const response = vnnox(state, url, init);
+      const failure = state.deviceResponseFailure;
+      if (!failure || failure.resource !== url.pathname) return response;
+      state.events.push({
+        type: "device-response-failure",
+        resource: url.pathname,
+        kind: failure.kind,
+      });
+      const reflected = `private-device-response ${privateMarker} ${init.headers.Authorization ?? ""} ${init.body ?? ""}`;
+      if (failure.kind === "transport")
+        throw new Error(reflected, { cause: new Error(reflected) });
+      if (failure.kind === "http")
+        return new Response(reflected, { status: 503 });
+      if (failure.kind === "auth-code") return Response.json({ code: 8273 });
+      if (failure.kind === "missing-token") return Response.json({ code: 0 });
+      if (failure.kind === "malformed-json")
+        return new Response(`<html>${reflected}</html>`);
+      assert.equal(failure.kind, "body-read-rejection");
+      return new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.error(new Error(reflected));
+          },
+        }),
+      );
+    }
     state.events.push({ type: "unexpected-network-denied" });
     return deniedNetwork();
   } finally {
