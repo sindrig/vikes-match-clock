@@ -33,10 +33,27 @@ and validation errors retain their existing error behavior, with client
 cleanup still performed.
 
 The synchronous, cached SSM lookup runs in an AnyIO worker thread and
-does not block the event loop. Cancellation stops waiting for the result;
-Python cannot stop the synchronous SSM call already running in that
-thread. It may finish and populate the existing successful-key cache,
-but no HTTP client is constructed after its request has ended. No new
+does not block the event loop. A separate task acquires the default
+AnyIO thread limiter before submitting work and keeps that capacity
+until the worker finishes. Its private one-token limiter lets `run_sync`
+use the reserved capacity without acquiring a second default token.
+The caller awaits this task through `asyncio.shield`, so its deadline or
+cancellation stops waiting promptly without releasing running work's
+capacity. A lookup still waiting for default capacity is cancelled before
+worker submission. Thus only live callers wait in the capacity queue;
+timed-out requests cannot accumulate abandoned workers or queued work.
+Pending tasks are retained until completion, then removed and their
+exceptions retrieved even when their callers have left.
+
+Python cannot stop a synchronous SSM call already running. It may finish
+and populate the existing successful-key cache, but no HTTP client is
+constructed after its request has ended. The lazy shared SSM client uses
+two-second connect and read timeouts with standard retries capped at two
+total attempts (the first call and at most one retry). This leaves room
+within the ten-second work budget for normal SDK connection/read waits
+and retry backoff. These are per-operation limits, not a hard wall-clock
+bound on DNS, credential discovery, or trickling response bodies;
+capacity stays occupied if synchronous work outlasts the caller. No new
 single-flight or cross-request cache semantics are introduced.
 
 The timer begins when FastAPI enters the KSI dependency. Request upload,
@@ -72,9 +89,10 @@ info, and roster resolution. No other production code constructs a
 client, and the dependency tests now enter the async generator as a
 context manager. Existing endpoint overrides continue to work.
 
-The shared SSM/key functions also serve weather; their implementation,
-cache lifetime, failure retries, and lazy import/health/export behavior
-are unchanged. Weather request handling is outside this change.
+The shared SSM/key functions also serve weather. The bounded SDK settings
+apply to that shared client; separate successful-key caches, failure
+retries on subsequent lookups, and lazy import/health/export behavior are
+preserved. Weather request handling is outside this change.
 
 Frontend consumers are `TodaysMatches.tsx` (matches, info, lineups),
 `TeamAssetController.tsx` (lineups), and `ResolveRosterModal.tsx`
@@ -113,17 +131,35 @@ same-loop transport closure, and request isolation. SSM tests exercise
 overlapping cold lookups, concurrent health requests, cached keys,
 failure retries, and timeout/cancellation without late HTTP allocation.
 
+The SSM capacity regression uses three waves of two cold requests with
+the default AnyIO limiter set to two tokens and blocked mock SSM calls.
+On `2eed63fc`, actual active workers grow **2 → 4 → 6** while every
+request returns 504. With the repair, workers stay **2 → 2 → 2** and
+every wave still completes at its shortened deadline. It also cancels
+queued requests through both asyncio and AnyIO, checks that they never
+reach SSM, then releases the first workers and verifies queued recovery.
+Both late success and late failure are covered: successful keys remain
+cached, failures allow retry, no late HTTP client is allocated, all
+capacity and retained tasks are released, and no background exception
+is left unhandled. JUnit output records worker counts and wave timings.
+The repaired Python 3.12 suite passes **93 tests**, preserving the
+original 91 passes and one existing placeholder skip, with resource and
+runtime warnings treated as errors. In that run, each shortened
+100-millisecond wave completed in 102–105 milliseconds.
+
 `test_default_budget_closes_real_loopback_connection_before_gateway`
 also opens a local TCP server on an ephemeral loopback port, accepts a
 request without replying, and uses the unchanged production deadline.
 It requires a 504 in under 12 seconds and observes the peer connection
 closing. JUnit output records elapsed time and closure evidence. All
-external services are mocked; the only TCP connection is loopback.
+external services are mocked; the only TCP connection is loopback. The
+repaired suite recorded a 504 after 10.013 seconds with the connection
+closed.
 
 Run from `clock-api/v3` with Python 3.12 and the development dependencies:
 
 ```bash
-python -m pytest tests -q
+python -m pytest tests -q -W error::ResourceWarning -W error::RuntimeWarning
 python -m black --check --line-length 79 --skip-string-normalization \
   app/dependencies.py app/services/ksi.py tests/test_dependencies.py \
   tests/roster_data.py tests/test_roster_resolution.py tests/test_ksi_lifecycle.py

@@ -5,6 +5,7 @@ from functools import cache
 
 import anyio
 import boto3
+from botocore.config import Config
 from fastapi import Path
 from fastapi.exceptions import HTTPException
 
@@ -14,11 +15,20 @@ KSI_REQUEST_TIMEOUT_SECONDS = 10.0
 KSI_CLEANUP_TIMEOUT_SECONDS = 1.0
 
 logger = logging.getLogger(__name__)
+_ksi_key_lookups: set[asyncio.Task[str]] = set()
 
 
 @cache
 def get_ssm_client():
-    return boto3.client("ssm", region_name="eu-west-1")
+    return boto3.client(
+        "ssm",
+        region_name="eu-west-1",
+        config=Config(
+            connect_timeout=2,
+            read_timeout=2,
+            retries={"mode": "standard", "total_max_attempts": 2},
+        ),
+    )
 
 
 @cache
@@ -43,15 +53,39 @@ def get_weather_api_key() -> str:
     return response["Parameter"]["Value"]
 
 
+async def lookup_ksi_api_key(team_id: int) -> str:
+    started = False
+
+    async def lookup():
+        nonlocal started
+        async with anyio.to_thread.current_default_thread_limiter():
+            started = True
+            return await anyio.to_thread.run_sync(
+                get_ksi_api_key, team_id, limiter=anyio.CapacityLimiter(1)
+            )
+
+    def finished(task: asyncio.Task[str]):
+        _ksi_key_lookups.discard(task)
+        if not task.cancelled():
+            task.exception()
+
+    task = asyncio.create_task(lookup())
+    _ksi_key_lookups.add(task)
+    task.add_done_callback(finished)
+    try:
+        return await asyncio.shield(task)
+    finally:
+        if not started:
+            task.cancel()
+
+
 async def get_ksi_client(
     team_id: int = Path(alias="teamId"),
 ) -> AsyncIterator[KsiClient]:
     client = None
     try:
         async with asyncio.timeout(KSI_REQUEST_TIMEOUT_SECONDS):
-            api_key = await anyio.to_thread.run_sync(
-                get_ksi_api_key, team_id, cancellable=True
-            )
+            api_key = await lookup_ksi_api_key(team_id)
             client = KsiClient(api_key=api_key, team_id=team_id)
             yield client
     except TimeoutError as error:

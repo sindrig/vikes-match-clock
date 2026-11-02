@@ -1,7 +1,8 @@
 import asyncio
+import gc
 from contextlib import asynccontextmanager
-from threading import Event, get_ident
-from unittest.mock import AsyncMock, Mock, call, patch
+from threading import Event, Lock, get_ident
+from unittest.mock import ANY, AsyncMock, Mock, call, patch
 
 import anyio
 import pytest
@@ -43,7 +44,11 @@ def test_keys_share_one_lazy_regional_client_and_cache_separately():
         assert dependencies.get_weather_api_key() == "weather"
         assert dependencies.get_ssm_client() is ssm
 
-    factory.assert_called_once_with("ssm", region_name="eu-west-1")
+    factory.assert_called_once_with("ssm", region_name="eu-west-1", config=ANY)
+    config = factory.call_args.kwargs["config"]
+    assert config.connect_timeout == 2
+    assert config.read_timeout == 2
+    assert config.retries == {"mode": "standard", "total_max_attempts": 2}
     assert ssm.get_parameter.call_args_list == [
         call(
             Name="/vikes-match-clock/ksi-api-key/2492",
@@ -127,7 +132,7 @@ def test_parameter_failure_keeps_client_but_does_not_cache_key(get_key, args):
         assert get_key(*args) == "recovered"
         assert get_key(*args) == "recovered"
 
-    factory.assert_called_once_with("ssm", region_name="eu-west-1")
+    factory.assert_called_once_with("ssm", region_name="eu-west-1", config=ANY)
     assert ssm.get_parameter.call_count == 2
 
 
@@ -218,6 +223,8 @@ async def test_slow_secret_lookup_is_bounded_without_late_http_client(
     monkeypatch, end
 ):
     monkeypatch.setattr(dependencies, "KSI_REQUEST_TIMEOUT_SECONDS", 0.05)
+    limiter = anyio.to_thread.current_default_thread_limiter()
+    initial_borrowed = limiter.borrowed_tokens
     started, release, finished = Event(), Event(), Event()
     scopes = []
     ssm = Mock()
@@ -260,11 +267,178 @@ async def test_slow_secret_lookup_is_bounded_without_late_http_client(
                     }
                 assert not release.is_set()
                 assert not finished.is_set()
+                assert limiter.borrowed_tokens == initial_borrowed + 1
                 factory.assert_not_called()
                 assert (await client.get("/v3/health")).status_code == 200
             finally:
                 release.set()
                 assert await asyncio.to_thread(finished.wait, 0.5)
                 await asyncio.gather(request, return_exceptions=True)
-            await asyncio.sleep(0)
+            await wait_until(
+                lambda: limiter.borrowed_tokens == initial_borrowed
+                and not getattr(dependencies, "_ksi_key_lookups", ())
+            )
             factory.assert_not_called()
+
+
+async def wait_until(predicate):
+    async with asyncio.timeout(1):
+        while not predicate():
+            await asyncio.sleep(0.001)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("late_failure", [False, True])
+async def test_ssm_capacity_survives_timeout_waves_and_queued_cancellation(
+    monkeypatch, record_property, late_failure
+):
+    monkeypatch.setattr(dependencies, "KSI_REQUEST_TIMEOUT_SECONDS", 0.1)
+    limiter = anyio.to_thread.current_default_thread_limiter()
+    original_tokens = limiter.total_tokens
+    limiter.total_tokens = 2
+    release = Event()
+    lock = Lock()
+    active = 0
+    peak = 0
+    calls = []
+    clients = []
+    requests = []
+    scopes = []
+    unhandled = []
+    loop = asyncio.get_running_loop()
+    original_handler = loop.get_exception_handler()
+    loop.set_exception_handler(lambda loop, context: unhandled.append(context))
+
+    def lookup(**kwargs):
+        nonlocal active, peak
+        team_id = int(kwargs["Name"].rsplit("/", 1)[-1])
+        with lock:
+            calls.append(team_id)
+            call_number = len(calls)
+            active += 1
+            peak = max(peak, active)
+        try:
+            assert release.wait(5)
+            if late_failure and call_number <= 2:
+                raise ClientError(
+                    {"Error": {"Code": "InternalServerError"}},
+                    "GetParameter",
+                )
+            return {"Parameter": {"Value": f"mock-key-{team_id}"}}
+        finally:
+            with lock:
+                active -= 1
+
+    def create_client(**kwargs):
+        client = AsyncMock()
+        client.get_matches.return_value = []
+        clients.append(client)
+        return client
+
+    async def load(client, team_id):
+        with anyio.CancelScope() as scope:
+            scopes.append(scope)
+            return await client.get(f"/v3/{team_id}/matches/2026-06-15")
+
+    ssm = Mock()
+    ssm.get_parameter.side_effect = lookup
+    try:
+        with (
+            patch("app.dependencies.boto3.client", return_value=ssm),
+            patch(
+                "app.dependencies.KsiClient", side_effect=create_client
+            ) as factory,
+        ):
+            async with AsyncClient(app=app, base_url="http://api.test") as api:
+                workers_per_wave = []
+                elapsed_per_wave = []
+                for wave in range(3):
+                    started = loop.time()
+                    current = [
+                        asyncio.create_task(
+                            api.get(f"/v3/{team}/matches/2026-06-15")
+                        )
+                        for team in (wave * 2 + 1, wave * 2 + 2)
+                    ]
+                    requests.extend(current)
+                    responses = await asyncio.wait_for(
+                        asyncio.gather(*current), 0.5
+                    )
+                    elapsed_per_wave.append(loop.time() - started)
+                    assert [r.status_code for r in responses] == [504, 504]
+                    assert all(
+                        r.json() == {"detail": "KSI request timed out"}
+                        for r in responses
+                    )
+                    with lock:
+                        workers_per_wave.append(active)
+
+                record_property("ssm_workers_per_wave", workers_per_wave)
+                record_property("wave_elapsed_seconds", elapsed_per_wave)
+                assert workers_per_wave == [2, 2, 2]
+                assert limiter.borrowed_tokens == 2
+                factory.assert_not_called()
+
+                monkeypatch.setattr(
+                    dependencies, "KSI_REQUEST_TIMEOUT_SECONDS", 1
+                )
+                queued = [
+                    asyncio.create_task(load(api, team)) for team in (7, 8)
+                ]
+                requests.extend(queued)
+                await wait_until(
+                    lambda: limiter.statistics().tasks_waiting == 2
+                )
+                queued[0].cancel()
+                with pytest.raises(asyncio.CancelledError):
+                    await asyncio.wait_for(queued[0], 0.5)
+                scopes[1].cancel()
+                assert await asyncio.wait_for(queued[1], 0.5) is None
+                assert limiter.statistics().tasks_waiting == 0
+                assert limiter.borrowed_tokens == 2
+                assert not release.is_set()
+                factory.assert_not_called()
+
+                recovery = asyncio.create_task(
+                    api.get("/v3/9/matches/2026-06-15")
+                )
+                requests.append(recovery)
+                await wait_until(
+                    lambda: limiter.statistics().tasks_waiting == 1
+                )
+                release.set()
+                assert (
+                    await asyncio.wait_for(recovery, 0.5)
+                ).status_code == 200
+                assert factory.call_args_list == [
+                    call(api_key="mock-key-9", team_id=9)
+                ]
+                assert sorted(calls) == [1, 2, 9]
+                assert (
+                    await api.get("/v3/1/matches/2026-06-15")
+                ).status_code == 200
+                assert calls.count(1) == (2 if late_failure else 1)
+                assert len(clients) == 2
+                for client in clients:
+                    client.close.assert_awaited_once()
+                assert (await api.get("/v3/health")).status_code == 200
+                assert peak == 2
+    finally:
+        release.set()
+        for request in requests:
+            if not request.done():
+                request.cancel()
+        await asyncio.gather(*requests, return_exceptions=True)
+        try:
+            await wait_until(
+                lambda: active == 0
+                and limiter.borrowed_tokens == 0
+                and not getattr(dependencies, "_ksi_key_lookups", ())
+            )
+            assert limiter.statistics().tasks_waiting == 0
+            gc.collect()
+            await asyncio.sleep(0)
+        finally:
+            limiter.total_tokens = original_tokens
+            loop.set_exception_handler(original_handler)
+    assert unhandled == []
