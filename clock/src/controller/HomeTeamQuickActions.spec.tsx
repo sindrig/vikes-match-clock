@@ -5,6 +5,7 @@ import {
   screen,
   fireEvent,
   waitFor,
+  within,
 } from "@testing-library/react";
 import HomeTeamQuickActions from "./HomeTeamQuickActions";
 import { Player, Roster } from "../types";
@@ -17,7 +18,7 @@ import {
   useLocalState,
   useRemoteSettings,
 } from "../contexts/LocalStateContext";
-import { MutationSession } from "../lib/mutationSession";
+import { MutationRejectedError, MutationSession } from "../lib/mutationSession";
 import { getMOTMAsset, getPlayerAssetObject } from "./asset/team/assetHelpers";
 
 vi.mock("../contexts/FirebaseStateContext", () => ({
@@ -39,6 +40,7 @@ vi.mock("./asset/team/TeamPlayerSelectionModal", () => ({
     instruction,
     players,
     onSelect,
+    error,
   }: {
     open: boolean;
     onClose: () => void;
@@ -46,9 +48,11 @@ vi.mock("./asset/team/TeamPlayerSelectionModal", () => ({
     instruction?: string;
     players: Player[];
     onSelect: (player: Player) => void;
+    error?: string | null;
   }) =>
     open ? (
       <div data-testid="player-select-modal">
+        {error && <p role="alert">{error}</p>}
         <div data-testid="player-select-title">{title}</div>
         {instruction ? (
           <div data-testid="player-select-instruction">{instruction}</div>
@@ -448,6 +452,194 @@ describe("HomeTeamQuickActions", () => {
   });
 
   describe("modal interaction", () => {
+    it("does not revive a substitution's pre-submit session error after media finishes across a venue ABA", async () => {
+      const { mutationSession, mockAppendSubstitutionAndActivate } = setupMocks(
+        { roster: mockRoster },
+      );
+      const media =
+        deferred<Awaited<ReturnType<typeof getPlayerAssetObject>>>();
+      mockedGetPlayerAssetObject.mockReturnValue(media.promise);
+      mockAppendSubstitutionAndActivate.mockRejectedValue(
+        new MutationRejectedError(),
+      );
+      render(<HomeTeamQuickActions />);
+      fireEvent.click(screen.getByRole("button", { name: "Skipting" }));
+      fireEvent.click(screen.getByTestId("modal-player-Jón Jónsson"));
+      fireEvent.click(screen.getByTestId("modal-player-Siggi Bekkur"));
+      mutationSession.setLocation("other");
+      mutationSession.setLocation("vikinni");
+      mutationSession.setFreshness("ready");
+      await act(async () => {
+        media.resolve(preparedPlayer);
+        await media.promise;
+      });
+      expect(mockAppendSubstitutionAndActivate).toHaveBeenCalledTimes(1);
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    });
+
+    it.each(["success", "dismissal"])(
+      "a newer player %s keeps a late substitution failure from resurrecting cleared feedback",
+      async (outcome) => {
+        const { mockAppendSubstitutionAndActivate } = setupMocks({
+          roster: mockRoster,
+        });
+        const pending = deferred();
+        mockAppendSubstitutionAndActivate.mockReturnValue(pending.promise);
+        mockedGetPlayerAssetObject.mockResolvedValue(preparedPlayer);
+        render(<HomeTeamQuickActions />);
+        fireEvent.click(screen.getByRole("button", { name: "Skipting" }));
+        fireEvent.click(screen.getByTestId("modal-player-Jón Jónsson"));
+        fireEvent.click(screen.getByTestId("modal-player-Siggi Bekkur"));
+        await waitFor(() =>
+          expect(mockAppendSubstitutionAndActivate).toHaveBeenCalledTimes(1),
+        );
+        fireEvent.click(screen.getByRole("button", { name: "Birta leikmann" }));
+        if (outcome === "success") {
+          fireEvent.click(screen.getByTestId("modal-player-Ólafur Ólafsson"));
+          await waitFor(() =>
+            expect(
+              screen.queryByTestId("player-select-modal"),
+            ).not.toBeInTheDocument(),
+          );
+        } else
+          fireEvent.click(screen.getByRole("button", { name: "Close modal" }));
+        await act(async () => {
+          pending.reject(new Error("Old substitution denied"));
+          await pending.promise.catch(() => undefined);
+        });
+        expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      },
+    );
+
+    it.each(["Birta leikmann", "Maður leiksins"])(
+      "%s keeps its failed write inside the modal and clears feedback on explicit retry",
+      async (action) => {
+        const { mockShowItemNow } = setupMocks({ roster: mockRoster });
+        const retry = deferred();
+        mockShowItemNow
+          .mockRejectedValueOnce(new Error("PERMISSION_DENIED"))
+          .mockReturnValueOnce(retry.promise);
+        mockedGetPlayerAssetObject.mockResolvedValue(preparedPlayer);
+        mockedGetMOTMAsset.mockResolvedValue(preparedPlayer);
+        render(<HomeTeamQuickActions />);
+        fireEvent.click(screen.getByRole("button", { name: action }));
+        fireEvent.click(screen.getByTestId("modal-player-Jón Jónsson"));
+        const modal = within(screen.getByTestId("player-select-modal"));
+        expect(await modal.findByRole("alert")).toHaveTextContent(
+          "PERMISSION_DENIED",
+        );
+        fireEvent.click(modal.getByTestId("modal-player-Jón Jónsson"));
+        expect(modal.queryByRole("alert")).not.toBeInTheDocument();
+        await waitFor(() => expect(mockShowItemNow).toHaveBeenCalledTimes(2));
+        expect(screen.getByTestId("player-select-modal")).toBeInTheDocument();
+        await act(async () => {
+          retry.resolve();
+          await retry.promise;
+        });
+        expect(
+          screen.queryByTestId("player-select-modal"),
+        ).not.toBeInTheDocument();
+      },
+    );
+
+    it.each(["success", "failure"])(
+      "an old substitution %s cannot replace a newer modal denial, but still submits its independent state work",
+      async (outcome) => {
+        const { mockShowItemNow, mockAppendSubstitutionAndActivate } =
+          setupMocks({ roster: mockRoster });
+        const media =
+          deferred<Awaited<ReturnType<typeof getPlayerAssetObject>>>();
+        mockedGetPlayerAssetObject.mockImplementation(({ player }) =>
+          player.id === 101 ? media.promise : Promise.resolve(preparedPlayer),
+        );
+        if (outcome === "failure")
+          mockAppendSubstitutionAndActivate.mockRejectedValue(
+            new Error("Leikmannahópur hefur breyst"),
+          );
+        mockShowItemNow.mockRejectedValue(new Error("PERMISSION_DENIED"));
+        render(<HomeTeamQuickActions />);
+        fireEvent.click(screen.getByRole("button", { name: "Skipting" }));
+        fireEvent.click(screen.getByTestId("modal-player-Jón Jónsson"));
+        fireEvent.click(screen.getByTestId("modal-player-Siggi Bekkur"));
+        fireEvent.click(screen.getByRole("button", { name: "Birta leikmann" }));
+        fireEvent.click(screen.getByTestId("modal-player-Ólafur Ólafsson"));
+        const modal = within(screen.getByTestId("player-select-modal"));
+        expect(await modal.findByRole("alert")).toHaveTextContent(
+          "PERMISSION_DENIED",
+        );
+        await act(async () => {
+          media.resolve(preparedPlayer);
+          await media.promise;
+        });
+        expect(mockAppendSubstitutionAndActivate).toHaveBeenCalledTimes(1);
+        expect(modal.getByRole("alert")).toHaveTextContent("PERMISSION_DENIED");
+      },
+    );
+
+    it("shows a current substitution failure and clears it when reopening for explicit retry", async () => {
+      const { mockAppendSubstitutionAndActivate } = setupMocks({
+        roster: mockRoster,
+      });
+      mockedGetPlayerAssetObject.mockResolvedValue(preparedPlayer);
+      mockAppendSubstitutionAndActivate.mockRejectedValueOnce(
+        new Error("Current substitution denied"),
+      );
+      render(<HomeTeamQuickActions />);
+      const selectSub = () => {
+        fireEvent.click(screen.getByRole("button", { name: "Skipting" }));
+        fireEvent.click(screen.getByTestId("modal-player-Jón Jónsson"));
+        fireEvent.click(screen.getByTestId("modal-player-Siggi Bekkur"));
+      };
+      selectSub();
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        "Current substitution denied",
+      );
+      expect(
+        screen.queryByTestId("player-select-modal"),
+      ).not.toBeInTheDocument();
+      selectSub();
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      await waitFor(() =>
+        expect(mockAppendSubstitutionAndActivate).toHaveBeenCalledTimes(2),
+      );
+    });
+
+    it.each(["dismiss/reopen", "venue ABA", "auth ABA", "unmount"])(
+      "retires substitution failure feedback across %s",
+      async (boundary) => {
+        const { mockAppendSubstitutionAndActivate, mutationSession } =
+          setupMocks({ roster: mockRoster });
+        const pending = deferred();
+        mockAppendSubstitutionAndActivate.mockReturnValue(pending.promise);
+        mockedGetPlayerAssetObject.mockResolvedValue(preparedPlayer);
+        const { unmount } = render(<HomeTeamQuickActions />);
+        fireEvent.click(screen.getByRole("button", { name: "Skipting" }));
+        fireEvent.click(screen.getByTestId("modal-player-Jón Jónsson"));
+        fireEvent.click(screen.getByTestId("modal-player-Siggi Bekkur"));
+        await waitFor(() =>
+          expect(mockAppendSubstitutionAndActivate).toHaveBeenCalledTimes(1),
+        );
+        if (boundary === "dismiss/reopen") {
+          fireEvent.click(screen.getByRole("button", { name: "Skipting" }));
+          fireEvent.click(screen.getByRole("button", { name: "Close modal" }));
+          fireEvent.click(screen.getByRole("button", { name: "Skipting" }));
+        } else if (boundary === "venue ABA") {
+          mutationSession.setLocation("other");
+          mutationSession.setLocation("vikinni");
+          mutationSession.setFreshness("ready");
+        } else if (boundary === "auth ABA") {
+          mutationSession.setAuth(false);
+          mutationSession.setAuth(true, "local-user");
+          mutationSession.setFreshness("ready");
+        } else unmount();
+        await act(async () => {
+          pending.reject(new Error("Old substitution denied"));
+          await pending.promise.catch(() => undefined);
+        });
+        expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      },
+    );
+
     it.each(["Birta leikmann", "Maður leiksins"])(
       "retires %s success when dismissed and reopened while its write is pending",
       async (action) => {

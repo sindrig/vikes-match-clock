@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { minimalPerimeterDisplay } from "../src/lib/venue.fixtures";
 import type { ControllerState, Asset, Player } from "../src/types";
 
@@ -113,6 +113,29 @@ async function eligible(page: Page) {
       page.evaluate(() => window.sessionMutationHarness.snapshot().eligible),
     )
     .toBe(true);
+}
+
+async function visibleFeedback(error: Locator) {
+  await expect(error).toBeVisible();
+  const hit = await error.evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    const target = document.elementFromPoint(
+      bounds.x + bounds.width / 2,
+      bounds.y + bounds.height / 2,
+    );
+    return {
+      text: element.textContent,
+      hit: target === element || element.contains(target),
+    };
+  });
+  expect(
+    hit.hit,
+    `Feedback must be above the modal backdrop: ${hit.text}`,
+  ).toBe(true);
+  await test.info().attach("visible-feedback-hit", {
+    contentType: "application/json",
+    body: JSON.stringify(hit),
+  });
 }
 async function bootstrap(page: Page, mode = "prepared", login = true) {
   await page.route(/^https?:\/\/(?!localhost[:/]|127\.0\.0\.1[:/])/, (route) =>
@@ -482,6 +505,224 @@ test("picker UI ownership: actual overlapping playlists keep the newer draft ena
   expect((await audits()).length).toBe(1);
 });
 
+for (const mode of ["Birta leikmann", "Maður leiksins"]) {
+  test(`${mode}: actual SDK denial stays visible inside the modal and permits retry`, async ({
+    page,
+  }) => {
+    await bootstrap(page, "sub");
+    const before = await controller();
+    await rest("PUT", `auth/${uid}/${venue}`, false);
+    await page.getByRole("button", { name: mode, exact: true }).click();
+    const dialog = page.getByRole("dialog");
+    const player = dialog.getByRole("button", {
+      name: "7 Jón Jónsson",
+      exact: true,
+    });
+    await player.click();
+    const error = dialog.getByRole("alert");
+    await expect(error).toContainText("PERMISSION_DENIED");
+    await visibleFeedback(error);
+    await player.click({ trial: true });
+    expect(await controller()).toEqual(before);
+    expect(await audits()).toEqual([]);
+    expect(
+      await page.evaluate(() => window.sessionMutationHarness.counts.failed),
+    ).toBe(1);
+    await test.info().attach("modal-sdk-denial", {
+      contentType: "image/png",
+      body: await page.screenshot(),
+    });
+    await rest("PUT", `auth/${uid}/${venue}`, true);
+    await page.evaluate(() =>
+      window.sessionMutationHarness.holdAcknowledgements(),
+    );
+    await player.click();
+    await heldAck(page, 0);
+    await expect(error).toHaveCount(0);
+    await expect(dialog).toBeVisible();
+    await releaseAck(page, 0, 2);
+    await expect(dialog).toBeHidden();
+    expect((await audits()).length).toBe(1);
+    expect((await controller()).currentAsset?.asset.type).toBe(
+      mode === "Maður leiksins" ? "MOTM" : "PLAYER",
+    );
+  });
+}
+
+for (const surface of ["sub", "team"]) {
+  test(`${surface}: an independent delayed substitution still commits after a newer player selection succeeds`, async ({
+    page,
+  }) => {
+    await bootstrap(page, surface);
+    await page.evaluate(() =>
+      window.sessionMutationHarness.armMedia("old-sub"),
+    );
+    await pickSub(page);
+    await expect
+      .poll(() =>
+        page.evaluate(() => window.sessionMutationHarness.counts.mediaWaiting),
+      )
+      .toBe(2);
+    await page.evaluate(() => {
+      window.sessionMutationHarness.armMedia("new-player");
+      window.sessionMutationHarness.releaseMedia("new-player");
+    });
+    await page
+      .getByRole("button", { name: "Birta leikmann", exact: true })
+      .click();
+    if (surface === "sub") {
+      await page
+        .getByRole("dialog")
+        .getByRole("button", { name: "9 Kári Kárason", exact: true })
+        .click();
+      await expect(page.getByRole("dialog")).toBeHidden();
+    } else {
+      await page
+        .getByRole("button", { name: "#9 - Kári Kárason", exact: true })
+        .click();
+      await expect(
+        page.getByRole("button", { name: "Hætta við birtingu" }),
+      ).toHaveCount(0);
+    }
+    const afterPlayer = await controller();
+    expect(afterPlayer.roster.home.map((p) => p.show)).toEqual([
+      true,
+      true,
+      false,
+    ]);
+    await page.evaluate(() =>
+      window.sessionMutationHarness.releaseMedia("old-sub"),
+    );
+    await expect.poll(async () => (await audits()).length).toBe(2);
+    const after = await controller();
+    expect(after.roster.home.map((p) => p.show)).toEqual([false, true, true]);
+    expect(after.queues[after.activeQueueId ?? ""]?.name).toBe("Skiptingar");
+    expect(after.currentAsset).toEqual(afterPlayer.currentAsset);
+    expect(after.playing).toBe(afterPlayer.playing);
+    await expect(page.getByRole("alert")).toHaveCount(0);
+  });
+
+  test(`${surface}: delayed substitution roster rejection cannot replace a newer permission error`, async ({
+    page,
+  }) => {
+    await bootstrap(page, surface);
+    await page.evaluate(() =>
+      window.sessionMutationHarness.armMedia("old-sub"),
+    );
+    await pickSub(page);
+    await expect
+      .poll(() =>
+        page.evaluate(() => window.sessionMutationHarness.counts.mediaWaiting),
+      )
+      .toBe(2);
+    // Future selections use their own media lifetime; only the old sub stays held.
+    await page.evaluate(() => {
+      window.sessionMutationHarness.armMedia("new-player");
+      window.sessionMutationHarness.releaseMedia("new-player");
+    });
+    await page
+      .getByRole("button", { name: "Birta leikmann", exact: true })
+      .click();
+    await rest("PUT", `auth/${uid}/${venue}`, false);
+    const player =
+      surface === "sub"
+        ? page
+            .getByRole("dialog")
+            .getByRole("button", { name: "9 Kári Kárason", exact: true })
+        : page.getByRole("button", { name: "#9 - Kári Kárason", exact: true });
+    await player.click();
+    const error =
+      surface === "sub"
+        ? page.getByRole("dialog").getByRole("alert")
+        : page.locator(".team-asset-controller > .error");
+    // Record the newer real SDK denial before releasing the old media.
+    // Visibility is checked in the owning UI after the old failure settles.
+    await expect(page.locator(".resync-notice")).toContainText(
+      "PERMISSION_DENIED",
+    );
+    await test.info().attach("newer-error-before-old-sub", {
+      contentType: "application/json",
+      body: JSON.stringify(await page.getByRole("alert").allTextContents()),
+    });
+    await rest("PUT", `states/${venue}/controller/roster/home/0/show`, false);
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () =>
+            window.sessionMutationHarness.snapshot().controller.roster.home[0]
+              .show,
+        ),
+      )
+      .toBe(false);
+    const before = await controller();
+    await page.evaluate(() =>
+      window.sessionMutationHarness.releaseMedia("old-sub"),
+    );
+    // The provider's validation error proves the independent old intent reached
+    // submission validation; its local UI feedback must remain retired.
+    await expect(page.locator(".resync-notice")).toContainText(
+      "Leikmannahópur hefur breyst",
+    );
+    await expect(error).toContainText("PERMISSION_DENIED");
+    await visibleFeedback(error);
+    await expect(
+      page.locator(".team-asset-controller > [role=alert]"),
+    ).toHaveCount(0);
+    expect(await controller()).toEqual(before);
+    expect(await audits()).toEqual([]);
+    expect(
+      await page.evaluate(() => window.sessionMutationHarness.counts.ordinary),
+    ).toBe(1);
+    await rest("PUT", `auth/${uid}/${venue}`, true);
+    await player.click();
+    if (surface === "sub") await expect(page.getByRole("dialog")).toBeHidden();
+    else
+      await expect(
+        page.getByRole("button", { name: "Hætta við birtingu" }),
+      ).toHaveCount(0);
+    await expect(error).toHaveCount(surface === "sub" ? 0 : 1);
+    expect((await audits()).length).toBe(1);
+  });
+
+  test(`${surface}: current failed substitution is visible, can be dismissed and retried`, async ({
+    page,
+  }) => {
+    await bootstrap(page, surface);
+    const before = await controller();
+    await rest("PUT", `auth/${uid}/${venue}`, false);
+    await pickSub(page);
+    const error = page.locator(
+      surface === "sub"
+        ? ".home-team-quick-actions > [role=alert]"
+        : ".team-asset-controller > [role=alert]",
+    );
+    await expect(error).toContainText("PERMISSION_DENIED");
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await visibleFeedback(error);
+    expect(await controller()).toEqual(before);
+    expect(await audits()).toEqual([]);
+    await page
+      .getByRole("button", { name: "Skipting", exact: true })
+      .first()
+      .click();
+    await expect(page.getByRole("dialog").getByRole("alert")).toHaveCount(0);
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: /close/i })
+      .click();
+    await expect(page.getByRole("dialog")).toBeHidden();
+    await expect(error).toHaveCount(0);
+    await rest("PUT", `auth/${uid}/${venue}`, true);
+    await pickSub(page);
+    await expect.poll(async () => (await audits()).length).toBe(1);
+    expect((await controller()).roster.home.map((p) => p.show)).toEqual([
+      false,
+      true,
+      true,
+    ]);
+  });
+}
+
 test("player UI ownership: a newer denial survives an older success and retries in the same dialog", async ({
   page,
 }) => {
@@ -503,8 +744,9 @@ test("player UI ownership: a newer denial survives an older success and retries 
     .click();
   await heldAck(page, 1, "permission_denied");
   await releaseAck(page, 1, 1);
-  const error = page.locator(".home-team-quick-actions [role=alert]");
+  const error = dialog.getByRole("alert");
   await expect(error).toContainText("PERMISSION_DENIED");
+  await visibleFeedback(error);
   await releaseAck(page, 0, 2);
   await expect(dialog).toContainText("Birta leikmann");
   await expect(error).toContainText("PERMISSION_DENIED");
@@ -1098,9 +1340,17 @@ for (const side of ["home", "away"] as const) {
             firstToFinish === "first" ? "second" : "first",
           );
           if (conflicting) {
-            await expect(page.getByRole("alert")).toContainText(
+            await expect(page.locator(".resync-notice")).toContainText(
               "Leikmannahópur hefur breyst",
             );
+            if (firstToFinish === "first") {
+              await expect(page.getByRole("alert")).toContainText(
+                "Leikmannahópur hefur breyst",
+              );
+            } else {
+              // The rejected first action was retired by the second selection.
+              await expect(page.getByRole("alert")).toHaveCount(0);
+            }
             expect(await controller()).toEqual(afterFirst);
             expect(await audits()).toEqual(firstAudits);
             expect(
@@ -1562,9 +1812,10 @@ for (const mode of ["team", "sub", "prepared"]) {
       } else if (mode === "team")
         await expect(page.locator(".error")).toContainText("lota eða tenging");
       else
-        await expect(page.getByRole("alert").last()).toContainText(
+        await expect(page.locator(".resync-notice")).toContainText(
           "lota eða tenging",
         );
+      if (mode === "sub") await expect(page.getByRole("alert")).toHaveCount(0);
       await noAttempts(page, before, otherBefore);
       if (boundary === "offline") {
         await page.evaluate(() => window.sessionMutationHarness.online());

@@ -48,6 +48,23 @@ export function useHomeTeamQuickActions() {
     setError("");
   };
 
+  // Shared with the team tab: feedback belongs to the latest explicit action,
+  // even when an independent substitution is still preparing or committing.
+  const beginAction = () => {
+    const selection = Symbol();
+    currentSelection.current = selection;
+    const origin = mutationSession.getSnapshot();
+    const isSelected = () => currentSelection.current === selection;
+    const ownsUI = () => isSelected() && mutationSession.isCurrent(origin);
+    setError("");
+    return {
+      isSelected,
+      ownsUI,
+      canReport: (failure: unknown) =>
+        isSelected() && (failure instanceof MutationRejectedError || ownsUI()),
+    };
+  };
+
   const showPlayerCard = (
     player: Player,
     teamKey: TeamKey,
@@ -125,8 +142,8 @@ export function useHomeTeamQuickActions() {
     const actualTeamName = side === "home" ? match.homeTeam : match.awayTeam;
     // Capture before the first await. Never use a ref to a newer command here.
     const commit = appendSubstitutionAndActivate;
+    const action = beginAction();
     setModalMode(null);
-    setError("");
 
     void (async () => {
       try {
@@ -164,6 +181,8 @@ export function useHomeTeamQuickActions() {
           },
         });
       } catch (failure) {
+        // Retiring feedback must not cancel a still-valid substitution intent.
+        if (!action.ownsUI()) return;
         setError(
           failure instanceof Error
             ? failure.message
@@ -213,25 +232,16 @@ export function useHomeTeamQuickActions() {
     } else if (modalMode === "subOn") {
       handleSubOnSelect(player);
     } else if (modalMode === "playerCard" || modalMode === "motm") {
-      const selection = Symbol();
-      currentSelection.current = selection;
-      const origin = mutationSession.getSnapshot();
-      const isSelected = () => currentSelection.current === selection;
-      const ownsUI = () => isSelected() && mutationSession.isCurrent(origin);
+      const action = beginAction();
       const show = modalMode === "playerCard" ? showPlayerCard : showMOTM;
-      setError("");
-      void show(player, "homeTeam", isSelected)
+      void show(player, "homeTeam", action.isSelected)
         .then(() => {
-          if (ownsUI()) closeModal();
+          if (action.ownsUI()) closeModal();
         })
         .catch((failure: unknown) => {
           // A current draft can explain an origin rejection before submission.
           // A submitted write's late feedback belongs only to its old session.
-          if (
-            isSelected() &&
-            (failure instanceof MutationRejectedError || ownsUI())
-          )
-            reportError(failure);
+          if (action.canReport(failure)) reportError(failure);
         });
     }
   };
@@ -263,5 +273,6 @@ export function useHomeTeamQuickActions() {
     closeModal,
     showPlayerCard,
     showMOTM,
+    beginAction,
   };
 }

@@ -1497,16 +1497,27 @@ Firebase-backed behavior.
   the entire intent before any queue, roster or audit write. This also rejects
   overlapping preparations that reuse a player after another substitution's
   SDK echo, while independent and ordered substitutions remain eligible. The
-  existing current asset and playing flag are preserved; failures are shown
-  in the team/shortcut box. Player-card and MOTM operations await their retained
+  existing current asset and playing flag are preserved. Current substitution
+  failures are shown in the team/shortcut box; player-card and MOTM failures
+  are passed to the open selection modal's `error` prop so feedback stays
+  visible above its backdrop and selection can be retried. Player-card and
+  MOTM operations await their retained
   `renderAsset` command before reporting success. Each player selection owns its
   media and UI continuation: dismissal, replacement, a newer selection or
   unmounting retires it. Submitted acknowledgements can close or report errors
   only for that selection in its original mutation session (including venue or
   auth A → B → A). Already-submitted writes remain irrevocable. An origin
   rejection before submission still explains why the current draft could not
-  save. The Lið tab applies the same ownership checks to its inline player/MOTM
-  selection and to navigation/error feedback after a lineup replacement.
+  save. The hook's `beginAction` is also used by the Lið tab's inline
+  player/MOTM, lineup replacement and roster-fetch feedback. New actions,
+  dismissal and unmounting retire older feedback across those callers;
+  delayed substitution failures cannot overwrite a newer player error.
+  Closed substitution actions report failures only within their original
+  mutation session, including rejections after delayed media preparation.
+  Retirement gates UI feedback only: an independent substitution or lineup
+  replacement still reaches its retained command and current-roster/session
+  validation. Roster-fetch loading has a separate request lifetime so its
+  completion releases its spinner without clearing a newer action's error.
 - **Corrected SUB field semantics**: `subIn` carries the player **coming
   on** and `subOut` the player **going off** (the persisted fields were
   previously inverted from their meaning). The creation site builds

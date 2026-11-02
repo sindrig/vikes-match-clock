@@ -1564,7 +1564,8 @@ describe("atomic queue intent regressions", () => {
         media.resolve(asset);
         await media.promise;
       });
-      expect(quickApi.error).not.toBe("");
+      expect(currentApi.mutationError).toContain("lota eða tenging");
+      expect(quickApi.error).toBe("");
       noAttempts();
       expect(data).toEqual(before);
     },

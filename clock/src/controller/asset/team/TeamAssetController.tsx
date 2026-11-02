@@ -15,7 +15,6 @@ import {
   useView,
 } from "../../../contexts/FirebaseStateContext";
 import { useLocalState } from "../../../contexts/LocalStateContext";
-import { MutationRejectedError } from "../../../lib/mutationSession";
 import "../../../api/clientConfig";
 import { getLineups } from "../../../api/client";
 import { transformLineups, getTeamId } from "../../../lib/matchUtils";
@@ -33,7 +32,7 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
   const { roster } = controller;
   const { venues } = useListeners();
   const { view } = useView();
-  const { listenPrefix, mutationSession } = useLocalState();
+  const { listenPrefix } = useLocalState();
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -43,39 +42,13 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
   const [resolveRosterSide, setResolveRosterSide] = useState<
     "home" | "away" | null
   >(null);
-  const currentAction = useRef<symbol | null>(null);
+  const rosterRequest = useRef<symbol | null>(null);
   useLayoutEffect(
     () => () => {
-      currentAction.current = null;
+      rosterRequest.current = null;
     },
     [],
   );
-
-  const retireAction = (): void => {
-    currentAction.current = null;
-    setError("");
-  };
-
-  const beginAction = () => {
-    const action = Symbol();
-    currentAction.current = action;
-    const origin = mutationSession.getSnapshot();
-    const isSelected = () => currentAction.current === action;
-    const ownsUI = () => isSelected() && mutationSession.isCurrent(origin);
-    return {
-      isSelected,
-      ownsUI,
-      canReport: (failure: unknown) =>
-        isSelected() && (failure instanceof MutationRejectedError || ownsUI()),
-    };
-  };
-
-  const setPlayerAction = (action: "playerCard" | "motm" | null): void => {
-    retireAction();
-    setSelectPlayerAsset(action === "playerCard");
-    setSelectMOTM(action === "motm");
-  };
-
   const {
     error: quickActionsError,
     modalMode: quickActionsModalMode,
@@ -87,11 +60,30 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
     closeModal: quickActionsCloseModal,
     showPlayerCard,
     showMOTM,
+    beginAction: beginQuickAction,
   } = useHomeTeamQuickActions();
+
+  const retireAction = (): void => {
+    quickActionsCloseModal();
+    setError("");
+  };
+
+  const beginAction = () => {
+    setError("");
+    return beginQuickAction();
+  };
+
+  const setPlayerAction = (action: "playerCard" | "motm" | null): void => {
+    retireAction();
+    setSelectPlayerAsset(action === "playerCard");
+    setSelectMOTM(action === "motm");
+  };
 
   const refetchRoster = (): void => {
     if (!match.ksiMatchId) return;
-    retireAction();
+    const action = beginAction();
+    const request = Symbol();
+    rosterRequest.current = request;
     setLoading(true);
     const teamId = getTeamId(venues, listenPrefix);
     void getLineups({
@@ -104,10 +96,20 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
         };
         const rosterData = transformLineups(lineups);
         setRoster(rosterData);
-        setError("");
       })
-      .catch((e: Error) => setError(e.message))
-      .finally(() => setLoading(false));
+      .catch((failure: unknown) => {
+        if (action.canReport(failure))
+          setError(
+            failure instanceof Error
+              ? failure.message
+              : "Ekki tókst að sækja lið.",
+          );
+      })
+      .finally(() => {
+        // Loading is the roster request's own channel, independent of the
+        // newer player selection that may now own error feedback.
+        if (rosterRequest.current === request) setLoading(false);
+      });
   };
 
   const handleResolveRosterConfirm = (players: Player[]): void => {
@@ -356,7 +358,9 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
       <RingLoader loading={loading} />
       {!loading && renderControls()}
       <span className="error">{error}</span>
-      {quickActionsError && <p role="alert">{quickActionsError}</p>}
+      {quickActionsError && quickActionsModalMode === null && (
+        <p role="alert">{quickActionsError}</p>
+      )}
       <div className="team-columns">
         {renderTeam("homeTeam")}
         {renderTeam("awayTeam")}
@@ -376,6 +380,7 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
         instruction={quickActionsModalInstruction}
         players={quickActionsModalPlayers}
         onSelect={quickActionsHandleModalSelect}
+        error={quickActionsModalMode === null ? undefined : quickActionsError}
       />
       <ResolveRosterModal
         open={resolveRosterSide !== null}

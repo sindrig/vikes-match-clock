@@ -30,6 +30,7 @@ import { DEFAULT_THEME } from "../../src/constants";
 import { DEFAULT_BRIGHTNESS_AUTO_CONFIG } from "../../src/lib/autoBrightness";
 import type { CountdownCompletionObservation } from "../../src/lib/conditionalTransitions";
 import "../../src/index.css";
+import "rsuite/dist/rsuite.min.css";
 
 if (app.options.projectId !== "vikes-match-clock-test") {
   throw new Error("Session mutation fixture requires local emulators.");

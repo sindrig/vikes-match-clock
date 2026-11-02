@@ -13,6 +13,7 @@ import {
   screen,
   fireEvent,
   waitFor,
+  within,
 } from "@testing-library/react";
 import TeamAssetController from "./TeamAssetController";
 import { Player, Roster } from "../../../types";
@@ -110,6 +111,7 @@ vi.mock("./TeamPlayerSelectionModal", () => ({
     instruction,
     players,
     onSelect,
+    error,
   }: {
     open: boolean;
     onClose: () => void;
@@ -117,9 +119,11 @@ vi.mock("./TeamPlayerSelectionModal", () => ({
     instruction?: string;
     players: Player[];
     onSelect: (player: Player) => void;
+    error?: string | null;
   }) =>
     open ? (
       <div data-testid="player-select-modal">
+        {error && <p role="alert">{error}</p>}
         <div data-testid="player-select-title">{title}</div>
         {instruction ? (
           <div data-testid="player-select-instruction">{instruction}</div>
@@ -318,14 +322,20 @@ function setupMocks(overrides?: {
   };
 }
 
-function deferred() {
-  let resolve!: () => void;
+function deferred<T = void>() {
+  let resolve!: (value: T) => void;
   let reject!: (failure: Error) => void;
-  const promise = new Promise<void>((done, fail) => {
+  const promise = new Promise<T>((done, fail) => {
     resolve = done;
     reject = fail;
   });
   return { promise, resolve, reject };
+}
+
+function clickHomeSub() {
+  const button = screen.getAllByRole("button", { name: "Skipting" })[0];
+  if (!button) throw new Error("Home substitution button missing");
+  fireEvent.click(button);
 }
 
 const preparedPlayer = {
@@ -342,6 +352,141 @@ describe("TeamAssetController", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockPreviousView = vi.fn<() => void>();
+  });
+
+  it.each(["success", "failure"])(
+    "an old substitution %s cannot replace newer inline player feedback",
+    async (outcome) => {
+      const { mockShowItemNow, mockAppendSubstitutionAndActivate } = setupMocks(
+        { roster: mockRoster },
+      );
+      const pending = deferred();
+      mockAppendSubstitutionAndActivate.mockReturnValue(pending.promise);
+      mockedGetPlayerAssetObject.mockResolvedValue(preparedPlayer);
+      mockShowItemNow.mockRejectedValueOnce(new Error("Newer player denied"));
+      render(<TeamAssetController previousView={mockPreviousView} />);
+      clickHomeSub();
+      fireEvent.click(screen.getByTestId("modal-player-Jón Jónsson"));
+      fireEvent.click(screen.getByTestId("modal-player-Siggi Bekkur"));
+      await waitFor(() =>
+        expect(mockAppendSubstitutionAndActivate).toHaveBeenCalledTimes(1),
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Birta leikmann" }));
+      fireEvent.click(screen.getByTestId("select-player-homeTeam"));
+      expect(
+        await screen.findByText("Newer player denied"),
+      ).toBeInTheDocument();
+      await act(async () => {
+        if (outcome === "success") pending.resolve();
+        else pending.reject(new Error("Old substitution denied"));
+        await pending.promise.catch(() => undefined);
+      });
+      expect(screen.getByText("Newer player denied")).toBeInTheDocument();
+      expect(
+        screen.queryByText("Old substitution denied"),
+      ).not.toBeInTheDocument();
+      fireEvent.click(screen.getByTestId("select-player-homeTeam"));
+      await waitFor(() =>
+        expect(
+          screen.queryByRole("button", { name: "Hætta við birtingu" }),
+        ).not.toBeInTheDocument(),
+      );
+      expect(screen.queryByText("Newer player denied")).not.toBeInTheDocument();
+    },
+  );
+
+  it.each(["success", "failure"])(
+    "an older inline player %s cannot replace the current substitution failure",
+    async (outcome) => {
+      const { mockShowItemNow, mockAppendSubstitutionAndActivate } = setupMocks(
+        { roster: mockRoster },
+      );
+      const pending = deferred();
+      mockShowItemNow.mockReturnValueOnce(pending.promise);
+      mockAppendSubstitutionAndActivate.mockRejectedValueOnce(
+        new Error("Current substitution denied"),
+      );
+      mockedGetPlayerAssetObject.mockResolvedValue(preparedPlayer);
+      render(<TeamAssetController previousView={mockPreviousView} />);
+      fireEvent.click(screen.getByRole("button", { name: "Birta leikmann" }));
+      fireEvent.click(screen.getByTestId("select-player-homeTeam"));
+      await waitFor(() => expect(mockShowItemNow).toHaveBeenCalledTimes(1));
+      fireEvent.click(
+        screen.getByRole("button", { name: "Hætta við birtingu" }),
+      );
+      clickHomeSub();
+      fireEvent.click(screen.getByTestId("modal-player-Jón Jónsson"));
+      fireEvent.click(screen.getByTestId("modal-player-Siggi Bekkur"));
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        "Current substitution denied",
+      );
+      await act(async () => {
+        if (outcome === "success") pending.resolve();
+        else pending.reject(new Error("Old player denied"));
+        await pending.promise.catch(() => undefined);
+      });
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "Current substitution denied",
+      );
+      expect(screen.queryByText("Old player denied")).not.toBeInTheDocument();
+    },
+  );
+
+  it.each(["success", "failure"])(
+    "roster fetch %s cannot clear or replace a later player error, and releases its own spinner",
+    async (outcome) => {
+      const { mockShowItemNow, mockSetRoster } = setupMocks({
+        roster: mockRoster,
+      });
+      const request = deferred<Awaited<ReturnType<typeof getLineups<false>>>>();
+      mockedGetLineups.mockReturnValue(request.promise);
+      mockShowItemNow.mockRejectedValue(new Error("Newer player denied"));
+      mockedGetPlayerAssetObject.mockResolvedValue(preparedPlayer);
+      render(<TeamAssetController previousView={mockPreviousView} />);
+      fireEvent.click(screen.getByRole("button", { name: "Birta leikmann" }));
+      fireEvent.click(screen.getByRole("button", { name: "Sækja lið" }));
+      fireEvent.click(screen.getByTestId("select-player-homeTeam"));
+      expect(
+        await screen.findByText("Newer player denied"),
+      ).toBeInTheDocument();
+      mockedTransformLineups.mockReturnValue(mockRoster);
+      await act(async () => {
+        if (outcome === "success")
+          request.resolve({ data: undefined } as Awaited<
+            ReturnType<typeof getLineups<false>>
+          >);
+        else request.reject(new Error("Old fetch denied"));
+        await request.promise.catch(() => undefined);
+      });
+      expect(screen.getByText("Newer player denied")).toBeInTheDocument();
+      expect(screen.queryByText("Old fetch denied")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("ring-loader")).not.toBeInTheDocument();
+      if (outcome === "success")
+        expect(mockSetRoster).toHaveBeenCalledWith(mockRoster);
+    },
+  );
+
+  it("passes current substitution feedback to the team modal and clears it on dismissal", async () => {
+    const { mockAppendSubstitutionAndActivate } = setupMocks({
+      roster: mockRoster,
+    });
+    mockedGetPlayerAssetObject.mockResolvedValue(preparedPlayer);
+    mockAppendSubstitutionAndActivate.mockRejectedValueOnce(
+      new Error("Current substitution denied"),
+    );
+    render(<TeamAssetController previousView={mockPreviousView} />);
+    clickHomeSub();
+    fireEvent.click(screen.getByTestId("modal-player-Jón Jónsson"));
+    fireEvent.click(screen.getByTestId("modal-player-Siggi Bekkur"));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Current substitution denied",
+    );
+    clickHomeSub();
+    expect(
+      within(screen.getByTestId("player-select-modal")).queryByRole("alert"),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Close modal" }));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   afterEach(() => {

@@ -25,7 +25,7 @@ const HomeTeamQuickActions = (): React.JSX.Element | null => {
   return (
     <div className="home-team-quick-actions">
       <div className="home-team-quick-actions-label">Heimalið aðgerðir</div>
-      {error && <p role="alert">{error}</p>}
+      {error && modalMode === null && <p role="alert">{error}</p>}
       <div className="home-team-quick-actions-buttons">
         <button type="button" onClick={() => openSubModal("home")}>
           Skipting
@@ -44,6 +44,7 @@ const HomeTeamQuickActions = (): React.JSX.Element | null => {
         instruction={modalInstruction}
         players={modalPlayers}
         onSelect={handleModalSelect}
+        error={modalMode === null ? undefined : error}
       />
     </div>
   );
