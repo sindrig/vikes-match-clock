@@ -1357,6 +1357,19 @@ paths; metadata edits never replace items or unrelated autoplay settings.
 Only subscription callbacks update shared calculation refs. See the
 [queue intent contract and caller inventory](../docs/session-mutation-boundary.md#queue-intents-and-compound-callers-243).
 
+SDK local echoes do not prove that a newly created queue is durable.
+`PendingQueueCreations` tracks only in-flight creation acknowledgements,
+registered before the SDK call (including synchronous/reentrant echoes).
+Commands targeting a pending queue wait for settlement, then recompute their
+diff and player eligibility from current subscription refs with their original
+command origin. Named replacement/substitution can resolve the restored queue
+or create a complete new queue after denial; explicit ID operations reject if
+that queue disappeared. Overlapping waiters check dependencies again, and
+session changes cancel waiting commands immediately, even without an ack.
+Independent creations and operations on durable queues remain available and
+keep leaf diffs. There is no shadow queue state, timeout, offline replay or
+general server conflict resolution.
+
 #### QueuePicker Behavior
 
 `QueuePicker` is rendered as an rsuite `Modal` dialog. Every asset click (image, URL, etc.) opens QueuePicker, which offers two action types:
@@ -1500,7 +1513,10 @@ Firebase-backed behavior.
   existing current asset and playing flag are preserved. Current substitution
   failures are shown in the team/shortcut box; player-card and MOTM failures
   are passed to the open selection modal's `error` prop so feedback stays
-  visible above its backdrop and selection can be retried. Player-card and
+  visible above its backdrop and selection can be retried. The shared modal
+  renders its alert in the fixed header outside the scrolling player list,
+  keeping current feedback visible at lower roster rows without moving
+  keyboard focus. Player-card and
   MOTM operations await their retained
   `renderAsset` command before reporting success. Each player selection owns its
   media and UI continuation: dismissal, replacement, a newer selection or

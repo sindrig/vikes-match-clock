@@ -219,6 +219,211 @@ async function pickAsset(page: Page, mode: string) {
   await expect(page.getByRole("dialog")).toBeVisible();
 }
 
+test("ordered server frames: an independent substitution waits for denied queue creation and recomputes its atomic intent", async ({
+  page,
+}) => {
+  await rest("PUT", `states/${venue}/controller/roster/home`, [
+    starter,
+    secondStarter,
+    bench,
+    secondBench,
+  ]);
+  let paused = false;
+  const held: Array<() => void> = [];
+  const requests = new Set<number>();
+  const replies: string[] = [];
+  await page.routeWebSocket(/127\.0\.0\.1:9000/, (socket) => {
+    const remote = socket.connectToServer();
+    const payload = (message: string | Buffer) => {
+      try {
+        return JSON.parse(String(message)) as {
+          t?: string;
+          d?: { a?: string; r?: number; b?: { s?: string } };
+        };
+      } catch {
+        return {};
+      }
+    };
+    socket.onMessage((message) => {
+      const frame = payload(message);
+      if (frame.t === "d" && (frame.d?.a === "m" || frame.d?.a === "p"))
+        requests.add(frame.d.r!);
+      remote.send(message);
+    });
+    remote.onMessage((message) => {
+      const frame = payload(message);
+      if (frame.t === "d" && requests.has(frame.d?.r ?? -1))
+        replies.push(frame.d?.b?.s ?? "unknown");
+      if (paused) held.push(() => socket.send(message));
+      else socket.send(message);
+    });
+  });
+  await bootstrap(page, "sub");
+  const before = await controller();
+  paused = true;
+  await rest("PUT", `auth/${uid}/${venue}`, false);
+  await pickSub(page);
+  await expect.poll(() => replies).toEqual(["permission_denied"]);
+  expect(await controller()).toEqual(before);
+  expect(await audits()).toEqual([]);
+  await rest("PUT", `auth/${uid}/${venue}`, true);
+  // Call the real provider synchronously, after observing the first SDK echo.
+  // The status records entry and settlement without replacing SDK callbacks.
+  await page.evaluate(
+    ({ outgoing, incoming, asset }) => {
+      const probe = { status: "pending", error: "" };
+      (
+        window as unknown as { queueDependencyProbe: typeof probe }
+      ).queueDependencyProbe = probe;
+      void window.sessionMutationHarness.commands
+        .appendSubstitutionAndActivate({
+          side: "home",
+          outgoing,
+          incoming,
+          asset,
+        })
+        .then(
+          () => {
+            probe.status = "succeeded";
+          },
+          (error: unknown) => {
+            probe.status = "failed";
+            probe.error = String(error);
+          },
+        );
+    },
+    {
+      outgoing: secondStarter,
+      incoming: secondBench,
+      asset: { ...subAsset, key: "independent-after-denial" },
+    },
+  );
+  const beforeDelivery = {
+    ordinary: await page.evaluate(
+      () => window.sessionMutationHarness.counts.ordinary,
+    ),
+    controller: await controller(),
+    held: held.length,
+  };
+  paused = false;
+  for (const send of held.splice(0)) send();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as unknown as { queueDependencyProbe: { status: string } })
+            .queueDependencyProbe.status,
+      ),
+    )
+    .toBe("succeeded");
+  await expect
+    .poll(() =>
+      page.evaluate(() => window.sessionMutationHarness.counts.failed),
+    )
+    .toBe(1);
+  const after = await controller();
+  await test.info().attach("ordered-server-frames", {
+    contentType: "application/json",
+    body: JSON.stringify(
+      { replies, beforeDelivery, before, after, audit: await audits() },
+      null,
+      2,
+    ),
+  });
+  expect(beforeDelivery.ordinary).toBe(1);
+  expect(beforeDelivery.controller).toEqual(before);
+  expect(beforeDelivery.held).toBeGreaterThan(0);
+  const queues = Object.values(after.queues).filter(
+    (queue) => queue.name === "Skiptingar",
+  );
+  expect(queues).toHaveLength(1);
+  const queue = queues[0]!;
+  expect(queue).toEqual({
+    id: expect.any(String),
+    name: "Skiptingar",
+    items: [{ ...subAsset, key: "independent-after-denial" }],
+    autoPlay: false,
+    imageSeconds: 3,
+    cycle: false,
+    order: 2,
+  });
+  expect(after.activeQueueId).toBe(queue.id);
+  expect(after.roster.home.map((player) => player.show)).toEqual([
+    true,
+    false,
+    false,
+    true,
+  ]);
+  expect(after.currentAsset).toEqual(before.currentAsset);
+  expect(after.playing).toBe(before.playing);
+  expect(await audits()).toHaveLength(1);
+  expect(JSON.parse((await audits())[0]!.changes)).toMatchObject({
+    [`queues/${queue.id}`]: queue,
+    activeQueueId: queue.id,
+    "roster/home/1/show": false,
+    "roster/home/3/show": true,
+  });
+  expect(replies).toEqual(["permission_denied", "ok"]);
+});
+
+for (const action of ["Birta leikmann", "Maður leiksins"]) {
+  test(`${action}: current SDK denial stays hit-tested at the last row of a 23-player roster and keyboard retry succeeds`, async ({
+    page,
+  }) => {
+    const players = Array.from({ length: 23 }, (_, index) => ({
+      id: 100 + index,
+      name: `Roster Player ${String(index + 1)}`,
+      number: index + 1,
+      show: index < 11,
+    }));
+    await rest("PUT", `states/${venue}/controller/roster/home`, players);
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await bootstrap(page, "sub");
+    await page.getByRole("button", { name: action, exact: true }).click();
+    const dialog = page.getByRole("dialog");
+    const last = dialog.getByRole("button", {
+      name: "23 Roster Player 23",
+      exact: true,
+    });
+    await last.scrollIntoViewIfNeeded();
+    await expect
+      .poll(() =>
+        dialog
+          .locator(".rs-modal-body")
+          .evaluate((element) => element.scrollTop),
+      )
+      .toBeGreaterThan(0);
+    await rest("PUT", `auth/${uid}/${venue}`, false);
+    await last.click();
+    const alert = dialog.getByRole("alert");
+    await expect(alert).toContainText("PERMISSION_DENIED");
+    const geometry = await alert.evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      return {
+        top: rect.top,
+        bottom: rect.bottom,
+        viewport: window.innerHeight,
+      };
+    });
+    await test.info().attach("scrolled-error-geometry", {
+      contentType: "application/json",
+      body: JSON.stringify(geometry),
+    });
+    await visibleFeedback(alert);
+    expect(geometry.top).toBeGreaterThanOrEqual(0);
+    expect(geometry.bottom).toBeLessThanOrEqual(geometry.viewport);
+    expect(await audits()).toEqual([]);
+    await rest("PUT", `auth/${uid}/${venue}`, true);
+    await last.focus();
+    await last.press("Enter");
+    await expect(dialog).toBeHidden();
+    expect((await controller()).currentAsset?.asset.name).toBe(
+      "Roster Player 23",
+    );
+    expect(await audits()).toHaveLength(1);
+  });
+}
+
 async function heldAck(page: Page, index: number, status = "ok") {
   await expect
     .poll(() =>

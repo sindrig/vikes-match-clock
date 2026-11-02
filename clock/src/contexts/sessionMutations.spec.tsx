@@ -1521,6 +1521,277 @@ const ordinaryCommands: Array<
 ];
 
 describe("atomic queue intent regressions", () => {
+  function holdWrite(reenter?: () => void) {
+    const ack = deferred<void>();
+    const original = vi.mocked(update).getMockImplementation();
+    if (!original) throw new Error("Missing SDK mock");
+    const rollback = new Map<string, unknown>();
+    vi.mocked(update).mockImplementationOnce((reference, changes) => {
+      for (const path of Object.keys(changes))
+        rollback.set(path, structuredClone(read(path)));
+      void original(reference, changes);
+      reenter?.();
+      return ack.promise;
+    });
+    return {
+      accept: () => ack.resolve(),
+      deny: () => {
+        for (const [path, value] of rollback) write(path, value);
+        // The real SDK prunes the empty event after rolling back its leaves.
+        const events = new Set(
+          [...rollback.keys()]
+            .filter((path) => path.startsWith("audit/"))
+            .map((path) => path.split("/").slice(0, 3).join("/")),
+        );
+        for (const path of events)
+          if (Object.keys(object(read(path))).length === 0) write(path, null);
+        emit();
+        ack.reject(new Error("permission denied"));
+      },
+    };
+  }
+
+  const independent = {
+    ...substitution,
+    outgoing: { ...player, id: 12, name: "Other starter", number: 9 },
+    incoming: { ...benchPlayer, id: 13, name: "Other bench", number: 10 },
+    asset: { ...substitution.asset, key: "independent-sub" },
+  };
+
+  it.each(["create", "replace", "substitution"] as const)(
+    "%s creation registers before a reentrant SDK echo; a denied predecessor is recomputed without its failed items",
+    async (kind) => {
+      write("states/A/controller/roster/home", [
+        player,
+        benchPlayer,
+        independent.outgoing,
+        independent.incoming,
+      ]);
+      if (kind === "replace") {
+        write("states/A/controller/queues/queue/name", "Skiptingar");
+      }
+      mount();
+      let dependent: Promise<void> | undefined;
+      const gate = holdWrite(() => {
+        dependent = currentApi.appendSubstitutionAndActivate(independent);
+      });
+      let first: Promise<unknown>;
+      act(() => {
+        first = (
+          kind === "substitution"
+            ? currentApi.appendSubstitutionAndActivate(substitution)
+            : kind === "replace"
+              ? currentApi.replaceQueue("Skiptingar", [
+                  { ...asset, key: "failed-replacement" },
+                ])
+              : currentApi.createQueue("Skiptingar", [asset])
+        ).catch((error: unknown) => error);
+      });
+      expect(update).toHaveBeenCalledTimes(1);
+      // A durable, independent queue edit remains usable during the wait.
+      act(() => currentApi.updateQueueSettings("queue", { imageSeconds: 8 }));
+      if (kind !== "replace") expect(update).toHaveBeenCalledTimes(2);
+      await act(async () => {
+        gate.deny();
+        expect(await first).toBeInstanceOf(Error);
+        await dependent;
+      });
+      const queue = Object.values(currentApi.controller.queues).find(
+        (entry) => entry.name === "Skiptingar",
+      );
+      expect(queue).toMatchObject({
+        name: "Skiptingar",
+        items:
+          kind === "replace" ? [asset, independent.asset] : [independent.asset],
+        cycle: kind === "replace",
+        autoPlay: kind === "replace",
+        imageSeconds: 3,
+      });
+      expect(typeof queue?.id).toBe("string");
+      expect(typeof queue?.order).toBe("number");
+      expect(currentApi.controller.roster.home.map((p) => p.show)).toEqual([
+        true,
+        false,
+        false,
+        true,
+      ]);
+      const events = Object.values(object(read("audit/A"))).map(object);
+      expect(
+        events.filter(
+          (event) =>
+            event.action === "controller.append-substitution-and-activate",
+        ),
+      ).toHaveLength(1);
+    },
+  );
+
+  it("waits for success, then appends a leaf while preserving durable metadata", async () => {
+    write("states/A/controller/roster/home", [player, benchPlayer]);
+    mount();
+    const gate = holdWrite();
+    let first: Promise<string>;
+    let second: Promise<void>;
+    act(() => {
+      first = currentApi.createQueue("Skiptingar", [asset]);
+      second = currentApi.appendSubstitutionAndActivate(substitution);
+    });
+    expect(update).toHaveBeenCalledTimes(1);
+    const queue = Object.values(currentApi.controller.queues).find(
+      (entry) => entry.name === "Skiptingar",
+    )!;
+    act(() => {
+      write(`states/A/controller/queues/${queue.id}/imageSeconds`, 27);
+      emit();
+    });
+    await act(async () => {
+      gate.accept();
+      await Promise.all([first, second]);
+    });
+    expect(currentApi.controller.queues[queue.id]?.imageSeconds).toBe(27);
+    const diff = vi.mocked(firebaseDatabase.writeAudited).mock.calls[1]?.[2];
+    expect(diff).toHaveProperty(`queues/${queue.id}/items`, [
+      asset,
+      substitution.asset,
+    ]);
+    expect(diff).not.toHaveProperty(`queues/${queue.id}`);
+    expect(diff).not.toHaveProperty(`queues/${queue.id}/imageSeconds`);
+  });
+
+  it.each(boundaries)(
+    "cancels a dependent intent promptly on %s even with an ambiguous acknowledgement",
+    async (_name, crossBoundary) => {
+      write("states/A/controller/roster/home", [player, benchPlayer]);
+      mount();
+      const gate = holdWrite();
+      let first: Promise<string>;
+      let result: Promise<unknown>;
+      act(() => {
+        first = currentApi.createQueue("Skiptingar", [asset]);
+        result = currentApi
+          .appendSubstitutionAndActivate(substitution)
+          .catch((error: unknown) => error);
+      });
+      clearAttempts();
+      await act(async () => {
+        crossBoundary();
+        expect(await result).toBeInstanceOf(MutationRejectedError);
+      });
+      noAttempts();
+      await act(async () => {
+        gate.accept();
+        await first;
+      });
+      noAttempts();
+    },
+  );
+
+  it("rechecks multiple overlapping waiters against a successor creation and its settled roster", async () => {
+    write("states/A/controller/roster/home", [player, benchPlayer]);
+    mount();
+    const firstGate = holdWrite();
+    let first: Promise<unknown>;
+    let second: Promise<void>;
+    let third: Promise<unknown>;
+    let thirdSettled = false;
+    act(() => {
+      first = currentApi
+        .createQueue("Skiptingar", [asset])
+        .catch((error: unknown) => error);
+      second = currentApi.appendSubstitutionAndActivate(substitution);
+      third = currentApi
+        .appendSubstitutionAndActivate(substitution)
+        .catch((error: unknown) => {
+          thirdSettled = true;
+          return error;
+        });
+    });
+    const secondGate = holdWrite();
+    clearAttempts();
+    await act(async () => {
+      firstGate.deny();
+      await first;
+    });
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(thirdSettled).toBe(false);
+    clearAttempts();
+    await act(async () => {
+      secondGate.accept();
+      await second;
+      expect(String(await third)).toContain("Leikmannahópur");
+    });
+    noAttempts();
+    const queue = Object.values(currentApi.controller.queues).find(
+      (entry) => entry.name === "Skiptingar",
+    );
+    expect(queue?.items).toEqual([substitution.asset]);
+    expect(Object.keys(object(read("audit/A")))).toHaveLength(1);
+  });
+
+  it("revalidates eligibility after a pending creation settles", async () => {
+    write("states/A/controller/roster/home", [player, benchPlayer]);
+    mount();
+    const gate = holdWrite();
+    let first: Promise<string>;
+    let result: Promise<unknown>;
+    act(() => {
+      first = currentApi.createQueue("Skiptingar", [asset]);
+      result = currentApi
+        .appendSubstitutionAndActivate(substitution)
+        .catch((error: unknown) => error);
+      write("states/A/controller/roster/home/0/show", false);
+      emit();
+    });
+    clearAttempts();
+    await act(async () => {
+      gate.accept();
+      await first;
+      expect(String(await result)).toContain("Leikmannahópur");
+    });
+    noAttempts();
+  });
+
+  it("does not resurrect a denied queue for dependent item or metadata edits", async () => {
+    mount();
+    const gate = holdWrite();
+    let first: Promise<unknown>;
+    let append: Promise<unknown>;
+    act(() => {
+      first = currentApi
+        .createQueue("Pending", [asset])
+        .catch((error: unknown) => error);
+    });
+    const id = Object.values(currentApi.controller.queues).find(
+      (queue) => queue.name === "Pending",
+    )!.id;
+    act(() => {
+      append = currentApi
+        .addItemsToQueue(id, [asset])
+        .catch((error: unknown) => error);
+      currentApi.renameQueue(id, "Renamed");
+      currentApi.updateQueueSettings(id, { imageSeconds: 5 });
+      currentApi.playQueue(id);
+      currentApi.activateQueue(id);
+      currentApi.removeItemFromQueue(id, asset.key);
+      currentApi.reorderItemsInQueue(id, [asset]);
+      currentApi.deleteQueue(id);
+      currentApi.updateController({ activeQueueId: id });
+      currentApi.updateController({ queues: currentApi.controller.queues });
+    });
+    expect(update).toHaveBeenCalledTimes(1);
+    clearAttempts();
+    await act(async () => {
+      gate.deny();
+      await first;
+      expect(String(await append)).toContain("Biðröð");
+    });
+    noAttempts();
+    expect(currentApi.mutationError).toBeTruthy();
+    expect(
+      vi.mocked(console.error).mock.calls.map(([, error]) => String(error)),
+    ).toContain("Error: Biðröð er ekki lengur til. Reyndu aftur.");
+    expect(read(`states/A/controller/queues/${id}`)).toBeNull();
+  });
+
   it.each(boundaries)(
     "does not retarget a picker prepared before %s",
     async (_name, crossBoundary) => {

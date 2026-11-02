@@ -52,6 +52,10 @@ import {
   type AuditEventPayload,
 } from "../firebaseDatabase";
 import { MutationSession, type WriteFreshness } from "../lib/mutationSession";
+import {
+  PendingQueueCreations,
+  type QueueDependencies,
+} from "../lib/pendingQueueCreations";
 import { validateBrightnessAutoConfig } from "../lib/autoBrightness";
 import { Sports, DEFAULT_HALFSTOPS, VIEWS } from "../constants";
 import { msUntilMatchStart } from "../utils/timeUtils";
@@ -778,6 +782,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   }, [session, setWriteFreshness]);
 
   const [mutationError, setMutationError] = useState<string | null>(null);
+  const [pendingQueueCreations] = useState(() => new PendingQueueCreations());
   const dismissMutationError = useCallback(() => setMutationError(null), []);
   const reportMutationError = useCallback((error: unknown) => {
     console.error("Shared-state command failed:", error);
@@ -794,21 +799,37 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       stateArea: AuditStateArea,
       action: string,
       prepare: () => Record<string, unknown>,
+      queueDependencies: () => QueueDependencies = () => [],
     ): Promise<void> => {
       let submission: Promise<void>;
       try {
-        session.assertCurrent(origin);
-        const diff = prepare();
-        const audit = session.audit(origin, stateArea, action);
-        submission =
-          Object.keys(diff).length > 0
-            ? firebaseDatabase.writeAudited(
-                origin.location,
-                stateArea,
-                diff,
-                audit,
-              )
-            : Promise.resolve();
+        submission = pendingQueueCreations.run(
+          session,
+          origin,
+          queueDependencies,
+          (waited) => {
+            const ids = queueDependencies();
+            if (
+              waited &&
+              ids !== "all" &&
+              ids.some((id) => !controllerRef.current.queues[id])
+            ) {
+              throw new Error("Biðröð er ekki lengur til. Reyndu aftur.");
+            }
+            return prepare();
+          },
+          (diff) => {
+            const audit = session.audit(origin, stateArea, action);
+            return Object.keys(diff).length > 0
+              ? firebaseDatabase.writeAudited(
+                  origin.location,
+                  stateArea,
+                  diff,
+                  audit,
+                )
+              : Promise.resolve();
+          },
+        );
       } catch (error) {
         submission = Promise.reject(
           error instanceof Error ? error : new Error(String(error)),
@@ -819,7 +840,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       void submission.catch(reportMutationError);
       return submission;
     },
-    [session, origin, reportMutationError],
+    [session, origin, reportMutationError, pendingQueueCreations],
   );
 
   useEffect(() => {
@@ -1140,11 +1161,20 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   );
 
   const applyControllerUpdate = useCallback(
-    (getNewState: (prev: ControllerState) => ControllerState, action: string) =>
-      executeCommand("controller", action, () => {
-        const prev = controllerRef.current;
-        return computeControllerDiff(prev, getNewState(prev));
-      }),
+    (
+      getNewState: (prev: ControllerState) => ControllerState,
+      action: string,
+      dependencies: () => QueueDependencies = () => [],
+    ) =>
+      executeCommand(
+        "controller",
+        action,
+        () => {
+          const prev = controllerRef.current;
+          return computeControllerDiff(prev, getNewState(prev));
+        },
+        dependencies,
+      ),
     [executeCommand],
   );
 
@@ -1783,6 +1813,10 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
           ...updates,
         }),
         "controller.update",
+        () => [
+          ...Object.keys(updates.queues ?? {}),
+          ...(updates.activeQueueId ? [updates.activeQueueId] : []),
+        ],
       );
     },
     [applyControllerUpdate],
@@ -1829,6 +1863,12 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
           return getStateWithNewQueue(base, queueId, name, items, options);
         },
         replace ? "controller.replace-queue" : "controller.create-queue",
+        () =>
+          replace
+            ? Object.values(controllerRef.current.queues)
+                .filter((queue) => queue.name === name)
+                .map((queue) => queue.id)
+            : [],
       );
       const result = submission.then(() => queueId);
       // executeCommand reports the rejection. Also handle this derived promise
@@ -1909,6 +1949,10 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
             [`roster/${side}/${onIdx}/show`]: true,
           };
         },
+        () =>
+          Object.values(controllerRef.current.queues)
+            .filter((queue) => queue.name === "Skiptingar")
+            .map((queue) => queue.id),
       ),
     [executeCommand],
   );
@@ -1918,6 +1962,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       void applyControllerUpdate(
         (prev) => getStateWithoutQueue(prev, queueId),
         "controller.delete-queue",
+        () => [queueId],
       );
     },
     [applyControllerUpdate],
@@ -1925,45 +1970,53 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   const renameQueue = useCallback(
     (queueId: string, name: string) => {
-      void applyControllerUpdate((prev) => {
-        const queue = prev.queues[queueId];
-        if (!queue) return prev;
-        return {
-          ...prev,
-          queues: { ...prev.queues, [queueId]: { ...queue, name } },
-        };
-      }, "controller.rename-queue");
+      void applyControllerUpdate(
+        (prev) => {
+          const queue = prev.queues[queueId];
+          if (!queue) return prev;
+          return {
+            ...prev,
+            queues: { ...prev.queues, [queueId]: { ...queue, name } },
+          };
+        },
+        "controller.rename-queue",
+        () => [queueId],
+      );
     },
     [applyControllerUpdate],
   );
 
   const reorderQueues = useCallback(
     (orderedIds: string[]) => {
-      void applyControllerUpdate((prev) => {
-        if (!orderedIds.length) return prev;
-        const queues = { ...prev.queues };
-        const listedIds = new Set(orderedIds);
+      void applyControllerUpdate(
+        (prev) => {
+          if (!orderedIds.length) return prev;
+          const queues = { ...prev.queues };
+          const listedIds = new Set(orderedIds);
 
-        // Assign orders to listed queues
-        orderedIds.forEach((queueId, index) => {
-          const queue = queues[queueId];
-          if (queue) {
-            queues[queueId] = { ...queue, order: index };
-          }
-        });
+          // Assign orders to listed queues
+          orderedIds.forEach((queueId, index) => {
+            const queue = queues[queueId];
+            if (queue) {
+              queues[queueId] = { ...queue, order: index };
+            }
+          });
 
-        // Find unlisted queues and sort them by current order
-        const unlistedQueues = Object.entries(queues)
-          .filter(([id]) => !listedIds.has(id))
-          .sort((a, b) => (a[1].order ?? 0) - (b[1].order ?? 0));
+          // Find unlisted queues and sort them by current order
+          const unlistedQueues = Object.entries(queues)
+            .filter(([id]) => !listedIds.has(id))
+            .sort((a, b) => (a[1].order ?? 0) - (b[1].order ?? 0));
 
-        // Assign sequential orders to unlisted queues after listed ones
-        unlistedQueues.forEach(([queueId, queue], index) => {
-          queues[queueId] = { ...queue, order: orderedIds.length + index };
-        });
+          // Assign sequential orders to unlisted queues after listed ones
+          unlistedQueues.forEach(([queueId, queue], index) => {
+            queues[queueId] = { ...queue, order: orderedIds.length + index };
+          });
 
-        return { ...prev, queues };
-      }, "controller.reorder-queues");
+          return { ...prev, queues };
+        },
+        "controller.reorder-queues",
+        () => "all",
+      );
     },
     [applyControllerUpdate],
   );
@@ -1973,77 +2026,86 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       applyControllerUpdate(
         (prev) => getStateWithAddedItems(prev, queueId, assets),
         "controller.add-items-to-queue",
+        () => [queueId],
       ),
     [applyControllerUpdate],
   );
 
   const removeItemFromQueue = useCallback(
     (queueId: string, assetKey: string) => {
-      void applyControllerUpdate((prev) => {
-        const queue = prev.queues[queueId];
-        if (!queue) return prev;
-        const idx = queue.items.map((item) => item.key).indexOf(assetKey);
-        if (idx === -1) return prev;
-        const updatedItems = [...queue.items];
-        updatedItems.splice(idx, 1);
-        if (updatedItems.length === 0) {
-          const nextState = {
+      void applyControllerUpdate(
+        (prev) => {
+          const queue = prev.queues[queueId];
+          if (!queue) return prev;
+          const idx = queue.items.map((item) => item.key).indexOf(assetKey);
+          if (idx === -1) return prev;
+          const updatedItems = [...queue.items];
+          updatedItems.splice(idx, 1);
+          if (updatedItems.length === 0) {
+            const nextState = {
+              ...prev,
+              queues: {
+                ...prev.queues,
+                [queueId]: { ...queue, items: updatedItems },
+              },
+            };
+            return maybeAutoDeleteQueue(nextState, queueId);
+          }
+          return {
             ...prev,
             queues: {
               ...prev.queues,
               [queueId]: { ...queue, items: updatedItems },
             },
           };
-          return maybeAutoDeleteQueue(nextState, queueId);
-        }
-        return {
-          ...prev,
-          queues: {
-            ...prev.queues,
-            [queueId]: { ...queue, items: updatedItems },
-          },
-        };
-      }, "controller.remove-item-from-queue");
+        },
+        "controller.remove-item-from-queue",
+        () => [queueId],
+      );
     },
     [applyControllerUpdate],
   );
 
   const reorderItemsInQueue = useCallback(
     (queueId: string, items: Asset[]) => {
-      void applyControllerUpdate((prev) => {
-        const queue = prev.queues[queueId];
-        if (!queue) return prev;
-        const filteredItems = items.filter(
-          (asset) =>
-            Object.keys(assetTypes).indexOf(asset.type) !== -1 &&
-            Boolean(asset.key),
-        );
-        const dedupedItems: Asset[] = [];
-        const seenKeys = new Set<string>();
-        filteredItems.forEach((asset) => {
-          if (!seenKeys.has(asset.key)) {
-            dedupedItems.push(asset);
-            seenKeys.add(asset.key);
+      void applyControllerUpdate(
+        (prev) => {
+          const queue = prev.queues[queueId];
+          if (!queue) return prev;
+          const filteredItems = items.filter(
+            (asset) =>
+              Object.keys(assetTypes).indexOf(asset.type) !== -1 &&
+              Boolean(asset.key),
+          );
+          const dedupedItems: Asset[] = [];
+          const seenKeys = new Set<string>();
+          filteredItems.forEach((asset) => {
+            if (!seenKeys.has(asset.key)) {
+              dedupedItems.push(asset);
+              seenKeys.add(asset.key);
+            }
+          });
+          if (dedupedItems.length === 0) {
+            const nextState = {
+              ...prev,
+              queues: {
+                ...prev.queues,
+                [queueId]: { ...queue, items: dedupedItems },
+              },
+            };
+            return maybeAutoDeleteQueue(nextState, queueId);
           }
-        });
-        if (dedupedItems.length === 0) {
-          const nextState = {
+          return {
             ...prev,
             queues: {
               ...prev.queues,
               [queueId]: { ...queue, items: dedupedItems },
             },
           };
-          return maybeAutoDeleteQueue(nextState, queueId);
-        }
-        return {
-          ...prev,
-          queues: {
-            ...prev.queues,
-            [queueId]: { ...queue, items: dedupedItems },
-          },
-        };
-      }, "controller.reorder-items-in-queue");
+        },
+        "controller.reorder-items-in-queue",
+        () => [queueId],
+      );
     },
     [applyControllerUpdate],
   );
@@ -2055,33 +2117,41 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         Pick<QueueState, "autoPlay" | "imageSeconds" | "cycle">
       >,
     ) => {
-      void applyControllerUpdate((prev) => {
-        const queue = prev.queues[queueId];
-        if (!queue) return prev;
-        const nextState = {
-          ...prev,
-          queues: {
-            ...prev.queues,
-            [queueId]: { ...queue, ...settings },
-          },
-        };
-        if (settings.cycle === false) {
-          return maybeAutoDeleteQueue(nextState, queueId);
-        }
-        return nextState;
-      }, "controller.update-queue-settings");
+      void applyControllerUpdate(
+        (prev) => {
+          const queue = prev.queues[queueId];
+          if (!queue) return prev;
+          const nextState = {
+            ...prev,
+            queues: {
+              ...prev.queues,
+              [queueId]: { ...queue, ...settings },
+            },
+          };
+          if (settings.cycle === false) {
+            return maybeAutoDeleteQueue(nextState, queueId);
+          }
+          return nextState;
+        },
+        "controller.update-queue-settings",
+        () => [queueId],
+      );
     },
     [applyControllerUpdate],
   );
 
   const playQueue = useCallback(
     (queueId: string) => {
-      void applyControllerUpdate((prev) => {
-        return getStateShowingNextAsset({
-          ...prev,
-          activeQueueId: queueId,
-        });
-      }, "controller.play-queue");
+      void applyControllerUpdate(
+        (prev) => {
+          return getStateShowingNextAsset({
+            ...prev,
+            activeQueueId: queueId,
+          });
+        },
+        "controller.play-queue",
+        () => [queueId],
+      );
     },
     [applyControllerUpdate],
   );
@@ -2094,6 +2164,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
           activeQueueId: queueId,
         }),
         "controller.activate-queue",
+        () => [queueId],
       );
     },
     [applyControllerUpdate],
@@ -2142,25 +2213,36 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     void applyControllerUpdate(
       (prev) => getStateShowingNextAsset(prev),
       "controller.show-next-asset",
+      () =>
+        controllerRef.current.activeQueueId
+          ? [controllerRef.current.activeQueueId]
+          : [],
     );
   }, [applyControllerUpdate]);
 
   const removeAssetAfterTimeout = useCallback(() => {
-    void applyControllerUpdate((prev) => {
-      const activeQueue = prev.activeQueueId
-        ? prev.queues[prev.activeQueueId]
-        : null;
-      if (!activeQueue) {
-        return { ...prev, playing: false, currentAsset: null };
-      }
-      if (activeQueue.autoPlay) {
-        if (prev.playing) {
-          return getStateShowingNextAsset(prev);
+    void applyControllerUpdate(
+      (prev) => {
+        const activeQueue = prev.activeQueueId
+          ? prev.queues[prev.activeQueueId]
+          : null;
+        if (!activeQueue) {
+          return { ...prev, playing: false, currentAsset: null };
         }
-        return prev;
-      }
-      return { ...prev, currentAsset: null };
-    }, "controller.remove-asset-after-timeout");
+        if (activeQueue.autoPlay) {
+          if (prev.playing) {
+            return getStateShowingNextAsset(prev);
+          }
+          return prev;
+        }
+        return { ...prev, currentAsset: null };
+      },
+      "controller.remove-asset-after-timeout",
+      () =>
+        controllerRef.current.activeQueueId
+          ? [controllerRef.current.activeQueueId]
+          : [],
+    );
   }, [applyControllerUpdate]);
 
   const remoteRefresh = useCallback(() => {

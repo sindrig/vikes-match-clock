@@ -114,6 +114,19 @@ therefore cannot restore stale items or unrelated autoplay settings. Item
 arrays and explicit replacement/deletion still have last-write-wins semantics;
 this is not multi-controller conflict resolution.
 
+An SDK local echo is not a durable creation acknowledgement. The executor
+registers pending queue creations before calling the SDK, so reentrant commands
+also see the dependency. A command reading that queue waits for its creation
+to settle, then recomputes from current subscription refs, including current
+roster eligibility and the original command origin. Rejected creations are
+never copied back from a saved diff: named intents resolve the restored state
+or create a complete new queue containing only their own initial items.
+Explicit ID operations reject when the queue disappeared. Multiple waiters
+recheck dependencies on each settlement. Session/freshness changes reject
+waiting commands immediately even if an acknowledgement never arrives; they
+are not replayed. This stores acknowledgement lifetimes only, leaves
+independent actions usable, and preserves leaf writes for durable metadata.
+
 | Caller                                                                | Previous compound writes                                              | Intent and preparation ownership                                                                                                                  |
 | --------------------------------------------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `AssetController` / URL and playlist picker                           | create → append                                                       | `useQueuePickerActions` captures the gesture's commands before awaiting media; `createQueue(name, items)` submits once                            |
