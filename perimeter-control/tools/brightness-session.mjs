@@ -92,7 +92,14 @@ async function firebase(resource, method = "GET", body) {
     throw new Error("Firebase REST transport failed; no automatic retry");
   }
   assert(response.ok, `Firebase REST denied/failed (HTTP ${response.status})`);
-  return response.json();
+  try {
+    return await response.json();
+  } catch {
+    // A response body or stream error can also reflect the authenticated URL.
+    throw new Error(
+      `Firebase REST response body unreadable or invalid JSON (HTTP ${response.status}); no automatic retry`,
+    );
+  }
 }
 
 async function intent() {

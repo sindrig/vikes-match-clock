@@ -315,8 +315,38 @@ globalThis.fetch = async (input, init = {}) => {
   const state = load();
   const url = new URL(input);
   try {
-    if (url.origin === "https://firebase.invalid")
-      return firebase(state, url, init);
+    if (url.origin === "https://firebase.invalid") {
+      const response = firebase(state, url, init);
+      const failure = state.firebaseResponseFailure;
+      const resource = url.pathname.slice(1, -5);
+      if (
+        !failure ||
+        failure.resource !== resource ||
+        (failure.method ?? "GET") !== init.method
+      )
+        return response;
+      state.events.push({
+        type: "firebase-response-failure",
+        kind: failure.kind,
+        resource,
+        method: init.method,
+      });
+      // Reflect the authenticated URL in both a body and a stream error.
+      const reflected = `private-response-body ${url.href}`;
+      if (failure.kind === "malformed-json")
+        return new Response(`<html>${reflected}</html>`, {
+          status: response.status,
+        });
+      assert.equal(failure.kind, "body-read-rejection");
+      return new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.error(new Error(reflected));
+          },
+        }),
+        { status: response.status },
+      );
+    }
     if (url.origin === "http://vnnox.invalid") return vnnox(state, url, init);
     state.events.push({ type: "unexpected-network-denied" });
     return deniedNetwork();

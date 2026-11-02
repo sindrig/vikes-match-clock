@@ -205,16 +205,29 @@ async function fixture(
       maxBuffer: 256 * 1024,
     });
     assert.ifError(result.error);
+    const output = result.stdout + result.stderr;
     for (const secret of [
       "synthetic-operator-token",
       "synthetic-device-password",
       "synthetic-device-token",
+      overrides.FIREBASE_ID_TOKEN,
+      overrides.PERIMETER_VNNOX_PASSWORD,
     ]) {
-      assert(
-        !(result.stdout + result.stderr).includes(secret),
-        "Command output exposed a synthetic credential",
-      );
+      if (secret)
+        assert(
+          !output.includes(secret),
+          "Command output exposed a synthetic credential",
+        );
     }
+    for (const privateContent of ["private-response-body", "?auth=", "<html>"])
+      assert(
+        !output.includes(privateContent),
+        "Command output exposed a Firebase response body or URL",
+      );
+    assert(
+      !/https:\/\/firebase\.invalid\/\S*\.json/u.test(output),
+      "Command output exposed a Firebase request URL",
+    );
     return result;
   }
   const run = (names, overrides) =>
@@ -448,6 +461,104 @@ test("denied Firebase intent restoration does not block independent exact hardwa
   assert.deepEqual((await f.read()).screens, f.original.screens);
   assert.equal((await f.read()).workerRunning, false);
 });
+
+for (const kind of ["malformed-json", "body-read-rejection"]) {
+  const resources = [
+    "auth/operator/test-venue",
+    "states/test-venue/perimeter",
+    "perimeter/test-venue/brightnessStatus",
+  ];
+  for (const [index, resource] of resources.entries()) {
+    test(`snapshot sanitizes ${kind} at ${resource} before downstream I/O`, async (t) => {
+      const f = await fixture(t);
+      success(await f.run(["stop-before-snapshot"]));
+      await f.edit((state) => {
+        state.firebaseResponseFailure = { resource, kind };
+      });
+      const result = await f.run(sequence.slice(1));
+      failure(
+        result,
+        /Firebase REST response body unreadable or invalid JSON \(HTTP 200\); no automatic retry/u,
+      );
+      assert.equal(result.stdout, "");
+      const state = await f.read();
+      assert.deepEqual(state.db, f.original.db);
+      assert.deepEqual(state.screens, f.original.screens);
+      assert.equal(state.workerRunning, false);
+      assert.deepEqual(
+        state.events,
+        [
+          { type: "service-stop-and-simulated-drain" },
+          ...resources.slice(0, index + 1).map((readResource) => ({
+            type: "firebase-read",
+            resource: readResource,
+            authenticated: true,
+            permitted: true,
+          })),
+          { type: "firebase-response-failure", kind, resource, method: "GET" },
+        ],
+        "No retries, device I/O, Firebase writes or service starts after failure",
+      );
+      await assert.rejects(stat(f.session), { code: "ENOENT" });
+    });
+  }
+
+  test(`denied HTTP status is preserved with ${kind}`, async (t) => {
+    const f = await fixture(t);
+    await f.edit((state) => {
+      state.firebaseResponseFailure = {
+        resource: "auth/operator/test-venue",
+        kind,
+      };
+    });
+    failure(
+      await f.run(["stop-before-snapshot", "snapshot"], {
+        FIREBASE_ID_TOKEN: "synthetic-expired-token",
+      }),
+      /Firebase REST denied\/failed \(HTTP 401\)/u,
+    );
+    const state = await f.read();
+    assert.deepEqual(state.db, f.original.db);
+    assert.deepEqual(state.screens, f.original.screens);
+    assert.equal(
+      state.events.filter((e) => e.type === "firebase-read").length,
+      1,
+    );
+    assert(!state.events.some((e) => e.type === "device-request"));
+    await assert.rejects(stat(f.session), { code: "ENOENT" });
+  });
+
+  test(`ambiguous restore acknowledgement with ${kind} is not retried and hardware restore remains independent`, async (t) => {
+    const f = await fixture(t);
+    success(await f.run(sequence.slice(0, 7)));
+    await f.edit((state) => {
+      state.firebaseResponseFailure = { resource: "", method: "PATCH", kind };
+    });
+    const before = await f.read();
+    const result = await f.run(["restore-intent"]);
+    failure(
+      result,
+      /Firebase REST response body unreadable or invalid JSON \(HTTP 200\); no automatic retry/u,
+    );
+    assert.equal(result.stdout, "");
+    const state = await f.read();
+    assert.deepEqual(
+      state.events.slice(before.events.length).map((e) => e.type),
+      ["firebase-patch", "firebase-response-failure"],
+      "One committed patch, no retry or readback after its ambiguous response",
+    );
+    assert.deepEqual(state.db.states, f.original.db.states);
+    assert.equal(state.workerRunning, false);
+    success(
+      await f.run(["restore-hardware"], {
+        FIREBASE_ID_TOKEN: "",
+        FIREBASE_UID: "",
+      }),
+    );
+    assert.deepEqual((await f.read()).screens, f.original.screens);
+    assert.equal((await f.read()).workerRunning, false);
+  });
+}
 
 for (const [label, overrides] of [
   ["missing ID token", { FIREBASE_ID_TOKEN: "" }],
