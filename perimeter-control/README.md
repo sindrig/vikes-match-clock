@@ -750,12 +750,31 @@ elevation and irrelevant). Tuning knobs — `PERIMETER_AUTO_TICK_SECONDS` (60),
 `perimeter-control.env.example`. Venue egress to `api.open-meteo.com` must be
 reachable from the gateway box.
 
+Weather requests have a separate **10-second deadline** covering both response
+headers and the complete JSON body (`OpenMeteoCloudCover`'s `requestTimeoutMs`
+constructor option). A timeout preserves the cached value and its age, allowing
+the next scheduled poll to try again. `stop()` aborts the active request and
+prevents further polling until `start()`. Restarting polls immediately; late
+results from an earlier request cannot update the cache or release the new
+request's guard. Providers that ignore `AbortSignal` cannot hold up the poller,
+but their underlying work cannot be forcibly terminated.
+
 ## Tests
 
 ```bash
 npm install
 npm test
 ```
+
+Weather-only tests need no dependency installation. From `perimeter-control/`:
+
+```bash
+node --test tests/weather.test.js
+```
+
+These cover healthy/cache/stale behavior, cancellation-ignoring providers,
+stop/restart races, and real HTTP stalls on loopback with ephemeral ports.
+They do not contact Open-Meteo, Firebase, or hardware.
 
 ## Browser Web Perimeter
 
