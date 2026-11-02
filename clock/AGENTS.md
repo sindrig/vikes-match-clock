@@ -271,6 +271,17 @@ retained).
 
 ### Perimeter Control
 
+All venues are **web-only**; Resolume is unsupported. The gateway retirement
+(#240) leaves browser playback, media/compatibility records, kiosk and CORS
+tooling intact. `perimeter-control/` now runs only physical Vnnox brightness,
+the optional sun/weather scheduler and Firebase listener recovery. It no longer
+publishes media previews, overlay/ad-layout/import status or overlay geometry.
+Existing telemetry remains untouched, including active brightness status and
+calibration. Any Resolume execution details below describe historical behavior
+or remaining legacy frontend/Functions consumers pending #241; do not recreate
+the media executor or use it as a rollback target. Hardware qualification is
+**HOLD**. See [the gateway guide](../perimeter-control/README.md).
+
 #### Web Perimeter Display
 
 The local display target is persisted separately from Firebase in
@@ -318,9 +329,9 @@ previous generation's texture). Power-off clears the WebGL framebuffer to
 black. The renderer and runtime must remain read-only; Firebase continues to
 be the source of truth for desired layout, overlay, and power state.
 
-The perimeter LED screens at the Víkin stadium are driven by a dedicated
-Resolume Arena composition. Control flows through the **fourth** Firebase
-state subtree, `states/${listenPrefix}/perimeter`:
+The browser perimeter renderer consumes the **fourth** Firebase state subtree,
+`states/${listenPrefix}/perimeter`. Its power state also gates automatic
+physical brightness in the gateway:
 
 ```json
 {
@@ -342,9 +353,9 @@ state subtree, `states/${listenPrefix}/perimeter`:
   `states/${listenPrefix}/perimeter` and exposes the parsed `perimeter` state
   plus the authenticated `setPerimeterState(state)` write action (writes only
   `{ state }`, never `enabled`).
-- The daemon publishes a **preview snapshot** of the Resolume composition
+- The retired daemon published a **preview snapshot** of the Resolume composition
   (columns, clips, filenames and bounded JPEG thumbnails) to the top-level
-  `perimeter/${listenPrefix}` path (see **Preview snapshot** below).
+  `perimeter/${listenPrefix}` path (see **Legacy preview snapshot** below).
   `FirebaseStateContext.tsx` subscribes to it independently and exposes it as
   `preview` through `usePerimeter()`. It is deliberately **not** part of app
   readiness: absent metadata must never block the controller.
@@ -359,10 +370,12 @@ state subtree, `states/${listenPrefix}/perimeter`:
   editable **ad layout manager** for creating, reordering, and deleting ad
   columns with file upload and Storage browsing (see **Perimeter Ad Layout**
   below). Web venues derive their upload lanes and labels from the published
-  mapping's `compatibilityKeys.base` and `logicalScreens`; Resolume venues use
-  daemon-published lanes. Víkin-specific 48/40 overlay pairs are therefore not
+  mapping's `compatibilityKeys.base` and `logicalScreens`; the remaining legacy
+  branch consumes old daemon-published lanes (no longer refreshed).
+  Víkin-specific 48/40 overlay pairs are therefore not
   used by Virkið's web ad uploader. The old composition preview snapshot is
-  preserved for Resolume diagnostics. Styles live in `PerimeterControl.css`.
+  preserved as compatibility data pending #241. Styles live in
+  `PerimeterControl.css`.
 - `FirebaseStateContext.tsx` **auto-toggles the perimeter on view transitions**:
   entering the match view (`controller.view` `idle` → `match`) writes
   `state: "on"`, and leaving any view for `idle` writes `state: "off"`. Both
@@ -375,7 +388,8 @@ state subtree, `states/${listenPrefix}/perimeter`:
 - Follows the 100% Firebase model: the UI writes to Firebase and updates only
   after the subscription receives the new value (no optimistic updates).
 
-**Preview snapshot** (`perimeter/${listenPrefix}`, read-only for clients):
+**Legacy preview snapshot** (`perimeter/${listenPrefix}`, read-only for clients;
+no longer published):
 
 ```json
 {
@@ -396,7 +410,7 @@ state subtree, `states/${listenPrefix}/perimeter`:
 }
 ```
 
-- `updatedAt` is a Firebase **server timestamp** (set by the daemon with
+- `updatedAt` is a Firebase **server timestamp** (set by the former daemon with
   `ServerValue.TIMESTAMP`).
 - `parsePerimeterPreview()` in `firebaseParsers.ts` strictly parses the
   snapshot: clips without a filename and columns without a name are dropped;
@@ -406,30 +420,19 @@ state subtree, `states/${listenPrefix}/perimeter`:
   `auth/$uid/$location` is `true`. Only the daemon's service account can write
   (through the Admin SDK).
 
-**Daemon** (`perimeter-control/` at repo root): a systemd-managed **Node.js**
-service listens to `states/vikuti/perimeter/state` in Firebase Realtime
-Database via the **Firebase Admin SDK** (`ref.on("value", ...)`) and applies
-it to Resolume — `off` → `POST /api/v1/composition/disconnect-all` (global
-stop), `on` → `POST /api/v1/composition/columns/1/connect`. It converges to
-the current desired state: the first valid value observed is applied, and a
-value that changed while the daemon was down is applied on the next delivery
-(unchanged state is never re-applied). It deliberately uses Node because the
-JS Admin SDK reads RTDB over its **WebSocket protocol** (same transport as
-the clock apps) — the Python SDK's `listen()` is SSE-based and intermittently
-stalled for minutes on this network. The listener is periodically reopened as
-a safety net. It authenticates with a service-account credential file
-(required by `install.sh`), and retries Resolume failures with bounded
-exponential backoff, superseded by any newer Firebase value. It also publishes
-the **preview snapshot** above to `perimeter/vikuti` once at startup and after
-each successful `on` (non-blocking, never delaying the on/off retry behavior);
-a failed Resolume query or an oversized payload leaves the last published
-snapshot intact. The snapshot is written with `update()` (not `set()`) so the
-sibling status paths `perimeter/{location}/adLayout` and
-`perimeter/{location}/overlayStatus` are preserved — a `set()` on the preview
-path would replace the whole subtree and silently delete them. All
-Resolume-version-specific parsing is isolated in
-`resolume-preview.js`; see `perimeter-control/README.md` for installation and
-operation.
+**Gateway** (`perimeter-control/` at repo root): the systemd-managed Node >= 22
+service authenticates using the same Firebase service-account path and consumes
+the power state through the Admin SDK's WebSocket transport. Valid changes feed
+the automatic-brightness on/off gate; browser displays handle media playback.
+The periodic listener refresh republishes the last brightness status without
+replaying device writes. Manual/automatic brightness, weather fallback,
+calibration and the serialized snapshot → write → verify → restore worker
+remain intact. Shutdown stops scheduling and awaits an irreversible write's
+verification/restoration, bounded by the existing 30-second process grace.
+No legacy media flag can enable an executor. The installer uses pinned pnpm
+and a frozen lockfile, preserves `/etc/perimeter-control/` configuration, and
+prunes only the five retired installed media modules. See
+`perimeter-control/README.md` for installation and operation.
 
 #### Idle Perimeter Clock (web venues)
 
@@ -811,6 +814,11 @@ becomes selectable base-ad content. The three perimeter systems are:
 | Named media pairs | `{location}/perimeter-overlays/{pairId}/48\|40/` | `states/{location}/perimeter/overlay`  | overlay layers (2,4) |
 
 #### Perimeter Ad Layout (Content Deployer on the Base Layers)
+
+The desired layout and browser uploader remain active. The Resolume deployment
+and applied-status details in this section are **historical executor behavior**;
+those gateway modules have been removed. Remaining frontend telemetry/import
+consumers are legacy code pending #241, not a supported playback route.
 
 The controller writes a **desired layout** to `states/${listenPrefix}/perimeter/adLayout`,
 defining columns of ad files across daemon-published lanes. The daemon reads
@@ -1196,8 +1204,8 @@ server timestamp):
 **Operator behavior** (`PerimeterControl.tsx` — manual mode):
 
 - The `Bjartleiki jaðarskjás` section renders above the ad-layout board for
-  **both web and Resolume venues** (it is renderer-agnostic — brightness always
-  flows through a venue-local daemon, never the browser renderer) and is gated
+  venues with a brightness controller (it is renderer-agnostic — brightness
+  always flows through a venue-local daemon, never the browser renderer) and is gated
   by the same `perimeter.enabled` feature flag (the whole modal is hidden when
   disabled). A web venue only sees the section take effect if its daemon has
   brightness enabled (`PERIMETER_BRIGHTNESS_ENABLED=true`) with the venue's
@@ -1225,6 +1233,11 @@ server timestamp):
   matching the section title.
 
 #### Goal-Scorer Perimeter Media Preparation (Resolume venues)
+
+**Unsupported legacy pipeline pending #241.** The frontend/Functions code and
+old data remain, but the brightness gateway no longer publishes geometry or
+plays generated media. All venues use the browser-composed scorer described
+below. The following details document the remaining compatibility code.
 
 Before a home goal happens, the controller prepares player-specific repeating
 perimeter media for every eligible home player so scorer selection can
@@ -2467,8 +2480,9 @@ stacked layout that reproduces the published Virkið staging document
 (3648x384 framebuffer, screen-3648 at y=0, screen-3264 at y=192). Both are
 no-ops for drafts lacking the expected logical screens. See
 `perimeter-control/WEB_MAPPING_MEASUREMENT.md` and
-`perimeter-control/WEB_RENDERER_QUALIFICATION.md`. Keep Víkin's configuration
-at `renderer: "resolume"`; a second venue may use `web` independently.
+`perimeter-control/WEB_RENDERER_QUALIFICATION.md`. All venues now use `web`;
+Resolume is unsupported. This retirement does not publish mapping changes or
+qualify physical output; hardware qualification remains HOLD.
 
 Public Storage reads are limited to `{location}/perimeter/`,
 `{location}/perimeter-overlays/`, the venue crest (`{location}/crest.png`),
@@ -2502,17 +2516,14 @@ reads remain denied.
   pipeline never see a semantic command — Resolume venues keep version-1
   commands, and web rosters create no preparation requests, geometry/status
   subscriptions, or generated output dependency.
-- **Rollback**: clear any active version-2 overlay, restore controller
-  emission to version 1 (revert the renderer-aware dialog submission), and
-  deploy the prior web display bundle. No semantic command migrates persisted
-  roster or media data; Resolume behavior is unchanged throughout. Web-venue
-  generated scorer files from prior preparation jobs may age out separately
-  because no new command references them.
+- **Rollback**: an authorized operator restores the last qualified web
+  display/controller bundle and compatible mapping/media revision. Preserve
+  roster, media and compatibility data. Generated scorer cleanup is separate
+  work; the retired Resolume executor is not a rollback target.
 
-To roll back the browser perimeter target entirely, remove or change the
-venue's web mapping so the selector stops offering Perimeter, then reconnect
-its prior playback path. Do not delete the prior cached revision until the
-replacement has been qualified.
+If no qualified web output is available, keep the output off pending operator
+recovery. Preserve the prior cached revision until a replacement is qualified,
+and keep the Vnnox/UCenter route available for physical brightness.
 
 **Storage CORS (one-time bucket configuration)**: unlike `<img>` tags elsewhere
 in the app, the perimeter media loader downloads via `fetch()` into Cache
