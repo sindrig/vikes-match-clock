@@ -47,11 +47,14 @@ export function sunElevationDeg(
   return (SunCalc.getPosition(date, lat, lng).altitude * 180) / Math.PI;
 }
 
-// Piecewise clear-sky illuminance tuned to typical daylight values
-// (~100 000 lux at high sun; civil twilight ≈ tens of lux; night floor 0.5).
+// Continuous empirical curve for physical sun elevations (-90..90 degrees):
+// 0.5 lux at/below -6, 400 at the horizon, 120000 overhead. Keep the daytime
+// exponent 1.15; the offset joins daylight to twilight without a sunset jump.
 export function clearSkyLux(elevDeg: number): number {
-  if (elevDeg >= 0) return 120000 * Math.sin((elevDeg * Math.PI) / 180) ** 1.15;
-  if (elevDeg >= -6) return 400 * ((elevDeg + 6) / 6); // civil twilight ramp
+  if (elevDeg >= 0) {
+    return 400 + (120000 - 400) * Math.sin((elevDeg * Math.PI) / 180) ** 1.15;
+  }
+  if (elevDeg >= -6) return 0.5 + (400 - 0.5) * ((elevDeg + 6) / 6);
   return 0.5; // night ambient floor
 }
 

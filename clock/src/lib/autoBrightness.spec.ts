@@ -1,4 +1,6 @@
+import assert from "node:assert/strict";
 import { afterEach, describe, it, expect, vi } from "vitest";
+import contract from "../../../docs/fixtures/auto-brightness-contract.json";
 import {
   DEFAULT_BRIGHTNESS_AUTO_CONFIG,
   applyCloud,
@@ -14,9 +16,163 @@ import {
   validateBrightnessAutoConfig,
 } from "./autoBrightness";
 
-// Reference vectors from docs/auto-brightness-design.md (2026-09-22,
-// Fossvogur 64.117 N / −21.91 E, default config).
+// Reference date: 2026-09-22, Fossvogur 64.117 N / −21.91 E, defaults.
+// Lux vectors include the #253 continuity correction from the design doc.
 const FOSSVOGUR = { lat: 64.117, lng: -21.91 };
+
+// Both independently installed packages consume this contract through their
+// real prediction functions; neither package imports the other's runtime.
+describe("shared browser/daemon brightness contract", () => {
+  it("keeps the documented defaults", () => {
+    expect(DEFAULT_BRIGHTNESS_AUTO_CONFIG).toEqual(contract.configs[0]?.config);
+  });
+
+  it.each(contract.clearSkyCases)(
+    "predicts $lux lux / $defaultPercent% at $elevationDeg degrees",
+    ({ elevationDeg, lux, defaultPercent }) => {
+      expect(clearSkyLux(elevationDeg)).toBeCloseTo(lux, 8);
+      expect(
+        luxToPercent(
+          applyCloud(clearSkyLux(elevationDeg), 0),
+          DEFAULT_BRIGHTNESS_AUTO_CONFIG,
+        ),
+      ).toBe(defaultPercent);
+    },
+  );
+
+  it.each(contract.cloudCases)(
+    "clamps cloud fraction $fraction and weight $weight at $lux lux",
+    ({ lux, fraction, weight, expectedLux }) => {
+      expect(applyCloud(lux, fraction, weight)).toBeCloseTo(expectedLux, 8);
+    },
+  );
+
+  it.each(contract.configs)("honors config boundaries: $name", (row) => {
+    expect(validateBrightnessAutoConfig(row.config)).toBeNull();
+    contract.luxInputs.forEach((lux, index) => {
+      expect(luxToPercent(lux, row.config)).toBe(row.expectedPercents[index]);
+    });
+  });
+
+  it.each(contract.predictions)(
+    "predictAt($date, cloud=$cloudFraction) matches the shared vector",
+    ({ date, cloudFraction, lux, percent, sunElevationDeg: elevation }) => {
+      const result = predictAt(
+        new Date(date),
+        DEFAULT_BRIGHTNESS_AUTO_CONFIG,
+        cloudFraction,
+      );
+      expect(result.sunElevationDeg).toBeCloseTo(elevation, 10);
+      expect(result.lux).toBeCloseTo(lux, 8);
+      expect(result.percent).toBe(percent);
+    },
+  );
+
+  it.each([
+    { elevation: -6, lux: 0.5 },
+    { elevation: 0, lux: 400 },
+  ])(
+    "has the same one-sided limit at $elevation degrees",
+    ({ elevation, lux }) => {
+      expect(clearSkyLux(elevation)).toBe(lux);
+      for (const direction of [-1, 1]) {
+        let previousError = Infinity;
+        for (const epsilon of [1e-1, 1e-3, 1e-6, 1e-9]) {
+          const error = Math.abs(
+            clearSkyLux(elevation + direction * epsilon) - lux,
+          );
+          expect(error).toBeLessThanOrEqual(previousError);
+          previousError = error;
+        }
+        expect(previousError).toBeLessThan(1e-6);
+      }
+    },
+  );
+
+  const sweeps = [
+    { name: "physical sun domain", ...contract.physicalSweep },
+    ...contract.joinSweep.centers.map((center) => ({
+      name: `join at ${center} degrees`,
+      from: center + contract.joinSweep.radius,
+      to: center - contract.joinSweep.radius,
+      step: contract.joinSweep.step,
+    })),
+  ];
+
+  it.each(sweeps)(
+    "stays bounded and never brightens on falling elevation: $name",
+    ({ from, to, step }) => {
+      const clearValues = Array.from(
+        { length: Math.round((from - to) / step) + 1 },
+        (_, index) => clearSkyLux(from - index * step),
+      );
+      let previousClear = Infinity;
+      for (const lux of clearValues) {
+        assert.ok(Number.isFinite(lux) && lux >= 0.5 && lux <= 120000);
+        assert.ok(lux <= previousClear);
+        previousClear = lux;
+      }
+      for (const { config } of contract.configs) {
+        for (const cloud of contract.cloudFractions) {
+          let previousLux = Infinity;
+          let previousPercent = Infinity;
+          for (const clear of clearValues) {
+            const lux = applyCloud(clear, cloud, config.cloudWeight);
+            const percent = luxToPercent(lux, config);
+            assert.ok(lux >= 0.5 && lux <= previousLux);
+            assert.ok(Number.isInteger(percent));
+            assert.ok(percent >= config.min && percent <= config.max);
+            assert.ok(percent <= previousPercent);
+            previousLux = lux;
+            previousPercent = percent;
+          }
+        }
+      }
+    },
+  );
+
+  it("does not brighten real predictions through sunset or the night join", () => {
+    const start = Date.parse(contract.sunsetSweep.from);
+    const end = Date.parse(contract.sunsetSweep.to);
+    expect(sunElevationDeg(new Date(start))).toBeGreaterThan(0);
+    expect(sunElevationDeg(new Date(end))).toBeLessThan(-6);
+    for (const { config } of contract.configs) {
+      for (const cloud of contract.cloudFractions) {
+        let previousLux = Infinity;
+        let previousPercent = Infinity;
+        for (
+          let time = start;
+          time <= end;
+          time += contract.sunsetSweep.stepMs
+        ) {
+          const result = predictAt(new Date(time), config, cloud);
+          assert.ok(result.lux <= previousLux);
+          assert.ok(result.percent <= previousPercent);
+          previousLux = result.lux;
+          previousPercent = result.percent;
+        }
+      }
+    }
+  });
+
+  it("does not brighten the real evening preview under fixed cloud/config", () => {
+    const start = Date.parse("2026-09-22T17:00:00Z");
+    const end = Date.parse("2026-09-22T21:00:00Z");
+    for (const { config } of contract.configs) {
+      for (const cloud of contract.cloudFractions) {
+        const points = buildTargetCurve(start, config, () => cloud).filter(
+          (point) => point.time <= end,
+        );
+        expect(points).toHaveLength(17);
+        let previous = Infinity;
+        for (const point of points) {
+          expect(point.percent).toBeLessThanOrEqual(previous);
+          previous = point.percent;
+        }
+      }
+    }
+  });
+});
 
 describe("sunElevationDeg", () => {
   it("matches the reference table for Fossvogur on 2026-09-22", () => {
@@ -71,18 +227,13 @@ describe("sunElevationDeg", () => {
 describe("clearSkyLux", () => {
   it("uses the piecewise approximation from the design", () => {
     expect(clearSkyLux(90)).toBe(120000);
-    expect(clearSkyLux(90)).toBeCloseTo(
-      120000 * Math.sin((90 * Math.PI) / 180) ** 1.15,
-      5,
-    );
-    // Civil twilight ramp: 400 lux at −0°, 0 lux at −6°.
-    expect(clearSkyLux(-3)).toBe(200);
-    expect(clearSkyLux(-6)).toBe(0);
+    // Civil twilight ramp: 400 lux at 0°, 0.5 lux at −6°.
+    expect(clearSkyLux(-3)).toBe(200.25);
+    expect(clearSkyLux(-6)).toBe(0.5);
     // Night floor below civil twilight.
     expect(clearSkyLux(-6.5)).toBe(0.5);
     expect(clearSkyLux(-20)).toBe(0.5);
-    // Exactly at the horizon: sin(0)^1.15 = 0.
-    expect(clearSkyLux(0)).toBe(0);
+    expect(clearSkyLux(0)).toBe(400);
   });
 });
 
@@ -126,31 +277,31 @@ describe("luxToPercent", () => {
   });
 
   it("reproduces the reference-table percentages", () => {
-    expect(luxToPercent(43721, config)).toBe(76);
-    expect(luxToPercent(10930, config)).toBe(48);
+    expect(luxToPercent(43975, config)).toBe(76);
+    expect(luxToPercent(10994, config)).toBe(48);
     expect(luxToPercent(315, config)).toBe(16);
   });
 });
 
 describe("predictAt (test vectors)", () => {
   // Same inputs as the reference table, defaults above.
-  it("12:00Z clear → lux 43721, percent 76", () => {
+  it("12:00Z clear → lux 43975, percent 76", () => {
     const result = predictAt(
       new Date("2026-09-22T12:00:00Z"),
       DEFAULT_BRIGHTNESS_AUTO_CONFIG,
       0,
     );
-    expect(Math.round(result.lux)).toBe(43721);
+    expect(Math.round(result.lux)).toBe(43975);
     expect(result.percent).toBe(76);
   });
 
-  it("12:00Z overcast → lux 10930, percent 48", () => {
+  it("12:00Z overcast → lux 10994, percent 48", () => {
     const result = predictAt(
       new Date("2026-09-22T12:00:00Z"),
       DEFAULT_BRIGHTNESS_AUTO_CONFIG,
       1,
     );
-    expect(Math.round(result.lux)).toBe(10930);
+    expect(Math.round(result.lux)).toBe(10994);
     expect(result.percent).toBe(48);
   });
 
