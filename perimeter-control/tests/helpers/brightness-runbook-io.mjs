@@ -313,6 +313,25 @@ function deniedNetwork() {
   connectionAttempts += 1;
   throw new Error("Unexpected network access denied by runbook fixture");
 }
+
+function reflectedValue(kind, reflected) {
+  switch (kind) {
+    case "json-object":
+      return { error: reflected };
+    case "json-string":
+      return reflected;
+    case "json-array":
+      return [reflected];
+    case "json-number":
+      return 37.25;
+    case "json-boolean":
+      return true;
+    case "json-null":
+      return null;
+    default:
+      throw new Error("Unknown reflected fixture shape");
+  }
+}
 http.request = http.get = https.request = https.get = deniedNetwork;
 net.connect =
   net.createConnection =
@@ -330,10 +349,15 @@ globalThis.fetch = async (input, init = {}) => {
       const resource = url.pathname.slice(1, -5);
       if (
         !failure ||
-        failure.resource !== resource ||
+        (failure.resource !== resource &&
+          !(failure.resource === "audit" && resource.startsWith("audit/"))) ||
         (failure.method ?? "GET") !== init.method
       )
         return response;
+      if (failure.skip > 0) {
+        failure.skip -= 1;
+        return response;
+      }
       state.events.push({
         type: "firebase-response-failure",
         kind: failure.kind,
@@ -341,7 +365,58 @@ globalThis.fetch = async (input, init = {}) => {
         method: init.method,
       });
       // Reflect the authenticated URL in both a body and a stream error.
-      const reflected = `private-response-body ${url.href}`;
+      const reflected = `private-response-body ${privateMarker} ${url.href} ${process.env.PERIMETER_VNNOX_PASSWORD}`;
+      if (failure.kind.startsWith("json-")) {
+        const value = Object.hasOwn(failure, "value")
+          ? failure.value
+          : reflectedValue(failure.kind, reflected);
+        if (!failure.field) return Response.json(value);
+        const body = await response.json();
+        const fields = failure.field.split(".");
+        const last = fields.pop();
+        let node = body;
+        for (const field of fields) node = node[field];
+        node[last] = value;
+        return Response.json(body);
+      }
+      if (failure.kind === "transport")
+        throw new Error(reflected, { cause: new Error(reflected) });
+      if (failure.kind === "http")
+        return new Response(reflected, { status: 503, statusText: reflected });
+      if (failure.kind === "invalid-status")
+        return { ok: true, status: reflected, json: () => response.json() };
+      if (failure.kind === "type-exception")
+        return {
+          get status() {
+            throw new TypeError(reflected, { cause: new Error(reflected) });
+          },
+        };
+      if (failure.kind === "thrown-primitive")
+        return {
+          get status() {
+            throw reflected;
+          },
+        };
+      if (failure.kind === "inspection-trap")
+        return {
+          get status() {
+            throw Object.defineProperty({}, "message", {
+              get() {
+                throw new Error(reflected);
+              },
+            });
+          },
+        };
+      if (failure.kind === "body-shape-exception")
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            get brightness() {
+              throw new TypeError(reflected, { cause: new Error(reflected) });
+            },
+          }),
+        };
       if (failure.kind === "malformed-json")
         return new Response(`<html>${reflected}</html>`, {
           status: response.status,
@@ -388,6 +463,8 @@ globalThis.fetch = async (input, init = {}) => {
         kind: failure.kind,
       });
       const reflected = `private-device-response ${privateMarker} ${init.headers.Authorization ?? ""} ${init.body ?? ""}`;
+      if (failure.kind.startsWith("json-"))
+        return Response.json(reflectedValue(failure.kind, reflected));
       if (failure.kind === "transport")
         throw new Error(reflected, { cause: new Error(reflected) });
       if (failure.kind === "http")

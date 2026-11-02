@@ -276,15 +276,34 @@ Firebase command/subscription. A successful Vnnox response alone is insufficient
 readback must match. The worker's own failure restoration is best-effort and
 does not perform this additional exact restoration readback.
 
-Device failures report a fixed operation context (screen read/login, target
-brightness validation, or exact restore write/login) without raw transport
-errors, response bodies, assertion values or nested causes. A failed operation
-exits immediately with no automatic retry; an ambiguous write may have applied.
+The helper uses one diagnostic policy for the entire entrypoint, including
+environment/URL setup, Firebase authorization and readbacks, device operations
+and saved files. Failures print one line containing a fixed action/operation
+context and a helper-owned validation message. Firebase HTTP status is retained
+only after validating it as a numeric status. Unknown exceptions get a fixed
+fallback; their message, stack, cause and properties are never printed. Exact
+comparisons use booleans, so neither response values nor saved expected values
+enter assertion diagnostics. HTTP 200 with valid JSON still has to pass the
+authorization, shape, freshness and exact readback checks. Null/missing intent
+and absent status remain supported; malformed intent/status or saved-file
+shapes fail before the next operation.
+
+No failure diagnostic includes a raw response, authenticated URL, token,
+password or filesystem path. This policy covers errors after helper startup;
+Node loader/preload failures, fatal process errors and shell tracing are outside
+its boundary. Keep tracing off and retain session files privately: they contain
+observed state/device metadata, which an endpoint could itself populate with
+sensitive data. A failed operation exits immediately with no automatic retry;
+an ambiguous write may have applied. A failed check after a committed write
+does not undo it or certify completion. Keep the worker stopped and use the
+independent restoration procedure.
 
 If `restore-intent` fails, still perform `restore-hardware` independently while
 the worker is stopped. That command makes **no Firebase request** and does not
 need `FIREBASE_ID_TOKEN`/`FIREBASE_UID`. Retain the snapshot and resolve Firebase
-intent separately before any resume. If device restoration/readback fails,
+intent separately before any resume. Hardware recovery validates the saved
+scope and hardware fields independently of the saved Firebase intent or audit
+session identity. If device restoration/readback fails,
 keep the worker stopped, retain evidence, and obtain operator assistance;
 do not mark rollback complete or automate retries of an ambiguous write.
 
@@ -344,6 +363,13 @@ isolation, audit/null semantics, auth failures and stopped/disabled ordering.
 Device failure cases include the actual native fetch header validator rejecting
 a synthetic login token before any connection, plus transport/body failures
 and credential-bearing readback mismatches without printing their values.
+The JSON regression matrix covers reflected objects, arrays, strings, numbers,
+booleans and null at authorization, intent, status and audit comparisons. It
+also covers invalid URLs/files, unexpected type exceptions and unreadable
+streams. Each failing case checks the permitted I/O sequence and absence of
+synthetic secrets/URLs in stdout and stderr, including failures after a single
+committed write. Positive cases retain exact restoration, null deletion,
+hardware-only setup and independent readbacks after a valid JSON PATCH reply.
 This is mock evidence; rule-expression checks are not an emulator or deployed
 rules qualification. See [the README](README.md#tests) for runtime regressions.
 
