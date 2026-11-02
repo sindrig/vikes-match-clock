@@ -16,7 +16,7 @@ function deferred() {
 
 // Pause one actual transport call. The worker and scheduler are never replaced.
 // Cleanup releases every gate before draining, even when an assertion fails.
-function holdNext(fixture, object, method) {
+function holdNext(fixture, object, method, { after = false } = {}) {
   const entered = deferred();
   const release = deferred();
   const original = object[method].bind(object);
@@ -24,8 +24,10 @@ function holdNext(fixture, object, method) {
   object[method] = async (...args) => {
     if (first) {
       first = false;
+      const result = after ? await original(...args) : undefined;
       entered.resolve(args);
       await release.promise;
+      return after ? result : original(...args);
     }
     return original(...args);
   };
@@ -35,7 +37,13 @@ function holdNext(fixture, object, method) {
 
 function fixture(
   t,
-  { automatic = false, start = true, holdSeed = false } = {},
+  {
+    automatic = false,
+    start = true,
+    holdSeed = false,
+    initialPercent = 12.34,
+    env = {},
+  } = {},
 ) {
   t.mock.method(globalThis, "fetch", () => {
     throw new Error("Unexpected external I/O in arbitration regression");
@@ -44,6 +52,7 @@ function fixture(
     ...configuredEnv,
     ...(automatic ? { PERIMETER_AUTO_BRIGHTNESS_ENABLED: "true" } : {}),
     PERIMETER_BRIGHTNESS_VERIFY_INTERVAL_SECONDS: "0.001",
+    ...env,
   });
   const gateway = new PerimeterController(config);
   const worker = gateway._brightnessController;
@@ -52,8 +61,8 @@ function fixture(
   const status = db.ref(config.brightnessStatusPath);
   status.value = { phase: "applied", appliedPercent: 50 };
   const initial = {
-    percent: 12.34,
-    ratio: 1234,
+    percent: initialPercent,
+    ratio: initialPercent * 100,
     ratioScale: 10000,
     nitType: 0,
     nit: 0,
@@ -155,6 +164,342 @@ async function initializeAuto(f) {
 async function applied(f, percent) {
   await waitFor(() => f.status.value?.appliedPercent === percent);
   await settle(); // Include calibration and worker completion, not just status.
+}
+
+function weather(f, cloudCover) {
+  f.scheduler._weather.snapshot = () => ({
+    cloudCover,
+    ageMs: 0,
+    stale: false,
+  });
+}
+
+for (const maxSlew of [15, 7]) {
+  test(
+    `config refresh during dispatched auto rebases the next write to the verified baseline (slew ${maxSlew})`,
+    { timeout: 3000 },
+    async (t) => {
+      const f = fixture(t, {
+        automatic: true,
+        initialPercent: 50,
+        env: { PERIMETER_AUTO_MAX_SLEW: String(maxSlew) },
+      });
+      await initializeAuto(f);
+      const dispatch = holdNext(f, f.worker.client, "writeBrightness", {
+        after: true,
+      });
+      f.auto.emit({ enabled: true });
+      await dispatch.entered;
+      f.auto.emit({ enabled: true, exponent: 2 });
+      await settle();
+      assert.equal(f.worker.lastAppliedPercent, 50);
+      assert.deepEqual(f.writes(), [50 + maxSlew]);
+      dispatch.release();
+      await applied(f, 50);
+      assert.deepEqual(f.writes(), [50 + maxSlew, 50]);
+      assert.deepEqual(
+        f.calibration().map(({ source, percent }) => [source, percent]),
+        [
+          ["auto", 50 + maxSlew],
+          ["auto", 50],
+        ],
+      );
+      await f.scheduler.tick();
+      await applied(f, 50 - maxSlew);
+      assert.deepEqual(f.writes(), [50 + maxSlew, 50, 50 - maxSlew]);
+    },
+  );
+}
+
+test(
+  "one-second periodic ticks make progress through successful 1.5-second cabinet snapshots",
+  { timeout: 3000 },
+  async (t) => {
+    const f = fixture(t, {
+      automatic: true,
+      start: false,
+      initialPercent: 50,
+      env: { PERIMETER_AUTO_TICK_SECONDS: "1" },
+    });
+    await initializeAuto(f);
+    t.mock.timers.enable({ apis: ["setTimeout", "setInterval"] });
+    const cabinets = f.worker.client.readCabinets;
+    let snapshots = 0;
+    f.worker.client.readCabinets = async () => {
+      snapshots += 1;
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      return cabinets();
+    };
+    try {
+      f.gateway.startBrightness();
+      f.auto.emit({ enabled: true });
+      await settle();
+      for (let elapsed = 0; elapsed < 10000; elapsed += 500) {
+        t.mock.timers.tick(500);
+        await settle();
+      }
+      assert.deepEqual(f.writes(), [65, 76]);
+      assert.equal(f.worker.lastAppliedPercent, 76);
+      assert.equal(snapshots, 2, "equal ticks reuse the active snapshot");
+      assert.deepEqual(
+        f.calibration().map(({ percent }) => percent),
+        [65, 76],
+      );
+    } finally {
+      const drain = f.gateway.shutdown();
+      t.mock.timers.tick(1500);
+      await settle();
+      await drain;
+      t.mock.timers.reset();
+    }
+  },
+);
+
+test(
+  "equal automatic decisions keep progress and capture context only until dispatch",
+  { timeout: 3000 },
+  async (t) => {
+    const f = fixture(t, { automatic: true, initialPercent: 50 });
+    await initializeAuto(f);
+    const snapshot = holdNext(f, f.worker.client, "readCabinets");
+    const dispatch = holdNext(f, f.worker.client, "writeBrightness", {
+      after: true,
+    });
+    f.auto.emit({ enabled: true });
+    await snapshot.entered;
+    weather(f, 0.5); // Raw target 73%, still a bounded request for 65%.
+    await f.scheduler.tick();
+    snapshot.release();
+    await dispatch.entered;
+    weather(f, 0.6); // A later prediction cannot rewrite dispatched context.
+    await f.scheduler.tick();
+    dispatch.release();
+    await applied(f, 65);
+    assert.deepEqual(f.writes(), [65]);
+    assert.deepEqual(
+      f.calibration().map(({ source, percent, lux, cloudCover }) => ({
+        source,
+        percent,
+        lux,
+        cloudCover,
+      })),
+      [{ source: "auto", percent: 65, lux: 39622, cloudCover: 0.5 }],
+    );
+    assert.equal(f.device.filter(([op]) => op === "cabinets").length, 1);
+  },
+);
+
+test(
+  "periodic equal work coalesces after a queued config decision is rebased during drain",
+  { timeout: 3000 },
+  async (t) => {
+    const f = fixture(t, {
+      automatic: true,
+      start: false,
+      initialPercent: 50,
+      env: { PERIMETER_AUTO_TICK_SECONDS: "1" },
+    });
+    await initializeAuto(f);
+    const dispatch = holdNext(f, f.worker.client, "writeBrightness", {
+      after: true,
+    });
+    t.mock.timers.enable({ apis: ["setTimeout", "setInterval"] });
+    try {
+      f.worker.startWorker();
+      f.auto.emit({ enabled: true });
+      await dispatch.entered;
+      const cabinets = f.worker.client.readCabinets;
+      f.worker.client.readCabinets = async () => {
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        return cabinets();
+      };
+      f.scheduler.start();
+      f.auto.emit({ enabled: true, exponent: 2 });
+      await settle();
+      t.mock.timers.tick(1000);
+      await settle();
+      dispatch.release();
+      await settle();
+      for (let elapsed = 1000; elapsed < 10000; elapsed += 500) {
+        t.mock.timers.tick(500);
+        await settle();
+      }
+      assert.deepEqual(f.writes(), [65, 50, 35, 22]);
+      assert.deepEqual(
+        f.calibration().map(({ percent }) => percent),
+        [65, 50, 35, 22],
+      );
+      assert.equal(f.device.filter(([op]) => op === "cabinets").length, 4);
+    } finally {
+      dispatch.release();
+      const drain = f.gateway.shutdown();
+      t.mock.timers.tick(1500);
+      await settle();
+      await drain;
+      t.mock.timers.reset();
+    }
+  },
+);
+
+test(
+  "an equal automatic target can retry after a completed pending-status failure",
+  { timeout: 3000 },
+  async (t) => {
+    const f = fixture(t, { automatic: true, initialPercent: 50 });
+    await initializeAuto(f);
+    const set = f.status.set.bind(f.status);
+    let first = true;
+    f.status.set = async (value) => {
+      if (value.phase === "pending" && first) {
+        first = false;
+        throw new Error("fixture first pending status rejected");
+      }
+      return set(value);
+    };
+    f.auto.emit({ enabled: true });
+    await settle();
+    assert.deepEqual(f.device, []);
+    await f.scheduler.tick();
+    await applied(f, 65);
+    assert.deepEqual(f.writes(), [65]);
+    assert.equal(f.calibration().length, 1);
+  },
+);
+
+test(
+  "coalesced queued auto work uses the latest target and drops a post-drain hysteresis no-op",
+  { timeout: 3000 },
+  async (t) => {
+    const f = fixture(t, { automatic: true, initialPercent: 50 });
+    await initializeAuto(f);
+    const dispatch = holdNext(f, f.worker.client, "writeBrightness", {
+      after: true,
+    });
+    f.auto.emit({ enabled: true });
+    await dispatch.entered;
+    f.auto.emit({ enabled: true, exponent: 0.25 }); // New revision, target 82%.
+    await settle();
+    weather(f, 0.94); // Same bounded 65%, but the latest raw target is now 65%.
+    await f.scheduler.tick();
+    assert.equal(f.status.value.predicted.percent, 65);
+    dispatch.release();
+    await applied(f, 65);
+    assert.deepEqual(f.writes(), [65]);
+    assert.equal(f.device.filter(([op]) => op === "cabinets").length, 1);
+    assert.equal(f.calibration().length, 1);
+  },
+);
+
+for (const stage of ["snapshot", "dispatched"]) {
+  test(
+    `a fresh prediction within hysteresis withdraws obsolete auto work at ${stage}`,
+    { timeout: 3000 },
+    async (t) => {
+      const f = fixture(t, { automatic: true, initialPercent: 50 });
+      await initializeAuto(f);
+      const held =
+        stage === "snapshot"
+          ? holdNext(f, f.worker.client, "readCabinets")
+          : holdNext(f, f.worker.client, "writeBrightness", { after: true });
+      f.auto.emit({ enabled: true });
+      await held.entered;
+      weather(f, 1); // Queue a different decision while the worker is occupied.
+      await f.scheduler.tick();
+      weather(f, 0.98); // Target 50%: no longer needs an automatic write.
+      await f.scheduler.tick();
+      assert.equal(f.status.value.predicted.percent, 50);
+      held.release();
+      await settle();
+      assert.deepEqual(f.writes(), stage === "snapshot" ? [] : [65]);
+      weather(f, 1);
+      await f.scheduler.tick();
+      const next = stage === "snapshot" ? 48 : 50;
+      await applied(f, next);
+      assert.deepEqual(f.writes(), stage === "snapshot" ? [48] : [65, 50]);
+    },
+  );
+}
+
+test(
+  "an effective config change invalidates even an equal-valued automatic snapshot",
+  { timeout: 3000 },
+  async (t) => {
+    const f = fixture(t, { automatic: true, initialPercent: 50 });
+    await initializeAuto(f);
+    const snapshot = holdNext(f, f.worker.client, "readCabinets");
+    f.auto.emit({ enabled: true });
+    await snapshot.entered;
+    await f.scheduler.tick(); // Equivalent periodic work must coalesce first.
+    f.auto.emit({ enabled: true, exponent: 0.34 });
+    await settle();
+    snapshot.release();
+    await applied(f, 65);
+    assert.deepEqual(f.writes(), [65]);
+    assert.equal(f.device.filter(([op]) => op === "cabinets").length, 2);
+    assert.equal(f.calibration().length, 1);
+  },
+);
+
+test(
+  "a fresh equal-valued manual event still supersedes an older manual snapshot",
+  { timeout: 3000 },
+  async (t) => {
+    const f = fixture(t);
+    const snapshot = holdNext(f, f.worker.client, "readCabinets");
+    f.command.emit(60);
+    await snapshot.entered;
+    f.command.emit(60);
+    snapshot.release();
+    await applied(f, 60);
+    assert.deepEqual(f.writes(), [60]);
+    assert.equal(f.device.filter(([op]) => op === "cabinets").length, 2);
+  },
+);
+
+for (const stop of [false, true]) {
+  test(
+    `queued automatic work ${stop ? "is dropped by shutdown" : "uses the last verified baseline"} after ambiguous dispatch and exact restoration`,
+    { timeout: 3000 },
+    async (t) => {
+      const f = fixture(t, { automatic: true, initialPercent: 50 });
+      await initializeAuto(f);
+      const write = f.worker.client.writeBrightness;
+      let first = true;
+      f.worker.client.writeBrightness = async (percent) => {
+        await write(percent);
+        if (first) {
+          first = false;
+          throw new Error("fixture ambiguous automatic write");
+        }
+      };
+      const restore = holdNext(f, f.worker.client, "restoreBrightness");
+      f.auto.emit({ enabled: true });
+      await restore.entered;
+      f.auto.emit({ enabled: true, exponent: 2 });
+      await settle();
+      for (let i = 0; i < 3; i += 1) await f.scheduler.tick();
+      assert.equal(f.worker.lastAppliedPercent, 50);
+      assert.deepEqual(f.writes(), [65]);
+      const drain = stop ? f.gateway.shutdown() : null;
+      restore.release();
+      if (stop) await drain;
+      else await applied(f, 35);
+      assert.deepEqual(f.restores(), [f.initial]);
+      assert.deepEqual(f.writes(), stop ? [65] : [65, 35]);
+      assert.equal(f.worker.lastAppliedPercent, stop ? 50 : 35);
+      assert.deepEqual(
+        f.calibration().map(({ percent }) => percent),
+        stop ? [] : [35],
+      );
+      if (!stop) {
+        assert.ok(
+          f.device.findIndex(([op]) => op === "restore") <
+            f.device.findIndex(([op, value]) => op === "write" && value === 35),
+          "the exact raw restoration finishes before the next dispatch",
+        );
+      }
+    },
+  );
 }
 
 for (const method of ["readScreenBrightness", "readCabinets"]) {

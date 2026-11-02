@@ -10,10 +10,24 @@ remain on HOLD.
 
 ## Request and dispatch invariants
 
-- One serialized worker retains the latest accepted request. Each request is
-  one identity containing its percent, source and captured calibration context.
-  Equal percentages still have distinct identities: manual 65% supersedes
-  undispatched auto 65% and retains the manual calibration source.
+- One serialized worker retains the latest accepted request. Manual events
+  always have distinct identities: manual 65% supersedes undispatched auto
+  65%, and a fresh manual 65% supersedes an older manual 65% snapshot.
+- Automatic ticks submit the raw target and captured prediction to the worker.
+  Equal bounded percentages from the same automatic generation and slew setting
+  coalesce with outstanding automatic work, preserving progress through slow
+  snapshots. Before dispatch, coalescing refreshes the target and calibration
+  context. After dispatch, the sequence retains its original context.
+- The worker applies the existing hysteresis/slew/clamp decision at admission
+  and again when it picks up queued automatic work after the prior sequence
+  drains. A config refresh during an irreversible 50% → 65% write therefore
+  moves toward a new 22% target via 50%, rather than a stale 35% decision made
+  against the old 50% baseline. A post-drain decision within hysteresis is
+  dropped. Only verified successes advance the retained applied baseline;
+  failed attempts finish their restoration sequence before queued work is examined.
+- Every enabled tick submits its target, including targets within hysteresis.
+  Such a target withdraws obsolete undispatched automatic work; it cannot
+  interrupt an already-dispatched sequence or replace manual work.
 - Automatic ticks capture a worker-owned generation before predicting. A valid
   manual command or effective normalized automatic config change invalidates
   suspended ticks and undispatched auto requests. Timestamp-only config echoes
@@ -94,6 +108,16 @@ verification mismatches and restore errors, each with newer manual intent and
 with shutdown. Raw restoration uses 12.34% (`ratio: 1234`, `ratioScale: 10000`)
 to catch accidental whole-percent conversion. A separate deferred restoration
 case proves shutdown also waits at that await.
+
+The follow-up regressions run the actual periodic scheduler at one-second
+intervals with successful 1.5-second cabinet reads, using virtual timers. It
+writes 65%, then 76% within ten virtual seconds, with two snapshots and two
+calibration entries. The original PR #277 head repeatedly replaced identical
+65% requests and wrote nothing during that interval. Further gates cover config
+refresh during irreversible dispatch with both default and custom slew limits,
+changing predictions with equal bounded output, post-drain hysteresis, fresh
+manual/config invalidation at equal percentages, exact restoration baselines and
+shutdown with queued automatic work.
 
 Run the suite with Node >= 22 and the pinned pnpm:
 

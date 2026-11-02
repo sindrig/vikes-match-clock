@@ -242,10 +242,11 @@ export function calibrationEntry(source, percent, prediction, ts) {
 
 // The daemon-side scheduler: ticks every `tickMs`, computes the prediction
 // for the current instant, publishes it to the brightness status (shadow
-// mode — no writes while `brightnessAuto.enabled` is false), and enqueues at
-// most one hysteresis/slew-bounded write per tick into the serialized
-// brightness worker when auto is enabled. Never throws: any internal error
-// holds the last applied value instead of snapping to an extreme.
+// mode — no writes while `brightnessAuto.enabled` is false), and submits at
+// most one target per tick to the serialized brightness worker. The worker
+// applies hysteresis/slew both at admission and after earlier work drains.
+// Never throws: any internal error holds the last applied value instead of
+// snapping to an extreme.
 export class AutoBrightnessScheduler {
   constructor({
     controller,
@@ -348,14 +349,11 @@ export class AutoBrightnessScheduler {
     if (this._skipWhenOff && this._controller.perimeterState !== "on") {
       return;
     }
-    const next = nextAutoWrite(
+    this._controller.requestAuto(
       prediction.percent,
-      this._controller.lastAppliedPercent,
-      cfg,
+      predictionBlock,
+      autoRevision,
       { maxSlew: this._maxSlew },
     );
-    if (next.write) {
-      this._controller.requestAuto(next.percent, predictionBlock, autoRevision);
-    }
   }
 }

@@ -38,9 +38,9 @@
  *     daemon-subscribed `states/{location}/perimeter/brightnessAuto` config
  *     switches the AutoBrightnessScheduler between shadow mode (predict +
  *     publish only) and live auto. Auto writes enter the same worker via
- *     requestAuto(), bounded by hysteresis + slew + clamping in the
- *     scheduler, so supersession/verify/restore behavior is untouched. A
- *     manual command while auto is enabled disables auto (operator intent
+ *     requestAuto(), bounded by hysteresis + slew + clamping at admission
+ *     and again after the prior request drains. A manual command while auto
+ *     is enabled disables auto (operator intent
  *     wins) and applies the manual value. Daemon-owned outcomes are extended
  *     with `mode` and the live `predicted` readout, and every applied auto
  *     change (plus each manual override while auto is on) is appended to
@@ -56,6 +56,7 @@ import {
 } from "./vnnox.js";
 import {
   calibrationEntry,
+  nextAutoWrite,
   normalizeAutoConfig,
   validateAutoBrightnessConfig,
 } from "./auto-brightness.js";
@@ -106,8 +107,8 @@ export class BrightnessController {
     this.client = new VnnoxClient(config);
     this._commandRef = null;
     this._statusRef = null;
-    // Identity, percentage and source travel together. Even an equal-valued
-    // replacement is new intent (e.g. auto 65% yielding to manual 65%).
+    // Manual events always have a new identity, even at an equal percentage.
+    // Equivalent automatic ticks can share an outstanding request's identity.
     this._pendingRequest = null;
     this._latestRequest = null;
     this._current = null;
@@ -122,8 +123,8 @@ export class BrightnessController {
     this._lastStatus = null;
     // Automatic mode. The scheduler is attached only when the daemon-level
     // auto feature is enabled; it publishes predictions and enqueues writes
-    // through requestAuto(). The serialized worker treats auto writes exactly
-    // like manual commands.
+    // through requestAuto(). The worker rebases queued auto decisions before
+    // entering the shared snapshot/write/verify/restore path.
     this._autoScheduler = null;
     this._autoRef = null;
     this._autoConfig = normalizeAutoConfig(null);
@@ -381,6 +382,20 @@ export class BrightnessController {
   // the request was enqueued.
   async _handleRequest(request) {
     if (!this._canDispatch(request)) return;
+    if (request.source === "auto") {
+      // Admission may have happened while the preceding irreversible write
+      // was still verifying/restoring. Use its settled baseline, not the
+      // percentage calculated before it drained. Keep the original target
+      // so both hysteresis and slew are re-evaluated, not just clipped again.
+      const next = nextAutoWrite(
+        request.targetPercent,
+        this._lastAppliedPercent,
+        this._autoConfig,
+        { maxSlew: request.maxSlew },
+      );
+      if (!next.write) return;
+      request.percent = next.percent;
+    }
     const { percent: target } = request;
     if (!this.config.brightnessEnabled) {
       console.log(`Brightness disabled; ignoring command ${target}%`);
@@ -452,6 +467,7 @@ export class BrightnessController {
     // applied. From here on, any failure (write or verification) always
     // routes through best-effort restoration; this stage never checks
     // `_stopping` or supersession so an in-flight write always completes.
+    request.dispatched = true;
     const writeStarted = true;
     let errorText;
     try {
@@ -617,10 +633,15 @@ export class BrightnessController {
     }
   }
 
-  // Entry point for the AutoBrightnessScheduler: enqueues one auto-initiated
-  // write into the same serialized worker the manual command listener feeds.
-  // Returns whether the request was accepted for processing.
-  requestAuto(percent, prediction, autoRevision) {
+  // Admit the scheduler's latest target, including decisions within hysteresis
+  // that withdraw obsolete undispatched work. Equivalent bounded decisions
+  // share one outstanding identity so ticks cannot starve a slow snapshot.
+  requestAuto(
+    targetPercent,
+    prediction,
+    autoRevision,
+    { maxSlew = this.config.autoMaxSlew } = {},
+  ) {
     if (
       !this.autoReady ||
       !this.config.brightnessEnabled ||
@@ -632,15 +653,49 @@ export class BrightnessController {
     ) {
       return false;
     }
-    if (!Number.isInteger(percent) || percent < 0 || percent > 100) {
+    if (
+      !Number.isInteger(targetPercent) ||
+      targetPercent < 0 ||
+      targetPercent > 100
+    ) {
       console.warn(
-        `Auto scheduler produced an invalid percent: ${JSON.stringify(percent)}`,
+        `Auto scheduler produced an invalid percent: ${JSON.stringify(targetPercent)}`,
       );
       return false;
+    }
+    const next = nextAutoWrite(
+      targetPercent,
+      this._lastAppliedPercent,
+      this._autoConfig,
+      { maxSlew },
+    );
+    if (!next.write) {
+      if (this._pendingRequest?.source === "auto") this._pendingRequest = null;
+      if (this._latestRequest?.source === "auto") this._latestRequest = null;
+      return true;
+    }
+    const { percent } = next;
+    const existing = this._pendingRequest ?? this._current;
+    if (
+      existing?.source === "auto" &&
+      existing === this._latestRequest &&
+      existing.autoRevision === autoRevision &&
+      existing.percent === percent &&
+      existing.maxSlew === maxSlew
+    ) {
+      // Retain the latest goal for post-drain rebasing and calibration, but
+      // never change the context of an already-dispatched sequence.
+      if (!existing.dispatched) {
+        existing.targetPercent = targetPercent;
+        existing.prediction = prediction ?? null;
+      }
+      return true;
     }
     console.log(`Auto brightness request: ${percent}%`);
     this._enqueueRequest({
       percent,
+      targetPercent,
+      maxSlew,
       source: "auto",
       prediction: prediction ?? null,
       autoRevision,
