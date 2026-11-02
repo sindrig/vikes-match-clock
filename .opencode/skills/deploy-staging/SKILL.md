@@ -18,8 +18,10 @@ Supports **subpath bundle locations** (e.g. `staging-klukka.irdn.is/my-feature/`
 
 ## Prerequisites
 
-- `/home/dev/vikes-creds.txt` must exist (provisioned by Terraform from `infra/devpod-creds/`)
+- Existing approved AWS CLI access for staging and operator-provided `STAGING_BUCKET` / `CLOUDFRONT_DISTRIBUTION_ID` metadata. See [the environment contract](../../../docs/environment.md#manual-aws-staging-operations) for retrieval and loaders.
 - `pnpm` installed and `clock/node_modules` present
+
+No fixed credential path or Devpod installation is required. GitHub Actions uses OIDC for CI AWS deployment jobs; that does not configure a local shell. The legacy `infra/devpod-creds/` stack creates a static IAM key and provisions a specific remote host. It remains available to authorized operators of that installation, and is not a missing-credentials fallback for this skill.
 
 ## Parameters
 
@@ -33,20 +35,19 @@ Before substituting `<subpath>` into commands, require an agreed, nonempty singl
 
 ## Steps
 
-### 1. Source credentials
+### 1. Load the approved staging environment
+
+Use already exported AWS access and staging metadata, or explicitly select a trusted **Bash** environment file with `VIKES_STAGING_ENV_FILE`. It must export its variables; a dotenv `.envrc-local` file is loaded only by optional direnv, not by `source`. The contract provides placeholder examples. Run these checks and the later AWS commands in the same shell; repeat this setup if using a new shell/tool process.
 
 ```bash
-source /home/dev/vikes-creds.txt
+if [[ -n "${VIKES_STAGING_ENV_FILE:-}" ]]; then
+  source "$VIKES_STAGING_ENV_FILE" || { echo "Could not load the selected staging Bash file." >&2; exit 1; }
+fi
+: "${STAGING_BUCKET:?Ask the infrastructure maintainer for staging bucket metadata.}"
+: "${CLOUDFRONT_DISTRIBUTION_ID:?Ask the infrastructure maintainer for staging distribution metadata.}"
 ```
 
-Verify the variables are set:
-
-```bash
-echo "Bucket: $STAGING_BUCKET"
-echo "CF Distribution: $CLOUDFRONT_DISTRIBUTION_ID"
-```
-
-If the file doesn't exist or variables are empty, tell the user to run `terraform apply` in `infra/devpod-creds/` to provision credentials.
+Check presence without printing credential values or reading secret files into the conversation. These checks do not prove AWS authentication/authorization. If credentials, the selected file, or metadata are missing, stop and ask the infrastructure maintainer for the existing approved staging access. Do not initiate login or apply Terraform as a bootstrap/recovery step. Continue offline generation/build work only if it is part of the requested task.
 
 ### 2. Install dependencies (if needed)
 
@@ -91,12 +92,10 @@ Verify the `clock/build/` directory exists and contains `index.html`.
 **Deletion scope:** This removes every object in the staging bucket except `pr-images/*`, including all other subpath bundles and older hashed assets, before uploading the root build. Coordinate with other staging users and inspect the deletion dry run first. This is not a retention or atomic deployment procedure.
 
 ```bash
-source /home/dev/vikes-creds.txt
 aws s3 rm "s3://$STAGING_BUCKET" --recursive --exclude "pr-images/*" --dryrun --region eu-west-1
 ```
 
 ```bash
-source /home/dev/vikes-creds.txt
 aws s3 rm "s3://$STAGING_BUCKET" --recursive --exclude "pr-images/*" --region eu-west-1
 aws s3 cp clock/build/ "s3://$STAGING_BUCKET" --recursive --region eu-west-1
 ```
@@ -106,7 +105,6 @@ The `--exclude "pr-images/*"` preserves PR screenshot uploads for this manual co
 #### Subpath deploy
 
 ```bash
-source /home/dev/vikes-creds.txt
 aws s3 rm "s3://$STAGING_BUCKET/<subpath>/" --recursive --region eu-west-1
 aws s3 cp clock/build/ "s3://$STAGING_BUCKET/<subpath>/" --recursive --region eu-west-1
 ```
@@ -118,7 +116,6 @@ Only remove/upload the validated subpath. This deletes the prior files under tha
 For root deploy:
 
 ```bash
-source /home/dev/vikes-creds.txt
 INVALIDATION_ID=$(aws cloudfront create-invalidation \
   --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" \
   --paths "/index.html" \
@@ -133,7 +130,6 @@ echo "Invalidation complete"
 For subpath deploy:
 
 ```bash
-source /home/dev/vikes-creds.txt
 INVALIDATION_ID=$(aws cloudfront create-invalidation \
   --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" \
   --paths "/<subpath>/*" \
@@ -162,14 +158,13 @@ When a subpath deploy is no longer needed:
 Recheck the exact nonempty prefix as described above. Cleanup deletes frontend files under that prefix only; it does not remove shared Firebase data or browser storage. Do not clear shared state as part of bundle cleanup.
 
 ```bash
-source /home/dev/vikes-creds.txt
 aws s3 rm "s3://$STAGING_BUCKET/<subpath>/" --recursive --region eu-west-1
 ```
 
 ## Error handling
 
 - If `pnpm build` fails: show the build errors, do NOT proceed to deploy
-- If S3 upload fails: check credentials are valid (expired key?), suggest re-running `terraform apply` in `infra/staging/`
+- If S3 upload fails: stop subsequent deployment steps and report the error with secrets redacted. Ask the infrastructure maintainer for the correct existing session/profile, target metadata or permissions. Do not treat denied access or expired credentials as a reason to apply Terraform, mint keys or start login automatically.
 - If CloudFront invalidation fails: deploy still succeeded (S3 has new files), just note the CF invalidation failed
 
 ## Important notes
@@ -183,10 +178,10 @@ aws s3 rm "s3://$STAGING_BUCKET/<subpath>/" --recursive --region eu-west-1
 
 ## Uploading screenshots for PRs
 
-GitHub doesn't support programmatic image uploads to PR comments. Use the staging S3 bucket instead:
+GitHub doesn't support programmatic image uploads to PR comments. For an authorized upload, load approved AWS access and `STAGING_BUCKET` metadata as in step 1 (a screenshot upload does not require a distribution ID). Use the staging S3 bucket:
 
 ```bash
-source /home/dev/vikes-creds.txt
+: "${STAGING_BUCKET:?Ask the infrastructure maintainer for staging upload access and bucket metadata.}"
 TIMESTAMP=$(date +%s)
 aws s3 cp screenshot.png "s3://$STAGING_BUCKET/pr-images/<ISSUE_NUMBER>-<descriptive-name>-${TIMESTAMP}.png" --region eu-west-1
 ```

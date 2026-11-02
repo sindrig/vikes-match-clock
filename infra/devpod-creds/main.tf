@@ -1,3 +1,6 @@
+# Legacy specialized operator path: creates a static IAM key and copies a
+# sensitive Bash file to a specific remote Devpod installation. See ../AGENTS.md
+# and ../../docs/environment.md; this is not general worktree bootstrap.
 terraform {
   required_version = ">= 1.0"
 

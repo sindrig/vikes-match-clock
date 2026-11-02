@@ -78,10 +78,11 @@ never touches the autopilot.
 ## Prerequisites
 
 1. **Node.js >= 18** on the gateway.
-2. **Firebase service account**: download the JSON private key from Firebase
-   console → Project settings → Service accounts → **Generate new private
-   key**. The project's service account must be allowed to read Realtime
-   Database (the Admin SDK bypasses the public `states` read rules).
+2. **Firebase service account**: obtain the approved JSON credential file from
+   the project/gateway maintainer through the existing credential store. The
+   service account needs the daemon's Firebase/Storage access (the Admin SDK
+   bypasses client rules). Creating a new key is a separate authorized operator
+   action, not a missing-file setup step. See [the environment contract](../docs/environment.md#gateway-access).
 3. **Resolume**: enable the **web server** in Resolume Arena Preferences →
    Advanced, and configure a reverse proxy so the API is reachable on
    `http://localhost:80/api/v1` on the same machine as this service. Verify
@@ -122,6 +123,12 @@ The installer:
 ## Configuration
 
 Edit `/etc/perimeter-control/perimeter-control.env`:
+
+The systemd unit loads this file with `EnvironmentFile=`. Use systemd
+`NAME=value` syntax without `export`; it is not a shell script or an
+automatically loaded Node dotenv file. For an authorized manual Node launch,
+export the variables into that process's shell explicitly. Do not start the
+daemon merely to validate credential presence: it can apply live desired state.
 
 | Variable                             | Default                                                 | Description                                                       |
 | ------------------------------------ | ------------------------------------------------------- | ----------------------------------------------------------------- |
@@ -647,8 +654,9 @@ Required to enable: `PERIMETER_BRIGHTNESS_ENABLED=true` plus a device serial
 (`PERIMETER_VNNOX_PERIMETER_GUID`) — there is deliberately no default for the
 GUID, so a name-based or all-screen selection is impossible. If the feature is
 enabled but configuration is incomplete, requests fail with a
-configuration-caused status instead of touching hardware. The Vnnox password
-is never committed: `PERIMETER_VNNOX_PASSWORD_SOURCE=env` reads
+configuration-caused status instead of touching hardware. Retrieve the current
+device username and password from the gateway maintainer's approved credential
+store; do not assume a default login. `PERIMETER_VNNOX_PASSWORD_SOURCE=env` reads
 `PERIMETER_VNNOX_PASSWORD`, `=file` reads the first line of
 `PERIMETER_VNNOX_PASSWORD_FILE` on the gateway.
 

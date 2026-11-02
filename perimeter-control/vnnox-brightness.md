@@ -27,28 +27,32 @@ executed.
 
 ## Auth
 
-No password is set on the box. Login uses the stock default:
+Obtain the current device username and password from the gateway maintainer's
+approved credential store. Do not assume a vendor/default login. See
+[the environment contract](../docs/environment.md#gateway-access) for the
+daemon's environment/file loaders. Never paste credentials or tokens into
+logs, issues or this guide. This request shape is descriptive; authenticate
+only as part of authorized gateway work.
 
-```
+```text
 POST http://localhost:81/unico/v1/system/auth/login
 headers: Content-Type: application/json
          ip: 10.182.45.40
          port: 8088
-         protocol: http            # NB: this is the *linkType* ("http"),
-                                   # NOT the protocolType "G4A"
-body: {"username":"admin","password":"<base64 of 123456>"}
+         protocol: http            # linkType, not the protocolType G4A
+body: { "username": "<retrieved-device-username>", "password": "<base64-of-retrieved-password>" }
 ```
 
-`<base64 of 123456>` = `MTIzNDU2`. Response:
-`{"code":0,"data":{"token":"<JWT>"}}`. Send that token as `Authorization`
-on all subsequent calls.
+The password field is the Base64 encoding of the retrieved plaintext password;
+Base64 is reversible, so handle the encoded value as a credential too.
+Response: `{"code":0,"data":{"token":"<JWT>"}}`. Send that token as
+`Authorization` on subsequent calls.
 
 Notes:
 
-- Direct login to the device (`10.182.45.40:8088/unico/v1/system/auth/login`)
-  also works with the same body.
-- Each device has its own token (login is per `ip` header); `System 1` at
-  `10.182.45.50` rejects the perimeter token with code `8273`.
+- The daemon uses the UCenter login route above.
+- A token is scoped to the device selected by the routing headers; another
+  device rejects the perimeter token with code `8273`.
 - The `protocol` header must be `http` (the linkType). `G4A` returns
   `code:500 "failed"`.
 
@@ -131,8 +135,10 @@ write endpoint's `ratio` field is an integer (read-scale, 10000). Verified live:
 
 **Risks:**
 
-1. **No auth barrier** — stock `admin`/`123456`; any LAN host can read and
-   write brightness via `localhost:81` or directly on `10.182.45.40:8088`.
+1. **Credential exposure** — prior notes included a device login. Retrieve
+   current access from the gateway maintainer; the credential owner must
+   assess any prior exposure separately. LAN reachability alone does not
+   authorize device access.
 2. **Immediate effect** — writes apply instantly, screen-wide (empty
    `list` = all 40 cabinets), no staging/confirmation. A buggy script
    instantly dims/brightens a live perimeter.

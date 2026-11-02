@@ -1,0 +1,21 @@
+# DOTENV syntax, not a shell script. All entries are optional and commented.
+# Copy to this worktree's ignored .envrc-local and enable only the needed mode.
+# The root .envrc loads it through direnv's dotenv_if_exists after direnv allow.
+# Without direnv, use the explicit Bash environment examples in docs/environment.md.
+
+# Firebase emulator mode (Vite reads this when starting/building).
+# VITE_USE_EMULATOR=true
+
+# Authorized staging browser login only; retrieve access from a maintainer.
+# Emulator E2E fixtures create their own synthetic accounts without this value.
+# TEST_CREDENTIALS="REPLACE_WITH_STAGING_EMAIL;REPLACE_WITH_STAGING_PASSWORD"
+
+# Optional AWS profile already configured by an authorized operator.
+# AWS_PROFILE=REPLACE_WITH_APPROVED_PROFILE
+# AWS_DEFAULT_REGION=eu-west-1
+# STAGING_BUCKET=REPLACE_WITH_STAGING_BUCKET
+# CLOUDFRONT_DISTRIBUTION_ID=REPLACE_WITH_STAGING_DISTRIBUTION_ID
+
+# Existing operator bootstrap only: install/configure the helpers before opting in.
+# VIKES_USE_LAYOUT_PYTHON=1
+# VIKES_USE_AWS_SSO_LOGIN=1
