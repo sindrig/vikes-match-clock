@@ -47,6 +47,21 @@ the outage count. Probes still use a timestamp query and `cache: "no-store"`;
 recovery uses `location.replace` with the unchanged clock URL. Native injection
 on page-load completion and every minute also remains unchanged.
 
+Recovery attempts record a deadline in tab- and origin-scoped `sessionStorage`
+before navigating. The first attempt is immediate; subsequent attempts on that
+origin wait at least 60 seconds, including across fresh documents. This prevents repeated
+page-load recovery when the timestamped probe succeeds but the canonical clock
+URL still serves an error document. Deadlines that are expired, malformed or
+more than one interval in the future are ignored so stale data or a clock change
+cannot indefinitely prevent recovery. Healthy app/startup checks do not navigate
+or change this deadline.
+
+If storage access or writes fail, each document waits one full retry interval
+before allowing a recovery attempt on a later periodic check. This can delay
+initial recovery, but still bounds attempts when no deadline can survive a
+navigation. A displayed clock awaiting recovery from a sustained outage retains
+that recovery until an attempt is allowed.
+
 ## Windows runtime packaging
 
 Windows MSVC builds statically link the C/C++ runtime via `.cargo/config.toml`.
@@ -99,6 +114,16 @@ Run `node --test scripts/probe.test.cjs` in `kiosk/` for connectivity probe
 regressions, and `cargo test --locked` in `src-tauri` for the Rust tests. The
 release workflow runs both on Windows before building the installers.
 
+With `clock/`'s Playwright dependency and Chromium installed, run
+`node kiosk/scripts/probe.browser.cjs` from the repository root for isolated
+loopback HTTP browser regressions. It reinjects the probe after every real page
+load and waits through real 60-second retry intervals, including with denied
+storage. Optional arguments are a probe source path and a JSON evidence path;
+`--loop-only` after those arguments selects just the repeated-navigation case.
+It uses fresh browser contexts and closes its browser and local servers. No
+application scripts, Firebase or external origins are loaded. This is JavaScript
+verification, not Windows/WebView2 qualification.
+
 For a Windows multi-monitor smoke test:
 
 1. Start the kiosk and move it to the secondary screen using the shortcut above.
@@ -132,6 +157,12 @@ For a network recovery smoke test:
    recovery navigation. Delay React startup with an empty `#root` and verify no
    repeated navigation. Exercise the actual WebView2 network-error document as
    well as the server's same-origin HTTP error document.
+7. Keep canonical `/` serving 503 without `#root` while timestamped probes return
+   a 200 app shell. Verify the first recovery attempt is immediate and repeated
+   page-load injections cannot trigger another attempt within 60 seconds. Restore
+   the canonical page and verify a later check recovers it. Repeat with storage
+   unavailable: each fresh document must wait a full interval before attempting
+   recovery, including the initial attempt.
 
 **Qualification HOLD:** local Node/Chromium checks do not qualify Windows or
 WebView2 error-page injection, native retry timing, monitor persistence or
