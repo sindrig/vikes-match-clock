@@ -1704,6 +1704,15 @@ config, screen and mapping metadata. Reads never migrate persisted documents.
 mapping edits retain legacy aliases/array indices and fully write missing
 defaulted objects on first edit.
 
+`LocationsManager` derives its editor remount keys from the venue key and known
+editable fields only. Unrelated metadata snapshots preserve open panels and
+unsaved drafts; changes to known venue/screen/mapping fields still refresh the
+editor, and a different venue key starts a separate draft. Screen drafts and
+save comparisons also project only editable fields, so saving after an unknown
+config, screen or style metadata update cannot restore stale metadata from the
+draft. Leaf writes still use the latest canonical `Venue.document` for stored
+paths and defaulted branches.
+
 ### The `listenPrefix` System
 
 The `listenPrefix` (e.g., `"vikinni"`, `"hasteinsvollur"`) determines which Firebase path the instance subscribes to:

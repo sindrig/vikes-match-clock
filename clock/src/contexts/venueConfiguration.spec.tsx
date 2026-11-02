@@ -203,6 +203,211 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+it("coordinator regression: preserves an edit when unrelated venue metadata changes", () => {
+  renderVenue({ admin: true });
+  fireEvent.click(screen.getByText("Test venue"));
+  fireEvent.change(screen.getByDisplayValue("2492"), {
+    target: { value: "2058" },
+  });
+  expect(screen.getByDisplayValue("2058")).toBeInTheDocument();
+  act(() => {
+    locations = {
+      ...locations,
+      "test-venue": {
+        ...storedVenue(),
+        futureVenue: { keep: [1, 2, 3] },
+      },
+    };
+    emitLocations();
+  });
+  expect(screen.getByDisplayValue("2058")).toBeInTheDocument();
+  expect(record(storedVenue().config).homeTeam).toBe(2492);
+  expect(
+    screen.getByRole("button", { name: "Vista breytingar" }),
+  ).toBeInTheDocument();
+});
+
+describe("admin drafts across venue snapshots", () => {
+  it.each(["array", "map"])(
+    "saves edits without reverting changed, added or removed metadata in a screen %s",
+    async (shape) => {
+      const childKey = shape === "array" ? "0" : "main-screen";
+      const mainScreen = {
+        key: "main",
+        name: "Main",
+        futureScreen: { revision: 1 },
+        removedScreen: true,
+        style: {
+          width: 512,
+          height: 400,
+          calibration: { revision: 1 },
+          removedStyle: true,
+        },
+      };
+      storedVenue().screens =
+        shape === "array" ? [mainScreen] : { [childKey]: mainScreen };
+      record(storedVenue().config).removedConfig = true;
+      renderVenue({ admin: true, metadata: true });
+      fireEvent.click(screen.getByText("Test venue"));
+      fireEvent.change(screen.getByLabelText("Heimalið (ID)"), {
+        target: { value: "2058" },
+      });
+      fireEvent.change(screen.getByPlaceholderText("Nafn"), {
+        target: { value: "Edited main" },
+      });
+      fireEvent.change(screen.getByDisplayValue("512"), {
+        target: { value: "640" },
+      });
+
+      const latest = structuredClone(storedVenue());
+      latest.futureVenue = { keep: [1, 2, 3] };
+      const config = record(latest.config);
+      config.weatherStation = "akureyri";
+      config.future = { enabled: false };
+      config.addedConfig = true;
+      delete config.removedConfig;
+      const latestScreen = record(record(latest.screens)[childKey]);
+      latestScreen.futureScreen = { revision: 2 };
+      latestScreen.addedScreen = true;
+      delete latestScreen.removedScreen;
+      const style = record(latestScreen.style);
+      style.calibration = { revision: 2 };
+      style.addedStyle = true;
+      delete style.removedStyle;
+      act(() => {
+        locations = { ...locations, "test-venue": latest };
+        emitLocations();
+      });
+
+      expect(screen.getByDisplayValue("2058")).toBeInTheDocument();
+      expect(screen.getByDisplayValue("Edited main")).toBeInTheDocument();
+      expect(screen.getByDisplayValue("640")).toBeInTheDocument();
+      expect(update).not.toHaveBeenCalled();
+      const expectedChanges = {
+        "config/homeTeam": 2058,
+        [`screens/${childKey}/name`]: "Edited main",
+        [`screens/${childKey}/style/width`]: 640,
+      };
+      const expected = structuredClone(latest);
+      applyUpdates(expected, expectedChanges);
+      fireEvent.click(screen.getByRole("button", { name: "Vista breytingar" }));
+
+      await waitFor(() =>
+        expect(update).toHaveBeenCalledExactlyOnceWith(
+          "locations/test-venue",
+          expectedChanges,
+        ),
+      );
+      expect(storedVenue()).toEqual(expected);
+      expectTeamRequest(
+        await fetchTodaysMatches(),
+        2058,
+        new Date().toISOString().slice(0, 10),
+      );
+      expect(set).not.toHaveBeenCalled();
+    },
+  );
+
+  it("does not restore removed style metadata when edited default dimensions need materializing", async () => {
+    storedVenue().screens = {
+      main: {
+        key: "main",
+        name: "Main",
+        style: { width: 512, height: 400, calibration: "old" },
+      },
+    };
+    renderVenue({ admin: true });
+    fireEvent.click(screen.getByText("Test venue"));
+    fireEvent.change(screen.getByDisplayValue("512"), {
+      target: { value: "640" },
+    });
+    const latest = structuredClone(storedVenue());
+    delete record(record(latest.screens).main).style;
+    act(() => {
+      locations = { ...locations, "test-venue": latest };
+      emitLocations();
+    });
+    expect(screen.getByDisplayValue("640")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Vista breytingar" }));
+
+    await waitFor(() =>
+      expect(update).toHaveBeenCalledExactlyOnceWith("locations/test-venue", {
+        "screens/main/style": { width: 640, height: 400 },
+      }),
+    );
+    expect(record(record(storedVenue().screens).main).style).toEqual({
+      width: 640,
+      height: 400,
+    });
+  });
+
+  it.each([
+    { path: "label", value: "Updated venue" },
+    { path: "config/homeTeam", value: 2500 },
+    { path: "pitchIds", value: [104, 105] },
+    { path: "screens/0/name", value: "Updated main" },
+    { path: "screens/0/key", value: "new-main" },
+    { path: "screens/0/fontSize", value: "120%" },
+    { path: "screens/0/style/width", value: 640 },
+    { path: "screens/0/style/height", value: 480 },
+    { path: "perimeterDisplay/playback/cueDurationMs", value: 30_000 },
+  ])("refreshes drafts when the known $path changes", ({ path, value }) => {
+    storedVenue().screens = [
+      { key: "main", name: "Main", style: { width: 512, height: 400 } },
+    ];
+    storedVenue().perimeterDisplay = minimalPerimeterDisplay;
+    renderVenue({ admin: true });
+    fireEvent.click(screen.getByText("Test venue"));
+    fireEvent.change(screen.getByLabelText("Heimalið (ID)"), {
+      target: { value: "2058" },
+    });
+    const latest = structuredClone(storedVenue());
+    applyUpdates(latest, { [path]: value });
+    act(() => {
+      locations = { ...locations, "test-venue": latest };
+      emitLocations();
+    });
+
+    expect(screen.queryByDisplayValue("2058")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Vista breytingar" }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(
+      screen.getByText(path === "label" ? "Updated venue" : "Test venue"),
+    );
+    const displayedValue =
+      path === "perimeterDisplay/playback/cueDurationMs"
+        ? "30"
+        : Array.isArray(value)
+          ? value.join(", ")
+          : String(value);
+    expect(screen.getByDisplayValue(displayedValue)).toBeInTheDocument();
+    expect(update).not.toHaveBeenCalled();
+    expect(set).not.toHaveBeenCalled();
+  });
+
+  it("does not carry a draft to a different venue with identical fields", () => {
+    renderVenue({ admin: true });
+    fireEvent.click(screen.getByText("Test venue"));
+    fireEvent.change(screen.getByLabelText("Heimalið (ID)"), {
+      target: { value: "2058" },
+    });
+    act(() => {
+      locations = { "other-venue": structuredClone(storedVenue()) };
+      emitLocations();
+    });
+    expect(screen.getByText("other-venue")).toBeInTheDocument();
+    expect(screen.queryByDisplayValue("2058")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("Test venue"));
+    expect(screen.getByDisplayValue("2492")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Vista breytingar" }),
+    ).not.toBeInTheDocument();
+    expect(update).not.toHaveBeenCalled();
+    expect(set).not.toHaveBeenCalled();
+  });
+});
+
 describe("saved venue configuration to generated API requests", () => {
   it.each([false, true])(
     "sends the non-default saved home team unchanged (scoreboard screen: %s)",
@@ -409,19 +614,30 @@ describe("admin metadata roundtrip", () => {
     expect(set).not.toHaveBeenCalled();
   });
 
-  it("publishes mapping edits without replacing venue or unknown mapping fields", async () => {
+  it("keeps mapping drafts and publishes without reverting incoming unknown mapping metadata", async () => {
     storedVenue().perimeterDisplay = {
       ...minimalPerimeterDisplay,
       futureMapping: true,
       playback: { ...minimalPerimeterDisplay.playback, futurePlayback: true },
       regions: [{ ...minimalPerimeterDisplay.regions[0], futureRegion: true }],
     };
-    const original = structuredClone(storedVenue());
     renderVenue({ admin: true });
     fireEvent.click(screen.getByText("Test venue"));
     fireEvent.change(screen.getByLabelText("cue duration seconds"), {
       target: { value: "30" },
     });
+    const latest = structuredClone(storedVenue());
+    const mapping = record(latest.perimeterDisplay);
+    mapping.futureMapping = { revision: 2 };
+    record(mapping.playback).futurePlayback = "new metadata";
+    record(record(mapping.regions)["0"]).futureRegion = { revision: 2 };
+    act(() => {
+      locations = { ...locations, "test-venue": latest };
+      emitLocations();
+    });
+    expect(screen.getByLabelText("cue duration seconds")).toHaveValue("30");
+    expect(update).not.toHaveBeenCalled();
+    const original = structuredClone(storedVenue());
     fireEvent.click(screen.getByRole("button", { name: "Publish" }));
     await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
     const changes: unknown = vi.mocked(update).mock.calls[0]?.[1];

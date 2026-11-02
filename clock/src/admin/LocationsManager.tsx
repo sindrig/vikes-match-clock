@@ -19,6 +19,28 @@ import "./LocationsManager.css";
 
 type LocationsMap = Record<string, Venue>;
 
+// Drafts, diffs and remount keys use only fields this form edits. Keep the
+// canonical venue's unknown metadata out of drafts so saving cannot revert it.
+function editableLocation(location: Venue): Venue {
+  return {
+    label: location.label,
+    pitchIds: location.pitchIds,
+    config: { homeTeam: location.config.homeTeam },
+    screens: Object.fromEntries(
+      Object.entries(location.screens).map(([key, screen]) => [
+        key,
+        {
+          key: screen.key,
+          name: screen.name,
+          fontSize: screen.fontSize,
+          style: { width: screen.style.width, height: screen.style.height },
+        },
+      ]),
+    ),
+    perimeterDisplay: location.perimeterDisplay,
+  };
+}
+
 function slugify(text: string): string {
   return text
     .toLowerCase()
@@ -134,7 +156,9 @@ function LocationEditor({
   const [homeTeam, setHomeTeam] = useState<number | string | null>(
     location.config.homeTeam ?? null,
   );
-  const [screens, setScreens] = useState(location.screens);
+  const [screens, setScreens] = useState(
+    () => editableLocation(location).screens,
+  );
   const [perimeterDisplay, setPerimeterDisplay] = useState(
     location.perimeterDisplay,
   );
@@ -165,7 +189,7 @@ function LocationEditor({
           "config/homeTeam",
         ),
         ...metadataUpdates(
-          location.screens,
+          editableLocation(location).screens,
           screens,
           "screens",
           location.document?.screens,
@@ -556,7 +580,7 @@ export function LocationsManager() {
       ) : (
         entries.map(([key, loc]) => (
           <LocationEditor
-            key={`${key}-${JSON.stringify(loc)}`}
+            key={`${key}-${JSON.stringify(editableLocation(loc))}`}
             venueKey={key}
             location={loc}
           />
