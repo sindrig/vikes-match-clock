@@ -94,6 +94,7 @@ let sdkUser: User | null;
 let connected = true;
 let deliverWrites = true;
 const subscriptions = new Map<string, Set<Subscription>>();
+const pausedVenues = new Set<string>();
 const operator = { uid: "operator", email: "local@example.test" } as User;
 const player = { id: 10, name: "Jón", number: 7, show: true };
 type PlayerAsset = NonNullable<
@@ -270,6 +271,7 @@ beforeEach(() => {
   connected = true;
   deliverWrites = true;
   subscriptions.clear();
+  pausedVenues.clear();
   localStorage.clear();
   sessionStorage.clear();
   localStorage.setItem("clock_listenPrefix", "A");
@@ -351,7 +353,8 @@ beforeEach(() => {
     const callbacks = subscriptions.get(path) ?? new Set<Subscription>();
     callbacks.add(callback);
     subscriptions.set(path, callbacks);
-    callback({ val: () => read(path) } as DataSnapshot);
+    if (!pausedVenues.has(path.split("/")[1] ?? ""))
+      callback({ val: () => read(path) } as DataSnapshot);
     return () => {
       callbacks.delete(callback);
     };
@@ -396,6 +399,223 @@ afterEach(() => {
   Object.defineProperty(document, "hidden", {
     configurable: true,
     value: false,
+  });
+});
+
+describe("initial subscription readiness and freshness handshake", () => {
+  const required = [
+    "match",
+    "controller",
+    "view",
+    "clubOverrides",
+    "perimeter",
+  ];
+  const cases = [false, true].flatMap((startup) =>
+    required.map((last) => ({ startup, last })),
+  );
+
+  function loading(startup: boolean) {
+    const location = startup ? "A" : "B";
+    if (startup) pausedVenues.add(location);
+    mount();
+    const retained = currentApi;
+    if (!startup) {
+      expect(currentApi.writeEligible).toBe(true);
+      pausedVenues.add(location);
+      act(() => local.setListenPrefix(location));
+    }
+    expect(currentApi.ready).toBe(false);
+    expect(currentApi.writeEligible).toBe(false);
+    clearAttempts();
+    return { location, retained };
+  }
+  function deliver(location: string, leaf: string) {
+    act(() => emit(`states/${location}/${leaf}`));
+  }
+  async function blocked(api = currentApi) {
+    await act(async () => {
+      await expect(api.setPerimeterBrightness(45)).rejects.toBeInstanceOf(
+        MutationRejectedError,
+      );
+    });
+    noAttempts();
+  }
+  async function saved(location: string, retained: Api) {
+    expect(currentApi.ready).toBe(true);
+    expect(currentApi.writeFreshness).toBe("ready");
+    expect(currentApi.writeEligible).toBe(true);
+    await blocked(retained);
+    await act(async () => currentApi.setPerimeterBrightness(45));
+    expect(read(`states/${location}/perimeter/brightness`)).toBe(45);
+    expect(firebaseDatabase.writeAudited).toHaveBeenCalledTimes(1);
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(firebaseDatabase.writeAuditOnly).not.toHaveBeenCalled();
+    expect(read(`audit/${location}`)).not.toBeNull();
+    clearAttempts();
+    act(() => {
+      hidden(true);
+      hidden(false);
+    });
+    expect(currentApi.writeEligible).toBe(true);
+    await blocked(retained);
+  }
+
+  it.each(cases)(
+    "recovers after hide/resume during loading (startup=$startup, last=$last)",
+    async ({ startup, last }) => {
+      const { location, retained } = loading(startup);
+      act(() => {
+        hidden(true);
+        hidden(false);
+      });
+      for (const leaf of required.filter((leaf) => leaf !== last)) {
+        deliver(location, leaf);
+        expect(currentApi.ready).toBe(false);
+        await blocked();
+      }
+      deliver(location, last);
+      await saved(location, retained);
+    },
+  );
+
+  it.each(cases)(
+    "finishes an undropped resume with only the missing initial snapshot (startup=$startup, last=$last)",
+    async ({ startup, last }) => {
+      const { location, retained } = loading(startup);
+      for (const leaf of required.filter((leaf) => leaf !== last))
+        deliver(location, leaf);
+      act(() => {
+        hidden(true);
+        hidden(false);
+      });
+      await blocked();
+      deliver(location, last);
+      await saved(location, retained);
+    },
+  );
+
+  it.each([false, true])(
+    "keeps reconnect proof received before the final non-core initial snapshot (startup=%s)",
+    async (startup) => {
+      const { location, retained } = loading(startup);
+      act(() => {
+        window.dispatchEvent(new Event("offline"));
+        connected = false;
+        emit(".info/connected");
+        window.dispatchEvent(new Event("online"));
+        connected = true;
+        emit(".info/connected");
+      });
+      for (const leaf of required.filter((leaf) => leaf !== "perimeter"))
+        deliver(location, leaf);
+      expect(currentApi.ready).toBe(false);
+      await blocked();
+      deliver(location, "perimeter");
+      await saved(location, retained);
+    },
+  );
+
+  it.each([false, true])(
+    "requires a connected core delivery when all initial snapshots precede reconnect (startup=%s)",
+    async (startup) => {
+      const { location, retained } = loading(startup);
+      act(() => {
+        connected = false;
+        emit(".info/connected");
+        window.dispatchEvent(new Event("offline"));
+      });
+      for (const leaf of required) deliver(location, leaf);
+      expect(currentApi.ready).toBe(true);
+      await blocked();
+      act(() => {
+        connected = true;
+        emit(".info/connected");
+        window.dispatchEvent(new Event("online"));
+      });
+      deliver(location, "perimeter");
+      deliver(location, "clubOverrides");
+      await blocked();
+      deliver(location, "view");
+      await saved(location, retained);
+    },
+  );
+
+  it("finishes startup after initial disconnected snapshots and a connected core delivery", async () => {
+    connected = false;
+    const { location, retained } = loading(true);
+    for (const leaf of required) deliver(location, leaf);
+    await blocked();
+    act(() => {
+      connected = true;
+      emit(".info/connected");
+    });
+    await blocked();
+    deliver(location, "match");
+    await saved(location, retained);
+  });
+
+  it("requires post-drop core proof when connectivity drops during partial loading without browser events", async () => {
+    const { location, retained } = loading(false);
+    for (const leaf of ["match", "controller", "view"]) deliver(location, leaf);
+    act(() => {
+      connected = false;
+      emit(".info/connected");
+      connected = true;
+      emit(".info/connected");
+    });
+    deliver(location, "clubOverrides");
+    deliver(location, "perimeter");
+    await blocked();
+    deliver(location, "controller");
+    await saved(location, retained);
+  });
+
+  it.each([false, true])(
+    "waits for visibility when initial snapshots finish while hidden (startup=%s)",
+    async (startup) => {
+      const { location, retained } = loading(startup);
+      act(() => hidden(true));
+      for (const leaf of required) deliver(location, leaf);
+      expect(currentApi.ready).toBe(true);
+      await blocked();
+      act(() => hidden(false));
+      await saved(location, retained);
+    },
+  );
+
+  it("does not use a prior scope's callbacks as readiness or reconnect proof after A -> B -> A", async () => {
+    mount();
+    const retained = currentApi;
+    const prior = [...subscriptions.entries()].flatMap(([path, callbacks]) =>
+      path.startsWith("states/A/")
+        ? [...callbacks].map((callback) => ({ path, callback }))
+        : [],
+    );
+    pausedVenues.add("A");
+    act(() => {
+      local.setListenPrefix("B");
+      local.setListenPrefix("A");
+    });
+    act(() => {
+      hidden(true);
+      connected = false;
+      emit(".info/connected");
+      connected = true;
+      emit(".info/connected");
+      hidden(false);
+      for (const { callback } of prior)
+        callback({ val: () => ({ homeScore: 999 }) } as DataSnapshot);
+    });
+    expect(currentApi.ready).toBe(true); // The rendered data can remain ready across ABA.
+    expect(currentApi.writeEligible).toBe(false);
+    expect(currentApi.match.homeScore).toBe(2);
+    clearAttempts();
+    await blocked();
+    for (const leaf of required.filter((leaf) => leaf !== "perimeter"))
+      deliver("A", leaf);
+    await blocked();
+    deliver("A", "perimeter");
+    await saved("A", retained);
   });
 });
 

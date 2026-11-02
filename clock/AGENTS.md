@@ -84,7 +84,15 @@ core subscription delivers a post-resume/reconnect snapshot. A resume whose
 Firebase connection never dropped (no `/.info/connected` false observed while
 suspended and still connected on return) restores `ready` immediately, because
 the existing subscription epoch is still current and no `onValue` delivery
-would otherwise fire when no data changed. Rendering exposes
+would otherwise fire when no data changed. Initial readiness separately requires
+all five current-scope subscriptions (match, controller, view, clubOverrides,
+perimeter). A connected core delivery during loading records resynchronization
+proof without enabling writes early; the last required snapshot may then finish
+readiness, including a non-core delivery. If an undropped resume follows the
+initial core deliveries, the last required snapshot completes readiness without
+another core update. A disconnect during loading still requires connected core
+proof; connection alone, non-core updates, and prior-scope callbacks cannot
+supply it. Rendering exposes
 `writeEligible`; submission also checks the synchronously updated `MutationSession`
 and its render-bound origin. Hide/resume, venue changes (including A → B → A),
 and logout/login permanently obsolete retained callbacks. The Auth SDK UID is

@@ -309,6 +309,119 @@ for (const boundary of ["hide-resume", "ABA"] as const) {
   });
 }
 
+for (const resumeAfterCore of [false, true]) {
+  test(`initial venue snapshots finish readiness after resume (core delivered before resume: ${resumeAfterCore})`, async ({
+    page,
+  }) => {
+    let paused = false;
+    const held: Array<{ path?: string; send: () => void }> = [];
+    // Pause every incoming frame, including acknowledgements, so delivery
+    // order remains the real emulator's order. No snapshots are discarded.
+    await page.routeWebSocket(/127\.0\.0\.1:9000/, (socket) => {
+      const server = socket.connectToServer();
+      socket.onMessage((message) => server.send(message));
+      server.onMessage((message) => {
+        const payload = JSON.parse(String(message)) as {
+          d?: { b?: { p?: string } };
+        };
+        const send = () => socket.send(message);
+        if (paused) held.push({ path: payload.d?.b?.p, send });
+        else send();
+      });
+    });
+    await bootstrap(page);
+    const before = await rest("GET", `states/${venue}`);
+    const otherBefore = await rest("GET", `states/${other}`);
+    paused = true;
+    await page.evaluate((location) => {
+      const h = window.sessionMutationHarness;
+      h.retain();
+      h.venue(location);
+    }, other);
+    await expect
+      .poll(() => held.some(({ path }) => path === `states/${other}/perimeter`))
+      .toBe(true);
+    expect(
+      await page.evaluate(() => window.sessionMutationHarness.snapshot().ready),
+    ).toBe(false);
+    const resume = () =>
+      page.evaluate(() => {
+        const h = window.sessionMutationHarness;
+        h.hide(true);
+        h.hide(false);
+      });
+    if (!resumeAfterCore) await resume();
+    const partialPaths: Array<string | undefined> = [];
+    while (held.length) {
+      const message = held.shift();
+      if (!message) throw new Error("Missing paused frame");
+      partialPaths.push(message.path);
+      message.send();
+      if (message.path === `states/${other}/clubOverrides`) break;
+    }
+    expect(partialPaths).toContain(`states/${other}/match`);
+    expect(partialPaths).not.toContain(`states/${other}/perimeter`);
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => window.sessionMutationHarness.snapshot().match.homeScore,
+        ),
+      )
+      .toBe(90);
+    if (resumeAfterCore) await resume();
+    expect(
+      await page.evaluate(() => window.sessionMutationHarness.snapshot().ready),
+    ).toBe(false);
+    expect(
+      await page.evaluate(() =>
+        window.sessionMutationHarness.brightness(45).then(
+          () => "accepted",
+          () => "blocked",
+        ),
+      ),
+    ).toBe("blocked");
+    await noAttempts(page, before);
+    expect(await rest("GET", `states/${other}`)).toEqual(otherBefore);
+    paused = false;
+    for (const message of held.splice(0)) message.send();
+    await expect
+      .poll(() =>
+        page.evaluate(() => window.sessionMutationHarness.snapshot().ready),
+      )
+      .toBe(true);
+    expect(
+      await page.evaluate(() => window.sessionMutationHarness.snapshot()),
+    ).toMatchObject({
+      eligible: true,
+      freshness: "ready",
+      location: other,
+      match: { homeScore: 90 },
+    });
+    expect(
+      await page.evaluate(() => window.sessionMutationHarness.oldCommands()),
+    ).toEqual(["rejected", "rejected", "rejected", "rejected"]);
+    await noAttempts(page, before);
+    await page.evaluate(() => window.sessionMutationHarness.brightness(45));
+    expect(await rest("GET", `states/${other}/perimeter/brightness`)).toBe(45);
+    const audit = Object.values(
+      (await rest("GET", `audit/${other}`)) as Record<
+        string,
+        { uid: string; action: string; timestamp: number; sessionId: string }
+      >,
+    );
+    expect(audit).toHaveLength(1);
+    expect(audit[0]).toMatchObject({ uid, action: "perimeter.set-brightness" });
+    expect(audit[0]?.sessionId).toBeTruthy();
+    expect(Math.abs((audit[0]?.timestamp ?? 0) - Date.now())).toBeLessThan(
+      30000,
+    );
+    expect(await rest("GET", `states/${venue}`)).toEqual(before);
+    expect(
+      await page.evaluate(() => window.sessionMutationHarness.counts),
+    ).toMatchObject({ ordinary: 1, auditOnly: 0, sdk: ["merge:/"] });
+  });
+}
+
 test("fresh scorer, brightness and auto config commit with accountable server-timestamped audits", async ({
   page,
 }) => {

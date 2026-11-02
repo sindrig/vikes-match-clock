@@ -83,6 +83,7 @@ function hidden(value: boolean) {
 export const harness = {
   emulator: app.options.databaseURL,
   snapshot: () => ({
+    ready: api.ready,
     eligible: api.writeEligible,
     freshness: api.writeFreshness,
     location: local.listenPrefix,
@@ -129,6 +130,7 @@ export const harness = {
   retain: () => {
     retained = api;
   },
+  brightness: (percent: number) => api.setPerimeterBrightness(percent),
   oldCommands: async () => {
     retained.addGoal("home");
     retained.setBackground("Obsolete");

@@ -17,6 +17,17 @@ retained callback. Unmount invalidates the scope. Old subscription callbacks
 cannot populate a replacement scope or make it eligible. Resume cannot bypass
 initial subscription readiness.
 
+Initial readiness and reconnect proof can arrive in either order. All five
+required subscriptions (match, controller, view, clubOverrides, perimeter) must
+deliver for the current scope. A connected core snapshot can satisfy a pending
+resync while those initial deliveries are incomplete; it does not yet enable
+writes. Once all required snapshots arrive, that proof allows a fresh command
+without an unrelated core update. An undropped resume can also finish on the
+last initial snapshot when the core snapshots arrived before resume. A drop
+during loading or initially disconnected startup requires a connected core
+delivery; connection alone and non-core updates cannot clear that barrier.
+Neither path restores any retained command origin.
+
 Callbacks must retain their original command function across asynchronous
 preparation. Do not replace it with a mutable ref to the newest callback: that
 would turn an old intention into a new command. The boundary rejects before

@@ -589,8 +589,10 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   // delivered a snapshot after the tab became visible or online again.
   const markSubscriptionDelivered = useCallback(() => {
     if (!resyncPendingRef.current) return;
-    if (readyScopeRef.current !== session.getSnapshot().scope) return;
     if (!firebaseConnectedRef.current) return;
+    // Active subscription callbacks may prove resynchronization before all
+    // initial venue snapshots arrive. Keep that proof; checkReady still owns
+    // the all-required-snapshots gate for this scope.
     resyncPendingRef.current = false;
     suspendedDropRef.current = false;
     // A core subscription delivery after a resume is proof the SDK
@@ -598,7 +600,10 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     // change or a reconnect re-sync), so the client is eligible again.
     // `navigator.onLine` is intentionally not consulted: it is unreliable and
     // a genuinely offline client simply never receives a delivery.
-    if (typeof document === "undefined" || !document.hidden) {
+    if (
+      readyScopeRef.current === session.getSnapshot().scope &&
+      (typeof document === "undefined" || !document.hidden)
+    ) {
       setWriteFreshness("ready");
     }
   }, [session, setWriteFreshness]);
@@ -689,9 +694,9 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       const connected = snapshot.val() === true;
       firebaseConnectedRef.current = connected;
       if (connected) return;
+      resyncPendingRef.current = true;
       suspendedDropRef.current = true;
       if (!document.hidden && session.getSnapshot().freshness === "ready") {
-        resyncPendingRef.current = true;
         setWriteFreshness("resyncing");
       }
     });
@@ -780,8 +785,9 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       // Reset the transition baseline so a new venue's loaded view is treated
       // as an initial load, never a stale cross-venue transition.
       prevControllerViewRef.current = null;
-      // A new venue is a fresh initial load: no resume epoch is pending.
-      resyncPendingRef.current = false;
+      // A new venue needs all initial snapshots, and if disconnected it also
+      // needs a connected core delivery before it can become eligible.
+      resyncPendingRef.current = !firebaseConnectedRef.current;
 
       let active = true;
       const subscriptionScope = session.getSnapshot();
@@ -807,14 +813,17 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         ) {
           setReady(true);
           readyScopeRef.current = subscriptionScope.scope;
-          // Initial load becomes write-eligible once all required venue
-          // subscriptions have delivered (unless a hide/offline event raced
-          // in before the last delivery).
+          // Readiness and resynchronization can finish in either order. An
+          // undropped resume also needs no extra core update once the last
+          // required initial snapshot arrives, even if it is non-core.
           if (
-            !resyncPendingRef.current &&
+            (!resyncPendingRef.current ||
+              (!suspendedDropRef.current &&
+                session.getSnapshot().freshness === "resyncing")) &&
             !document.hidden &&
             firebaseConnectedRef.current
           ) {
+            resyncPendingRef.current = false;
             suspendedDropRef.current = false;
             setWriteFreshness("ready");
           }
