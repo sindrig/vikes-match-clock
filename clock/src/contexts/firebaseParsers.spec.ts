@@ -97,12 +97,12 @@ describe("firebaseParsers", () => {
 
     it("handles array input (coerces to object)", () => {
       const result = parseLocations([]);
-      expect(result).toEqual({ available: [], screens: [] });
+      expect(result).toEqual({ available: [], venues: {}, screens: [] });
     });
 
     it("returns empty object with empty input", () => {
       const result = parseLocations({});
-      expect(result).toEqual({ available: [], screens: [] });
+      expect(result).toEqual({ available: [], venues: {}, screens: [] });
     });
 
     it("parses single location with screens", () => {
@@ -131,6 +131,7 @@ describe("firebaseParsers", () => {
         },
         label: "Viken",
         key: "viken",
+        pitchIds: [],
       });
     });
 
@@ -217,15 +218,15 @@ describe("firebaseParsers", () => {
               key: "main",
             },
           ],
-          pitchIds: ["pitch1", "pitch2"],
+          pitchIds: [102, "103"],
         },
       };
 
       const result = parseLocations(data);
-      expect(result!.screens[0]!.pitchIds).toEqual(["pitch1", "pitch2"]);
+      expect(result!.screens[0]!.pitchIds).toEqual([102, 103]);
     });
 
-    it("omits pitchIds when not present", () => {
+    it("defaults pitchIds to an empty list when not present", () => {
       const data = {
         viken: {
           label: "Viken",
@@ -240,7 +241,7 @@ describe("firebaseParsers", () => {
       };
 
       const result = parseLocations(data);
-      expect(result!.screens[0]!.pitchIds).toBeUndefined();
+      expect(result!.screens[0]!.pitchIds).toEqual([]);
     });
 
     it("skips invalid location values", () => {

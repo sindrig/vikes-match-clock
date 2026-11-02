@@ -148,7 +148,11 @@ const createMockLocalState = (
 beforeEach(() => {
   vi.clearAllMocks();
   mockedUsePerimeter.mockReturnValue(createMockPerimeterReturn());
-  mockedUseListeners.mockReturnValue({ available: [], screens: [] });
+  mockedUseListeners.mockReturnValue({
+    available: [],
+    venues: {},
+    screens: [],
+  });
   mockedUseLocalState.mockReturnValue(createMockLocalState());
   mockedUseController.mockReturnValue({
     controller: { roster: { home: [], away: [] } },
@@ -175,23 +179,21 @@ describe("PerimeterControl", () => {
     expect(setPerimeterState).toHaveBeenCalledWith("on");
   });
 
-  const mockWebVenueScreens = [
-    {
-      key: "test-location",
+  const mockWebVenues = {
+    "test-location": {
       label: "Test location",
-      screen: {} as never,
+      pitchIds: [],
+      config: {},
+      screens: {},
       perimeterDisplay: {
         renderer: "web",
-        compatibilityKeys: {
-          base: { "1": "left" },
-          overlay: {},
-        },
+        compatibilityKeys: { base: { "1": "left" }, overlay: {} },
         logicalScreens: {
           left: { id: "left", name: "Left", width: 4, height: 1 },
         },
       } as never,
     },
-  ];
+  };
 
   const webVenueAdLayout = {
     version: 1,
@@ -210,7 +212,8 @@ describe("PerimeterControl", () => {
     const skipPerimeterCue = vi.fn();
     mockedUseListeners.mockReturnValue({
       available: [],
-      screens: mockWebVenueScreens,
+      venues: mockWebVenues,
+      screens: [],
     });
     mockedUsePerimeter.mockReturnValue(
       createMockPerimeterReturn({
@@ -233,7 +236,8 @@ describe("PerimeterControl", () => {
   it("disables the skip-forward button while the perimeter is off", () => {
     mockedUseListeners.mockReturnValue({
       available: [],
-      screens: mockWebVenueScreens,
+      venues: mockWebVenues,
+      screens: [],
     });
     mockedUsePerimeter.mockReturnValue(
       createMockPerimeterReturn({
@@ -252,7 +256,8 @@ describe("PerimeterControl", () => {
   it("shows the brightness section on a web venue", () => {
     mockedUseListeners.mockReturnValue({
       available: [],
-      screens: mockWebVenueScreens,
+      venues: mockWebVenues,
+      screens: [],
     });
     mockedUsePerimeter.mockReturnValue(
       createMockPerimeterReturn({
@@ -273,7 +278,8 @@ describe("PerimeterControl", () => {
   it("hides the brightness section at venues without a brightness controller", () => {
     mockedUseListeners.mockReturnValue({
       available: [],
-      screens: mockWebVenueScreens,
+      venues: mockWebVenues,
+      screens: [],
     });
     mockedUseLocalState.mockReturnValue(
       createMockLocalState({ listenPrefix: "virkid" }),
@@ -320,7 +326,8 @@ describe("PerimeterControl", () => {
   it("shows the scorer celebration selector on a web venue with the default style active", () => {
     mockedUseListeners.mockReturnValue({
       available: [],
-      screens: mockWebVenueScreens,
+      venues: mockWebVenues,
+      screens: [],
     });
     mockedUsePerimeter.mockReturnValue(
       createMockPerimeterReturn({
@@ -346,11 +353,12 @@ describe("PerimeterControl", () => {
   it("hides the scorer celebration selector on a Resolume venue", () => {
     mockedUseListeners.mockReturnValue({
       available: [],
-      screens: [
-        {
-          key: "test-location",
+      venues: {
+        "test-location": {
           label: "Test location",
-          screen: {} as never,
+          pitchIds: [],
+          config: {},
+          screens: {},
           perimeterDisplay: {
             renderer: "resolume",
             compatibilityKeys: {
@@ -362,7 +370,8 @@ describe("PerimeterControl", () => {
             },
           } as never,
         },
-      ],
+      },
+      screens: [],
     });
     mockedUsePerimeter.mockReturnValue(
       createMockPerimeterReturn({
@@ -378,7 +387,8 @@ describe("PerimeterControl", () => {
   it("saves the idle toggle without optimistic state and reports write failures", async () => {
     mockedUseListeners.mockReturnValue({
       available: [],
-      screens: mockWebVenueScreens,
+      venues: mockWebVenues,
+      screens: [],
     });
     const save = vi.fn().mockResolvedValue(undefined);
     mockedUsePerimeter.mockReturnValue(
@@ -413,7 +423,8 @@ describe("PerimeterControl", () => {
   it("exposes the shared night blackout config next to the clock", () => {
     mockedUseListeners.mockReturnValue({
       available: [],
-      screens: mockWebVenueScreens,
+      venues: mockWebVenues,
+      screens: [],
     });
     const setBlackoutStart = vi.fn();
     const setBlackoutEnd = vi.fn();
@@ -446,7 +457,8 @@ describe("PerimeterControl", () => {
   it("writes the selected scorer celebration style", () => {
     mockedUseListeners.mockReturnValue({
       available: [],
-      screens: mockWebVenueScreens,
+      venues: mockWebVenues,
+      screens: [],
     });
     const setPerimeterScorerCelebration = vi
       .fn<ReturnType<typeof usePerimeter>["setPerimeterScorerCelebration"]>()
@@ -474,7 +486,8 @@ describe("PerimeterControl", () => {
   it("shows the player band style selector on a web venue with Default active", () => {
     mockedUseListeners.mockReturnValue({
       available: [],
-      screens: mockWebVenueScreens,
+      venues: mockWebVenues,
+      screens: [],
     });
     mockedUsePerimeter.mockReturnValue(
       createMockPerimeterReturn({
@@ -502,11 +515,12 @@ describe("PerimeterControl", () => {
   it("hides the player band style selector on a Resolume venue", () => {
     mockedUseListeners.mockReturnValue({
       available: [],
-      screens: [
-        {
-          key: "test-location",
+      venues: {
+        "test-location": {
           label: "Test location",
-          screen: {} as never,
+          pitchIds: [],
+          config: {},
+          screens: {},
           perimeterDisplay: {
             renderer: "resolume",
             compatibilityKeys: {
@@ -518,7 +532,8 @@ describe("PerimeterControl", () => {
             },
           } as never,
         },
-      ],
+      },
+      screens: [],
     });
     mockedUsePerimeter.mockReturnValue(
       createMockPerimeterReturn({
@@ -535,7 +550,8 @@ describe("PerimeterControl", () => {
   it("writes the selected player band style and disables while settling", async () => {
     mockedUseListeners.mockReturnValue({
       available: [],
-      screens: mockWebVenueScreens,
+      venues: mockWebVenues,
+      screens: [],
     });
     const setPerimeterPlayerDisplayStyle = vi
       .fn<ReturnType<typeof usePerimeter>["setPerimeterPlayerDisplayStyle"]>()
@@ -574,7 +590,8 @@ describe("PerimeterControl", () => {
   it("shows the substitution style selector on a web venue with Static active", () => {
     mockedUseListeners.mockReturnValue({
       available: [],
-      screens: mockWebVenueScreens,
+      venues: mockWebVenues,
+      screens: [],
     });
     mockedUsePerimeter.mockReturnValue(
       createMockPerimeterReturn({
@@ -602,7 +619,8 @@ describe("PerimeterControl", () => {
   it("writes the selected substitution style and disables while settling", async () => {
     mockedUseListeners.mockReturnValue({
       available: [],
-      screens: mockWebVenueScreens,
+      venues: mockWebVenues,
+      screens: [],
     });
     const setPerimeterSubstitutionStyle = vi
       .fn<ReturnType<typeof usePerimeter>["setPerimeterSubstitutionStyle"]>()
@@ -643,11 +661,12 @@ describe("PerimeterControl", () => {
       .mockResolvedValue(undefined);
     mockedUseListeners.mockReturnValue({
       available: [],
-      screens: [
-        {
-          key: "test-location",
+      venues: {
+        "test-location": {
           label: "Test location",
-          screen: {} as never,
+          pitchIds: [],
+          config: {},
+          screens: {},
           perimeterDisplay: {
             renderer: "web",
             compatibilityKeys: {
@@ -670,7 +689,8 @@ describe("PerimeterControl", () => {
             },
           } as never,
         },
-      ],
+      },
+      screens: [],
     });
     mockedUsePerimeter.mockReturnValue(
       createMockPerimeterReturn({
@@ -757,7 +777,8 @@ describe("PerimeterControl", () => {
     const restartPerimeterDisplays = vi.fn();
     mockedUseListeners.mockReturnValue({
       available: [],
-      screens: mockWebVenueScreens,
+      venues: mockWebVenues,
+      screens: [],
     });
     mockedUsePerimeter.mockReturnValue(
       createMockPerimeterReturn({
@@ -795,7 +816,8 @@ describe("PerimeterControl", () => {
   it("hides the scorer preparation panel and retry control on a web venue", () => {
     mockedUseListeners.mockReturnValue({
       available: [],
-      screens: mockWebVenueScreens,
+      venues: mockWebVenues,
+      screens: [],
     });
     mockedUsePerimeter.mockReturnValue(
       createMockPerimeterReturn({
@@ -830,18 +852,20 @@ describe("PerimeterControl", () => {
     const requestGoalScorerPreparation = vi.fn().mockResolvedValue(undefined);
     mockedUseListeners.mockReturnValue({
       available: [],
-      screens: [
-        {
-          key: "test-location",
+      venues: {
+        "test-location": {
           label: "Test location",
-          screen: {} as never,
+          pitchIds: [],
+          config: {},
+          screens: {},
           perimeterDisplay: {
             renderer: "resolume",
             compatibilityKeys: { base: {}, overlay: {} },
             logicalScreens: {},
           } as never,
         },
-      ],
+      },
+      screens: [],
     });
     mockedUseController.mockReturnValue({
       controller: {
@@ -885,11 +909,12 @@ describe("PerimeterControl", () => {
   it("derives editable lanes from a web venue mapping without daemon status", () => {
     mockedUseListeners.mockReturnValue({
       available: [],
-      screens: [
-        {
-          key: "test-location",
+      venues: {
+        "test-location": {
           label: "Test location",
-          screen: {} as never,
+          pitchIds: [],
+          config: {},
+          screens: {},
           perimeterDisplay: {
             renderer: "web",
             compatibilityKeys: {
@@ -902,7 +927,8 @@ describe("PerimeterControl", () => {
             },
           } as never,
         },
-      ],
+      },
+      screens: [],
     });
     mockedUsePerimeter.mockReturnValue(
       createMockPerimeterReturn({

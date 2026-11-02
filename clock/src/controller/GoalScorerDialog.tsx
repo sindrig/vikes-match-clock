@@ -42,15 +42,14 @@ const GoalScorerDialog = ({
 }: GoalScorerDialogProps) => {
   const { renderAsset } = useController();
   const { goalScorerPreparationStatus, setPerimeterOverlay } = usePerimeter();
-  const { screens } = useListeners();
+  const { venues } = useListeners();
   const { listenPrefix } = useRemoteSettings();
 
   // The venue's published renderer selects the overlay path: only an
   // explicit "web" mapping composes the scorer in the browser from semantic
   // data. Every other venue — including one with no published mapping
   // (all existing Resolume venues) — keeps the prepared-PNG workflow.
-  const renderer = screens.find((entry) => entry.key === listenPrefix)
-    ?.perimeterDisplay?.renderer;
+  const renderer = venues[listenPrefix]?.perimeterDisplay?.renderer;
   const isWebVenue = renderer === "web";
 
   const selectPlayer = useCallback(

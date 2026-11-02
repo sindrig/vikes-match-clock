@@ -17,8 +17,9 @@ import {
   useView,
 } from "../../../contexts/FirebaseStateContext";
 import { useRemoteSettings } from "../../../contexts/LocalStateContext";
-import { transformLineups, getTeamId } from "../../../lib/matchUtils";
+import { transformLineups } from "../../../lib/matchUtils";
 import { getLineups } from "../../../api/client";
+import { parseLocations } from "../../../contexts/firebaseParsers";
 
 vi.mock("../../../contexts/FirebaseStateContext", () => ({
   useMatch: vi.fn(),
@@ -35,9 +36,9 @@ vi.mock("../../../api/client", () => ({
   getLineups: vi.fn(),
 }));
 
-vi.mock("../../../lib/matchUtils", () => ({
+vi.mock("../../../lib/matchUtils", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../lib/matchUtils")>()),
   transformLineups: vi.fn(),
-  getTeamId: vi.fn(),
 }));
 
 vi.mock("./Team", () => ({
@@ -148,7 +149,6 @@ const mockedUseView = vi.mocked(useView);
 const mockedUseRemoteSettings = vi.mocked(useRemoteSettings);
 const mockedGetLineups = vi.mocked(getLineups);
 const mockedTransformLineups = vi.mocked(transformLineups);
-const mockedGetTeamId = vi.mocked(getTeamId);
 const mockedGetPlayerAssetObject = vi.mocked(getPlayerAssetObject);
 const mockedGetMOTMAsset = vi.mocked(getMOTMAsset);
 
@@ -264,6 +264,9 @@ function setupMocks(overrides?: {
   } as unknown as ReturnType<typeof useRemoteSettings>);
 
   mockedUseListeners.mockReturnValue({
+    venues: {
+      vikinni: { label: "vikinni", pitchIds: [], config: {}, screens: {} },
+    },
     screens: [{ key: "vikinni", teamId: 2492 }],
   } as unknown as ReturnType<typeof useListeners>);
 
@@ -271,8 +274,6 @@ function setupMocks(overrides?: {
     view: overrides?.view ?? {},
     setGoalGifSettings: vi.fn(),
   } as unknown as ReturnType<typeof useView>);
-
-  mockedGetTeamId.mockReturnValue(2492);
 
   return {
     mockClearRoster,
@@ -359,6 +360,29 @@ describe("TeamAssetController", () => {
   });
 
   describe("refetchRoster / fetch lineups by ksiMatchId", () => {
+    it("uses the configured venue ID for roster refetch without scoreboard screens", async () => {
+      setupMocks();
+      mockedUseListeners.mockReturnValue(
+        parseLocations({
+          another: { config: { homeTeam: 2390 } },
+          vikinni: { config: { homeTeam: "2058" } },
+        })!,
+      );
+      mockedGetLineups.mockResolvedValueOnce({
+        data: { home: {}, away: {} },
+      } as unknown as Awaited<ReturnType<typeof getLineups>>);
+      mockedTransformLineups.mockReturnValue({ home: [], away: [] });
+      render(<TeamAssetController previousView={mockPreviousView} />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Sækja lið" }));
+
+      await waitFor(() =>
+        expect(mockedGetLineups).toHaveBeenCalledExactlyOnceWith({
+          path: { teamId: 2058, matchId: 12345 },
+        }),
+      );
+    });
+
     it("calls fetchLineups with teamId and ksiMatchId directly", async () => {
       const { mockSetRoster } = setupMocks();
       const rosterData: Roster = {

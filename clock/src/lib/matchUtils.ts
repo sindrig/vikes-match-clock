@@ -5,13 +5,13 @@ import type {
   TeamPlayer,
 } from "../api/client";
 import type { ListenersState, Player, Roster } from "../types";
+import { parseVenueId } from "./venue";
 
 export const getTeamId = (
-  screens: ListenersState["screens"],
+  venues: ListenersState["venues"],
   listenPrefix: string,
 ): number => {
-  const screen = screens.find((s: { key?: string }) => s.key === listenPrefix);
-  return screen?.teamId ?? 2492;
+  return parseVenueId(venues[listenPrefix]?.config?.homeTeam) ?? 2492;
 };
 
 function mapRole(tp: TeamPlayer): string {

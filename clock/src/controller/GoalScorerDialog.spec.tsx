@@ -89,10 +89,12 @@ const setupContexts = (
     setPerimeterOverlay,
   } as unknown as ReturnType<typeof usePerimeter>);
   mockedUseListeners.mockReturnValue({
-    screens: [
-      {
-        key: "vikuti",
+    venues: {
+      vikuti: {
         label: "Vikuti",
+        pitchIds: [],
+        config: {},
+        screens: {},
         ...(options.renderer
           ? {
               perimeterDisplay: {
@@ -103,7 +105,8 @@ const setupContexts = (
             }
           : {}),
       },
-    ],
+    },
+    screens: [],
   } as unknown as ReturnType<typeof useListeners>);
   mockedUseRemoteSettings.mockReturnValue({
     listenPrefix: "vikuti",
@@ -362,17 +365,20 @@ describe("GoalScorerDialog", () => {
   it("keeps the Resolume prepared-file workflow for an unrecognized mapping renderer", async () => {
     setupContexts({ renderer: "resolume" });
     mockedUseListeners.mockReturnValue({
-      screens: [
-        {
-          key: "vikuti",
+      venues: {
+        vikuti: {
           label: "Vikuti",
+          pitchIds: [],
+          config: {},
+          screens: {},
           perimeterDisplay: {
             version: 1,
             revision: "r",
             renderer: "unexpected",
           },
         },
-      ],
+      },
+      screens: [],
     } as unknown as ReturnType<typeof useListeners>);
     // Unrecognized renderers never opt into browser composition, so the
     // legacy prepared-file path applies: a ready pair still replaces the

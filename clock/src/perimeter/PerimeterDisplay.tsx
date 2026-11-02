@@ -63,7 +63,7 @@ const resolveGeneration = async (source: string) => {
 
 export default function PerimeterDisplay() {
   const { listenPrefix } = useLocalState();
-  const { screens } = useListeners();
+  const { venues } = useListeners();
   const { ready, match, controller, view: viewState } = useFirebaseState();
   const { perimeter, adLayout, overlay } = usePerimeter();
   const { clubOverrides } = useClubOverrides();
@@ -112,12 +112,10 @@ export default function PerimeterDisplay() {
   }, [clubOverrides]);
   const configuration = useMemo(
     () =>
-      screens.find(
-        (entry) =>
-          entry.key === listenPrefix &&
-          entry.perimeterDisplay?.renderer === "web",
-      )?.perimeterDisplay,
-    [listenPrefix, screens],
+      venues[listenPrefix]?.perimeterDisplay?.renderer === "web"
+        ? venues[listenPrefix]?.perimeterDisplay
+        : undefined,
+    [listenPrefix, venues],
   );
 
   // Report display-side problems to the controller (Skjáarvillur). Reports

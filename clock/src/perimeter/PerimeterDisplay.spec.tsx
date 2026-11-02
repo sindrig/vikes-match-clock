@@ -123,7 +123,7 @@ const playerController = (name: string) => ({
 });
 
 const setupContexts = ({
-  screens = [{ key: "vikuti", perimeterDisplay: configuration }],
+  venues = { vikuti: { perimeterDisplay: configuration } },
   ready = true,
   adLayout = { version: 1, revision: "rev-1", columns: [] },
   overlay = null,
@@ -132,7 +132,7 @@ const setupContexts = ({
   controller,
   view = {},
 }: {
-  screens?: unknown[];
+  venues?: Record<string, unknown>;
   ready?: boolean;
   adLayout?: unknown;
   overlay?: unknown;
@@ -148,7 +148,8 @@ const setupContexts = ({
     view,
   } as unknown as ReturnType<typeof useFirebaseState>);
   mockedUseListeners.mockReturnValue({
-    screens,
+    venues,
+    screens: [],
   } as unknown as ReturnType<typeof useListeners>);
   mockedUsePerimeter.mockReturnValue({
     perimeter,
@@ -207,7 +208,7 @@ describe("PerimeterDisplay", () => {
   });
 
   it("reports a missing web mapping while no configuration exists", async () => {
-    setupContexts({ screens: [] });
+    setupContexts({ venues: {} });
 
     render(<PerimeterDisplay />);
 
@@ -227,7 +228,7 @@ describe("PerimeterDisplay", () => {
   });
 
   it("does not report before the venue state is ready", async () => {
-    setupContexts({ screens: [], ready: false });
+    setupContexts({ venues: {}, ready: false });
 
     render(<PerimeterDisplay />);
 

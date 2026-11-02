@@ -3,6 +3,8 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import Controller from "./Controller";
 import { VIEWS } from "../constants";
 import { secondStadiumWebConfiguration } from "../perimeter/fixtures";
+import { parseLocations } from "../contexts/firebaseParsers";
+import { minimalPerimeterDisplay } from "../lib/venue.fixtures";
 
 vi.mock("../contexts/FirebaseStateContext", () => ({
   useController: vi.fn(),
@@ -113,6 +115,9 @@ function setupState1() {
     view: { vp: defaultViewport, background: "Default" },
   } as unknown as ReturnType<typeof useView>);
   mockedUseListeners.mockReturnValue({
+    venues: {
+      vikinni: { label: "Víkin", pitchIds: [], config: {}, screens: {} },
+    },
     screens: [{ label: "Víkin", screen: { name: "Main" }, key: "vikinni" }],
     available: [],
   } as unknown as ReturnType<typeof useListeners>);
@@ -148,6 +153,7 @@ function setupState2() {
     view: { vp: defaultViewport, background: "Default" },
   } as unknown as ReturnType<typeof useView>);
   mockedUseListeners.mockReturnValue({
+    venues: {},
     screens: [],
     available: [],
   } as unknown as ReturnType<typeof useListeners>);
@@ -188,6 +194,7 @@ function setupState3() {
     view: { vp: defaultViewport, background: "Default" },
   } as unknown as ReturnType<typeof useView>);
   mockedUseListeners.mockReturnValue({
+    venues: {},
     screens: [],
     available: [],
   } as unknown as ReturnType<typeof useListeners>);
@@ -242,6 +249,20 @@ function setupScreenSelector(
     view: { vp: defaultViewport, background: "Default" },
   } as unknown as ReturnType<typeof useView>);
   mockedUseListeners.mockReturnValue({
+    venues: {
+      vikinni: {
+        label: "Víkingur Reykjavík",
+        pitchIds: [],
+        config: {},
+        screens: {},
+      },
+      hasteinsvollur: {
+        label: "Hásteinsvöllur",
+        pitchIds: [],
+        config: {},
+        screens: {},
+      },
+    },
     screens: [
       {
         label: "Víkingur Reykjavík",
@@ -332,6 +353,15 @@ describe("Controller", () => {
         setDisplayTarget: mockSetDisplayTarget,
       });
       mockedUseListeners.mockReturnValue({
+        venues: {
+          vikinni: {
+            label: "Víkin",
+            pitchIds: [],
+            config: {},
+            screens: {},
+            perimeterDisplay: secondStadiumWebConfiguration,
+          },
+        },
         screens: [
           {
             label: "Víkin",
@@ -368,6 +398,48 @@ describe("Controller", () => {
 
       const button = screen.getByText("Birta skjá");
       expect(button).toBeDisabled();
+    });
+
+    it("offers a web perimeter without scoreboard screens and excludes Resolume browser targets", () => {
+      setupState1();
+      const setDisplayTarget = vi.fn();
+      const setListenPrefix = vi.fn();
+      mockedUseLocalState.mockReturnValue({
+        ...mockedUseLocalState(),
+        setDisplayTarget,
+        setListenPrefix,
+      });
+      mockedUseListeners.mockReturnValue(
+        parseLocations({
+          web: {
+            label: "Web venue",
+            perimeterDisplay: minimalPerimeterDisplay,
+          },
+          resolume: {
+            label: "Resolume venue",
+            perimeterDisplay: {
+              ...minimalPerimeterDisplay,
+              renderer: "resolume",
+            },
+          },
+        })!,
+      );
+      render(<Controller />);
+
+      expect(
+        screen.getByRole("option", { name: "Web venue Perimeter" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("option", { name: "Resolume venue Perimeter" }),
+      ).not.toBeInTheDocument();
+      fireEvent.change(screen.getByRole("combobox"), {
+        target: { value: "perimeter-web" },
+      });
+      fireEvent.click(screen.getByText("Birta skjá"));
+      expect(setListenPrefix).toHaveBeenCalledExactlyOnceWith("web");
+      expect(setDisplayTarget).toHaveBeenCalledExactlyOnceWith({
+        kind: "perimeter",
+      });
     });
 
     it("email/password login does NOT call setListenPrefix", () => {
@@ -414,6 +486,15 @@ describe("Controller", () => {
       const setDisplayTarget = vi.fn();
       const { setListenPrefix } = setupScreenSelector({ setDisplayTarget });
       mockedUseListeners.mockReturnValue({
+        venues: {
+          vikinni: {
+            label: "Víkingur Reykjavík",
+            pitchIds: [],
+            config: {},
+            screens: {},
+            perimeterDisplay: secondStadiumWebConfiguration,
+          },
+        },
         screens: [
           {
             label: "Víkingur Reykjavík",
@@ -439,6 +520,41 @@ describe("Controller", () => {
       fireEvent.click(screen.getByText("Hásteinsvöllur Skjár 1"));
 
       expect(setListenPrefix).toHaveBeenCalledWith("hasteinsvollur");
+    });
+
+    it("offers perimeter-only venues only within the operator's location permissions", () => {
+      const setDisplayTarget = vi.fn();
+      const { setListenPrefix } = setupScreenSelector({
+        available: ["allowed"],
+        setDisplayTarget,
+      });
+      mockedUseListeners.mockReturnValue(
+        parseLocations({
+          allowed: {
+            label: "Allowed",
+            perimeterDisplay: minimalPerimeterDisplay,
+          },
+          denied: {
+            label: "Denied",
+            perimeterDisplay: minimalPerimeterDisplay,
+          },
+        })!,
+      );
+      render(<Controller />);
+
+      expect(
+        screen.queryByRole("button", { name: /Denied/ }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Allowed" }),
+      ).not.toBeInTheDocument();
+      fireEvent.click(
+        screen.getByRole("button", { name: "Allowed Perimeter" }),
+      );
+      expect(setListenPrefix).toHaveBeenCalledExactlyOnceWith("allowed");
+      expect(setDisplayTarget).toHaveBeenCalledExactlyOnceWith({
+        kind: "perimeter",
+      });
     });
 
     it("preserves the persisted screen choice when selecting a venue that contains it", () => {
@@ -588,6 +704,15 @@ describe("Controller", () => {
     it("does not render PerimeterControl inside the settings modal for a venue with a published mapping", () => {
       setupState3();
       mockedUseListeners.mockReturnValue({
+        venues: {
+          vikinni: {
+            label: "Víkin",
+            pitchIds: [],
+            config: {},
+            screens: {},
+            perimeterDisplay: secondStadiumWebConfiguration,
+          },
+        },
         screens: [
           {
             label: "Víkin",

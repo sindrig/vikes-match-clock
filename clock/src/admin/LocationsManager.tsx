@@ -9,33 +9,15 @@ import {
   FlexboxGrid,
 } from "rsuite";
 import PlusIcon from "@rsuite/icons/Plus";
-import { ref, onValue, set } from "firebase/database";
+import { ref, onValue, set, update } from "firebase/database";
 import { database } from "../firebase";
-import { parsePerimeterDisplay } from "../contexts/firebaseParsers";
-import type { PerimeterDisplayConfig } from "../types";
+import { parseLocations } from "../contexts/firebaseParsers";
+import { metadataUpdates, parsePitchIds, parseVenueId } from "../lib/venue";
+import type { PerimeterDisplayConfig, Venue, VenueScreen } from "../types";
 import PerimeterMappingEditor from "./PerimeterMappingEditor";
 import "./LocationsManager.css";
 
-interface ScreenDef {
-  key: string;
-  name: string;
-  fontSize: string;
-  style: { width: number; height: number };
-}
-
-interface LocationConfig {
-  homeTeam?: number;
-}
-
-interface LocationData {
-  label: string;
-  pitchIds: number[];
-  config?: LocationConfig;
-  screens: ScreenDef[];
-  perimeterDisplay?: PerimeterDisplayConfig;
-}
-
-type LocationsMap = Record<string, LocationData>;
+type LocationsMap = Record<string, Venue>;
 
 function slugify(text: string): string {
   return text
@@ -60,68 +42,8 @@ function useLocationsData(): {
     const unsubscribe = onValue(
       locRef,
       (snapshot) => {
-        const data = snapshot.val() as Record<string, unknown> | null;
-        if (data && typeof data === "object") {
-          const parsed: LocationsMap = {};
-          for (const [key, raw] of Object.entries(data)) {
-            if (raw && typeof raw === "object") {
-              const r = raw as Record<string, unknown>;
-              const screens: ScreenDef[] = [];
-              if (Array.isArray(r.screens)) {
-                for (const s of r.screens) {
-                  if (s && typeof s === "object") {
-                    const sc = s as Record<string, unknown>;
-                    const style =
-                      sc.style && typeof sc.style === "object"
-                        ? (sc.style as Record<string, unknown>)
-                        : {};
-                    screens.push({
-                      key: typeof sc.key === "string" ? sc.key : "",
-                      name: typeof sc.name === "string" ? sc.name : "",
-                      fontSize:
-                        typeof sc.fontSize === "string" ? sc.fontSize : "100%",
-                      style: {
-                        width: Number(style.width ?? 512),
-                        height: Number(style.height ?? 400),
-                      },
-                    });
-                  }
-                }
-              }
-              const pitchIds: number[] = Array.isArray(r.pitchIds)
-                ? (r.pitchIds as unknown[]).map(Number).filter((n) => !isNaN(n))
-                : [];
-              const config: LocationConfig | undefined =
-                r.config && typeof r.config === "object"
-                  ? (() => {
-                      const c = r.config as Record<string, unknown>;
-                      const cfg: LocationConfig = {};
-                      if (typeof c.homeTeam === "number")
-                        cfg.homeTeam = c.homeTeam;
-                      return Object.keys(cfg).length > 0 ? cfg : undefined;
-                    })()
-                  : undefined;
-              const perimeterDisplay = parsePerimeterDisplay(
-                r.perimeterDisplay,
-              );
-              parsed[key] = {
-                label:
-                  typeof r.label === "string"
-                    ? r.label
-                    : typeof r.name === "string"
-                      ? r.name
-                      : key,
-                pitchIds,
-                config,
-                screens,
-                perimeterDisplay,
-              };
-            }
-          }
-          setLocations(parsed);
-        } else {
-          setLocations({});
-        }
+        setLocations(parseLocations(snapshot.val())?.venues ?? {});
+        setError(null);
         setLoading(false);
       },
       (err) => {
@@ -139,8 +61,8 @@ function ScreenEditor({
   screen,
   onChange,
 }: {
-  screen: ScreenDef;
-  onChange: (updated: ScreenDef) => void;
+  screen: VenueScreen;
+  onChange: (updated: VenueScreen) => void;
 }) {
   return (
     <div className="loc-screen-row">
@@ -165,7 +87,7 @@ function ScreenEditor({
           <Input
             size="sm"
             placeholder="Leturstærð"
-            value={screen.fontSize}
+            value={screen.fontSize ?? "100%"}
             onChange={(val) => onChange({ ...screen, fontSize: val })}
           />
         </FlexboxGrid.Item>
@@ -205,65 +127,100 @@ function LocationEditor({
   location,
 }: {
   venueKey: string;
-  location: LocationData;
+  location: Venue;
 }) {
   const [label, setLabel] = useState(location.label);
   const [pitchIdsStr, setPitchIdsStr] = useState(location.pitchIds.join(", "));
-  const [homeTeam, setHomeTeam] = useState<number | null>(
-    location.config?.homeTeam ?? null,
+  const [homeTeam, setHomeTeam] = useState<number | string | null>(
+    location.config.homeTeam ?? null,
   );
-  const [screens, setScreens] = useState<ScreenDef[]>(location.screens);
+  const [screens, setScreens] = useState(location.screens);
   const [perimeterDisplay, setPerimeterDisplay] = useState(
     location.perimeterDisplay,
   );
   const [dirty, setDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const markDirty = useCallback(() => setDirty(true), []);
 
   const save = useCallback(
-    (perimeterOverride = perimeterDisplay) => {
-      const pitchIds = pitchIdsStr
-        .split(",")
-        .map((s) => Number(s.trim()))
-        .filter((n) => !isNaN(n) && n > 0);
-
-      const config: LocationConfig = {};
-      if (homeTeam !== null && homeTeam > 0) config.homeTeam = homeTeam;
-
-      const data: Record<string, unknown> = {
-        label,
-        pitchIds,
-        screens,
+    async (publishedMapping?: PerimeterDisplayConfig) => {
+      if (saving) return;
+      const pitchValues = pitchIdsStr.trim() ? pitchIdsStr.split(",") : [];
+      const homeTeamId = parseVenueId(homeTeam);
+      if (
+        (homeTeam !== null && homeTeamId === undefined) ||
+        pitchValues.some((value) => parseVenueId(value) === undefined)
+      ) {
+        setSaveError("Auðkenni þurfa að vera jákvæðar heiltölur.");
+        return;
+      }
+      const pitchIds = parsePitchIds(pitchValues);
+      const changes: Record<string, unknown> = {
+        ...metadataUpdates(location.label, label, "label"),
+        ...metadataUpdates(
+          location.config.homeTeam,
+          homeTeamId,
+          "config/homeTeam",
+        ),
+        ...metadataUpdates(
+          location.screens,
+          screens,
+          "screens",
+          location.document?.screens,
+        ),
       };
-      if (Object.keys(config).length > 0) {
-        data.config = config;
+      if (JSON.stringify(pitchIds) !== JSON.stringify(location.pitchIds)) {
+        changes.pitchIds = pitchIds;
       }
-      if (perimeterOverride) {
-        data.perimeterDisplay = perimeterOverride;
+      if (publishedMapping) {
+        Object.assign(
+          changes,
+          metadataUpdates(
+            location.perimeterDisplay,
+            publishedMapping,
+            "perimeterDisplay",
+            location.document?.perimeterDisplay,
+          ),
+        );
       }
 
-      const locRef = ref(database, `locations/${venueKey}`);
-      void set(locRef, data);
-      setDirty(false);
+      setSaving(true);
+      setSaveError(null);
+      try {
+        await update(ref(database, `locations/${venueKey}`), changes);
+        setDirty(false);
+        if (publishedMapping) setPerimeterDisplay(publishedMapping);
+      } catch (error) {
+        setSaveError(
+          error instanceof Error ? error.message : "Vistun mistókst.",
+        );
+      } finally {
+        setSaving(false);
+      }
     },
-    [venueKey, label, pitchIdsStr, homeTeam, screens, perimeterDisplay],
+    [venueKey, location, label, pitchIdsStr, homeTeam, screens, saving],
   );
 
   const addScreen = () => {
-    const newScreen: ScreenDef = {
+    const newScreen: VenueScreen = {
       key: "",
       name: "",
       fontSize: "100%",
       style: { width: 512, height: 400 },
     };
-    setScreens([...screens, newScreen]);
+    const index =
+      Math.max(
+        -1,
+        ...Object.keys(screens).map(Number).filter(Number.isSafeInteger),
+      ) + 1;
+    setScreens({ ...screens, [index]: newScreen });
     markDirty();
   };
 
-  const updateScreen = (index: number, updated: ScreenDef) => {
-    const next = [...screens];
-    next[index] = updated;
-    setScreens(next);
+  const updateScreen = (key: string, updated: VenueScreen) => {
+    setScreens({ ...screens, [key]: updated });
     markDirty();
   };
 
@@ -273,7 +230,7 @@ function LocationEditor({
   // screen as a single logical screen; admins adjust geometry, templates,
   // and the cue duration in the editor before publishing.
   const addPerimeterMapping = () => {
-    const first = screens[0];
+    const first = Object.values(screens)[0];
     const width = first?.style.width ?? 1024;
     const height = first?.style.height ?? 256;
     const screenId = first?.key.trim() || "skjar-1";
@@ -317,6 +274,7 @@ function LocationEditor({
             <label className="loc-label">Heiti</label>
             <Input
               size="sm"
+              aria-label="Heiti"
               value={label}
               onChange={(val) => {
                 setLabel(val);
@@ -329,6 +287,7 @@ function LocationEditor({
             <Input
               size="sm"
               placeholder="102, 103"
+              aria-label="Völlur (pitchIds)"
               value={pitchIdsStr}
               onChange={(val) => {
                 setPitchIdsStr(val);
@@ -340,9 +299,10 @@ function LocationEditor({
             <label className="loc-label">Heimalið (ID)</label>
             <InputNumber
               size="sm"
+              aria-label="Heimalið (ID)"
               value={homeTeam ?? undefined}
               onChange={(val) => {
-                setHomeTeam(val ? Number(val) : null);
+                setHomeTeam(val === "" ? null : val);
                 markDirty();
               }}
             />
@@ -381,11 +341,11 @@ function LocationEditor({
           </FlexboxGrid>
         </div>
 
-        {screens.map((screen, i) => (
+        {Object.entries(screens).map(([key, screen]) => (
           <ScreenEditor
-            key={i}
+            key={key}
             screen={screen}
-            onChange={(updated) => updateScreen(i, updated)}
+            onChange={(updated) => updateScreen(key, updated)}
           />
         ))}
 
@@ -405,8 +365,7 @@ function LocationEditor({
           <PerimeterMappingEditor
             configuration={perimeterDisplay}
             onPublish={(published) => {
-              setPerimeterDisplay(published);
-              save(published);
+              void save(published);
             }}
           />
         )}
@@ -415,12 +374,14 @@ function LocationEditor({
           <Button
             appearance="primary"
             size="sm"
-            onClick={() => save()}
+            loading={saving}
+            onClick={() => void save()}
             style={{ marginTop: "0.75rem" }}
           >
             Vista breytingar
           </Button>
         )}
+        {saveError && <p role="alert">{saveError}</p>}
       </div>
     </Panel>
   );
@@ -429,9 +390,11 @@ function LocationEditor({
 function NewLocationModal({
   open,
   onClose,
+  existingKeys,
 }: {
   open: boolean;
   onClose: () => void;
+  existingKeys: string[];
 }) {
   const [label, setLabel] = useState("");
   const [venueKey, setVenueKey] = useState("");
@@ -446,21 +409,23 @@ function NewLocationModal({
 
   const canSave =
     effectiveKey.length > 0 &&
+    !existingKeys.includes(effectiveKey) &&
     label.trim().length > 0 &&
     screenKey.trim().length > 0;
 
   const handleSave = () => {
-    const data: LocationData = {
+    const data: Venue = {
       label: label.trim(),
       pitchIds: [],
-      screens: [
-        {
+      config: {},
+      screens: {
+        "0": {
           key: screenKey.trim(),
           name: screenName.trim() || "Skjár",
           fontSize,
           style: { width, height },
         },
-      ],
+      },
     };
     const locRef = ref(database, `locations/${effectiveKey}`);
     void set(locRef, data);
@@ -601,6 +566,7 @@ export function LocationsManager() {
       <NewLocationModal
         open={showNewModal}
         onClose={() => setShowNewModal(false)}
+        existingKeys={Object.keys(locations)}
       />
     </div>
   );
