@@ -40,11 +40,17 @@ test.describe("Penalty System - 2-Minute Suspensions", () => {
       .getByText("Control", { exact: true })
       .click();
 
+    const penaltyButton = page
+      .locator(".match-controller-box-home")
+      .getByText("Brottvísun");
+    await expect(penaltyButton).toBeEnabled();
     await startSimpleClockAndWait(page);
+    await expect(penaltyButton).toBeDisabled();
     await fakeClock.advance(page, ONE_MINUTE * 5);
     await expect(page.locator(".matchclock")).toHaveText("05:00");
 
     await stopSimpleClockAndWait(page);
+    await expect(penaltyButton).toBeEnabled();
 
     await page
       .locator(".match-controller-box-home")
@@ -147,36 +153,6 @@ test.describe("Penalty System - 2-Minute Suspensions", () => {
 
     await fakeClock.advance(page, 12 * SECOND);
     await expect(page.locator(".team.away .penalty")).toHaveCount(0);
-  });
-
-  test("penalty button is disabled when match clock is running", async ({
-    page,
-  }) => {
-    const fakeClock = new FakeClock(new Date(2025, 3, 10, 14, 0, 0));
-    await page.getByRole("button", { name: "Stillingar" }).click();
-    await page.locator(".match-type-selector").selectOption("handball");
-    await closeSettings(page);
-    await page
-      .locator(".view-mode-buttons")
-      .getByText("Control", { exact: true })
-      .click();
-
-    await expect(
-      page.locator(".match-controller-box-home").getByText("Brottvísun"),
-    ).not.toBeDisabled();
-
-    await startSimpleClockAndWait(page);
-    await fakeClock.advance(page, ONE_MINUTE);
-
-    await expect(
-      page.locator(".match-controller-box-home").getByText("Brottvísun"),
-    ).toBeDisabled();
-
-    await stopSimpleClockAndWait(page);
-
-    await expect(
-      page.locator(".match-controller-box-home").getByText("Brottvísun"),
-    ).not.toBeDisabled();
   });
 
   test("penalty countdown pauses when match is paused", async ({ page }) => {
