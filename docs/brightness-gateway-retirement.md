@@ -31,7 +31,7 @@ Vnnox connectivity, service identity and `/etc/perimeter-control/` paths remain.
 
 `brightness.js`, `auto-brightness.js`, `weather.js`, `vnnox.js` and their four
 existing test suites are byte-identical to the base. All **93 retained tests**
-pass against the baseline and within the new **139-test** gateway suite.
+pass against the baseline and within the new **143-test** gateway suite.
 The retained brightness/automatic/weather section of the gateway README is also
 byte-identical, avoiding unnecessary overlap with open PR #270.
 
@@ -77,7 +77,7 @@ proof counts/hashes; external transports are blocked.
 
 ## Installer and package checks
 
-**18 installer/package-policy tests** run the installer in temporary fixtures.
+**22 installer/package-policy tests** run the installer in temporary fixtures.
 Only destination constants and the root-check input are substituted; user,
 systemd and dependency commands are doubles. They cover:
 
@@ -85,12 +85,13 @@ systemd and dependency commands are doubles. They cover:
   source/lock/config/unit files, bad arguments and missing account path.
 - Checking the resolved service executable even when a PATH shim advertises
   a newer Node version.
-- Rejecting a mismatched pnpm or failed frozen dependency preparation before
+- Rejecting a mismatched pnpm or failed frozen/offline dependency preparation,
+  external/absolute dependency links or a failed runtime import before
   installation changes, including an existing installation.
 - Exact validated Node executable in `ExecStart`, unchanged user/group and
   credential/environment paths, correct credential/config modes and frozen
   production/offline install arguments.
-- Upgrade deletion of only the five retired module names, including safe
+- Repeated upgrade deletion of only the five retired module names, including safe
   unlinking of a symlink, while operator JS, environment, old key/cache and
   unmanaged lockfile bytes survive.
 - The gateway's pnpm-only preinstall policy without invoking another manager.
@@ -100,6 +101,32 @@ A separate real production dependency fixture passes
 runtime under `/usr/local/bin/node` **v22.23.3**. A manifest-drift probe is rejected
 by the frozen lock without changing lock bytes. No systemd service is installed.
 Bash/JavaScript syntax, focused formatting and diff whitespace checks pass.
+
+### R1 installer repairs
+
+Real pnpm 12.16.1 reproduces the original installer's same-filesystem success,
+cross-filesystem `ERR_PNPM_NO_OFFLINE_TARBALL` after overwriting runtime files,
+and successful global-layout install resolving Firebase Admin outside the
+project into a host temporary directory. That dependency location is hidden
+by the unit's `PrivateTmp`/`ProtectHome` protections.
+
+The installer now uses one private absolute store for both frozen production
+installs. It explicitly selects isolated project-local modules and copies
+package contents, overriding inherited pnpm layout settings. It discards the
+online dependency tree, rebuilds it offline, checks every dependency link for
+relative project-local resolution, and imports the staged runtime with the exact
+validated Node executable before changing any installed files. The verified
+tree is copied into `/opt/perimeter-control/node_modules`; it needs neither the
+temporary store nor pnpm at runtime. No package or dependency version changes.
+
+`tests/install-pnpm.mjs` is the opt-in real-pnpm regression proof; the gateway
+README documents its second-filesystem input and optional before/after logs.
+It checks repeated upgrades under default, cross-filesystem, inherited global
+and conflicting PnP/custom-directory layouts. Runtime imports and all dependency
+links are checked after staging cleanup. Frozen-lock drift and an emptied
+offline store must fail before changing the old runtime, dependency sentinel,
+credential, environment or unit. Only user/service commands are doubles; no
+actual service, cloud, Firebase or hardware operation is performed.
 
 This completes only the **gateway portion of #239**: pinned pnpm, one repository
 lockfile, frozen production installs and Node >= 22 validation. Functions,

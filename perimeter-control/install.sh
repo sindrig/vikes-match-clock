@@ -60,17 +60,57 @@ PNPM_VERSION="${BASH_REMATCH[1]}"
 
 STAGE_DIR="$(mktemp -d)"
 trap 'rm -rf -- "$STAGE_DIR"' EXIT
+STAGE_DIR="$(cd "$STAGE_DIR" && pwd)"
 for file in "${APP_FILES[@]}"; do
   cp "$SCRIPT_DIR/$file" "$STAGE_DIR/$file"
 done
+# One private absolute store for both phases, even when TMPDIR and /opt are
+# on different filesystems. The service must use ordinary Node resolution,
+# independent of the installing user's pnpm layout or home/tmp directories.
+PNPM_INSTALL=(install --prod --frozen-lockfile
+  --store-dir "$STAGE_DIR/store" --node-linker isolated
+  --config.virtual-store-type=project --config.enable-global-virtual-store=false
+  --config.modules-dir=node_modules --config.virtual-store-dir=node_modules/.pnpm
+  --config.package-import-method=copy --config.symlink=true
+  --config.enable-modules-dir=true --config.virtual-store-only=false)
 # Running from the staged package makes Corepack select its packageManager.
 # No credential file is read by Node or copied into dependency staging.
 (
   cd "$STAGE_DIR"
   [[ "$("$NODE_BIN" "$COREPACK_BIN" pnpm --version)" == "$PNPM_VERSION" ]] ||
     fail "Corepack must provide $PNPM_SPEC"
-  CI=true "$NODE_BIN" "$COREPACK_BIN" pnpm install --prod --frozen-lockfile
+  CI=true "$NODE_BIN" "$COREPACK_BIN" pnpm "${PNPM_INSTALL[@]}"
+  # Rebuild from the populated store, not from the online install's links.
+  # A cache miss or unusable layout must fail before touching the old runtime.
+  rm -rf -- "$STAGE_DIR/node_modules"
+  CI=true "$NODE_BIN" "$COREPACK_BIN" pnpm "${PNPM_INSTALL[@]}" --offline
 )
+chmod -R a+rX "$STAGE_DIR/node_modules"
+"$NODE_BIN" --input-type=module - "$STAGE_DIR" <<'NODE'
+import fs from "node:fs";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
+
+const root = process.argv[2];
+const modules = path.join(root, "node_modules");
+function verifyLinks(directory) {
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    const file = path.join(directory, entry.name);
+    if (entry.isSymbolicLink()) {
+      const target = fs.readlinkSync(file);
+      const resolved = fs.realpathSync(file);
+      if (path.isAbsolute(target) || !resolved.startsWith(`${modules}/`)) {
+        throw new Error(`dependency link must stay project-local and relative: ${file}`);
+      }
+    } else if (entry.isDirectory()) {
+      verifyLinks(file);
+    }
+  }
+}
+verifyLinks(modules);
+// Import only: this does not call main(), load credentials or start a daemon.
+await import(pathToFileURL(path.join(root, "index.js")));
+NODE
 
 if ! id perimeter-control >/dev/null 2>&1; then
   useradd --system --no-create-home --shell /usr/sbin/nologin perimeter-control
@@ -79,13 +119,12 @@ fi
 install -d -o root -g root -m 0755 "$APP_DIR"
 install -d -o root -g perimeter-control -m 0750 "$ETC_DIR"
 for file in "${APP_FILES[@]}"; do
-  install -o root -g root -m 0644 "$SCRIPT_DIR/$file" "$APP_DIR/$file"
+  install -o root -g root -m 0644 "$STAGE_DIR/$file" "$APP_DIR/$file"
 done
-(
-  cd "$APP_DIR"
-  CI=true "$NODE_BIN" "$COREPACK_BIN" pnpm install --prod --frozen-lockfile --offline
-)
-chmod -R a+rX "$APP_DIR/node_modules"
+# node_modules is installer-managed. Copy the verified, self-contained tree;
+# no install/cache lookup can fail after the runtime files have been replaced.
+rm -rf -- "$APP_DIR/node_modules"
+cp -a -- "$STAGE_DIR/node_modules" "$APP_DIR/node_modules"
 
 # Only these retired, previously installed modules are pruned. Leave local
 # files, credentials, old caches and Firebase/Storage data alone.

@@ -73,8 +73,8 @@ function fixture(t) {
       { mode: 0o755 },
     );
   }
-  // The node shim reports a controlled executable/version; only manifest
-  // parsing uses real Node. Corepack/dependency installs are fully local doubles.
+  // The node shim controls the executable/version; manifest parsing and the
+  // staged import check use real Node. Dependency installs are local doubles.
   fs.writeFileSync(
     path.join(bin, "node"),
     `#!/bin/bash
@@ -93,10 +93,27 @@ fi
     `
 if (args.join(' ') === 'pnpm --version') { console.log(process.env.FIXTURE_PNPM_VERSION || '12.16.1'); }
 else if (args[0] === 'pnpm' && args[1] === 'install') {
-  if (process.env.FIXTURE_DEPENDENCY_FAILURE === '1') process.exit(42);
+  if (process.env.FIXTURE_DEPENDENCY_FAILURE === '1' ||
+      (process.env.FIXTURE_OFFLINE_FAILURE === '1' && args.includes('--offline'))) process.exit(42);
   if (!args.includes('--prod') || !args.includes('--frozen-lockfile')) process.exit(43);
-  fs.mkdirSync('node_modules', {recursive:true});
+  fs.mkdirSync('node_modules/firebase-admin', {recursive:true});
+  fs.writeFileSync('node_modules/firebase-admin/package.json', JSON.stringify({type:'module',exports:{'./app':'./app.js','./database':'./database.js'}}));
+  fs.writeFileSync('node_modules/firebase-admin/app.js', 'export const cert=()=>{}; export const initializeApp=()=>{};');
+  fs.writeFileSync('node_modules/firebase-admin/database.js', 'export const getDatabase=()=>{}; export const ServerValue={TIMESTAMP:0};');
+  fs.mkdirSync('node_modules/suncalc', {recursive:true});
+  fs.writeFileSync('node_modules/suncalc/package.json', JSON.stringify({type:'module',exports:'./index.js'}));
+  fs.writeFileSync('node_modules/suncalc/index.js', 'export default {};');
   fs.writeFileSync('node_modules/fixture-dependency', 'synthetic');
+  if (args.includes('--offline')) {
+    if (process.env.FIXTURE_BAD_LINK === 'external') {
+      fs.writeFileSync('outside-modules', 'synthetic');
+      fs.symlinkSync('../outside-modules', 'node_modules/bad-link');
+    }
+    if (process.env.FIXTURE_BAD_LINK === 'absolute') {
+      fs.symlinkSync(path.resolve('node_modules/fixture-dependency'), 'node_modules/bad-link');
+    }
+    if (process.env.FIXTURE_IMPORT_FAILURE === '1') fs.unlinkSync('node_modules/firebase-admin/app.js');
+  }
 } else process.exit(44);
 `,
   );
@@ -125,6 +142,7 @@ const result=spawnSync('/usr/bin/install', filtered, {stdio:'inherit'}); process
     PATH: `${bin}:/usr/bin:/bin`,
     FIXTURE_LOG: log,
     FIXTURE_NODE: path.join(bin, "node"),
+    NODE_OPTIONS: "--max-old-space-size=512",
   };
   return {
     root,
@@ -279,12 +297,24 @@ test("fresh installation preserves service identity and installs the exact valid
     f.app,
     "frozen dependencies prepared outside installation",
   );
-  assert.equal(installs[1].cwd, f.app);
+  assert.equal(installs[1].cwd, installs[0].cwd);
   assert.ok(installs[1].args.includes("--offline"));
+  const store = (command) =>
+    command.args[command.args.indexOf("--store-dir") + 1];
+  assert.ok(path.isAbsolute(store(installs[0])));
+  assert.equal(store(installs[0]), store(installs[1]));
+  assert.equal(fs.existsSync(installs[0].cwd), false);
+  assert.equal(
+    fs.readFileSync(
+      path.join(f.app, "node_modules/fixture-dependency"),
+      "utf8",
+    ),
+    "synthetic",
+  );
   const firstMutation = commands.findIndex(({ name }) =>
     ["useradd", "install"].includes(name),
   );
-  assert.ok(firstMutation > commands.indexOf(installs[0]));
+  assert.ok(firstMutation > commands.indexOf(installs[1]));
 });
 
 test("upgrade prunes only the five named obsolete JS files and preserves operator files", (t) => {
@@ -311,8 +341,10 @@ test("upgrade prunes only the five named obsolete JS files and preserves operato
     path.join(oldCache, "asset.mp4"),
     path.join(f.app, "geometry.js"),
   );
-  const result = f.run({ FIXTURE_EXISTING_USER: "1" });
-  assert.equal(result.status, 0, result.stderr);
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const result = f.run({ FIXTURE_EXISTING_USER: "1" });
+    assert.equal(result.status, 0, result.stderr);
+  }
   for (const file of retired)
     assert.equal(fs.existsSync(path.join(f.app, file)), false);
   for (const [file, content] of preserved)
@@ -321,14 +353,28 @@ test("upgrade prunes only the five named obsolete JS files and preserves operato
     .commands()
     .filter(
       ({ name, args }) =>
-        name === "rm" && args.some((arg) => arg.startsWith(`${f.app}/`)),
+        name === "rm" &&
+        args[0] === "-f" &&
+        args.some((arg) => arg.startsWith(`${f.app}/`)),
     );
   assert.deepEqual(
     pruned.map(({ args }) => path.basename(args.at(-1))).sort(),
-    retired.toSorted(),
+    [...retired, ...retired].toSorted(),
   );
   assert.ok(
     pruned.every(({ args }) => args[0] === "-f" && !args.includes("-r")),
+  );
+  assert.deepEqual(
+    f
+      .commands()
+      .filter(
+        ({ name, args }) =>
+          name === "rm" &&
+          args[0] === "-rf" &&
+          args.some((arg) => arg.startsWith(`${f.app}/`)),
+      )
+      .map(({ args }) => args.at(-1)),
+    [path.join(f.app, "node_modules"), path.join(f.app, "node_modules")],
   );
   assert.equal(
     f.commands().some(({ name }) => name === "useradd"),
@@ -336,27 +382,40 @@ test("upgrade prunes only the five named obsolete JS files and preserves operato
   );
 });
 
-test("failed prerequisites leave an existing installation byte-for-byte untouched", (t) => {
-  const f = fixture(t);
-  fs.mkdirSync(f.app);
-  fs.mkdirSync(f.etc);
-  const files = [
-    [path.join(f.app, "index.js"), "old runtime"],
-    [path.join(f.app, "overlay.js"), "old media module"],
-    [path.join(f.etc, "perimeter-control.env"), "operator configuration"],
-    [f.unit, "old unit"],
-  ];
-  for (const [file, content] of files) fs.writeFileSync(file, content);
-  assert.equal(f.run({ FIXTURE_DEPENDENCY_FAILURE: "1" }).status, 42);
-  for (const [file, content] of files)
-    assert.equal(fs.readFileSync(file, "utf8"), content);
-  assert.equal(
-    f
-      .commands()
-      .some(({ name }) => ["install", "useradd", "systemctl"].includes(name)),
-    false,
-  );
-});
+for (const overrides of [
+  { FIXTURE_DEPENDENCY_FAILURE: "1" },
+  { FIXTURE_OFFLINE_FAILURE: "1" },
+  { FIXTURE_BAD_LINK: "external" },
+  { FIXTURE_BAD_LINK: "absolute" },
+  { FIXTURE_IMPORT_FAILURE: "1" },
+])
+  test(`failed preparation leaves an existing installation untouched: ${Object.keys(overrides)[0]}=${Object.values(overrides)[0]}`, (t) => {
+    const f = fixture(t);
+    fs.mkdirSync(f.app);
+    fs.mkdirSync(f.etc);
+    const files = [
+      [path.join(f.app, "index.js"), "old runtime"],
+      [path.join(f.app, "overlay.js"), "old media module"],
+      [path.join(f.app, "node_modules/old-dependency"), "old dependency"],
+      [path.join(f.etc, "perimeter-control.env"), "operator configuration"],
+      [
+        path.join(f.etc, "perimeter-service-account.json"),
+        "old synthetic account",
+      ],
+      [f.unit, "old unit"],
+    ];
+    fs.mkdirSync(path.join(f.app, "node_modules"));
+    for (const [file, content] of files) fs.writeFileSync(file, content);
+    assert.notEqual(f.run(overrides).status, 0);
+    for (const [file, content] of files)
+      assert.equal(fs.readFileSync(file, "utf8"), content);
+    assert.equal(
+      f
+        .commands()
+        .some(({ name }) => ["install", "useradd", "systemctl"].includes(name)),
+      false,
+    );
+  });
 
 test("gateway package policy rejects another manager without invoking it", () => {
   const pkg = JSON.parse(
@@ -373,6 +432,7 @@ test("gateway package policy rejects another manager without invoking it", () =>
     env: {
       PATH: path.dirname(process.execPath),
       npm_config_user_agent: "other/1.0.0",
+      NODE_OPTIONS: "--max-old-space-size=512",
     },
     encoding: "utf8",
   });
@@ -381,6 +441,7 @@ test("gateway package policy rejects another manager without invoking it", () =>
     env: {
       PATH: path.dirname(process.execPath),
       npm_config_user_agent: "pnpm/12.16.1",
+      NODE_OPTIONS: "--max-old-space-size=512",
     },
     encoding: "utf8",
   });

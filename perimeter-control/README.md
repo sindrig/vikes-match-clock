@@ -73,12 +73,21 @@ sudo ./install.sh /path/to/firebase-service-account.json
 Before changing the user, target directories or service, the installer checks
 arguments, source files, required commands, the selected Node version, and the
 pinned pnpm version, then prepares a frozen production dependency install in a
-temporary directory. A failed prerequisite leaves the installation untouched.
+temporary directory. Both pnpm phases use one private absolute store and an
+explicit isolated, project-local `node_modules/.pnpm` layout, overriding inherited
+layout settings. It rebuilds the dependencies offline from that store, verifies
+that every dependency link is relative and stays inside `node_modules`, and
+imports the runtime with the validated Node executable. These checks finish
+before any installation files change; a failed preparation leaves the old
+runtime, dependencies, credentials, environment and unit untouched.
 It then:
 
 - Keeps the `perimeter-control` system user and service identity.
-- Installs the retained gateway under `/opt/perimeter-control`, using
-  `pnpm install --prod --frozen-lockfile --offline` with the prepared store.
+- Installs the retained gateway under `/opt/perimeter-control` and copies the
+  verified offline dependency tree, replacing only the installer-managed
+  `node_modules`. Dependencies remain readable by the service without the
+  installer's home, temporary directory or cache, including when staging and
+  the destination are on different filesystems.
 - Removes **only** these obsolete installed JavaScript files:
   `overlay.js`, `ad-layout.js`, `resolume-import.js`,
   `resolume-preview.js`, `geometry.js`.
@@ -319,8 +328,29 @@ Tests run one file at a time and use mocks/temporary installation fixtures.
 The retained worker, auto model, weather and Vnnox suites are unchanged.
 Gateway integration scenarios cover power gating, manual and auto writes,
 weather fallback, calibration, status recovery and irreversible-write drain.
-Installer fixtures stub user/service/dependency operations; they never install
-an actual systemd service. Hardware acceptance remains on HOLD.
+Installer unit fixtures stub user/service/dependency operations; they never
+install an actual systemd service. Hardware acceptance remains on HOLD.
+
+The opt-in real-pnpm proof runs the installer against synthetic existing
+installations, twice per successful layout. It checks same- and cross-filesystem
+destinations, inherited global/PnP/custom layout settings, runtime imports after
+staging cleanup, and frozen/offline preparation failures preserving the old
+installation. Choose a writable directory on a different filesystem from
+`TMPDIR` (or `/tmp`); allow about 100 MiB per fixture, rather than a small `/dev/shm`:
+
+```bash
+PNPM_TEST_CROSS_DEVICE_TMPDIR=/path/on/second/filesystem \
+  node tests/install-pnpm.mjs
+```
+
+User/service commands remain doubles; only the pinned pnpm and file operations
+are real. No gateway is started. Optional `PNPM_TEST_ARTIFACTS` saves logs and
+JSON proof metadata. Setting `PNPM_TEST_INSTALLER_REF=a5e7ba0b` instead exercises
+the original installer and asserts its two failures; that comparison needs a
+cold automatically selected store on the destination filesystem. It does not
+delete a caller store; the original installer may write to pnpm's automatically
+selected cache. The repaired installer uses only its own temporary store.
+pnpm/dependency versions are unchanged.
 
 See [the retirement proof](../docs/brightness-gateway-retirement.md) for the
 removal inventory and reproducible comparison with the reviewed baseline.
