@@ -3,7 +3,7 @@
 import { useLayoutEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { ref, set, goOffline, goOnline } from "firebase/database";
+import { ref, set, goOffline, goOnline, onValue } from "firebase/database";
 import { auth, app, database, storageHelpers } from "../../src/firebase";
 import { firebaseDatabase } from "../../src/firebaseDatabase";
 import {
@@ -18,6 +18,8 @@ import ClubOverrideForm from "../../src/controller/ClubOverrideForm";
 import GoalScorerDialog from "../../src/controller/GoalScorerDialog";
 import PerimeterControl from "../../src/controller/PerimeterControl";
 import ResyncNotice from "../../src/controller/ResyncNotice";
+import ThemeEditorModal from "../../src/controller/theme/ThemeEditor";
+import { DEFAULT_THEME } from "../../src/constants";
 import { DEFAULT_BRIGHTNESS_AUTO_CONFIG } from "../../src/lib/autoBrightness";
 import type { CountdownCompletionObservation } from "../../src/lib/conditionalTransitions";
 import "../../src/index.css";
@@ -33,19 +35,35 @@ const counts = {
   auditOnly: 0,
   sdk: [] as string[],
   mediaWaiting: 0,
+  succeeded: 0,
+  failed: 0,
 };
 let api: Api;
 let local: LocalApi;
 let retained: Api;
 let openScorer: () => void;
 let openClub: () => void;
+let openTheme: () => void;
+let connected = false;
+onValue(ref(database, ".info/connected"), (snapshot) => {
+  connected = snapshot.val() === true;
+});
 let mediaGate: Promise<void> | null = null;
 let releaseMedia: () => void = () => undefined;
 const originalAudited = firebaseDatabase.writeAudited;
 const originalAuditOnly = firebaseDatabase.writeAuditOnly;
 firebaseDatabase.writeAudited = (...args) => {
   counts.ordinary++;
-  return originalAudited(...args);
+  const result = originalAudited(...args);
+  void result.then(
+    () => {
+      counts.succeeded++;
+    },
+    () => {
+      counts.failed++;
+    },
+  );
+  return result;
 };
 firebaseDatabase.writeAuditOnly = (...args) => {
   counts.auditOnly++;
@@ -89,6 +107,8 @@ export const harness = {
     location: local.listenPrefix,
     match: api.match,
     controller: api.controller,
+    view: api.view,
+    connected,
   }),
   counts,
   reset: () => {
@@ -96,6 +116,8 @@ export const harness = {
     counts.auditOnly = 0;
     counts.sdk.length = 0;
     counts.mediaWaiting = 0;
+    counts.succeeded = 0;
+    counts.failed = 0;
   },
   login: (email: string, password: string) =>
     signInWithEmailAndPassword(auth, email, password).then(() => undefined),
@@ -118,6 +140,10 @@ export const harness = {
   pagehide: () => window.dispatchEvent(new Event("pagehide")),
   openScorer: () => openScorer(),
   openClub: () => openClub(),
+  openTheme: () => openTheme(),
+  // Pure SDK disconnect/reconnect, without browser offline/online events.
+  disconnect: () => goOffline(database),
+  reconnect: () => goOnline(database),
   armMedia: () => {
     mediaGate = new Promise((resolve) => {
       releaseMedia = resolve;
@@ -164,6 +190,26 @@ export const harness = {
     api.playQueue(id);
     return id;
   },
+  rapidOrdinary: async () => {
+    api.addGoal("home");
+    api.addGoal("home");
+    const first = api.createQueue("First rapid queue");
+    const second = api.createQueue("Second rapid queue");
+    for (const key of ["rapid-one", "rapid-two"]) {
+      api.addItemsToQueue(first, [{ type: "NO_IMAGE_PLAYER", key, name: key }]);
+    }
+    await Promise.all([
+      api.saveCustomPreset("rapid-one", {
+        name: "First",
+        theme: DEFAULT_THEME,
+      }),
+      api.saveCustomPreset("rapid-two", {
+        name: "Second",
+        theme: DEFAULT_THEME,
+      }),
+    ]);
+    return { first, second };
+  },
   conditional: (observed: CountdownCompletionObservation) =>
     api.completeCountdownIfCurrent(observed),
   rawWrite: (path: string, value: unknown) =>
@@ -185,11 +231,13 @@ function Controls() {
   const localValue = useLocalState();
   const [scorer, setScorer] = useState(false);
   const [club, setClub] = useState(false);
+  const [theme, setTheme] = useState(false);
   useLayoutEffect(() => {
     api = value;
     local = localValue;
     openScorer = () => setScorer(true);
     openClub = () => setClub(true);
+    openTheme = () => setTheme(true);
   }, [value, localValue]);
   return (
     <>
@@ -216,6 +264,7 @@ function Controls() {
         onClose={() => setClub(false)}
       />
       <PerimeterControl standalone />
+      <ThemeEditorModal open={theme} onClose={() => setTheme(false)} />
     </>
   );
 }

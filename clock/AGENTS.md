@@ -76,7 +76,8 @@ asset, so it is not a blind mutation. It submits the generation-conditional
 precondition rejects it unless the current asset/queue still matches.
 
 **2. Freshness barrier.** An authenticated client is only write-eligible while
-it has confirmed current Firebase state. `FirebaseStateContext` tracks
+it satisfies the subscription readiness/recovery policy.
+`FirebaseStateContext` tracks
 `writeFreshness` (`loading | ready | hidden | offline | resyncing`); the client
 becomes ineligible on `visibilitychange`→hidden, `pagehide`, offline, or an
 observed `/.info/connected` drop while eligible, and returns to `ready` once a
@@ -90,9 +91,19 @@ perimeter). A connected core delivery during loading records resynchronization
 proof without enabling writes early; the last required snapshot may then finish
 readiness, including a non-core delivery. If an undropped resume follows the
 initial core deliveries, the last required snapshot completes readiness without
-another core update. A disconnect during loading still requires connected core
-proof; connection alone, non-core updates, and prior-scope callbacks cannot
-supply it. Rendering exposes
+another core update. New subscription scopes start without a pending recovery;
+a Firebase disconnect sets pending only while visible and already ready,
+without erasing a recovery already pending from a suspension/offline event.
+Thus a partial initial load may finish on its remaining snapshot after a
+cached reconnect even when unchanged core nodes do not emit again. Connection
+arrival alone never unlocks writes. Already-pending recovery still needs a
+connected current-scope core delivery; non-core and prior-scope deliveries
+cannot clear it. This restores the baseline initial-load policy, not a new
+server freshness guarantee: SDK `onValue` does not expose server/cache
+provenance. A settled reconnect with unchanged core state can still remain
+resyncing, and initial snapshots all delivered while disconnected without a
+pending recovery can still stall. Those inherited delivery orders are outside
+this repair. Rendering exposes
 `writeEligible`; submission also checks the synchronously updated `MutationSession`
 and its render-bound origin. Hide/resume, venue changes (including A → B → A),
 and logout/login permanently obsolete retained callbacks. The Auth SDK UID is
@@ -1617,7 +1628,12 @@ All properties are CSS value strings. Grouped by display area:
 - **Editing a custom preset** updates it directly (no copy behavior)
 - **Creating a new preset** creates a blank custom preset with `DEFAULT_THEME` values
 - **Deleting** a custom preset removes it from Firebase; if it was active, falls back to Default
-- **Renaming** custom presets is supported via double-click on the preset name
+- **Renaming** custom presets uses the pencil button. Completion belongs to
+  the submitting edit instance, draft revision, submission, modal lifetime,
+  and session scope. Late success/failure cannot close or change feedback on
+  a newer, reopened, or same-ID revised draft. Enter followed by blur submits
+  once, including a blur after reopening. A matching rejected save keeps its
+  draft/error and permits an explicit Enter retry.
 
 #### Key Files
 

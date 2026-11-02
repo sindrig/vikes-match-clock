@@ -23,10 +23,22 @@ deliver for the current scope. A connected core snapshot can satisfy a pending
 resync while those initial deliveries are incomplete; it does not yet enable
 writes. Once all required snapshots arrive, that proof allows a fresh command
 without an unrelated core update. An undropped resume can also finish on the
-last initial snapshot when the core snapshots arrived before resume. A drop
-during loading or initially disconnected startup requires a connected core
-delivery; connection alone and non-core updates cannot clear that barrier.
-Neither path restores any retained command origin.
+last initial snapshot when the core snapshots arrived before resume. Each new
+subscription scope starts without a pending recovery. A Firebase disconnect
+sets pending only while visible and already ready; it still records the drop
+and preserves any recovery already pending. A partial initial load can thus
+finish after a cached reconnect on its missing initial snapshot without an
+unrelated core update. All five deliveries, visibility, connection and current
+authenticated UID remain required. Connection arrival alone never unlocks
+writes; non-core updates cannot clear an already-pending recovery. Neither
+path restores any retained command origin.
+
+This is the baseline initial-load compatibility policy, not global server
+certification. SDK `onValue` has no public server/cache provenance. A settled
+unchanged reconnect can remain resyncing when no core delivery occurs. An
+initial load whose snapshots all arrive disconnected without a pending
+recovery can also remain loading, even after connection arrival and another
+core delivery. These inherited delivery orders are not repaired here.
 
 Callbacks must retain their original command function across asynchronous
 preparation. Do not replace it with a mutable ref to the newest callback: that
@@ -43,14 +55,23 @@ controller notice reports failures; save dialogs show their own errors and keep
 drafts open. Scorer selection catches media/submission failures and closes only
 after success. Club uploads, media-pair uploads, goal-video/layout edits,
 brightness/config saves, and preset renames must await their command before
-clearing a draft or reporting success. Club forms supply data and an action,
+clearing a draft or reporting success. Preset rename completion is scoped to
+its edit instance, draft revision, submission, modal lifetime and session scope;
+matching a preset ID alone is insufficient after switching away/back or
+reopening it. Enter/blur share a submission guard, while matching rejected
+saves retain their draft/feedback and allow an explicit Enter retry. Old
+completions cannot clear a newer draft's pending guard or feedback.
+Club forms supply data and an action,
 never their own UID/session audit payload. Brightness and auto config use
 `perimeter.set-brightness` and `perimeter.set-brightness-auto`; auto config keeps
 its existing `updatedAt: serverTimestamp()` shape.
 
 Only Firebase subscriptions update shared state and its calculation refs. An
 accepted write does not advance shadow refs while waiting for a subscription.
-This preserves the same behavior after a rejected write.
+This preserves the same behavior after a rejected write. The existing writer's
+synchronous SDK subscription echoes also advance these refs between rapid
+ordinary commands: two goals, queue edits and preset saves preserve both
+accepted actions without waiting for React to render or server acknowledgements.
 
 ## Ordinary mutation inventory
 

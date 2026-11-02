@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   act,
   fireEvent,
@@ -540,9 +540,9 @@ describe("initial subscription readiness and freshness handshake", () => {
     },
   );
 
-  it("finishes startup after initial disconnected snapshots and a connected core delivery", async () => {
+  it("records the inherited stall when all startup snapshots arrive disconnected without a pending recovery", async () => {
     connected = false;
-    const { location, retained } = loading(true);
+    const { location } = loading(true);
     for (const leaf of required) deliver(location, leaf);
     await blocked();
     act(() => {
@@ -551,13 +551,40 @@ describe("initial subscription readiness and freshness handshake", () => {
     });
     await blocked();
     deliver(location, "match");
-    await saved(location, retained);
+    // Baseline policy does not schedule recovery for this delivery order.
+    // This compatibility repair does not expand its readiness guarantees.
+    expect(currentApi.writeFreshness).toBe("loading");
+    await blocked();
   });
 
-  it("requires post-drop core proof when connectivity drops during partial loading without browser events", async () => {
+  it.each(cases)(
+    "preserves baseline initial-load progress after a cached reconnect (startup=$startup, last=$last)",
+    async ({ startup, last }) => {
+      const { location, retained } = loading(startup);
+      for (const leaf of required.filter((leaf) => leaf !== last))
+        deliver(location, leaf);
+      act(() => {
+        connected = false;
+        emit(".info/connected");
+      });
+      await blocked();
+      act(() => {
+        connected = true;
+        emit(".info/connected");
+      });
+      // Connection alone never unlocks. An unchanged cached core need not
+      // emit again; initial loading still finishes on the missing delivery.
+      await blocked();
+      deliver(location, last);
+      await saved(location, retained);
+    },
+  );
+
+  it("does not erase an already-pending loading recovery on another disconnect", async () => {
     const { location, retained } = loading(false);
     for (const leaf of ["match", "controller", "view"]) deliver(location, leaf);
     act(() => {
+      window.dispatchEvent(new Event("offline"));
       connected = false;
       emit(".info/connected");
       connected = true;
@@ -616,6 +643,183 @@ describe("initial subscription readiness and freshness handshake", () => {
     await blocked();
     deliver("A", "perimeter");
     await saved("A", retained);
+  });
+});
+
+describe("preset rename completion ownership", () => {
+  function Editor() {
+    const [open, setOpen] = useState(true);
+    return (
+      <>
+        <button onClick={() => setOpen((value) => !value)}>Toggle theme</button>
+        <ThemeEditorModal open={open} onClose={() => setOpen(false)} />
+      </>
+    );
+  }
+  function input() {
+    const element = document.querySelector<HTMLInputElement>(
+      ".theme-rename-input",
+    );
+    if (!element) throw new Error("Missing rename input");
+    return element;
+  }
+  function edit(index: number, value: string) {
+    fireEvent.click(screen.getAllByTitle("Endurnefna")[index]!);
+    fireEvent.change(input(), { target: { value } });
+  }
+  function submit() {
+    fireEvent.keyDown(input(), { key: "Enter", code: "Enter" });
+  }
+  function setup() {
+    write("states/A/view/customPresets/second", { name: "Second", theme: {} });
+    mount(<Editor />);
+    const pending = deferred<void>();
+    vi.mocked(firebaseDatabase.writeAudited).mockReturnValueOnce(
+      pending.promise,
+    );
+    edit(0, "First submission");
+    submit();
+    expect(firebaseDatabase.writeAudited).toHaveBeenCalledTimes(1);
+    return pending;
+  }
+  async function settle(
+    pending: ReturnType<typeof deferred<void>>,
+    failure: boolean,
+  ) {
+    await act(async () => {
+      if (failure) pending.reject(new Error("Old rename failed"));
+      else pending.resolve();
+      await pending.promise.catch(() => undefined);
+    });
+  }
+
+  const changes: Array<[string, () => void]> = [
+    ["A -> B", () => edit(1, "New draft")],
+    [
+      "A -> B -> A",
+      () => {
+        edit(1, "Other draft");
+        edit(0, "New draft");
+      },
+    ],
+    [
+      "same-ID revision",
+      () => fireEvent.change(input(), { target: { value: "New draft" } }),
+    ],
+    ["same-ID reopened edit", () => edit(0, "New draft")],
+    [
+      "modal close/reopen",
+      () => {
+        fireEvent.click(screen.getByText("Toggle theme"));
+        fireEvent.click(screen.getByText("Toggle theme"));
+        edit(0, "New draft");
+      },
+    ],
+  ];
+  it.each(
+    changes.flatMap(([label, change]) =>
+      [false, true].map((failure) => ({ label, change, failure })),
+    ),
+  )(
+    "preserves $label after late completion (failure=$failure)",
+    async ({ change, failure }) => {
+      const pending = setup();
+      change();
+      await settle(pending, failure);
+      expect(input()).toHaveValue("New draft");
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it.each([false, true])(
+    "ignores completion after closing and reopening without a new edit (failure=%s)",
+    async (failure) => {
+      const pending = setup();
+      fireEvent.click(screen.getByText("Toggle theme"));
+      fireEvent.click(screen.getByText("Toggle theme"));
+      // Reopening can focus the old draft; clicking another control then
+      // blurs it in a new modal lifetime without another explicit save.
+      fireEvent.blur(input());
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledTimes(1);
+      await settle(pending, failure);
+      expect(input()).toHaveValue("First submission");
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    },
+  );
+
+  it.each(
+    boundaries
+      .filter(
+        ([label]) =>
+          label === "batched A -> B -> A" ||
+          label === "logout + same-user login",
+      )
+      .flatMap(([label, invalidate]) =>
+        [false, true].map((failure) => ({ label, invalidate, failure })),
+      ),
+  )(
+    "ignores a previous session's completion after $label (failure=$failure)",
+    async ({ invalidate, failure }) => {
+      const pending = setup();
+      act(invalidate);
+      await settle(pending, failure);
+      expect(input()).toHaveValue("First submission");
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    },
+  );
+
+  it("deduplicates Enter/blur, keeps a matching rejection and allows explicit retry", async () => {
+    const pending = setup();
+    fireEvent.blur(input());
+    expect(firebaseDatabase.writeAudited).toHaveBeenCalledTimes(1);
+    await settle(pending, true);
+    expect(input()).toHaveValue("First submission");
+    expect(screen.getByRole("alert")).toHaveTextContent("Old rename failed");
+    fireEvent.blur(input());
+    expect(firebaseDatabase.writeAudited).toHaveBeenCalledTimes(1);
+    submit();
+    await waitFor(() =>
+      expect(document.querySelector(".theme-rename-input")).toBeNull(),
+    );
+    expect(firebaseDatabase.writeAudited).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it.each([false, true])(
+    "preserves a newer submission's feedback after an old completion (failure=%s)",
+    async (failure) => {
+      const pending = setup();
+      const newer = deferred<void>();
+      vi.mocked(firebaseDatabase.writeAudited).mockReturnValueOnce(
+        newer.promise,
+      );
+      fireEvent.change(input(), { target: { value: "New draft" } });
+      submit();
+      await act(async () => {
+        newer.reject(new Error("New rename failed"));
+        await newer.promise.catch(() => undefined);
+      });
+      await settle(pending, failure);
+      expect(input()).toHaveValue("New draft");
+      expect(screen.getByRole("alert")).toHaveTextContent("New rename failed");
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  it("does not clear a newer submission's pending guard when an old save settles", async () => {
+    const pending = setup();
+    const newer = deferred<void>();
+    vi.mocked(firebaseDatabase.writeAudited).mockReturnValueOnce(newer.promise);
+    fireEvent.change(input(), { target: { value: "New draft" } });
+    submit();
+    await settle(pending, false);
+    fireEvent.blur(input());
+    submit();
+    expect(input()).toHaveValue("New draft");
+    expect(firebaseDatabase.writeAudited).toHaveBeenCalledTimes(2);
+    await settle(newer, false);
+    expect(document.querySelector(".theme-rename-input")).toBeNull();
   });
 });
 

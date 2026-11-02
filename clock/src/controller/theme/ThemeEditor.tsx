@@ -1,4 +1,11 @@
-import { useState, useCallback, useMemo, useEffect } from "react";
+import {
+  useState,
+  useCallback,
+  useMemo,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+} from "react";
 import {
   Button,
   ButtonGroup,
@@ -14,7 +21,7 @@ import TrashIcon from "@rsuite/icons/Trash";
 import EditIcon from "@rsuite/icons/Edit";
 import PlusIcon from "@rsuite/icons/Plus";
 import { useView } from "../../contexts/FirebaseStateContext";
-import { useRemoteSettings } from "../../contexts/LocalStateContext";
+import { useLocalState } from "../../contexts/LocalStateContext";
 import {
   DEFAULT_THEME,
   THEME_PRESETS,
@@ -767,6 +774,15 @@ interface ThemeEditorModalProps {
   onClose: () => void;
 }
 
+interface RenameDraft {
+  id: string;
+  value: string;
+  edit: object;
+  revision: object;
+  submission?: object;
+  error?: string;
+}
+
 const ThemeEditorModal = ({ open, onClose }: ThemeEditorModalProps) => {
   const {
     view: { theme, themePreset, customPresets, idleAd },
@@ -776,11 +792,23 @@ const ThemeEditorModal = ({ open, onClose }: ThemeEditorModalProps) => {
     deleteCustomPreset,
     setIdleAd,
   } = useView();
-  const { listenPrefix } = useRemoteSettings();
+  const { listenPrefix, mutationSession } = useLocalState();
 
-  const [renamingId, setRenamingId] = useState<string | null>(null);
-  const [renameValue, setRenameValue] = useState("");
-  const [renameError, setRenameError] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState<RenameDraft | null>(null);
+  const renameLifetime = useRef<object | null>(null);
+  const lastRenameSubmission = useRef<{
+    edit: object;
+    revision: object;
+    lifetime: object;
+    scope: object;
+    pending: boolean;
+  } | null>(null);
+  useLayoutEffect(() => {
+    renameLifetime.current = open ? {} : null;
+    return () => {
+      renameLifetime.current = null;
+    };
+  }, [open, mutationSession]);
   const [editorTab, setEditorTab] = useState<
     "visual" | "idle-visual" | "advanced"
   >("visual");
@@ -888,36 +916,79 @@ const ThemeEditorModal = ({ open, onClose }: ThemeEditorModalProps) => {
 
   // Start renaming
   const startRename = useCallback((id: string, currentName: string) => {
-    setRenameError(null);
-    setRenamingId(id);
-    setRenameValue(currentName);
+    setRenameDraft({ id, value: currentName, edit: {}, revision: {} });
   }, []);
 
-  // Commit rename
-  const commitRename = useCallback(() => {
-    if (!renamingId || !renameValue.trim()) {
-      setRenamingId(null);
-      return;
-    }
-    const preset = customPresets?.[renamingId];
-    if (preset) {
-      void saveCustomPreset(renamingId, {
-        ...preset,
-        name: renameValue.trim(),
-      }).then(
-        () => {
-          setRenamingId(null);
-          setRenameError(null);
-        },
-        (error: unknown) =>
-          setRenameError(
-            error instanceof Error
-              ? error.message
-              : "Ekki tókst að vista heiti.",
-          ),
-      );
-    }
-  }, [renamingId, renameValue, customPresets, saveCustomPreset]);
+  // A completion owns one edit, draft revision and submission. Preset IDs
+  // alone cannot distinguish switching away/back or reopening the same edit.
+  const commitRename = useCallback(
+    (trigger: "enter" | "blur") => {
+      const draft = renameDraft;
+      const lifetime = renameLifetime.current;
+      if (!draft || !lifetime) return;
+      const scope = mutationSession.getSnapshot().scope;
+      if (!draft.value.trim()) {
+        setRenameDraft((current) => (current === draft ? null : current));
+        return;
+      }
+      const previous = lastRenameSubmission.current;
+      if (
+        previous?.edit === draft.edit &&
+        previous.revision === draft.revision &&
+        (trigger === "blur" ||
+          (previous.pending &&
+            previous.lifetime === lifetime &&
+            previous.scope === scope))
+      )
+        return;
+      const preset = customPresets?.[draft.id];
+      if (preset) {
+        const submission = {
+          edit: draft.edit,
+          revision: draft.revision,
+          lifetime,
+          scope,
+          pending: true,
+        };
+        lastRenameSubmission.current = submission;
+        const owns = (current: RenameDraft | null) =>
+          current?.edit === draft.edit &&
+          current.revision === draft.revision &&
+          current.submission === submission &&
+          renameLifetime.current === lifetime &&
+          mutationSession.getSnapshot().scope === scope;
+        setRenameDraft((current) =>
+          current?.edit === draft.edit && current.revision === draft.revision
+            ? { ...current, submission, error: undefined }
+            : current,
+        );
+        void saveCustomPreset(draft.id, {
+          ...preset,
+          name: draft.value.trim(),
+        }).then(
+          () => {
+            submission.pending = false;
+            setRenameDraft((current) => (owns(current) ? null : current));
+          },
+          (error: unknown) => {
+            submission.pending = false;
+            setRenameDraft((current) =>
+              current && owns(current)
+                ? {
+                    ...current,
+                    error:
+                      error instanceof Error
+                        ? error.message
+                        : "Ekki tókst að vista heiti.",
+                  }
+                : current,
+            );
+          },
+        );
+      }
+    },
+    [renameDraft, customPresets, saveCustomPreset, mutationSession],
+  );
 
   return (
     <Modal open={open} onClose={onClose} size="md" overflow>
@@ -925,7 +996,7 @@ const ThemeEditorModal = ({ open, onClose }: ThemeEditorModalProps) => {
         <Modal.Title>Klukku þema</Modal.Title>
       </Modal.Header>
       <Modal.Body className="theme-modal-body">
-        {renameError && <p role="alert">{renameError}</p>}
+        {renameDraft?.error && <p role="alert">{renameDraft.error}</p>}
         <div className="theme-preset-section">
           <div className="theme-preset-section-header">
             <span className="theme-section-label">Forstillingar</span>
@@ -981,13 +1052,25 @@ const ThemeEditorModal = ({ open, onClose }: ThemeEditorModalProps) => {
                             onClick={() => selectPreset(entry)}
                             className="theme-custom-preset-name"
                           >
-                            {renamingId === entry.id ? (
+                            {renameDraft?.id === entry.id ? (
                               <Input
                                 size="xs"
-                                value={renameValue}
-                                onChange={(v) => setRenameValue(v)}
-                                onBlur={commitRename}
-                                onPressEnter={commitRename}
+                                value={renameDraft.value}
+                                onChange={(value) =>
+                                  setRenameDraft((current) =>
+                                    current?.edit === renameDraft.edit
+                                      ? {
+                                          ...current,
+                                          value,
+                                          revision: {},
+                                          submission: undefined,
+                                          error: undefined,
+                                        }
+                                      : current,
+                                  )
+                                }
+                                onBlur={() => commitRename("blur")}
+                                onPressEnter={() => commitRename("enter")}
                                 autoFocus
                                 className="theme-rename-input"
                                 onClick={(e) => e.stopPropagation()}

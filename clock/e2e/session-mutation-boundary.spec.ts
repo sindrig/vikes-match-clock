@@ -605,3 +605,215 @@ test("fresh create/add/play uses subscribed queue state within one browser event
     await page.evaluate(() => window.sessionMutationHarness.counts.ordinary),
   ).toBe(3);
 });
+
+test("cached reconnect finishes a partial initial load without another core update", async ({
+  page,
+}) => {
+  let paused = false;
+  const held: Array<{ path?: string; send: () => void }> = [];
+  const delivered: string[] = [];
+  await page.routeWebSocket(/127\.0\.0\.1:9000/, (socket) => {
+    const server = socket.connectToServer();
+    socket.onMessage((message) => server.send(message));
+    server.onMessage((message) => {
+      const payload = JSON.parse(String(message)) as {
+        d?: { b?: { p?: string } };
+      };
+      const path = payload.d?.b?.p;
+      const send = () => {
+        if (path) delivered.push(path);
+        socket.send(message);
+      };
+      if (paused) held.push({ path, send });
+      else send();
+    });
+  });
+  await bootstrap(page);
+  const before = await rest("GET", `states/${venue}`);
+  paused = true;
+  await page.evaluate((location) => {
+    const h = window.sessionMutationHarness;
+    h.retain();
+    h.venue(location);
+  }, other);
+  await expect
+    .poll(() => held.some(({ path }) => path === `states/${other}/perimeter`))
+    .toBe(true);
+  // Keep the original data/ack order. Deliver only through the core areas.
+  while (held.length) {
+    const message = held.shift()!;
+    if (
+      message.path === `states/${other}/clubOverrides` ||
+      message.path === `states/${other}/perimeter`
+    ) {
+      held.unshift(message);
+      break;
+    }
+    message.send();
+  }
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => window.sessionMutationHarness.snapshot().match.homeScore,
+      ),
+    )
+    .toBe(90);
+  expect(
+    await page.evaluate(() => window.sessionMutationHarness.snapshot()),
+  ).toMatchObject({ ready: false, eligible: false });
+  await page.evaluate(() => window.sessionMutationHarness.disconnect());
+  await expect
+    .poll(() =>
+      page.evaluate(() => window.sessionMutationHarness.snapshot().connected),
+    )
+    .toBe(false);
+  await page.evaluate(() => window.sessionMutationHarness.oldCommands());
+  await noAttempts(page, before);
+  // Only unread frames from the socket actually disconnected are discarded.
+  held.length = 0;
+  paused = false;
+  const reconnectStart = delivered.length;
+  await page.evaluate(() => window.sessionMutationHarness.reconnect());
+  await eligible(page);
+  expect(delivered.slice(reconnectStart)).toContain(
+    `states/${other}/perimeter`,
+  );
+  expect(
+    delivered
+      .slice(reconnectStart)
+      .filter((path) =>
+        ["match", "controller", "view"].some(
+          (leaf) => path === `states/${other}/${leaf}`,
+        ),
+      ),
+  ).toEqual([]);
+  await page.evaluate(() => window.sessionMutationHarness.oldCommands());
+  await noAttempts(page, before);
+  await page.evaluate(() => window.sessionMutationHarness.brightness(49));
+  expect(await rest("GET", `states/${other}/perimeter/brightness`)).toBe(49);
+  expect(
+    await page.evaluate(() => window.sessionMutationHarness.counts),
+  ).toMatchObject({ ordinary: 1, auditOnly: 0, sdk: ["merge:/"] });
+});
+
+test("rapid ordinary commands retain both goals, queue edits and presets through SDK echoes", async ({
+  page,
+}) => {
+  await bootstrap(page);
+  const queues = await page.evaluate(() =>
+    window.sessionMutationHarness.rapidOrdinary(),
+  );
+  await expect
+    .poll(
+      async () =>
+        Object.keys((await rest("GET", `audit/${venue}`)) as object).length,
+    )
+    .toBe(8);
+  expect(await rest("GET", `states/${venue}/match/homeScore`)).toBe(4);
+  expect(
+    await rest("GET", `states/${venue}/controller/queues/${queues.first}/name`),
+  ).toBe("First rapid queue");
+  expect(
+    await rest(
+      "GET",
+      `states/${venue}/controller/queues/${queues.second}/name`,
+    ),
+  ).toBe("Second rapid queue");
+  const items = (await rest(
+    "GET",
+    `states/${venue}/controller/queues/${queues.first}/items`,
+  )) as Array<{ key: string }>;
+  expect(items.map(({ key }) => key)).toEqual(["rapid-one", "rapid-two"]);
+  const presets = (await rest(
+    "GET",
+    `states/${venue}/view/customPresets`,
+  )) as Record<string, { name: string }>;
+  expect(presets["rapid-one"]?.name).toBe("First");
+  expect(presets["rapid-two"]?.name).toBe("Second");
+  expect(
+    await page.evaluate(() => window.sessionMutationHarness.counts.ordinary),
+  ).toBe(8);
+});
+
+for (const fail of [false, true]) {
+  test(`late rename ${fail ? "failure" : "success"} preserves another preset's draft and deduplicates Enter/blur`, async ({
+    page,
+  }) => {
+    let buffering = false;
+    let arm = false;
+    const held: Array<() => void> = [];
+    await page.routeWebSocket(/127\.0\.0\.1:9000/, (socket) => {
+      const server = socket.connectToServer();
+      socket.onMessage((message) => {
+        const payload = JSON.parse(String(message)) as {
+          d?: { a?: string; b?: { d?: Record<string, unknown> } };
+        };
+        if (
+          arm &&
+          payload.d?.a === "m" &&
+          Object.keys(payload.d.b?.d ?? {}).some((path) =>
+            path.startsWith(`states/${venue}/view/`),
+          )
+        )
+          buffering = true;
+        if (buffering) held.push(() => server.send(message));
+        else server.send(message);
+      });
+    });
+    await rest("PATCH", `states/${venue}/view`, {
+      customPresets: {
+        one: { name: "One", theme: { logoTop: "0px" } },
+        two: { name: "Two", theme: { logoTop: "0px" } },
+      },
+    });
+    await bootstrap(page);
+    await page.evaluate(() => window.sessionMutationHarness.openTheme());
+    await page.locator('button[title="Endurnefna"]').first().click();
+    const input = page.locator(".theme-rename-input");
+    await input.fill("Submitted first name");
+    arm = true;
+    await input.press("Enter");
+    await expect.poll(() => held.length).toBeGreaterThan(0);
+    await page.locator('button[title="Endurnefna"]').nth(1).click();
+    await input.fill("Unsaved second draft");
+    expect(
+      await page.evaluate(() => window.sessionMutationHarness.counts.ordinary),
+    ).toBe(1);
+    if (fail) await rest("PUT", `auth/${uid}/${venue}`, false);
+    arm = false;
+    buffering = false;
+    for (const send of held.splice(0)) send();
+    // Wait for actual server acceptance/denial and then the promise handlers.
+    await expect
+      .poll(() =>
+        page.evaluate((failure) => {
+          const { counts } = window.sessionMutationHarness;
+          return failure ? counts.failed : counts.succeeded;
+        }, fail),
+      )
+      .toBe(1);
+    if (fail) {
+      await expect
+        .poll(() =>
+          page.evaluate(
+            () =>
+              window.sessionMutationHarness.snapshot().view.customPresets?.one
+                ?.name,
+          ),
+        )
+        .toBe("One");
+    } else {
+      await expect
+        .poll(() => rest("GET", `states/${venue}/view/customPresets/one/name`))
+        .toBe("Submitted first name");
+    }
+    await expect(input).toHaveValue("Unsaved second draft");
+    await expect(page.locator('.theme-modal-body [role="alert"]')).toHaveCount(
+      0,
+    );
+    expect(
+      await rest("GET", `states/${venue}/view/customPresets/two/name`),
+    ).toBe("Two");
+    if (fail) await rest("PUT", `auth/${uid}/${venue}`, true);
+  });
+}

@@ -595,9 +595,9 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     // the all-required-snapshots gate for this scope.
     resyncPendingRef.current = false;
     suspendedDropRef.current = false;
-    // A core subscription delivery after a resume is proof the SDK
-    // re-synchronized with current server state (a live-connection data
-    // change or a reconnect re-sync), so the client is eligible again.
+    // A connected core delivery satisfies the existing recovery policy.
+    // onValue does not expose server/cache provenance; this barrier does not
+    // independently certify server freshness.
     // `navigator.onLine` is intentionally not consulted: it is unreliable and
     // a genuinely offline client simply never receives a delivery.
     if (
@@ -694,9 +694,9 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       const connected = snapshot.val() === true;
       firebaseConnectedRef.current = connected;
       if (connected) return;
-      resyncPendingRef.current = true;
       suspendedDropRef.current = true;
       if (!document.hidden && session.getSnapshot().freshness === "ready") {
+        resyncPendingRef.current = true;
         setWriteFreshness("resyncing");
       }
     });
@@ -785,9 +785,10 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       // Reset the transition baseline so a new venue's loaded view is treated
       // as an initial load, never a stale cross-venue transition.
       prevControllerViewRef.current = null;
-      // A new venue needs all initial snapshots, and if disconnected it also
-      // needs a connected core delivery before it can become eligible.
-      resyncPendingRef.current = !firebaseConnectedRef.current;
+      // A new venue is a fresh initial load: no resume epoch is pending.
+      // Unchanged cached core nodes need not emit again after reconnect;
+      // the remaining initial deliveries still complete the all-five gate.
+      resyncPendingRef.current = false;
 
       let active = true;
       const subscriptionScope = session.getSnapshot();
