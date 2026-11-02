@@ -580,7 +580,7 @@ test("conditional generations commit once and stale observations produce no audi
   expect(await rest("GET", `states/${venue}/match/countdown`)).toBe(false);
 });
 
-test("fresh create/add/play uses subscribed queue state within one browser event turn", async ({
+test("fresh create-with-items then play uses subscribed queue state", async ({
   page,
 }) => {
   await bootstrap(page);
@@ -592,7 +592,7 @@ test("fresh create/add/play uses subscribed queue state within one browser event
       async () =>
         Object.keys((await rest("GET", `audit/${venue}`)) as object).length,
     )
-    .toBe(3);
+    .toBe(2);
   expect(await rest("GET", `states/${venue}/controller/activeQueueId`)).toBe(
     id,
   );
@@ -603,7 +603,7 @@ test("fresh create/add/play uses subscribed queue state within one browser event
   expect(current.asset.key).toBe("fresh-player");
   expect(
     await page.evaluate(() => window.sessionMutationHarness.counts.ordinary),
-  ).toBe(3);
+  ).toBe(2);
 });
 
 test("cached reconnect finishes a partial initial load without another core update", async ({

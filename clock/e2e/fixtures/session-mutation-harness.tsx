@@ -19,6 +19,13 @@ import GoalScorerDialog from "../../src/controller/GoalScorerDialog";
 import PerimeterControl from "../../src/controller/PerimeterControl";
 import ResyncNotice from "../../src/controller/ResyncNotice";
 import ThemeEditorModal from "../../src/controller/theme/ThemeEditor";
+import AssetController from "../../src/controller/asset/AssetController";
+import TeamAssetController from "../../src/controller/asset/team/TeamAssetController";
+import HomeTeamQuickActions from "../../src/controller/HomeTeamQuickActions";
+import MediaManager from "../../src/controller/media/MediaManager";
+import QueuePicker from "../../src/controller/asset/queue/QueuePicker";
+import { useQueuePickerActions } from "../../src/controller/asset/queue/useQueuePickerActions";
+import { getPlayerAssetObject } from "../../src/controller/asset/team/assetHelpers";
 import { DEFAULT_THEME } from "../../src/constants";
 import { DEFAULT_BRIGHTNESS_AUTO_CONFIG } from "../../src/lib/autoBrightness";
 import type { CountdownCompletionObservation } from "../../src/lib/conditionalTransitions";
@@ -44,6 +51,10 @@ let retained: Api;
 let openScorer: () => void;
 let openClub: () => void;
 let openTheme: () => void;
+let preparePicker: () => void;
+let failPreparation = false;
+const observations: unknown[] = [];
+let stopObserving: () => void = () => undefined;
 let connected = false;
 onValue(ref(database, ".info/connected"), (snapshot) => {
   connected = snapshot.val() === true;
@@ -86,13 +97,23 @@ for (const name of ["put", "merge"] as const) {
   };
 }
 const originalDownload = storageHelpers.getDownloadURL;
-storageHelpers.getDownloadURL = async (path) => {
-  const result = await originalDownload(path);
-  if (mediaGate && (/\/players\//.test(path) || /\/club-logos\//.test(path))) {
-    counts.mediaWaiting++;
-    await mediaGate;
+storageHelpers.getDownloadURL = (path) => {
+  // A synchronous preparation fault (before a promise exists), separate from
+  // missing player photos, which intentionally fall back to text-only cards.
+  if (failPreparation && /\/players\//.test(path)) {
+    failPreparation = false;
+    throw new Error("Injected media preparation failure");
   }
-  return result;
+  return originalDownload(path).then(async (result) => {
+    if (
+      mediaGate &&
+      (/\/players\//.test(path) || /\/club-logos\//.test(path))
+    ) {
+      counts.mediaWaiting++;
+      await mediaGate;
+    }
+    return result;
+  });
 };
 function hidden(value: boolean) {
   Object.defineProperty(document, "hidden", { configurable: true, value });
@@ -111,6 +132,24 @@ export const harness = {
     connected,
   }),
   counts,
+  get commands() {
+    return api;
+  },
+  get retainedCommands() {
+    return retained;
+  },
+  observations,
+  observe: (location: string) => {
+    stopObserving();
+    observations.length = 0;
+    stopObserving = onValue(ref(database, `states/${location}`), (snapshot) => {
+      observations.push(snapshot.val());
+    });
+  },
+  failPreparation: () => {
+    failPreparation = true;
+  },
+  preparePicker: () => preparePicker(),
   reset: () => {
     counts.ordinary = 0;
     counts.auditOnly = 0;
@@ -176,9 +215,8 @@ export const harness = {
       enabled: true,
     });
   },
-  queueRoundTrip: () => {
-    const id = api.createQueue("Fresh queue");
-    api.addItemsToQueue(id, [
+  queueRoundTrip: async () => {
+    const id = await api.createQueue("Fresh queue", [
       {
         type: "NO_IMAGE_PLAYER",
         key: "fresh-player",
@@ -193,8 +231,10 @@ export const harness = {
   rapidOrdinary: async () => {
     api.addGoal("home");
     api.addGoal("home");
-    const first = api.createQueue("First rapid queue");
-    const second = api.createQueue("Second rapid queue");
+    const [first, second] = await Promise.all([
+      api.createQueue("First rapid queue"),
+      api.createQueue("Second rapid queue"),
+    ]);
     for (const key of ["rapid-one", "rapid-two"]) {
       api.addItemsToQueue(first, [{ type: "NO_IMAGE_PLAYER", key, name: key }]);
     }
@@ -226,6 +266,23 @@ declare global {
 }
 window.sessionMutationHarness = harness;
 
+function PreparedPicker() {
+  const { controller } = useFirebaseState();
+  const { listenPrefix } = useLocalState();
+  const { pending, selectAssets } = useQueuePickerActions();
+  useLayoutEffect(() => {
+    preparePicker = () =>
+      selectAssets([
+        getPlayerAssetObject({
+          listenPrefix,
+          teamName: "Víkingur R",
+          player: { id: 10, name: "Jón", number: 7 },
+        }),
+      ]);
+  }, [selectAssets, listenPrefix]);
+  return pending && <QueuePicker queues={controller.queues} {...pending} />;
+}
+
 function Controls() {
   const value = useFirebaseState();
   const localValue = useLocalState();
@@ -239,6 +296,23 @@ function Controls() {
     openClub = () => setClub(true);
     openTheme = () => setTheme(true);
   }, [value, localValue]);
+  const queueFixture = new URLSearchParams(window.location.search).get(
+    "queues",
+  );
+  if (queueFixture)
+    return (
+      <>
+        <output data-testid="eligibility">{String(value.writeEligible)}</output>
+        <ResyncNotice />
+        {queueFixture === "team" && (
+          <TeamAssetController previousView={() => undefined} />
+        )}
+        {queueFixture === "sub" && <HomeTeamQuickActions />}
+        {queueFixture === "asset" && <AssetController />}
+        {queueFixture === "media" && value.writeEligible && <MediaManager />}
+        {queueFixture === "prepared" && <PreparedPicker />}
+      </>
+    );
   return (
     <>
       <output data-testid="eligibility">{String(value.writeEligible)}</output>

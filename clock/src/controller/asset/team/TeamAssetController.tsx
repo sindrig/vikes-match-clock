@@ -27,15 +27,8 @@ interface OwnProps {
 const TeamAssetController = (props: OwnProps): React.JSX.Element => {
   const { previousView } = props;
   const { match } = useMatch();
-  const {
-    controller,
-    setRoster,
-    clearRoster,
-    createQueue,
-    deleteQueue,
-    addItemsToQueue,
-    showItemNow,
-  } = useController();
+  const { controller, setRoster, clearRoster, replaceQueue, showItemNow } =
+    useController();
   const { roster } = controller;
   const { venues } = useListeners();
   const { view } = useView();
@@ -51,6 +44,7 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
   >(null);
 
   const {
+    error: quickActionsError,
     modalMode: quickActionsModalMode,
     modalTitle: quickActionsModalTitle,
     modalInstruction: quickActionsModalInstruction,
@@ -98,48 +92,69 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
       return;
     }
 
-    const assetPromises = playersToShow.map((player) =>
-      getPlayerAssetObject({ player, teamName, listenPrefix }),
-    );
-
-    const existingQueue = Object.values(controller.queues).find(
-      (q) => q.name === teamName,
-    );
-    if (existingQueue) {
-      deleteQueue(existingQueue.id);
+    // Keep this command's origin across media preparation and rerenders.
+    const commit = replaceQueue;
+    setError("");
+    try {
+      const resolved = await Promise.all(
+        playersToShow.map((player) =>
+          getPlayerAssetObject({ player, teamName, listenPrefix }),
+        ),
+      );
+      const validAssets: Asset[] = resolved.filter((asset) => asset !== null);
+      if (validAssets.length !== resolved.length) {
+        throw new Error("Ekki tókst að undirbúa alla leikmenn.");
+      }
+      const homeRevealBg = view.homeTeamRevealBackground;
+      const assetsWithBg =
+        side === "home" && homeRevealBg
+          ? validAssets.map((asset) => ({ ...asset, background: homeRevealBg }))
+          : validAssets;
+      await commit(teamName, assetsWithBg, { cycle: false });
+      previousView();
+    } catch (failure) {
+      setError(
+        failure instanceof Error
+          ? failure.message
+          : "Ekki tókst að vista biðröð.",
+      );
     }
-    const newQueueId = createQueue(teamName, { cycle: false });
-
-    const resolved = await Promise.all(assetPromises);
-    const validAssets: Asset[] = resolved.filter((a) => a !== null);
-    const homeRevealBg = view.homeTeamRevealBackground;
-    const assetsWithBg =
-      side === "home" && homeRevealBg
-        ? validAssets.map((a) => ({ ...a, background: homeRevealBg }))
-        : validAssets;
-    addItemsToQueue(newQueueId, assetsWithBg);
-
-    previousView();
   };
 
   const selectPlayerAssetAction = (
     player: Player,
     teamName: "homeTeam" | "awayTeam",
   ): void => {
-    void showPlayerCard(player, teamName).then(() => {
-      setSelectPlayerAsset(false);
-      setSelectMOTM(false);
-    });
+    void showPlayerCard(player, teamName)
+      .then(() => {
+        setSelectPlayerAsset(false);
+        setSelectMOTM(false);
+      })
+      .catch((failure: unknown) =>
+        setError(
+          failure instanceof Error
+            ? failure.message
+            : "Ekki tókst að birta leikmann.",
+        ),
+      );
   };
 
   const selectMOTMAction = (
     player: Player,
     teamName: "homeTeam" | "awayTeam",
   ): void => {
-    void showMOTM(player, teamName).then(() => {
-      setSelectPlayerAsset(false);
-      setSelectMOTM(false);
-    });
+    void showMOTM(player, teamName)
+      .then(() => {
+        setSelectPlayerAsset(false);
+        setSelectMOTM(false);
+      })
+      .catch((failure: unknown) =>
+        setError(
+          failure instanceof Error
+            ? failure.message
+            : "Ekki tókst að birta leikmann.",
+        ),
+      );
   };
 
   const handleGoalScorerModalSelect = (player: Player): void => {
@@ -289,6 +304,7 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
       <RingLoader loading={loading} />
       {!loading && renderControls()}
       <span className="error">{error}</span>
+      {quickActionsError && <p role="alert">{quickActionsError}</p>}
       <div className="team-columns">
         {renderTeam("homeTeam")}
         {renderTeam("awayTeam")}

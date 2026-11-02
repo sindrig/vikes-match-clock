@@ -1339,7 +1339,13 @@ interface QueueState {
 | `dndUtils` | `queue/dndUtils.ts` | DnD ID namespacing + `typedCollisionDetection` (see **Drag-and-Drop Collision Detection** below) |
 
 **State operations** (in `FirebaseStateContext.tsx`):
-`createQueue`, `deleteQueue`, `renameQueue`, `reorderQueues`, `addItemsToQueue`, `removeItemFromQueue`, `reorderItemsInQueue`, `updateQueueSettings`, `playQueue`, `stopPlaying`, `showItemNow`
+`createQueue`, `replaceQueue`, `appendSubstitutionAndActivate`, `deleteQueue`, `renameQueue`, `reorderQueues`, `addItemsToQueue`, `removeItemFromQueue`, `reorderItemsInQueue`, `updateQueueSettings`, `playQueue`, `stopPlaying`, `showItemNow`
+
+Create/replace with initial items and substitution (including both roster
+flags) are single audited intents. Existing queue fields are written as leaf
+paths; metadata edits never replace items or unrelated autoplay settings.
+Only subscription callbacks update shared calculation refs. See the
+[queue intent contract and caller inventory](../docs/session-mutation-boundary.md#queue-intents-and-compound-callers-243).
 
 #### QueuePicker Behavior
 
@@ -1350,6 +1356,13 @@ interface QueueState {
 3. **"Ný biðröð"** (primary button at bottom) — creates a new queue and adds the asset
 
 Special case: **0 queues** → auto-creates "Biðröð 1" and adds the item (no dialog shown).
+
+`useQueuePickerActions` owns each draft's media and the commands captured
+before asynchronous preparation. Rerenders cannot give an old draft a newer
+venue/session origin. Create-with-items and append are awaited; rejected
+saves retain the draft and display an error. A failed automatic create on an
+empty board opens the dialog for explicit retry. An older completion cannot
+close a newer draft.
 
 The old "Birta strax" / "Setja í biðröð" radio buttons in MediaManager were removed. `ImageList` no longer has a `displayNow` prop — it always calls `onAddAssets`, which opens QueuePicker.
 
@@ -1393,18 +1406,31 @@ is no transcoding.
 
 #### createQueue Options
 
-`createQueue(name, options?)` accepts an optional `options` parameter:
+`createQueue(name, items = [], options?)` creates all initial items in one
+audited update and returns a `Promise<string>` that resolves to its ID only
+after submission succeeds:
 
 ```typescript
-createQueue(name: string, options?: { cycle?: boolean })
+createQueue(name: string, items?: Asset[], options?: { cycle?: boolean }): Promise<string>
 ```
 
 - `cycle` defaults to `true` (loop by default for most queues)
 - Team queues pass `{ cycle: false }` since lineup sequences shouldn't loop
 
+Never chain create/append/activate to assemble an operator action. Use
+`replaceQueue(name, items, options?)` for a named team replacement and
+`appendSubstitutionAndActivate` for substitutions. These remain ordinary
+current-origin commands, separate from generation-conditional playback CAS.
+
 #### Team Queue Integration
 
 `TeamAssetController.tsx` renders a "Setja lið í biðröð" button above each team (home/away) separately. Clicking it creates a named queue (e.g., "Víkingur R") containing that team's starting lineup as player card assets. The queue is created with `cycle: false` since lineup presentations are one-shot sequences.
+
+All player media is prepared first, then the retained `replaceQueue` command
+creates/replaces the complete queue in one update. Preparation failure leaves
+the old queue intact. Submission failure is shown without leaving the team
+view. Replacement retains the old delete/create placement (new ID, after the
+remaining queues) and clears playback only if the replaced queue was active.
 
 #### Manual Roster Creation (Resolve Roster)
 
@@ -1443,9 +1469,14 @@ Firebase-backed behavior.
   `showPlayerCard(player, teamKey)` and `showMOTM(player, teamKey)` operations.
 - The substitution flow preserves the established sequence: on-pitch
   (`show: true`) players for the outgoing step, eligible off-pitch players
-  (`!show && number != null`) for the incoming step, `editPlayer` roster status
-  updates, trimming of last names on the generated assets, `Skiptingar` queue
-  creation/append/activation, and the home-team reveal background on assets.
+  (`!show && number != null`) for the incoming step, trimming of last names on
+  the generated assets and the home-team reveal background. Both cards prepare
+  before the retained `appendSubstitutionAndActivate` command submits the
+  `Skiptingar` queue creation/append/activation and both roster status leaves
+  together. An absent selected roster member rejects the entire intent. The
+  existing current asset and playing flag are preserved; failures are shown
+  in the team/shortcut box. Player-card and MOTM operations await their retained
+  `renderAsset` command before reporting success.
 - **Corrected SUB field semantics**: `subIn` carries the player **coming
   on** and `subOut` the player **going off** (the persisted fields were
   previously inverted from their meaning). The creation site builds

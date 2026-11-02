@@ -22,6 +22,8 @@ import ClubOverrideForm from "../controller/ClubOverrideForm";
 import ThemeEditorModal from "../controller/theme/ThemeEditor";
 import GoalScorerDialog from "../controller/GoalScorerDialog";
 import { getPlayerAssetObject } from "../controller/asset/team/assetHelpers";
+import { useHomeTeamQuickActions } from "../controller/asset/team/useHomeTeamQuickActions";
+import { useQueuePickerActions } from "../controller/asset/queue/useQueuePickerActions";
 import { storageHelpers } from "../firebase";
 import { firebaseAuth } from "../firebaseAuth";
 import { firebaseDatabase } from "../firebaseDatabase";
@@ -91,12 +93,15 @@ let currentApi: Api;
 let local: LocalApi;
 let authChanged: (user: User | null) => void;
 let sdkUser: User | null;
+let pickerApi: ReturnType<typeof useQueuePickerActions>;
+let quickApi: ReturnType<typeof useHomeTeamQuickActions>;
 let connected = true;
 let deliverWrites = true;
 const subscriptions = new Map<string, Set<Subscription>>();
 const pausedVenues = new Set<string>();
 const operator = { uid: "operator", email: "local@example.test" } as User;
 const player = { id: 10, name: "Jón", number: 7, show: true };
+const benchPlayer = { id: 11, name: "Óli", number: 8, show: false };
 type PlayerAsset = NonNullable<
   Awaited<ReturnType<typeof getPlayerAssetObject>>
 >;
@@ -107,6 +112,12 @@ const asset: PlayerAsset = {
   overlay: { text: "" },
   teamName: "Víkingur R",
   number: 7,
+};
+const substitution = {
+  side: "home" as const,
+  outgoing: player,
+  incoming: benchPlayer,
+  asset: { type: "SUB", key: "sub", subIn: asset, subOut: asset },
 };
 const override: ClubOverride = {
   name: "Draft Club",
@@ -180,6 +191,15 @@ function Capture() {
     currentApi = api;
     local = localApi;
   }, [api, localApi]);
+  return null;
+}
+function CaptureQueueCallers() {
+  const picker = useQueuePickerActions();
+  const quick = useHomeTeamQuickActions();
+  useEffect(() => {
+    pickerApi = picker;
+    quickApi = quick;
+  }, [picker, quick]);
   return null;
 }
 function Bridge({ children }: { children: ReactNode }) {
@@ -1263,9 +1283,21 @@ const ordinaryCommands: Array<
   [
     "createQueue",
     "controller.create-queue",
-    (api) => {
-      api.createQueue("New");
+    async (api) => {
+      await api.createQueue("New", [asset]);
     },
+  ],
+  [
+    "replaceQueue",
+    "controller.replace-queue",
+    async (api) => {
+      await api.replaceQueue("Queue", [asset], { cycle: false });
+    },
+  ],
+  [
+    "appendSubstitutionAndActivate",
+    "controller.append-substitution-and-activate",
+    (api) => api.appendSubstitutionAndActivate(substitution),
   ],
   ["deleteQueue", "controller.delete-queue", (api) => api.deleteQueue("queue")],
   [
@@ -1276,7 +1308,7 @@ const ordinaryCommands: Array<
   [
     "reorderQueues",
     "controller.reorder-queues",
-    (api) => api.reorderQueues(["queue"]),
+    (api) => api.reorderQueues(["missing", "queue"]),
   ],
   [
     "addItemsToQueue",
@@ -1488,11 +1520,275 @@ const ordinaryCommands: Array<
   ],
 ];
 
+describe("atomic queue intent regressions", () => {
+  it.each(boundaries)(
+    "does not retarget a picker prepared before %s",
+    async (_name, crossBoundary) => {
+      const media = deferred<PlayerAsset | null>();
+      mount(<CaptureQueueCallers />);
+      act(() => pickerApi.selectAssets([media.promise]));
+      act(() => crossBoundary());
+      const before = structuredClone(data);
+      clearAttempts();
+      await act(async () => {
+        media.resolve(asset);
+        await media.promise;
+      });
+      const draft = pickerApi.pending;
+      if (!draft) throw new Error("Missing picker draft");
+      await act(async () => {
+        await expect(
+          draft.onCreateAndAdd("Obsolete", draft.assets),
+        ).rejects.toBeInstanceOf(MutationRejectedError);
+      });
+      noAttempts();
+      expect(data).toEqual(before);
+    },
+  );
+
+  it.each(boundaries)(
+    "does not retarget a substitution prepared before %s",
+    async (_name, crossBoundary) => {
+      write("states/A/controller/roster/home", [player, benchPlayer]);
+      const media = deferred<PlayerAsset | null>();
+      vi.mocked(getPlayerAssetObject).mockReturnValue(media.promise);
+      mount(<CaptureQueueCallers />);
+      act(() => quickApi.openSubModal("home"));
+      act(() => quickApi.handleModalSelect(player));
+      act(() => quickApi.handleModalSelect(benchPlayer));
+      expect(getPlayerAssetObject).toHaveBeenCalledTimes(2);
+      const before = structuredClone(data);
+      clearAttempts();
+      act(() => crossBoundary());
+      await act(async () => {
+        media.resolve(asset);
+        await media.promise;
+      });
+      expect(quickApi.error).not.toBe("");
+      noAttempts();
+      expect(data).toEqual(before);
+    },
+  );
+
+  it("replaces a named active queue with all items in one mutation, retaining unrelated queues", async () => {
+    write("states/A/controller/queues/other", {
+      id: "other",
+      name: "Other",
+      items: [asset],
+      order: 3,
+      cycle: true,
+      autoPlay: true,
+      imageSeconds: 9,
+    });
+    mount();
+    const otherBefore = read("states/A/controller/queues/other");
+    clearAttempts();
+    let id = "";
+    await act(async () => {
+      id = await currentApi.replaceQueue(
+        "Queue",
+        [{ ...asset, key: "replacement" }],
+        { cycle: false },
+      );
+    });
+    expect(id).not.toBe("queue");
+    expect(read("states/A/controller/queues/queue")).toBeNull();
+    expect(read(`states/A/controller/queues/${id}`)).toMatchObject({
+      items: [{ key: "replacement" }],
+      cycle: false,
+      autoPlay: false,
+      order: 4,
+    });
+    expect(read("states/A/controller/queues/other")).toEqual(otherBefore);
+    expect(currentApi.controller).toMatchObject({
+      activeQueueId: null,
+      currentAsset: null,
+      playing: false,
+    });
+    expect(firebaseDatabase.writeAudited).toHaveBeenCalledTimes(1);
+    expect(update).toHaveBeenCalledTimes(1);
+  });
+
+  it("retains the old active queue and audit history when replacement is denied", async () => {
+    mount();
+    const before = structuredClone(data);
+    vi.mocked(update).mockRejectedValueOnce(new Error("replacement denied"));
+    await act(async () => {
+      await expect(currentApi.replaceQueue("Queue", [asset])).rejects.toThrow(
+        "replacement denied",
+      );
+    });
+    expect(data).toEqual(before);
+    expect(currentApi.controller.activeQueueId).toBe("queue");
+  });
+
+  it("submits both roster flags, queue items and activation together without interrupting playback", async () => {
+    write("states/A/controller/roster/home", [benchPlayer, player]);
+    mount();
+    clearAttempts();
+    await act(async () =>
+      currentApi.appendSubstitutionAndActivate(substitution),
+    );
+    const subQueue = Object.values(currentApi.controller.queues).find(
+      (queue) => queue.name === "Skiptingar",
+    );
+    expect(subQueue).toMatchObject({
+      items: [substitution.asset],
+      cycle: false,
+      autoPlay: false,
+      order: 1,
+    });
+    expect(currentApi.controller.activeQueueId).toBe(subQueue?.id);
+    expect(currentApi.controller.currentAsset?.asset).toEqual(asset);
+    expect(currentApi.controller.playing).toBe(true);
+    expect(currentApi.controller.roster.home).toEqual([
+      { ...benchPlayer, show: true },
+      { ...player, show: false },
+    ]);
+    expect(firebaseDatabase.writeAudited).toHaveBeenCalledTimes(1);
+    expect(update).toHaveBeenCalledTimes(1);
+    const diff = vi.mocked(firebaseDatabase.writeAudited).mock.calls[0]?.[2];
+    expect(diff).toMatchObject({
+      "roster/home/1/show": false,
+      "roster/home/0/show": true,
+    });
+    expect(diff).not.toHaveProperty("roster");
+  });
+
+  it("rejects an absent roster member without a partial queue or roster update", async () => {
+    mount();
+    clearAttempts();
+    const before = structuredClone(data);
+    await act(async () => {
+      await expect(
+        currentApi.appendSubstitutionAndActivate(substitution),
+      ).rejects.toThrow("Leikmannahópur");
+    });
+    noAttempts();
+    expect(data).toEqual(before);
+  });
+
+  it("keeps both roster flags and the old queue when the substitution save fails", async () => {
+    write("states/A/controller/roster/home", [player, benchPlayer]);
+    mount();
+    const before = structuredClone(data);
+    vi.mocked(update).mockRejectedValueOnce(new Error("substitution denied"));
+    await act(async () => {
+      await expect(
+        currentApi.appendSubstitutionAndActivate(substitution),
+      ).rejects.toThrow("substitution denied");
+    });
+    expect(data).toEqual(before);
+  });
+
+  it("preserves rapid creates and substitutions through subscription echoes before React rerenders", async () => {
+    write("states/A/controller/roster/home", [player, benchPlayer]);
+    mount();
+    const api = currentApi;
+    await act(async () => {
+      const first = api.createQueue("First", [asset]);
+      const second = api.createQueue("Second", [asset]);
+      const subOne = api.appendSubstitutionAndActivate(substitution);
+      const subTwo = api.appendSubstitutionAndActivate({
+        ...substitution,
+        asset: { ...substitution.asset, key: "sub-two" },
+      });
+      await Promise.all([first, second, subOne, subTwo]);
+    });
+    expect(
+      Object.values(currentApi.controller.queues).map((queue) => queue.order),
+    ).toEqual([0, 1, 2, 3]);
+    const queue = Object.values(currentApi.controller.queues).find(
+      (queue) => queue.name === "Skiptingar",
+    );
+    expect(queue?.items.map((item) => item.key)).toEqual(["sub", "sub-two"]);
+  });
+
+  it("does not advance queue refs without a subscription delivery", async () => {
+    mount();
+    deliverWrites = false;
+    const before = currentApi.controller;
+    let id = "";
+    await act(async () => {
+      id = await currentApi.createQueue("Unobserved", [asset]);
+    });
+    expect(currentApi.controller).toBe(before);
+    clearAttempts();
+    await act(async () => {
+      await currentApi.addItemsToQueue(id, [
+        { ...asset, key: "must-not-use-shadow" },
+      ]);
+    });
+    noAttempts();
+    act(() => emit());
+    expect(currentApi.controller.queues[id]?.items).toEqual([asset]);
+  });
+
+  it("creates initial items in one observable audited mutation", async () => {
+    mount();
+    clearAttempts();
+    let id = "";
+    await act(async () => {
+      id = await currentApi.createQueue("Initial items", [asset]);
+    });
+    expect(read(`states/A/controller/queues/${id}/items`)).toEqual([asset]);
+    expect(firebaseDatabase.writeAudited).toHaveBeenCalledTimes(1);
+    expect(update).toHaveBeenCalledTimes(1);
+    const events = Object.values(object(read("audit/A"))).map(object);
+    expect(events).toHaveLength(1);
+    expect(JSON.parse(String(events[0]?.changes))).toMatchObject({
+      [`queues/${id}`]: { name: "Initial items", items: [asset], order: 1 },
+    });
+  });
+
+  it("does not return a valid queue ID when creation submission fails", async () => {
+    mount();
+    const before = structuredClone(data);
+    vi.mocked(update).mockRejectedValueOnce(new Error("queue denied"));
+    await act(async () => {
+      await expect(
+        Promise.resolve(currentApi.createQueue("Denied")),
+      ).rejects.toThrow("queue denied");
+    });
+    expect(data).toEqual(before);
+  });
+
+  it.each([
+    ["rename", (api: Api) => api.renameQueue("queue", "Renamed")],
+    [
+      "duration",
+      (api: Api) => api.updateQueueSettings("queue", { imageSeconds: 8 }),
+    ],
+    ["ordering", (api: Api) => api.reorderQueues(["missing", "queue"])],
+  ] as const)(
+    "%s preserves concurrent items and autoplay via leaf writes",
+    (_name, change) => {
+      mount();
+      // Another writer changed these leaves, before this subscription sees it.
+      const concurrent = [{ ...asset, key: "concurrent" }];
+      write("states/A/controller/queues/queue/items", concurrent);
+      write("states/A/controller/queues/queue/autoPlay", false);
+      clearAttempts();
+      act(() => change(currentApi));
+      expect(read("states/A/controller/queues/queue/items")).toEqual(
+        concurrent,
+      );
+      expect(read("states/A/controller/queues/queue/autoPlay")).toBe(false);
+      for (const call of vi.mocked(firebaseDatabase.writeAudited).mock.calls) {
+        expect(call[2]).not.toHaveProperty("queues/queue");
+        expect(call[2]).not.toHaveProperty("queues/queue/items");
+        expect(call[2]).not.toHaveProperty("queues/queue/autoPlay");
+      }
+    },
+  );
+});
+
 describe("ordinary mutation inventory", () => {
   it.each(ordinaryCommands)(
     "audits an accepted %s command (%s)",
     async (_name, action, command) => {
       write("states/A/perimeter/enabled", false);
+      write("states/A/controller/roster/home", [player, benchPlayer]);
       write("states/A/match/timeElapsed", 45 * 60 * 1000);
       write("states/A/match/halfStops", [45, 90]);
       write("states/A/match/matchStartTime", "23:59");

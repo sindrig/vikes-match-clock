@@ -102,7 +102,11 @@ function setupMocks(overrides?: {
   roster?: Roster;
   view?: Record<string, unknown>;
 }) {
-  const mockShowItemNow = vi.fn();
+  const mockShowItemNow = vi.fn().mockResolvedValue(undefined);
+  const mockAppendSubstitutionAndActivate = vi
+    .fn()
+    .mockResolvedValue(undefined);
+  const mockReplaceQueue = vi.fn().mockResolvedValue("replacement-id");
   const mockEditPlayer = vi.fn();
   const mockCreateQueue = vi
     .fn<(name: string) => string>()
@@ -116,6 +120,9 @@ function setupMocks(overrides?: {
       queues: {},
     },
     showItemNow: mockShowItemNow,
+    renderAsset: mockShowItemNow,
+    appendSubstitutionAndActivate: mockAppendSubstitutionAndActivate,
+    replaceQueue: mockReplaceQueue,
     editPlayer: mockEditPlayer,
     createQueue: mockCreateQueue,
     addItemsToQueue: mockAddItemsToQueue,
@@ -136,6 +143,8 @@ function setupMocks(overrides?: {
 
   return {
     mockShowItemNow,
+    mockAppendSubstitutionAndActivate,
+    mockReplaceQueue,
     mockEditPlayer,
     mockCreateQueue,
     mockAddItemsToQueue,
@@ -183,6 +192,27 @@ describe("HomeTeamQuickActions", () => {
   });
 
   describe("substitution quick action", () => {
+    it("does not change either roster flag before media preparation finishes", async () => {
+      const {
+        mockEditPlayer,
+        mockCreateQueue,
+        mockAddItemsToQueue,
+        mockActivateQueue,
+      } = setupMocks({ roster: mockRoster });
+      mockedGetPlayerAssetObject.mockReturnValue(new Promise(() => undefined));
+      render(<HomeTeamQuickActions />);
+      fireEvent.click(screen.getByRole("button", { name: "Skipting" }));
+      fireEvent.click(screen.getByTestId("modal-player-Jón Jónsson"));
+      fireEvent.click(screen.getByTestId("modal-player-Siggi Bekkur"));
+      await waitFor(() =>
+        expect(mockedGetPlayerAssetObject).toHaveBeenCalled(),
+      );
+      expect(mockEditPlayer).not.toHaveBeenCalled();
+      expect(mockCreateQueue).not.toHaveBeenCalled();
+      expect(mockAddItemsToQueue).not.toHaveBeenCalled();
+      expect(mockActivateQueue).not.toHaveBeenCalled();
+    });
+
     it("opens the substitution modal with only on-pitch home players", () => {
       setupMocks({ roster: mockRoster });
 
@@ -225,12 +255,9 @@ describe("HomeTeamQuickActions", () => {
     });
 
     it("records the substitution and updates player status when both steps complete", async () => {
-      const {
-        mockEditPlayer,
-        mockCreateQueue,
-        mockAddItemsToQueue,
-        mockActivateQueue,
-      } = setupMocks({ roster: mockRoster });
+      const { mockAppendSubstitutionAndActivate } = setupMocks({
+        roster: mockRoster,
+      });
 
       const subInAsset = {
         type: "PLAYER",
@@ -261,28 +288,24 @@ describe("HomeTeamQuickActions", () => {
       fireEvent.click(screen.getByTestId("modal-player-Jón Jónsson"));
       fireEvent.click(screen.getByTestId("modal-player-Siggi Bekkur"));
 
-      expect(mockEditPlayer).toHaveBeenCalledWith("home", 0, {
-        show: false,
-      });
-      expect(mockEditPlayer).toHaveBeenCalledWith("home", 2, { show: true });
-
       await waitFor(() => {
-        expect(mockCreateQueue).toHaveBeenCalledWith("Skiptingar", {
-          cycle: false,
-        });
+        expect(mockAppendSubstitutionAndActivate).toHaveBeenCalledTimes(1);
       });
 
       // Corrected semantics: subIn = coming on, subOut = going off.
       // The first modal step picks the outgoing player (Jón Jónsson), the
       // second the incoming player (Siggi Bekkur).
-      expect(mockAddItemsToQueue).toHaveBeenCalledWith("new-queue-id", [
-        expect.objectContaining({
+      expect(mockAppendSubstitutionAndActivate).toHaveBeenCalledWith({
+        side: "home",
+        outgoing: mockHomePlayers[0],
+        incoming: mockHomePlayers[2],
+        asset: {
+          key: "sub-sub-in-key-sub-out-key",
           type: "SUB",
           subIn: { ...subInAsset, fullName: "Siggi Bekkur" },
           subOut: { ...subOutAsset, fullName: "Jón Jónsson" },
-        }),
-      ]);
-      expect(mockActivateQueue).toHaveBeenCalledWith("new-queue-id");
+        },
+      });
     });
   });
 

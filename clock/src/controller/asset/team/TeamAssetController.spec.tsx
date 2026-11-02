@@ -231,7 +231,11 @@ function setupMocks(overrides?: {
 }) {
   const mockClearRoster = vi.fn();
   const mockSetRoster = vi.fn();
-  const mockShowItemNow = vi.fn();
+  const mockShowItemNow = vi.fn().mockResolvedValue(undefined);
+  const mockAppendSubstitutionAndActivate = vi
+    .fn()
+    .mockResolvedValue(undefined);
+  const mockReplaceQueue = vi.fn().mockResolvedValue("replacement-id");
   const mockEditPlayer = vi.fn();
   const mockActivateQueue = vi.fn();
   const mockCreateQueue = vi
@@ -252,6 +256,9 @@ function setupMocks(overrides?: {
     clearRoster: mockClearRoster,
     setRoster: mockSetRoster,
     showItemNow: mockShowItemNow,
+    renderAsset: mockShowItemNow,
+    appendSubstitutionAndActivate: mockAppendSubstitutionAndActivate,
+    replaceQueue: mockReplaceQueue,
     editPlayer: mockEditPlayer,
     createQueue: mockCreateQueue,
     deleteQueue: mockDeleteQueue,
@@ -279,6 +286,8 @@ function setupMocks(overrides?: {
     mockClearRoster,
     mockSetRoster,
     mockShowItemNow,
+    mockAppendSubstitutionAndActivate,
+    mockReplaceQueue,
     mockEditPlayer,
     mockCreateQueue,
     mockDeleteQueue,
@@ -477,8 +486,65 @@ describe("TeamAssetController", () => {
   });
 
   describe("add players to queue", () => {
+    it.each(["null", "rejected", "save"])(
+      "keeps the team view and old queue on %s preparation/submission failure",
+      async (failure) => {
+        const {
+          mockReplaceQueue,
+          mockDeleteQueue,
+          mockCreateQueue,
+          mockAddItemsToQueue,
+        } = setupMocks({ roster: mockRoster });
+        if (failure === "null")
+          mockedGetPlayerAssetObject.mockResolvedValue(null);
+        else if (failure === "rejected")
+          mockedGetPlayerAssetObject.mockRejectedValue(
+            new Error("Media preparation failed"),
+          );
+        else {
+          mockedGetPlayerAssetObject.mockResolvedValue({
+            type: "PLAYER",
+            key: "ready",
+            name: "Jón",
+            overlay: { text: "" },
+            teamName: "Víkingur R",
+          });
+          mockReplaceQueue.mockRejectedValue(new Error("Queue save failed"));
+        }
+        render(<TeamAssetController previousView={mockPreviousView} />);
+        fireEvent.click(
+          screen.getAllByRole("button", { name: "Setja lið í biðröð" })[0],
+        );
+        await waitFor(() =>
+          expect(document.querySelector(".error")).not.toHaveTextContent(/^$/),
+        );
+        expect(mockDeleteQueue).not.toHaveBeenCalled();
+        expect(mockCreateQueue).not.toHaveBeenCalled();
+        expect(mockAddItemsToQueue).not.toHaveBeenCalled();
+        if (failure !== "save") expect(mockReplaceQueue).not.toHaveBeenCalled();
+        expect(mockPreviousView).not.toHaveBeenCalled();
+      },
+    );
+
+    it("prepares all team media before any queue mutation", async () => {
+      const { mockCreateQueue, mockDeleteQueue, mockAddItemsToQueue } =
+        setupMocks({ roster: mockRoster });
+      mockedGetPlayerAssetObject.mockReturnValue(new Promise(() => undefined));
+      render(<TeamAssetController previousView={mockPreviousView} />);
+      fireEvent.click(
+        screen.getAllByRole("button", { name: "Setja lið í biðröð" })[0],
+      );
+      await waitFor(() =>
+        expect(mockedGetPlayerAssetObject).toHaveBeenCalledTimes(3),
+      );
+      expect(mockCreateQueue).not.toHaveBeenCalled();
+      expect(mockDeleteQueue).not.toHaveBeenCalled();
+      expect(mockAddItemsToQueue).not.toHaveBeenCalled();
+      expect(mockPreviousView).not.toHaveBeenCalled();
+    });
+
     it("adds visible home team players to queue named after team and calls previousView", async () => {
-      const { mockCreateQueue, mockAddItemsToQueue } = setupMocks({
+      const { mockReplaceQueue } = setupMocks({
         roster: mockRoster,
       });
 
@@ -500,10 +566,15 @@ describe("TeamAssetController", () => {
       fireEvent.click(queueButtons[0]);
 
       await waitFor(() => {
-        expect(mockCreateQueue).toHaveBeenCalledWith("Víkingur R", {
-          cycle: false,
-        });
-        expect(mockAddItemsToQueue).toHaveBeenCalled();
+        expect(mockReplaceQueue).toHaveBeenCalledWith(
+          "Víkingur R",
+          expect.arrayContaining([
+            expect.objectContaining({ key: "player-key" }),
+          ]),
+          {
+            cycle: false,
+          },
+        );
         expect(mockPreviousView).toHaveBeenCalled();
       });
     });
@@ -618,12 +689,7 @@ describe("TeamAssetController", () => {
     });
 
     it("completes substitution flow when both players selected", async () => {
-      const {
-        mockCreateQueue,
-        mockAddItemsToQueue,
-        mockActivateQueue,
-        mockEditPlayer,
-      } = setupMocks({
+      const { mockAppendSubstitutionAndActivate } = setupMocks({
         roster: mockRoster,
       });
 
@@ -658,24 +724,24 @@ describe("TeamAssetController", () => {
       fireEvent.click(screen.getByTestId("modal-player-Jón Jónsson"));
       fireEvent.click(screen.getByTestId("modal-player-Siggi Bekkur"));
 
-      await waitFor(() => {
-        expect(mockCreateQueue).toHaveBeenCalledWith("Skiptingar", {
-          cycle: false,
-        });
-      });
+      await waitFor(() =>
+        expect(mockAppendSubstitutionAndActivate).toHaveBeenCalledTimes(1),
+      );
 
-      expect(mockAddItemsToQueue).toHaveBeenCalledWith("new-queue-id", [
-        expect.objectContaining({
+      expect(mockAppendSubstitutionAndActivate).toHaveBeenCalledWith({
+        side: "home",
+        outgoing: mockPlayers[0],
+        incoming: mockPlayers[3],
+        asset: {
+          key: "sub-sub-in-key-sub-out-key",
           type: "SUB",
           // Corrected semantics: subIn = coming on, subOut = going off.
           // The first modal step picks the outgoing player (Jón Jónsson),
           // the second the incoming player (Siggi Bekkur).
           subIn: { ...subInAsset, fullName: "Siggi Bekkur" },
           subOut: { ...subOutAsset, fullName: "Jón Jónsson" },
-        }),
-      ]);
-      expect(mockActivateQueue).toHaveBeenCalledWith("new-queue-id");
-      expect(mockEditPlayer).toHaveBeenCalled();
+        },
+      });
     });
 
     it("does not add to queue if getPlayerAssetObject returns null for subIn", async () => {
