@@ -8,7 +8,7 @@ FastAPI application wrapping the Analyticom KSI REST API for match data and weat
 clock-api/v3/
 ├── app/
 │   ├── main.py            # FastAPI app
-│   ├── dependencies.py    # SSM lookups (cached), client factories
+│   ├── dependencies.py    # Lazy cached SSM client + keys, KSI client factory
 │   ├── models/
 │   │   ├── matches.py     # Pydantic models for KSI match data
 │   │   └── weather.py     # Pydantic model for weather response
@@ -23,7 +23,9 @@ clock-api/v3/
 │   ├── test_matches.py    # KSI client + match endpoint tests
 │   ├── test_weather.py    # Weather service + endpoint tests
 │   ├── test_integration.py # Cross-endpoint integration tests
-│   └── test_handler.py    # App config + LWA setup tests
+│   ├── test_handler.py    # App config + LWA setup tests
+│   ├── test_dependencies.py # Lazy SSM lifecycle, key caches, failure retries
+│   └── test_openapi.py    # Offline export + health, byte-for-byte contract check
 ├── run.sh                 # uvicorn startup script for Lambda Web Adapter
 ├── export-openapi.py      # Generates openapi.json from app
 ├── requirements.txt       # Production deps
@@ -66,6 +68,7 @@ REST API for Icelandic football data. Requires `API_KEY` header on all requests.
 **SSM Parameter Store**: API keys cached with `@functools.cache`:
 - `/vikes-match-clock/ksi-api-key/{team_id}` — one KSI API key per team
 - `/vikes-match-clock/weather-api` — OpenWeatherMap API key
+- `get_ssm_client()` lazily constructs and caches the eu-west-1 SSM client on the first key lookup. Importing the app, exporting OpenAPI, and serving health do not construct AWS clients. Failed construction/key lookups are retried; successful keys retain their existing process lifetime caches. KSI HTTP clients remain request-scoped.
 
 **Dependency Injection**: FastAPI `Depends()` for KSI client. Tests override via `app.dependency_overrides`.
 
@@ -96,10 +99,16 @@ Generating OpenAPI spec:
 python export-openapi.py
 ```
 
-Generating TypeScript types (from `clock/` directory):
+Generating the ignored TypeScript SDK (from `clock/` directory):
 ```bash
-pnpm run generate-api-types
+pnpm run generate-api-client
 ```
+
+After API contract edits, export and commit `openapi.json` first, then
+regenerate the SDK. CI checks schema freshness separately. Frontend
+`pnpm start`/`pnpm build` generate from the committed schema without Python
+or AWS. See [API client preparation](../../docs/api-client-preparation.md)
+for isolated setup and the offline export regression test.
 
 ## Code Style
 

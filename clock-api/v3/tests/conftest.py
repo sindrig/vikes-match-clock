@@ -14,7 +14,8 @@ def client():
 
 @pytest.fixture
 def mock_ssm():
-    with patch("app.dependencies.ssm_client") as mock:
+    with patch("app.dependencies.get_ssm_client") as factory:
+        mock = factory.return_value
         mock.get_parameter.return_value = {
             "Parameter": {"Value": "test-api-key"}
         }

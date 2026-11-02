@@ -1841,9 +1841,9 @@ When a team side has no players loaded, `TeamAssetController.tsx` shows a **"Bú
 1. User clicks "Búa til leikmannahóp" for home or away side
 2. `ResolveRosterModal` opens with two sections: **Byrjunarlið** (11 required number inputs) and **Varamenn** (12 optional number inputs)
 3. Client-side validation enforces: all 11 starters filled, positive integers only, no duplicate numbers across both groups
-4. On submit, sends `POST ${apiConfig.gateWayUrl}v3/{teamId}/resolve-roster` with body `{ starters: number[], substitutes: number[] }`
+4. On submit, calls the generated `resolveRoster` SDK operation with `path: { teamId }` and body `{ starters: number[], substitutes: number[] }`, using `api/clientConfig.ts` for the gateway URL and `throwOnError: true` for request failures
 5. API returns `{ players: TeamPlayer[], officials: [] }` (TeamLineup shape) for the requested side
-6. Response is transformed using the same `mapRole` semantics as `transformLineups()` in `lib/matchUtils.ts`
+6. Response is transformed with `transformSingleLineup()` in `lib/matchUtils.ts`, the same adapter used by `transformLineups()`: goalkeeper roles take precedence over captain, missing flags default to false, absent shirt numbers are omitted, and hidden coaches follow players
 7. A preview shows player numbers, names, and roles grouped by starters/substitutes
 8. On confirm, the generated roster merges into the existing roster via `setRoster({ ...roster, [side]: generatedPlayers })`
 
@@ -2215,6 +2215,8 @@ The exported `FONT_OPTIONS` array in `ThemeEditor.tsx` defines the available fon
 - **Bundler**: Vite (migrated from Create React App) - config in `vite.config.ts`
 - **Testing**: Vitest for unit tests, Playwright for e2e
 - **Linting**: ESLint (airbnb-style) + Prettier
+- **API client preparation**: `pnpm start` and `pnpm build` explicitly run `generate-api-client` from the committed `clock-api/v3/openapi.json` before Vite/TypeScript. This also covers `scripts/deploy-prod.sh`; CI retains its explicit `make generate-ts-client` step before lint/tests. For standalone checks on a fresh checkout, run `pnpm run generate-api-client` first. Frontend preparation needs Node/pnpm only.
+- **Contract changes**: Export and commit OpenAPI before regenerating the ignored SDK. Never hand-edit or commit `src/api/client/`. See [API client preparation](../docs/api-client-preparation.md) for setup and offline verification.
 
 ### ESLint Policy (MANDATORY)
 
@@ -2282,6 +2284,8 @@ PORT=4500 VITE_USE_EMULATOR=true pnpm e2e
 - `vite.config.ts` reads `process.env.PORT` for server configuration
 - `playwright.config.ts` calculates `baseURL` from `process.env.PORT` and passes it to the webServer config
 - CI always uses default port 3000 (no env var set)
+
+For a persistent workspace-owned server, use `bash scripts/dev-server.sh start 8000` from the repository root (default port 8000, unlike plain `pnpm start`). The helper needs tmux, runs the installed Vite CLI with an explicit port and `--strictPort`, and keeps logs in `.dev-server/<port>.log`. Use `status <port>` to identify its worktree/session/PID and `stop <port>` to close only that worktree/port's session. It preserves Vite's cache and does not own servers started by Playwright or other launchers. Stop it before moving/deleting a worktree. See `.opencode/skills/dev-server/SKILL.md` for preparation and HTTP/browser verification.
 
 ### Firebase Emulator
 
@@ -2373,33 +2377,28 @@ The asset E2E tests (`e2e/assets.spec.ts`) use these selectors for the multi-que
 - `"Hreinsa virkt overlay"` — clear button shown only when an overlay is active WITHOUT an active queue
 - rsuite `Toggle` components use `data-checked="true"` attribute (NOT `rs-toggle-checked` class)
 
-### Playwright MCP Limitations for Multi-Session Testing
+### Independent Browser Sessions
 
-This app requires testing scenarios with **two independent browser sessions** (e.g., controller + remote display). The Playwright MCP has limitations that make this difficult:
+Controller/display tests may need two independent browser sessions. Tabs on the same origin within one context/profile share localStorage and Firebase auth persistence; opening another ordinary window in the same profile does not isolate them. Different staging URL subpaths also share these keys. Separate local ports have distinct origins but still default to the same staging Firebase project.
 
-1. **Tabs share browser context**: Multiple tabs opened via `browser_tabs` share localStorage, cookies, and session state. Both tabs will have identical local state.
+Use Playwright's test runner with a separate context per role:
 
-2. **Cannot control multiple contexts**: While you can create separate browser contexts via `browser_run_code`:
+```javascript
+const controllerContext = await browser.newContext();
+const displayContext = await browser.newContext();
+try {
+  const controller = await controllerContext.newPage();
+  const display = await displayContext.newPage();
+  // Navigate and interact with each page through its own context.
+} finally {
+  await controllerContext.close();
+  await displayContext.close();
+}
+```
 
-   ```javascript
-   const newContext = await browser.newContext();
-   const newPage = await newContext.newPage();
-   ```
+Browser tool capabilities differ. If a tool exposes code execution and context APIs, it can interact with those context-owned pages through code, even when click/snapshot tools track only their default page. Inspect the available APIs; do not assume all Playwright MCP or Paseo tools support or prohibit multiple contexts. If context APIs are unavailable, use the runner or separate browser profiles (for example normal plus incognito) and report the verification limit.
 
-   The MCP only tracks/controls the original page. The new context's page cannot be interacted with via standard MCP tools (`browser_click`, `browser_snapshot`, etc.).
-
-3. **Workarounds for multi-session testing**:
-   - **Manual testing**: Open two separate browser windows (or one incognito) and test manually
-   - **Playwright e2e tests**: Use the Playwright test runner which can handle multiple browser contexts
-   - **Single-session verification**: Test that actions dispatch correctly and state changes as expected, then rely on Firebase sync logic being correct
-
-4. **What CAN be tested with Playwright MCP**:
-   - Single-session UI flows (login, navigation, clicking buttons)
-   - Verifying UI state after actions
-   - Form interactions and validation
-   - Visual snapshots of single pages
-
-For testing Firebase sync between controller and display (e.g., PlaybackBar stop clearing on remote), you'll need to either test manually or write Playwright tests that can manage multiple browser contexts.
+Separate contexts isolate browser storage, not Firebase data. Use the emulator for state-mutating tests and coordinate any authorized shared-staging tests by project and `listenPrefix`. A single-session check does not establish cross-client synchronization. An HTTP 200 or expected HTML title verifies only the shell; check rendered content, console errors and failed requests before claiming application startup works.
 
 ## Related Systems
 

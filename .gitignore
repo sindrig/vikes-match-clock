@@ -92,3 +92,6 @@ functions/lib/**/*.map
 /.opencode/package-lock.json
 infra/devpod-creds/devpod-creds.txt
 screenshots/
+
+# Workspace-owned development server logs
+/.dev-server/
