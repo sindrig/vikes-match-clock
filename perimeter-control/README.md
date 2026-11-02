@@ -149,7 +149,9 @@ sudo systemctl disable --now perimeter-control
 Weather timeout/cancellation fixes belong to #254 (open PR #270) and are **not
 included in this base**. Cached/stale weather behavior below is retained; an
 HTTP provider stall remains an existing limitation until that work is integrated.
-Brightness arbitration/model fixes in #252/#253 are likewise separate.
+This stack includes the #252 worker arbitration and #253 continuous brightness
+curve; see [arbitration](../docs/brightness-arbitration.md) and the
+[model](../docs/auto-brightness-design.md). Physical qualification remains HOLD.
 
 ## Perimeter brightness (Vnnox/UCenter LED brightness)
 
@@ -182,15 +184,16 @@ For each valid request the daemon:
 1. publishes `pending`,
 2. **snapshots** the current perimeter screen brightness and reads the
    cabinet metadata for diagnosis,
-3. logs in to Vnnox (per-device token) and **writes the converted fraction
+3. logs in to Vnnox (per-device token) and **writes the integer read-scale ratio
    only to the configured perimeter screen GUID** (`guidList` has exactly one
    entry) — the MVR screen is never targeted,
 4. **polls the screen read** until it matches the request within an integer
    percentage tolerance, then publishes `applied`,
 5. on any failure after the write has started, **best-effort restores the
-   snapshot** (writing the exact pre-write ratio/ratioScale back to the same
-   screen) before publishing `failed`; restore failures are logged and
-   appended to the safe error text.
+   snapshot** (writing the exact pre-write ratio/ratioScale/nit/nitType back to
+   the same screen) before publishing `failed`; restore failures are logged
+   and appended to the safe error text. This best-effort restore does not
+   independently verify the restored readback.
 
 Requests are processed **one at a time** by a serialized worker that keeps the
 newest pending request. A newer request supersedes an older one before a write
@@ -205,6 +208,32 @@ disable update. With the auto feature enabled, retained automatic mode governs
 startup after both initial subscriptions and the prior applied baseline settle.
 See the [arbitration contract and local regression proof](../docs/brightness-arbitration.md)
 for startup ordering and the irreversible dispatch boundary.
+
+### Authenticated smoke test and exact rollback
+
+Use the [single executable smoke/restoration procedure](BRIGHTNESS_SMOKE_TEST.md)
+for both integer and fractional snapshots. Its reference helper has local mock
+verification only; physical gateway qualification remains **HOLD**. Select the
+database URL, venue, device route/serial/project and perimeter GUID explicitly;
+provide the selected project's Firebase ID token and a venue-authorized UID
+through the approved loader. The REST commands use an atomic root PATCH with
+an append-only audit record and exact stringified changes, including nulls.
+They never write daemon-owned status/calibration. Current brightness UI
+setters use direct state writes; rules allow those but do not enforce audit
+pairing. An unauthenticated production PATCH is not a supported example.
+
+Snapshot raw `ratio`, `ratioScale`, `nit` and `nitType`, and all non-target
+screen values, before changing anything. Integer commands 0–100 are distinct
+from exact hardware restoration: rounding 4.5% to a command of 4 or 5 loses
+the snapshot, and even an integer percentage may have nondefault nit fields.
+Stop/drain the worker, restore saved Firebase intent, then directly restore
+and read back all four Vnnox fields while the worker remains stopped. If
+Firebase restoration fails, the direct hardware step is still executable
+without Firebase access. Leave the worker stopped until ownership is decided;
+resuming manual mode can replay retained intent and resuming auto can change
+the hardware. Hiding the UI, setting power `off`, or disabling auto alone does
+not stop manual writes. Never submit a command expecting a disabled worker
+to restore the device or publish a new result.
 
 ### Configuration
 
@@ -231,22 +260,22 @@ The brightness feature can run an `automatic` mode that replaces the operator's
 5–6 manual brightness changes per match with a prediction computed **in this
 daemon**: the sun's altitude at the screen's location (exact, offline math via
 SunCalc 1.9.0) and cloud cover at that location from **Open-Meteo**
-(free for non-commercial use — attribution required: *"Weather data by
-Open-Meteo.com"*). The controller UI only writes mode and parameters; predicted
+(free for non-commercial use — attribution required: _"Weather data by
+Open-Meteo.com"_). The controller UI only writes mode and parameters; predicted
 values flow through the same snapshot → write → verify → restore worker as
 manual commands. The model (empirical curve: clear-sky lux from elevation,
 Kasten & Czeplak cloud multiplier, power-law lux→percent mapping) is documented
-in `docs/auto-brightness-design.md` in the vikin-gateway repository; the
+in [`docs/auto-brightness-design.md`](../docs/auto-brightness-design.md); the
 reference test vectors in that doc are encoded in `tests/auto-brightness.test.js`.
 
 ### Paths
 
-| Path                                                | Writer     | Purpose                                                                       |
-| --------------------------------------------------- | ---------- | ----------------------------------------------------------------------------- |
-| `states/{location}/perimeter/brightnessAuto`        | Controller | Auto mode config: `{ enabled, min, max, exponent, cloudWeight, luxMin, luxMax, updatedAt }` |
-| `perimeter/{location}/brightnessStatus`             | Daemon     | Extended with `mode` (`"auto"`) and a live `predicted` readout; a fresh daemon with no worker history publishes a `shadow`-phase prediction document |
-| `perimeter/{location}/brightnessCalibration`        | Daemon     | Append-only fit log: `{ ts, source: "auto"\|"manual", percent, lux, sunElevationDeg, cloudCover }` |
-| `states/{location}/perimeter/brightness`            | Controller + Daemon | Unchanged: auto writes are ordinary integer commands into this path    |
+| Path                                         | Writer              | Purpose                                                                                                                                              |
+| -------------------------------------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `states/{location}/perimeter/brightnessAuto` | Controller          | Auto mode config: `{ enabled, min, max, exponent, cloudWeight, luxMin, luxMax, updatedAt }`                                                          |
+| `perimeter/{location}/brightnessStatus`      | Daemon              | Extended with `mode` (`"auto"`) and a live `predicted` readout; a fresh daemon with no worker history publishes a `shadow`-phase prediction document |
+| `perimeter/{location}/brightnessCalibration` | Daemon              | Append-only fit log: `{ ts, source: "auto"\|"manual", percent, lux, sunElevationDeg, cloudCover }`                                                   |
+| `states/{location}/perimeter/brightness`     | Controller/operator | Manual integer intent only; automatic targets enter the shared worker directly                                                                       |
 
 The `predicted` block is `{ lux, percent, sunElevationDeg, cloudCover,
 weatherAgeMin, weatherStale }` — the live readout the controller shows. It is
@@ -272,12 +301,15 @@ against the operator's manual values during rollout).
   gate).
 - **Errors are contained:** any internal tick failure holds the last applied
   value; weather problems degrade to the last cached cloud fraction, and after
-  **3 h stale** to a conservative fixed fraction of 0.8 with `weatherStale:
-  true` in the status (dimming is safer than glaring over Reykjavík on an
-  overcast day). The daemon never blocks or throws on weather problems.
-- **Enabled but incomplete** (invalid `PERIMETER_LAT`/`PERIMETER_LNG`, or
-  `PERIMETER_BRIGHTNESS_ENABLED` not true) publishes a configuration-caused
-  `failed` status instead of a silent no-op.
+  **3 h stale** to a conservative fixed fraction of 0.8 with
+  `weatherStale: true` in the status (dimming is safer than glaring over
+  Reykjavík on an overcast day). The daemon never blocks or throws on weather
+  problems.
+- **Enabled but incomplete:** with the brightness worker and auto feature on,
+  invalid `PERIMETER_LAT`/`PERIMETER_LNG` publishes a configuration-caused
+  `failed` status. With `PERIMETER_BRIGHTNESS_ENABLED` false there is no
+  brightness worker/listener and no fresh brightness outcome; a controller
+  command cannot restore hardware through that disabled worker.
 
 ### Backward compatibility (regression safety)
 
@@ -287,7 +319,7 @@ against the operator's manual values during rollout).
   payload shapes, so manual-only operation cannot regress.
 - With the flag on, worker status documents gain extra fields (`mode`,
   `predicted`) that older controllers ignore gracefully: the legacy parser
-  builds its own object and only rejects unknown *phases*. The one
+  builds its own object and only rejects unknown _phases_. The one
   not-parseable shape is the fresh-daemon `shadow` document (prediction
   published before any write); it is inert for manual operation and the
   updated controller renders it as the `Samanburður` badge. Enable the
@@ -338,6 +370,19 @@ Gateway integration scenarios cover power gating, manual and auto writes,
 weather fallback, calibration, status recovery and irreversible-write drain.
 Installer unit fixtures stub user/service/dependency operations; they never
 install an actual systemd service. Hardware acceptance remains on HOLD.
+
+For the documentation procedure alone, no dependency install is needed:
+
+```bash
+node --test --test-concurrency=1 tests/brightness-runbook.test.js
+```
+
+It executes the smoke guide's marked Bash commands with the actual reference
+helper/Vnnox client and synthetic authenticated REST/device/systemctl doubles.
+Unexpected network requests are denied. Integer/fractional and nondefault
+scale/nit restoration, non-target GUID isolation, audited null deletion,
+auth/rule-expression denial and stopped/feature-disabled ordering are mock
+evidence only, separate from physical HOLD. No live credentials are consumed.
 
 The opt-in real-pnpm proof runs the installer against synthetic existing
 installations, twice per successful layout. It checks same- and cross-filesystem

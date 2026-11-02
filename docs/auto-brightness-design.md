@@ -246,9 +246,11 @@ GET https://api.open-meteo.com/v1/forecast
 // { ts, source: "auto"|"manual", percent, lux, sunElevationDeg, cloudCover }
 ```
 
-Auto changes are dispatched as ordinary integer commands into the existing
-`states/{location}/perimeter/brightness` path, so the worker, status phases,
-snapshot/verify/restore, and supersession logic remain untouched.
+Automatic targets enter the serialized worker via `requestAuto()`; the
+scheduler does not write the manual
+`states/{location}/perimeter/brightness` path. The worker owns status phases,
+snapshot/verify/restore and supersession. See [arbitration](brightness-arbitration.md)
+and the [authenticated smoke/exact-restoration procedure](../perimeter-control/BRIGHTNESS_SMOKE_TEST.md).
 
 ## Daemon integration points (`brightness.js`)
 
