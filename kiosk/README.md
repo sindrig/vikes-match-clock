@@ -31,6 +31,22 @@ single failed check does not interrupt the display.
 Each connectivity check times out after 10 seconds. A stalled request counts as
 a failed check and does not block the next one-minute retry.
 
+On the clock's origin, only a successful HTTP response counts as a healthy
+check. HTTP errors (including 5xx) count toward the same two-check outage as
+network failures. A same-origin error document without the clock's `#root`
+element navigates back to the clock on the first successful check, even if it
+has never observed a failed probe. The root is part of the initial HTML shell;
+an empty root while React starts does not trigger a reload. This identifies the
+application document, not whether React, Firebase or match data are ready.
+
+From the local bootstrap or an off-origin WebView error page, a cross-origin
+`no-cors` request can return an opaque response. That proves only transport
+reachability, not HTTP success; it permits a navigation attempt so the next
+same-origin check can inspect HTTP status and the document. It does not reset
+the outage count. Probes still use a timestamp query and `cache: "no-store"`;
+recovery uses `location.replace` with the unchanged clock URL. Native injection
+on page-load completion and every minute also remains unchanged.
+
 ## Windows runtime packaging
 
 Windows MSVC builds statically link the C/C++ runtime via `.cargo/config.toml`.
@@ -106,3 +122,19 @@ For a network recovery smoke test:
    minute of reconnecting. Use a local reload because an offline kiosk cannot
    receive "Endurræsa alla skjái" from Firebase until it reconnects.
 4. Restart with the network enabled; verify the clock appears immediately.
+5. Using a controlled local HTTP fixture in Windows/WebView2, serve a same-origin
+   503 document without `#root`, allow repeated probes to return 503, then restore
+   HTTP 200. Verify errors do not clear the outage and the clock returns after the
+   next check. Also test an initial 503 document whose very first probe gets
+   200: it must recover without waiting for two failed checks.
+6. On a working display, return one probe 503 followed by 200 and verify no
+   reload or display-state loss. Return two 503s followed by 200 and verify one
+   recovery navigation. Delay React startup with an empty `#root` and verify no
+   repeated navigation. Exercise the actual WebView2 network-error document as
+   well as the server's same-origin HTTP error document.
+
+**Qualification HOLD:** local Node/Chromium checks do not qualify Windows or
+WebView2 error-page injection, native retry timing, monitor persistence or
+physical display behavior. Complete the Windows checks above before deploying
+this recovery change. No release, installer publication or deployment is
+authorized by local verification.

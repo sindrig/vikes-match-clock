@@ -7,16 +7,22 @@ const vm = require("node:vm");
 const APP_URL = "https://klukka.irdn.is";
 const source = readFileSync(path.join(__dirname, "../ui/probe.js"), "utf8");
 
-function createProbe(origin, outcomes) {
+function createProbe(
+  origin,
+  outcomes,
+  { appDocument = origin === APP_URL } = {},
+) {
   const requests = [];
   const reloads = [];
   const timers = new Map();
   let now = 0;
+  const root = appDocument ? { textContent: "Working display" } : null;
   const context = vm.createContext({
     AbortController,
     URL,
     Date: { now: () => now },
     window: {},
+    document: { getElementById: (id) => (id === "root" ? root : null) },
     location: { origin, replace: (url) => reloads.push(url) },
     setTimeout: (callback, delay) => {
       const id = Symbol();
@@ -40,13 +46,19 @@ function createProbe(origin, outcomes) {
       if (outcome === "failure") {
         return Promise.reject(new Error("Network unavailable"));
       }
-      return Promise.resolve({});
+      if (typeof outcome === "object") return Promise.resolve(outcome);
+      return Promise.resolve(
+        origin === APP_URL
+          ? { ok: true, status: 200, type: "basic" }
+          : { ok: false, status: 0, type: "opaque" },
+      );
     },
   });
 
   const flushPromises = () => new Promise((resolve) => setImmediate(resolve));
   return {
     window: context.window,
+    root,
     requests,
     reloads,
     timers,
@@ -172,4 +184,171 @@ test("an error document retries after failure and navigates on recovery", async 
   await probe.run();
   assert.deepEqual(probe.reloads, [APP_URL]);
   assert.equal(probe.timers.size, 0);
+});
+
+for (const status of [404, 429, 500, 502, 503, 504]) {
+  test(`HTTP ${status} is a failed check and sustained errors recover once`, async () => {
+    const error = { ok: false, status, type: "basic" };
+    const probe = createProbe(APP_URL, [error, error, "success", "success"]);
+
+    await probe.run();
+    assert.equal(probe.window.__kioskFailures, 1);
+    assert.deepEqual(probe.reloads, []);
+    assert.equal(probe.window.__kioskProbePending, false);
+    assert.equal(probe.timers.size, 0);
+
+    await probe.advance(60000);
+    await probe.run();
+    assert.equal(probe.window.__kioskFailures, 2);
+    assert.deepEqual(probe.reloads, []);
+
+    await probe.advance(60000);
+    await probe.run();
+    assert.deepEqual(probe.reloads, [APP_URL]);
+    assert.equal(probe.window.__kioskFailures, 0);
+    assert.equal(probe.timers.size, 0);
+
+    await probe.advance(60000);
+    await probe.run();
+    assert.deepEqual(probe.reloads, [APP_URL]);
+  });
+}
+
+test("one HTTP error preserves the working display and its state", async () => {
+  const probe = createProbe(APP_URL, [
+    { ok: false, status: 503, type: "basic" },
+    "success",
+  ]);
+  probe.window.displayState = { screen: "main", score: "2–1" };
+  const displayState = probe.window.displayState;
+  await probe.run();
+  assert.equal(probe.window.__kioskFailures, 1);
+  await probe.advance(60000);
+  await probe.run();
+  assert.equal(probe.window.__kioskFailures, 0);
+  assert.equal(probe.window.displayState, displayState);
+  assert.equal(probe.root.textContent, "Working display");
+  assert.deepEqual(probe.reloads, []);
+});
+
+test("HTTP errors and transport failures count toward the same outage", async () => {
+  const probe = createProbe(APP_URL, [
+    "failure",
+    { ok: false, status: 503, type: "basic" },
+    "success",
+  ]);
+  await probe.run();
+  await probe.advance(60000);
+  await probe.run();
+  assert.equal(probe.window.__kioskFailures, 2);
+  assert.deepEqual(probe.reloads, []);
+  await probe.advance(60000);
+  await probe.run();
+  assert.deepEqual(probe.reloads, [APP_URL]);
+});
+
+test("healthy checks separate isolated HTTP errors", async () => {
+  const probe = createProbe(APP_URL, [
+    { ok: false, status: 503, type: "basic" },
+    "success",
+    { ok: false, status: 500, type: "basic" },
+    "success",
+  ]);
+  for (let check = 0; check < 4; check += 1) {
+    await probe.run();
+    assert.equal(probe.window.__kioskFailures, check % 2 === 0 ? 1 : 0);
+    await probe.advance(60000);
+  }
+  assert.deepEqual(probe.reloads, []);
+});
+
+test("a same-origin error document waits for HTTP success, then recovers", async () => {
+  const probe = createProbe(
+    APP_URL,
+    [
+      { ok: false, status: 503, type: "basic" },
+      { ok: false, status: 503, type: "basic" },
+      "success",
+    ],
+    { appDocument: false },
+  );
+  await probe.run();
+  assert.equal(probe.window.__kioskFailures, 1);
+  assert.deepEqual(probe.reloads, []);
+  await probe.advance(60000);
+  await probe.run();
+  assert.equal(probe.window.__kioskFailures, 2);
+  assert.deepEqual(probe.reloads, []);
+  await probe.advance(60000);
+  await probe.run();
+  assert.deepEqual(probe.reloads, [APP_URL]);
+});
+
+test("an initial same-origin error page recovers on its first healthy probe", async () => {
+  const probe = createProbe(APP_URL, ["success"], { appDocument: false });
+  await probe.run();
+  assert.deepEqual(probe.reloads, [APP_URL]);
+  assert.equal(probe.window.__kioskFailures, 0);
+  assert.equal(probe.window.__kioskProbePending, false);
+  assert.equal(probe.timers.size, 0);
+});
+
+test("an empty application root is safe during normal startup", async () => {
+  const probe = createProbe(APP_URL, ["success", "success", "success"]);
+  probe.root.textContent = "";
+  for (let check = 0; check < 3; check += 1) {
+    await probe.run();
+    await probe.advance(60000);
+  }
+  assert.deepEqual(probe.reloads, []);
+});
+
+test("opaque responses cannot mark a displayed app healthy", async () => {
+  const probe = createProbe(APP_URL, [
+    { ok: false, status: 0, type: "opaque" },
+    { ok: false, status: 0, type: "opaqueredirect" },
+    "success",
+  ]);
+  await probe.run();
+  assert.equal(probe.window.__kioskFailures, 1);
+  await probe.advance(60000);
+  await probe.run();
+  assert.equal(probe.window.__kioskFailures, 2);
+  assert.deepEqual(probe.reloads, []);
+  await probe.advance(60000);
+  await probe.run();
+  assert.deepEqual(probe.reloads, [APP_URL]);
+});
+
+test("off-origin opaque reachability permits navigation without claiming HTTP health", async () => {
+  const probe = createProbe("null", ["success"]);
+  probe.window.__kioskFailures = 2;
+  await probe.run();
+  assert.deepEqual(probe.reloads, [APP_URL]);
+  assert.equal(probe.window.__kioskFailures, 2);
+  assert.equal(probe.requests[0].mode, "no-cors");
+});
+
+test("a readable HTTP error does not navigate the bootstrap", async () => {
+  const probe = createProbe("http://tauri.localhost", [
+    { ok: false, status: 503, type: "basic" },
+  ]);
+  await probe.run();
+  assert.deepEqual(probe.reloads, []);
+  assert.equal(probe.window.__kioskProbePending, false);
+  assert.equal(probe.timers.size, 0);
+});
+
+test("same-origin checks expose status and preserve cache-busting and navigation", async () => {
+  const probe = createProbe(APP_URL, ["failure", "failure", "success"]);
+  for (let check = 0; check < 3; check += 1) {
+    await probe.run();
+    const request = probe.requests[check];
+    assert.equal(request.mode, "same-origin");
+    assert.equal(request.cache, "no-store");
+    assert.equal(request.url, `${APP_URL}/?kiosk-probe=${check * 60000}`);
+    assert.equal(request.signal.aborted, false);
+    await probe.advance(60000);
+  }
+  assert.deepEqual(probe.reloads, [APP_URL]);
 });
