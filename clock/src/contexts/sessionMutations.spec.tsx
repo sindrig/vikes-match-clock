@@ -2304,6 +2304,21 @@ function NestedDisplay() {
 }
 
 describe("ordinary roster commands preserve raw child identity", () => {
+  afterEach(() => {
+    const actWarnings = vi
+      .mocked(console.error)
+      .mock.calls.filter((args) =>
+        args.some(
+          (value) =>
+            typeof value === "string" &&
+            /not wrapped in act|without await|overlapping act|not configured to support act/i.test(
+              value,
+            ),
+        ),
+      );
+    expect(actWarnings).toEqual([]);
+  });
+
   const starter = { ...player, annotation: { keep: "starter" } };
   const coach = { name: "Coach", role: "Þjálfari", producer: { keep: 3 } };
   const rejected = { name: { invalid: true }, annotation: { keep: "raw" } };
@@ -2525,7 +2540,10 @@ describe("ordinary roster commands preserve raw child identity", () => {
       view: "match",
       roster: currentApi.controller.roster,
     };
-    await act<void>(() => currentApi.updateController(genericUpdate));
+    // Keep act open while the void adapter reports the rejected command.
+    await act<void>(() =>
+      Promise.resolve(currentApi.updateController(genericUpdate)),
+    );
     noAttempts();
     expect(read("states/A/controller/roster")).toEqual(before);
     expect(currentApi.mutationError).toBe(
