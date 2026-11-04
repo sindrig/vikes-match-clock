@@ -7,8 +7,8 @@ FastAPI application wrapping the Analyticom KSI REST API for match data and weat
 ```
 clock-api/v3/
 ├── app/
-│   ├── main.py            # FastAPI app
-│   ├── dependencies.py    # Lazy cached SSM client + keys, KSI client factory
+│   ├── main.py            # FastAPI app + loop-owned KSI admission lifespan
+│   ├── dependencies.py    # Lazy SSM caches, request-scoped KSI lifetime + budget
 │   ├── models/
 │   │   ├── matches.py     # Pydantic models for KSI match data
 │   │   └── weather.py     # Pydantic model for weather response
@@ -25,6 +25,9 @@ clock-api/v3/
 │   ├── test_integration.py # Cross-endpoint integration tests
 │   ├── test_handler.py    # App config + LWA setup tests
 │   ├── test_dependencies.py # Lazy SSM lifecycle, key caches, failure retries
+│   ├── test_ksi_lifecycle.py # Real dependencies, budgets, cancellation + cleanup
+│   ├── test_ssm_admission.py # Worker handoff, FIFO, independent budgets + shutdown
+│   ├── test_roster_resolution.py # Baseline results, ordering + bounded lookups
 │   └── test_openapi.py    # Offline export + health, byte-for-byte contract check
 ├── run.sh                 # uvicorn startup script for Lambda Web Adapter
 ├── export-openapi.py      # Generates openapi.json from app
@@ -35,15 +38,15 @@ clock-api/v3/
 
 ## API Endpoints
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/health` | Health check |
-| GET | `/{team_id}/matches/{date}` | Matches for a team on a date (YYYY-MM-DD). Optional `utc_offset` query param. |
-| GET | `/{team_id}/matches/{match_id}/lineups` | Lineups for a match |
-| GET | `/{team_id}/matches/{match_id}/events` | Events (goals, cards, subs) for a match |
-| GET | `/{team_id}/matches/{match_id}/info` | Detailed match info |
-| POST | `/{teamId}/resolve-roster` | Resolve shirt numbers to player names from recent match history |
-| GET | `/weather?lat=&lon=` | Weather at coordinates (OpenWeatherMap with vedur.is fallback) |
+| Method | Path                                    | Description                                                                   |
+| ------ | --------------------------------------- | ----------------------------------------------------------------------------- |
+| GET    | `/health`                               | Health check                                                                  |
+| GET    | `/{team_id}/matches/{date}`             | Matches for a team on a date (YYYY-MM-DD). Optional `utc_offset` query param. |
+| GET    | `/{team_id}/matches/{match_id}/lineups` | Lineups for a match                                                           |
+| GET    | `/{team_id}/matches/{match_id}/events`  | Events (goals, cards, subs) for a match                                       |
+| GET    | `/{team_id}/matches/{match_id}/info`    | Detailed match info                                                           |
+| POST   | `/{teamId}/resolve-roster`              | Resolve shirt numbers to player names from recent match history               |
+| GET    | `/weather?lat=&lon=`                    | Weather at coordinates (OpenWeatherMap with vedur.is fallback)                |
 
 Note: App is mounted at `root_path="/v3"`, so full production paths are `/v3/health`, `/v3/{team_id}/matches/...`, etc.
 
@@ -51,6 +54,7 @@ Note: App is mounted at `root_path="/v3"`, so full production paths are `/v3/hea
 
 **Analyticom KSI API** (`api-ksi.analyticom.de`):
 REST API for Icelandic football data. Requires `API_KEY` header on all requests.
+
 - Match list: `GET /api/live/matchList/{date}/{utcOffset}?teamIdFilter={teamId}`
 - Past matches (paginated): `GET /api/live/team/{teamId}/matches/paginated/past/{utcOffset}?page=1&pageSize=10`
 - Lineups: `GET /api/live/match/{matchId}/lineups`
@@ -60,17 +64,25 @@ REST API for Icelandic football data. Requires `API_KEY` header on all requests.
 - API docs: `https://api-ksi.analyticom.de/v3/api-docs/live`
 
 **Weather** — two-source fallback:
+
 1. OpenWeatherMap — JSON API, uses lat/lon from request, requires API key
 2. vedur.is (Icelandic Met Office) — XML API, station 1472, no auth needed
 
 ## Key Patterns
 
 **SSM Parameter Store**: API keys cached with `@functools.cache`:
+
 - `/vikes-match-clock/ksi-api-key/{team_id}` — one KSI API key per team
 - `/vikes-match-clock/weather-api` — OpenWeatherMap API key
-- `get_ssm_client()` lazily constructs and caches the eu-west-1 SSM client on the first key lookup. Importing the app, exporting OpenAPI, and serving health do not construct AWS clients. Failed construction/key lookups are retried; successful keys retain their existing process lifetime caches. KSI HTTP clients remain request-scoped.
+- `get_ssm_client()` lazily constructs and caches the eu-west-1 SSM client on the first key lookup. Its SDK configuration uses two-second connect/read timeouts and standard retries with two total attempts. Importing the app, exporting OpenAPI, and serving health do not construct AWS clients. Failed construction/key lookups are retried; successful keys retain their existing process lifetime caches. KSI HTTP clients remain request-scoped.
 
-**Dependency Injection**: FastAPI `Depends()` for KSI client. Tests override via `app.dependency_overrides`.
+**Dependency Injection**: FastAPI `Depends()` for KSI client. The async generator owns one HTTP client per request and closes it on the request's event loop. One absolute 10-second work deadline includes admission, key lookup and all endpoint work; cleanup is shielded from request cancellation and capped at one additional second. Pending cancellation and expiry are checked before HTTP allocation. Tests can still override via `app.dependency_overrides`.
+
+**KSI admission lifecycle**: `main.py` explicitly creates one `KsiKeyLookups` per application lifespan on its serving asyncio loop. Its `asyncio.BoundedSemaphore` has independent, fixed KSI capacity **C=40**. A queued child is cancelled when its caller leaves; Python 3.12 forwards notified reservations if that child is cancelled. An admitted child keeps capacity until its synchronous lookup finishes, using AnyIO worker offload with a private uncontended one-token limiter. Tasks are retained and late exceptions retrieved. Shutdown closes admission, cancels queued children and drains admitted owners on their loop, deferring even repeated native task cancellation until drain completes. Never replace an owner while its workers remain alive. Fixtures must enter the actual app lifespan; HTTPX's ASGI transport alone does not start it.
+
+**Capacity contract**: KSI work does not borrow default AnyIO tokens; changing the default limit **G** does not resize **C**. Combined nominal admission is **C+G**, not a global thread bound. Default AnyIO limiter races remain outside this repair; weather's synchronous key getter is outside the KSI gate. Multiple loops, processes and Lambda instances multiply capacity. A permanently stuck synchronous call keeps its slot and can prevent graceful shutdown; process termination is the final boundary. SDK operation timeouts do not bound DNS, credential discovery or response trickling absolutely. Successful lazy key caches and failure retries are unchanged.
+
+**Roster Resolution**: The ten-match history cache belongs to the request's `KsiClient`; no roster data is shared across requests. Resolve newest first, skip unrelated matches before fetching lineups, and stop when every requested starter and substitute number is found. Successful history exhaustion retains `#number` placeholders. Upstream status/transport failures return 502 and timeouts return 504 without partial rosters. See [KSI lifetime and regression evidence](../../docs/ksi-roster-lifecycle.md).
 
 **Pydantic v2**: `X | None = None` for optional fields, `model_validate()` for JSON conversion. FastAPI auto-generates OpenAPI spec from models.
 
@@ -85,27 +97,32 @@ credential chain; key values are not loaded from dotenv. See
 requirements and credential-free alternatives.
 
 Setup:
+
 ```bash
 cd clock-api/v3
 pip install -r requirements-dev.txt
 ```
 
 Running tests:
+
 ```bash
 python -m pytest tests/ -v
 ```
 
 Formatting (always run before committing):
+
 ```bash
 python -m black --line-length 79 --skip-string-normalization .
 ```
 
 Generating OpenAPI spec:
+
 ```bash
 python export-openapi.py
 ```
 
 Generating the ignored TypeScript SDK (from `clock/` directory):
+
 ```bash
 pnpm run generate-api-client
 ```

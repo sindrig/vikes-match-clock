@@ -1,9 +1,10 @@
 # Brightness gateway retirement (#240)
 
-The implementation is stacked on reviewed open PR #272:
+The original implementation was stacked on reviewed PR #272:
 `audit/264-portable-environment` at
-`7b110a5df3a697866f79fe9d6e18d15f6999d8fe`. Its future PR base is that branch,
-not master. All venues are owner-confirmed web-only; Resolume is unsupported.
+`7b110a5df3a697866f79fe9d6e18d15f6999d8fe`. After that prerequisite merged,
+the retirement PR was refreshed onto master. All venues are owner-confirmed
+web-only; Resolume is unsupported.
 
 ## Removal inventory
 
@@ -29,11 +30,20 @@ Vnnox connectivity, service identity and `/etc/perimeter-control/` paths remain.
 
 ## Retained behavior proof
 
-`brightness.js`, `auto-brightness.js`, `weather.js`, `vnnox.js` and their four
-existing test suites are byte-identical to the base. All **93 retained tests**
-pass against the baseline and within the new **143-test** gateway suite.
-The retained brightness/automatic/weather section of the gateway README is also
-byte-identical, avoiding unnecessary overlap with open PR #270.
+At the original retirement head `198e43eb`, `brightness.js`,
+`auto-brightness.js`, `weather.js`, `vnnox.js` and their four
+existing test suites were byte-identical to the base. All **93 retained tests**
+passed against the baseline and within the new **143-test** gateway suite.
+The retained brightness/automatic/weather section of the gateway README was also
+byte-identical, avoiding unnecessary overlap with then-open PR #270.
+
+The subsequent master integration includes the separately reviewed and merged
+weather deadline/cancellation fix from #270. Its `weather.js` and weather tests
+match master byte-for-byte; the retirement entry point, other three retained
+runtime modules, installer, service unit and dependency files remain identical
+to `198e43eb`. The combined retained gateway suite passed again. The original
+byte-identity counts above are historical retirement evidence, not a claim that
+the independently fixed weather implementation is unchanged.
 
 `perimeter-control/tests/compare-baseline.mjs` runs the original
 `PERIMETER_RESOLUME_ENABLED=false` path and the new bootstrap's controllers with

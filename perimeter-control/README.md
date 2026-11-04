@@ -355,6 +355,15 @@ elevation and irrelevant). Tuning knobs — `PERIMETER_AUTO_TICK_SECONDS` (60),
 `perimeter-control.env.example`. Venue egress to `api.open-meteo.com` must be
 reachable from the gateway box.
 
+Weather requests have a separate **10-second deadline** covering both response
+headers and the complete JSON body (`OpenMeteoCloudCover`'s `requestTimeoutMs`
+constructor option). A timeout preserves the cached value and its age, allowing
+the next scheduled poll to try again. `stop()` aborts the active request and
+prevents further polling until `start()`. Restarting polls immediately; late
+results from an earlier request cannot update the cache or release the new
+request's guard. Providers that ignore `AbortSignal` cannot hold up the poller,
+but their underlying work cannot be forcibly terminated.
+
 ## Tests
 
 From `perimeter-control/`, with Node >= 22 and Corepack:
@@ -365,7 +374,8 @@ corepack pnpm test
 ```
 
 Tests run one file at a time and use mocks/temporary installation fixtures.
-The retained worker, auto model, weather and Vnnox suites are unchanged.
+The retained worker, auto model and Vnnox suites remain; the weather suite also
+covers the separately reviewed deadline/cancellation fix.
 Gateway integration scenarios cover power gating, manual and auto writes,
 weather fallback, calibration, status recovery and irreversible-write drain.
 Installer unit fixtures stub user/service/dependency operations; they never
@@ -383,6 +393,16 @@ Unexpected network requests are denied. Integer/fractional and nondefault
 scale/nit restoration, non-target GUID isolation, audited null deletion,
 auth/rule-expression denial and stopped/feature-disabled ordering are mock
 evidence only, separate from physical HOLD. No live credentials are consumed.
+
+Weather-only tests need no dependency installation. From `perimeter-control/`:
+
+```bash
+node --test tests/weather.test.js
+```
+
+These cover healthy/cache/stale behavior, cancellation-ignoring providers,
+stop/restart races, and real HTTP stalls on loopback with ephemeral ports.
+They do not contact Open-Meteo, Firebase, or hardware.
 
 The opt-in real-pnpm proof runs the installer against synthetic existing
 installations, twice per successful layout. It checks same- and cross-filesystem

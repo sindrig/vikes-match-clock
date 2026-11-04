@@ -1,7 +1,7 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import AssetComponent from "./Asset";
+import AssetComponent, { PlaybackAsset } from "./Asset";
 import assetTypes from "./AssetTypes";
 
 // Mock the Firebase context hooks
@@ -19,6 +19,8 @@ vi.mock("../../contexts/LocalStateContext", () => ({
   useAuth: vi.fn(),
 }));
 
+const endedCallbacks = vi.hoisted(() => [] as (() => void)[]);
+
 // Mock child components
 vi.mock("./VideoPlayer", () => ({
   default: ({
@@ -27,12 +29,15 @@ vi.mock("./VideoPlayer", () => ({
   }: {
     asset: { key: string };
     onEnded?: () => void;
-  }) => (
-    <div data-testid="video-player">
-      VideoPlayer: {asset.key}
-      <button data-testid="video-ended" onClick={onEnded} />
-    </div>
-  ),
+  }) => {
+    if (onEnded) endedCallbacks.push(onEnded);
+    return (
+      <div data-testid="video-player">
+        VideoPlayer: {asset.key}
+        <button data-testid="video-ended" onClick={onEnded} />
+      </div>
+    );
+  },
 }));
 
 vi.mock("./PlayerCard", () => ({
@@ -492,6 +497,30 @@ describe("AssetComponent", () => {
   });
 
   describe("Media completion (video / YouTube end event)", () => {
+    it("remounts the media on replay and retains the old rendered callback identity", () => {
+      const current = {
+        asset: {
+          key: "same-video",
+          url: "https://example.com/same.mp4",
+          type: "VIDEO",
+        },
+        time: null,
+        occurrenceId: "A1",
+      };
+      const { rerender } = render(<PlaybackAsset current={current} />);
+      const oldButton = screen.getByTestId("video-ended");
+      const oldEnd = endedCallbacks[endedCallbacks.length - 1]!;
+      rerender(<PlaybackAsset current={{ ...current, occurrenceId: "A2" }} />);
+      expect(screen.getByTestId("video-ended")).not.toBe(oldButton);
+      oldEnd();
+      expect(mockCompleteAssetIfCurrent).toHaveBeenLastCalledWith(
+        expect.objectContaining({ occurrenceId: "A1" }),
+      );
+      fireEvent.click(screen.getByTestId("video-ended"));
+      expect(mockCompleteAssetIfCurrent).toHaveBeenLastCalledWith(
+        expect.objectContaining({ occurrenceId: "A2" }),
+      );
+    });
     it.each([null, 5])(
       "does not complete a looping video on natural end (time %s)",
       (time) => {
@@ -537,6 +566,7 @@ describe("AssetComponent", () => {
 
       expect(mockCompleteAssetIfCurrent).toHaveBeenCalledTimes(1);
       expect(mockCompleteAssetIfCurrent).toHaveBeenCalledWith({
+        occurrenceId: null,
         assetKey: "video.mp4",
         time: 3,
         activeQueueId: "queue-1",

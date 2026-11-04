@@ -7,7 +7,14 @@ import {
   afterEach,
   type Mock,
 } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import {
+  act,
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import TeamAssetController from "./TeamAssetController";
 import { Player, Roster } from "../../../types";
 import {
@@ -16,9 +23,14 @@ import {
   useListeners,
   useView,
 } from "../../../contexts/FirebaseStateContext";
-import { useRemoteSettings } from "../../../contexts/LocalStateContext";
-import { transformLineups, getTeamId } from "../../../lib/matchUtils";
+import {
+  useLocalState,
+  useRemoteSettings,
+} from "../../../contexts/LocalStateContext";
+import { MutationSession } from "../../../lib/mutationSession";
+import { transformLineups } from "../../../lib/matchUtils";
 import { getLineups } from "../../../api/client";
+import { parseLocations } from "../../../contexts/firebaseParsers";
 
 vi.mock("../../../contexts/FirebaseStateContext", () => ({
   useMatch: vi.fn(),
@@ -28,6 +40,7 @@ vi.mock("../../../contexts/FirebaseStateContext", () => ({
 }));
 
 vi.mock("../../../contexts/LocalStateContext", () => ({
+  useLocalState: vi.fn(),
   useRemoteSettings: vi.fn(),
 }));
 
@@ -35,9 +48,9 @@ vi.mock("../../../api/client", () => ({
   getLineups: vi.fn(),
 }));
 
-vi.mock("../../../lib/matchUtils", () => ({
+vi.mock("../../../lib/matchUtils", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../lib/matchUtils")>()),
   transformLineups: vi.fn(),
-  getTeamId: vi.fn(),
 }));
 
 vi.mock("./Team", () => ({
@@ -98,6 +111,7 @@ vi.mock("./TeamPlayerSelectionModal", () => ({
     instruction,
     players,
     onSelect,
+    error,
   }: {
     open: boolean;
     onClose: () => void;
@@ -105,9 +119,11 @@ vi.mock("./TeamPlayerSelectionModal", () => ({
     instruction?: string;
     players: Player[];
     onSelect: (player: Player) => void;
+    error?: string | null;
   }) =>
     open ? (
       <div data-testid="player-select-modal">
+        {error && <p role="alert">{error}</p>}
         <div data-testid="player-select-title">{title}</div>
         {instruction ? (
           <div data-testid="player-select-instruction">{instruction}</div>
@@ -148,7 +164,6 @@ const mockedUseView = vi.mocked(useView);
 const mockedUseRemoteSettings = vi.mocked(useRemoteSettings);
 const mockedGetLineups = vi.mocked(getLineups);
 const mockedTransformLineups = vi.mocked(transformLineups);
-const mockedGetTeamId = vi.mocked(getTeamId);
 const mockedGetPlayerAssetObject = vi.mocked(getPlayerAssetObject);
 const mockedGetMOTMAsset = vi.mocked(getMOTMAsset);
 
@@ -231,7 +246,11 @@ function setupMocks(overrides?: {
 }) {
   const mockClearRoster = vi.fn();
   const mockSetRoster = vi.fn();
-  const mockShowItemNow = vi.fn();
+  const mockShowItemNow = vi.fn().mockResolvedValue(undefined);
+  const mockAppendSubstitutionAndActivate = vi
+    .fn()
+    .mockResolvedValue(undefined);
+  const mockReplaceQueue = vi.fn().mockResolvedValue("replacement-id");
   const mockEditPlayer = vi.fn();
   const mockActivateQueue = vi.fn();
   const mockCreateQueue = vi
@@ -252,6 +271,9 @@ function setupMocks(overrides?: {
     clearRoster: mockClearRoster,
     setRoster: mockSetRoster,
     showItemNow: mockShowItemNow,
+    renderAsset: mockShowItemNow,
+    appendSubstitutionAndActivate: mockAppendSubstitutionAndActivate,
+    replaceQueue: mockReplaceQueue,
     editPlayer: mockEditPlayer,
     createQueue: mockCreateQueue,
     deleteQueue: mockDeleteQueue,
@@ -262,8 +284,21 @@ function setupMocks(overrides?: {
   mockedUseRemoteSettings.mockReturnValue({
     listenPrefix: "vikinni",
   } as unknown as ReturnType<typeof useRemoteSettings>);
+  const mutationSession = new MutationSession({
+    location: "vikinni",
+    authenticated: true,
+    uid: "local-user",
+  });
+  mutationSession.setFreshness("ready");
+  vi.mocked(useLocalState).mockReturnValue({
+    listenPrefix: "vikinni",
+    mutationSession,
+  } as unknown as ReturnType<typeof useLocalState>);
 
   mockedUseListeners.mockReturnValue({
+    venues: {
+      vikinni: { label: "vikinni", pitchIds: [], config: {}, screens: {} },
+    },
     screens: [{ key: "vikinni", teamId: 2492 }],
   } as unknown as ReturnType<typeof useListeners>);
 
@@ -272,12 +307,13 @@ function setupMocks(overrides?: {
     setGoalGifSettings: vi.fn(),
   } as unknown as ReturnType<typeof useView>);
 
-  mockedGetTeamId.mockReturnValue(2492);
-
   return {
+    mutationSession,
     mockClearRoster,
     mockSetRoster,
     mockShowItemNow,
+    mockAppendSubstitutionAndActivate,
+    mockReplaceQueue,
     mockEditPlayer,
     mockCreateQueue,
     mockDeleteQueue,
@@ -285,6 +321,30 @@ function setupMocks(overrides?: {
     mockActivateQueue,
   };
 }
+
+function deferred<T = void>() {
+  let resolve!: (value: T) => void;
+  let reject!: (failure: Error) => void;
+  const promise = new Promise<T>((done, fail) => {
+    resolve = done;
+    reject = fail;
+  });
+  return { promise, resolve, reject };
+}
+
+function clickHomeSub() {
+  const button = screen.getAllByRole("button", { name: "Skipting" })[0];
+  if (!button) throw new Error("Home substitution button missing");
+  fireEvent.click(button);
+}
+
+const preparedPlayer = {
+  type: "NO_IMAGE_PLAYER",
+  key: "prepared",
+  name: "Jón Jónsson",
+  overlay: { text: "" },
+  teamName: "Víkingur R",
+};
 
 describe("TeamAssetController", () => {
   let mockPreviousView: Mock<() => void>;
@@ -294,8 +354,229 @@ describe("TeamAssetController", () => {
     mockPreviousView = vi.fn<() => void>();
   });
 
+  it.each(["success", "failure"])(
+    "an old substitution %s cannot replace newer inline player feedback",
+    async (outcome) => {
+      const { mockShowItemNow, mockAppendSubstitutionAndActivate } = setupMocks(
+        { roster: mockRoster },
+      );
+      const pending = deferred();
+      mockAppendSubstitutionAndActivate.mockReturnValue(pending.promise);
+      mockedGetPlayerAssetObject.mockResolvedValue(preparedPlayer);
+      mockShowItemNow.mockRejectedValueOnce(new Error("Newer player denied"));
+      render(<TeamAssetController previousView={mockPreviousView} />);
+      clickHomeSub();
+      fireEvent.click(screen.getByTestId("modal-player-Jón Jónsson"));
+      fireEvent.click(screen.getByTestId("modal-player-Siggi Bekkur"));
+      await waitFor(() =>
+        expect(mockAppendSubstitutionAndActivate).toHaveBeenCalledTimes(1),
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Birta leikmann" }));
+      fireEvent.click(screen.getByTestId("select-player-homeTeam"));
+      expect(
+        await screen.findByText("Newer player denied"),
+      ).toBeInTheDocument();
+      await act(async () => {
+        if (outcome === "success") pending.resolve();
+        else pending.reject(new Error("Old substitution denied"));
+        await pending.promise.catch(() => undefined);
+      });
+      expect(screen.getByText("Newer player denied")).toBeInTheDocument();
+      expect(
+        screen.queryByText("Old substitution denied"),
+      ).not.toBeInTheDocument();
+      fireEvent.click(screen.getByTestId("select-player-homeTeam"));
+      await waitFor(() =>
+        expect(
+          screen.queryByRole("button", { name: "Hætta við birtingu" }),
+        ).not.toBeInTheDocument(),
+      );
+      expect(screen.queryByText("Newer player denied")).not.toBeInTheDocument();
+    },
+  );
+
+  it.each(["success", "failure"])(
+    "an older inline player %s cannot replace the current substitution failure",
+    async (outcome) => {
+      const { mockShowItemNow, mockAppendSubstitutionAndActivate } = setupMocks(
+        { roster: mockRoster },
+      );
+      const pending = deferred();
+      mockShowItemNow.mockReturnValueOnce(pending.promise);
+      mockAppendSubstitutionAndActivate.mockRejectedValueOnce(
+        new Error("Current substitution denied"),
+      );
+      mockedGetPlayerAssetObject.mockResolvedValue(preparedPlayer);
+      render(<TeamAssetController previousView={mockPreviousView} />);
+      fireEvent.click(screen.getByRole("button", { name: "Birta leikmann" }));
+      fireEvent.click(screen.getByTestId("select-player-homeTeam"));
+      await waitFor(() => expect(mockShowItemNow).toHaveBeenCalledTimes(1));
+      fireEvent.click(
+        screen.getByRole("button", { name: "Hætta við birtingu" }),
+      );
+      clickHomeSub();
+      fireEvent.click(screen.getByTestId("modal-player-Jón Jónsson"));
+      fireEvent.click(screen.getByTestId("modal-player-Siggi Bekkur"));
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        "Current substitution denied",
+      );
+      await act(async () => {
+        if (outcome === "success") pending.resolve();
+        else pending.reject(new Error("Old player denied"));
+        await pending.promise.catch(() => undefined);
+      });
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "Current substitution denied",
+      );
+      expect(screen.queryByText("Old player denied")).not.toBeInTheDocument();
+    },
+  );
+
+  it.each(["success", "failure"])(
+    "roster fetch %s cannot clear or replace a later player error, and releases its own spinner",
+    async (outcome) => {
+      const { mockShowItemNow, mockSetRoster } = setupMocks({
+        roster: mockRoster,
+      });
+      const request = deferred<Awaited<ReturnType<typeof getLineups<false>>>>();
+      mockedGetLineups.mockReturnValue(request.promise);
+      mockShowItemNow.mockRejectedValue(new Error("Newer player denied"));
+      mockedGetPlayerAssetObject.mockResolvedValue(preparedPlayer);
+      render(<TeamAssetController previousView={mockPreviousView} />);
+      fireEvent.click(screen.getByRole("button", { name: "Birta leikmann" }));
+      fireEvent.click(screen.getByRole("button", { name: "Sækja lið" }));
+      fireEvent.click(screen.getByTestId("select-player-homeTeam"));
+      expect(
+        await screen.findByText("Newer player denied"),
+      ).toBeInTheDocument();
+      mockedTransformLineups.mockReturnValue(mockRoster);
+      await act(async () => {
+        if (outcome === "success")
+          request.resolve({ data: undefined } as Awaited<
+            ReturnType<typeof getLineups<false>>
+          >);
+        else request.reject(new Error("Old fetch denied"));
+        await request.promise.catch(() => undefined);
+      });
+      expect(screen.getByText("Newer player denied")).toBeInTheDocument();
+      expect(screen.queryByText("Old fetch denied")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("ring-loader")).not.toBeInTheDocument();
+      if (outcome === "success")
+        expect(mockSetRoster).toHaveBeenCalledWith(mockRoster);
+    },
+  );
+
+  it("passes current substitution feedback to the team modal and clears it on dismissal", async () => {
+    const { mockAppendSubstitutionAndActivate } = setupMocks({
+      roster: mockRoster,
+    });
+    mockedGetPlayerAssetObject.mockResolvedValue(preparedPlayer);
+    mockAppendSubstitutionAndActivate.mockRejectedValueOnce(
+      new Error("Current substitution denied"),
+    );
+    render(<TeamAssetController previousView={mockPreviousView} />);
+    clickHomeSub();
+    fireEvent.click(screen.getByTestId("modal-player-Jón Jónsson"));
+    fireEvent.click(screen.getByTestId("modal-player-Siggi Bekkur"));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Current substitution denied",
+    );
+    clickHomeSub();
+    expect(
+      within(screen.getByTestId("player-select-modal")).queryByRole("alert"),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Close modal" }));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  describe("acknowledgement ownership", () => {
+    it.each(["Birta leikmann", "Birta mann leiksins"])(
+      "keeps a newer list selection after cancelling a pending %s",
+      async (action) => {
+        const { mockShowItemNow } = setupMocks({ roster: mockRoster });
+        const acknowledgement = deferred();
+        mockShowItemNow.mockReturnValue(acknowledgement.promise);
+        mockedGetPlayerAssetObject.mockResolvedValue(preparedPlayer);
+        mockedGetMOTMAsset.mockResolvedValue(preparedPlayer);
+        render(<TeamAssetController previousView={mockPreviousView} />);
+        fireEvent.click(screen.getByRole("button", { name: action }));
+        fireEvent.click(screen.getByTestId("select-player-homeTeam"));
+        await waitFor(() => expect(mockShowItemNow).toHaveBeenCalledTimes(1));
+        fireEvent.click(
+          screen.getByRole("button", { name: "Hætta við birtingu" }),
+        );
+        fireEvent.click(screen.getByRole("button", { name: action }));
+        await act(async () => {
+          acknowledgement.resolve();
+          await acknowledgement.promise;
+        });
+        expect(
+          screen.getByTestId("select-player-homeTeam"),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: "Hætta við birtingu" }),
+        ).toBeInTheDocument();
+      },
+    );
+
+    it("keeps a newer selection's error when an older failure arrives", async () => {
+      const { mockShowItemNow } = setupMocks({ roster: mockRoster });
+      const older = deferred();
+      mockShowItemNow
+        .mockReturnValueOnce(older.promise)
+        .mockRejectedValueOnce(new Error("Current denied"));
+      mockedGetPlayerAssetObject.mockResolvedValue(preparedPlayer);
+      render(<TeamAssetController previousView={mockPreviousView} />);
+      fireEvent.click(screen.getByRole("button", { name: "Birta leikmann" }));
+      fireEvent.click(screen.getByTestId("select-player-homeTeam"));
+      await waitFor(() => expect(mockShowItemNow).toHaveBeenCalledTimes(1));
+      fireEvent.click(screen.getByTestId("select-player-awayTeam"));
+      expect(await screen.findByText("Current denied")).toBeInTheDocument();
+      await act(async () => {
+        older.reject(new Error("Older denied"));
+        await older.promise.catch(() => undefined);
+      });
+      expect(screen.getByText("Current denied")).toBeInTheDocument();
+      expect(screen.queryByText("Older denied")).not.toBeInTheDocument();
+    });
+
+    it.each(["new selection", "unmount", "session ABA"])(
+      "does not navigate away after a lineup acknowledgement outlives %s",
+      async (boundary) => {
+        const { mockReplaceQueue, mutationSession } = setupMocks({
+          roster: mockRoster,
+        });
+        const acknowledgement = deferred();
+        mockReplaceQueue.mockReturnValue(acknowledgement.promise);
+        mockedGetPlayerAssetObject.mockResolvedValue(preparedPlayer);
+        const { unmount } = render(
+          <TeamAssetController previousView={mockPreviousView} />,
+        );
+        fireEvent.click(
+          screen.getAllByRole("button", { name: "Setja lið í biðröð" })[0]!,
+        );
+        await waitFor(() => expect(mockReplaceQueue).toHaveBeenCalledTimes(1));
+        if (boundary === "unmount") unmount();
+        else if (boundary === "new selection")
+          fireEvent.click(
+            screen.getByRole("button", { name: "Birta leikmann" }),
+          );
+        else {
+          mutationSession.setLocation("other");
+          mutationSession.setLocation("vikinni");
+          mutationSession.setFreshness("ready");
+        }
+        await act(async () => {
+          acknowledgement.resolve();
+          await acknowledgement.promise;
+        });
+        expect(mockPreviousView).not.toHaveBeenCalled();
+      },
+    );
   });
 
   describe("initial render", () => {
@@ -359,6 +640,29 @@ describe("TeamAssetController", () => {
   });
 
   describe("refetchRoster / fetch lineups by ksiMatchId", () => {
+    it("uses the configured venue ID for roster refetch without scoreboard screens", async () => {
+      setupMocks();
+      mockedUseListeners.mockReturnValue(
+        parseLocations({
+          another: { config: { homeTeam: 2390 } },
+          vikinni: { config: { homeTeam: "2058" } },
+        })!,
+      );
+      mockedGetLineups.mockResolvedValueOnce({
+        data: { home: {}, away: {} },
+      } as unknown as Awaited<ReturnType<typeof getLineups>>);
+      mockedTransformLineups.mockReturnValue({ home: [], away: [] });
+      render(<TeamAssetController previousView={mockPreviousView} />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Sækja lið" }));
+
+      await waitFor(() =>
+        expect(mockedGetLineups).toHaveBeenCalledExactlyOnceWith({
+          path: { teamId: 2058, matchId: 12345 },
+        }),
+      );
+    });
+
     it("calls fetchLineups with teamId and ksiMatchId directly", async () => {
       const { mockSetRoster } = setupMocks();
       const rosterData: Roster = {
@@ -453,8 +757,65 @@ describe("TeamAssetController", () => {
   });
 
   describe("add players to queue", () => {
+    it.each(["null", "rejected", "save"])(
+      "keeps the team view and old queue on %s preparation/submission failure",
+      async (failure) => {
+        const {
+          mockReplaceQueue,
+          mockDeleteQueue,
+          mockCreateQueue,
+          mockAddItemsToQueue,
+        } = setupMocks({ roster: mockRoster });
+        if (failure === "null")
+          mockedGetPlayerAssetObject.mockResolvedValue(null);
+        else if (failure === "rejected")
+          mockedGetPlayerAssetObject.mockRejectedValue(
+            new Error("Media preparation failed"),
+          );
+        else {
+          mockedGetPlayerAssetObject.mockResolvedValue({
+            type: "PLAYER",
+            key: "ready",
+            name: "Jón",
+            overlay: { text: "" },
+            teamName: "Víkingur R",
+          });
+          mockReplaceQueue.mockRejectedValue(new Error("Queue save failed"));
+        }
+        render(<TeamAssetController previousView={mockPreviousView} />);
+        fireEvent.click(
+          screen.getAllByRole("button", { name: "Setja lið í biðröð" })[0],
+        );
+        await waitFor(() =>
+          expect(document.querySelector(".error")).not.toHaveTextContent(/^$/),
+        );
+        expect(mockDeleteQueue).not.toHaveBeenCalled();
+        expect(mockCreateQueue).not.toHaveBeenCalled();
+        expect(mockAddItemsToQueue).not.toHaveBeenCalled();
+        if (failure !== "save") expect(mockReplaceQueue).not.toHaveBeenCalled();
+        expect(mockPreviousView).not.toHaveBeenCalled();
+      },
+    );
+
+    it("prepares all team media before any queue mutation", async () => {
+      const { mockCreateQueue, mockDeleteQueue, mockAddItemsToQueue } =
+        setupMocks({ roster: mockRoster });
+      mockedGetPlayerAssetObject.mockReturnValue(new Promise(() => undefined));
+      render(<TeamAssetController previousView={mockPreviousView} />);
+      fireEvent.click(
+        screen.getAllByRole("button", { name: "Setja lið í biðröð" })[0],
+      );
+      await waitFor(() =>
+        expect(mockedGetPlayerAssetObject).toHaveBeenCalledTimes(3),
+      );
+      expect(mockCreateQueue).not.toHaveBeenCalled();
+      expect(mockDeleteQueue).not.toHaveBeenCalled();
+      expect(mockAddItemsToQueue).not.toHaveBeenCalled();
+      expect(mockPreviousView).not.toHaveBeenCalled();
+    });
+
     it("adds visible home team players to queue named after team and calls previousView", async () => {
-      const { mockCreateQueue, mockAddItemsToQueue } = setupMocks({
+      const { mockReplaceQueue } = setupMocks({
         roster: mockRoster,
       });
 
@@ -476,10 +837,15 @@ describe("TeamAssetController", () => {
       fireEvent.click(queueButtons[0]);
 
       await waitFor(() => {
-        expect(mockCreateQueue).toHaveBeenCalledWith("Víkingur R", {
-          cycle: false,
-        });
-        expect(mockAddItemsToQueue).toHaveBeenCalled();
+        expect(mockReplaceQueue).toHaveBeenCalledWith(
+          "Víkingur R",
+          expect.arrayContaining([
+            expect.objectContaining({ key: "player-key" }),
+          ]),
+          {
+            cycle: false,
+          },
+        );
         expect(mockPreviousView).toHaveBeenCalled();
       });
     });
@@ -594,12 +960,7 @@ describe("TeamAssetController", () => {
     });
 
     it("completes substitution flow when both players selected", async () => {
-      const {
-        mockCreateQueue,
-        mockAddItemsToQueue,
-        mockActivateQueue,
-        mockEditPlayer,
-      } = setupMocks({
+      const { mockAppendSubstitutionAndActivate } = setupMocks({
         roster: mockRoster,
       });
 
@@ -634,24 +995,24 @@ describe("TeamAssetController", () => {
       fireEvent.click(screen.getByTestId("modal-player-Jón Jónsson"));
       fireEvent.click(screen.getByTestId("modal-player-Siggi Bekkur"));
 
-      await waitFor(() => {
-        expect(mockCreateQueue).toHaveBeenCalledWith("Skiptingar", {
-          cycle: false,
-        });
-      });
+      await waitFor(() =>
+        expect(mockAppendSubstitutionAndActivate).toHaveBeenCalledTimes(1),
+      );
 
-      expect(mockAddItemsToQueue).toHaveBeenCalledWith("new-queue-id", [
-        expect.objectContaining({
+      expect(mockAppendSubstitutionAndActivate).toHaveBeenCalledWith({
+        side: "home",
+        outgoing: mockPlayers[0],
+        incoming: mockPlayers[3],
+        asset: {
+          key: "sub-sub-in-key-sub-out-key",
           type: "SUB",
           // Corrected semantics: subIn = coming on, subOut = going off.
           // The first modal step picks the outgoing player (Jón Jónsson),
           // the second the incoming player (Siggi Bekkur).
           subIn: { ...subInAsset, fullName: "Siggi Bekkur" },
           subOut: { ...subOutAsset, fullName: "Jón Jónsson" },
-        }),
-      ]);
-      expect(mockActivateQueue).toHaveBeenCalledWith("new-queue-id");
-      expect(mockEditPlayer).toHaveBeenCalled();
+        },
+      });
     });
 
     it("does not add to queue if getPlayerAssetObject returns null for subIn", async () => {

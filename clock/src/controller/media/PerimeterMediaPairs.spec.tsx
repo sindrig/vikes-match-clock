@@ -73,8 +73,6 @@ const createMockPerimeterReturn = (
 ): ReturnType<typeof usePerimeter> =>
   ({
     perimeter: { enabled: true, state: "off" },
-    preview: null,
-    previewLoaded: false,
     setPerimeterState: vi.fn(),
     setPerimeterOverlay: mockSetPerimeterOverlay,
     clearPerimeterOverlay: mockClearPerimeterOverlay,
@@ -85,11 +83,7 @@ const createMockPerimeterReturn = (
     writeEligible: true,
     mediaPairs: { [pairId]: pair },
     overlay: null,
-    overlayStatus: null,
     adLayout: null,
-    appliedAdLayout: undefined,
-    appliedAdLayoutLoaded: false,
-    appliedAdLayoutError: null,
     getServerTime: () => Date.now(),
     ...overrides,
   }) as unknown as ReturnType<typeof usePerimeter>;
@@ -191,7 +185,7 @@ describe("PerimeterMediaPairs", () => {
         ...(type === "VIDEO" ? { loop: true } : {}),
       });
       expect(shown?.key).toBeTypeOf("string");
-      expect(shown?.key).not.toBe(asset.key);
+      expect(shown?.key).toBe(asset.key);
       expect(mockSetPerimeterOverlay).toHaveBeenCalledWith(
         expect.objectContaining({
           columns: [{ durationMs: 10000, files: pair.files }],
@@ -199,7 +193,7 @@ describe("PerimeterMediaPairs", () => {
       );
       const firstKey: unknown = mockShowItemNow.mock.calls[0]?.[0];
       fireEvent.click(screen.getByRole("button", { name: "Sýna" }));
-      expect(mockShowItemNow.mock.calls[1]?.[0]).not.toEqual(firstKey);
+      expect(mockShowItemNow.mock.calls[1]?.[0]).toEqual(firstKey);
     },
   );
 
@@ -295,23 +289,6 @@ describe("PerimeterMediaPairs", () => {
     expect(mockDeletePair).toHaveBeenCalledWith(pairId);
     expect(mockedDelete).not.toHaveBeenCalled();
     vi.restoreAllMocks();
-  });
-
-  it("shows the daemon overlay status and error text", () => {
-    mockedUsePerimeter.mockReturnValue(
-      createMockPerimeterReturn({
-        overlayStatus: {
-          commandId: pairId,
-          phase: "downloading",
-          activeColumn: 0,
-          error: "scp failed",
-        },
-      }),
-    );
-    render(<PerimeterMediaPairs />);
-
-    expect(screen.getByText("Sækir")).toBeInTheDocument();
-    expect(screen.getByText("scp failed")).toBeInTheDocument();
   });
 
   it("disables Vista until name, 48 and 40 files are selected", () => {

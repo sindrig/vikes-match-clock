@@ -242,6 +242,57 @@ const isColor = (
     (channel) => Math.abs(actual[channel]! - expected[channel]!) <= tolerance,
   );
 
+// Let the real write reach RTDB and the independent display, but keep the
+// controller's save pending until the test releases its acknowledgement.
+async function holdScorerAcknowledgement(page: Page, playerId: string) {
+  let requestId: number | undefined;
+  let acknowledge: (() => void) | undefined;
+  type Frame = {
+    d?: {
+      a?: string;
+      r?: number;
+      b?: {
+        d?: Record<
+          string,
+          { version?: number; player?: { id?: string } } | null
+        >;
+      };
+    };
+  };
+  await page.routeWebSocket(/127\.0\.0\.1:9000/, (socket) => {
+    const server = socket.connectToServer();
+    socket.onMessage((message) => {
+      const { d } = JSON.parse(String(message)) as Frame;
+      const overlay =
+        d?.b?.d?.[`states/${TEST_LISTEN_PREFIX}/perimeter/overlay`];
+      if (
+        d?.a === "m" &&
+        overlay?.version === 2 &&
+        overlay.player?.id === playerId
+      ) {
+        requestId = d.r;
+      }
+      server.send(message);
+    });
+    server.onMessage((message) => {
+      const { d } = JSON.parse(String(message)) as Frame;
+      if (requestId !== undefined && d?.r === requestId) {
+        acknowledge = () => socket.send(message);
+      } else {
+        socket.send(message);
+      }
+    });
+  });
+  return {
+    isHeld: () => acknowledge !== undefined,
+    release: () => {
+      if (!acknowledge) throw new Error("No scorer acknowledgement held");
+      acknowledge();
+      acknowledge = undefined;
+    },
+  };
+}
+
 // Controller login for a venue that also offers a Perimeter entry: the
 // scoreboard button ("{label} {screen name}") is targeted exactly so the
 // strict-mode locator does not collide with the Perimeter button.
@@ -274,7 +325,7 @@ async function loginController(page: Page): Promise<void> {
     name: `Test Location ${TEST_LISTEN_PREFIX.replace("test-location-", "")} Display 1`,
   });
   await scoreboardButton.waitFor({ state: "visible", timeout: 15000 });
-  await scoreboardButton.click({ force: true });
+  await scoreboardButton.click();
   await page
     .getByRole("button", { name: "Biðröð" })
     .waitFor({ state: "visible", timeout: 10000 });
@@ -388,6 +439,13 @@ test.describe("Web perimeter goal scorer", () => {
     browser,
     clockPage,
   }) => {
+    const acknowledgement = await holdScorerAcknowledgement(clockPage, "10");
+    const scorerDialog = clockPage.getByRole("dialog", {
+      name: "Markaskorari — Víkingur R",
+    });
+    const homeGoal = clockPage
+      .getByTestId("score-buttons-home")
+      .getByRole("button", { name: "+", exact: true });
     // -- The anonymous perimeter display -----------------------------------
     const displayContext = await browser.newContext();
     const displayPage = await displayContext.newPage();
@@ -422,14 +480,11 @@ test.describe("Web perimeter goal scorer", () => {
         .getByText("Match", { exact: true })
         .click();
 
-      await clockPage
-        .locator(".preview-score-buttons")
-        .first()
-        .getByRole("button")
-        .first()
-        .click({ force: true });
-      await clockPage.getByText("Veldu leikmann sem skoraði").waitFor();
-      await clockPage.getByText("Jón", { exact: true }).click();
+      await homeGoal.click();
+      await scorerDialog.getByText("Veldu leikmann sem skoraði").waitFor();
+      await scorerDialog
+        .getByRole("button", { name: "7 Jón", exact: true })
+        .click();
 
       // The perimeter receives the semantic scorer command (the generic
       // goal command may still be visible until the write lands).
@@ -467,15 +522,21 @@ test.describe("Web perimeter goal scorer", () => {
         )
         .toBe(true);
 
+      // A visible overlay does not mean the controller's save has settled.
+      // Finish the selection, including the modal's exit animation, before
+      // starting another goal. A forced click could hit the closing dialog.
+      await expect.poll(acknowledgement.isHeld).toBe(true);
+      await expect(scorerDialog).toBeVisible();
+      acknowledgement.release();
+      await expect(scorerDialog).toBeHidden();
+
       // -- Fallback: select the crest-only player --------------------------
-      await clockPage
-        .locator(".preview-score-buttons")
-        .first()
-        .getByRole("button")
-        .first()
-        .click({ force: true });
-      await clockPage.getByText("Veldu leikmann sem skoraði").waitFor();
-      await clockPage.getByText("Anna", { exact: true }).click();
+      await homeGoal.click();
+      await scorerDialog.getByText("Veldu leikmann sem skoraði").waitFor();
+      await scorerDialog
+        .getByRole("button", { name: "8 Anna", exact: true })
+        .click();
+      await expect(scorerDialog).toBeHidden();
 
       // Player 999 has no celebration image: the band composes the venue
       // crest (gold) instead. The new command supersedes the previous one.
@@ -525,5 +586,49 @@ test.describe("Web perimeter goal scorer", () => {
     } finally {
       await displayContext.close();
     }
+  });
+
+  test("keeps a reopened scorer dialog usable after an earlier acknowledgement", async ({
+    clockPage,
+  }) => {
+    const acknowledgement = await holdScorerAcknowledgement(clockPage, "10");
+    const scorerDialog = clockPage.getByRole("dialog", {
+      name: "Markaskorari — Víkingur R",
+    });
+    const homeGoal = clockPage
+      .getByTestId("score-buttons-home")
+      .getByRole("button", { name: "+", exact: true });
+    await clockPage.goto("/");
+    await loginController(clockPage);
+    await homeGoal.click();
+    await scorerDialog
+      .getByRole("button", { name: "7 Jón", exact: true })
+      .click();
+    await expect.poll(acknowledgement.isHeld).toBe(true);
+
+    await scorerDialog
+      .getByRole("button", { name: "Close", exact: true })
+      .click();
+    await expect(scorerDialog).toBeHidden();
+    await homeGoal.click();
+    await expect(scorerDialog).toBeVisible();
+    acknowledgement.release();
+
+    // A normal, stable click must still reach the new dialog after the old
+    // save settles. The old onClose used to detach this player's button.
+    await scorerDialog
+      .getByRole("button", { name: "8 Anna", exact: true })
+      .click();
+    await expect(scorerDialog).toBeHidden();
+    await expect
+      .poll(async () => {
+        const doc = await readRtdb(
+          `states/${TEST_LISTEN_PREFIX}/perimeter/overlay`,
+        );
+        return doc.player;
+      })
+      .toEqual({ id: "999", name: "Anna", number: "8" });
+    const match = await readRtdb(`states/${TEST_LISTEN_PREFIX}/match`);
+    expect(match.homeScore).toBe(2);
   });
 });

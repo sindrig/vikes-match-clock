@@ -54,8 +54,8 @@ test.describe("Basic navigation", () => {
     await closeSettings(page);
     await fakeClock.advance(page, ONE_MINUTE * 10);
     await expect(page.locator(".matchclock")).toContainText(/11:3\d/);
-    await expect(page.locator(".away img")).toHaveCount(1);
-    await expect(page.locator(".away img")).toHaveAttribute("src", /Fram/);
+    await expect(page.locator(".team.away img")).toHaveCount(1);
+    await expect(page.locator(".team.away img")).toHaveAttribute("src", /Fram/);
     await page.getByRole("button", { name: "Stillingar" }).click();
     await expect(page.locator(".halfstops-input")).toHaveCount(4);
     await closeSettings(page);

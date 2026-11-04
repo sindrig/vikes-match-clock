@@ -1,3 +1,4 @@
+import { isPlaybackOccurrenceId } from "../lib/playbackOccurrence";
 import type {
   Match,
   InjuryTimeDisplayMode,
@@ -15,9 +16,6 @@ import type {
   ScorerCelebrationStyle,
   PlayerBandStyle,
   SubstitutionBandStyle,
-  PerimeterPreview,
-  PerimeterColumn,
-  PerimeterClip,
   PerimeterOverlay,
   PerimeterOverlayColumn,
   PerimeterOverlayFile,
@@ -28,11 +26,6 @@ import type {
   PerimeterAdLayout,
   PerimeterAdLayoutColumn,
   PerimeterAdLayoutFile,
-  PerimeterAppliedAdLayout,
-  PerimeterAppliedAdColumn,
-  PerimeterAppliedAdFile,
-  PerimeterAdLane,
-  PerimeterAdPhase,
   AuditEvent,
   AuditStateArea,
   PerimeterBrightnessStatus,
@@ -40,40 +33,21 @@ import type {
   PerimeterBrightnessAutoMode,
   PerimeterBrightnessPredicted,
   PerimeterBrightnessPhase,
-  PerimeterOverlayTarget,
-  PerimeterOverlayGeometry,
-  GoalScorerPreparationStatus,
-  GoalScorerPreparationPhase,
-  GoalScorerPlayerStatus,
-  GoalScorerPreparationPlayerResult,
   PerimeterDisplayConfig,
   PerimeterLogicalScreen,
   PerimeterRegion,
   PerimeterRect,
   PerimeterRegionTransform,
+  ListenersState,
+  Venue,
+  VenueConfig,
+  VenueScreen,
 } from "../types";
 import { Sports, DEFAULT_THEME } from "../constants";
+import { parsePitchIds, parseVenueId } from "../lib/venue";
 import { validatePerimeterMapping } from "../perimeter/perimeterMapping";
 
-interface LocationData {
-  label: string;
-  screens: Array<{
-    style: { height: number; width: number };
-    fontSize?: string;
-    name: string;
-    key: string;
-  }>;
-  pitchIds?: string[];
-  perimeterDisplay?: PerimeterDisplayConfig;
-}
-
-export interface ParsedScreen {
-  screen: LocationData["screens"][0];
-  label: string;
-  key: string;
-  pitchIds?: string[];
-  perimeterDisplay?: PerimeterDisplayConfig;
-}
+export type ParsedScreen = ListenersState["screens"][number];
 
 function parseRect(data: unknown): PerimeterRect | undefined {
   if (!data || typeof data !== "object") return undefined;
@@ -200,7 +174,7 @@ export function parsePerimeterDisplay(
   if (raw.version !== 1) return undefined;
   const revision = typeof raw.revision === "string" ? raw.revision : "";
   const renderer = raw.renderer;
-  if (!revision || (renderer !== "web" && renderer !== "resolume")) {
+  if (!revision || renderer !== "web") {
     return undefined;
   }
 
@@ -254,42 +228,93 @@ export function parsePerimeterDisplay(
   return validatePerimeterMapping(config).valid ? config : undefined;
 }
 
-export function parseLocations(data: unknown): {
-  available: string[];
-  screens: ParsedScreen[];
-} | null {
+function isMetadataRecord(data: unknown): data is Record<string, unknown> {
+  return data !== null && typeof data === "object" && !Array.isArray(data);
+}
+
+function screenDimension(value: unknown, fallback: number): number {
+  const number = typeof value === "string" ? Number(value) : value;
+  return typeof number === "number" && Number.isFinite(number) && number > 0
+    ? number
+    : fallback;
+}
+
+function parseVenueScreen(data: unknown): VenueScreen | null {
+  if (!isMetadataRecord(data)) return null;
+  const { style, fontSize, ...metadata } = data;
+  const rawStyle = isMetadataRecord(style) ? style : {};
+  return {
+    ...metadata,
+    key: typeof data.key === "string" ? data.key : "",
+    name: typeof data.name === "string" ? data.name : "",
+    style: {
+      ...rawStyle,
+      width: screenDimension(rawStyle.width, 512),
+      height: screenDimension(rawStyle.height, 400),
+    },
+    ...(typeof fontSize === "string" ? { fontSize } : {}),
+  };
+}
+
+export function parseVenue(data: unknown, key: string): Venue | null {
+  if (!isMetadataRecord(data)) return null;
+  const { perimeterDisplay: rawMapping, ...metadata } = data;
+  const rawConfig = isMetadataRecord(data.config) ? data.config : {};
+  const config: VenueConfig = { ...rawConfig };
+  delete config.homeTeam;
+  const homeTeam = parseVenueId(rawConfig.homeTeam);
+  if (homeTeam !== undefined) config.homeTeam = homeTeam;
+  const screens = Object.fromEntries(
+    data.screens && typeof data.screens === "object"
+      ? Object.entries(data.screens).flatMap(([screenKey, raw]) => {
+          const screen = parseVenueScreen(raw);
+          return screen ? [[screenKey, screen]] : [];
+        })
+      : [],
+  );
+  const perimeterDisplay = parsePerimeterDisplay(rawMapping);
+  return {
+    ...metadata,
+    document: data,
+    label:
+      typeof data.label === "string"
+        ? data.label
+        : typeof data.name === "string"
+          ? data.name
+          : key,
+    pitchIds: parsePitchIds(data.pitchIds),
+    config,
+    screens,
+    ...(perimeterDisplay ? { perimeterDisplay } : {}),
+  };
+}
+
+export function parseLocations(data: unknown): ListenersState | null {
   if (!data || typeof data !== "object") return null;
 
-  const locations = data as Record<string, unknown>;
-  const available = Object.keys(locations);
+  const venues: Record<string, Venue> = Object.fromEntries(
+    Object.entries(data).flatMap(([key, value]) => {
+      const venue = parseVenue(value, key);
+      return venue ? [[key, venue]] : [];
+    }),
+  );
   const screens: ParsedScreen[] = [];
 
-  for (const [key, value] of Object.entries(locations)) {
-    if (!value || typeof value !== "object") continue;
-    const loc = value as Record<string, unknown>;
-
-    const label = typeof loc.label === "string" ? loc.label : key;
-    const locScreens = Array.isArray(loc.screens) ? loc.screens : [];
-    const pitchIds = Array.isArray(loc.pitchIds)
-      ? (loc.pitchIds as string[])
-      : undefined;
-    const perimeterDisplay = parsePerimeterDisplay(loc.perimeterDisplay);
-
-    for (const screen of locScreens) {
-      if (screen && typeof screen === "object") {
-        const parsedScreen: ParsedScreen = {
-          screen: screen as ParsedScreen["screen"],
-          label,
-          key,
-          pitchIds,
-        };
-        if (perimeterDisplay) parsedScreen.perimeterDisplay = perimeterDisplay;
-        screens.push(parsedScreen);
-      }
+  for (const [key, venue] of Object.entries(venues)) {
+    for (const screen of Object.values(venue.screens)) {
+      screens.push({
+        screen,
+        label: venue.label,
+        key,
+        pitchIds: venue.pitchIds,
+        ...(venue.perimeterDisplay
+          ? { perimeterDisplay: venue.perimeterDisplay }
+          : {}),
+      });
     }
   }
 
-  return { available, screens };
+  return { available: Object.keys(venues), venues, screens };
 }
 
 function parseTwoMinArray(arr: unknown): TwoMinPenalty[] {
@@ -426,6 +451,32 @@ function parseInjuryTimeDisplayMode(
   return defaultMatch.injuryTimeDisplayMode;
 }
 
+export function parseCurrentAsset(
+  data: unknown,
+): ControllerState["currentAsset"] {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+  const raw = data as Record<string, unknown>;
+  if (!raw.asset || typeof raw.asset !== "object" || Array.isArray(raw.asset))
+    return null;
+  const asset = raw.asset as Record<string, unknown>;
+  if (typeof asset.key !== "string" || typeof asset.type !== "string")
+    return null;
+  const hasId = Object.prototype.hasOwnProperty.call(raw, "occurrenceId");
+  if (hasId && !isPlaybackOccurrenceId(raw.occurrenceId)) return null;
+  if (
+    raw.time != null &&
+    (typeof raw.time !== "number" || !Number.isFinite(raw.time) || raw.time < 0)
+  )
+    return null;
+  return {
+    asset: asset as unknown as Asset,
+    time: typeof raw.time === "number" ? raw.time : null,
+    ...(isPlaybackOccurrenceId(raw.occurrenceId)
+      ? { occurrenceId: raw.occurrenceId }
+      : {}),
+  };
+}
+
 export function parseController(
   data: unknown,
   defaultController: ControllerState,
@@ -463,10 +514,7 @@ export function parseController(
               : defaultController.roster.away,
           }
         : defaultController.roster,
-    currentAsset:
-      raw.currentAsset && typeof raw.currentAsset === "object"
-        ? (raw.currentAsset as ControllerState["currentAsset"])
-        : null,
+    currentAsset: parseCurrentAsset(raw.currentAsset),
     refreshToken:
       typeof raw.refreshToken === "string"
         ? raw.refreshToken
@@ -732,54 +780,6 @@ export function parseSubstitutionStyle(
   return VALID_SUBSTITUTION_STYLES.includes(data as SubstitutionBandStyle)
     ? (data as SubstitutionBandStyle)
     : undefined;
-}
-
-// Strict, tolerant parse of the daemon-published composition preview. Clips
-// and columns without usable data are dropped; the snapshot only becomes
-// undefined when the whole payload is not an object.
-export function parsePerimeterPreview(
-  data: unknown,
-): PerimeterPreview | undefined {
-  if (!data || typeof data !== "object") return undefined;
-
-  const raw = data as Record<string, unknown>;
-  const updatedAt = typeof raw.updatedAt === "number" ? raw.updatedAt : null;
-
-  const columns: PerimeterColumn[] = [];
-  if (Array.isArray(raw.columns)) {
-    for (const entry of raw.columns) {
-      if (!entry || typeof entry !== "object") continue;
-      const column = entry as Record<string, unknown>;
-      const name = typeof column.name === "string" ? column.name : "";
-      if (!name) continue;
-
-      const clips: PerimeterClip[] = [];
-      if (Array.isArray(column.clips)) {
-        for (const clipEntry of column.clips) {
-          if (!clipEntry || typeof clipEntry !== "object") continue;
-          const clip = clipEntry as Record<string, unknown>;
-          const filename =
-            typeof clip.filename === "string" ? clip.filename : "";
-          if (!filename) continue;
-          const thumbnail =
-            typeof clip.thumbnail === "string" ? clip.thumbnail : undefined;
-          clips.push({
-            id: typeof clip.id === "number" ? clip.id : null,
-            filename,
-            thumbnail,
-          });
-        }
-      }
-
-      columns.push({
-        id: typeof column.id === "number" ? column.id : null,
-        name,
-        clips,
-      });
-    }
-  }
-
-  return { updatedAt, columns };
 }
 
 const MAX_OVERLAY_COLUMNS = 20;
@@ -1410,88 +1410,6 @@ export function parsePerimeterAdLayout(
   return { version, revision, columns };
 }
 
-// Parse the daemon-published applied layout
-function parseAppliedAdFile(data: unknown): PerimeterAppliedAdFile | undefined {
-  if (!data || typeof data !== "object") return undefined;
-  const raw = data as Record<string, unknown>;
-  const name = typeof raw.name === "string" ? raw.name : "";
-  if (!validateAdFileName(name)) return undefined;
-  const thumbnail =
-    typeof raw.thumbnail === "string" ? raw.thumbnail : undefined;
-  return { name, thumbnail };
-}
-
-function parseAppliedAdColumn(
-  data: unknown,
-): PerimeterAppliedAdColumn | undefined {
-  if (!data || typeof data !== "object") return undefined;
-  const raw = data as Record<string, unknown>;
-  const id = typeof raw.id === "string" ? raw.id : "";
-  if (!id) return undefined;
-  // deckColumns is optional: a layout column with no mapped deck columns
-  // (more layout columns than deck columns) still reports its files.
-  let deckColumns: number[] = [];
-  if (Array.isArray(raw.deckColumns)) {
-    deckColumns = raw.deckColumns
-      .map((dc) => (typeof dc === "number" && Number.isInteger(dc) ? dc : -1))
-      .filter((dc) => dc >= 1);
-  }
-  const filesRaw = raw.files;
-  if (!filesRaw || typeof filesRaw !== "object") return undefined;
-  const files: Record<string, PerimeterAppliedAdFile> = {};
-  for (const [key, value] of Object.entries(
-    filesRaw as Record<string, unknown>,
-  )) {
-    const parsed = parseAppliedAdFile(value);
-    if (!parsed) return undefined;
-    files[key] = parsed;
-  }
-  if (Object.keys(files).length === 0) return undefined;
-  return { id, deckColumns, files };
-}
-
-export function parsePerimeterAppliedAdLayout(
-  data: unknown,
-): PerimeterAppliedAdLayout | undefined {
-  if (!data || typeof data !== "object") return undefined;
-  const raw = data as Record<string, unknown>;
-
-  // Parse lanes
-  const lanes: PerimeterAdLane[] = [];
-  if (Array.isArray(raw.lanes)) {
-    for (const entry of raw.lanes) {
-      if (!entry || typeof entry !== "object") continue;
-      const lane = entry as Record<string, unknown>;
-      const id = typeof lane.id === "string" ? lane.id : "";
-      const name = typeof lane.name === "string" ? lane.name : "";
-      if (id && name) lanes.push({ id, name });
-    }
-  }
-
-  const revision = typeof raw.revision === "string" ? raw.revision : "";
-  const phase: PerimeterAdPhase = [
-    "loading",
-    "playing",
-    "error",
-    "idle",
-  ].includes(raw.phase as string)
-    ? (raw.phase as PerimeterAdPhase)
-    : "idle";
-  const error = typeof raw.error === "string" ? raw.error : null;
-  const updatedAt =
-    typeof raw.updatedAt === "number" ? raw.updatedAt : Date.now();
-
-  const columns: PerimeterAppliedAdColumn[] = [];
-  if (Array.isArray(raw.columns)) {
-    for (const entry of raw.columns) {
-      const column = parseAppliedAdColumn(entry);
-      if (column) columns.push(column);
-    }
-  }
-
-  return { lanes, revision, phase, error, updatedAt, columns };
-}
-
 // -- Perimeter brightness (Vnnox LED brightness) -----------------------------
 
 const VALID_BRIGHTNESS_PHASES: PerimeterBrightnessPhase[] = [
@@ -1648,164 +1566,5 @@ export function parsePerimeterBrightnessStatus(
     updatedAt,
     mode,
     ...(predicted ? { predicted } : {}),
-  };
-}
-
-// -- Perimeter overlay target geometry ---------------------------------------
-
-// Strict parse of the daemon-published overlay target geometry at
-// `perimeter/{location}/overlayGeometry`. A missing revision, a non-numeric
-// updatedAt, or a non-array targets list rejects the whole document (null).
-// Individual malformed targets are dropped so a single bad layer never voids
-// the geometry of the others; the daemon only publishes fully validated
-// targets, so an empty targets list means no usable overlay targets.
-export function parsePerimeterOverlayGeometry(
-  data: unknown,
-): PerimeterOverlayGeometry | null {
-  if (!data || typeof data !== "object") return null;
-  const raw = data as Record<string, unknown>;
-
-  const revision = typeof raw.revision === "string" ? raw.revision : "";
-  if (!revision) return null;
-  const updatedAt = typeof raw.updatedAt === "number" ? raw.updatedAt : null;
-  if (updatedAt === null) return null;
-  if (!Array.isArray(raw.targets)) return null;
-
-  const targets: PerimeterOverlayTarget[] = [];
-  for (const entry of raw.targets) {
-    if (!entry || typeof entry !== "object") continue;
-    const target = entry as Record<string, unknown>;
-    const layerId = typeof target.layerId === "string" ? target.layerId : "";
-    const label = typeof target.label === "string" ? target.label : "";
-    const targetFolder =
-      typeof target.targetFolder === "string" ? target.targetFolder : "";
-    const width =
-      typeof target.width === "number" && Number.isInteger(target.width)
-        ? target.width
-        : 0;
-    const height =
-      typeof target.height === "number" && Number.isInteger(target.height)
-        ? target.height
-        : 0;
-    if (!layerId || !label || !targetFolder || width <= 0 || height <= 0) {
-      continue;
-    }
-    targets.push({ layerId, label, targetFolder, width, height });
-  }
-
-  return { revision, updatedAt, targets };
-}
-
-// -- Goal-scorer perimeter media preparation ---------------------------------
-
-const VALID_GOAL_SCORER_PREPARATION_PHASES: GoalScorerPreparationPhase[] = [
-  "preparing",
-  "ready",
-  "failed",
-];
-const VALID_GOAL_SCORER_PLAYER_STATUSES: GoalScorerPlayerStatus[] = [
-  "preparing",
-  "ready",
-  "fallback",
-  "unavailable",
-  "failed",
-];
-
-function positiveCount(value: unknown): number {
-  return typeof value === "number" && Number.isInteger(value) && value >= 0
-    ? value
-    : 0;
-}
-
-function parseGoalScorerPlayerResult(
-  data: unknown,
-  options?: { location?: string; bucket?: string },
-): GoalScorerPreparationPlayerResult | undefined {
-  if (!data || typeof data !== "object") return undefined;
-  const raw = data as Record<string, unknown>;
-  const status = raw.status as GoalScorerPlayerStatus;
-  if (
-    typeof status !== "string" ||
-    !VALID_GOAL_SCORER_PLAYER_STATUSES.includes(status)
-  ) {
-    return undefined;
-  }
-  const error = typeof raw.error === "string" ? raw.error : null;
-
-  let files: Record<string, PerimeterOverlayFile> | undefined;
-  if (raw.files !== null && raw.files !== undefined) {
-    if (typeof raw.files !== "object") return undefined;
-    const filesRaw = raw.files as Record<string, unknown>;
-    const parsedFiles: Record<string, PerimeterOverlayFile> = {};
-    for (const [key, value] of Object.entries(filesRaw)) {
-      const parsed = parseOverlayFile(value, options);
-      if (!parsed) return undefined;
-      parsedFiles[key] = parsed;
-    }
-    if (Object.keys(parsedFiles).length > 0) files = parsedFiles;
-  }
-
-  // A ready/fallback result must carry usable media sources.
-  if (
-    (status === "ready" || status === "fallback") &&
-    (files === undefined || Object.keys(files).length === 0)
-  ) {
-    return undefined;
-  }
-
-  return { status, error, files };
-}
-
-// Strict parse of the daemon-owned preparation status at
-// `perimeter/{location}/goalScorerPreparation`. Malformed per-player entries
-// are dropped so one bad player never voids the whole status; a malformed
-// top-level shape (missing jobId, unknown phase, non-numeric updatedAt)
-// rejects the document (null).
-export function parseGoalScorerPreparationStatus(
-  data: unknown,
-  options?: { location?: string; bucket?: string },
-): GoalScorerPreparationStatus | null {
-  if (!data || typeof data !== "object") return null;
-  const raw = data as Record<string, unknown>;
-
-  const jobId = typeof raw.jobId === "string" ? raw.jobId : "";
-  if (!jobId) return null;
-  const rosterSignature =
-    typeof raw.rosterSignature === "string" ? raw.rosterSignature : undefined;
-  const phase = raw.phase as GoalScorerPreparationPhase;
-  if (
-    typeof phase !== "string" ||
-    !VALID_GOAL_SCORER_PREPARATION_PHASES.includes(phase)
-  ) {
-    return null;
-  }
-  const updatedAt = typeof raw.updatedAt === "number" ? raw.updatedAt : null;
-  if (updatedAt === null) return null;
-  const error = typeof raw.error === "string" ? raw.error : null;
-
-  const players: Record<string, GoalScorerPreparationPlayerResult> = {};
-  const playersRaw = raw.players;
-  if (playersRaw && typeof playersRaw === "object") {
-    for (const [playerId, value] of Object.entries(
-      playersRaw as Record<string, unknown>,
-    )) {
-      if (!playerId) continue;
-      const parsed = parseGoalScorerPlayerResult(value, options);
-      if (parsed) players[playerId] = parsed;
-    }
-  }
-
-  return {
-    jobId,
-    ...(rosterSignature ? { rosterSignature } : {}),
-    phase,
-    readyCount: positiveCount(raw.readyCount),
-    fallbackCount: positiveCount(raw.fallbackCount),
-    unavailableCount: positiveCount(raw.unavailableCount),
-    failedCount: positiveCount(raw.failedCount),
-    total: positiveCount(raw.total),
-    updatedAt,
-    error,
-    players,
   };
 }
