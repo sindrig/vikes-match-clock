@@ -1,5 +1,11 @@
 # Perimeter brightness — gateway smoke-test checklist
 
+**Qualification status for #240: HOLD.** Only mocked runtime and temporary
+installer tests have run. Execute this checklist only with separate gateway
+and hardware authorization. All venues use browser media playback; the
+brightness service and Vnnox route remain required. Confirm the exact Node
+binary in the service's `ExecStart` is >= 22 before host qualification.
+
 Pre-deploy and post-deploy verification for the Vnnox brightness feature.
 Follow this on the gateway (the host running `perimeter-control`) and in the
 controller UI. **Never skip the rollback step** — the whole point of the
