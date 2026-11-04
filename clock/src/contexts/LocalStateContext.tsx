@@ -1,5 +1,7 @@
 import {
   createContext,
+  useCallback,
+  useRef,
   useContext,
   useState,
   useEffect,
@@ -11,6 +13,7 @@ import { firebaseAuth } from "../firebaseAuth";
 import { database } from "../firebase";
 import type { DisplayTarget } from "../types";
 import { MutationSession } from "../lib/mutationSession";
+import { useSubscriptionRead, type ReadStatus } from "./subscriptionRead";
 
 export interface FirebaseAuthState {
   isLoaded: boolean;
@@ -30,6 +33,8 @@ interface LocalStateContextType {
   listenPrefix: string;
   setListenPrefix: (prefix: string) => void;
   available: string[] | null;
+  availableStatus: ReadStatus;
+  retryAvailable: () => void;
 
   // Screen key (from "Birta skjá" selection) — used to resolve viewport from live Firebase locations
   screenKey: string | null;
@@ -47,6 +52,14 @@ interface LocalStateContextType {
 const LocalStateContext = createContext<LocalStateContextType | undefined>(
   undefined,
 );
+
+const emptyGrants: string[] = [];
+const parseGrants = (raw: unknown): string[] =>
+  raw && typeof raw === "object"
+    ? Object.entries(raw)
+        .filter(([, value]) => value === true)
+        .map(([key]) => key)
+    : [];
 
 const LISTEN_PREFIX_KEY = "clock_listenPrefix";
 const SCREEN_KEY_KEY = "clock_screenKey";
@@ -130,7 +143,8 @@ export function LocalStateProvider({ children }: { children: ReactNode }) {
     return localStorage.getItem(LISTEN_PREFIX_KEY) || "";
   });
 
-  const [available, setAvailable] = useState<string[] | null>(null);
+  const [authReadScope, setAuthReadScope] = useState(() => ({}));
+  const authReadScopeRef = useRef(authReadScope);
   const [mutationSession] = useState(
     () =>
       new MutationSession(
@@ -138,6 +152,25 @@ export function LocalStateProvider({ children }: { children: ReactNode }) {
         () => firebaseAuth.getCurrentUser()?.uid,
       ),
   );
+
+  const grantsCurrent = useCallback(
+    () =>
+      authReadScopeRef.current === authReadScope &&
+      mutationSession.getSnapshot().authenticated &&
+      mutationSession.getSnapshot().uid === auth.uid,
+    [authReadScope, mutationSession, auth.uid],
+  );
+  const grants = useSubscriptionRead({
+    scope: authReadScope,
+    path: `auth/${auth.uid}`,
+    area: "aðgang að skjám",
+    initial: emptyGrants,
+    parse: parseGrants,
+    isCurrent: grantsCurrent,
+    enabled: Boolean(auth.uid),
+    clearOnError: true,
+  });
+  const available = grants.status.phase === "ready" ? grants.value : null;
 
   // Admin state
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
@@ -186,12 +219,16 @@ export function LocalStateProvider({ children }: { children: ReactNode }) {
 
   const logout = (): Promise<void> => {
     mutationSession.setAuth(false);
+    authReadScopeRef.current = {};
+    setAuthReadScope(authReadScopeRef.current);
     return firebaseAuth.logout().catch((error: unknown) => {
       // A failed sign-out must not revive old commands or leave the still
       // authenticated operator permanently locked out. Re-enter via a new
       // subscription scope using the SDK's actual user.
       const user = firebaseAuth.getCurrentUser();
       mutationSession.setAuth(Boolean(user), user?.uid);
+      authReadScopeRef.current = {};
+      setAuthReadScope(authReadScopeRef.current);
       throw error;
     });
   };
@@ -223,6 +260,8 @@ export function LocalStateProvider({ children }: { children: ReactNode }) {
     const unsubscribe = firebaseAuth.onAuthStateChanged((user: User | null) => {
       const authState = firebaseAuth.userToAuthState(user);
       mutationSession.setAuth(!authState.isEmpty, authState.uid);
+      authReadScopeRef.current = {};
+      setAuthReadScope(authReadScopeRef.current);
       setAuth(authState);
 
       // Expose UID on window for E2E tests
@@ -232,31 +271,6 @@ export function LocalStateProvider({ children }: { children: ReactNode }) {
     });
     return () => unsubscribe();
   }, [mutationSession]);
-
-  // Available Locations Listener
-  useEffect(() => {
-    if (!auth.uid) {
-      return;
-    }
-
-    const authRef = ref(database, `auth/${auth.uid}`);
-    const unsubscribe = onValue(authRef, (snapshot) => {
-      const data = snapshot.val() as Record<string, boolean> | null;
-      if (data && typeof data === "object") {
-        const locations = Object.entries(data)
-          .filter(([, value]) => value === true)
-          .map(([key]) => key);
-        setAvailable(locations);
-      } else {
-        setAvailable([]);
-      }
-    });
-
-    return () => {
-      unsubscribe();
-      setAvailable(null);
-    };
-  }, [auth.uid]);
 
   // Admin Listener
   useEffect(() => {
@@ -283,6 +297,8 @@ export function LocalStateProvider({ children }: { children: ReactNode }) {
     listenPrefix,
     setListenPrefix,
     available,
+    availableStatus: grants.status,
+    retryAvailable: grants.retry,
     screenKey,
     setScreenKey,
     displayTarget,

@@ -1,4 +1,7 @@
-import { useFirebaseState } from "../contexts/FirebaseStateContext";
+import {
+  useFirebaseReadStatus,
+  useMutationStatus,
+} from "../contexts/FirebaseStateContext";
 
 // Concise operator feedback when the client is not write-eligible (initial
 // load, hidden/offline, or resynchronizing after a resume/reconnect). Shared
@@ -12,7 +15,9 @@ const FRESHNESS_LABELS: Record<string, string> = {
 
 const ResyncNotice = () => {
   const { writeEligible, writeFreshness, mutationError, dismissMutationError } =
-    useFirebaseState();
+    useMutationStatus();
+
+  const { retry } = useFirebaseReadStatus();
 
   if (writeEligible && !mutationError) {
     return null;
@@ -26,6 +31,11 @@ const ResyncNotice = () => {
         ⚠
       </span>
       <span>{mutationError ?? label}</span>
+      {!writeEligible && (
+        <button type="button" onClick={retry}>
+          Reyna lestur aftur
+        </button>
+      )}
       {mutationError && (
         <button type="button" onClick={dismissMutationError}>
           Loka

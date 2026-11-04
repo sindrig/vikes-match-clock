@@ -3,6 +3,7 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import PerimeterDisplay from "./PerimeterDisplay";
 import {
   useFirebaseState,
+  useVenueMetadataStatus,
   useListeners,
   usePerimeter,
 } from "../contexts/FirebaseStateContext";
@@ -19,6 +20,14 @@ vi.mock("./idleClock", () => ({
 
 vi.mock("../contexts/FirebaseStateContext", () => ({
   useFirebaseState: vi.fn(),
+  useVenueMetadataStatus: vi.fn(() => ({
+    status: { phase: "ready" },
+    retry: vi.fn(),
+  })),
+  useFirebaseReadStatus: () => ({ ready: useFirebaseState().ready }),
+  useMatch: () => ({ match: useFirebaseState().match }),
+  useController: () => ({ controller: useFirebaseState().controller }),
+  useView: () => ({ view: useFirebaseState().view }),
   useListeners: vi.fn(),
   usePerimeter: vi.fn(),
   useClubOverrides: vi.fn(() => ({
@@ -167,6 +176,10 @@ const setupContexts = ({
 describe("PerimeterDisplay", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(useVenueMetadataStatus).mockReturnValue({
+      status: { phase: "ready" },
+      retry: vi.fn(),
+    });
     rendererHooks.onError = null;
     runtimeInstance.prepareBase = vi.fn().mockResolvedValue(undefined);
     runtimeInstance.setOverlay = vi.fn().mockResolvedValue(undefined);
@@ -898,5 +911,30 @@ describe("PerimeterDisplay", () => {
     expect(restartPerimeterDisplays).not.toHaveBeenCalled();
     expect(setPerimeterPlayerDisplayStyle).not.toHaveBeenCalled();
     expect(setPerimeterSubstitutionStyle).not.toHaveBeenCalled();
+  });
+
+  it("distinguishes pending or failed metadata from a loaded missing mapping", () => {
+    setupContexts({ venues: {} });
+    vi.mocked(useVenueMetadataStatus).mockReturnValue({
+      status: { phase: "loading" },
+      retry: vi.fn(),
+    });
+    const mounted = render(<PerimeterDisplay />);
+    expect(screen.getByText("Hleð jaðarskjástillingum…")).toBeVisible();
+    expect(
+      screen.queryByText("Engin gild perimeter stilling tiltæk."),
+    ).not.toBeInTheDocument();
+    vi.mocked(useVenueMetadataStatus).mockReturnValue({
+      status: {
+        phase: "error",
+        kind: "unavailable",
+        message: "Stillingar ótiltækar. Reyndu lestur aftur.",
+      },
+      retry: vi.fn(),
+    });
+    mounted.rerender(<PerimeterDisplay />);
+    expect(
+      screen.getByText("Stillingar ótiltækar. Reyndu lestur aftur."),
+    ).toBeVisible();
   });
 });

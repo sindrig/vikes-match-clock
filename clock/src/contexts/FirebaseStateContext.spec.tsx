@@ -14,6 +14,8 @@ import {
   useController,
   useView,
   usePerimeter,
+  usePerimeterTelemetry,
+  useFirebaseReadStatus,
   useFirebaseState,
 } from "./FirebaseStateContext";
 import { Asset, Roster, ViewPort } from "../types";
@@ -101,12 +103,19 @@ const TestViewConsumer = ({
   );
 };
 
+// Explicit composition for tests that exercise desired and hardware data together.
+const useTestPerimeter = () => ({
+  ...usePerimeter(),
+  ...usePerimeterTelemetry(),
+  readStatus: useFirebaseReadStatus().status,
+});
+
 const TestPerimeterConsumer = ({
   onMount,
 }: {
-  onMount: (api: ReturnType<typeof usePerimeter>) => void;
+  onMount: (api: ReturnType<typeof useTestPerimeter>) => void;
 }) => {
-  const perimeterApi = usePerimeter();
+  const perimeterApi = useTestPerimeter();
   React.useEffect(() => {
     onMount(perimeterApi);
   }, [perimeterApi, onMount]);
@@ -2696,14 +2705,14 @@ describe("FirebaseStateContext", () => {
       listenPrefix: string,
       isAuthenticated: boolean,
       data: unknown = null,
-    ): ReturnType<typeof usePerimeter> | null {
+    ): ReturnType<typeof useTestPerimeter> | null {
       vi.mocked(onValue).mockImplementation(
         withConnectedInfo((path) =>
           path.includes("/perimeter") ? data : null,
         ),
       );
 
-      let perimeterApi: ReturnType<typeof usePerimeter> | null = null;
+      let perimeterApi: ReturnType<typeof useTestPerimeter> | null = null;
       render(
         <FirebaseStateProvider
           uid="operator"
@@ -2738,7 +2747,7 @@ describe("FirebaseStateContext", () => {
         }),
       );
 
-      let perimeterApi: ReturnType<typeof usePerimeter> | null = null;
+      let perimeterApi: ReturnType<typeof useTestPerimeter> | null = null;
       render(
         <FirebaseStateProvider
           uid="operator"
@@ -3097,23 +3106,24 @@ describe("FirebaseStateContext", () => {
       brightnessData: unknown = null,
       statusData: unknown = null,
       brightnessAutoData: unknown = null,
-    ): ReturnType<typeof usePerimeter> | null {
+    ): ReturnType<typeof useTestPerimeter> | null {
       vi.mocked(onValue).mockImplementation(
         withConnectedInfo((path) => {
-          if (path.endsWith("/perimeter/brightness")) {
-            return brightnessData;
+          if (path.endsWith("/perimeter")) {
+            return {
+              brightness: brightnessData,
+              brightnessAuto: brightnessAutoData,
+            };
           }
           if (path.endsWith("/brightnessStatus")) {
             return statusData;
           }
-          if (path.endsWith("/perimeter/brightnessAuto")) {
-            return brightnessAutoData;
-          }
+
           return null;
         }),
       );
 
-      let perimeterApi: ReturnType<typeof usePerimeter> | null = null;
+      let perimeterApi: ReturnType<typeof useTestPerimeter> | null = null;
       render(
         <FirebaseStateProvider
           uid="operator"
@@ -3245,17 +3255,16 @@ describe("FirebaseStateContext", () => {
       listenPrefix: string,
       isAuthenticated: boolean,
       brightnessAutoData: unknown = null,
-    ): ReturnType<typeof usePerimeter> | null {
+    ): ReturnType<typeof useTestPerimeter> | null {
       vi.mocked(onValue).mockImplementation(
         withConnectedInfo((path) => {
-          if (path.endsWith("/perimeter/brightnessAuto")) {
-            return brightnessAutoData;
-          }
-          return null;
+          return path.endsWith("/perimeter")
+            ? { brightnessAuto: brightnessAutoData }
+            : null;
         }),
       );
 
-      let perimeterApi: ReturnType<typeof usePerimeter> | null = null;
+      let perimeterApi: ReturnType<typeof useTestPerimeter> | null = null;
       render(
         <FirebaseStateProvider
           uid="operator"
@@ -3416,14 +3425,14 @@ describe("FirebaseStateContext", () => {
       listenPrefix: string,
       isAuthenticated: boolean,
       mediaPairsData: unknown = null,
-    ): ReturnType<typeof usePerimeter> | null {
+    ): ReturnType<typeof useTestPerimeter> | null {
       vi.mocked(onValue).mockImplementation(
         withConnectedInfo((path) =>
-          path.includes("perimeter/mediaPairs") ? mediaPairsData : null,
+          path.endsWith("/perimeter") ? { mediaPairs: mediaPairsData } : null,
         ),
       );
 
-      let perimeterApi: ReturnType<typeof usePerimeter> | null = null;
+      let perimeterApi: ReturnType<typeof useTestPerimeter> | null = null;
       render(
         <FirebaseStateProvider
           uid="operator"
@@ -3608,14 +3617,14 @@ describe("FirebaseStateContext", () => {
       listenPrefix: string,
       isAuthenticated: boolean,
       perimeterData: unknown = null,
-    ): ReturnType<typeof usePerimeter> | null {
+    ): ReturnType<typeof useTestPerimeter> | null {
       vi.mocked(onValue).mockImplementation(
         withConnectedInfo((path) =>
           path.endsWith(`${listenPrefix}/perimeter`) ? perimeterData : null,
         ),
       );
 
-      let perimeterApi: ReturnType<typeof usePerimeter> | null = null;
+      let perimeterApi: ReturnType<typeof useTestPerimeter> | null = null;
       render(
         <FirebaseStateProvider
           uid="operator"
@@ -3717,14 +3726,14 @@ describe("FirebaseStateContext", () => {
       listenPrefix: string,
       isAuthenticated: boolean,
       perimeterData: unknown = null,
-    ): ReturnType<typeof usePerimeter> | null {
+    ): ReturnType<typeof useTestPerimeter> | null {
       vi.mocked(onValue).mockImplementation(
         withConnectedInfo((path) =>
           path.endsWith(`${listenPrefix}/perimeter`) ? perimeterData : null,
         ),
       );
 
-      let perimeterApi: ReturnType<typeof usePerimeter> | null = null;
+      let perimeterApi: ReturnType<typeof useTestPerimeter> | null = null;
       render(
         <FirebaseStateProvider
           uid="operator"
@@ -3794,52 +3803,51 @@ describe("FirebaseStateContext", () => {
   });
 
   describe("perimeter subscription errors", () => {
-    it("logs an error when the brightnessAuto subscription fails", () => {
-      const errorSpy = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => undefined);
-      const errorCallbacks: Array<(error: unknown) => void> = [];
+    it("surfaces a required parent fault and has no auto-config child owner", () => {
+      let current: ReturnType<typeof useTestPerimeter> | undefined;
+      let cancel: ((error: Error) => unknown) | undefined;
+      const original = vi.mocked(onValue).getMockImplementation()!;
       vi.mocked(onValue).mockImplementation(
-        (
-          reference: unknown,
-          callback: (snapshot: unknown) => void,
-          errorCallback?: (error: unknown) => void,
-        ) => {
-          const path = String(reference);
-          if (path.endsWith("/perimeter/brightnessAuto") && errorCallback) {
-            errorCallbacks.push(errorCallback);
-          }
-          callback({
-            val: () => (path === ".info/connected" ? true : null),
-          } as never);
-          return vi.fn();
+        (reference, callback, errorCallback) => {
+          if (
+            String(reference) === "states/vikuti/perimeter" &&
+            typeof errorCallback === "function"
+          )
+            cancel = errorCallback;
+          return original(reference, callback, errorCallback);
         },
       );
-
       render(
         <FirebaseStateProvider
           uid="operator"
           listenPrefix="vikuti"
-          isAuthenticated={true}
+          isAuthenticated
           screenKey={null}
         >
           <TestPerimeterConsumer
-            onMount={() => {
-              return undefined;
+            onMount={(value) => {
+              current = value;
             }}
           />
         </FirebaseStateProvider>,
       );
-
+      expect(
+        vi
+          .mocked(onValue)
+          .mock.calls.some(([reference]) =>
+            String(reference).endsWith("/perimeter/brightnessAuto"),
+          ),
+      ).toBe(false);
+      expect(current?.readStatus.phase).toBe("ready");
       act(() => {
-        for (const callback of errorCallbacks) callback(new Error("denied"));
+        cancel?.(
+          Object.assign(new Error("private fixture failure"), {
+            code: "PERMISSION_DENIED",
+          }),
+        );
       });
-
-      expect(errorSpy).toHaveBeenCalledWith(
-        "Firebase perimeter brightnessAuto subscription error:",
-        expect.anything(),
-      );
-      errorSpy.mockRestore();
+      expect(current?.readStatus.phase).toBe("error");
+      expect(current?.writeEligible).toBe(false);
     });
   });
 });

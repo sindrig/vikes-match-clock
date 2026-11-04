@@ -3,7 +3,8 @@ import { Button, ButtonGroup, Tooltip, Whisper } from "rsuite";
 import CloseIcon from "@rsuite/icons/CloseOutline";
 import { RingLoader } from "react-spinners";
 import {
-  useFirebaseState,
+  useFirebaseReadStatus,
+  useVenueMetadataStatus,
   useController,
   useMatch,
   useView,
@@ -12,6 +13,7 @@ import {
 import { useLocalState } from "./contexts/LocalStateContext";
 import Controller from "./controller/Controller";
 import ResyncNotice from "./controller/ResyncNotice";
+import ReadNotice from "./controller/ReadNotice";
 import MatchActions from "./controller/MatchActions";
 import MatchCountdownDisplay from "./controller/MatchCountdownDisplay";
 import HomeTeamQuickActions from "./controller/HomeTeamQuickActions";
@@ -193,7 +195,10 @@ const ClearOverlayButton = () => {
 
 function App() {
   useGlobalShortcuts();
-  const { controller, view: viewState, ready } = useFirebaseState();
+  const { controller } = useController();
+  const { view: viewState } = useView();
+  const { ready, status: readStatus, retry } = useFirebaseReadStatus();
+  const metadataStatus = useVenueMetadataStatus();
   const {
     auth,
     listenPrefix,
@@ -252,6 +257,22 @@ function App() {
     // State 1: no listenPrefix, not authenticated — Controller handles screen selector + login
     if (!listenPrefix && !isAuthenticated) {
       return <Controller />;
+    }
+
+    if (!ready && readStatus.phase === "error") {
+      return (
+        <div className="initial-screen">
+          <ReadNotice status={readStatus} retry={retry} />
+          <Button
+            onClick={() => {
+              setDisplayTarget(null);
+              setListenPrefix("");
+            }}
+          >
+            Velja annan skjá
+          </Button>
+        </div>
+      );
     }
 
     // Show spinner while waiting for auth state or Firebase data to load.
@@ -432,7 +453,6 @@ function App() {
         {showController && (
           <div className="controller-layout">
             <div className="controller-sidebar">
-              <ResyncNotice />
               <div className="preview-and-controls">
                 <div className="preview-with-scores">
                   {showMatchControls ? (
@@ -521,6 +541,9 @@ function App() {
       listenPrefix={presencePrefix}
       displayKind={displayKind}
     >
+      {ready && isAuthenticated && listenPrefix && <ResyncNotice />}
+      {ready && <ReadNotice status={readStatus} retry={retry} />}
+      {listenPrefix && <ReadNotice {...metadataStatus} />}
       {renderAppTree()}
     </DisplayDiagnosticsProvider>
   );

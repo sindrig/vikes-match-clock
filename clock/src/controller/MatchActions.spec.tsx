@@ -6,16 +6,16 @@ import { Sports } from "../constants";
 
 vi.mock("../contexts/FirebaseStateContext", () => ({
   useMatch: vi.fn(),
-  useFirebaseState: vi.fn(() => ({
+  useMutationStatus: vi.fn(() => ({
     writeEligible: true,
     writeFreshness: "ready",
   })),
 }));
 
-import { useMatch, useFirebaseState } from "../contexts/FirebaseStateContext";
+import { useMatch, useMutationStatus } from "../contexts/FirebaseStateContext";
 
 const mockedUseMatch = vi.mocked(useMatch);
-const mockedUseFirebaseState = vi.mocked(useFirebaseState);
+const mockedUseFirebaseState = vi.mocked(useMutationStatus);
 
 const MINUTE_MS = 60 * 1000;
 

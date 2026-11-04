@@ -46,9 +46,10 @@ import {
   SubstitutionBandStyle,
 } from "../types";
 import {
-  useFirebaseState,
+  useMutationStatus,
   useListeners,
   usePerimeter,
+  usePerimeterTelemetry,
   useView,
 } from "../contexts/FirebaseStateContext";
 import { useLocalState } from "../contexts/LocalStateContext";
@@ -61,6 +62,7 @@ import {
   validateBrightnessAutoConfig,
   CloudCoverForecast,
 } from "../lib/autoBrightness";
+import ReadNotice from "./ReadNotice";
 import PerimeterDisplayReports from "./PerimeterDisplayReports";
 import PerimeterFileThumb from "./PerimeterFileThumb";
 import {
@@ -819,11 +821,15 @@ const AutoBrightnessPanel = ({
 const BrightnessSection = () => {
   const {
     brightness,
-    brightnessStatus,
     brightnessAuto,
     setPerimeterBrightness,
     setPerimeterBrightnessAuto,
   } = usePerimeter();
+  const {
+    brightnessStatus,
+    status: telemetryStatus,
+    retry: retryTelemetry,
+  } = usePerimeterTelemetry();
   // Manual edit draft: `null` means "untouched" (display the synced Firebase
   // value), `""` means the user explicitly cleared the input (display
   // blank, distinct from "untouched" so clearing never silently reverts to
@@ -931,6 +937,13 @@ const BrightnessSection = () => {
 
   return (
     <div className="perimeter-brightness">
+      <ReadNotice status={telemetryStatus} retry={retryTelemetry} />
+      {telemetryStatus.phase === "loading" && (
+        <span role="status">Hleð stöðu bjartleika…</span>
+      )}
+      {telemetryStatus.phase === "ready" && !brightnessStatus && (
+        <span role="status">Engin gild staða bjartleika tiltæk.</span>
+      )}
       <div className="perimeter-brightness-header">
         <span className="perimeter-brightness-title">
           Bjartleiki jaðarskjás
@@ -1097,7 +1110,7 @@ const SCORER_CELEBRATION_ORDER: ScorerCelebrationStyle[] = [
 
 const IdleClockSection = () => {
   const { perimeter, setPerimeterIdleClock } = usePerimeter();
-  const { writeEligible } = useFirebaseState();
+  const { writeEligible } = useMutationStatus();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState(false);
   const change = (enabled: boolean) => {
@@ -1127,7 +1140,7 @@ const IdleClockSection = () => {
 
 const NightBlackoutSection = () => {
   const { view: viewState, setBlackoutStart, setBlackoutEnd } = useView();
-  const { writeEligible } = useFirebaseState();
+  const { writeEligible } = useMutationStatus();
   return (
     <div className="perimeter-scorer-celebration">
       <div className="perimeter-brightness-header">

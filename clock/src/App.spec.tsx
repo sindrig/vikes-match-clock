@@ -7,6 +7,22 @@ import { VIEWS } from "./constants";
 
 vi.mock("./contexts/FirebaseStateContext", () => ({
   useFirebaseState: vi.fn(),
+  useVenueMetadataStatus: () => ({
+    status: { phase: "ready" },
+    retry: vi.fn(),
+  }),
+  useFirebaseReadStatus: () => ({
+    ready: useFirebaseState().ready,
+    status: { phase: "ready" },
+    retry: vi.fn(),
+    connected: true,
+  }),
+  useMutationStatus: () => ({
+    writeEligible: true,
+    writeFreshness: "ready",
+    mutationError: null,
+    dismissMutationError: vi.fn(),
+  }),
   useMatch: vi.fn(),
   useController: vi.fn(),
   useView: vi.fn(),
@@ -93,6 +109,15 @@ const mockedUseView = vi.mocked(useView);
 const mockedUseRemoteSettings = vi.mocked(useRemoteSettings);
 const mockedUsePerimeter = vi.mocked(usePerimeter);
 
+function setRuntimeTuple(value: ReturnType<typeof useFirebaseState>) {
+  mockedUseFirebaseState.mockReturnValue(value);
+  mockedUseController.mockReturnValue({
+    ...mockedUseController(),
+    controller: value.controller,
+  });
+  mockedUseView.mockReturnValue({ ...mockedUseView(), view: value.view });
+}
+
 const defaultViewport = {
   style: { height: 100, width: 200 },
   name: "test",
@@ -118,7 +143,7 @@ function setupState1() {
     setPassword: vi.fn(),
     isAdmin: false,
   });
-  mockedUseFirebaseState.mockReturnValue({
+  setRuntimeTuple({
     controller: { view: VIEWS.idle, currentAsset: null },
     view: { vp: defaultViewport, background: "Default" },
     ready: true,
@@ -158,7 +183,7 @@ function setupState2(
     setPassword: vi.fn(),
     isAdmin: false,
   });
-  mockedUseFirebaseState.mockReturnValue({
+  setRuntimeTuple({
     controller: { view, currentAsset: null },
     view: { vp: defaultViewport, background: "Default" },
     ready: true,
@@ -199,7 +224,7 @@ function setupState3(
     setPassword: vi.fn(),
     isAdmin: false,
   });
-  mockedUseFirebaseState.mockReturnValue({
+  setRuntimeTuple({
     controller: { view, currentAsset: null },
     view: { vp: defaultViewport, background: "Default" },
     ready: true,
@@ -486,7 +511,7 @@ describe("App", () => {
         setPassword: vi.fn(),
         isAdmin: false,
       });
-      mockedUseFirebaseState.mockReturnValue({
+      setRuntimeTuple({
         controller: { view: VIEWS.idle, currentAsset: null },
         view: {
           vp: { ...defaultViewport, fontSize: "200%" },
@@ -526,7 +551,7 @@ describe("App", () => {
         setPassword: vi.fn(),
         isAdmin: false,
       });
-      mockedUseFirebaseState.mockReturnValue({
+      setRuntimeTuple({
         controller: { view: VIEWS.idle, currentAsset: null },
         view: {
           vp: { ...defaultViewport, fontSize: "200%" },
@@ -546,7 +571,7 @@ describe("App", () => {
       // Controllers resolve a screen viewport (for the preview), but the
       // operator UI must never inherit the physical screen's fontSize.
       setupState3(VIEWS.idle);
-      mockedUseFirebaseState.mockReturnValue({
+      setRuntimeTuple({
         controller: { view: VIEWS.idle, currentAsset: null },
         view: {
           vp: { ...defaultViewport, fontSize: "290%" },
@@ -579,7 +604,7 @@ describe("App", () => {
         setPassword: vi.fn(),
         isAdmin: false,
       });
-      mockedUseFirebaseState.mockReturnValue({
+      setRuntimeTuple({
         controller: { view: VIEWS.idle, currentAsset: null },
         view: {
           vp: { ...defaultViewport, fontSize: "200%" },
@@ -619,7 +644,7 @@ describe("App", () => {
         setPassword: vi.fn(),
         isAdmin: false,
       });
-      mockedUseFirebaseState.mockReturnValue({
+      setRuntimeTuple({
         controller: { view: VIEWS.idle, currentAsset: null },
         view: { vp: defaultViewport, background: "Default" },
         ready: false,
@@ -650,7 +675,7 @@ describe("App", () => {
         setPassword: vi.fn(),
         isAdmin: false,
       });
-      mockedUseFirebaseState.mockReturnValue({
+      setRuntimeTuple({
         controller: { view: VIEWS.idle, currentAsset: null },
         view: { vp: defaultViewport, background: "Default" },
         ready: false,
@@ -682,7 +707,7 @@ describe("App", () => {
         setPassword: vi.fn(),
         isAdmin: false,
       });
-      mockedUseFirebaseState.mockReturnValue({
+      setRuntimeTuple({
         controller: { view: VIEWS.idle, currentAsset: null },
         view: { vp: defaultViewport, background: "Default" },
         ready: true,

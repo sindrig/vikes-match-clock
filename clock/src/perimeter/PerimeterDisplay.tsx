@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  useFirebaseState,
+  useFirebaseReadStatus,
+  useVenueMetadataStatus,
+  useMatch,
+  useController,
+  useView,
   useListeners,
   usePerimeter,
   useClubOverrides,
@@ -64,7 +68,11 @@ const resolveGeneration = async (source: string) => {
 export default function PerimeterDisplay() {
   const { listenPrefix } = useLocalState();
   const { venues } = useListeners();
-  const { ready, match, controller, view: viewState } = useFirebaseState();
+  const { ready } = useFirebaseReadStatus();
+  const metadata = useVenueMetadataStatus();
+  const { match } = useMatch();
+  const { controller } = useController();
+  const { view: viewState } = useView();
   const { perimeter, adLayout, overlay } = usePerimeter();
   const { clubOverrides } = useClubOverrides();
   const { reportError } = useDisplayDiagnostics();
@@ -122,13 +130,20 @@ export default function PerimeterDisplay() {
   // are gated on `ready` so the brief window before the mapping subscription
   // delivers cannot publish a phantom missing-configuration error, and a
   // disconnect clears the report so a stale error never outlives the screen.
-  const reportedError = !ready
-    ? null
-    : configuration
-      ? [rendererError, bandError, textureError, idleClockError]
-          .filter(Boolean)
-          .join(" ") || null
-      : NO_CONFIGURATION_MESSAGE;
+  const configurationNotice =
+    metadata.status.phase === "loading"
+      ? "Hleð jaðarskjástillingum…"
+      : metadata.status.phase === "error"
+        ? metadata.status.message
+        : NO_CONFIGURATION_MESSAGE;
+  const reportedError =
+    !ready || metadata.status.phase === "loading"
+      ? null
+      : configuration
+        ? [rendererError, bandError, textureError, idleClockError]
+            .filter(Boolean)
+            .join(" ") || null
+        : configurationNotice;
   const displayError = ready && configuration ? reportedError : null;
 
   useEffect(() => {
@@ -558,7 +573,7 @@ export default function PerimeterDisplay() {
         className="perimeter-display perimeter-display-error"
         style={{ minHeight: "100vh", background: "#000", color: "#fff" }}
       >
-        <p>{NO_CONFIGURATION_MESSAGE}</p>
+        <p>{configurationNotice}</p>
       </div>
     );
   }
