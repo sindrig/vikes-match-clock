@@ -118,6 +118,16 @@ flex layout.
 Media cards use 132px-high `object-fit: contain` thumbnails and truncate long
 filenames, so original upload dimensions cannot expand the controller view.
 
+### Scoreboard rotating ads
+
+The scoreboard's optional rotating `AdImage` slot reads the selected venue's
+Storage folder. A denied listing or failed download URL leaves the slot empty
+without an unhandled rejection; authorization rules are unchanged. This handles
+the inherited anonymous `smallAds` listing failure. Authorized listings still
+resolve URLs and rotate normally. Venue or image-type changes immediately mask
+the old list, and unmount/change cleanup retires pending listing and URL
+completions so they cannot replace or clear the current ads.
+
 ### Main-Screen MP4 Media
 
 The **Myndefni → Myndir** library accepts JPG, PNG, GIF, and MP4 uploads.

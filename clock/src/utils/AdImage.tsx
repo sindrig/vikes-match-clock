@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef } from "react";
-import { storageHelpers, StorageReference } from "../firebase";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+
 import { useLocalState } from "../contexts/LocalStateContext";
+import { storageHelpers } from "../firebase";
 
 function useInterval(callback: () => void, delay: number): void {
   const savedCallback = useRef<(() => void) | undefined>(undefined);
@@ -32,7 +33,15 @@ const AdImage: React.FC<AdImageProps> = ({
   postAdImg = null,
 }) => {
   const { listenPrefix } = useLocalState();
-  const [assets, setAssets] = useState<string[]>([]);
+  const scope = useMemo(
+    () => ({ listenPrefix, imageType }),
+    [listenPrefix, imageType],
+  );
+  const [loaded, setLoaded] = useState<{ scope: object; assets: string[] }>({
+    scope,
+    assets: [],
+  });
+  const assets = loaded.scope === scope ? loaded.assets : [];
   const [img, setImg] = useState(0);
   const [isBlank, setBlank] = useState(blankBetweenImages);
   const [isPost, setPost] = useState(!postAdImg);
@@ -53,16 +62,28 @@ const AdImage: React.FC<AdImageProps> = ({
   }, time * 1000);
 
   useEffect(() => {
+    let active = true;
     void storageHelpers
-      .listAll(`${String(listenPrefix)}/${String(imageType)}`)
-      .then((res) =>
-        Promise.all(
-          res.items.map((itemRef: StorageReference) =>
+      .listAll(`${scope.listenPrefix}/${scope.imageType}`)
+      .then(async (res) => {
+        if (!active) return;
+        const urls = await Promise.all(
+          res.items.map((itemRef) =>
             storageHelpers.getDownloadURL(itemRef.fullPath),
           ),
-        ).then(setAssets),
-      );
-  }, [imageType, listenPrefix]);
+        );
+        if (!active) return;
+        setLoaded({ scope, assets: urls });
+        setImg(0);
+      })
+      .catch(() => {
+        // Ads are optional; denied listings and failed URLs leave an empty slot.
+        if (active) setLoaded({ scope, assets: [] });
+      });
+    return () => {
+      active = false;
+    };
+  }, [scope]);
 
   if (isBlank || assets.length === 0) {
     return null;
