@@ -1,13 +1,8 @@
 import { useRef, useEffect } from "react";
-
-interface VideoAsset {
-  url?: string;
-  key: string;
-  loop?: boolean;
-}
+import type { VideoAsset } from "../../types";
 
 interface VideoPlayerProps {
-  asset: VideoAsset;
+  asset: Pick<VideoAsset, "url" | "key" | "loop">;
   playbackSpeed?: number;
   onEnded?: () => void;
   thumbnail?: boolean;

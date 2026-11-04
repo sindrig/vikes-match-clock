@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Button } from "rsuite";
 
 import { Player } from "../../../types";
+import { playerChildKey } from "../../../contexts/nestedParsers";
 
 import "./Team.css";
 import {
@@ -33,7 +34,7 @@ const Team = ({ teamName, selectPlayer }: OwnProps): React.JSX.Element => {
     teamName === "homeTeam" ? match.homeTeam : match.awayTeam;
 
   const toggleShow = (idx: number, currentShow: boolean): void => {
-    editPlayer(side, idx, { show: !currentShow });
+    editPlayer(side, playerChildKey(team, idx), { show: !currentShow });
   };
 
   const submitForm = (event: React.FormEvent<HTMLFormElement>): void => {
@@ -76,7 +77,7 @@ const Team = ({ teamName, selectPlayer }: OwnProps): React.JSX.Element => {
       <div className="team-name">{displayTeamName}</div>
       {displayTeamName
         ? team.map((p, i) => (
-            <div className="player-whole-line" key={String(i)}>
+            <div className="player-whole-line" key={playerChildKey(team, i)}>
               {selectPlayer && p.name ? (
                 <Button
                   appearance="default"

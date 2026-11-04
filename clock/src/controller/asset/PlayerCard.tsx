@@ -3,6 +3,7 @@ import React, { useMemo } from "react";
 import { DEFAULT_THEME, THUMB_VP, getBackground } from "../../constants";
 import { useView } from "../../contexts/FirebaseStateContext";
 import { resolveTheme } from "../../hooks/useThemeCssVars";
+import type { AssetFields, AssetOverlay } from "../../types";
 import GoalScorerReveal from "./GoalScorerReveal";
 
 // Cached canvas for text measurement performance
@@ -38,27 +39,16 @@ const getMaxFontSize = (
   return regular;
 };
 
-interface PlayerAsset {
-  key: string;
-  name?: string;
-  number?: number | string;
-  role?: string;
-  isGoalCelebration?: boolean;
-}
-
-interface Overlay {
-  text: string;
-  blink?: boolean;
-  effect?: string;
-}
-
 interface OwnProps {
   thumbnail?: boolean;
-  asset: PlayerAsset;
+  asset: Pick<
+    AssetFields,
+    "key" | "name" | "number" | "role" | "isGoalCelebration"
+  >;
   children?: React.ReactNode;
   className?: string;
   widthMultiplier?: number;
-  overlay?: Overlay;
+  overlay?: AssetOverlay;
   includeBackground?: boolean;
 }
 

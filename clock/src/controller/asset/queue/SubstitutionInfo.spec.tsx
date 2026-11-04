@@ -45,16 +45,32 @@ describe("SubstitutionInfo", () => {
     expect(container.innerHTML).toBe("");
   });
 
+  it("does not interpret unrelated media metadata as a substitution", () => {
+    setupMock({
+      currentAsset: {
+        asset: {
+          key: "img1",
+          type: "IMAGE",
+          subIn: { name: { metadata: "retained" } },
+          subOut: { name: "unrelated" },
+        },
+        time: null,
+      },
+    });
+    const { container } = render(<SubstitutionInfo />);
+    expect(container).toBeEmptyDOMElement();
+  });
+
   it("renders player full names and team for substitution asset", () => {
     setupMock({
       currentAsset: {
         asset: {
           key: "sub-1",
-          type: "IMAGE",
+          type: "SUB",
           // Corrected semantics: subIn = coming on, subOut = going off.
           subIn: {
             key: "in-1",
-            type: "IMAGE",
+            type: "PLAYER",
             name: "Jón",
             fullName: "Jón Jónsson",
             number: 7,
@@ -62,7 +78,7 @@ describe("SubstitutionInfo", () => {
           },
           subOut: {
             key: "out-1",
-            type: "IMAGE",
+            type: "PLAYER",
             name: "Guðmundur",
             fullName: "Guðmundur Pétursson",
             number: 11,
@@ -88,9 +104,9 @@ describe("SubstitutionInfo", () => {
       currentAsset: {
         asset: {
           key: "sub-2",
-          type: "IMAGE",
-          subIn: { key: "in-2", type: "IMAGE", name: "Entering Player" },
-          subOut: { key: "out-2", type: "IMAGE", name: "Leaving Player" },
+          type: "SUB",
+          subIn: { key: "in-2", type: "PLAYER", name: "Entering Player" },
+          subOut: { key: "out-2", type: "PLAYER", name: "Leaving Player" },
         },
         time: null,
       },

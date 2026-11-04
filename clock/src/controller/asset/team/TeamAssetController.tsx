@@ -114,7 +114,7 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
 
   const handleResolveRosterConfirm = (players: Player[]): void => {
     if (!resolveRosterSide) return;
-    setRoster({ ...roster, [resolveRosterSide]: players });
+    setRoster({ [resolveRosterSide]: players });
     setResolveRosterSide(null);
   };
 

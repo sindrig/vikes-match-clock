@@ -12,7 +12,12 @@ import VideoPlayer from "./VideoPlayer";
 import { useController, useView } from "../../contexts/FirebaseStateContext";
 import { useClubLogo } from "../../hooks/useClubLogo";
 import { isVideoUrl } from "../../utils/matchUtils";
-import { CurrentAsset } from "../../types";
+import type {
+  Asset as AssetModel,
+  CurrentAsset,
+  PlayerCardAsset,
+  SubstitutionAsset,
+} from "../../types";
 import { isPlaybackOccurrenceId } from "../../lib/playbackOccurrence";
 
 const PRELOAD_TIMEOUT_MS = 5000;
@@ -83,11 +88,7 @@ function usePreloadedMedia(urls: string[]): boolean {
   return key === readyKey;
 }
 
-function getAssetMediaUrls(
-  asset:
-    | { type: string; key: string; url?: string; background?: string }
-    | undefined,
-): string[] {
+function getAssetMediaUrls(asset: AssetModel | undefined): string[] {
   if (!asset) return [];
   const urls: string[] = [];
   if (asset.background) urls.push(asset.background);
@@ -98,17 +99,17 @@ function getAssetMediaUrls(
     case assetTypes.PLAYER:
       urls.push(asset.key);
       break;
+    case assetTypes.MOTM:
+      if (asset.originalAssetType === assetTypes.PLAYER) urls.push(asset.key);
+      break;
     case assetTypes.VIDEO:
       urls.push(asset.url || asset.key);
       break;
     case assetTypes.SUB: {
-      const sub = asset as {
-        subIn?: { background?: string; key?: string };
-        subOut?: { key?: string };
-      };
-      if (sub.subIn?.background) urls.push(sub.subIn.background);
-      if (sub.subIn?.key) urls.push(sub.subIn.key);
-      if (sub.subOut?.key) urls.push(sub.subOut.key);
+      if (asset.subIn.background) urls.push(asset.subIn.background);
+      for (const side of [asset.subIn, asset.subOut]) {
+        if (side.type === assetTypes.PLAYER) urls.push(side.key);
+      }
       break;
     }
   }
@@ -137,30 +138,8 @@ export function useDeferredAsset(
   return next;
 }
 
-interface Overlay {
-  text: string;
-  blink?: boolean;
-  effect?: string;
-}
-
-interface AssetObject {
-  type: string;
-  key: string;
-  url?: string;
-  loop?: boolean;
-  background?: string;
-  teamName?: string;
-  overlay?: Overlay | null;
-  subIn?: AssetObject;
-  subOut?: AssetObject;
-  originalAssetType?: string;
-  name?: string;
-  number?: number | string;
-  role?: string;
-}
-
 interface OwnProps {
-  asset: AssetObject;
+  asset: AssetModel;
   thumbnail?: boolean;
   time?: number | null;
   occurrenceId?: string;
@@ -212,7 +191,7 @@ const AssetComponent = (props: AssetProps) => {
     widthMultiplier,
     includeBackground,
   }: {
-    asset: AssetObject;
+    asset: PlayerCardAsset;
     widthMultiplier?: number;
     includeBackground?: boolean;
   }): React.JSX.Element | null => {
@@ -331,12 +310,8 @@ const AssetComponent = (props: AssetProps) => {
     return null;
   };
 
-  const renderSub = (): React.JSX.Element | null => {
-    const { subIn, subOut } = asset;
-    if (!subIn || !subOut) {
-      console.log("No subin or subout", asset);
-      return null;
-    }
+  const renderSub = ({ subIn, subOut }: SubstitutionAsset) => {
+    if (!subIn || !subOut) return null;
     return (
       <Substitution thumbnail={thumbnail} backgroundUrl={subIn.background}>
         {[subOut, subIn].map((subAsset) =>
@@ -428,15 +403,16 @@ const AssetComponent = (props: AssetProps) => {
     case assetTypes.MOTM:
       return (
         <MOTM>
-          {getPlayerAsset({
-            asset: { ...asset, type: asset.originalAssetType || asset.type },
-            widthMultiplier: 1,
-          })}
+          {asset.originalAssetType &&
+            getPlayerAsset({
+              asset: { ...asset, type: asset.originalAssetType },
+              widthMultiplier: 1,
+            })}
         </MOTM>
       );
 
     case assetTypes.SUB:
-      return renderSub();
+      return renderSub(asset);
 
     default:
       console.error("No type for item ", asset);

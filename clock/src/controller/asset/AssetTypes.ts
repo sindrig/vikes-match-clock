@@ -1,3 +1,5 @@
+import type { Asset } from "../../types";
+
 export default {
   URL: "URL",
   PLAYER: "PLAYER",
@@ -6,4 +8,4 @@ export default {
   IMAGE: "IMAGE",
   VIDEO: "VIDEO",
   SUB: "SUB",
-};
+} as const satisfies { [Type in Asset["type"]]: Type };

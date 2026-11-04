@@ -7,7 +7,7 @@ import TrashIcon from "@rsuite/icons/Trash";
 
 import "./ImageList.css";
 
-const AssetTypeSuffixMap: Record<string, string> = {
+const AssetTypeSuffixMap: Record<string, "IMAGE" | "VIDEO"> = {
   mp4: assetTypes.VIDEO,
 };
 

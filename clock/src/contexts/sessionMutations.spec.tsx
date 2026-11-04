@@ -22,6 +22,8 @@ import ClubOverrideForm from "../controller/ClubOverrideForm";
 import ThemeEditorModal from "../controller/theme/ThemeEditor";
 import GoalScorerDialog from "../controller/GoalScorerDialog";
 import { getPlayerAssetObject } from "../controller/asset/team/assetHelpers";
+import { PlaybackAsset, useDeferredAsset } from "../controller/asset/Asset";
+import Team from "../controller/asset/team/Team";
 import { useHomeTeamQuickActions } from "../controller/asset/team/useHomeTeamQuickActions";
 import { useQueuePickerActions } from "../controller/asset/queue/useQueuePickerActions";
 import { storageHelpers } from "../firebase";
@@ -30,6 +32,7 @@ import { firebaseDatabase } from "../firebaseDatabase";
 import { DEFAULT_BRIGHTNESS_AUTO_CONFIG } from "../lib/autoBrightness";
 import { MutationRejectedError } from "../lib/mutationSession";
 import { minimalPerimeterDisplay } from "../lib/venue.fixtures";
+import MatchLifecycle from "../match/MatchLifecycle";
 import type { ClubOverride } from "../types";
 import {
   FirebaseStateProvider,
@@ -117,7 +120,7 @@ const substitution = {
   side: "home" as const,
   outgoing: player,
   incoming: benchPlayer,
-  asset: { type: "SUB", key: "sub", subIn: asset, subOut: asset },
+  asset: { type: "SUB" as const, key: "sub", subIn: asset, subOut: asset },
 };
 const override: ClubOverride = {
   name: "Draft Club",
@@ -2286,4 +2289,454 @@ it("fails a conditional command before submission when audit identity is unavail
   });
   noAttempts();
   expect(read("states/A/match/countdown")).toBe(true);
+});
+
+function NestedDisplay() {
+  const { controller } = useFirebaseState();
+  const current = useDeferredAsset(controller.currentAsset);
+  return (
+    <>
+      {current && <PlaybackAsset current={current} />}
+      <Team teamName="homeTeam" />
+      <MatchLifecycle />
+    </>
+  );
+}
+
+describe("ordinary roster commands preserve raw child identity", () => {
+  afterEach(() => {
+    const actWarnings = vi
+      .mocked(console.error)
+      .mock.calls.filter((args) =>
+        args.some(
+          (value) =>
+            typeof value === "string" &&
+            /not wrapped in act|without await|overlapping act|not configured to support act/i.test(
+              value,
+            ),
+        ),
+      );
+    expect(actWarnings).toEqual([]);
+  });
+
+  const starter = { ...player, annotation: { keep: "starter" } };
+  const coach = { name: "Coach", role: "Þjálfari", producer: { keep: 3 } };
+  const rejected = { name: { invalid: true }, annotation: { keep: "raw" } };
+  const blank = { name: "", number: "", show: false, role: "" };
+  const replacement = [{ name: "Replacement", number: 42, source: "API" }];
+  const layouts: Array<{
+    name: string;
+    raw: unknown;
+    selected: string;
+    next: string;
+  }> = [
+    {
+      name: "dense",
+      raw: [starter, coach, rejected],
+      selected: "0",
+      next: "3",
+    },
+    {
+      name: "array with a hole",
+      raw: [starter, null, coach, rejected],
+      selected: "0",
+      next: "4",
+    },
+    {
+      name: "sparse numeric map",
+      raw: { 17: starter, 26: rejected, 31: coach, 40: false },
+      selected: "17",
+      next: "41",
+    },
+    {
+      name: "named map",
+      raw: { zCoach: coach, aStarter: starter, bRejected: rejected },
+      selected: "aStarter",
+      next: "zCoach~",
+    },
+  ];
+
+  function seed(side: "home" | "away", raw: unknown) {
+    write("states/A/controller/roster", {
+      home: structuredClone([starter, null, rejected, coach]),
+      away: structuredClone([starter, null, rejected, coach]),
+      [side]: structuredClone(raw),
+      provenance: { keep: "roster metadata" },
+    });
+    mount();
+    clearAttempts();
+    return structuredClone(object(read("states/A/controller/roster")));
+  }
+
+  function expectIntent(action: string, diff: Data) {
+    expect(firebaseDatabase.writeAudited).toHaveBeenCalledExactlyOnceWith(
+      "A",
+      "controller",
+      diff,
+      expect.objectContaining({ action }),
+    );
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(runTransaction).not.toHaveBeenCalled();
+    const events = Object.values(object(read("audit/A")));
+    expect(events).toHaveLength(1);
+    expect(object(events[0]).changes).toBe(JSON.stringify(diff));
+  }
+
+  describe.each(layouts)("$name", ({ raw, selected, next }) => {
+    it.each(["home", "away"] as const)(
+      "edits only requested %s child fields",
+      async (side) => {
+        const before = seed(side, raw);
+        await act<void>(() => {
+          currentApi.editPlayer(side, 0, {
+            show: false,
+            number: "07",
+            role: undefined,
+          });
+        });
+        const expected = structuredClone(before);
+        Object.assign(object(object(expected[side])[selected]), {
+          show: false,
+          number: "07",
+        });
+        expect(read("states/A/controller/roster")).toEqual(expected);
+        expectIntent("controller.edit-player", {
+          [`roster/${side}/${selected}/show`]: false,
+          [`roster/${side}/${selected}/number`]: "07",
+        });
+      },
+    );
+
+    it.each(["home", "away"] as const)(
+      "deletes the actual %s child without rekeying siblings",
+      async (side) => {
+        const before = seed(side, raw);
+        await act<void>(() => currentApi.deletePlayer(side, 0));
+        const expected = structuredClone(before);
+        delete object(expected[side])[selected];
+        expect(read("states/A/controller/roster")).toEqual(expected);
+        expectIntent("controller.delete-player", {
+          [`roster/${side}/${selected}`]: null,
+        });
+        expect(currentApi.controller.roster[side]).toEqual([coach]);
+      },
+    );
+
+    it.each(["home", "away"] as const)(
+      "appends an unused %s child after rejected rows too",
+      async (side) => {
+        const before = seed(side, raw);
+        await act<void>(() => currentApi.addPlayer(side));
+        const expected = structuredClone(before);
+        object(expected[side])[next] = blank;
+        expect(read("states/A/controller/roster")).toEqual(expected);
+        expectIntent("controller.add-player", {
+          [`roster/${side}/${next}`]: blank,
+        });
+        expect(currentApi.controller.roster[side]).toEqual([
+          starter,
+          coach,
+          blank,
+        ]);
+      },
+    );
+
+    it.each(["home", "away"] as const)(
+      "replaces only the requested %s side",
+      async (side) => {
+        const before = seed(side, raw);
+        await act<void>(() => currentApi.setRoster({ [side]: replacement }));
+        expect(read("states/A/controller/roster")).toEqual({
+          ...before,
+          [side]: replacement,
+        });
+        expectIntent("controller.set-roster", {
+          [`roster/${side}`]: replacement,
+        });
+      },
+    );
+  });
+
+  it("uses subscription keys across rapid SDK echoes, deletion and additions with a retained current-origin API", async () => {
+    const before = seed("home", {
+      17: starter,
+      26: rejected,
+      31: coach,
+      40: false,
+    });
+    const retained = currentApi;
+    await act<void>(() => {
+      retained.editPlayer("home", 0, { show: false });
+      retained.editPlayer("home", 0, { name: "Edited" });
+      retained.deletePlayer("home", 0);
+      retained.editPlayer("home", 0, { name: "Coach edited" });
+      retained.addPlayer("home");
+      retained.addPlayer("home");
+    });
+    expect(read("states/A/controller/roster")).toEqual({
+      ...before,
+      home: {
+        26: rejected,
+        31: { ...coach, name: "Coach edited" },
+        40: false,
+        41: blank,
+        42: blank,
+      },
+    });
+    expect(
+      vi
+        .mocked(firebaseDatabase.writeAudited)
+        .mock.calls.map((call) => call[2]),
+    ).toEqual([
+      { "roster/home/17/show": false },
+      { "roster/home/17/name": "Edited" },
+      { "roster/home/17": null },
+      { "roster/home/31/name": "Coach edited" },
+      { "roster/home/41": blank },
+      { "roster/home/42": blank },
+    ]);
+    expect(update).toHaveBeenCalledTimes(6);
+  });
+
+  it("ignores unchanged supplied projections and out-of-range selections", async () => {
+    const before = seed("home", { 17: starter, 26: rejected });
+    await act<void>(() => {
+      currentApi.setRoster(currentApi.controller.roster);
+      currentApi.editPlayer("home", 0, { show: true, role: undefined });
+      for (const index of [-1, 1, 0.5, NaN]) {
+        currentApi.editPlayer("home", index, { name: "Wrong" });
+        currentApi.deletePlayer("home", index);
+      }
+    });
+    noAttempts();
+    expect(read("states/A/controller/roster")).toEqual(before);
+  });
+
+  it("keeps a rendered child's key across an earlier deletion and ignores keys that disappeared", async () => {
+    seed("home", { 17: starter, 26: rejected, 31: coach });
+    const retained = currentApi;
+    await act<void>(() => {
+      retained.deletePlayer("home", "17");
+      retained.editPlayer("home", "31", { show: true });
+      retained.editPlayer("home", "17", { name: "Do not resurrect" });
+      retained.deletePlayer("home", "17");
+      retained.deletePlayer("home", "26");
+    });
+    expect(read("states/A/controller/roster/home")).toEqual({
+      26: rejected,
+      31: { ...coach, show: true },
+    });
+    expect(
+      vi
+        .mocked(firebaseDatabase.writeAudited)
+        .mock.calls.map((call) => call[2]),
+    ).toEqual([{ "roster/home/17": null }, { "roster/home/31/show": true }]);
+    expect(update).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects roster replacement through the generic controller writer", async () => {
+    const before = seed("home", { 17: starter, 26: rejected });
+    const genericUpdate = {
+      view: "match",
+      roster: currentApi.controller.roster,
+    };
+    // Keep act open while the void adapter reports the rejected command.
+    await act<void>(() =>
+      Promise.resolve(currentApi.updateController(genericUpdate)),
+    );
+    noAttempts();
+    expect(read("states/A/controller/roster")).toEqual(before);
+    expect(currentApi.mutationError).toBe(
+      "Use roster commands to change players.",
+    );
+  });
+
+  it("explicitly replaces both imported sides but only full clear removes roster metadata", async () => {
+    const before = seed("home", { 17: starter, 26: rejected });
+    await act<void>(() =>
+      currentApi.setRoster({ home: replacement, away: [] }),
+    );
+    expect(read("states/A/controller/roster")).toEqual({
+      ...before,
+      home: replacement,
+      away: [],
+    });
+    expectIntent("controller.set-roster", {
+      "roster/home": replacement,
+      "roster/away": [],
+    });
+    clearAttempts();
+    await act<void>(() => currentApi.clearRoster());
+    expect(read("states/A/controller/roster")).toEqual({ home: [], away: [] });
+    expect(firebaseDatabase.writeAudited).toHaveBeenCalledExactlyOnceWith(
+      "A",
+      "controller",
+      { roster: { home: [], away: [] } },
+      expect.objectContaining({ action: "controller.clear-roster" }),
+    );
+  });
+
+  it("clears rejected raw rows even when the parsed roster is empty", async () => {
+    seed("home", { 26: rejected });
+    await act<void>(() => currentApi.setRoster({ home: [] }));
+    expectIntent("controller.set-roster", { "roster/home": [] });
+    expect(read("states/A/controller/roster/home")).toEqual([]);
+  });
+});
+
+describe("nested data at subscription and conditional-write boundaries", () => {
+  it("renders a mixed roster and rejects malformed media/penalties with no SDK or audit attempt", async () => {
+    write("states/A/controller/currentAsset", {
+      asset: { ...asset, background: { not: "a media URL" } },
+      time: 0.001,
+    });
+    write("states/A/controller/roster/home", [
+      player,
+      null,
+      { name: { invalid: true }, number: 9 },
+      { name: "Foreign coach", id: "foreign-coach", role: "Þjálfari" },
+    ]);
+    write("states/A/match/home2min", [
+      { key: "bad", atTimeElapsed: [], penaltyLength: false },
+      { key: "good", atTimeElapsed: 0, penaltyLength: 120000 },
+    ]);
+    const before = structuredClone(data);
+    mount(<NestedDisplay />);
+    await waitFor(() => expect(currentApi.writeEligible).toBe(true));
+    expect(screen.getByText("Foreign coach")).toBeInTheDocument();
+    expect(currentApi.controller.roster.home).toHaveLength(2);
+    expect(currentApi.match.home2min).toHaveLength(1);
+    await act(() => new Promise((resolve) => setTimeout(resolve, 250)));
+    noAttempts();
+    expect(data).toEqual(before);
+  });
+
+  it.each([
+    [
+      null,
+      { name: {}, number: 2 },
+      { ...player, note: { source: "old" } },
+      benchPlayer,
+    ],
+    {
+      7: { ...player, note: { source: "old" } },
+      10: { name: {} },
+      25: benchPlayer,
+    },
+    {
+      outgoing: { ...player, note: { source: "old" } },
+      broken: false,
+      incoming: benchPlayer,
+    },
+  ])(
+    "writes substitution flags at original Firebase child keys: %j",
+    async (players) => {
+      write("states/A/controller/roster/home", players);
+      mount();
+      clearAttempts();
+      await act(async () => {
+        await currentApi.appendSubstitutionAndActivate(substitution);
+      });
+      const offKey = Array.isArray(players)
+        ? "2"
+        : "7" in players
+          ? "7"
+          : "outgoing";
+      const onKey = Array.isArray(players)
+        ? "3"
+        : "25" in players
+          ? "25"
+          : "incoming";
+      const changes = vi.mocked(firebaseDatabase.writeAudited).mock
+        .calls[0]![2];
+      expect(changes).toMatchObject({
+        [`roster/home/${offKey}/show`]: false,
+        [`roster/home/${onKey}/show`]: true,
+      });
+      expect(read(`states/A/controller/roster/home/${offKey}/show`)).toBe(
+        false,
+      );
+      expect(read(`states/A/controller/roster/home/${onKey}/show`)).toBe(true);
+      expect(read(`states/A/controller/roster/home/${offKey}/note`)).toEqual({
+        source: "old",
+      });
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledTimes(1);
+      expect(runTransaction).not.toHaveBeenCalled();
+    },
+  );
+
+  it("preserves raw unrelated collections and metadata during a valid legacy completion", async () => {
+    write("states/A/controller", {
+      playing: false,
+      currentAsset: { asset, time: null, annotation: { source: "legacy" } },
+      roster: {
+        home: { 9: player, 15: { name: {} } },
+        away: { 40: benchPlayer },
+        note: "keep",
+      },
+      queues: {
+        saved: {
+          items: { 4: asset, 9: { type: "SUB", key: "bad" } },
+          note: { source: "saved" },
+        },
+        corrupt: [],
+      },
+      custom: { revision: 17 },
+    });
+    const before = structuredClone(read("states/A/controller"));
+    mount();
+    clearAttempts();
+    await act(async () => {
+      expect(
+        await currentApi.completeAssetIfCurrent({
+          occurrenceId: null,
+          assetKey: asset.key,
+          time: null,
+          activeQueueId: null,
+          playing: false,
+        }),
+      ).toBe(true);
+    });
+    expect(read("states/A/controller")).toEqual({
+      ...object(before),
+      currentAsset: null,
+    });
+    expect(firebaseDatabase.writeAuditOnly).toHaveBeenCalledExactlyOnceWith(
+      "A",
+      "controller",
+      { currentAsset: null },
+      expect.objectContaining({ action: "controller.complete-asset" }),
+    );
+  });
+
+  it("does not rewrite a sparse penalty collection when completing a countdown", async () => {
+    write("states/A/match", {
+      started: 100,
+      countdown: true,
+      halftimeCountdown: false,
+      home2min: {
+        9: { key: "p", atTimeElapsed: 0, penaltyLength: 120000, note: "keep" },
+        40: { invalid: true },
+      },
+      custom: { source: "legacy" },
+    });
+    const before = object(structuredClone(read("states/A/match")));
+    mount();
+    clearAttempts();
+    await act(async () => {
+      expect(
+        await currentApi.completeCountdownIfCurrent({
+          started: 100,
+          countdown: true,
+          halftimeCountdown: false,
+        }),
+      ).toBe(true);
+    });
+    expect(read("states/A/match")).toEqual({
+      ...before,
+      started: 0,
+      countdown: false,
+    });
+    expect(firebaseDatabase.writeAuditOnly).toHaveBeenCalledTimes(1);
+  });
 });

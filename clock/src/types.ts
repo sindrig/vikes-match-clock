@@ -2,6 +2,7 @@ import { Sports } from "./constants";
 
 // Two-minute penalty type
 export interface TwoMinPenalty {
+  [field: string]: unknown;
   atTimeElapsed: number;
   key: string;
   penaltyLength: number;
@@ -39,8 +40,9 @@ export interface Match {
 
 // Player type
 export interface Player {
+  [field: string]: unknown;
   name: string;
-  id?: number;
+  id?: number | string;
   number?: number | string;
   role?: string;
   show?: boolean;
@@ -48,15 +50,16 @@ export interface Player {
 
 // Overlay on player assets
 export interface AssetOverlay {
+  [field: string]: unknown;
   text: string;
   blink?: boolean;
   effect?: string;
 }
 
-// Asset type
-export interface Asset {
+// Shared structural fields. Presentation constraints belong to consumers.
+export interface AssetFields {
+  [field: string]: unknown;
   key: string;
-  type: string;
   url?: string;
   loop?: boolean;
   background?: string;
@@ -66,26 +69,59 @@ export interface Asset {
   overlay?: AssetOverlay | null;
   teamName?: string;
   fullName?: string;
-  originalAssetType?: string;
-  subIn?: Asset;
-  subOut?: Asset;
   isGoalCelebration?: boolean;
 }
 
-// Current asset with timing
-export interface CurrentAsset {
+export interface ImageAsset extends AssetFields {
+  type: "IMAGE";
+}
+export interface VideoAsset extends AssetFields {
+  type: "VIDEO";
+}
+export interface UrlAsset extends AssetFields {
+  type: "URL";
+}
+export interface PlayerImageAsset extends AssetFields {
+  type: "PLAYER";
+}
+export interface NoImagePlayerAsset extends AssetFields {
+  type: "NO_IMAGE_PLAYER";
+}
+export type PlayerCardAsset = PlayerImageAsset | NoImagePlayerAsset;
+export interface MotmAsset extends AssetFields {
+  type: "MOTM";
+  originalAssetType?: PlayerCardAsset["type"];
+}
+export interface SubstitutionAsset extends AssetFields {
+  type: "SUB";
+  subIn: PlayerCardAsset;
+  subOut: PlayerCardAsset;
+}
+export type Asset =
+  | ImageAsset
+  | VideoAsset
+  | UrlAsset
+  | PlayerCardAsset
+  | MotmAsset
+  | SubstitutionAsset;
+
+interface CurrentAssetFields {
+  [field: string]: unknown;
   asset: Asset;
   time: number | null;
-  // Absent only for persisted legacy playback; new selections always have IDs.
-  occurrenceId?: string;
 }
+// Absence is only persisted legacy playback, never a malformed present ID.
+export type CurrentAsset = CurrentAssetFields &
+  ({ occurrenceId: string } | { occurrenceId?: undefined });
 
 // Roster type
 export type Roster = { home: Player[]; away: Player[] };
 
 // Viewport type
 export interface ViewPort {
+  [field: string]: unknown;
   style: {
+    [field: string]: unknown;
     height: number;
     width: number;
   };
@@ -102,6 +138,7 @@ export interface Background {
 
 // Queue state type
 export interface QueueState {
+  [field: string]: unknown;
   id: string;
   name: string;
   items: Asset[];
@@ -487,7 +524,7 @@ export interface PerimeterGoalVideoConfig {
 }
 
 // An ordinary image/video selected from the main-screen media library.
-export interface MainScreenMediaAsset extends Asset {
+export interface MainScreenMediaAsset extends AssetFields {
   type: "IMAGE" | "VIDEO";
   name: string;
   url: string;

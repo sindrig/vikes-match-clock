@@ -1,4 +1,6 @@
 import assetTypes from "../controller/asset/AssetTypes";
+import { parseCurrentAsset } from "../contexts/nestedParsers";
+import type { AssetFields } from "../types";
 import type { BandIdentity } from "./playerBandPresentation";
 
 // A derived band request for the perimeter band channel. Player-like
@@ -10,29 +12,10 @@ export type PlayerBandRequest =
   | { kind: "player"; identity: BandIdentity; motm?: boolean }
   | { kind: "substitution"; off: BandIdentity; on: BandIdentity };
 
-// The player-like asset types whose cards the band mirrors. NO_IMAGE_PLAYER
-// cards have no image reference, so their identity omits imageRef and the
-// loader resolves the team logo directly.
-const PLAYER_ASSET_TYPES: readonly string[] = [
-  assetTypes.PLAYER,
-  assetTypes.NO_IMAGE_PLAYER,
-  assetTypes.MOTM,
-];
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-
 // Validates one identity: bounded non-empty name, digit-only shirt number
 // (normalized to at most 4 digits), and a team name. Returns null when the
 // side cannot be rendered.
-function normalizeIdentity(asset: unknown): BandIdentity | null {
-  if (!isRecord(asset)) return null;
-  // currentAsset is not deeply parsed by the controller subscription. Check
-  // its fields here before using string methods or coercing shirt numbers.
-  for (const field of ["name", "fullName", "teamName", "key"]) {
-    if (asset[field] != null && typeof asset[field] !== "string") return null;
-  }
+function normalizeIdentity(asset: AssetFields): BandIdentity | null {
   const rawName = asset.fullName ?? asset.name;
   if (typeof rawName !== "string") return null;
   const name = rawName.trim();
@@ -56,16 +39,6 @@ function normalizeIdentity(asset: unknown): BandIdentity | null {
   return { name, number, teamName, imageRef };
 }
 
-function playerIdentity(asset: Record<string, unknown>): BandIdentity | null {
-  if (
-    typeof asset.type !== "string" ||
-    !PLAYER_ASSET_TYPES.includes(asset.type)
-  )
-    return null;
-  if (asset.isGoalCelebration) return null;
-  return normalizeIdentity(asset);
-}
-
 // Derives the band request from the scoreboard's already-public controller
 // state (states/{location}/controller, `currentAsset`). Read-only: no
 // Firebase writes, commands, or audit events are involved.
@@ -79,19 +52,25 @@ function playerIdentity(asset: Record<string, unknown>): BandIdentity | null {
 export function deriveBandRequest(
   currentAsset: unknown,
 ): PlayerBandRequest | null {
-  if (!isRecord(currentAsset)) return null;
-  const asset = currentAsset.asset;
-  if (!isRecord(asset)) return null;
+  const current = parseCurrentAsset(currentAsset);
+  if (!current) return null;
+  const { asset } = current;
 
   if (asset.type === assetTypes.SUB) {
-    if (!asset.subIn || !asset.subOut) return null;
     const off = normalizeIdentity(asset.subOut);
     const on = normalizeIdentity(asset.subIn);
     if (!off || !on) return null;
     return { kind: "substitution", off, on };
   }
 
-  const identity = playerIdentity(asset);
+  if (
+    (asset.type !== assetTypes.PLAYER &&
+      asset.type !== assetTypes.NO_IMAGE_PLAYER &&
+      asset.type !== assetTypes.MOTM) ||
+    asset.isGoalCelebration
+  )
+    return null;
+  const identity = normalizeIdentity(asset);
   if (!identity) return null;
   return {
     kind: "player",

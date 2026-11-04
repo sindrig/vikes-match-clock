@@ -117,7 +117,13 @@ const configuration = secondStadiumWebConfiguration;
 
 const playerController = (name: string) => ({
   currentAsset: {
-    asset: { type: "PLAYER", name, number: 7, teamName: "Víkingur R" },
+    asset: {
+      type: "PLAYER",
+      key: `https://example.com/${name}.png`,
+      name,
+      number: 7,
+      teamName: "Víkingur R",
+    },
     time: null,
   },
 });
