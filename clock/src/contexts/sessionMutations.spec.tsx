@@ -2372,7 +2372,7 @@ describe("ordinary roster commands preserve raw child identity", () => {
       "edits only requested %s child fields",
       async (side) => {
         const before = seed(side, raw);
-        await act(async () => {
+        await act<void>(() => {
           currentApi.editPlayer(side, 0, {
             show: false,
             number: "07",
@@ -2396,7 +2396,7 @@ describe("ordinary roster commands preserve raw child identity", () => {
       "deletes the actual %s child without rekeying siblings",
       async (side) => {
         const before = seed(side, raw);
-        await act(async () => currentApi.deletePlayer(side, 0));
+        await act<void>(() => currentApi.deletePlayer(side, 0));
         const expected = structuredClone(before);
         delete object(expected[side])[selected];
         expect(read("states/A/controller/roster")).toEqual(expected);
@@ -2411,7 +2411,7 @@ describe("ordinary roster commands preserve raw child identity", () => {
       "appends an unused %s child after rejected rows too",
       async (side) => {
         const before = seed(side, raw);
-        await act(async () => currentApi.addPlayer(side));
+        await act<void>(() => currentApi.addPlayer(side));
         const expected = structuredClone(before);
         object(expected[side])[next] = blank;
         expect(read("states/A/controller/roster")).toEqual(expected);
@@ -2430,7 +2430,7 @@ describe("ordinary roster commands preserve raw child identity", () => {
       "replaces only the requested %s side",
       async (side) => {
         const before = seed(side, raw);
-        await act(async () => currentApi.setRoster({ [side]: replacement }));
+        await act<void>(() => currentApi.setRoster({ [side]: replacement }));
         expect(read("states/A/controller/roster")).toEqual({
           ...before,
           [side]: replacement,
@@ -2450,7 +2450,7 @@ describe("ordinary roster commands preserve raw child identity", () => {
       40: false,
     });
     const retained = currentApi;
-    await act(async () => {
+    await act<void>(() => {
       retained.editPlayer("home", 0, { show: false });
       retained.editPlayer("home", 0, { name: "Edited" });
       retained.deletePlayer("home", 0);
@@ -2485,7 +2485,7 @@ describe("ordinary roster commands preserve raw child identity", () => {
 
   it("ignores unchanged supplied projections and out-of-range selections", async () => {
     const before = seed("home", { 17: starter, 26: rejected });
-    await act(async () => {
+    await act<void>(() => {
       currentApi.setRoster(currentApi.controller.roster);
       currentApi.editPlayer("home", 0, { show: true, role: undefined });
       for (const index of [-1, 1, 0.5, NaN]) {
@@ -2500,7 +2500,7 @@ describe("ordinary roster commands preserve raw child identity", () => {
   it("keeps a rendered child's key across an earlier deletion and ignores keys that disappeared", async () => {
     seed("home", { 17: starter, 26: rejected, 31: coach });
     const retained = currentApi;
-    await act(async () => {
+    await act<void>(() => {
       retained.deletePlayer("home", "17");
       retained.editPlayer("home", "31", { show: true });
       retained.editPlayer("home", "17", { name: "Do not resurrect" });
@@ -2525,7 +2525,7 @@ describe("ordinary roster commands preserve raw child identity", () => {
       view: "match",
       roster: currentApi.controller.roster,
     };
-    await act(async () => currentApi.updateController(genericUpdate));
+    await act<void>(() => currentApi.updateController(genericUpdate));
     noAttempts();
     expect(read("states/A/controller/roster")).toEqual(before);
     expect(currentApi.mutationError).toBe(
@@ -2535,7 +2535,7 @@ describe("ordinary roster commands preserve raw child identity", () => {
 
   it("explicitly replaces both imported sides but only full clear removes roster metadata", async () => {
     const before = seed("home", { 17: starter, 26: rejected });
-    await act(async () =>
+    await act<void>(() =>
       currentApi.setRoster({ home: replacement, away: [] }),
     );
     expect(read("states/A/controller/roster")).toEqual({
@@ -2548,7 +2548,7 @@ describe("ordinary roster commands preserve raw child identity", () => {
       "roster/away": [],
     });
     clearAttempts();
-    await act(async () => currentApi.clearRoster());
+    await act<void>(() => currentApi.clearRoster());
     expect(read("states/A/controller/roster")).toEqual({ home: [], away: [] });
     expect(firebaseDatabase.writeAudited).toHaveBeenCalledExactlyOnceWith(
       "A",
@@ -2560,7 +2560,7 @@ describe("ordinary roster commands preserve raw child identity", () => {
 
   it("clears rejected raw rows even when the parsed roster is empty", async () => {
     seed("home", { 26: rejected });
-    await act(async () => currentApi.setRoster({ home: [] }));
+    await act<void>(() => currentApi.setRoster({ home: [] }));
     expectIntent("controller.set-roster", { "roster/home": [] });
     expect(read("states/A/controller/roster/home")).toEqual([]);
   });
