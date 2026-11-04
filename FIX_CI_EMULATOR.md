@@ -81,7 +81,7 @@ await expect(page.getByText("Hefja niðurtalningu")).toHaveCount(0);
 - Firebase Auth emulator: port 9099
 - Firebase Database emulator: port 9000
 - Docker container: `vikes-firebase-emulator`
-- Test user: `e2e-test@test.com` / `testpassword123`
+- Test users: synthetic accounts created by `clock/e2e/fixtures/test-helpers.ts`; use the fixture for local emulator login details, never a staging account.
 - Firebase paths: `states/test-e2e/...` (after login)
 - Listen prefix: `test-e2e`
 
