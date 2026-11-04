@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import {
+  act,
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+} from "@testing-library/react";
 import GoalScorerDialog from "./GoalScorerDialog";
 import {
   useController,
@@ -9,6 +15,8 @@ import {
 import { useRemoteSettings } from "../contexts/LocalStateContext";
 import { getPlayerAssetObject } from "./asset/team/assetHelpers";
 import { preloadMedia } from "../utils/matchUtils";
+import { parseLocations } from "../contexts/firebaseParsers";
+import { minimalPerimeterDisplay } from "../lib/venue.fixtures";
 
 vi.mock("../contexts/FirebaseStateContext", () => ({
   useController: vi.fn(),
@@ -43,79 +51,41 @@ const PLAYERS = [
   { id: 7, name: "Anna", number: 8, show: true, role: "MF" },
 ] as never[];
 
-const readyResult = {
-  status: "ready" as const,
-  error: null,
-  files: {
-    "2": {
-      name: "10-abc-v1-48.png",
-      source: "gs://bucket/vikuti/perimeter-overlays/job/48/10-abc-v1-48.png",
-    },
-    "4": {
-      name: "10-abc-v1-40.png",
-      source: "gs://bucket/vikuti/perimeter-overlays/job/40/10-abc-v1-40.png",
-    },
-  },
+const PLAYER_ASSET = {
+  type: "player",
+  key: "https://storage.example.com/player-fagn.png",
+  name: "Jón",
+  number: 7,
+  overlay: { text: "" },
+  teamName: "Víkingur R",
 };
 
-const fallbackResult = {
-  status: "fallback" as const,
-  error: null,
-  files: {
-    "2": {
-      name: "10-fb-v1-48.png",
-      source: "gs://bucket/vikuti/perimeter-overlays/job/48/10-fb-v1-48.png",
-    },
-    "4": {
-      name: "10-fb-v1-40.png",
-      source: "gs://bucket/vikuti/perimeter-overlays/job/40/10-fb-v1-40.png",
-    },
-  },
-};
+function deferred() {
+  let resolve!: () => void;
+  let reject!: (error: Error) => void;
+  const promise = new Promise<void>((done, fail) => {
+    resolve = done;
+    reject = fail;
+  });
+  return { promise, resolve, reject };
+}
 
-const preparingResult = { status: "preparing" as const, error: null };
-
-const setupContexts = (
-  options: {
-    renderer?: "web" | "resolume";
-    preparationStatus?: unknown;
-  } = {},
-) => {
+const setupContexts = (mapping: unknown = minimalPerimeterDisplay) => {
   mockedUseController.mockReturnValue({
     renderAsset,
   } as unknown as ReturnType<typeof useController>);
   mockedUsePerimeter.mockReturnValue({
-    goalScorerPreparationStatus: options.preparationStatus ?? null,
     setPerimeterOverlay,
   } as unknown as ReturnType<typeof usePerimeter>);
-  mockedUseListeners.mockReturnValue({
-    screens: [
-      {
-        key: "vikuti",
-        label: "Vikuti",
-        ...(options.renderer
-          ? {
-              perimeterDisplay: {
-                version: 1,
-                revision: "r",
-                renderer: options.renderer,
-              },
-            }
-          : {}),
-      },
-    ],
-  } as unknown as ReturnType<typeof useListeners>);
+  mockedUseListeners.mockReturnValue(
+    parseLocations({
+      vikuti: { label: "Vikuti", perimeterDisplay: mapping },
+    })!,
+  );
   mockedUseRemoteSettings.mockReturnValue({
     listenPrefix: "vikuti",
   } as unknown as ReturnType<typeof useRemoteSettings>);
-  mockedGetPlayerAssetObject.mockResolvedValue({
-    type: "player",
-    key: "https://storage.example.com/player-fagn.png",
-    name: "Jón",
-    number: 7,
-    overlay: { text: "" },
-    teamName: "Víkingur R",
-  } as never);
+  mockedGetPlayerAssetObject.mockResolvedValue(PLAYER_ASSET);
 };
 
 const renderDialog = (props: Record<string, unknown> = {}) =>
@@ -132,128 +102,16 @@ const renderDialog = (props: Record<string, unknown> = {}) =>
 
 beforeEach(() => {
   vi.clearAllMocks();
+  renderAsset.mockResolvedValue(undefined);
+  setPerimeterOverlay.mockResolvedValue(undefined);
   setupContexts();
 });
 
 describe("GoalScorerDialog", () => {
-  // -- Resolume venues: prepared-file workflow (unchanged) ------------------
-
-  it("replaces the perimeter overlay with the player's ready pair at a Resolume venue", async () => {
-    setupContexts({
-      renderer: "resolume",
-      preparationStatus: {
-        jobId: "job-1",
-        phase: "ready",
-        readyCount: 1,
-        fallbackCount: 0,
-        unavailableCount: 0,
-        failedCount: 0,
-        total: 1,
-        updatedAt: 1723392000000,
-        error: null,
-        players: { "10": readyResult },
-      },
-    });
-    renderDialog();
-    fireEvent.click(screen.getByText("Jón"));
-    await waitFor(() =>
-      expect(setPerimeterOverlay).toHaveBeenCalledWith(
-        expect.objectContaining({
-          version: 1,
-          columns: [
-            expect.objectContaining({
-              durationMs: 10000,
-              files: readyResult.files,
-            }),
-          ],
-        }),
-      ),
-    );
-    expect(renderAsset).toHaveBeenCalled();
-  });
-
-  it("uses the crest fallback pair when the player's media is fallback", async () => {
-    setupContexts({
-      renderer: "resolume",
-      preparationStatus: {
-        jobId: "job-1",
-        phase: "ready",
-        readyCount: 0,
-        fallbackCount: 1,
-        unavailableCount: 0,
-        failedCount: 0,
-        total: 1,
-        updatedAt: 1723392000000,
-        error: null,
-        players: { "10": fallbackResult },
-      },
-    });
-    renderDialog();
-    fireEvent.click(screen.getByText("Jón"));
-    await waitFor(() =>
-      expect(setPerimeterOverlay).toHaveBeenCalledWith(
-        expect.objectContaining({
-          columns: [expect.objectContaining({ files: fallbackResult.files })],
-        }),
-      ),
-    );
-  });
-
-  it("keeps the generic overlay when the player's media is preparing", async () => {
-    setupContexts({
-      renderer: "resolume",
-      preparationStatus: {
-        jobId: "job-1",
-        phase: "preparing",
-        readyCount: 0,
-        fallbackCount: 0,
-        unavailableCount: 0,
-        failedCount: 0,
-        total: 1,
-        updatedAt: 1723392000000,
-        error: null,
-        players: { "10": preparingResult },
-      },
-    });
-    renderDialog();
-    fireEvent.click(screen.getByText("Jón"));
-    await waitFor(() => expect(renderAsset).toHaveBeenCalled());
-    expect(setPerimeterOverlay).not.toHaveBeenCalled();
-  });
-
-  it("keeps the generic overlay when the player has no preparation result", async () => {
-    setupContexts({ renderer: "resolume" });
-    renderDialog();
-    fireEvent.click(screen.getByText("Jón"));
-    await waitFor(() => expect(renderAsset).toHaveBeenCalled());
-    expect(setPerimeterOverlay).not.toHaveBeenCalled();
-  });
-
-  it("shows per-player readiness labels at a Resolume venue", () => {
-    setupContexts({
-      renderer: "resolume",
-      preparationStatus: {
-        jobId: "job-1",
-        phase: "ready",
-        readyCount: 1,
-        fallbackCount: 1,
-        unavailableCount: 0,
-        failedCount: 0,
-        total: 2,
-        updatedAt: 1723392000000,
-        error: null,
-        players: { "10": readyResult, "7": fallbackResult },
-      },
-    });
-    renderDialog();
-    expect(screen.getByText("Tilbúið")).toBeInTheDocument();
-    expect(screen.getByText("Skjöldur")).toBeInTheDocument();
-  });
-
   // -- Web venues: semantic commands ----------------------------------------
 
   it("writes a fresh semantic scorer command at a web venue without prepared media", async () => {
-    setupContexts({ renderer: "web" });
+    setupContexts();
     renderDialog();
     fireEvent.click(screen.getByText("Jón"));
     await waitFor(() =>
@@ -276,7 +134,7 @@ describe("GoalScorerDialog", () => {
   });
 
   it("submits the main-screen reveal before the semantic perimeter command", async () => {
-    setupContexts({ renderer: "web" });
+    setupContexts();
     renderDialog();
     fireEvent.click(screen.getByText("Jón"));
     await waitFor(() => expect(setPerimeterOverlay).toHaveBeenCalled());
@@ -286,7 +144,7 @@ describe("GoalScorerDialog", () => {
   });
 
   it("keeps the generic overlay when a web player has invalid display data", async () => {
-    setupContexts({ renderer: "web" });
+    setupContexts();
     const invalidPlayers = [
       { id: null, name: "Nafnlaus", number: 7, show: true, role: "FW" },
       { id: 10, name: "Jón", number: null, show: true, role: "FW" },
@@ -302,113 +160,160 @@ describe("GoalScorerDialog", () => {
     expect(setPerimeterOverlay).not.toHaveBeenCalled();
   });
 
-  it("does not show generated-media readiness labels at a web venue", () => {
-    setupContexts({
-      renderer: "web",
-      preparationStatus: {
-        jobId: "job-1",
-        phase: "ready",
-        readyCount: 1,
-        fallbackCount: 1,
-        unavailableCount: 0,
-        failedCount: 0,
-        total: 2,
-        updatedAt: 1723392000000,
-        error: null,
-        players: { "10": readyResult, "7": fallbackResult },
-      },
-    });
+  it("offers scorer selection without generated-media readiness labels", () => {
     renderDialog();
     expect(screen.queryByText("Tilbúið")).not.toBeInTheDocument();
     expect(screen.queryByText("Skjöldur")).not.toBeInTheDocument();
     expect(screen.queryByText("Ekki tiltækt")).not.toBeInTheDocument();
   });
 
-  it("keeps the Resolume prepared-file workflow when the venue mapping is missing", async () => {
-    // Missing mappings default to the legacy Resolume path: a ready
-    // prepared pair still replaces the generic goal overlay.
-    setupContexts({
-      preparationStatus: {
-        jobId: "job-1",
-        phase: "ready",
-        readyCount: 1,
-        fallbackCount: 0,
-        unavailableCount: 0,
-        failedCount: 0,
-        total: 1,
-        updatedAt: 1723392000000,
-        error: null,
-        players: { "10": readyResult },
-      },
-    });
-    renderDialog();
-    fireEvent.click(screen.getByText("Jón"));
-    await waitFor(() =>
-      expect(setPerimeterOverlay).toHaveBeenCalledWith(
-        expect.objectContaining({
-          version: 1,
-          columns: [
-            expect.objectContaining({
-              durationMs: 10000,
-              files: readyResult.files,
-            }),
-          ],
-        }),
-      ),
-    );
-    expect(renderAsset).toHaveBeenCalled();
-  });
+  it.each([
+    ["missing mapping", null],
+    ["invalid geometry", { ...minimalPerimeterDisplay, regions: [] }],
+    ["retired renderer", { ...minimalPerimeterDisplay, renderer: "resolume" }],
+    [
+      "unknown renderer",
+      { ...minimalPerimeterDisplay, renderer: "unexpected" },
+    ],
+  ])(
+    "keeps the main-screen reveal available with %s",
+    async (_label, mapping) => {
+      setupContexts(mapping);
+      renderDialog();
+      fireEvent.click(screen.getByText("Jón"));
+      await waitFor(() => expect(renderAsset).toHaveBeenCalled());
+      expect(setPerimeterOverlay).not.toHaveBeenCalled();
+    },
+  );
 
-  it("keeps the Resolume prepared-file workflow for an unrecognized mapping renderer", async () => {
-    setupContexts({ renderer: "resolume" });
-    mockedUseListeners.mockReturnValue({
-      screens: [
-        {
-          key: "vikuti",
-          label: "Vikuti",
-          perimeterDisplay: {
-            version: 1,
-            revision: "r",
-            renderer: "unexpected",
-          },
-        },
-      ],
-    } as unknown as ReturnType<typeof useListeners>);
-    // Unrecognized renderers never opt into browser composition, so the
-    // legacy prepared-file path applies: a ready pair still replaces the
-    // generic goal overlay.
-    mockedUsePerimeter.mockReturnValue({
-      goalScorerPreparationStatus: {
-        jobId: "job-1",
-        phase: "ready",
-        readyCount: 1,
-        fallbackCount: 0,
-        unavailableCount: 0,
-        failedCount: 0,
-        total: 1,
-        updatedAt: 1723392000000,
-        error: null,
-        players: { "10": readyResult },
-      },
-      setPerimeterOverlay,
-    } as unknown as ReturnType<typeof usePerimeter>);
+  it("replaces the scorer with a fresh command on each selection", async () => {
     renderDialog();
     fireEvent.click(screen.getByText("Jón"));
-    await waitFor(() =>
-      expect(setPerimeterOverlay).toHaveBeenCalledWith(
-        expect.objectContaining({
-          version: 1,
-          columns: [
-            expect.objectContaining({
-              files: readyResult.files,
-            }),
-          ],
-        }),
-      ),
-    );
+    await waitFor(() => expect(setPerimeterOverlay).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByText("Anna"));
+    await waitFor(() => expect(setPerimeterOverlay).toHaveBeenCalledTimes(2));
+    const first = setPerimeterOverlay.mock.calls[0]![0] as { id: string };
+    const second = setPerimeterOverlay.mock.calls[1]![0] as { id: string };
+    expect(second.id).not.toBe(first.id);
+    expect(second).toMatchObject({
+      version: 2,
+      player: { id: "7", name: "Anna" },
+    });
   });
 
   // -- Shared behavior -------------------------------------------------------
+
+  it.each([
+    ["media", false],
+    ["media", true],
+    ["main-screen", false],
+    ["main-screen", true],
+    ["perimeter", false],
+    ["perimeter", true],
+  ] as const)(
+    "ignores a dismissed selection's late %s completion (failure: %s)",
+    async (stage, failure) => {
+      const pending = deferred();
+      const onClose = vi.fn();
+      if (stage === "media") {
+        mockedGetPlayerAssetObject.mockReturnValueOnce(
+          pending.promise.then(() => PLAYER_ASSET),
+        );
+      } else if (stage === "main-screen") {
+        renderAsset.mockReturnValueOnce(pending.promise);
+      } else {
+        setPerimeterOverlay.mockReturnValueOnce(pending.promise);
+      }
+      const dialog = (open: boolean) => (
+        <GoalScorerDialog
+          open={open}
+          players={PLAYERS}
+          teamName="Víkingur R"
+          onClose={onClose}
+        />
+      );
+      const mounted = render(dialog(true));
+      fireEvent.click(screen.getByText("Jón"));
+      const delayed =
+        stage === "media"
+          ? mockedGetPlayerAssetObject
+          : stage === "main-screen"
+            ? renderAsset
+            : setPerimeterOverlay;
+      await waitFor(() => expect(delayed).toHaveBeenCalledTimes(1));
+
+      fireEvent.click(screen.getByRole("button", { name: "Close" }));
+      expect(onClose).toHaveBeenCalledTimes(1);
+      mounted.rerender(dialog(false));
+      mounted.rerender(dialog(true));
+      onClose.mockClear();
+      await act(async () => {
+        if (failure) pending.reject(new Error("Old selection failed"));
+        else pending.resolve();
+        await pending.promise.catch(() => undefined);
+      });
+
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      expect(renderAsset).toHaveBeenCalledTimes(stage === "media" ? 0 : 1);
+      expect(setPerimeterOverlay).toHaveBeenCalledTimes(
+        stage === "perimeter" ? 1 : 0,
+      );
+      fireEvent.click(screen.getByText("Anna"));
+      await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+      expect(setPerimeterOverlay).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          player: { id: "7", name: "Anna", number: "8" },
+        }),
+      );
+    },
+  );
+
+  it("does not close a newer selection when an earlier acknowledgement arrives", async () => {
+    const first = deferred();
+    const second = deferred();
+    const onClose = vi.fn();
+    setPerimeterOverlay
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise);
+    renderDialog({ onClose });
+    fireEvent.click(screen.getByText("Jón"));
+    await waitFor(() => expect(setPerimeterOverlay).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByText("Anna"));
+    await waitFor(() => expect(setPerimeterOverlay).toHaveBeenCalledTimes(2));
+
+    await act(async () => {
+      first.resolve();
+      await first.promise;
+    });
+    expect(onClose).not.toHaveBeenCalled();
+    await act(async () => {
+      second.resolve();
+      await second.promise;
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["main-screen", "perimeter"])(
+    "keeps a rejected %s selection open with an error and permits an explicit retry",
+    async (stage) => {
+      const onClose = vi.fn();
+      const writer =
+        stage === "main-screen" ? renderAsset : setPerimeterOverlay;
+      writer.mockRejectedValueOnce(new Error("Save blocked"));
+      renderDialog({ onClose });
+      fireEvent.click(screen.getByText("Jón"));
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        "Save blocked",
+      );
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.getByRole("dialog")).toBeVisible();
+
+      fireEvent.click(screen.getByText("Jón"));
+      await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    },
+  );
 
   it("does not wait for the goal background before rendering the player", async () => {
     let resolveBackground: (() => void) | undefined;

@@ -13,11 +13,14 @@
  *     on an overcast day — and flags the snapshot stale.
  *   * If `current` is missing from an otherwise good response (short
  *     outage), the hourly point nearest to now covers it.
+ *   * Each request has one deadline covering headers and JSON consumption.
+ *     Stopping aborts the active request; late results cannot update the cache.
  *   * The daemon never blocks or throws on weather problems: worst case is
  *     a conservative fixed cloud fraction, best case is current cloud data.
  */
 
 const DEFAULT_POLL_MS = 15 * 60_000; // Open-Meteo 15-min nowcast cadence
+const DEFAULT_REQUEST_TIMEOUT_MS = 10_000;
 const DEFAULT_STALE_AFTER_MS = 3 * 60 * 60_000;
 const DEFAULT_STALE_CLOUD_COVER = 0.8;
 
@@ -61,6 +64,7 @@ export class OpenMeteoCloudCover {
     url,
     fetchImpl = fetch,
     pollMs = DEFAULT_POLL_MS,
+    requestTimeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
     staleAfterMs = DEFAULT_STALE_AFTER_MS,
     staleCloudCover = DEFAULT_STALE_CLOUD_COVER,
     now = () => Date.now(),
@@ -68,13 +72,14 @@ export class OpenMeteoCloudCover {
     this._url = url;
     this._fetch = fetchImpl;
     this._pollMs = pollMs;
+    this._requestTimeoutMs = requestTimeoutMs;
     this._staleAfterMs = staleAfterMs;
     this._staleCloudCover = staleCloudCover;
     this._now = now;
     this._cached = null; // { cloudCover, fetchedAtMs, source }
     this._pollTimer = null;
     this._stopping = false;
-    this._polling = false;
+    this._activePoll = null;
   }
 
   // Begins immediate polling and repeats every `pollMs`. Idempotent.
@@ -91,6 +96,11 @@ export class OpenMeteoCloudCover {
       clearTimeout(this._pollTimer);
       this._pollTimer = null;
     }
+    // Release ownership synchronously so start() can poll immediately. The
+    // old poll's finally must not release a restarted poll's guard.
+    const activePoll = this._activePoll;
+    this._activePoll = null;
+    activePoll?.abort();
   }
 
   _schedule() {
@@ -106,17 +116,40 @@ export class OpenMeteoCloudCover {
   // One fetch + cache update. Public so callers (and tests) can force an
   // immediate poll; never throws — a failure keeps the last cached value.
   async poll() {
-    if (this._polling) return;
-    this._polling = true;
+    if (this._stopping || this._activePoll) return;
+    const controller = new AbortController();
+    this._activePoll = controller;
+    let deadline;
+    let onAbort;
     try {
-      const response = await this._fetch(this._url);
-      if (!response.ok) {
-        throw new Error(`Open-Meteo returned HTTP ${response.status}`);
-      }
-      const parsed = parseCloudCoverResponse(
-        await response.json(),
-        this._now(),
-      );
+      const cancelled = new Promise((_, reject) => {
+        onAbort = () => reject(controller.signal.reason);
+        controller.signal.addEventListener("abort", onAbort, { once: true });
+      });
+      deadline = setTimeout(() => {
+        controller.abort(
+          new Error(
+            `Open-Meteo request timed out after ${this._requestTimeoutMs} ms`,
+          ),
+        );
+      }, this._requestTimeoutMs);
+      // Racing the entire operation also bounds providers that ignore the
+      // signal. Only the owning poll may publish; detached work never does.
+      const data = await Promise.race([
+        (async () => {
+          const response = await this._fetch(this._url, {
+            signal: controller.signal,
+          });
+          if (controller.signal.aborted) return undefined;
+          if (!response.ok) {
+            throw new Error(`Open-Meteo returned HTTP ${response.status}`);
+          }
+          return response.json();
+        })(),
+        cancelled,
+      ]);
+      if (this._activePoll !== controller || controller.signal.aborted) return;
+      const parsed = parseCloudCoverResponse(data, this._now());
       if (parsed) {
         this._cached = {
           cloudCover: parsed.cloudCover,
@@ -134,9 +167,16 @@ export class OpenMeteoCloudCover {
     } catch (err) {
       // Keep the last cached value and expose its age; staleness handling
       // happens in snapshot(). The daemon never blocks or throws here.
-      console.error(`Open-Meteo fetch failed (keeping last value): ${err.message}`);
+      if (this._activePoll === controller) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error(
+          `Open-Meteo fetch failed (keeping last value): ${message}`,
+        );
+      }
     } finally {
-      this._polling = false;
+      clearTimeout(deadline);
+      controller.signal.removeEventListener("abort", onAbort);
+      if (this._activePoll === controller) this._activePoll = null;
     }
   }
 

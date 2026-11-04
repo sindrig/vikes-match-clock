@@ -13,18 +13,18 @@ import PerimeterControl from "./PerimeterControl";
 import {
   useListeners,
   usePerimeter,
-  useController,
   useView,
 } from "../contexts/FirebaseStateContext";
 import { useLocalState } from "../contexts/LocalStateContext";
 import { closestCenter } from "@dnd-kit/core";
 import type { CollisionDetection, DragEndEvent } from "@dnd-kit/core";
+import { parseLocations } from "../contexts/firebaseParsers";
+import { minimalPerimeterDisplay } from "../lib/venue.fixtures";
 
 vi.mock("../contexts/FirebaseStateContext", () => ({
   useFirebaseState: vi.fn(() => ({ writeEligible: true })),
   usePerimeter: vi.fn(),
   useListeners: vi.fn(),
-  useController: vi.fn(),
   useView: vi.fn(),
 }));
 
@@ -63,37 +63,33 @@ vi.mock("@dnd-kit/core", async (importOriginal) => {
 const mockedUsePerimeter = vi.mocked(usePerimeter);
 const mockedUseListeners = vi.mocked(useListeners);
 const mockedUseLocalState = vi.mocked(useLocalState);
-const mockedUseController = vi.mocked(useController);
 
-const basePreview = {
-  updatedAt: Date.now(),
-  columns: [
-    {
-      id: 1,
-      name: "Column 1",
-      clips: [
+const defaultListeners = parseLocations({
+  "test-location": {
+    label: "Test location",
+    perimeterDisplay: {
+      ...minimalPerimeterDisplay,
+      compatibilityKeys: {
+        base: { "lane-1": "strip", "lane-2": "second" },
+        overlay: { "2": "strip", "4": "second" },
+      },
+      framebuffer: { width: 4, height: 1, background: "black" },
+      logicalScreens: {
+        strip: { id: "strip", name: "40 skjáir", width: 2, height: 1 },
+        second: { id: "second", name: "48 skjáir", width: 2, height: 1 },
+      },
+      regions: [
+        minimalPerimeterDisplay.regions[0],
         {
-          id: 12,
-          filename: "sponsor-loop.mp4",
-          thumbnail: "data:image/jpeg;base64,abc",
+          ...minimalPerimeterDisplay.regions[0],
+          id: "second-region",
+          logicalScreenId: "second",
+          destination: { x: 2, y: 0, width: 2, height: 1 },
         },
-        { id: 13, filename: "logo.mp4" },
       ],
     },
-  ],
-};
-
-const baseAppliedAdLayout = {
-  lanes: [
-    { id: "lane-1", name: "40 skjáir" },
-    { id: "lane-2", name: "48 skjáir" },
-  ],
-  revision: "rev-123",
-  phase: "idle" as const,
-  error: null,
-  updatedAt: Date.now(),
-  columns: [],
-};
+  },
+})!;
 
 const mockSetPerimeterAdLayout =
   vi.fn<ReturnType<typeof usePerimeter>["setPerimeterAdLayout"]>();
@@ -103,8 +99,6 @@ const createMockPerimeterReturn = (
 ): ReturnType<typeof usePerimeter> =>
   ({
     perimeter: { enabled: true, state: "off" },
-    preview: basePreview,
-    previewLoaded: true,
     setPerimeterState: vi.fn(),
     setPerimeterIdleClock: vi.fn().mockResolvedValue(undefined),
     skipPerimeterCue: vi.fn(),
@@ -113,11 +107,7 @@ const createMockPerimeterReturn = (
     clearPerimeterOverlay: vi.fn(),
     setPerimeterAdLayout: mockSetPerimeterAdLayout,
     overlay: null,
-    overlayStatus: null,
     adLayout: null,
-    appliedAdLayout: baseAppliedAdLayout,
-    appliedAdLayoutLoaded: true,
-    appliedAdLayoutError: null,
     brightness: null,
     brightnessStatus: null,
     brightnessAuto: null,
@@ -148,11 +138,8 @@ const createMockLocalState = (
 beforeEach(() => {
   vi.clearAllMocks();
   mockedUsePerimeter.mockReturnValue(createMockPerimeterReturn());
-  mockedUseListeners.mockReturnValue({ available: [], screens: [] });
+  mockedUseListeners.mockReturnValue(defaultListeners);
   mockedUseLocalState.mockReturnValue(createMockLocalState());
-  mockedUseController.mockReturnValue({
-    controller: { roster: { home: [], away: [] } },
-  } as unknown as ReturnType<typeof useController>);
   vi.mocked(useView).mockReturnValue({
     view: { blackoutStart: undefined, blackoutEnd: undefined },
     setBlackoutStart: vi.fn(),
@@ -175,23 +162,21 @@ describe("PerimeterControl", () => {
     expect(setPerimeterState).toHaveBeenCalledWith("on");
   });
 
-  const mockWebVenueScreens = [
-    {
-      key: "test-location",
+  const mockWebVenues = {
+    "test-location": {
       label: "Test location",
-      screen: {} as never,
+      pitchIds: [],
+      config: {},
+      screens: {},
       perimeterDisplay: {
         renderer: "web",
-        compatibilityKeys: {
-          base: { "1": "left" },
-          overlay: {},
-        },
+        compatibilityKeys: { base: { "1": "left" }, overlay: {} },
         logicalScreens: {
           left: { id: "left", name: "Left", width: 4, height: 1 },
         },
       } as never,
     },
-  ];
+  };
 
   const webVenueAdLayout = {
     version: 1,
@@ -210,7 +195,8 @@ describe("PerimeterControl", () => {
     const skipPerimeterCue = vi.fn();
     mockedUseListeners.mockReturnValue({
       available: [],
-      screens: mockWebVenueScreens,
+      venues: mockWebVenues,
+      screens: [],
     });
     mockedUsePerimeter.mockReturnValue(
       createMockPerimeterReturn({
@@ -233,7 +219,8 @@ describe("PerimeterControl", () => {
   it("disables the skip-forward button while the perimeter is off", () => {
     mockedUseListeners.mockReturnValue({
       available: [],
-      screens: mockWebVenueScreens,
+      venues: mockWebVenues,
+      screens: [],
     });
     mockedUsePerimeter.mockReturnValue(
       createMockPerimeterReturn({
@@ -252,7 +239,8 @@ describe("PerimeterControl", () => {
   it("shows the brightness section on a web venue", () => {
     mockedUseListeners.mockReturnValue({
       available: [],
-      screens: mockWebVenueScreens,
+      venues: mockWebVenues,
+      screens: [],
     });
     mockedUsePerimeter.mockReturnValue(
       createMockPerimeterReturn({
@@ -273,7 +261,8 @@ describe("PerimeterControl", () => {
   it("hides the brightness section at venues without a brightness controller", () => {
     mockedUseListeners.mockReturnValue({
       available: [],
-      screens: mockWebVenueScreens,
+      venues: mockWebVenues,
+      screens: [],
     });
     mockedUseLocalState.mockReturnValue(
       createMockLocalState({ listenPrefix: "virkid" }),
@@ -320,7 +309,8 @@ describe("PerimeterControl", () => {
   it("shows the scorer celebration selector on a web venue with the default style active", () => {
     mockedUseListeners.mockReturnValue({
       available: [],
-      screens: mockWebVenueScreens,
+      venues: mockWebVenues,
+      screens: [],
     });
     mockedUsePerimeter.mockReturnValue(
       createMockPerimeterReturn({
@@ -346,11 +336,12 @@ describe("PerimeterControl", () => {
   it("hides the scorer celebration selector on a Resolume venue", () => {
     mockedUseListeners.mockReturnValue({
       available: [],
-      screens: [
-        {
-          key: "test-location",
+      venues: {
+        "test-location": {
           label: "Test location",
-          screen: {} as never,
+          pitchIds: [],
+          config: {},
+          screens: {},
           perimeterDisplay: {
             renderer: "resolume",
             compatibilityKeys: {
@@ -362,7 +353,8 @@ describe("PerimeterControl", () => {
             },
           } as never,
         },
-      ],
+      },
+      screens: [],
     });
     mockedUsePerimeter.mockReturnValue(
       createMockPerimeterReturn({
@@ -378,7 +370,8 @@ describe("PerimeterControl", () => {
   it("saves the idle toggle without optimistic state and reports write failures", async () => {
     mockedUseListeners.mockReturnValue({
       available: [],
-      screens: mockWebVenueScreens,
+      venues: mockWebVenues,
+      screens: [],
     });
     const save = vi.fn().mockResolvedValue(undefined);
     mockedUsePerimeter.mockReturnValue(
@@ -413,7 +406,8 @@ describe("PerimeterControl", () => {
   it("exposes the shared night blackout config next to the clock", () => {
     mockedUseListeners.mockReturnValue({
       available: [],
-      screens: mockWebVenueScreens,
+      venues: mockWebVenues,
+      screens: [],
     });
     const setBlackoutStart = vi.fn();
     const setBlackoutEnd = vi.fn();
@@ -438,6 +432,11 @@ describe("PerimeterControl", () => {
   });
 
   it("hides the night blackout section for non-web venues", () => {
+    mockedUseListeners.mockReturnValue({
+      available: [],
+      venues: {},
+      screens: [],
+    });
     render(<PerimeterControl standalone />);
 
     expect(screen.queryByLabelText("Næturstilling byrjar")).toBeNull();
@@ -446,7 +445,8 @@ describe("PerimeterControl", () => {
   it("writes the selected scorer celebration style", () => {
     mockedUseListeners.mockReturnValue({
       available: [],
-      screens: mockWebVenueScreens,
+      venues: mockWebVenues,
+      screens: [],
     });
     const setPerimeterScorerCelebration = vi
       .fn<ReturnType<typeof usePerimeter>["setPerimeterScorerCelebration"]>()
@@ -474,7 +474,8 @@ describe("PerimeterControl", () => {
   it("shows the player band style selector on a web venue with Default active", () => {
     mockedUseListeners.mockReturnValue({
       available: [],
-      screens: mockWebVenueScreens,
+      venues: mockWebVenues,
+      screens: [],
     });
     mockedUsePerimeter.mockReturnValue(
       createMockPerimeterReturn({
@@ -502,11 +503,12 @@ describe("PerimeterControl", () => {
   it("hides the player band style selector on a Resolume venue", () => {
     mockedUseListeners.mockReturnValue({
       available: [],
-      screens: [
-        {
-          key: "test-location",
+      venues: {
+        "test-location": {
           label: "Test location",
-          screen: {} as never,
+          pitchIds: [],
+          config: {},
+          screens: {},
           perimeterDisplay: {
             renderer: "resolume",
             compatibilityKeys: {
@@ -518,7 +520,8 @@ describe("PerimeterControl", () => {
             },
           } as never,
         },
-      ],
+      },
+      screens: [],
     });
     mockedUsePerimeter.mockReturnValue(
       createMockPerimeterReturn({
@@ -535,7 +538,8 @@ describe("PerimeterControl", () => {
   it("writes the selected player band style and disables while settling", async () => {
     mockedUseListeners.mockReturnValue({
       available: [],
-      screens: mockWebVenueScreens,
+      venues: mockWebVenues,
+      screens: [],
     });
     const setPerimeterPlayerDisplayStyle = vi
       .fn<ReturnType<typeof usePerimeter>["setPerimeterPlayerDisplayStyle"]>()
@@ -574,7 +578,8 @@ describe("PerimeterControl", () => {
   it("shows the substitution style selector on a web venue with Static active", () => {
     mockedUseListeners.mockReturnValue({
       available: [],
-      screens: mockWebVenueScreens,
+      venues: mockWebVenues,
+      screens: [],
     });
     mockedUsePerimeter.mockReturnValue(
       createMockPerimeterReturn({
@@ -602,7 +607,8 @@ describe("PerimeterControl", () => {
   it("writes the selected substitution style and disables while settling", async () => {
     mockedUseListeners.mockReturnValue({
       available: [],
-      screens: mockWebVenueScreens,
+      venues: mockWebVenues,
+      screens: [],
     });
     const setPerimeterSubstitutionStyle = vi
       .fn<ReturnType<typeof usePerimeter>["setPerimeterSubstitutionStyle"]>()
@@ -643,11 +649,12 @@ describe("PerimeterControl", () => {
       .mockResolvedValue(undefined);
     mockedUseListeners.mockReturnValue({
       available: [],
-      screens: [
-        {
-          key: "test-location",
+      venues: {
+        "test-location": {
           label: "Test location",
-          screen: {} as never,
+          pitchIds: [],
+          config: {},
+          screens: {},
           perimeterDisplay: {
             renderer: "web",
             compatibilityKeys: {
@@ -670,7 +677,8 @@ describe("PerimeterControl", () => {
             },
           } as never,
         },
-      ],
+      },
+      screens: [],
     });
     mockedUsePerimeter.mockReturnValue(
       createMockPerimeterReturn({
@@ -740,6 +748,11 @@ describe("PerimeterControl", () => {
   });
 
   it("hides the skip-forward button on non-web venues", () => {
+    mockedUseListeners.mockReturnValue({
+      available: [],
+      venues: {},
+      screens: [],
+    });
     mockedUsePerimeter.mockReturnValue(
       createMockPerimeterReturn({
         perimeter: { enabled: true, state: "on" },
@@ -757,7 +770,8 @@ describe("PerimeterControl", () => {
     const restartPerimeterDisplays = vi.fn();
     mockedUseListeners.mockReturnValue({
       available: [],
-      screens: mockWebVenueScreens,
+      venues: mockWebVenues,
+      screens: [],
     });
     mockedUsePerimeter.mockReturnValue(
       createMockPerimeterReturn({
@@ -778,6 +792,11 @@ describe("PerimeterControl", () => {
   });
 
   it("hides the restart button on non-web venues", () => {
+    mockedUseListeners.mockReturnValue({
+      available: [],
+      venues: {},
+      screens: [],
+    });
     mockedUsePerimeter.mockReturnValue(
       createMockPerimeterReturn({
         perimeter: { enabled: true, state: "on" },
@@ -795,24 +814,13 @@ describe("PerimeterControl", () => {
   it("hides the scorer preparation panel and retry control on a web venue", () => {
     mockedUseListeners.mockReturnValue({
       available: [],
-      screens: mockWebVenueScreens,
+      venues: mockWebVenues,
+      screens: [],
     });
     mockedUsePerimeter.mockReturnValue(
       createMockPerimeterReturn({
         perimeter: { enabled: true, state: "on" },
         adLayout: webVenueAdLayout,
-        goalScorerPreparationStatus: {
-          jobId: "job-1",
-          phase: "preparing",
-          readyCount: 0,
-          fallbackCount: 0,
-          unavailableCount: 0,
-          failedCount: 0,
-          total: 2,
-          updatedAt: Date.now(),
-          error: null,
-          players: {},
-        } as never,
       }),
     );
 
@@ -826,70 +834,15 @@ describe("PerimeterControl", () => {
     ).toBeNull();
   });
 
-  it("keeps the scorer preparation panel and retry control on a Resolume venue", () => {
-    const requestGoalScorerPreparation = vi.fn().mockResolvedValue(undefined);
-    mockedUseListeners.mockReturnValue({
-      available: [],
-      screens: [
-        {
-          key: "test-location",
-          label: "Test location",
-          screen: {} as never,
-          perimeterDisplay: {
-            renderer: "resolume",
-            compatibilityKeys: { base: {}, overlay: {} },
-            logicalScreens: {},
-          } as never,
-        },
-      ],
-    });
-    mockedUseController.mockReturnValue({
-      controller: {
-        roster: {
-          home: [{ id: 10, name: "Jón", number: 7, show: true, role: "FW" }],
-          away: [],
-        },
-      },
-    } as unknown as ReturnType<typeof useController>);
-    mockedUsePerimeter.mockReturnValue(
-      createMockPerimeterReturn({
-        perimeter: { enabled: true, state: "on" },
-        goalScorerPreparationStatus: {
-          jobId: "job-1",
-          phase: "ready",
-          readyCount: 1,
-          fallbackCount: 0,
-          unavailableCount: 0,
-          failedCount: 0,
-          total: 1,
-          updatedAt: Date.now(),
-          error: null,
-          players: {
-            "10": { status: "ready", error: null },
-          },
-        } as never,
-        requestGoalScorerPreparation,
-      }),
-    );
-
-    render(<PerimeterControl standalone />);
-
-    expect(screen.getByText("Markaskorari — jaðarefni")).toBeVisible();
-    expect(screen.getByTestId("goal-scorer-player-10")).toBeVisible();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Endurtaka undirbúning" }),
-    );
-    expect(requestGoalScorerPreparation).toHaveBeenCalledWith(true);
-  });
-
   it("derives editable lanes from a web venue mapping without daemon status", () => {
     mockedUseListeners.mockReturnValue({
       available: [],
-      screens: [
-        {
-          key: "test-location",
+      venues: {
+        "test-location": {
           label: "Test location",
-          screen: {} as never,
+          pitchIds: [],
+          config: {},
+          screens: {},
           perimeterDisplay: {
             renderer: "web",
             compatibilityKeys: {
@@ -902,12 +855,11 @@ describe("PerimeterControl", () => {
             },
           } as never,
         },
-      ],
+      },
+      screens: [],
     });
     mockedUsePerimeter.mockReturnValue(
       createMockPerimeterReturn({
-        appliedAdLayout: undefined,
-        appliedAdLayoutLoaded: false,
         adLayout: {
           version: 1,
           revision: "revision",
@@ -969,63 +921,19 @@ describe("PerimeterControl", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows a loading state before the appliedAdLayout subscription delivers", () => {
-    mockedUsePerimeter.mockReturnValue(
-      createMockPerimeterReturn({ appliedAdLayoutLoaded: false }),
-    );
-    render(<PerimeterControl />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Opna" }));
-
-    expect(screen.getByText(/Sæki forskoðun/i)).toBeInTheDocument();
-  });
-
-  it("shows the no-preview state when appliedAdLayout is undefined", () => {
-    mockedUsePerimeter.mockReturnValue(
-      createMockPerimeterReturn({
-        appliedAdLayout: undefined,
-        appliedAdLayoutLoaded: true,
-      }),
-    );
-    render(<PerimeterControl />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Opna" }));
-
-    expect(
-      screen.getByText(/Engin forskoðun hefur verið birt enn/i),
-    ).toBeInTheDocument();
-  });
-
-  it("shows an error state when phase is error", () => {
-    mockedUsePerimeter.mockReturnValue(
-      createMockPerimeterReturn({
-        appliedAdLayout: {
-          ...baseAppliedAdLayout,
-          phase: "error",
-          error: "Failed to load Resolume composition",
-        },
-      }),
-    );
-    render(<PerimeterControl />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Opna" }));
-
-    expect(screen.getByText("Villa")).toBeInTheDocument();
-    expect(
-      screen.getByText("Failed to load Resolume composition"),
-    ).toBeInTheDocument();
-  });
-
   it("shows a no-lanes warning when lanes array is empty", () => {
-    mockedUsePerimeter.mockReturnValue(
-      createMockPerimeterReturn({
-        appliedAdLayout: {
-          ...baseAppliedAdLayout,
-          lanes: [],
-          columns: [],
+    mockedUseListeners.mockReturnValue({
+      ...defaultListeners,
+      venues: {
+        "test-location": {
+          ...defaultListeners.venues["test-location"]!,
+          perimeterDisplay: {
+            ...minimalPerimeterDisplay,
+            compatibilityKeys: { base: {}, overlay: {} },
+          },
         },
-      }),
-    );
+      },
+    });
     render(<PerimeterControl />);
 
     fireEvent.click(screen.getByRole("button", { name: "Opna" }));
@@ -1049,97 +957,12 @@ describe("PerimeterControl", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Opna" }));
 
-    expect(screen.getByText("Í bið")).toBeInTheDocument();
+    expect(screen.getByText("Web")).toBeInTheDocument();
     expect(screen.getByText("2 raðir")).toBeInTheDocument();
   });
 
-  it("shows revision pending indicator when revisions differ", () => {
-    mockedUsePerimeter.mockReturnValue(
-      createMockPerimeterReturn({
-        adLayout: {
-          version: 1,
-          revision: "rev-different",
-          columns: [],
-        },
-        appliedAdLayout: baseAppliedAdLayout,
-      }),
-    );
-    render(<PerimeterControl />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Opna" }));
-
-    expect(screen.getByText("Uppfærslu beðið")).toBeInTheDocument();
-  });
-
-  it("shows live indicator when revisions match", () => {
-    mockedUsePerimeter.mockReturnValue(
-      createMockPerimeterReturn({
-        adLayout: {
-          version: 1,
-          revision: "rev-123",
-          columns: [],
-        },
-        appliedAdLayout: baseAppliedAdLayout,
-      }),
-    );
-    render(<PerimeterControl />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Opna" }));
-
-    expect(screen.getByText("Lifandi")).toBeInTheDocument();
-  });
-
-  it("shows stale warning based on the applied ad-layout status timestamp", () => {
-    mockedUsePerimeter.mockReturnValue(
-      createMockPerimeterReturn({
-        appliedAdLayout: {
-          ...baseAppliedAdLayout,
-          updatedAt: Date.now() - 60 * 60 * 1000,
-        },
-      }),
-    );
-    render(<PerimeterControl />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Opna" }));
-
-    expect(screen.getByText(/Staða jaðarskjás er gömul/i)).toBeInTheDocument();
-  });
-
-  it("does not warn when the applied status is fresh", () => {
-    mockedUsePerimeter.mockReturnValue(
-      createMockPerimeterReturn({
-        preview: { updatedAt: Date.now() - 60 * 60 * 1000, columns: [] },
-      }),
-    );
-    render(<PerimeterControl />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Opna" }));
-
-    expect(
-      screen.queryByText(/Staða jaðarskjás er gömul/i),
-    ).not.toBeInTheDocument();
-  });
-
   it("opens add column dialog when clicking add button", () => {
-    mockedUsePerimeter.mockReturnValue(
-      createMockPerimeterReturn({
-        appliedAdLayout: {
-          ...baseAppliedAdLayout,
-          columns: [
-            {
-              id: "col-1",
-              deckColumns: [1],
-              files: {
-                "lane-1": {
-                  name: "test.mp4",
-                  thumbnail: "data:image/png;base64,abc",
-                },
-              },
-            },
-          ],
-        },
-      }),
-    );
+    mockedUsePerimeter.mockReturnValue(createMockPerimeterReturn({}));
     render(<PerimeterControl />);
 
     fireEvent.click(screen.getByRole("button", { name: "Opna" }));
@@ -1154,14 +977,7 @@ describe("PerimeterControl", () => {
   });
 
   it("disables the save button until all lanes have a file selected", () => {
-    mockedUsePerimeter.mockReturnValue(
-      createMockPerimeterReturn({
-        appliedAdLayout: {
-          ...baseAppliedAdLayout,
-          columns: [],
-        },
-      }),
-    );
+    mockedUsePerimeter.mockReturnValue(createMockPerimeterReturn({}));
     render(<PerimeterControl />);
 
     fireEvent.click(screen.getByRole("button", { name: "Opna" }));
@@ -1190,20 +1006,6 @@ describe("PerimeterControl", () => {
           version: 1,
           revision: "rev-123",
           columns: [testColumn],
-        },
-        appliedAdLayout: {
-          ...baseAppliedAdLayout,
-          columns: [
-            {
-              id: "col-test",
-              deckColumns: [1],
-              files: {
-                "lane-1": {
-                  name: "file.mp4",
-                },
-              },
-            },
-          ],
         },
       }),
     );
@@ -1265,7 +1067,6 @@ describe("PerimeterControl", () => {
     mockedUsePerimeter.mockReturnValue(
       createMockPerimeterReturn({
         adLayout: { version: 1, revision: "rev-123", columns: manyColumns },
-        appliedAdLayout: { ...baseAppliedAdLayout, columns: [] },
       }),
     );
     render(<PerimeterControl />);
@@ -1276,43 +1077,6 @@ describe("PerimeterControl", () => {
       screen.getByRole("button", { name: /Bæta við dálki/ }),
     ).toBeDisabled();
     expect(screen.getByText(/Hámark 20 dálka náð/)).toBeInTheDocument();
-  });
-
-  it("keeps the board visible and shows the error in the status bar", () => {
-    mockedUsePerimeter.mockReturnValue(
-      createMockPerimeterReturn({
-        appliedAdLayout: {
-          ...baseAppliedAdLayout,
-          phase: "error",
-          error: "scp failed",
-        },
-      }),
-    );
-    render(<PerimeterControl />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Opna" }));
-
-    expect(screen.getByText("Villa")).toBeInTheDocument();
-    expect(screen.getByText(/scp failed/)).toBeInTheDocument();
-    // The add control remains available for a corrective revision.
-    expect(screen.getByText("Bæta við dálki")).toBeInTheDocument();
-  });
-
-  it("shows a subscription error instead of an endless loader", () => {
-    mockedUsePerimeter.mockReturnValue(
-      createMockPerimeterReturn({
-        appliedAdLayout: undefined,
-        appliedAdLayoutLoaded: true,
-        appliedAdLayoutError: "Gat ekki sótt stöðu jaðarskjás",
-      }),
-    );
-    render(<PerimeterControl />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Opna" }));
-
-    expect(
-      screen.getByText(/Gat ekki sótt stöðu jaðarskjás/),
-    ).toBeInTheDocument();
   });
 
   it("shows a write error and stays open when saving fails", async () => {

@@ -90,6 +90,12 @@ REST API for Icelandic football data. Requires `API_KEY` header on all requests.
 
 ## Development
 
+Schema export, health and mocked tests require no AWS credentials. Live
+match/weather calls lazily retrieve API keys from SSM using boto3's AWS
+credential chain; key values are not loaded from dotenv. See
+[the environment contract](../../docs/environment.md#api-secrets) for access
+requirements and credential-free alternatives.
+
 Setup:
 
 ```bash

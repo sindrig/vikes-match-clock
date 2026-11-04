@@ -21,26 +21,21 @@ const resolveFileUrl = (objectPath: string): Promise<string | null> => {
 interface PerimeterFileThumbProps {
   name: string;
   source?: string;
-  appliedThumbnail?: string;
   /** "card" = board card (large, contain); "option" = picker list row (small) */
   variant?: "card" | "option";
 }
 
-// Thumbnail for a perimeter ad file. Prefers the daemon-published applied
-// thumbnail; otherwise resolves the file itself from Storage (an image <img>
-// or a first-frame <video> preview) and falls back to a placeholder box.
+// Resolve perimeter thumbnails from Storage: an image or a first-frame video
+// preview, with a placeholder when the object is unavailable.
 const PerimeterFileThumb = ({
   name,
   source,
-  appliedThumbnail,
   variant = "card",
 }: PerimeterFileThumbProps) => {
   const baseClass =
     variant === "option" ? "perimeter-option-thumb" : "perimeter-file-thumb";
-  const objectPath = appliedThumbnail
-    ? null
-    : (parseGsReference(source ?? "", FIREBASE_STORAGE_BUCKET)?.objectPath ??
-      null);
+  const objectPath =
+    parseGsReference(source ?? "", FIREBASE_STORAGE_BUCKET)?.objectPath ?? null;
   const resolvable =
     objectPath !== null && typeof storageHelpers.getDownloadURL === "function";
 
@@ -69,11 +64,8 @@ const PerimeterFileThumb = ({
     resolved !== null && resolved.key === objectPath ? resolved.url : null;
   const unavailable =
     failed ||
-    (!resolvable && !appliedThumbnail) ||
-    (!appliedThumbnail &&
-      resolved !== null &&
-      resolved.key === objectPath &&
-      resolved.url === null);
+    !resolvable ||
+    (resolved !== null && resolved.key === objectPath && resolved.url === null);
 
   if (unavailable) {
     return (
@@ -82,7 +74,7 @@ const PerimeterFileThumb = ({
       </div>
     );
   }
-  const mediaUrl = appliedThumbnail ?? resolvedUrl;
+  const mediaUrl = resolvedUrl;
   if (!mediaUrl) {
     return <div className={`${baseClass} perimeter-thumb-loading`} />;
   }

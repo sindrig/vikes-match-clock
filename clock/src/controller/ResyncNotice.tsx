@@ -11,9 +11,10 @@ const FRESHNESS_LABELS: Record<string, string> = {
 };
 
 const ResyncNotice = () => {
-  const { writeEligible, writeFreshness } = useFirebaseState();
+  const { writeEligible, writeFreshness, mutationError, dismissMutationError } =
+    useFirebaseState();
 
-  if (writeEligible) {
+  if (writeEligible && !mutationError) {
     return null;
   }
 
@@ -24,7 +25,12 @@ const ResyncNotice = () => {
       <span className="resync-notice-icon" aria-hidden="true">
         ⚠
       </span>
-      <span>{label}</span>
+      <span>{mutationError ?? label}</span>
+      {mutationError && (
+        <button type="button" onClick={dismissMutationError}>
+          Loka
+        </button>
+      )}
     </div>
   );
 };

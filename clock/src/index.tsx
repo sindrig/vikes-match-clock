@@ -13,7 +13,7 @@ import { AdminRoute } from "./admin/AdminRoute";
 
 // Create a wrapper component that bridges LocalState to FirebaseState
 function AppWithProviders() {
-  const { listenPrefix, auth, screenKey } = useLocalState();
+  const { listenPrefix, auth, screenKey, mutationSession } = useLocalState();
   const isAuthenticated = auth.isLoaded && !auth.isEmpty;
 
   return (
@@ -22,6 +22,7 @@ function AppWithProviders() {
       isAuthenticated={isAuthenticated}
       screenKey={screenKey}
       uid={auth.uid}
+      mutationSession={mutationSession}
     >
       <App />
     </FirebaseStateProvider>

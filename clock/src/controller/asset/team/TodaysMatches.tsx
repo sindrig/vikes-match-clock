@@ -23,7 +23,7 @@ const getClubName = (team: Team): string => team.parent?.name ?? team.name;
 const TodaysMatches = (): React.JSX.Element => {
   const { setRoster } = useController();
   const { updateMatch } = useMatch();
-  const { screens } = useListeners();
+  const { venues } = useListeners();
   const { listenPrefix } = useRemoteSettings();
 
   const [loading, setLoading] = useState(false);
@@ -31,7 +31,7 @@ const TodaysMatches = (): React.JSX.Element => {
   const [matches, setMatches] = useState<Match[]>([]);
 
   const fetchTodaysMatches = async (): Promise<void> => {
-    const teamId = getTeamId(screens, listenPrefix);
+    const teamId = getTeamId(venues, listenPrefix);
     setLoading(true);
 
     try {
@@ -54,7 +54,7 @@ const TodaysMatches = (): React.JSX.Element => {
     const matchId = prompt("ID á leikskýrslu");
     if (!matchId) return;
 
-    const teamId = getTeamId(screens, listenPrefix);
+    const teamId = getTeamId(venues, listenPrefix);
     setLoading(true);
 
     try {
@@ -113,7 +113,7 @@ const TodaysMatches = (): React.JSX.Element => {
       ksiMatchId: match.id,
     });
 
-    const teamId = getTeamId(screens, listenPrefix);
+    const teamId = getTeamId(venues, listenPrefix);
 
     try {
       const result = await getLineups({

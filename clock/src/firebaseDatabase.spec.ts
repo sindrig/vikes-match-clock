@@ -1,8 +1,6 @@
 import type { Mock } from "vitest";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
-  saveClubOverride,
-  deleteClubOverride,
   generateClubOverrideId,
   writeAuditedState,
   AuditEventPayload,
@@ -198,7 +196,7 @@ describe("saveClubOverride", () => {
       isOverride: true,
     };
 
-    await saveClubOverride(prefix, id, override, audit);
+    await writeAuditedState(prefix, "clubOverrides", { [id]: override }, audit);
 
     const updates = await getUpdates();
     expect(updates[`states/${prefix}/clubOverrides/${id}`]).toEqual(override);
@@ -215,7 +213,7 @@ describe("saveClubOverride", () => {
       isOverride: false,
     };
 
-    await saveClubOverride(prefix, id, override, audit);
+    await writeAuditedState(prefix, "clubOverrides", { [id]: override }, audit);
 
     const updates = await getUpdates();
     expect(updates[`states/${prefix}/clubOverrides/${id}`]).toEqual(override);
@@ -229,42 +227,19 @@ describe("saveClubOverride", () => {
       isOverride: false,
     };
 
-    await saveClubOverride("test", "id1", override, audit);
+    await writeAuditedState("test", "clubOverrides", { id1: override }, audit);
 
     const updates = await getUpdates();
     expect(updates["states/test/clubOverrides/id1"]).toEqual(override);
   });
 });
 
-describe("deleteClubOverride", () => {
-  it("removes from both RTDB and Storage", async () => {
-    const prefix = "vikinni";
-    const id = "uuid-to-delete";
-
-    await deleteClubOverride(prefix, id, {
-      uid: "uid-123",
-      sessionId: "session-abc",
-      action: "clubOverrides.delete",
-      stateArea: "clubOverrides",
-    });
-
+describe("club override deletion payload", () => {
+  it("keeps the null deletion in the atomic state/audit update", async () => {
+    await writeAuditedState("venue", "clubOverrides", { id: null }, audit);
     const updates = await getUpdates();
-    expect(updates[`states/${prefix}/clubOverrides/${id}`]).toEqual(null);
-    expect(getAuditPaths(updates, `audit/${prefix}`)).toHaveLength(6);
-
-    const { storageHelpers } = await import("./firebase");
-    expect(storageHelpers.deleteObject).toHaveBeenCalledWith(
-      `${prefix}/club-logos/${id}`,
-    );
-  });
-
-  it("constructs correct Storage path", async () => {
-    await deleteClubOverride("production", "logo-xyz", audit);
-
-    const { storageHelpers } = await import("./firebase");
-    expect(storageHelpers.deleteObject).toHaveBeenCalledWith(
-      "production/club-logos/logo-xyz",
-    );
+    expect(updates["states/venue/clubOverrides/id"]).toBeNull();
+    expect(getAuditPaths(updates, "audit/venue")).toHaveLength(6);
   });
 });
 

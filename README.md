@@ -1,5 +1,9 @@
 Match clock
 
+See [the environment and credential contract](docs/environment.md) to choose
+credential-free frontend/emulator work or explicitly configured staging, API,
+AWS and gateway access. For frontend tooling, see [API client preparation](docs/api-client-preparation.md).
+
 # Structure
 
 ## clock

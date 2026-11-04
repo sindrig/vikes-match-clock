@@ -11,15 +11,17 @@ Supports **subpath bundle locations** (e.g. `staging-klukka.irdn.is/my-feature/`
 
 ## Shared staging boundaries
 
-- On `staging-klukka.irdn.is`, `clock/src/firebase.ts` selects the same staging Firebase project for root and every subpath. Auth, Realtime Database, Storage and Functions are shared; controllers using the same `listenPrefix` can change each other's state. A subpath does not create a Firebase namespace.
+- On `staging-klukka.irdn.is`, `clock/src/firebase.ts` selects the same staging Firebase project for root and every subpath unless emulator mode was compiled into the build. See [Firebase selection](../../../docs/environment.md#firebase-selection) for mode/hostname precedence. Auth, Realtime Database, Storage and Functions are shared; controllers using the same `listenPrefix` can change each other's state. A subpath does not create a Firebase namespace.
 - Subpaths share an origin. Within one browser context/profile they share localStorage keys (including screen selection and `listenPrefix`) and Firebase auth persistence. Use separate browser contexts/profiles for independent sessions; these still use shared backend data. Separate same-origin tabs or ordinary windows in the same profile do not isolate sessions.
 - `VITE_BASE_PATH` sets Vite's public asset base; it does not configure React Router. `clock/src/index.tsx` uses `BrowserRouter` without a `basename`; the admin route and navigation remain root-relative (`/admin`). A subpath bundle is not a fully namespaced application, and an HTML 200 at a subpath does not verify routing or application startup.
 - Coordinate bundle prefixes and shared staging state with other users. For isolated state testing, use the emulator setup in `clock/AGENTS.md` with deliberately separate test data. Do not treat subpaths as disposable independent environments.
 
 ## Prerequisites
 
-- `/home/dev/vikes-creds.txt` must exist (provisioned by Terraform from `infra/devpod-creds/`)
+- Existing approved AWS CLI access for staging and operator-provided `STAGING_BUCKET` / `CLOUDFRONT_DISTRIBUTION_ID` metadata. See [the environment contract](../../../docs/environment.md#manual-aws-staging-operations) for retrieval and loaders.
 - `pnpm` installed and `clock/node_modules` present
+
+No fixed credential path or Devpod installation is required. GitHub Actions uses OIDC for CI AWS deployment jobs; that does not configure a local shell. The legacy `infra/devpod-creds/` stack creates a static IAM key and provisions a specific remote host. It remains available to authorized operators of that installation, and is not a missing-credentials fallback for this skill.
 
 ## Parameters
 
@@ -33,20 +35,19 @@ Before substituting `<subpath>` into commands, require an agreed, nonempty singl
 
 ## Steps
 
-### 1. Source credentials
+### 1. Load the approved staging environment
+
+Use already exported AWS access and staging metadata, or explicitly select a trusted **Bash** environment file with `VIKES_STAGING_ENV_FILE`. It must export its variables; a dotenv `.envrc-local` file is loaded only by optional direnv, not by `source`. The contract provides placeholder examples. Run these checks and the later AWS commands in the same shell; repeat this setup if using a new shell/tool process.
 
 ```bash
-source /home/dev/vikes-creds.txt
+if [[ -n "${VIKES_STAGING_ENV_FILE:-}" ]]; then
+  source "$VIKES_STAGING_ENV_FILE" || { echo "Could not load the selected staging Bash file." >&2; exit 1; }
+fi
+: "${STAGING_BUCKET:?Ask the infrastructure maintainer for staging bucket metadata.}"
+: "${CLOUDFRONT_DISTRIBUTION_ID:?Ask the infrastructure maintainer for staging distribution metadata.}"
 ```
 
-Verify the variables are set:
-
-```bash
-echo "Bucket: $STAGING_BUCKET"
-echo "CF Distribution: $CLOUDFRONT_DISTRIBUTION_ID"
-```
-
-If the file doesn't exist or variables are empty, tell the user to run `terraform apply` in `infra/devpod-creds/` to provision credentials.
+Check presence without printing credential values or reading secret files into the conversation. These checks do not prove AWS authentication/authorization. If credentials, the selected file, or metadata are missing, stop and ask the infrastructure maintainer for the existing approved staging access. Do not initiate login or apply Terraform as a bootstrap/recovery step. Continue offline generation/build work only if it is part of the requested task.
 
 ### 2. Install dependencies (if needed)
 
@@ -91,12 +92,10 @@ Verify the `clock/build/` directory exists and contains `index.html`.
 **Deletion scope:** This removes every object in the staging bucket except `pr-images/*`, including all other subpath bundles and older hashed assets, before uploading the root build. Coordinate with other staging users and inspect the deletion dry run first. This is not a retention or atomic deployment procedure.
 
 ```bash
-source /home/dev/vikes-creds.txt
 aws s3 rm "s3://$STAGING_BUCKET" --recursive --exclude "pr-images/*" --dryrun --region eu-west-1
 ```
 
 ```bash
-source /home/dev/vikes-creds.txt
 aws s3 rm "s3://$STAGING_BUCKET" --recursive --exclude "pr-images/*" --region eu-west-1
 aws s3 cp clock/build/ "s3://$STAGING_BUCKET" --recursive --region eu-west-1
 ```
@@ -106,7 +105,6 @@ The `--exclude "pr-images/*"` preserves PR screenshot uploads for this manual co
 #### Subpath deploy
 
 ```bash
-source /home/dev/vikes-creds.txt
 aws s3 rm "s3://$STAGING_BUCKET/<subpath>/" --recursive --region eu-west-1
 aws s3 cp clock/build/ "s3://$STAGING_BUCKET/<subpath>/" --recursive --region eu-west-1
 ```
@@ -118,7 +116,6 @@ Only remove/upload the validated subpath. This deletes the prior files under tha
 For root deploy:
 
 ```bash
-source /home/dev/vikes-creds.txt
 INVALIDATION_ID=$(aws cloudfront create-invalidation \
   --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" \
   --paths "/index.html" \
@@ -133,7 +130,6 @@ echo "Invalidation complete"
 For subpath deploy:
 
 ```bash
-source /home/dev/vikes-creds.txt
 INVALIDATION_ID=$(aws cloudfront create-invalidation \
   --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" \
   --paths "/<subpath>/*" \
@@ -162,20 +158,19 @@ When a subpath deploy is no longer needed:
 Recheck the exact nonempty prefix as described above. Cleanup deletes frontend files under that prefix only; it does not remove shared Firebase data or browser storage. Do not clear shared state as part of bundle cleanup.
 
 ```bash
-source /home/dev/vikes-creds.txt
 aws s3 rm "s3://$STAGING_BUCKET/<subpath>/" --recursive --region eu-west-1
 ```
 
 ## Error handling
 
 - If `pnpm build` fails: show the build errors, do NOT proceed to deploy
-- If S3 upload fails: check credentials are valid (expired key?), suggest re-running `terraform apply` in `infra/staging/`
+- If S3 upload fails: stop subsequent deployment steps and report the error with secrets redacted. Ask the infrastructure maintainer for the correct existing session/profile, target metadata or permissions. Do not treat denied access or expired credentials as a reason to apply Terraform, mint keys or start login automatically.
 - If CloudFront invalidation fails: deploy still succeeded (S3 has new files), just note the CF invalidation failed
 
 ## Important notes
 
 - This deploys ONLY the frontend. Backend/API changes require a separate deployment.
-- The staging hostname selects staging Firebase, shared by all staging bundles. Verify the target and current users before interacting; a frontend build or subpath alone does not establish backend isolation.
+- The staging hostname selects shared staging Firebase unless emulator mode was compiled in at build time. Previewing the default production build on localhost selects production Firebase unless emulator mode was compiled in; changing preview mode/environment does not rewrite the bundle. Verify the target and current users before interacting; a frontend build or subpath alone does not establish backend isolation.
 - CloudFront caches aggressively; without invalidation, changes may take up to 24h to appear.
 - Only `/index.html` is invalidated for root deploys because asset files are content-hashed (unique filenames on each build).
 - For subpath deploys, `/<subpath>/*` is invalidated to cover all files under that path.
@@ -183,10 +178,10 @@ aws s3 rm "s3://$STAGING_BUCKET/<subpath>/" --recursive --region eu-west-1
 
 ## Uploading screenshots for PRs
 
-GitHub doesn't support programmatic image uploads to PR comments. Use the staging S3 bucket instead:
+GitHub doesn't support programmatic image uploads to PR comments. For an authorized upload, load approved AWS access and `STAGING_BUCKET` metadata as in step 1 (a screenshot upload does not require a distribution ID). Use the staging S3 bucket:
 
 ```bash
-source /home/dev/vikes-creds.txt
+: "${STAGING_BUCKET:?Ask the infrastructure maintainer for staging upload access and bucket metadata.}"
 TIMESTAMP=$(date +%s)
 aws s3 cp screenshot.png "s3://$STAGING_BUCKET/pr-images/<ISSUE_NUMBER>-<descriptive-name>-${TIMESTAMP}.png" --region eu-west-1
 ```

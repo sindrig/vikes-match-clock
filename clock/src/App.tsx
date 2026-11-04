@@ -10,14 +10,13 @@ import {
   usePerimeter,
 } from "./contexts/FirebaseStateContext";
 import { useLocalState } from "./contexts/LocalStateContext";
-import { firebaseAuth } from "./firebaseAuth";
 import Controller from "./controller/Controller";
 import ResyncNotice from "./controller/ResyncNotice";
 import MatchActions from "./controller/MatchActions";
 import MatchCountdownDisplay from "./controller/MatchCountdownDisplay";
 import HomeTeamQuickActions from "./controller/HomeTeamQuickActions";
 import RefreshHandler from "./controller/RefreshHandler";
-import AssetComponent, { useDeferredAsset } from "./controller/asset/Asset";
+import { PlaybackAsset, useDeferredAsset } from "./controller/asset/Asset";
 import PlaybackBar from "./controller/asset/queue/PlaybackBar";
 import SubstitutionInfo from "./controller/asset/queue/SubstitutionInfo";
 import GoalScorerDialog from "./controller/GoalScorerDialog";
@@ -77,13 +76,13 @@ const ScoreButtons = ({ side }: { side: "home" | "away" }) => {
                 source: `gs://${FIREBASE_STORAGE_BUCKET}/${listenPrefix}/perimeter/goal-40.mp4`,
               },
             };
-      setPerimeterOverlay({
+      void setPerimeterOverlay({
         version: 1,
         id: crypto.randomUUID(),
         columns: [{ durationMs: 10000, files: goalFiles }],
       });
       if (view.goalGif1) {
-        renderAsset({
+        void renderAsset({
           key: view.goalGif1,
           type: isVideoUrl(view.goalGif1) ? assetTypes.VIDEO : assetTypes.IMAGE,
         });
@@ -180,7 +179,7 @@ const ClearOverlayButton = () => {
         appearance="primary"
         size="sm"
         onClick={() => {
-          renderAsset(null);
+          void renderAsset(null);
           clearPerimeterOverlay();
         }}
         block
@@ -198,6 +197,7 @@ function App() {
     auth,
     listenPrefix,
     setListenPrefix,
+    logout: logoutSession,
     setScreenKey,
     displayTarget,
     setDisplayTarget,
@@ -351,7 +351,7 @@ function App() {
             {renderAppContents()}
             {asset ? (
               <div className="overlay-container" style={vp.style}>
-                <AssetComponent asset={asset.asset} time={asset.time} />
+                <PlaybackAsset current={asset} />
               </div>
             ) : null}
           </div>
@@ -388,7 +388,7 @@ function App() {
 
     const logout = () => {
       disconnectScreen();
-      firebaseAuth.logout().catch(console.error);
+      logoutSession().catch(console.error);
     };
 
     if (displayTarget?.kind === "perimeter") {
@@ -455,10 +455,7 @@ function App() {
                       {renderAppContents()}
                       {asset ? (
                         <div className="overlay-container" style={vp.style}>
-                          <AssetComponent
-                            asset={asset.asset}
-                            time={asset.time}
-                          />
+                          <PlaybackAsset current={asset} />
                         </div>
                       ) : null}
                     </div>
@@ -491,7 +488,7 @@ function App() {
             {renderAppContents()}
             {asset ? (
               <div className="overlay-container" style={vp.style}>
-                <AssetComponent asset={asset.asset} time={asset.time} />
+                <PlaybackAsset current={asset} />
               </div>
             ) : null}
           </div>
