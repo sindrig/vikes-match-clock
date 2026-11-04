@@ -1159,6 +1159,90 @@ describe("ordinary session command boundary", () => {
     expect(firebaseDatabase.writeAuditOnly).toHaveBeenCalledTimes(1);
   });
 
+  it.each([undefined, "first-A"])(
+    "consumes legacy/identified playback once and stamps even a one-item successor (%s)",
+    async (occurrenceId) => {
+      const currentAsset = {
+        asset,
+        time: 3,
+        ...(occurrenceId ? { occurrenceId } : {}),
+      };
+      write("states/A/controller/currentAsset", currentAsset);
+      mount();
+      clearAttempts();
+      const observed = {
+        occurrenceId: occurrenceId ?? null,
+        assetKey: asset.key,
+        time: 3,
+        activeQueueId: "queue",
+        playing: true,
+      };
+      await act(async () => {
+        expect(await currentApi.completeAssetIfCurrent(observed)).toBe(true);
+      });
+      const successor = object(read("states/A/controller/currentAsset"));
+      expect(successor.occurrenceId).toEqual(expect.any(String));
+      expect(successor.occurrenceId).not.toBe(occurrenceId);
+      expect(successor.asset).toEqual(asset);
+      await act(async () => {
+        expect(await currentApi.completeAssetIfCurrent(observed)).toBe(false);
+      });
+      expect(firebaseDatabase.writeAuditOnly).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("reuses one successor candidate across transaction retries without reader-generated IDs", async () => {
+    write("states/A/controller/currentAsset", {
+      asset,
+      time: 3,
+      occurrenceId: "first-A",
+    });
+    mount();
+    const candidates: unknown[] = [];
+    vi.mocked(runTransaction).mockImplementationOnce((reference, change) => {
+      const before = read(String(reference));
+      candidates.push(object(object(change(before)).currentAsset).occurrenceId);
+      const next = change(before);
+      candidates.push(object(object(next).currentAsset).occurrenceId);
+      write(String(reference), next);
+      return Promise.resolve({
+        committed: true,
+        snapshot: { val: () => next },
+      } as never);
+    });
+    await act(async () => {
+      expect(
+        await currentApi.completeAssetIfCurrent({
+          occurrenceId: "first-A",
+          assetKey: asset.key,
+          time: 3,
+          activeQueueId: "queue",
+          playing: true,
+        }),
+      ).toBe(true);
+    });
+    expect(candidates[0]).toEqual(expect.any(String));
+    expect(candidates[1]).toBe(candidates[0]);
+  });
+
+  it("replay changes occurrence while preserving media and unrelated metadata writes preserve it", async () => {
+    mount();
+    await act(async () => {
+      await currentApi.renderAsset(asset);
+    });
+    const first = object(read("states/A/controller/currentAsset"));
+    act(() => {
+      currentApi.renameQueue("queue", "Renamed");
+    });
+    expect(read("states/A/controller/currentAsset")).toEqual(first);
+    await act(async () => {
+      await currentApi.renderAsset(asset);
+    });
+    const second = object(read("states/A/controller/currentAsset"));
+    expect(second.asset).toEqual(first.asset);
+    expect(second.occurrenceId).not.toBe(first.occurrenceId);
+  });
+
   it("aborts a conditional retry invalidated by suspension and emits no audit", async () => {
     write("states/A/match", {
       started: 1,
@@ -1341,11 +1425,6 @@ const ordinaryCommands: Array<
   ["setPlaying", "controller.set-playing", (api) => api.setPlaying(false)],
   ["renderAsset", "controller.render-asset", (api) => api.renderAsset(null)],
   ["showNextAsset", "controller.show-next-asset", (api) => api.showNextAsset()],
-  [
-    "removeAssetAfterTimeout",
-    "controller.remove-asset-after-timeout",
-    (api) => api.removeAssetAfterTimeout(),
-  ],
   ["remoteRefresh", "controller.remote-refresh", (api) => api.remoteRefresh()],
   [
     "setRoster",

@@ -2100,62 +2100,6 @@ describe("FirebaseStateContext", () => {
     });
   });
 
-  describe("removeAssetAfterTimeout", () => {
-    it("clears currentAsset when autoPlay is off", () => {
-      let controllerApi: ReturnType<typeof useController> | null = null;
-      render(
-        <FirebaseStateProvider
-          uid="operator"
-          listenPrefix="test-location"
-          isAuthenticated={true}
-          screenKey={null}
-        >
-          <TestControllerConsumer
-            onMount={(api) => {
-              controllerApi = api;
-            }}
-          />
-        </FirebaseStateProvider>,
-      );
-      act(() => {
-        void controllerApi!.renderAsset({ type: "IMAGE", key: "img-1" });
-      });
-      vi.clearAllMocks();
-      act(() => {
-        controllerApi!.removeAssetAfterTimeout();
-      });
-      expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
-        "test-location",
-        "controller",
-        expect.objectContaining({ currentAsset: null }),
-        expect.anything(),
-      );
-    });
-
-    it("does nothing when autoPlay is on but not playing", () => {
-      let controllerApi: ReturnType<typeof useController> | null = null;
-      render(
-        <FirebaseStateProvider
-          uid="operator"
-          listenPrefix="test-location"
-          isAuthenticated={true}
-          screenKey={null}
-        >
-          <TestControllerConsumer
-            onMount={(api) => {
-              controllerApi = api;
-            }}
-          />
-        </FirebaseStateProvider>,
-      );
-      vi.clearAllMocks();
-      act(() => {
-        controllerApi!.removeAssetAfterTimeout();
-      });
-      expect(firebaseDatabase.writeAudited).not.toHaveBeenCalled();
-    });
-  });
-
   describe("player CRUD", () => {
     const setupWithRoster = () => {
       let controllerApi: ReturnType<typeof useController> | null = null;
@@ -4022,6 +3966,7 @@ describe("FirebaseStateContext integration", () => {
 
       await act(async () => {
         const committed = await controllerApi!.completeAssetIfCurrent({
+          occurrenceId: null,
           assetKey: "asset-1",
           time: 1,
           activeQueueId: null,

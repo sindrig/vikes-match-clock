@@ -117,9 +117,9 @@ controls while resyncing.
 **3. Conditional automatic transitions (compare-and-set).** Automatic
 lifecycle progression uses Firebase `runTransaction` to re-validate its
 precondition against CURRENT authoritative state before committing. Precondition
-identities come from existing fields only: `started`+`countdown`+
+identities use existing match fields and a dedicated playback occurrence: `started`+`countdown`+
 `halftimeCountdown` (clock), `timeout` (timeout), penalty `key`+creation data
-(penalty), current-asset identity+queue (asset). An obsolete or duplicate
+(penalty), `currentAsset.occurrenceId`+asset/queue context (asset). An obsolete or duplicate
 attempt aborts the transaction and leaves state unchanged. Only the first
 concurrent attempt commits; exactly one audit event is written per committed
 transition (`firebaseDatabase.writeAuditOnly`). For media completion (video /
@@ -127,6 +127,17 @@ YouTube end), `Asset.tsx` submits a `TimedAssetCompletionObservation` whose
 `activeQueueId`/`playing` come from the rendered controller's live values —
 not hard-coded `null`/`false` — so completion during active autoplay satisfies
 the queue precondition and advances the queue instead of being silently dropped.
+
+Playback observations carry a captured occurrence ID, or explicit null for
+legitimate legacy playback. Legacy completion matches only a truly absent raw
+ID field plus the existing tuple; its successor always receives a fresh ID.
+Malformed present IDs reject parsing and raw CAS validation, never fall back to
+legacy. Readers never generate IDs. New selections/replays/advances mint IDs;
+metadata and pause changes preserve them. `PlaybackAsset` remounts live media
+by the deferred rendered occurrence, so old natural-end callbacks keep their
+old identity. Existing rules cannot constrain old binaries: coordinate client
+refresh and retain the documented mixed-writer limit. See
+[the playback occurrence contract](../docs/playback-occurrences.md).
 
 `MatchLifecycle` is **commit-aware and retry-safe**, so a transition that is due
 while the client is ineligible is never lost and never latched prematurely:
@@ -663,7 +674,8 @@ web runtime holds the final column until clear, the pair loops until cleared. Th
 overlay channel is single-writer: showing a pair replaces a home-goal overlay
 and a subsequent home goal replaces the pair (last command wins).
 If the entry has `mainScreenAsset`, the same **Sýna** click also calls the
-existing controller `showItemNow` with a fresh playback key: the main-screen
+existing controller `showItemNow` with stable library identity and a fresh
+`currentAsset.occurrenceId`: the main-screen
 queue stops, the image holds or video loops until cleared/replaced, and
 re-selecting the entry restarts its main-screen media. These use the existing
 audited main-screen and perimeter actions, not frame-synchronized playback.
@@ -1334,6 +1346,8 @@ interface QueueState {
 - Empty non-cycling queues are auto-deleted via `maybeAutoDeleteQueue()`
 - `computeControllerDiff()` writes per-queue nested paths (`queues/{id}/items`) to prevent multi-controller data loss
 - `parseQueueMap()` in `firebaseParsers.ts` validates queue data and auto-repairs duplicate `order` values
+- `parseCurrentAsset()` validates playback envelopes and preserves legitimate legacy absence without generating IDs
+- Storage library keys remain stable; existing queue duplicate rejection applies. Playback occurrence identity is separate from media identity/URL
 
 **Component hierarchy**:
 | Component | File | Purpose |

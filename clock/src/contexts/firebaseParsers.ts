@@ -1,3 +1,4 @@
+import { isPlaybackOccurrenceId } from "../lib/playbackOccurrence";
 import type {
   Match,
   InjuryTimeDisplayMode,
@@ -450,6 +451,32 @@ function parseInjuryTimeDisplayMode(
   return defaultMatch.injuryTimeDisplayMode;
 }
 
+export function parseCurrentAsset(
+  data: unknown,
+): ControllerState["currentAsset"] {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+  const raw = data as Record<string, unknown>;
+  if (!raw.asset || typeof raw.asset !== "object" || Array.isArray(raw.asset))
+    return null;
+  const asset = raw.asset as Record<string, unknown>;
+  if (typeof asset.key !== "string" || typeof asset.type !== "string")
+    return null;
+  const hasId = Object.prototype.hasOwnProperty.call(raw, "occurrenceId");
+  if (hasId && !isPlaybackOccurrenceId(raw.occurrenceId)) return null;
+  if (
+    raw.time != null &&
+    (typeof raw.time !== "number" || !Number.isFinite(raw.time) || raw.time < 0)
+  )
+    return null;
+  return {
+    asset: asset as unknown as Asset,
+    time: typeof raw.time === "number" ? raw.time : null,
+    ...(isPlaybackOccurrenceId(raw.occurrenceId)
+      ? { occurrenceId: raw.occurrenceId }
+      : {}),
+  };
+}
+
 export function parseController(
   data: unknown,
   defaultController: ControllerState,
@@ -487,10 +514,7 @@ export function parseController(
               : defaultController.roster.away,
           }
         : defaultController.roster,
-    currentAsset:
-      raw.currentAsset && typeof raw.currentAsset === "object"
-        ? (raw.currentAsset as ControllerState["currentAsset"])
-        : null,
+    currentAsset: parseCurrentAsset(raw.currentAsset),
     refreshToken:
       typeof raw.refreshToken === "string"
         ? raw.refreshToken

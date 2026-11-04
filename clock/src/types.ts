@@ -76,6 +76,8 @@ export interface Asset {
 export interface CurrentAsset {
   asset: Asset;
   time: number | null;
+  // Absent only for persisted legacy playback; new selections always have IDs.
+  occurrenceId?: string;
 }
 
 // Roster type

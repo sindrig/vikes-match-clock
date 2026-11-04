@@ -208,6 +208,10 @@ export function computeControllerDiff(
   return diff;
 }
 
+type ControllerUpdates = Partial<Omit<ControllerState, "currentAsset">> & {
+  currentAsset?: null;
+};
+
 interface QueueOptions {
   cycle?: boolean;
 }
@@ -267,7 +271,7 @@ interface FirebaseStateContextType {
   updateRedCards: (home: number, away: number) => void;
   getServerTime: () => number;
 
-  updateController: (updates: Partial<ControllerState>) => void;
+  updateController: (updates: ControllerUpdates) => void;
   selectView: (view: string) => void;
   selectAssetView: (assetView: string) => void;
   createQueue: (
@@ -298,7 +302,6 @@ interface FirebaseStateContextType {
   setPlaying: (playing: boolean) => void;
   renderAsset: (asset: Asset | null) => Promise<void>;
   showNextAsset: () => void;
-  removeAssetAfterTimeout: () => void;
   remoteRefresh: () => void;
   setRoster: (roster: Roster) => void;
   editPlayer: (
@@ -425,6 +428,7 @@ export const getStateWithAddedItems = (
 
 export const getStateShowingNextAsset = (
   state: ControllerState,
+  occurrenceId: string,
 ): ControllerState => {
   const { activeQueueId } = state;
   const newState: ControllerState = {
@@ -468,6 +472,7 @@ export const getStateShowingNextAsset = (
 
   newState.currentAsset = {
     asset: nextAsset,
+    occurrenceId,
     time: activeQueue.autoPlay ? activeQueue.imageSeconds : null,
   };
   newState.playing = activeQueue.autoPlay;
@@ -1373,7 +1378,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   const applyControllerConditionalTransition = useCallback(
     async (
-      precondition: (prev: ControllerState) => boolean,
+      precondition: (prev: ControllerState, rawData: unknown) => boolean,
       getNewState: (prev: ControllerState) => ControllerState,
       action: string,
     ): Promise<boolean> => {
@@ -1397,7 +1402,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
           if (!prev) {
             return; // abort: no authoritative state to compare against
           }
-          if (!precondition(prev)) {
+          if (!precondition(prev, currentData)) {
             return; // abort: obsolete or duplicate attempt
           }
           const newState = getNewState(prev);
@@ -1764,12 +1769,12 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   );
 
   // Timed asset completion, conditional on the exact current asset and queue
-  // still being authoritative. Mirrors the old renderer-owned
-  // `removeAssetAfterTimeout` behavior but only applies when the observed
-  // generation matches current state.
+  // still being authoritative. Legacy observations match only an absent raw
+  // occurrence field; every advancing successor receives a fresh ID.
   const completeAssetIfCurrent = useCallback(
-    (observed: TimedAssetCompletionObservation): Promise<boolean> =>
-      applyControllerConditionalTransition(
+    (observed: TimedAssetCompletionObservation): Promise<boolean> => {
+      const successorOccurrenceId = crypto.randomUUID();
+      return applyControllerConditionalTransition(
         timedAssetCompletionPrecondition(observed),
         (prev) => {
           const activeQueue = prev.activeQueueId
@@ -1780,14 +1785,15 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
           }
           if (activeQueue.autoPlay) {
             if (prev.playing) {
-              return getStateShowingNextAsset(prev);
+              return getStateShowingNextAsset(prev, successorOccurrenceId);
             }
             return prev;
           }
           return { ...prev, currentAsset: null };
         },
         "controller.complete-asset",
-      ),
+      );
+    },
     [applyControllerConditionalTransition],
   );
 
@@ -1806,12 +1812,13 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   );
 
   const updateController = useCallback(
-    (updates: Partial<ControllerState>) => {
+    (updates: ControllerUpdates) => {
       void applyControllerUpdate(
-        (prev) => ({
-          ...prev,
-          ...updates,
-        }),
+        (prev) => {
+          if (updates.currentAsset != null)
+            throw new Error("Use renderAsset to select playback.");
+          return { ...prev, ...updates };
+        },
         "controller.update",
         () => [
           ...Object.keys(updates.queues ?? {}),
@@ -2144,10 +2151,13 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     (queueId: string) => {
       void applyControllerUpdate(
         (prev) => {
-          return getStateShowingNextAsset({
-            ...prev,
-            activeQueueId: queueId,
-          });
+          return getStateShowingNextAsset(
+            {
+              ...prev,
+              activeQueueId: queueId,
+            },
+            crypto.randomUUID(),
+          );
         },
         "controller.play-queue",
         () => [queueId],
@@ -2192,7 +2202,9 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       return applyControllerUpdate(
         (prev) => ({
           ...prev,
-          currentAsset: asset ? { asset, time: null } : null,
+          currentAsset: asset
+            ? { asset, time: null, occurrenceId: crypto.randomUUID() }
+            : null,
           activeQueueId: null,
           playing: false,
         }),
@@ -2211,33 +2223,8 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   const showNextAsset = useCallback(() => {
     void applyControllerUpdate(
-      (prev) => getStateShowingNextAsset(prev),
+      (prev) => getStateShowingNextAsset(prev, crypto.randomUUID()),
       "controller.show-next-asset",
-      () =>
-        controllerRef.current.activeQueueId
-          ? [controllerRef.current.activeQueueId]
-          : [],
-    );
-  }, [applyControllerUpdate]);
-
-  const removeAssetAfterTimeout = useCallback(() => {
-    void applyControllerUpdate(
-      (prev) => {
-        const activeQueue = prev.activeQueueId
-          ? prev.queues[prev.activeQueueId]
-          : null;
-        if (!activeQueue) {
-          return { ...prev, playing: false, currentAsset: null };
-        }
-        if (activeQueue.autoPlay) {
-          if (prev.playing) {
-            return getStateShowingNextAsset(prev);
-          }
-          return prev;
-        }
-        return { ...prev, currentAsset: null };
-      },
-      "controller.remove-asset-after-timeout",
       () =>
         controllerRef.current.activeQueueId
           ? [controllerRef.current.activeQueueId]
@@ -2750,7 +2737,6 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       setPlaying,
       renderAsset,
       showNextAsset,
-      removeAssetAfterTimeout,
       remoteRefresh,
       setRoster,
       editPlayer,
@@ -2853,7 +2839,6 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       setPlaying,
       renderAsset,
       showNextAsset,
-      removeAssetAfterTimeout,
       remoteRefresh,
       setRoster,
       editPlayer,
@@ -3001,7 +2986,6 @@ export const useController = () => {
     setPlaying,
     renderAsset,
     showNextAsset,
-    removeAssetAfterTimeout,
     completeAssetIfCurrent,
     remoteRefresh,
     setRoster,
@@ -3033,7 +3017,6 @@ export const useController = () => {
     setPlaying,
     renderAsset,
     showNextAsset,
-    removeAssetAfterTimeout,
     completeAssetIfCurrent,
     remoteRefresh,
     setRoster,
