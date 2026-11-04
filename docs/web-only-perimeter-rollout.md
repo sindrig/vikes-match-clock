@@ -20,10 +20,17 @@ rules unchanged during Phase 1. Functions deploy independently of the frontend;
 removing the export now could delete the service before older clients stop
 calling it. This phase grants no deployment or remote-deletion authority.
 
-The branch starts from reviewed PR #274 at `02b2de47`. Its future PR must target
-`audit/245-venue-configuration`, preserving canonical venue metadata independently
-of scoreboard entries. No workflow changes are included while auth scope is
-pending.
+The Phase 1 frontend retirement is merged, as is the brightness-only gateway
+retirement. The original PR stack started from reviewed PR #274 at `02b2de47`;
+that branch target is historical, not a current implementation instruction.
+Merged code alone does not certify that older clients have been refreshed in
+either environment. Phase 2 remains a separate release with the evidence below.
+
+Current browser commands and retained media semantics live in
+[perimeter media](clock/perimeter-media.md), mapping/client operations in
+[perimeter operations](clock/perimeter-operations.md), and backend ownership in
+[Functions guidance](../functions/AGENTS.md). Update this document when rollout
+evidence or the Phase 2 hold changes; do not copy the removal checklist elsewhere.
 
 ## Separate Phase 2
 

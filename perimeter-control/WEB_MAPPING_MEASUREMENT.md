@@ -10,9 +10,14 @@ the gateway retirement (#240) remains **HOLD**; no mapping is changed by it.
 4. Build the configuration with the mapping editor. Use Identity mapping for an unmodified strip and Horizontal split when one source is divided across output regions.
 5. Enable calibration preview and compare the region labels, source coordinates, and destination boundaries on the physical output. Correct measurements before publishing.
 6. Publish one complete document. The revision ID must change for every publication; do not edit a published document in place.
-7. Validate the exported document with `validatePerimeterMapping` and confirm every logical source has exact pixel coverage. A web venue is not selectable until the immutable media generations have also been backfilled.
+7. Validate the exported document with `validatePerimeterMapping` and confirm every logical source has exact pixel coverage. A valid published web mapping exposes the display target; referenced media also needs immutable Storage generations (including legacy backfill) before playback.
 8. Preserve numeric compatibility keys, existing ad layouts, overlays, media
    pairs and Storage objects. Captured Resolume mappings are historical
    evidence, not a supported renderer or rollback target.
 
 The checked-in example fixture is `clock/src/perimeter/fixtures.ts`. Replace the second-stadium example values with measured values before production publication.
+
+The [mapping editor and runtime reference](../docs/clock/perimeter-operations.md)
+owns software behavior. Save calibration captures under ignored `screenshots/`;
+never commit them. Use [screenshot handling](../docs/screenshots.md) for authorized
+hosting; existing source images are a separate reviewed input.

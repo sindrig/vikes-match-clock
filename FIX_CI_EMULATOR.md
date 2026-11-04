@@ -1,22 +1,31 @@
 # CI E2E Tests with Firebase Emulator - Investigation Summary
 
+> Historical investigation, retained for provenance. Its full-state write paths,
+> line numbers, diagnoses and pass/fail counts describe an earlier revision,
+> not the current command boundary. Use [Clock testing](docs/clock/testing.md)
+> and the [session contract](docs/session-mutation-boundary.md) for current work.
+
 ## Problem
+
 GitHub Actions CI e2e tests fail when running Playwright tests with Firebase emulator.
 
 ## Root Cause Identified: Firebase Race Condition
 
 When setting TWO team selectors in sequence via UI:
+
 1. Select homeTeam → `updateMatch({homeTeam: "X"})` → Firebase writes full state via `set()`
 2. Select awayTeam → `updateMatch({awayTeam: "Y"})` → But `onValue` from first write fires, resetting awayTeam to ""
 
 **Architecture issue**: `syncState()` in `firebaseDatabase.ts` uses Firebase `set()` which replaces entire state. When `onValue` fires from the homeTeam write, it overwrites the awayTeam update.
 
 ### Evidence
+
 - Setting ONLY awayTeam works - test passes
 - Setting BOTH in sequence fails - race condition
 - Firebase REST API shows: `homeTeam: "Víkingur R"` (correct), `awayTeam: ""` (overwritten)
 
 ### Key Files
+
 - `clock/src/contexts/FirebaseStateContext.tsx` - `updateMatch()` (line 332), `applyMatchUpdate()` (line 287), `onValue` subscriptions (line 223)
 - `clock/src/firebaseDatabase.ts` - `syncState()` uses `set()` not `update()`
 - `clock/src/controller/TeamSelector.tsx` - Controlled input with `value={match[teamAttrName]}`
@@ -24,9 +33,11 @@ When setting TWO team selectors in sequence via UI:
 ## Fixes Applied
 
 ### 1. Moved `clearEmulatorData()` from `beforeAll` to `beforeEach`
+
 Files: `assets.spec.ts`, `basic-navigation.spec.ts`, `match-flow.spec.ts`, `penalties.spec.ts`
 
 ### 2. Fixed `assets.spec.ts` "switches between Biðröð and Lið views" test
+
 Bypassed UI race condition by setting teams directly via Firebase REST API:
 
 ```typescript
@@ -45,13 +56,16 @@ test("switches between Biðröð and Lið views", async ({ page, request }) => {
   );
 
   await page.reload();
-  await page.getByRole("button", { name: "Heim", exact: true }).waitFor({ state: "visible", timeout: 10000 });
+  await page
+    .getByRole("button", { name: "Heim", exact: true })
+    .waitFor({ state: "visible", timeout: 10000 });
   await page.getByText("Stillingar").click();
   // ... rest of test
 });
 ```
 
 ### 3. Fixed timing issue in `basic-navigation.spec.ts`
+
 Added wait for "Pása" button to appear before asserting countdown button disappears:
 
 ```typescript
@@ -63,21 +77,25 @@ await expect(page.getByText("Hefja niðurtalningu")).toHaveCount(0);
 ## Remaining Issues
 
 ### `basic-navigation.spec.ts` - Clock doesn't start after clicking "Byrja"
+
 - The "Byrja" button is visible and clickable
 - Clicking it doesn't trigger the clock to start (no "Pása" button appears)
 - May be related to fake clock (`page.clock.install()`) interaction with Firebase async operations
 - `startMatch()` calls `Date.now()` which is mocked by fake clock
 
 ### Tests Passing
+
 - All 9 tests in `assets.spec.ts` ✅
 
 ### Tests Still Failing
+
 - `basic-navigation.spec.ts`: "starts the clock and does some things"
 - `basic-navigation.spec.ts`: "uses the simple control panel and updates the clock"
 - `basic-navigation.spec.ts`: "starts a countdown"
 - `image-upload.spec.ts`: (timeout issues)
 
 ## Emulator Setup
+
 - Firebase Auth emulator: port 9099
 - Firebase Database emulator: port 9000
 - Docker container: `vikes-firebase-emulator`
@@ -86,6 +104,7 @@ await expect(page.getByText("Hefja niðurtalningu")).toHaveCount(0);
 - Listen prefix: `test-e2e`
 
 ## Test Commands
+
 ```bash
 # Run all e2e tests with emulator
 cd clock && VITE_USE_EMULATOR=true pnpm exec playwright test --reporter=list --workers=1

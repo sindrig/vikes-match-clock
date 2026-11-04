@@ -178,12 +178,14 @@ aws s3 rm "s3://$STAGING_BUCKET/<subpath>/" --recursive --region eu-west-1
 
 ## Uploading screenshots for PRs
 
+Save captures under ignored `screenshots/`; follow the [canonical screenshot guide](../../../docs/screenshots.md).
+
 GitHub doesn't support programmatic image uploads to PR comments. For an authorized upload, load approved AWS access and `STAGING_BUCKET` metadata as in step 1 (a screenshot upload does not require a distribution ID). Use the staging S3 bucket:
 
 ```bash
 : "${STAGING_BUCKET:?Ask the infrastructure maintainer for staging upload access and bucket metadata.}"
 TIMESTAMP=$(date +%s)
-aws s3 cp screenshot.png "s3://$STAGING_BUCKET/pr-images/<ISSUE_NUMBER>-<descriptive-name>-${TIMESTAMP}.png" --region eu-west-1
+aws s3 cp screenshots/screenshot.png "s3://$STAGING_BUCKET/pr-images/<ISSUE_NUMBER>-<descriptive-name>-${TIMESTAMP}.png" --region eu-west-1
 ```
 
 Then reference in PR/comment markdown:

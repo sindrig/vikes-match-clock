@@ -5,6 +5,11 @@ media playback; Resolume is unsupported.** This service retains manual and
 automatic physical brightness through Vnnox/UCenter, Firebase status and
 calibration, and the power-state gate for automatic writes.
 
+For development commands, scope and platform prerequisites, read the
+[gateway entrypoint](AGENTS.md); the [task index](../docs/README.md) routes
+browser/Functions work. This README owns installation, configuration and runtime
+operation. Preserve its existing section links when updating those procedures.
+
 **Hardware qualification: HOLD.** This retirement is verified with mocks and
 temporary installation fixtures only. No gateway installation, live Firebase,
 Vnnox, SSH, cloud cleanup or physical qualification is performed. The
@@ -37,7 +42,8 @@ settings are ignored. Existing `adLayout`, `overlay`, `mediaPairs`, numeric
 compatibility keys, Storage media and legacy telemetry records remain intact.
 The daemon writes only brightness status/calibration and the retained automatic
 brightness control paths; it never replaces or deletes the telemetry subtree.
-Frontend/Functions retirement is separate work in #241.
+Frontend retirement is merged; the Functions backend is still retained during
+the [#241 Phase 2 rollout hold](../docs/web-only-perimeter-rollout.md).
 
 ## Prerequisites
 
@@ -146,9 +152,9 @@ sudo systemctl stop perimeter-control
 sudo systemctl disable --now perimeter-control
 ```
 
-Weather timeout/cancellation fixes belong to #254 (open PR #270) and are **not
-included in this base**. Cached/stale weather behavior below is retained; an
-HTTP provider stall remains an existing limitation until that work is integrated.
+The merged #254 weather fix bounds headers and body by a ten-second deadline
+and supports stop/restart cancellation; see [automatic brightness](#automatic-brightness-sun--weather-prediction)
+for the retained provider/cache limits.
 This stack includes the #252 worker arbitration and #253 continuous brightness
 curve; see [arbitration](../docs/brightness-arbitration.md) and the
 [model](../docs/auto-brightness-design.md). Physical qualification remains HOLD.
@@ -219,8 +225,9 @@ provide the selected project's Firebase ID token and a venue-authorized UID
 through the approved loader. The REST commands use an atomic root PATCH with
 an append-only audit record and exact stringified changes, including nulls.
 They never write daemon-owned status/calibration. Current brightness UI
-setters use direct state writes; rules allow those but do not enforce audit
-pairing. An unauthenticated production PATCH is not a supported example.
+setters use the current-session/origin-gated audited command boundary; rules
+still do not enforce audit pairing. See [audit limits](../docs/clock/audit.md#limits).
+An unauthenticated production PATCH is not a supported example.
 
 Snapshot raw `ratio`, `ratioScale`, `nit` and `nitType`, and all non-target
 screen values, before changing anything. Integer commands 0–100 are distinct
