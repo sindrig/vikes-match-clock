@@ -105,7 +105,7 @@ const ImageList: React.FC<ImageListProps> = ({
                     ? AssetTypeSuffixMap[suffix] || assetTypes.IMAGE
                     : assetTypes.IMAGE;
                   const asset = {
-                    key: String(imageUrl) + String(Date.now()),
+                    key: ref,
                     name,
                     url: imageUrl,
                     type,

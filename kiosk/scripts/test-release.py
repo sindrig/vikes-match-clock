@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 import tomllib
 import unittest
@@ -38,6 +39,13 @@ class ReleaseTest(unittest.TestCase):
             target = self.repo / relative
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(ROOT / relative, target)
+        # Keep the fixture's starting version independent of the checkout.
+        subprocess.run(
+            [sys.executable, "kiosk/scripts/set-release-version.py", "v0.1.0"],
+            cwd=self.repo,
+            check=True,
+            capture_output=True,
+        )
         self.git("checkout", "-b", "master")
         self.git("config", "user.name", "Release test")
         self.git("config", "user.email", "release@example.com")
@@ -55,36 +63,60 @@ class ReleaseTest(unittest.TestCase):
         ).stdout.strip()
 
     def prepare(self, tag):
+        # Each workflow attempt receives its own output file.
+        self.output = Path(self.temp.name) / "output"
+        self.output.unlink(missing_ok=True)
         return subprocess.run(
             ["bash", "kiosk/scripts/prepare-release.sh"],
             cwd=self.repo,
             env={
                 **os.environ,
                 "GITHUB_REF_NAME": tag,
-                "GITHUB_OUTPUT": str(Path(self.temp.name) / "output"),
+                "GITHUB_OUTPUT": str(self.output),
             },
             capture_output=True,
             text=True,
         )
 
-    def test_release_and_retry(self):
+    def publish_tag(self, tag, annotated):
+        if annotated:
+            self.git("tag", "-a", tag, "-m", "Release")
+        else:
+            self.git("tag", tag)
+        self.git("push", "origin", tag)
+        return self.git("rev-parse", f"refs/tags/{tag}")
+
+    def remote_refs(self, tag):
+        refs = {}
+        for line in self.git(
+            "ls-remote",
+            "origin",
+            "refs/heads/master",
+            f"refs/tags/{tag}",
+            f"refs/tags/{tag}^{{}}",
+        ).splitlines():
+            sha, ref = line.split()
+            refs[ref] = sha
+        return refs
+
+    def check_release_bump(self, annotated):
         original_lock = tomllib.loads(
             (self.repo / "kiosk/src-tauri/Cargo.lock").read_text()
         )
-        self.git("tag", "-a", "v0.2.0", "-m", "Release")
-        self.git("push", "origin", "v0.2.0")
+        self.publish_tag("v0.2.0", annotated)
         original_sha = self.git("rev-parse", "HEAD")
         result = self.prepare("v0.2.0")
         self.assertEqual(result.returncode, 0, result.stderr)
         sha = self.git("rev-parse", "HEAD")
         self.assertNotEqual(original_sha, sha)
+        self.assertEqual(self.git("rev-parse", "HEAD^"), original_sha)
         self.assertEqual(self.git("rev-parse", "origin/master"), sha)
+        # A bump replaces even an annotated tag with a lightweight tag.
+        self.assertEqual(self.git("rev-parse", "refs/tags/v0.2.0"), sha)
         self.assertEqual(self.git("rev-parse", "v0.2.0^{commit}"), sha)
-        refs = self.git(
-            "ls-remote", "origin", "refs/heads/master", "refs/tags/v0.2.0"
-        )
-        self.assertTrue(
-            all(line.startswith(sha) for line in refs.splitlines())
+        self.assertEqual(
+            self.remote_refs("v0.2.0"),
+            {"refs/heads/master": sha, "refs/tags/v0.2.0": sha},
         )
         changed = self.git("diff", "--name-only", "HEAD~", "HEAD").splitlines()
         self.assertEqual(
@@ -104,12 +136,44 @@ class ReleaseTest(unittest.TestCase):
             if package["name"] == "vikes-match-clock":
                 package["version"] = "0.2.0"
         self.assertEqual(lock, original_lock)
-        self.assertEqual(
-            (Path(self.temp.name) / "output").read_text(), f"sha={sha}\n"
-        )
-        retry = self.prepare("v0.2.0")
-        self.assertEqual(retry.returncode, 0, retry.stderr)
-        self.assertEqual(self.git("rev-parse", "HEAD"), sha)
+        self.assertEqual(self.output.read_text(), f"sha={sha}\n")
+        self.assertEqual(self.git("status", "--porcelain"), "")
+
+    def test_release_bump_from_annotated_tag(self):
+        self.check_release_bump(annotated=True)
+
+    def test_release_bump_from_lightweight_tag(self):
+        self.check_release_bump(annotated=False)
+
+    def check_already_versioned_retry(self, annotated):
+        sha = self.git("rev-parse", "HEAD")
+        tag_sha = self.publish_tag("v0.1.0", annotated)
+        refs = {"refs/heads/master": sha, "refs/tags/v0.1.0": tag_sha}
+        if annotated:
+            self.assertNotEqual(tag_sha, sha)
+            refs["refs/tags/v0.1.0^{}"] = sha
+        else:
+            self.assertEqual(tag_sha, sha)
+
+        for attempt in range(2):
+            with self.subTest(attempt=attempt + 1):
+                result = self.prepare("v0.1.0")
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(self.git("rev-parse", "HEAD"), sha)
+                self.assertEqual(self.git("rev-parse", "origin/master"), sha)
+                self.assertEqual(
+                    self.git("rev-parse", "refs/tags/v0.1.0"), tag_sha
+                )
+                self.assertEqual(self.git("rev-parse", "v0.1.0^{commit}"), sha)
+                self.assertEqual(self.remote_refs("v0.1.0"), refs)
+                self.assertEqual(self.output.read_text(), f"sha={sha}\n")
+                self.assertEqual(self.git("status", "--porcelain"), "")
+
+    def test_already_versioned_retry_with_annotated_tag(self):
+        self.check_already_versioned_retry(annotated=True)
+
+    def test_already_versioned_retry_with_lightweight_tag(self):
+        self.check_already_versioned_retry(annotated=False)
 
     def test_reject_stale_tag(self):
         self.git("tag", "v0.2.0")

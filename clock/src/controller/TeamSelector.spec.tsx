@@ -36,6 +36,7 @@ describe("TeamSelector", () => {
         },
       },
       saveClubOverride: vi.fn(),
+      commitClubOverride: vi.fn(),
       deleteClubOverride: vi.fn(),
     });
   });

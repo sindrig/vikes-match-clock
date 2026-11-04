@@ -13,6 +13,7 @@ import { useController, useView } from "../../contexts/FirebaseStateContext";
 import { useClubLogo } from "../../hooks/useClubLogo";
 import { isVideoUrl } from "../../utils/matchUtils";
 import { CurrentAsset } from "../../types";
+import { isPlaybackOccurrenceId } from "../../lib/playbackOccurrence";
 
 const PRELOAD_TIMEOUT_MS = 5000;
 
@@ -162,12 +163,13 @@ interface OwnProps {
   asset: AssetObject;
   thumbnail?: boolean;
   time?: number | null;
+  occurrenceId?: string;
 }
 
 type AssetProps = OwnProps;
 
 const AssetComponent = (props: AssetProps) => {
-  const { asset, thumbnail, time } = props;
+  const { asset, thumbnail, time, occurrenceId } = props;
   const { controller, completeAssetIfCurrent } = useController();
   const {
     view: { vp },
@@ -191,7 +193,13 @@ const AssetComponent = (props: AssetProps) => {
   // controller (not hard-coded values) so completion during active autoplay
   // (activeQueueId set, playing true) still satisfies the precondition.
   const handleMediaEnded = () => {
+    if (
+      thumbnail ||
+      (occurrenceId !== undefined && !isPlaybackOccurrenceId(occurrenceId))
+    )
+      return;
     void completeAssetIfCurrent({
+      occurrenceId: occurrenceId === undefined ? null : occurrenceId,
       assetKey: asset?.key ?? "",
       time: time ?? null,
       activeQueueId: controller.activeQueueId,
@@ -435,5 +443,19 @@ const AssetComponent = (props: AssetProps) => {
       return null;
   }
 };
+
+export function PlaybackAsset({ current }: { current: CurrentAsset }) {
+  return (
+    <AssetComponent
+      key={JSON.stringify([
+        current.occurrenceId === undefined ? "legacy" : "identified",
+        current.occurrenceId ?? current.asset.key,
+      ])}
+      asset={current.asset}
+      time={current.time}
+      occurrenceId={current.occurrenceId}
+    />
+  );
+}
 
 export default AssetComponent;

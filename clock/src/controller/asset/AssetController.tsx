@@ -1,7 +1,7 @@
-import { useCallback, useState } from "react";
 import { addVideosFromPlaylist } from "./YoutubePlaylist";
 import { QueueBoard } from "./queue";
 import QueuePicker from "./queue/QueuePicker";
+import { useQueuePickerActions } from "./queue/useQueuePickerActions";
 import { ASSET_VIEWS } from "../../constants";
 import TeamAssetController from "./team/TeamAssetController";
 import UrlController from "./UrlController";
@@ -21,7 +21,6 @@ const AssetController = () => {
     deleteQueue,
     renameQueue,
     reorderQueues,
-    addItemsToQueue,
     removeItemFromQueue,
     reorderItemsInQueue,
     updateQueueSettings,
@@ -31,27 +30,7 @@ const AssetController = () => {
   } = useController();
 
   const { assetView, queues, activeQueueId, playing } = controller;
-  const [pendingAssets, setPendingAssets] = useState<Asset[]>([]);
-
-  const addMultipleAssets = (
-    promises: (Asset | Promise<Asset | null>)[],
-    { showNow }: { showNow?: boolean } = {},
-  ): void => {
-    void (async () => {
-      const results = await Promise.all(
-        promises.map((p) => Promise.resolve(p)),
-      );
-      const validAssets = results.filter((a): a is Asset => a !== null);
-
-      const [firstAsset] = validAssets;
-
-      if (showNow && firstAsset) {
-        showItemNow(firstAsset);
-      } else if (validAssets.length > 0) {
-        setPendingAssets(validAssets);
-      }
-    })();
-  };
+  const { pending, error, selectAssets } = useQueuePickerActions();
 
   const addAssetKey = (asset: Asset) => {
     if (asset.type === assetTypes.URL && isYoutubeUrl(asset.key)) {
@@ -60,35 +39,8 @@ const AssetController = () => {
         return addVideosFromPlaylist(listId, addAssetKey);
       }
     }
-    return addMultipleAssets([asset]);
+    return selectAssets([asset]);
   };
-
-  const handleShowNow = useCallback(
-    (assets: Asset[]) => {
-      for (const asset of assets) {
-        showItemNow(asset);
-      }
-      setPendingAssets([]);
-    },
-    [showItemNow],
-  );
-
-  const handleAddToQueue = useCallback(
-    (queueId: string, assets: Asset[]) => {
-      addItemsToQueue(queueId, assets);
-      setPendingAssets([]);
-    },
-    [addItemsToQueue],
-  );
-
-  const handleCreateAndAdd = useCallback(
-    (queueName: string, assets: Asset[]) => {
-      const newQueueId = createQueue(queueName);
-      addItemsToQueue(newQueueId, assets);
-      setPendingAssets([]);
-    },
-    [createQueue, addItemsToQueue],
-  );
 
   const renderAssetController = () => {
     return (
@@ -115,19 +67,11 @@ const AssetController = () => {
           }
           onCreateQueue={() => {
             const name = `Biðröð ${Object.keys(queues).length + 1}`;
-            createQueue(name);
+            void createQueue(name);
           }}
         />
-        {pendingAssets.length > 0 && (
-          <QueuePicker
-            queues={queues}
-            assets={pendingAssets}
-            onShowNow={handleShowNow}
-            onAddToQueue={handleAddToQueue}
-            onCreateAndAdd={handleCreateAndAdd}
-            onClose={() => setPendingAssets([])}
-          />
-        )}
+        {error && <p role="alert">{error}</p>}
+        {pending && <QueuePicker queues={queues} {...pending} />}
       </div>
     );
   };
@@ -141,9 +85,7 @@ const AssetController = () => {
       {assetView === ASSET_VIEWS.assets && renderAssetController()}
       {assetView === ASSET_VIEWS.teams && (
         <TeamAssetController
-          previousView={() =>
-            setTimeout(() => selectAssetView(ASSET_VIEWS.assets), 500)
-          }
+          previousView={() => selectAssetView(ASSET_VIEWS.assets)}
         />
       )}
     </div>

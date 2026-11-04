@@ -68,7 +68,7 @@ const confirmRefresh = () => confirm("Are you absolutely sure?");
 
 const Controller = () => {
   const { controller, selectAssetView } = useController();
-  const { screens } = useListeners();
+  const { screens, venues } = useListeners();
   const {
     view: { themePreset, customPresets },
   } = useView();
@@ -79,6 +79,7 @@ const Controller = () => {
     setPassword,
     listenPrefix,
     setListenPrefix,
+    logout,
     available,
     setScreenKey,
     displayTarget,
@@ -149,7 +150,7 @@ const Controller = () => {
       target: DisplayTarget;
     }> = [];
 
-    screens.forEach(({ label, screen, key, perimeterDisplay }, index) => {
+    screens.forEach(({ label, screen, key }, index) => {
       displayOptions.push({
         value: `scoreboard-${index}`,
         label: `${label} ${screen.name}`,
@@ -158,13 +159,26 @@ const Controller = () => {
       });
 
       if (
-        perimeterDisplay?.renderer === "web" &&
+        venues[key]?.perimeterDisplay?.renderer === "web" &&
         !perimeterLocations.has(key)
       ) {
         perimeterLocations.add(key);
         displayOptions.push({
           value: `perimeter-${key}`,
           label: `${label} Perimeter`,
+          locationKey: key,
+          target: { kind: "perimeter" },
+        });
+      }
+    });
+    Object.entries(venues).forEach(([key, venue]) => {
+      if (
+        venue.perimeterDisplay?.renderer === "web" &&
+        !perimeterLocations.has(key)
+      ) {
+        displayOptions.push({
+          value: `perimeter-${key}`,
+          label: `${venue.label} Perimeter`,
           locationKey: key,
           target: { kind: "perimeter" },
         });
@@ -189,7 +203,7 @@ const Controller = () => {
           <p className="initial-screen-card-desc">
             Veldu skjá til að birta stigatöflu
           </p>
-          {screens.length === 0 ? (
+          {displayOptions.length === 0 ? (
             <p className="initial-screen-empty">Engir skjáir tiltækir</p>
           ) : (
             <div className="initial-screen-select-group">
@@ -300,11 +314,10 @@ const Controller = () => {
               const locationScreens = screens.filter(
                 (s) => s.key === locationKey,
               );
-              if (locationScreens.length === 0) return null;
-
+              const venue = venues[locationKey];
+              if (!venue) return null;
               const first = locationScreens[0];
-              if (!first) return null;
-              const label = first.label;
+              const label = venue.label;
               const screenNames = locationScreens
                 .map((s) => s.screen.name)
                 .join(" / ");
@@ -312,12 +325,14 @@ const Controller = () => {
 
               return (
                 <div key={locationKey} className="screen-selector-location">
-                  <ScreenSelectorButton
-                    locationKey={locationKey}
-                    label={buttonLabel}
-                    onClick={() => selectControllerLocation(locationKey)}
-                  />
-                  {first.perimeterDisplay && (
+                  {first && (
+                    <ScreenSelectorButton
+                      locationKey={locationKey}
+                      label={buttonLabel}
+                      onClick={() => selectControllerLocation(locationKey)}
+                    />
+                  )}
+                  {venue.perimeterDisplay && (
                     <button
                       type="button"
                       className="screen-selector-button"
@@ -336,7 +351,7 @@ const Controller = () => {
         <button
           type="button"
           className="screen-selector-logout"
-          onClick={() => void firebaseAuth.logout()}
+          onClick={() => void logout().catch(console.error)}
         >
           Útskrá
         </button>
@@ -419,12 +434,9 @@ const Controller = () => {
           <MatchActionSettings />
           {/* Venues with a published perimeter mapping manage the perimeter
           through the standalone perimeter manager (offered on the screen
-          selector); legacy venues without a mapping keep the
-          settings-embedded control so their brightness, ad layout, media
-          pairs, and preparation controls stay reachable. */}
-          {!screens.some(
-            (s) => s.key === listenPrefix && s.perimeterDisplay,
-          ) && <PerimeterControl />}
+          selector); unconfigured venues keep the settings control so
+          hardware brightness remains reachable without a web mapping. */}
+          {!venues[listenPrefix]?.perimeterDisplay && <PerimeterControl />}
           <div className="theme-trigger-row">
             <div className="theme-trigger-info">
               <span className="theme-trigger-label">Klukku þema</span>

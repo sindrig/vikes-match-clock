@@ -13,6 +13,7 @@ describe("useClubLogo", () => {
   const createMockReturnValue = (overrides: Record<string, ClubOverride>) => ({
     clubOverrides: overrides,
     saveClubOverride: vi.fn<() => Promise<void>>(),
+    commitClubOverride: vi.fn<() => Promise<void>>(),
     deleteClubOverride: vi.fn<() => Promise<void>>(),
   });
 

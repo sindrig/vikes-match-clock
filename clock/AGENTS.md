@@ -39,13 +39,13 @@ This architecture eliminates several classes of bugs:
 
 When an authenticated controller calls an action (e.g., `startMatch()`):
 
-1. Action computes new state from current `ref.current`
-2. Action writes to Firebase via `firebaseDatabase.syncState()`
+1. The render-bound command checks its current session/venue/freshness epoch before reading subscription refs
+2. `executeCommand` checks again immediately before an atomic `firebaseDatabase.writeAudited()` submission
 3. Firebase triggers `onValue()` callback
 4. React state updates from Firebase snapshot
 5. UI re-renders with new state
 
-**Important**: Unauthenticated clients are read-only. All write operations check `isAuthenticated` before proceeding.
+**Important**: Unauthenticated clients are read-only. Ordinary commands require a current Auth SDK UID, ready freshness, and the same command-origin epoch. Ref values change only on Firebase subscription deliveries. See [the command contract and complete mutation inventory](../docs/session-mutation-boundary.md).
 
 ### Multi-Controller Behavior
 
@@ -76,7 +76,8 @@ asset, so it is not a blind mutation. It submits the generation-conditional
 precondition rejects it unless the current asset/queue still matches.
 
 **2. Freshness barrier.** An authenticated client is only write-eligible while
-it has confirmed current Firebase state. `FirebaseStateContext` tracks
+it satisfies the subscription readiness/recovery policy.
+`FirebaseStateContext` tracks
 `writeFreshness` (`loading | ready | hidden | offline | resyncing`); the client
 becomes ineligible on `visibilitychange`→hidden, `pagehide`, offline, or an
 observed `/.info/connected` drop while eligible, and returns to `ready` once a
@@ -84,9 +85,31 @@ core subscription delivers a post-resume/reconnect snapshot. A resume whose
 Firebase connection never dropped (no `/.info/connected` false observed while
 suspended and still connected on return) restores `ready` immediately, because
 the existing subscription epoch is still current and no `onValue` delivery
-would otherwise fire when no data changed. Eligibility is gated on
-`writeEligible` (`writeFreshness === "ready"`); `navigator.onLine` is never
-consulted — `/.info/connected` is the authoritative connectivity signal. Stale
+would otherwise fire when no data changed. Initial readiness separately requires
+all five current-scope subscriptions (match, controller, view, clubOverrides,
+perimeter). A connected core delivery during loading records resynchronization
+proof without enabling writes early; the last required snapshot may then finish
+readiness, including a non-core delivery. If an undropped resume follows the
+initial core deliveries, the last required snapshot completes readiness without
+another core update. New subscription scopes start without a pending recovery;
+a Firebase disconnect sets pending only while visible and already ready,
+without erasing a recovery already pending from a suspension/offline event.
+Thus a partial initial load may finish on its remaining snapshot after a
+cached reconnect even when unchanged core nodes do not emit again. Connection
+arrival alone never unlocks writes. Already-pending recovery still needs a
+connected current-scope core delivery; non-core and prior-scope deliveries
+cannot clear it. This restores the baseline initial-load policy, not a new
+server freshness guarantee: SDK `onValue` does not expose server/cache
+provenance. A settled reconnect with unchanged core state can still remain
+resyncing, and initial snapshots all delivered while disconnected without a
+pending recovery can still stall. Those inherited delivery orders are outside
+this repair. Rendering exposes
+`writeEligible`; submission also checks the synchronously updated `MutationSession`
+and its render-bound origin. Hide/resume, venue changes (including A → B → A),
+and logout/login permanently obsolete retained callbacks. The Auth SDK UID is
+read at submission; React callback/effect updates are not a safety gate.
+Repeated suspension signals preserve an observed Firebase disconnect until
+resynchronization. `navigator.onLine` is never consulted — `/.info/connected` is the authoritative connectivity signal. Stale
 attempts are dropped, never queued for replay. The UI surfaces this via
 `ResyncNotice` (`controller/ResyncNotice.tsx`) and disables primary match
 controls while resyncing.
@@ -94,9 +117,9 @@ controls while resyncing.
 **3. Conditional automatic transitions (compare-and-set).** Automatic
 lifecycle progression uses Firebase `runTransaction` to re-validate its
 precondition against CURRENT authoritative state before committing. Precondition
-identities come from existing fields only: `started`+`countdown`+
+identities use existing match fields and a dedicated playback occurrence: `started`+`countdown`+
 `halftimeCountdown` (clock), `timeout` (timeout), penalty `key`+creation data
-(penalty), current-asset identity+queue (asset). An obsolete or duplicate
+(penalty), `currentAsset.occurrenceId`+asset/queue context (asset). An obsolete or duplicate
 attempt aborts the transaction and leaves state unchanged. Only the first
 concurrent attempt commits; exactly one audit event is written per committed
 transition (`firebaseDatabase.writeAuditOnly`). For media completion (video /
@@ -104,6 +127,17 @@ YouTube end), `Asset.tsx` submits a `TimedAssetCompletionObservation` whose
 `activeQueueId`/`playing` come from the rendered controller's live values —
 not hard-coded `null`/`false` — so completion during active autoplay satisfies
 the queue precondition and advances the queue instead of being silently dropped.
+
+Playback observations carry a captured occurrence ID, or explicit null for
+legitimate legacy playback. Legacy completion matches only a truly absent raw
+ID field plus the existing tuple; its successor always receives a fresh ID.
+Malformed present IDs reject parsing and raw CAS validation, never fall back to
+legacy. Readers never generate IDs. New selections/replays/advances mint IDs;
+metadata and pause changes preserve them. `PlaybackAsset` remounts live media
+by the deferred rendered occurrence, so old natural-end callbacks keep their
+old identity. Existing rules cannot constrain old binaries: coordinate client
+refresh and retain the documented mixed-writer limit. See
+[the playback occurrence contract](../docs/playback-occurrences.md).
 
 `MatchLifecycle` is **commit-aware and retry-safe**, so a transition that is due
 while the client is ineligible is never lost and never latched prematurely:
@@ -187,7 +221,8 @@ an `update()` value object cannot contain keys with `/`, so writing the diff as
 a whole node value would be rejected or clobber sibling state.
 
 **Conditional (CAS) transitions** — automatic lifecycle transitions
-(`MatchLifecycle`) and generation-conditional explicit commands do NOT use
+(`MatchLifecycle`) and generation-conditional explicit commands share current-session
+eligibility (also checked on transaction retries) but do NOT use
 `writeAudited`. They run a `runTransaction` on the state subtree to atomically
 re-validate the observed generation precondition and commit the mutation, then
 append exactly one audit record via `firebaseDatabase.writeAuditOnly` (audit
@@ -222,15 +257,18 @@ audit record.
   `perimeter.set-scorer-celebration`,
   `perimeter.set-player-display-style`, `perimeter.set-substitution-style`.
 - Club overrides use `clubOverrides.create|update|save|delete` (both the
-  context actions and `ClubOverrideForm.tsx`, which builds its own audit
-  payload).
+  context actions and `ClubOverrideForm.tsx`, through `commitClubOverride`).
+- Brightness/config use `perimeter.set-brightness` and
+  `perimeter.set-brightness-auto`; auto config retains its server timestamp.
 
 **Identity** — `FirebaseStateProvider` accepts a `uid` prop (passed from
 `index.tsx` as `auth.uid`) for the accountable operator. `getOrCreateSessionId()`
 in `lib/sessionId.ts` returns one opaque UUID per browser session, stored in
 `sessionStorage` (regenerated per session, survives reloads, never an identity
-substitute). `makeAudit()` builds the payload and skips the write entirely when
-the provider cannot write.
+substitute). `MutationSession.audit()` owns that identity and validates the
+current command origin. `executeCommand` rejects obsolete/ineligible commands before any writer
+call; save APIs propagate rejection and keep drafts open. Void button adapters
+explicitly discard the centrally reported promise without unhandled rejections.
 
 **Firebase rules** (`firebase-rules.json`) — `audit/{location}` reads require
 venue authorization; event creation requires the same authorization, all
@@ -329,96 +367,32 @@ previous generation's texture). Power-off clears the WebGL framebuffer to
 black. The renderer and runtime must remain read-only; Firebase continues to
 be the source of truth for desired layout, overlay, and power state.
 
-The browser perimeter renderer consumes the **fourth** Firebase state subtree,
-`states/${listenPrefix}/perimeter`. Its power state also gates automatic
-physical brightness in the gateway:
+All venues use the web renderer. The fourth Firebase state subtree,
+`states/{location}/perimeter`, carries the admin-managed `enabled` flag and
+operator-controlled `state: "on" | "off"`. `parsePerimeterState()` validates
+both; `setPerimeterState()` writes only the desired power state.
+The power state also gates automatic physical brightness in the gateway.
 
-```json
-{
-  "enabled": true,
-  "state": "on"
-}
-```
+`PerimeterControl.tsx` is the standalone management page for a venue with a
+published web mapping. Venues without a valid mapping retain the settings
+entry in the scoreboard controller so hardware brightness remains reachable.
+The manager self-hides when `perimeter.enabled !== true`. Unconfigured venues
+show a configuration notice and brightness controls; they never use a legacy
+renderer or guessed geometry. Venues without a brightness controller remain
+excluded by `VENUES_WITHOUT_BRIGHTNESS` (currently `virkid`).
 
-- `enabled` is an admin-created UI feature flag: the controller only shows the
-  perimeter control when `enabled === true`.
-- `state` is the desired state, either `"on"` or `"off"`.
+The published mapping is the authority for ad lanes: `compatibilityKeys.base`
+selects lane keys and `logicalScreens` provides labels. The frontend does not
+subscribe to composition previews, applied ad layouts, overlay status, overlay
+geometry, or scorer preparation requests/status, and never invokes
+`prepareGoalScorerMedia`. Only authenticated hardware brightness telemetry at
+`perimeter/{location}/brightnessStatus` remains. Display errors continue to
+arrive through presence diagnostics.
 
-**Frontend** (`clock/`):
-
-- `parsePerimeterState()` in `firebaseParsers.ts` preserves `enabled` only when
-  boolean and `state` only when `"on"`/`"off"` (anything else falls back to
-  disabled/off).
-- `FirebaseStateContext.tsx` subscribes independently to
-  `states/${listenPrefix}/perimeter` and exposes the parsed `perimeter` state
-  plus the authenticated `setPerimeterState(state)` write action (writes only
-  `{ state }`, never `enabled`).
-- The retired daemon published a **preview snapshot** of the Resolume composition
-  (columns, clips, filenames and bounded JPEG thumbnails) to the top-level
-  `perimeter/${listenPrefix}` path (see **Legacy preview snapshot** below).
-  `FirebaseStateContext.tsx` subscribes to it independently and exposes it as
-  `preview` through `usePerimeter()`. It is deliberately **not** part of app
-  readiness: absent metadata must never block the controller.
-- `PerimeterControl.tsx` is rendered as a standalone management page after the
-  operator selects a venue's Perimeter entry. It self-hides when
-  `perimeter.enabled !== true`. Venues with a published perimeter mapping get
-  the standalone page only; legacy venues without a mapping keep
-  `<PerimeterControl />` mounted inside the scoreboard controller's
-  `Stillingar` dialog so their brightness, ad layout, media pairs, and
-  preparation controls stay reachable. The page provides explicit on/off
-  controls and an
-  editable **ad layout manager** for creating, reordering, and deleting ad
-  columns with file upload and Storage browsing (see **Perimeter Ad Layout**
-  below). Web venues derive their upload lanes and labels from the published
-  mapping's `compatibilityKeys.base` and `logicalScreens`; the remaining legacy
-  branch consumes old daemon-published lanes (no longer refreshed).
-  Víkin-specific 48/40 overlay pairs are therefore not
-  used by Virkið's web ad uploader. The old composition preview snapshot is
-  preserved as compatibility data pending #241. Styles live in
-  `PerimeterControl.css`.
-- `FirebaseStateContext.tsx` **auto-toggles the perimeter on view transitions**:
-  entering the match view (`controller.view` `idle` → `match`) writes
-  `state: "on"`, and leaving any view for `idle` writes `state: "off"`. Both
-  writes happen only when `perimeter.enabled === true`; other transitions
-  (`match` ↔ `control`, `idle` → `control`) leave the perimeter unchanged. The
-  transition is detected in a `useEffect` gated on `ready` (which also waits for
-  the perimeter subscription, so `enabled` is known before any transition), so a
-  reload or reconnect never replays a stale command (matching the daemon's
-  behavior).
-- Follows the 100% Firebase model: the UI writes to Firebase and updates only
-  after the subscription receives the new value (no optimistic updates).
-
-**Legacy preview snapshot** (`perimeter/${listenPrefix}`, read-only for clients;
-no longer published):
-
-```json
-{
-  "updatedAt": 1723392000000,
-  "columns": [
-    {
-      "id": 1,
-      "name": "Column 1",
-      "clips": [
-        {
-          "id": 12,
-          "filename": "sponsor-loop.mp4",
-          "thumbnail": "data:image/jpeg;base64,..."
-        }
-      ]
-    }
-  ]
-}
-```
-
-- `updatedAt` is a Firebase **server timestamp** (set by the former daemon with
-  `ServerValue.TIMESTAMP`).
-- `parsePerimeterPreview()` in `firebaseParsers.ts` strictly parses the
-  snapshot: clips without a filename and columns without a name are dropped;
-  missing ids become `null`; a `thumbnail` is optional.
-- The path lives **outside** the writable `states/` subtree. `firebase-rules.json`
-  denies all client writes and permits reads only when
-  `auth/$uid/$location` is `true`. Only the daemon's service account can write
-  (through the Admin SDK).
+Entering match view from idle turns the perimeter on; returning to idle turns
+it off, only when enabled and after initial readiness. The transition baseline
+still prevents commands on initial load or venue changes. All writes retain
+the existing Firebase subscription, auditing, and write-eligibility behavior.
 
 **Gateway** (`perimeter-control/` at repo root): the systemd-managed Node >= 22
 service authenticates using the same Firebase service-account path and consumes
@@ -433,6 +407,12 @@ No legacy media flag can enable an executor. The installer uses pinned pnpm
 and a frozen lockfile, preserves `/etc/perimeter-control/` configuration, and
 prunes only the five retired installed media modules. See
 `perimeter-control/README.md` for installation and operation.
+
+This is frontend retirement **Phase 1 of #241**. The independent Functions
+deployment must retain the preparation service until this client has rolled
+out. See [the rollout hold and Phase 2 checklist](../docs/web-only-perimeter-rollout.md).
+The backend implementation, exports, tests, sharp dependency, and database and
+Storage rules are unchanged in this phase.
 
 #### Idle Perimeter Clock (web venues)
 
@@ -618,38 +598,21 @@ target, picked or uploaded from `{listenPrefix}/perimeter/` in Storage):
 }
 ```
 
-- `overlay: null` clears the overlay (disconnects only overlay layers).
-- Each column must include one file entry per configured Resolume overlay
-  layer index. The keys are Resolume **layer indices** (not IDs): `2` is the
-  overlay above the `48 skjáir` base layer (plays `goal-48.mp4`) and `4` is
-  the overlay above the `40 skjáir` base layer (plays `goal-40.mp4`). They
-  must match `PERIMETER_OVERLAY_LAYER_IDS` on the daemon.
-- Earlier columns advance after `durationMs`; the final column loops forever.
-- The overlay keeps looping **until cleared even though the base `Efni`
-  content auto-advances through its ~20s deck columns** (composition autopilot
-  = "Play Next Column"). The daemon **pauses the deck autopilot** for the
-  duration of the goal celebration (restoring it on clear), loads the overlay
-  file into the currently active deck column, and triggers the clip there — so
-  the goal celebration never vanishes on an Efni transition. A goal placed in
-  a single column without pausing the autopilot would disappear at the first
-  transition.
-- A new `id` replaces/restarts an active sequence. Replacing one overlay with
-  another (a new `id` while one is playing) is **double-buffered**: the daemon
-  loads the new overlay into a standby deck column while the old one keeps
-  playing, then connects the standby column and clears the old slot — so the
-  swap never shows the base ads in between. A clip crossfade (default 0.5s
-  Dissolve, `PERIMETER_OVERLAY_TRANSITION_SECONDS`/`_BLEND`) softens the
-  cutover. Because the standby column is connected, the deck ends up on that
-  column after the swap; the ads simply resume from there once the overlay
-  clears.
-- Only files from the approved `gs://vikes-match-clock-firebase.appspot.com`
-  bucket are accepted. The daemon copies them only into `C:/Content` on the
-  Windows Resolume host.
+- `overlay: null` clears the overlay and reveals the existing base/band channels.
+- Each file column retains the two protocol keys `"2"` and `"4"`. The
+  published mapping's `compatibilityKeys.overlay` maps these to logical
+  screens; the keys do not imply screen geometry.
+- Earlier columns advance after `durationMs`; the final column loops until
+  cleared. The base ad timeline continues independently beneath the overlay.
+- A new command `id` replaces the active overlay immediately. The base shows
+  through while the replacement prepares; only frame-ready media activates.
+- Sources must belong to the active environment's bucket and the current
+  venue's approved Storage prefix. Existing generated files remain valid
+  version-1 media; no remote cleanup is part of this phase.
 
-**Daemon status**: Published to `perimeter/${listenPrefix}/overlayStatus` by
-the daemon (read-only for clients). Contains `commandId`, `phase`
-(`downloading`/`copying`/`loading`/`playing`/`error`), `activeColumn`, and
-safe `error` text.
+The web display renders the overlay command directly. Renderer problems are
+reported through the existing presence diagnostics; the controller does not
+read the retired daemon overlay-status path.
 
 **Clearing**: The "Hreinsa virkt overlay" button in the controller UI clears
 both the main screen overlay (`controller.currentAsset`) **and** the perimeter
@@ -664,8 +627,6 @@ Types are defined in `types.ts`:
   scorer — see **Web Goal Scorer Overlay (Browser Composition)** below)
 - `PerimeterOverlayColumn` — a column with duration and paired files
 - `PerimeterOverlayFile` — filename + GCS source
-- `PerimeterOverlayStatus` — daemon-published status
-- `PerimeterOverlayPhase` — phase enum
 
 Parsing is in `firebaseParsers.ts`:
 
@@ -735,11 +696,12 @@ uploading the main-screen media again. Existing pairs remain perimeter-only.
 **Showing** a pair writes a fresh `PerimeterOverlay` to the existing command
 path `states/${listenPrefix}/perimeter/overlay` with a new command `id` and a
 single column (`durationMs: 10000`) holding the pair's two files. Because the
-daemon holds the final column until clear, the pair loops until cleared. The
+web runtime holds the final column until clear, the pair loops until cleared. The
 overlay channel is single-writer: showing a pair replaces a home-goal overlay
 and a subsequent home goal replaces the pair (last command wins).
 If the entry has `mainScreenAsset`, the same **Sýna** click also calls the
-existing controller `showItemNow` with a fresh playback key: the main-screen
+existing controller `showItemNow` with stable library identity and a fresh
+`currentAsset.occurrenceId`: the main-screen
 queue stops, the image holds or video loops until cleared/replaced, and
 re-selecting the entry restarts its main-screen media. These use the existing
 audited main-screen and perimeter actions, not frame-synchronized playback.
@@ -796,9 +758,8 @@ UI in `controller/media/PerimeterMediaPairs.tsx` (fifth "Jaðarefni" tab):
   the `safamyri` → `fotbolti` library alias, and never offers deletion/upload.
   **Vista** saves the draft; cancel leaves the saved entry unchanged.
 - Green **Sýna** action, red **Fjarlægja** (confirmation), tab-local
-  **Hreinsa jaðarskjá** / **Hreinsa alla skjái**, and the daemon `overlayStatus`
-  (phase + error). Mutations are disabled while Firebase write eligibility is
-  unavailable.
+  **Hreinsa jaðarskjá** / **Hreinsa alla skjái**, and write-error feedback. Mutations are disabled while Firebase write
+  eligibility is unavailable.
 
 `e2e/perimeter-media-pairs.spec.ts` covers selecting existing media when creating
 a triple, one-click main/perimeter commands, detaching without changing current
@@ -813,280 +774,41 @@ becomes selectable base-ad content. The three perimeter systems are:
 | Home-goal overlay | `{location}/perimeter/`                          | `states/{location}/perimeter/overlay`  | overlay layers (2,4) |
 | Named media pairs | `{location}/perimeter-overlays/{pairId}/48\|40/` | `states/{location}/perimeter/overlay`  | overlay layers (2,4) |
 
-#### Perimeter Ad Layout (Content Deployer on the Base Layers)
+#### Perimeter Ad Layout (Web Base Ads)
 
-The desired layout and browser uploader remain active. The Resolume deployment
-and applied-status details in this section are **historical executor behavior**;
-those gateway modules have been removed. Remaining frontend telemetry/import
-consumers are legacy code pending #241, not a supported playback route.
+The controller writes the desired `PerimeterAdLayout` to
+`states/{location}/perimeter/adLayout`. Each version-1 layout has an opaque
+`revision` and ordered `columns`; each column has a stable `id` and a
+`files` map keyed by the published mapping's `compatibilityKeys.base`.
+Files hold a safe basename, a same-environment `gs://` source under the
+venue's `perimeter/` prefix, and an optional immutable Storage `generation`.
+An empty columns array clears the base deck. The web display backfills missing
+generations before playback and applies the existing complete-revision and
+cue-boundary behavior. Legacy file records remain readable; reads never
+migrate persisted state.
 
-The controller writes a **desired layout** to `states/${listenPrefix}/perimeter/adLayout`,
-defining columns of ad files across daemon-published lanes. The daemon reads
-this path, validates, stages assets, and **deploys** the ad files into the
-Resolume deck columns on the base layers, then publishes the **applied
-layout** to `perimeter/${listenPrefix}/adLayout`.
+`parsePerimeterAdLayout()` keeps version/revision, column-count (20), complete
+lane-set, safe-name/source, and duplicate-id checks. `setPerimeterAdLayout()`
+writes an audited complete desired layout; rejections propagate to the board.
+`usePerimeter()` exposes `adLayout` and its write action. There is no applied
+layout subscription, phase/revision comparison, or daemon freshness badge.
 
-The ad-layout is a **content deployer, not a playback driver**: it only opens
-files into clip slots (and clears them). It never calls `connect`,
-`disconnect`, `loop-*`, or `transport/*` endpoints and never touches the
-composition autopilot. The deck autopilot cycles the columns exactly as it
-cycles the Efni content, so the Resolume UI (column count, autopilot speed,
-manual column selection) keeps working untouched.
+The board supports add, delete, and horizontal drag reorder. File selectors
+browse/upload `{location}/perimeter/`, capture Storage generations, and save
+only with a file for every published lane. Thumbnails resolve directly from
+Storage through `PerimeterFileThumb.tsx` (cached download URLs, lazy images,
+first-frame video, and an unavailable placeholder). Deleting a column removes
+only references. Layout writes retain their existing serialization and
+subscription-settling behavior; errors keep the board/dialog open.
 
-**Data ownership**:
+The standalone header retains `Næsti dálkur` (new `skipCue` token, disabled
+while off or empty) and `Endurræsa skjá` (new `refreshToken`). First deliveries
+establish baselines; only changed tokens advance/reload the web displays.
+These commands remain separate from global scoreboard refresh. No queue,
+media lifecycle, or write-freshness protocol changes are part of Phase 1.
 
-| Path                                   | Writer     | Purpose                                         |
-| -------------------------------------- | ---------- | ----------------------------------------------- |
-| `states/{location}/perimeter/adLayout` | Controller | Desired layout command                          |
-| `perimeter/{location}/adLayout`        | Daemon     | Applied layout, lanes, column mapping, previews |
-| `states/{location}/perimeter/import`   | Controller | One-shot deck import command (`from-resolume`)  |
-| `perimeter/{location}/importStatus`    | Daemon     | Import result (phase, columnsImported, errors)  |
-| `{location}/perimeter/*` in Storage    | Controller | Selectable/uploaded source assets               |
-
-The daemon never writes to the desired path, eliminating a self-write
-feedback loop. The single deliberate exception is the deck import command: it
-writes a generated layout to `states/{location}/perimeter/adLayout` once per
-explicit `{ commandId, command: "from-resolume" }` write to the separate
-`states/{location}/perimeter/import` path (deduped by `commandId`), so it
-cannot loop.
-
-**Layer separation** — the ad layout and the goal overlay use **disjoint
-layers** and never interfere:
-
-| System       | Layers                                                        | Code         |
-| ------------ | ------------------------------------------------------------- | ------------ |
-| Ad layout    | base layers (`PERIMETER_AD_LANE_IDS`, default `1,3`)          | ad-layout.js |
-| Goal overlay | overlay layers (`PERIMETER_OVERLAY_LAYER_IDS`, default `2,4`) | overlay.js   |
-
-`assertNoSlotConflicts` in `perimeter-control/index.js` rejects any
-overlapping lane configuration at daemon startup.
-
-**Desired layout schema** (`states/${listenPrefix}/perimeter/adLayout`):
-
-```json
-{
-  "version": 1,
-  "revision": "uuid",
-  "columns": [
-    {
-      "id": "uuid",
-      "files": {
-        "1": {
-          "name": "ad-48.png",
-          "source": "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/ad-48.png"
-        },
-        "3": {
-          "name": "ad-40.mp4",
-          "source": "gs://vikes-match-clock-firebase.appspot.com/vikuti/perimeter/ad-40.mp4"
-        }
-      }
-    }
-  ]
-}
-```
-
-- `revision` is a UUID that changes for every edit (including reorder).
-- `columns` is the complete intended order, not an incremental log.
-- Each column must have exactly one valid file for every configured lane.
-- An empty `columns` array is valid and clears the ad clips from all deck
-  columns on the ad lanes.
-- Source objects must belong to the approved bucket and the current
-  location's `perimeter/` prefix.
-- File names are basename-only; traversal and control characters are rejected.
-
-**Column mapping** — each layout column maps **1:1** to a deck column: layout
-column _i_ (0-based) loads into deck column _i+1_. Surplus deck columns stay
-empty; the deck autopilot skips empty columns, so the deck cycles only through
-the `N` ads (never a blank column). A layout with more columns than the deck is
-refused with an `error` status (each ad needs its own deck column).
-
-- 12 layout columns → deck columns 1–12 (trailing columns left empty).
-- 1 layout column → deck column 1.
-- Each ad file is loaded into its own deck column on **every** configured
-  lane. The autopilot then cycles them naturally.
-
-**Applied layout schema** (`perimeter/${listenPrefix}/adLayout`, daemon-published):
-
-```json
-{
-  "lanes": [
-    { "id": "1", "name": "48 skjair" },
-    { "id": "3", "name": "40 skjair" }
-  ],
-  "revision": "uuid",
-  "phase": "loading|playing|error|idle",
-  "error": null,
-  "updatedAt": 1723392000000,
-  "columns": [
-    {
-      "id": "uuid",
-      "deckColumns": [1, 2, 3, 4, 5],
-      "files": {
-        "1": {
-          "name": "ad-48.png",
-          "thumbnail": "data:image/png;base64,..."
-        },
-        "3": {
-          "name": "ad-40.mp4",
-          "thumbnail": "data:image/png;base64,..."
-        }
-      }
-    }
-  ]
-}
-```
-
-**Key behaviors**:
-
-- Lane metadata is daemon-owned from local Resolume configuration; the UI
-  renders lanes dynamically and must not hard-code two lanes.
-- The UI shows the applied layout, not merely the submitted request.
-- `deckColumns` lists which deck column indices hold each ad; thumbnails are
-  fetched once per unique ad file (not per deck column instance).
-- The phase model is `loading` (staging/opening), `playing` (all files
-  deployed, autopilot cycling), `error`, and `idle` (no layout).
-- The deck autopilot is the ads' transport: every perimeter `on` asserts it to
-  `PERIMETER_DECK_AUTOPILOT` (skipped while a goal overlay is freezing the
-  deck), so a stale pause never leaves the deck stuck on a single ad.
-- Layout changes are **clear-then-load**: the daemon empties all old ad slots
-  across the deck, then stages and opens the new files. A brief blank flash
-  is expected.
-- On a staging/load failure the daemon publishes an `error` status and clears
-  the slots it already emptied.
-- An empty `columns` layout clears the ad clips from all deck columns on the
-  ad lanes (never the whole layer) while preserving the submitted revision in
-  the idle status.
-- The same Storage object may be reused across lanes (identical name +
-  source); a filename mapped to two different sources is rejected because
-  staging copies lane files to a shared remote dir keyed by name.
-- On daemon restart, the desired revision is read and restored; no new
-  revision is created.
-- The status publish is retried and re-published on the listener refresh, so
-  a write lost right after restart self-heals.
-- The goal overlay protocol remains separate and uses the disjoint overlay
-  layers; overlapping lane configuration is rejected at daemon startup.
-
-**UI operations**:
-
-- **Add column**: Dialog with one file selector per lane. Lists existing files
-  (sorted by name) from `{listenPrefix}/perimeter/` in Storage with a small
-  thumbnail preview per option, and permits upload. Saves only when every lane
-  has a selection. Sources are stored as `gs://` URIs. Adding is disabled once
-  the layout reaches 20 columns (the daemon/parser limit). The file-picker
-  styles in `PerimeterControl.css` are deliberately **not** scoped under
-  `.perimeter-preview-modal`: rsuite portals the add dialog to `document.body`,
-  so a preview-modal scope would never match and the dialog would render raw.
-- **Thumbnails**: `controller/PerimeterFileThumb.tsx` renders per-file previews
-  anywhere in the ad-layout UI. It prefers the daemon-published applied
-  thumbnail; when absent (e.g. web venues, freshly edited columns), it resolves
-  the Storage object itself via a cached `getDownloadURL` — images render as
-  `<img loading="lazy">`, videos as a first-frame `<video preload="metadata">`
-  — falling back to an "Engin mynd" placeholder. Resolution failures and media
-  errors degrade to the placeholder instead of breaking the card.
-- **Delete column**: Red X button with confirmation dialog
-  (`Fjarlægja dálk? Skrárnar verða áfram í Firebase Storage.`). Removes only
-  the layout reference, never deletes Storage objects.
-- **Reorder columns**: `@dnd-kit` horizontal sortable pattern with dnd-kit's
-  `closestCenter` collision detection (column IDs are raw UUIDs, so the
-  queue-specific `typedCollisionDetection` — which only matches `col:`/`item:`
-  IDs — would filter out every perimeter droppable). Produces one new
-  full-layout revision with stable column UUIDs.
-- Writes are serialized (queued) and every mutating control (add/delete/drag)
-  is disabled while a write is pending; handlers always compute from the
-  latest desired columns, so a rapid second edit can never clobber the first.
-- A failed Firebase write keeps the board (and the add dialog) open and shows
-  an actionable error in the status bar instead of pretending the revision was
-  saved.
-- Storage listings filter out names that fail the daemon filename rules, and
-  uploads reject such names before they reach Storage.
-
-**Revision comparison**:
-
-If `adLayout.revision !== appliedAdLayout.revision`, the UI shows
-"Uppfærslu beðið" (update pending). When they match, it shows "Lifandi" (live)
-with the daemon phase.
-
-**Skip-forward command (web venues)**:
-
-- The standalone admin header offers a "Næsti dálkur" button (web venues only)
-  that advances every subscribed web perimeter display to the next ad column
-  immediately.
-- The write is an opaque `skipCue` token (a UUID) under the desired
-  `states/{location}/perimeter` path, audited as `perimeter.skip-cue`. Only a
-  change of the token value matters; its content is never interpreted.
-- `parsePerimeterState()` preserves `skipCue` verbatim when it is a non-empty
-  string and drops it otherwise (the field is optional, so absent tokens keep
-  the parsed shape unchanged).
-- `PerimeterDisplay` tracks the last observed token: the first delivery only
-  initializes the baseline (a display that reconnects never replays an old
-  skip), and every subsequent change calls `PerimeterRuntime.skipCue(now)`,
-  which re-anchors the base timeline so the next cue boundary is now — the
-  current cue ends and the following one starts with a full fresh duration. A
-  prepared base revision waiting on a cue boundary commits with the skip. The
-  button is disabled while the perimeter is off or no columns exist.
-- `createBaseTimeline()` stores `cueDurationMs` and `cueCount` in closure
-  variables exposed through accessor properties: the runtime mutates them
-  after construction (`commitPreparedBase`, `replaceConfiguration`), and plain
-  object property writes would never be seen by the timeline's closures.
-
-**Display restart command (web venues)**:
-
-- The standalone admin header also offers an "Endurræsa skjá" button (web
-  venues only) that asks every subscribed web perimeter display to perform a
-  full page reload of itself — the remote equivalent of the manual hard
-  refresh, for when a display is stuck on stale media and the operator cannot
-  reach the venue computer.
-- The write is an opaque `refreshToken` token (a UUID) under the desired
-  `states/{location}/perimeter` path, audited as `perimeter.restart-displays`.
-  Only a change of the token value matters; its content is never interpreted.
-- `parsePerimeterState()` preserves `refreshToken` verbatim when it is a
-  non-empty string and drops it otherwise (same tolerant rules as `skipCue`).
-- `PerimeterDisplay` tracks the last observed token: the first delivery only
-  initializes the baseline (a display that reconnects never replays an old
-  restart), and every subsequent change calls `window.location.reload()`. The
-  effect runs before the runtime exists, so a restart is honored even while
-  the renderer is still initializing.
-- This is perimeter-scoped and independent of `controller.refreshToken`
-  (the "Endurræsa alla skjái" button in the scoreboard controller's
-  Stillingar dialog): the global button also reloads perimeter displays
-  because `RefreshHandler` is mounted in the perimeter display path, while
-  the perimeter button restarts perimeter screens without interrupting
-  scoreboard screens.
-
-Types are defined in `types.ts`:
-
-- `PerimeterAdLayout` — desired layout
-- `PerimeterAdLayoutColumn` — column with per-lane files
-- `PerimeterAdLayoutFile` — filename + `gs://` source
-- `PerimeterAdLane` — lane ID + display name
-- `PerimeterAppliedAdLayout` — daemon-published applied layout
-- `PerimeterAppliedAdColumn` — applied column with deck column mapping
-- `PerimeterAppliedAdFile` — applied file with thumbnail
-- `PerimeterAdPhase` — phase enum (`loading|playing|error|idle`)
-
-Parsing is in `firebaseParsers.ts`:
-
-- `parsePerimeterAdLayout()` — validates desired layout (version, revision,
-  column count, lane set enforcement, filename/bucket safety, duplicate IDs)
-- `parsePerimeterAppliedAdLayout()` — validates applied layout (lanes,
-  revision, phase, columns with `deckColumns`, files)
-
-Write actions are in `FirebaseStateContext.tsx`:
-
-- `setPerimeterAdLayout(layout)` — writes complete desired layout to
-  `states/${listenPrefix}/perimeter/adLayout`. Rejections propagate to the
-  caller (never swallowed), so the controller can surface permission/network
-  failures instead of treating the write as saved.
-
-These are exposed via `usePerimeter()` hook (new fields):
-
-- `adLayout` — desired `PerimeterAdLayout | null`
-- `appliedAdLayout` — applied `PerimeterAppliedAdLayout | undefined`
-- `appliedAdLayoutLoaded` — boolean (subscription delivered)
-- `appliedAdLayoutError` — string | null; set when the applied-status
-  subscription fails (denied/unavailable), so the modal shows a failure
-  instead of an endless loader
-- `setPerimeterAdLayout` — write action
+Types: `PerimeterAdLayout`, `PerimeterAdLayoutColumn`,
+`PerimeterAdLayoutFile`, and `PerimeterAdLane`.
 
 #### Perimeter Brightness (Vnnox LED brightness)
 
@@ -1170,7 +892,7 @@ server timestamp):
 
 - `brightnessAuto` — `PerimeterBrightnessAuto | null`; the Firebase-synced
   desired auto config (`null` = disabled).
-- `setPerimeterBrightnessAuto(config)` — authenticated single-node write of
+- `setPerimeterBrightnessAuto(config)` — authenticated, audited whole-node write of
   the whole config with `updatedAt: serverTimestamp()`; rejects invalid
   configs locally without writing (rejections propagate so the UI can clear
   its pending state).
@@ -1204,8 +926,8 @@ server timestamp):
 **Operator behavior** (`PerimeterControl.tsx` — manual mode):
 
 - The `Bjartleiki jaðarskjás` section renders above the ad-layout board for
-  venues with a brightness controller (it is renderer-agnostic — brightness
-  always flows through a venue-local daemon, never the browser renderer) and is gated
+  **configured and unconfigured web venues** (it is renderer-agnostic — brightness always
+  flows through a venue-local daemon, never the browser renderer) and is gated
   by the same `perimeter.enabled` feature flag (the whole modal is hidden when
   disabled). A web venue only sees the section take effect if its daemon has
   brightness enabled (`PERIMETER_BRIGHTNESS_ENABLED=true`) with the venue's
@@ -1232,179 +954,35 @@ server timestamp):
 - The input carries an accessible label (`aria-label="Bjartleiki jaðarskjás"`)
   matching the section title.
 
-#### Goal-Scorer Perimeter Media Preparation (Resolume venues)
+#### Goal Scorer Selection
 
-**Unsupported legacy pipeline pending #241.** The frontend/Functions code and
-old data remain, but the brightness gateway no longer publishes geometry or
-plays generated media. All venues use the browser-composed scorer described
-below. The following details document the remaining compatibility code.
+`GoalScorerDialog.tsx` validates the selected player and submits a fresh
+version-2 browser scorer command only when the canonical venue has a valid
+published web mapping. The main-screen reveal is submitted first. Missing or
+invalid mappings, unsafe player identifiers, missing numbers, and empty names
+never produce a perimeter scorer command; the independent main-screen reveal
+continues through the existing player/portrait fallback path.
 
-Before a home goal happens, the controller prepares player-specific repeating
-perimeter media for every eligible home player so scorer selection can
-attribute the goal reliably during live play. A Firebase Cloud Function
-renders static PNG bands (see `functions/src/goalScorerPreparation.ts`) using
-the daemon-published overlay geometry; the controller never renders media and
-never infers readiness from Storage listings.
+Scorer selection remains open until the main-screen and applicable perimeter
+writes acknowledge success. A rejection keeps the current dialog open with an
+error for explicit retry. Each selection owns its asynchronous continuation:
+dismissal, unmounting, or a newer selection retires the old continuation, so
+late media/write results cannot submit further commands, close a reopened
+dialog, or replace its error. Already-submitted writes remain irrevocable.
+Browser journeys must wait for the completed selection's dialog to disappear
+before adding another goal, and use normal button actionability; a forced
+click can hit the still-visible modal during its exit animation.
 
-**This pipeline is Resolume-scoped.** A venue whose published
-`locations/{location}/perimeterDisplay` mapping says `renderer: "web"` uses
-the browser-composed semantic scorer overlay instead (see **Web Goal Scorer
-Overlay (Browser Composition)** below): web rosters create no preparation
-request, no geometry/status subscriptions, and no generated output
-dependency. The machinery below starts only at Resolume venues; the
-preparation panel and its "Endurtaka undirbúning" retry are hidden on web
-venues.
+The dialog and shared `TeamPlayerSelectionModal` have no generated-media
+readiness labels. There is no preparation panel, roster-signature effect,
+retry action, request write, geometry/status subscriber, or callable trigger.
+Version-1 files already referenced by goal videos, media pairs, or old overlays
+remain supported, including files from previous generated-media jobs. Do not
+remove these Storage objects as part of frontend retirement.
 
-**Data ownership:**
-
-| Path                                                         | Writer     | Purpose                                                            |
-| ------------------------------------------------------------ | ---------- | ------------------------------------------------------------------ |
-| `states/{location}/perimeter/goalScorerPreparation`          | Controller | Desired preparation request (jobId + home-player snapshot)         |
-| `perimeter/{location}/goalScorerPreparation`                 | Function   | Job progress + per-player ready/fallback/unavailable/failed result |
-| `perimeter/{location}/overlayGeometry`                       | Daemon     | Configured overlay target geometry (native sizes, revision)        |
-| `{location}/players/{playerId}-fagn.png` in Storage          | Operator   | Personalized celebration image (personal source)                   |
-| `{location}/crest.png` in Storage                            | Operator   | Standard club crest (fallback source)                              |
-| `{location}/perimeter-overlays/{jobId}/{48\|40}/` in Storage | Function   | Deterministic rendered PNG output                                  |
-
-**Request schema** (`states/{location}/perimeter/goalScorerPreparation`):
-
-```json
-{
-  "jobId": "uuid",
-  "players": [{ "id": "123", "name": "Jón", "number": 7 }]
-}
-```
-
-- `jobId` is a UUID; it scopes the output storage folder and keys the
-  service-owned status (stale jobs cannot overwrite a newer request).
-- `players` is a snapshot of the home roster at request time, so the job is
-  tied to the requested roster rather than a later mutation.
-- The RTDB rules validate the request shape (jobId string + players object);
-  only authenticated controllers with location access may write it.
-
-**Status schema** (`perimeter/{location}/goalScorerPreparation`):
-
-```json
-{
-  "jobId": "uuid",
-  "phase": "preparing|ready|failed",
-  "readyCount": 2,
-  "fallbackCount": 1,
-  "unavailableCount": 0,
-  "failedCount": 0,
-  "total": 3,
-  "updatedAt": 1723392000000,
-  "error": null,
-  "players": {
-    "123": {
-      "status": "ready|fallback|preparing|unavailable|failed",
-      "error": null,
-      "files": {
-        "2": { "name": "123-<geomRev>-v1-48.png", "source": "gs://..." },
-        "4": { "name": "123-<geomRev>-v1-40.png", "source": "gs://..." }
-      }
-    }
-  }
-}
-```
-
-- `ready` = personalized celebration image; `fallback` = crest-backed. Both
-  carry the two `PerimeterOverlayFile` sources (one per overlay layer) usable
-  directly as an overlay column.
-- `unavailable` = player had no valid identifier; `failed` = a rendering or
-  storage error (safe error text only).
-- `phase: "ready"` means the job completed; per-player failures still show in
-  the counts. `phase: "failed"` means the job itself could not run (e.g. no
-  published geometry).
-
-**Rendering:** the function renders one native-size repeating PNG band per
-configured overlay target. The band repeats `[portrait-or-crest | number |
-name | gap]` across the target width. Source resolution: try
-`{location}/players/{playerId}-fagn.png`, else `{location}/crest.png`. Output
-lives under `{location}/perimeter-overlays/{jobId}/{48|40}/` (the
-daemon-validated media-pair family) so it is directly playable by the existing
-overlay command. Filenames are `{playerId}-{geometryRevision}-v1-{targetFolder}.png`
-(deterministic and geometry-scoped). The `v1` render version changes if the
-renderer layout changes, forcing fresh files. Both the uploaded objects and the
-returned `gs://` source URLs use the function's **active storage bucket**
-(`admin.storage().bucket().name`), so staging output is never advertised under
-the production bucket.
-
-**Controller behavior:**
-
-- `FirebaseStateContext.tsx` subscribes to the geometry and status paths and
-  exposes them through `usePerimeter()` as `overlayGeometry` and
-  `goalScorerPreparationStatus`, plus `requestGoalScorerPreparation()`.
-- `prepareGoalScorerMedia` is an `onRequest` wrapper around the internal
-  callable handler because callable manifests do not declare Cloud Run
-  invokers. The wrapper is public only so browser CORS preflight requests can
-  reach the endpoint; the inner callable still requires Firebase Auth and
-  verifies the caller can access the location.
-- Preparation is requested in the background whenever the home roster gains
-  eligible players (match selection or match-report roster loading) at a
-  Resolume venue. The
-  controller waits for the service-owned preparation status and skips it when
-  its roster signature is unchanged, so a refresh or scorer selection never
-  starts another job. A player
-  is eligible only when they have both a non-empty `id` and a shirt `number`;
-  players without a number are skipped because Firebase rejects `undefined`
-  values and the rendered band cannot attribute an unnumbered player. The
-  write and the `prepareGoalScorerMedia` callable run fire-and-forget and never
-  block the roster from becoming available. The request is gated on the venue
-  being a Resolume venue (`locations/{location}/perimeterDisplay` `renderer:
-"resolume"` **or the mapping absent** — every venue without a published
-  mapping is treated as a legacy Resolume venue, so existing venues never
-  silently lose the pipeline), having opted into the perimeter
-  (`states/{location}/perimeter` `enabled: true`)
-  AND
-  a daemon having published overlay geometry (`perimeter/{location}/overlayGeometry`
-  present) — a venue without either would only produce a job that must fail, so
-  no request is issued for it. The explicit "Endurtaka undirbúning" retry below
-  bypasses the gate. A venue whose published renderer is `web` never receives a
-  preparation request even when the perimeter is enabled.
-- The geometry and preparation-status subscriptions (and the desired
-  request-document subscription) start only for authenticated controllers at
-  Resolume venues. Only a published `renderer: "web"` mapping (or a venue
-  whose locations entry has not loaded yet) stops the subscriptions and
-  resets `overlayGeometry`/`goalScorerPreparationStatus` to null, so a venue
-  switching to web drops its generated-media dependency immediately.
-- `GoalScorerPreparation.tsx` (rendered inside the `Jaðarskjár` modal) lists
-  each home player's celebration-image source and prepared-media outcome with
-  counts and an explicit "Endurtaka undirbúning" retry action.
-- On scorer selection, `GoalScorerDialog.tsx` resolves the venue's published
-  renderer before submitting the perimeter replacement (only an explicit
-  `renderer: "web"` mapping opts into the web path — a missing or
-  unrecognized mapping keeps the legacy Resolume path):
-  - `resolume` (including venues with no published mapping): keeps the
-    generic home-goal overlay until the selected
-    player's preparation result is `ready`/`fallback`; only then does it
-    replace the generic overlay with the player's prepared target pair
-    (version-1 command). The dialog shows a per-player readiness label so the
-    operator knows which players can be attributed. The generic overlay stays
-    when the player is preparing/unavailable/failed.
-  - `web`: validates the selected player's display data and writes a fresh
-    version-2 semantic scorer command (see below) without waiting for or
-    referencing generated media. A player with an invalid identifier, empty
-    name, or missing shirt number still gets the main-screen reveal but never
-    a malformed perimeter command, and shows no readiness label.
-    The main-screen reveal is always submitted before the perimeter command.
-- The existing clear action (`Hreinsa virkt overlay`) writes `overlay: null`,
-  clearing both the main-screen reveal and the player perimeter pair and
-  restoring the rotating perimeter content.
-
-**Daemon geometry** (`perimeter/{location}/overlayGeometry`): the daemon
-publishes validated overlay target geometry derived from its configured layer
-IDs, target folders, and clip canvases, with a `revision` hash. The
-preparation function reads this before rendering and fails safely when it is
-absent or malformed instead of guessing sizes. Each daemon instance publishes
-beneath its own venue's `perimeter/{location}/overlayGeometry` (configurable
-via `PERIMETER_OVERLAY_GEOMETRY_PATH`), so a venue with no geometry has no
-daemon and is skipped by preparation. See `perimeter-control/geometry.js`.
-
-The overlay parsers (`parsePerimeterOverlay`, `parsePerimeterMediaPairs`,
-`parsePerimeterAdLayout`) are scoped to the active environment's storage bucket
-(`FIREBASE_STORAGE_BUCKET`), so a source from another environment's bucket is
-rejected for the active deployment.
+The independently deployed preparation Function remains unchanged for older
+clients until rollout and the separate Phase 2 release described in
+[the deployment hold](../docs/web-only-perimeter-rollout.md).
 
 #### Web Goal Scorer Overlay (Browser Composition)
 
@@ -1429,7 +1007,8 @@ The active overlay channel is a **discriminated union**
 `types.ts`):
 
 - Version 1 (`PerimeterFileOverlay`) — unchanged: timed `columns` of paired
-  overlay files (home-goal videos, named media pairs, Resolume scorer pairs).
+  overlay files (home-goal videos, named media pairs, previously generated
+  scorer files).
 - Version 2 (`GoalScorerOverlayCommand`): semantic player data for browser
   composition. `player.id` is a safe identifier (`[A-Za-z0-9_-]{1,64}`, also
   used to derive the approved celebration-image path), `name` is a bounded
@@ -1533,10 +1112,9 @@ players for semantic submission.
   (`perimeter.scorerCelebration`), written by
   `setPerimeterScorerCelebration()` (audited as
   `perimeter.set-scorer-celebration`) from the **Markasvör** section in the
-  standalone perimeter manager (web venues only; the Resolume
-  preparation pipeline is untouched). Absent or invalid values fall back
-  to `DEFAULT_SCORER_CELEBRATION_STYLE`. The display applies the style
-  before the overlay effect runs, and a style change while a scorer is
+  standalone perimeter manager at configured web venues. Absent or invalid
+  values fall back to `DEFAULT_SCORER_CELEBRATION_STYLE`. The display applies
+  the style before the overlay effect runs, and a style change while a scorer is
   visible recomposes the active command's presentations; failures retain
   the current textures.
 
@@ -1605,7 +1183,7 @@ spacing steady. A missing/unreadable/undecodable pose leaves the usable portrait
 on screen; if neither works, the existing crest chain applies. Arbitrary,
 cross-bucket, and cross-venue card URLs do not get sibling lookups. Both decoded
 portraits are released on clear/replacement, including superseded preparations.
-Main-scoreboard cards and Resolume-generated media are unchanged.
+Main-scoreboard cards and previously generated files are unchanged.
 
 **Runtime channel** (`perimeter/runtime.ts`): `setPlayerBand(band | null,
 now)` with scorer-style generation lifecycle (atomic activation, stale
@@ -1695,6 +1273,37 @@ silently override the entrance opacity or palette.
   standalone perimeter manager (web venues only), adjacent to the
   Markasvör section, with the same pending-write disable pattern.
 
+### Venue Metadata
+
+`parseVenue()` / `parseLocations()` in `firebaseParsers.ts` provide the shared
+validated `Venue` model for `LocationsManager` and runtime. The locations
+subscription exposes `useListeners().venues[locationKey]` independently of
+the flattened scoreboard `screens` selector entries. Read venue configuration
+and perimeter mappings from `venues`, including for perimeter-only venues.
+Screen entries retain their existing labels, keys, viewports and mapping
+projection; authenticated selectors still use the operator's allowed locations.
+
+`config.homeTeam` selects the KSI team for today's matches, match reports and
+roster refetches. Team and pitch IDs normalize positive safe integers and
+legacy decimal strings to numbers; missing/invalid home-team IDs alone use
+the historical 2492 fallback. Screen definitions accept Firebase arrays,
+sparse arrays and keyed maps, retaining child keys for edits. Admin saves
+patch changed metadata leaves (including mapping publications) and clear only
+`config/homeTeam` when that field is emptied, preserving unknown venue,
+config, screen and mapping metadata. Reads never migrate persisted documents.
+`Venue.document` retains the original snapshot solely for metadata edits;
+mapping edits retain legacy aliases/array indices and fully write missing
+defaulted objects on first edit.
+
+`LocationsManager` derives its editor remount keys from the venue key and known
+editable fields only. Unrelated metadata snapshots preserve open panels and
+unsaved drafts; changes to known venue/screen/mapping fields still refresh the
+editor, and a different venue key starts a separate draft. Screen drafts and
+save comparisons also project only editable fields, so saving after an unknown
+config, screen or style metadata update cannot restore stale metadata from the
+draft. Leaf writes still use the latest canonical `Venue.document` for stored
+paths and defaulted branches.
+
 ### The `listenPrefix` System
 
 The `listenPrefix` (e.g., `"vikinni"`, `"hasteinsvollur"`) determines which Firebase path the instance subscribes to:
@@ -1763,6 +1372,8 @@ interface QueueState {
 - Empty non-cycling queues are auto-deleted via `maybeAutoDeleteQueue()`
 - `computeControllerDiff()` writes per-queue nested paths (`queues/{id}/items`) to prevent multi-controller data loss
 - `parseQueueMap()` in `firebaseParsers.ts` validates queue data and auto-repairs duplicate `order` values
+- `parseCurrentAsset()` validates playback envelopes and preserves legitimate legacy absence without generating IDs
+- Storage library keys remain stable; existing queue duplicate rejection applies. Playback occurrence identity is separate from media identity/URL
 
 **Component hierarchy**:
 | Component | File | Purpose |
@@ -1778,7 +1389,26 @@ interface QueueState {
 | `dndUtils` | `queue/dndUtils.ts` | DnD ID namespacing + `typedCollisionDetection` (see **Drag-and-Drop Collision Detection** below) |
 
 **State operations** (in `FirebaseStateContext.tsx`):
-`createQueue`, `deleteQueue`, `renameQueue`, `reorderQueues`, `addItemsToQueue`, `removeItemFromQueue`, `reorderItemsInQueue`, `updateQueueSettings`, `playQueue`, `stopPlaying`, `showItemNow`
+`createQueue`, `replaceQueue`, `appendSubstitutionAndActivate`, `deleteQueue`, `renameQueue`, `reorderQueues`, `addItemsToQueue`, `removeItemFromQueue`, `reorderItemsInQueue`, `updateQueueSettings`, `playQueue`, `stopPlaying`, `showItemNow`
+
+Create/replace with initial items and substitution (including both roster
+flags) are single audited intents. Existing queue fields are written as leaf
+paths; metadata edits never replace items or unrelated autoplay settings.
+Only subscription callbacks update shared calculation refs. See the
+[queue intent contract and caller inventory](../docs/session-mutation-boundary.md#queue-intents-and-compound-callers-243).
+
+SDK local echoes do not prove that a newly created queue is durable.
+`PendingQueueCreations` tracks only in-flight creation acknowledgements,
+registered before the SDK call (including synchronous/reentrant echoes).
+Commands targeting a pending queue wait for settlement, then recompute their
+diff and player eligibility from current subscription refs with their original
+command origin. Named replacement/substitution can resolve the restored queue
+or create a complete new queue after denial; explicit ID operations reject if
+that queue disappeared. Overlapping waiters check dependencies again, and
+session changes cancel waiting commands immediately, even without an ack.
+Independent creations and operations on durable queues remain available and
+keep leaf diffs. There is no shadow queue state, timeout, offline replay or
+general server conflict resolution.
 
 #### QueuePicker Behavior
 
@@ -1789,6 +1419,19 @@ interface QueueState {
 3. **"Ný biðröð"** (primary button at bottom) — creates a new queue and adds the asset
 
 Special case: **0 queues** → auto-creates "Biðröð 1" and adds the item (no dialog shown).
+
+`useQueuePickerActions` owns each draft's media and the commands captured
+before asynchronous preparation. Rerenders cannot give an old draft a newer
+venue/session origin. Create-with-items and append are awaited; rejected
+saves retain the draft and display an error. A failed automatic create on an
+empty board opens the dialog for explicit retry. Each draft has a unique
+`draftId`; `QueuePicker` keys its inner component by that ID so pending/error
+feedback, the immediate submission guard and automatic-create tracking belong
+only to that draft, including identical-assets A → B → A selections. An older
+completion cannot close or unlock a newer draft or replace its error. A ready
+draft remains usable while a newer selection prepares; once the newer media
+is ready, an older preparation cannot replace that draft. Newer selections
+and unmounting also retire obsolete preparation errors.
 
 The old "Birta strax" / "Setja í biðröð" radio buttons in MediaManager were removed. `ImageList` no longer has a `displayNow` prop — it always calls `onAddAssets`, which opens QueuePicker.
 
@@ -1832,18 +1475,33 @@ is no transcoding.
 
 #### createQueue Options
 
-`createQueue(name, options?)` accepts an optional `options` parameter:
+`createQueue(name, items = [], options?)` creates all initial items in one
+audited update and returns a `Promise<string>` that resolves to its ID only
+after submission succeeds:
 
 ```typescript
-createQueue(name: string, options?: { cycle?: boolean })
+createQueue(name: string, items?: Asset[], options?: { cycle?: boolean }): Promise<string>
 ```
 
 - `cycle` defaults to `true` (loop by default for most queues)
 - Team queues pass `{ cycle: false }` since lineup sequences shouldn't loop
 
+Never chain create/append/activate to assemble an operator action. Use
+`replaceQueue(name, items, options?)` for a named team replacement and
+`appendSubstitutionAndActivate` for substitutions. These remain ordinary
+current-origin commands, separate from generation-conditional playback CAS.
+
 #### Team Queue Integration
 
 `TeamAssetController.tsx` renders a "Setja lið í biðröð" button above each team (home/away) separately. Clicking it creates a named queue (e.g., "Víkingur R") containing that team's starting lineup as player card assets. The queue is created with `cycle: false` since lineup presentations are one-shot sequences.
+
+All player media is prepared first, then the retained `replaceQueue` command
+creates/replaces the complete queue in one update. Preparation failure leaves
+the old queue intact. Submission failure is shown without leaving the team
+view. Replacement retains the old delete/create placement (new ID, after the
+remaining queues) and clears playback only if the replaced queue was active.
+Successful navigation runs directly after acknowledgement while the initiating
+action still owns the team view, without a deferred navigation timer.
 
 #### Manual Roster Creation (Resolve Roster)
 
@@ -1882,9 +1540,40 @@ Firebase-backed behavior.
   `showPlayerCard(player, teamKey)` and `showMOTM(player, teamKey)` operations.
 - The substitution flow preserves the established sequence: on-pitch
   (`show: true`) players for the outgoing step, eligible off-pitch players
-  (`!show && number != null`) for the incoming step, `editPlayer` roster status
-  updates, trimming of last names on the generated assets, `Skiptingar` queue
-  creation/append/activation, and the home-team reveal background on assets.
+  (`!show && number != null`) for the incoming step, trimming of last names on
+  the generated assets and the home-team reveal background. Both cards prepare
+  before the retained `appendSubstitutionAndActivate` command submits the
+  `Skiptingar` queue creation/append/activation and both roster status leaves
+  together. At submission, both players are resolved from the current subscribed
+  roster: outgoing must still have `show`, and incoming must still satisfy
+  `!show && number != null`. An absent, identical or ineligible selection rejects
+  the entire intent before any queue, roster or audit write. This also rejects
+  overlapping preparations that reuse a player after another substitution's
+  SDK echo, while independent and ordered substitutions remain eligible. The
+  existing current asset and playing flag are preserved. Current substitution
+  failures are shown in the team/shortcut box; player-card and MOTM failures
+  are passed to the open selection modal's `error` prop so feedback stays
+  visible above its backdrop and selection can be retried. The shared modal
+  renders its alert in the fixed header outside the scrolling player list,
+  keeping current feedback visible at lower roster rows without moving
+  keyboard focus. Player-card and
+  MOTM operations await their retained
+  `renderAsset` command before reporting success. Each player selection owns its
+  media and UI continuation: dismissal, replacement, a newer selection or
+  unmounting retires it. Submitted acknowledgements can close or report errors
+  only for that selection in its original mutation session (including venue or
+  auth A → B → A). Already-submitted writes remain irrevocable. An origin
+  rejection before submission still explains why the current draft could not
+  save. The hook's `beginAction` is also used by the Lið tab's inline
+  player/MOTM, lineup replacement and roster-fetch feedback. New actions,
+  dismissal and unmounting retire older feedback across those callers;
+  delayed substitution failures cannot overwrite a newer player error.
+  Closed substitution actions report failures only within their original
+  mutation session, including rejections after delayed media preparation.
+  Retirement gates UI feedback only: an independent substitution or lineup
+  replacement still reaches its retained command and current-roster/session
+  validation. Roster-fetch loading has a separate request lifetime so its
+  completion releases its spinner without clearing a newer action's error.
 - **Corrected SUB field semantics**: `subIn` carries the player **coming
   on** and `subOut` the player **going off** (the persisted fields were
   previously inverted from their meaning). The creation site builds
@@ -2067,7 +1756,12 @@ All properties are CSS value strings. Grouped by display area:
 - **Editing a custom preset** updates it directly (no copy behavior)
 - **Creating a new preset** creates a blank custom preset with `DEFAULT_THEME` values
 - **Deleting** a custom preset removes it from Firebase; if it was active, falls back to Default
-- **Renaming** custom presets is supported via double-click on the preset name
+- **Renaming** custom presets uses the pencil button. Completion belongs to
+  the submitting edit instance, draft revision, submission, modal lifetime,
+  and session scope. Late success/failure cannot close or change feedback on
+  a newer, reopened, or same-ID revised draft. Enter followed by blur submits
+  once, including a blur after reopening. A matching rejected save keeps its
+  draft/error and permits an explicit Enter retry.
 
 #### Key Files
 
@@ -2462,8 +2156,9 @@ that materializes an editable draft (first screen as a single logical screen,
 20 s cue default) so a first mapping can be bootstrapped and published from
 the UI instead of a hand-written Firebase document. The editor keeps changes
 in a local draft, can show a calibration
-preview, validates exact source coverage, and publishes a new revision as one
-complete Firebase document. Its Playback control edits the base-ads cue
+preview, validates exact source coverage, and publishes a new revision in one
+atomic metadata update that preserves unknown fields. Its Playback control
+edits the base-ads cue
 length in seconds (stored as `playback.cueDurationMs`, defaulting to 20 s
 when absent); validation rejects non-positive durations, and short videos
 loop while long ones speed up to fit the configured cue. Besides the generic
@@ -2480,9 +2175,11 @@ stacked layout that reproduces the published Virkið staging document
 (3648x384 framebuffer, screen-3648 at y=0, screen-3264 at y=192). Both are
 no-ops for drafts lacking the expected logical screens. See
 `perimeter-control/WEB_MAPPING_MEASUREMENT.md` and
-`perimeter-control/WEB_RENDERER_QUALIFICATION.md`. All venues now use `web`;
-Resolume is unsupported. This retirement does not publish mapping changes or
-qualify physical output; hardware qualification remains HOLD.
+`perimeter-control/WEB_RENDERER_QUALIFICATION.md`. These measurement records
+remain historical references. Runtime mappings now accept only
+`renderer: "web"`; missing/invalid mappings are unconfigured, with no inferred
+geometry.
+Gateway retirement does not publish mapping changes or qualify physical output.
 
 Public Storage reads are limited to `{location}/perimeter/`,
 `{location}/perimeter-overlays/`, the venue crest (`{location}/crest.png`),
@@ -2503,8 +2200,8 @@ reads remain denied.
   restart the qualified web perimeter displays (`Endurræsa skjá`) BEFORE
   enabling controller submission at the venue. A stale web bundle cannot parse
   version-2 commands — the command would be ignored (or rejected by strict
-  parsing), leaving the generic goal overlay visible. Resolume commands remain
-  version 1 and are unaffected.
+  parsing), leaving the generic goal overlay visible. Existing version-1 file
+  commands remain supported.
 - **Qualification cases** for a web venue after the restart: personalized
   celebration band, crest fallback (no `players/{id}-fagn.png`), unavailable
   sources (neither object exists — bundled home-team crest shown), long names
@@ -2512,18 +2209,26 @@ reads remain denied.
   off, scorer restored), and mapping replacement (bands recomposed at the new
   logical dimensions). The targeted Playwright scenario is
   `e2e/perimeter-goal-scorer.spec.ts` (emulator).
-- **Compatibility boundary**: the daemon and the Resolume preparation
-  pipeline never see a semantic command — Resolume venues keep version-1
-  commands, and web rosters create no preparation requests, geometry/status
-  subscriptions, or generated output dependency.
-- **Rollback**: an authorized operator restores the last qualified web
-  display/controller bundle and compatible mapping/media revision. Preserve
-  roster, media and compatibility data. Generated scorer cleanup is separate
-  work; the retired Resolume executor is not a rollback target.
+- **Compatibility boundary**: version-1 file overlays (including previously
+  generated files), media pairs, `compatibilityKeys`, generation backfill,
+  player/crest Storage access, diagnostics/cache, and hardware brightness remain.
+  There is no missing-mapping fallback to generated scorer preparation.
+- **Phase 1 deployment hold**: retain `prepareGoalScorerMedia` and all backend
+  dependencies/rules until this client is deployed and older controllers have
+  been refreshed in each environment. The independent Functions workflow can
+  run before the frontend; removing its export now could break older clients.
+  Phase 2 and retained-Function health checks require separate qualification.
+- **Rollback**: clear a semantic overlay before restoring a client that cannot
+  parse it. Keep existing file references/cache data and the retained Function
+  available during rollout. This phase performs no remote changes.
 
-If no qualified web output is available, keep the output off pending operator
-recovery. Preserve the prior cached revision until a replacement is qualified,
-and keep the Vnnox/UCenter route available for physical brightness.
+To roll back the browser perimeter target entirely, remove or change the
+venue's web mapping so the selector stops offering Perimeter, then select a
+qualified display configuration. Missing mappings remain unconfigured and do
+not activate another playback path. Do not delete the prior cached revision
+until the replacement has been qualified.
+The retired Resolume executor is not a rollback target. Keep the Vnnox/UCenter
+route available for physical brightness.
 
 **Storage CORS (one-time bucket configuration)**: unlike `<img>` tags elsewhere
 in the app, the perimeter media loader downloads via `fetch()` into Cache
