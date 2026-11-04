@@ -62,64 +62,36 @@ test.describe("Admin portal", () => {
     });
   }
 
-  test("admin sees Stjórnborð link on screen selector", async ({ page }) => {
-    await loginAsAdmin(page);
-    await page
-      .getByRole("link", { name: /Stjórnborð/i })
-      .waitFor({ state: "visible", timeout: 15000 });
-    await expect(page.getByText("Admin")).toBeVisible();
-  });
-
-  test("non-admin does not see Stjórnborð link", async ({ page }) => {
-    await loginAsRegularUser(page);
-    await expect(
-      page.getByRole("link", { name: /Stjórnborð/i }),
-    ).not.toBeVisible();
-  });
-
-  test("navigate to /admin as admin shows portal", async ({ page }) => {
-    await loginAsAdmin(page);
-    await page.goto("/admin");
-    await page
-      .getByRole("heading", { name: /Stjórnborð/i })
-      .waitFor({ state: "visible", timeout: 15000 });
-    await expect(page.getByText("Stjórna notendum")).toBeVisible();
-    await expect(page.getByText("Boð í bið")).toBeVisible();
-  });
-
   test("navigate to /admin as non-admin shows access denied", async ({
     page,
   }) => {
     await loginAsRegularUser(page);
+    await expect(
+      page.getByRole("link", { name: /Stjórnborð/i }),
+    ).not.toBeVisible();
     await page.goto("/admin");
     await expect(
       page.getByText("Aðgangur bannaður", { exact: false }),
     ).toBeVisible({ timeout: 15000 });
   });
 
-  test("admin portal shows pending invitations section", async ({ page }) => {
-    await loginAsAdmin(page);
-    await page.goto("/admin");
-    await page
-      .getByRole("heading", { name: /Stjórnborð/i })
-      .waitFor({ state: "visible", timeout: 15000 });
-    await expect(page.getByText("Boð í bið")).toBeVisible();
-    await page.getByRole("button", { name: "Bjóða notanda" }).click();
-    await expect(
-      page.getByRole("dialog").getByText("Bjóða notanda"),
-    ).toBeVisible();
-  });
-
   test("create invitation shows in table", async ({ page }) => {
     await loginAsAdmin(page);
-    await page.goto("/admin");
+    const adminLink = page.getByRole("link", { name: /Stjórnborð/i });
+    await expect(adminLink).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText("Admin")).toBeVisible();
+    await adminLink.click();
+    await expect(page).toHaveURL(/\/admin$/);
     await page
       .getByRole("heading", { name: /Stjórnborð/i })
       .waitFor({ state: "visible", timeout: 15000 });
 
+    await expect(page.getByText("Stjórna notendum")).toBeVisible();
+    await expect(page.getByText("Boð í bið")).toBeVisible();
     await page.getByRole("button", { name: "Bjóða notanda" }).click();
     const dialog = page.getByRole("dialog");
     await dialog.waitFor({ state: "visible", timeout: 5000 });
+    await expect(dialog.getByText("Bjóða notanda")).toBeVisible();
     await dialog.getByLabel("Netfang:").fill("invitee@example.com");
     // Wait for location checkboxes to load (onValue may resolve after fetchUsers)
     const checkbox = dialog.getByRole("checkbox").first();
