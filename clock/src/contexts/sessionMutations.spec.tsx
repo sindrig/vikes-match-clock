@@ -2303,6 +2303,269 @@ function NestedDisplay() {
   );
 }
 
+describe("ordinary roster commands preserve raw child identity", () => {
+  const starter = { ...player, annotation: { keep: "starter" } };
+  const coach = { name: "Coach", role: "Þjálfari", producer: { keep: 3 } };
+  const rejected = { name: { invalid: true }, annotation: { keep: "raw" } };
+  const blank = { name: "", number: "", show: false, role: "" };
+  const replacement = [{ name: "Replacement", number: 42, source: "API" }];
+  const layouts: Array<{
+    name: string;
+    raw: unknown;
+    selected: string;
+    next: string;
+  }> = [
+    {
+      name: "dense",
+      raw: [starter, coach, rejected],
+      selected: "0",
+      next: "3",
+    },
+    {
+      name: "array with a hole",
+      raw: [starter, null, coach, rejected],
+      selected: "0",
+      next: "4",
+    },
+    {
+      name: "sparse numeric map",
+      raw: { 17: starter, 26: rejected, 31: coach, 40: false },
+      selected: "17",
+      next: "41",
+    },
+    {
+      name: "named map",
+      raw: { zCoach: coach, aStarter: starter, bRejected: rejected },
+      selected: "aStarter",
+      next: "zCoach~",
+    },
+  ];
+
+  function seed(side: "home" | "away", raw: unknown) {
+    write("states/A/controller/roster", {
+      home: structuredClone([starter, null, rejected, coach]),
+      away: structuredClone([starter, null, rejected, coach]),
+      [side]: structuredClone(raw),
+      provenance: { keep: "roster metadata" },
+    });
+    mount();
+    clearAttempts();
+    return structuredClone(object(read("states/A/controller/roster")));
+  }
+
+  function expectIntent(action: string, diff: Data) {
+    expect(firebaseDatabase.writeAudited).toHaveBeenCalledExactlyOnceWith(
+      "A",
+      "controller",
+      diff,
+      expect.objectContaining({ action }),
+    );
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(runTransaction).not.toHaveBeenCalled();
+    const events = Object.values(object(read("audit/A")));
+    expect(events).toHaveLength(1);
+    expect(object(events[0]).changes).toBe(JSON.stringify(diff));
+  }
+
+  describe.each(layouts)("$name", ({ raw, selected, next }) => {
+    it.each(["home", "away"] as const)(
+      "edits only requested %s child fields",
+      async (side) => {
+        const before = seed(side, raw);
+        await act(async () => {
+          currentApi.editPlayer(side, 0, {
+            show: false,
+            number: "07",
+            role: undefined,
+          });
+        });
+        const expected = structuredClone(before);
+        Object.assign(object(object(expected[side])[selected]), {
+          show: false,
+          number: "07",
+        });
+        expect(read("states/A/controller/roster")).toEqual(expected);
+        expectIntent("controller.edit-player", {
+          [`roster/${side}/${selected}/show`]: false,
+          [`roster/${side}/${selected}/number`]: "07",
+        });
+      },
+    );
+
+    it.each(["home", "away"] as const)(
+      "deletes the actual %s child without rekeying siblings",
+      async (side) => {
+        const before = seed(side, raw);
+        await act(async () => currentApi.deletePlayer(side, 0));
+        const expected = structuredClone(before);
+        delete object(expected[side])[selected];
+        expect(read("states/A/controller/roster")).toEqual(expected);
+        expectIntent("controller.delete-player", {
+          [`roster/${side}/${selected}`]: null,
+        });
+        expect(currentApi.controller.roster[side]).toEqual([coach]);
+      },
+    );
+
+    it.each(["home", "away"] as const)(
+      "appends an unused %s child after rejected rows too",
+      async (side) => {
+        const before = seed(side, raw);
+        await act(async () => currentApi.addPlayer(side));
+        const expected = structuredClone(before);
+        object(expected[side])[next] = blank;
+        expect(read("states/A/controller/roster")).toEqual(expected);
+        expectIntent("controller.add-player", {
+          [`roster/${side}/${next}`]: blank,
+        });
+        expect(currentApi.controller.roster[side]).toEqual([
+          starter,
+          coach,
+          blank,
+        ]);
+      },
+    );
+
+    it.each(["home", "away"] as const)(
+      "replaces only the requested %s side",
+      async (side) => {
+        const before = seed(side, raw);
+        await act(async () => currentApi.setRoster({ [side]: replacement }));
+        expect(read("states/A/controller/roster")).toEqual({
+          ...before,
+          [side]: replacement,
+        });
+        expectIntent("controller.set-roster", {
+          [`roster/${side}`]: replacement,
+        });
+      },
+    );
+  });
+
+  it("uses subscription keys across rapid SDK echoes, deletion and additions with a retained current-origin API", async () => {
+    const before = seed("home", {
+      17: starter,
+      26: rejected,
+      31: coach,
+      40: false,
+    });
+    const retained = currentApi;
+    await act(async () => {
+      retained.editPlayer("home", 0, { show: false });
+      retained.editPlayer("home", 0, { name: "Edited" });
+      retained.deletePlayer("home", 0);
+      retained.editPlayer("home", 0, { name: "Coach edited" });
+      retained.addPlayer("home");
+      retained.addPlayer("home");
+    });
+    expect(read("states/A/controller/roster")).toEqual({
+      ...before,
+      home: {
+        26: rejected,
+        31: { ...coach, name: "Coach edited" },
+        40: false,
+        41: blank,
+        42: blank,
+      },
+    });
+    expect(
+      vi
+        .mocked(firebaseDatabase.writeAudited)
+        .mock.calls.map((call) => call[2]),
+    ).toEqual([
+      { "roster/home/17/show": false },
+      { "roster/home/17/name": "Edited" },
+      { "roster/home/17": null },
+      { "roster/home/31/name": "Coach edited" },
+      { "roster/home/41": blank },
+      { "roster/home/42": blank },
+    ]);
+    expect(update).toHaveBeenCalledTimes(6);
+  });
+
+  it("ignores unchanged supplied projections and out-of-range selections", async () => {
+    const before = seed("home", { 17: starter, 26: rejected });
+    await act(async () => {
+      currentApi.setRoster(currentApi.controller.roster);
+      currentApi.editPlayer("home", 0, { show: true, role: undefined });
+      for (const index of [-1, 1, 0.5, NaN]) {
+        currentApi.editPlayer("home", index, { name: "Wrong" });
+        currentApi.deletePlayer("home", index);
+      }
+    });
+    noAttempts();
+    expect(read("states/A/controller/roster")).toEqual(before);
+  });
+
+  it("keeps a rendered child's key across an earlier deletion and ignores keys that disappeared", async () => {
+    seed("home", { 17: starter, 26: rejected, 31: coach });
+    const retained = currentApi;
+    await act(async () => {
+      retained.deletePlayer("home", "17");
+      retained.editPlayer("home", "31", { show: true });
+      retained.editPlayer("home", "17", { name: "Do not resurrect" });
+      retained.deletePlayer("home", "17");
+      retained.deletePlayer("home", "26");
+    });
+    expect(read("states/A/controller/roster/home")).toEqual({
+      26: rejected,
+      31: { ...coach, show: true },
+    });
+    expect(
+      vi
+        .mocked(firebaseDatabase.writeAudited)
+        .mock.calls.map((call) => call[2]),
+    ).toEqual([{ "roster/home/17": null }, { "roster/home/31/show": true }]);
+    expect(update).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects roster replacement through the generic controller writer", async () => {
+    const before = seed("home", { 17: starter, 26: rejected });
+    const genericUpdate = {
+      view: "match",
+      roster: currentApi.controller.roster,
+    };
+    await act(async () => currentApi.updateController(genericUpdate));
+    noAttempts();
+    expect(read("states/A/controller/roster")).toEqual(before);
+    expect(currentApi.mutationError).toBe(
+      "Use roster commands to change players.",
+    );
+  });
+
+  it("explicitly replaces both imported sides but only full clear removes roster metadata", async () => {
+    const before = seed("home", { 17: starter, 26: rejected });
+    await act(async () =>
+      currentApi.setRoster({ home: replacement, away: [] }),
+    );
+    expect(read("states/A/controller/roster")).toEqual({
+      ...before,
+      home: replacement,
+      away: [],
+    });
+    expectIntent("controller.set-roster", {
+      "roster/home": replacement,
+      "roster/away": [],
+    });
+    clearAttempts();
+    await act(async () => currentApi.clearRoster());
+    expect(read("states/A/controller/roster")).toEqual({ home: [], away: [] });
+    expect(firebaseDatabase.writeAudited).toHaveBeenCalledExactlyOnceWith(
+      "A",
+      "controller",
+      { roster: { home: [], away: [] } },
+      expect.objectContaining({ action: "controller.clear-roster" }),
+    );
+  });
+
+  it("clears rejected raw rows even when the parsed roster is empty", async () => {
+    seed("home", { 26: rejected });
+    await act(async () => currentApi.setRoster({ home: [] }));
+    expectIntent("controller.set-roster", { "roster/home": [] });
+    expect(read("states/A/controller/roster/home")).toEqual([]);
+  });
+});
+
 describe("nested data at subscription and conditional-write boundaries", () => {
   it("renders a mixed roster and rejects malformed media/penalties with no SDK or audit attempt", async () => {
     write("states/A/controller/currentAsset", {

@@ -1321,8 +1321,25 @@ fields normalize to absence, unnamed manual players to an empty name, and
 missing/null playback duration to null. Manual string IDs, foreign names,
 non-digit shirt text, coaches and partial player cards remain structurally
 valid. Unknown entry metadata survives accepted read/write round trips.
-Substitution leaf commands use the original Firebase roster child keys,
-retained outside the serialized model, rather than filtered array indexes.
+All ordinary roster edits and substitution leaf commands use the original
+Firebase child keys retained outside the serialized model, rather than filtered
+array indexes. `editPlayer` writes only supplied changed fields; `deletePlayer`
+removes the selected raw child; `addPlayer` appends after all raw child keys,
+including rejected rows. Numeric keys retain producer array order (players,
+then officials); named legacy keys follow in lexical order. Additions use the
+next numeric key or append `~` to the last named key (rejecting a key over
+Firebase's 768-byte limit), without moving any existing child. Allocation uses
+subscription deliveries, including SDK echoes, with the existing last-write-wins
+limit across controllers; it keeps no optimistic roster state.
+Edit/delete accept a raw child key (the Team checkbox passes its rendered key)
+or a current projection index for existing API callers. A disappeared/rejected
+key is ignored, so an earlier deletion cannot retarget a retained row control.
+`setRoster` deliberately replaces only supplied sides (`Partial<Roster>`),
+preserving the other raw side and roster metadata; unchanged subscription-array
+references are ignored. Lineup fetches supply both sides; Resolve Roster supplies
+one side. `clearRoster` explicitly replaces the entire roster, including raw
+rejected rows and roster metadata. Generic `updateController` rejects roster
+replacement; callers must express roster intent through these commands.
 Readers do not repair persisted state or generate playback IDs. Presentation
 limits remain downstream; viewport CSS projection omits structured metadata
 without deleting it from the admin model. See the
@@ -1510,7 +1527,7 @@ When a team side has no players loaded, `TeamAssetController.tsx` shows a **"Bú
 5. API returns `{ players: TeamPlayer[], officials: [] }` (TeamLineup shape) for the requested side
 6. Response is transformed with `transformSingleLineup()` in `lib/matchUtils.ts`, the same adapter used by `transformLineups()`: goalkeeper roles take precedence over captain, missing flags default to false, absent shirt numbers are omitted, and hidden coaches follow players
 7. A preview shows player numbers, names, and roles grouped by starters/substitutes
-8. On confirm, the generated roster merges into the existing roster via `setRoster({ ...roster, [side]: generatedPlayers })`
+8. On confirm, only the generated side is replaced via `setRoster({ [side]: generatedPlayers })`; the untouched raw side and roster-level metadata are preserved.
 
 **Key files**:
 

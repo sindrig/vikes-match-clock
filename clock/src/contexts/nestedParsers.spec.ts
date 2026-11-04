@@ -16,6 +16,7 @@ import {
   parseViewPort,
 } from "./firebaseParsers";
 import {
+  nextPlayerChildKey,
   parseAssetCollection,
   parsePenaltyCollection,
   playerChildKey,
@@ -259,6 +260,55 @@ describe("canonical nested structures and supported legacy round trips", () => {
     expect(playerChildKey(roster.home, 0)).toBe("10");
     expect(playerChildKey(roster.away, 0)).toBe("0");
     expect(JSON.parse(JSON.stringify(roster))).toEqual(roster);
+  });
+
+  it("retains producer order, including coaches after players rather than shirt-number order", () => {
+    const produced = [
+      { name: "First", number: 20 },
+      { name: "Second", number: 1 },
+      { name: "Coach", role: "Þjálfari" },
+    ];
+    const roster = parseRoster({ home: produced });
+    expect(roster.home).toEqual(produced);
+    expect(roster.home.map((_, i) => playerChildKey(roster.home, i))).toEqual([
+      "0",
+      "1",
+      "2",
+    ]);
+    expect(nextPlayerChildKey(roster.home)).toBe("3");
+    expect(nextPlayerChildKey(roster.away)).toBe("0");
+  });
+
+  it("orders mixed legacy keys deterministically and allocates after rejected raw children without changing the read source", () => {
+    const raw = {
+      z: { name: "Z" },
+      a: { name: "A" },
+      10: { name: "Ten" },
+      2: { name: "Two" },
+      zzRejected: { name: { invalid: true } },
+    };
+    const before = structuredClone(raw);
+    const { home } = parseRoster({ home: raw });
+    expect(home.map((p) => p.name)).toEqual(["Two", "Ten", "A", "Z"]);
+    expect(home.map((_, i) => playerChildKey(home, i))).toEqual([
+      "2",
+      "10",
+      "a",
+      "z",
+    ]);
+    expect(nextPlayerChildKey(home)).toBe("zzRejected~");
+    expect(raw).toEqual(before);
+    expect(JSON.parse(JSON.stringify(home))).toEqual(home);
+    expect(nextPlayerChildKey(parseRoster({ home: { 8: false } }).home)).toBe(
+      "9",
+    );
+  });
+
+  it("rejects an overlong append key without rekeying a legacy collection", () => {
+    const raw = { ["a".repeat(768)]: { name: "Keep" } };
+    const { home } = parseRoster({ home: raw });
+    expect(() => nextPlayerChildKey(home)).toThrow("of langur gagnalykill");
+    expect(Object.keys(raw)).toEqual(["a".repeat(768)]);
   });
 
   it("keeps finite penalty creation data and metadata, without coercion", () => {

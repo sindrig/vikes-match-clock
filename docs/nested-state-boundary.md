@@ -36,6 +36,37 @@ sparse numeric children. Invalid entries are discarded independently. Retain
 the actual child key for roster leaf commands; never substitute a compacted
 array index. Parsing is read-only and never repairs persisted data itself.
 
+Roster display order follows the actual array producers: numeric child keys in
+numeric order, including holes, with coaches/officials following players as
+produced. Named legacy children follow in lexical key order, independent of
+snapshot object insertion order. Shirt numbers never determine roster order.
+Parser-only key metadata also retains rejected raw child keys for allocation;
+it contains no optimistic values and is never serialized.
+The Team checkbox passes the rendered raw key. Edit/delete also retain numeric
+projection-index support for existing API callers; raw-key selections are
+resolved against the current subscription and ignored if no valid row remains.
+
+Ordinary roster commands never persist the compacted read projection:
+
+| Writer / production caller                                                                 | Intended update                                                                                           |
+| ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| `editPlayer` / Team checkbox                                                               | Changed supplied fields at the selected original child key; omitted/undefined fields are untouched        |
+| `deletePlayer` / public controller API (no production UI caller)                           | Null deletion of the selected original child, without shifting siblings                                   |
+| `addPlayer` / public controller API (no production UI caller)                              | One editable blank row at the next unused numeric child, or after the last named child using a `~` suffix |
+| `setRoster` / `TeamAssetController.refetchRoster`, both `TodaysMatches` lineup-fetch paths | Explicit replacement of both supplied sides, preserving roster-level metadata                             |
+| `setRoster` / Resolve Roster confirmation                                                  | Explicit replacement of the one supplied side, preserving the other raw side and roster-level metadata    |
+| `clearRoster` / team clear button                                                          | Explicit whole-roster replacement, including rejected rows and roster-level metadata                      |
+
+Side replacements accept `Partial<Roster>` and skip unchanged subscription-array
+references. Rejected rows within an explicitly replaced side are intentionally
+removed. Additions consider every raw child, including rejected rows, and never
+reuse holes or rekey existing siblings. A named append that exceeds Firebase's
+768-byte key limit rejects before submission. Rapid SDK echoes refresh the same
+subscription refs; commands do not create shadow state, new transactions, or
+general multi-controller conflict resolution. Generic `updateController` no
+longer accepts roster replacement. Each submitted ordinary roster command still
+uses its original session origin and one exact audited root update.
+
 Known optional null player/card scalar fields normalize to absence (Firebase
 removes null children); explicit `overlay: null` remains a supported empty
 overlay. Unnamed manual players with other known fields normalize to an empty

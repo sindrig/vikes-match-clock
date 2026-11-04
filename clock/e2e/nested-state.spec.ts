@@ -159,6 +159,355 @@ test.afterEach(async ({ page }) => {
   expect(pageErrors.get(page) ?? []).toEqual([]);
 });
 
+// Compare Firebase children, irrespective of RTDB's density-dependent JSON
+// array representation. Child keys, rejected rows and metadata stay exact.
+function rawChildren(value: unknown): unknown {
+  if (value === null || typeof value !== "object") return value;
+  const children = Object.entries(value).flatMap(([key, child]) => {
+    const raw = rawChildren(child);
+    return raw === null ? [] : [[key, raw]];
+  });
+  return children.length ? Object.fromEntries(children) : null;
+}
+
+function record(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    throw new Error("Expected a raw child map");
+  return value as Record<string, unknown>;
+}
+
+const rosterStarter = {
+  name: "Roster starter",
+  id: 21,
+  number: 20,
+  show: true,
+  note: { keep: 1 },
+};
+const rosterCoach = {
+  name: "Roster coach",
+  role: "Þjálfari",
+  note: { keep: 2 },
+};
+const rosterRejected = { name: { invalid: true }, note: { keep: "rejected" } };
+const blankPlayer = { name: "", number: "", role: "", show: false };
+const rosterLayouts = [
+  {
+    name: "dense",
+    raw: [rosterStarter, rosterCoach, rosterRejected],
+    selected: "0",
+    next: "3",
+  },
+  {
+    name: "hole",
+    raw: [rosterStarter, null, rosterCoach, rosterRejected],
+    selected: "0",
+    next: "4",
+  },
+  {
+    name: "sparse",
+    raw: { 17: rosterStarter, 26: rosterRejected, 31: rosterCoach, 40: false },
+    selected: "17",
+    next: "41",
+  },
+  {
+    name: "named",
+    raw: {
+      zCoach: rosterCoach,
+      aStarter: rosterStarter,
+      bRejected: rosterRejected,
+    },
+    selected: "aStarter",
+    next: "zCoach~",
+  },
+];
+
+for (const layout of rosterLayouts) {
+  for (const side of ["home", "away"] as const) {
+    test(`ordinary roster raw child writes: ${layout.name} ${side}`, async ({
+      page,
+    }, testInfo) => {
+      const rawRoster = {
+        home: layout.raw,
+        away: layout.raw,
+        provenance: { keep: "outside the edit" },
+      };
+      await rest("PUT", `states/${venue}/controller/roster`, rawRoster);
+      await bootstrap(page);
+      const evidence: unknown[] = [];
+      for (const operation of ["edit", "delete", "add", "replace"] as const) {
+        await rest("PUT", `states/${venue}/controller/roster`, rawRoster);
+        await rest("PUT", `audit/${venue}`, null);
+        await expect
+          .poll(() =>
+            page.evaluate((side) => {
+              const players =
+                window.nestedHarness.snapshot().controller.roster[side];
+              return players.map((p) => ({
+                name: p.name,
+                show: p.show ?? false,
+              }));
+            }, side),
+          )
+          .toEqual([
+            { name: rosterStarter.name, show: true },
+            { name: rosterCoach.name, show: false },
+          ]);
+        await page.evaluate(() => window.nestedHarness.resetAttempts());
+        const before = rawChildren(await rest("GET", `states/${venue}`));
+        const replacement = [
+          { name: "Resolved", number: 42, source: { keep: "API" } },
+        ];
+        let diff: Record<string, unknown>;
+        let action: string;
+        if (operation === "edit") {
+          diff = { [`roster/${side}/${layout.selected}/show`]: false };
+          action = "controller.edit-player";
+          if (side === "home")
+            await page.getByRole("checkbox").first().uncheck();
+          else
+            await page.evaluate(() =>
+              window.nestedHarness.commands.editPlayer("away", 0, {
+                show: false,
+              }),
+            );
+        } else if (operation === "delete") {
+          diff = { [`roster/${side}/${layout.selected}`]: null };
+          action = "controller.delete-player";
+          await page.evaluate(
+            (side) => window.nestedHarness.commands.deletePlayer(side, 0),
+            side,
+          );
+        } else if (operation === "add") {
+          diff = { [`roster/${side}/${layout.next}`]: blankPlayer };
+          action = "controller.add-player";
+          await page.evaluate(
+            (side) => window.nestedHarness.commands.addPlayer(side),
+            side,
+          );
+        } else {
+          diff = { [`roster/${side}`]: replacement };
+          action = "controller.set-roster";
+          await page.evaluate(
+            ({ side, replacement }) =>
+              window.nestedHarness.commands.setRoster({ [side]: replacement }),
+            { side, replacement },
+          );
+        }
+        await expect
+          .poll(
+            async () =>
+              Object.keys(record((await rest("GET", `audit/${venue}`)) ?? {}))
+                .length,
+          )
+          .toBe(1);
+        const events = Object.values(
+          record(await rest("GET", `audit/${venue}`)),
+        );
+        expect(events).toHaveLength(1);
+        const event = record(events[0]);
+        expect(event.action).toBe(action);
+        expect(JSON.parse(String(event.changes))).toEqual(diff);
+
+        const expected = structuredClone(record(before));
+        for (const [path, value] of Object.entries(diff)) {
+          const keys = ["controller", ...path.split("/")];
+          const leaf = keys.pop()!;
+          let parent = expected;
+          for (const key of keys) parent = record(parent[key]);
+          if (value === null) delete parent[leaf];
+          else parent[leaf] = rawChildren(value);
+        }
+        const after = rawChildren(await rest("GET", `states/${venue}`));
+        expect(after).toEqual(expected);
+        const snapshot = await page.evaluate(() =>
+          window.nestedHarness.snapshot(),
+        );
+        expect(snapshot.attempts).toBe(1);
+        expect(snapshot.transport).toHaveLength(1);
+        const wire = snapshot.transport[0]!;
+        expect(wire.method).toBe("merge");
+        expect(wire.path).toBe("/");
+        const wireData = record(wire.data);
+        const auditPaths = Object.keys(wireData).filter((path) =>
+          path.startsWith(`audit/${venue}/`),
+        );
+        expect(auditPaths).toHaveLength(6);
+        const eventPaths = new Set(
+          auditPaths.map((path) => path.split("/")[2]),
+        );
+        expect(eventPaths.size).toBe(1);
+        const statePaths = Object.fromEntries(
+          Object.entries(wireData).filter(([path]) =>
+            path.startsWith("states/"),
+          ),
+        );
+        expect(statePaths).toEqual(
+          Object.fromEntries(
+            Object.entries(diff).map(([path, value]) => [
+              `states/${venue}/controller/${path}`,
+              value,
+            ]),
+          ),
+        );
+        expect(Object.keys(wireData)).toHaveLength(
+          Object.keys(diff).length + 6,
+        );
+        const auditBase = `audit/${venue}/${[...eventPaths][0]!}`;
+        const wireDiff = Object.fromEntries(
+          Object.entries(statePaths).map(([path, value]) => [
+            path.slice(`states/${venue}/controller/`.length),
+            value,
+          ]),
+        );
+        expect(wireData[`${auditBase}/changes`]).toBe(JSON.stringify(wireDiff));
+        expect(event.changes).toBe(wireData[`${auditBase}/changes`]);
+        expect(wireData[`${auditBase}/action`]).toBe(action);
+        expect(wireData[`${auditBase}/uid`]).toBe(event.uid);
+        expect(wireData[`${auditBase}/sessionId`]).toBe(event.sessionId);
+        expect(wireData[`${auditBase}/stateArea`]).toBe("controller");
+        expect(wireData[`${auditBase}/timestamp`]).toEqual({
+          ".sv": "timestamp",
+        });
+        evidence.push({ operation, before, after, event, wire });
+      }
+      await testInfo.attach("roster-raw-roundtrips", {
+        body: JSON.stringify(evidence, null, 2),
+        contentType: "application/json",
+      });
+    });
+  }
+}
+
+test("ordinary roster rapid SDK echoes and explicit two-side replacement/full clear", async ({
+  page,
+}, testInfo) => {
+  await rest("PUT", `states/${venue}/controller/roster`, {
+    home: { 17: rosterStarter, 26: rosterRejected, 31: rosterCoach, 40: false },
+    away: [rosterStarter, null, rosterCoach],
+    provenance: { keep: "until full clear" },
+  });
+  await bootstrap(page);
+  const before = record(rawChildren(await rest("GET", `states/${venue}`)));
+  await page.evaluate(() => {
+    const retained = window.nestedHarness.commands;
+    retained.editPlayer("home", 0, { show: false });
+    retained.editPlayer("home", 0, { name: "Edited" });
+    retained.deletePlayer("home", 0);
+    retained.editPlayer("home", 0, { name: "Coach edited" });
+    retained.addPlayer("home");
+    retained.addPlayer("home");
+  });
+  await expect
+    .poll(
+      async () =>
+        Object.keys(record((await rest("GET", `audit/${venue}`)) ?? {})).length,
+    )
+    .toBe(6);
+  const expected = structuredClone(before);
+  record(record(expected.controller).roster).home = {
+    26: rosterRejected,
+    31: { ...rosterCoach, name: "Coach edited" },
+    40: false,
+    41: blankPlayer,
+    42: blankPlayer,
+  };
+  expect(rawChildren(await rest("GET", `states/${venue}`))).toEqual(expected);
+  const snapshot = await page.evaluate(() => window.nestedHarness.snapshot());
+  expect(snapshot.attempts).toBe(6);
+  const diffs = snapshot.transport.map((wire) => {
+    expect(wire.method).toBe("merge");
+    expect(wire.path).toBe("/");
+    const data = record(wire.data);
+    const changePath = Object.keys(data).find(
+      (path) => path.startsWith(`audit/${venue}/`) && path.endsWith("/changes"),
+    )!;
+    return JSON.parse(String(data[changePath])) as unknown;
+  });
+  expect(diffs).toEqual([
+    { "roster/home/17/show": false },
+    { "roster/home/17/name": "Edited" },
+    { "roster/home/17": null },
+    { "roster/home/31/name": "Coach edited" },
+    { "roster/home/41": blankPlayer },
+    { "roster/home/42": blankPlayer },
+  ]);
+  const rapidEvents = record(await rest("GET", `audit/${venue}`));
+  for (const wire of snapshot.transport) {
+    const changePath = Object.keys(record(wire.data)).find((path) =>
+      path.endsWith("/changes"),
+    )!;
+    const id = changePath.split("/")[2]!;
+    expect(record(rapidEvents[id]).changes).toBe(record(wire.data)[changePath]);
+  }
+  await testInfo.attach("rapid-echo-before-after", {
+    body: JSON.stringify(
+      {
+        before,
+        after: expected,
+        transport: snapshot.transport,
+        audit: rapidEvents,
+      },
+      null,
+      2,
+    ),
+    contentType: "application/json",
+  });
+
+  await rest("PUT", `audit/${venue}`, null);
+  await page.evaluate(() => {
+    window.nestedHarness.resetAttempts();
+    window.nestedHarness.commands.setRoster({
+      home: [{ name: "Imported" }],
+      away: [],
+    });
+  });
+  await expect
+    .poll(
+      async () =>
+        Object.keys(record((await rest("GET", `audit/${venue}`)) ?? {})).length,
+    )
+    .toBe(1);
+  expect(
+    rawChildren(await rest("GET", `states/${venue}/controller/roster`)),
+  ).toEqual({
+    home: { 0: { name: "Imported" } },
+    provenance: { keep: "until full clear" },
+  });
+  const replacementEvent = record(
+    Object.values(record(await rest("GET", `audit/${venue}`)))[0],
+  );
+  expect(JSON.parse(String(replacementEvent.changes))).toEqual({
+    "roster/home": [{ name: "Imported" }],
+    "roster/away": [],
+  });
+  expect(
+    await page.evaluate(() => window.nestedHarness.snapshot().attempts),
+  ).toBe(1);
+
+  await rest("PUT", `audit/${venue}`, null);
+  await page.evaluate(() => {
+    window.nestedHarness.resetAttempts();
+    window.nestedHarness.commands.clearRoster();
+  });
+  await expect
+    .poll(
+      async () =>
+        Object.keys(record((await rest("GET", `audit/${venue}`)) ?? {})).length,
+    )
+    .toBe(1);
+  expect(await rest("GET", `states/${venue}/controller/roster`)).toBeNull();
+  const clearEvent = record(
+    Object.values(record(await rest("GET", `audit/${venue}`)))[0],
+  );
+  expect(clearEvent.action).toBe("controller.clear-roster");
+  expect(JSON.parse(String(clearEvent.changes))).toEqual({
+    roster: { home: [], away: [] },
+  });
+  expect(
+    await page.evaluate(() => window.nestedHarness.snapshot().attempts),
+  ).toBe(1);
+});
+
 test("actual SDK/rules admit legacy malformed media while consumers stay safe and read-only", async ({
   page,
 }) => {

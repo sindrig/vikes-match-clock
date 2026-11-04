@@ -2139,13 +2139,7 @@ describe("FirebaseStateContext", () => {
       expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "controller",
-        expect.objectContaining({
-          roster: expect.objectContaining({
-            home: expect.arrayContaining([
-              expect.objectContaining({ name: "Updated Player" }),
-            ]) as unknown,
-          }) as unknown,
-        }),
+        { "roster/home/0/name": "Updated Player" },
         expect.anything(),
       );
     });
@@ -2188,11 +2182,7 @@ describe("FirebaseStateContext", () => {
       expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "controller",
-        expect.objectContaining({
-          roster: expect.objectContaining({
-            home: [expect.objectContaining({ name: "Player B", number: "7" })],
-          }) as unknown,
-        }),
+        { "roster/home/0": null },
         expect.anything(),
       );
     });
@@ -2205,18 +2195,7 @@ describe("FirebaseStateContext", () => {
       expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "controller",
-        expect.objectContaining({
-          roster: expect.objectContaining({
-            home: expect.arrayContaining([
-              expect.objectContaining({
-                name: "",
-                number: "",
-                show: false,
-                role: "",
-              }),
-            ]) as unknown,
-          }) as unknown,
-        }),
+        { "roster/home/2": { name: "", number: "", show: false, role: "" } },
         expect.anything(),
       );
     });
@@ -2540,9 +2519,7 @@ describe("FirebaseStateContext", () => {
       expect(firebaseDatabase.writeAudited).toHaveBeenCalledWith(
         "test-location",
         "controller",
-        expect.objectContaining({
-          roster,
-        }),
+        { "roster/home": roster.home, "roster/away": roster.away },
         expect.anything(),
       );
     });

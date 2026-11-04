@@ -38,6 +38,11 @@ if (app.options.projectId !== "vikes-match-clock-test")
 type Api = ReturnType<typeof useFirebaseState>;
 let api: Api;
 let attempts = 0;
+const transport: Array<{
+  method: "put" | "merge";
+  path: unknown;
+  data: unknown;
+}> = [];
 type Server = Record<"put" | "merge", (...args: unknown[]) => unknown>;
 // Observe the actual SDK transport, without replacing its authorization,
 // local echoes, transaction validation or server acknowledgements.
@@ -48,6 +53,7 @@ for (const method of ["put", "merge"] as const) {
   const original = server[method].bind(server);
   server[method] = (...args) => {
     attempts += 1;
+    transport.push({ method, path: args[0], data: structuredClone(args[1]) });
     return original(...args);
   };
 }
@@ -64,9 +70,11 @@ const harness = {
     mediaPairs: api.mediaPairs,
     eligible: api.writeEligible,
     attempts,
+    transport,
   }),
   resetAttempts: () => {
     attempts = 0;
+    transport.length = 0;
   },
   login: (email: string, password: string) =>
     signInWithEmailAndPassword(auth, email, password).then(() => undefined),

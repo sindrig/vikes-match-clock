@@ -146,10 +146,10 @@ describe("Team", () => {
       const checkboxes = container.querySelectorAll('input[type="checkbox"]');
 
       fireEvent.click(checkboxes[0] as HTMLElement);
-      expect(mockEditPlayer).toHaveBeenCalledWith("home", 0, { show: false });
+      expect(mockEditPlayer).toHaveBeenCalledWith("home", "0", { show: false });
 
       fireEvent.click(checkboxes[2] as HTMLElement);
-      expect(mockEditPlayer).toHaveBeenCalledWith("home", 2, { show: true });
+      expect(mockEditPlayer).toHaveBeenCalledWith("home", "2", { show: true });
     });
 
     it("should call editPlayer with away side for away team", () => {
@@ -157,7 +157,7 @@ describe("Team", () => {
       const checkboxes = container.querySelectorAll('input[type="checkbox"]');
 
       fireEvent.click(checkboxes[0] as HTMLElement);
-      expect(mockEditPlayer).toHaveBeenCalledWith("away", 0, { show: false });
+      expect(mockEditPlayer).toHaveBeenCalledWith("away", "0", { show: false });
     });
   });
 

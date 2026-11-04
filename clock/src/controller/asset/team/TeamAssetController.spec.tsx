@@ -150,6 +150,24 @@ vi.mock("./assetHelpers", () => ({
   getMOTMAsset: vi.fn(),
 }));
 
+vi.mock("./ResolveRosterModal", () => ({
+  default: ({
+    open,
+    onConfirm,
+  }: {
+    open: boolean;
+    onConfirm: (players: Player[]) => void;
+  }) =>
+    open ? (
+      <button
+        type="button"
+        onClick={() => onConfirm([{ name: "Resolved", number: 42 }])}
+      >
+        Confirm resolved roster
+      </button>
+    ) : null,
+}));
+
 vi.mock("react-spinners", () => ({
   RingLoader: ({ loading }: { loading: boolean }) =>
     loading ? <div data-testid="ring-loader">Loading...</div> : null,
@@ -638,6 +656,28 @@ describe("TeamAssetController", () => {
       ).not.toBeInTheDocument();
     });
   });
+
+  it.each(["home", "away"] as const)(
+    "resolves only the requested %s roster side",
+    (side) => {
+      const { mockSetRoster } = setupMocks({
+        roster: { home: mockPlayers, away: mockPlayers, [side]: [] },
+      });
+      render(<TeamAssetController previousView={mockPreviousView} />);
+      fireEvent.click(
+        screen.getByRole("button", { name: "Búa til leikmannahóp" }),
+      );
+      fireEvent.click(
+        screen.getByRole("button", { name: "Confirm resolved roster" }),
+      );
+      expect(mockSetRoster).toHaveBeenCalledExactlyOnceWith({
+        [side]: [{ name: "Resolved", number: 42 }],
+      });
+      expect(
+        screen.queryByRole("button", { name: "Confirm resolved roster" }),
+      ).not.toBeInTheDocument();
+    },
+  );
 
   describe("refetchRoster / fetch lineups by ksiMatchId", () => {
     it("uses the configured venue ID for roster refetch without scoreboard screens", async () => {

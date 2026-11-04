@@ -202,24 +202,69 @@ export function parsePlayer(data: unknown): Player | null {
   };
 }
 
-const playerChildKeys = new WeakMap<Player[], string[]>();
+// API/manual producers use array order (players, then officials). Numeric
+// child keys retain that order even with holes; named legacy keys use lexical
+// order, independent of object insertion order. Never sort by shirt number.
+function playerIndex(key: string): number | null {
+  const index = Number(key);
+  return Number.isSafeInteger(index) && index >= 0 && String(index) === key
+    ? index
+    : null;
+}
+
+function comparePlayerKeys(a: string, b: string): number {
+  const aIndex = playerIndex(a);
+  const bIndex = playerIndex(b);
+  if (aIndex !== null && bIndex !== null) return aIndex - bIndex;
+  if (aIndex !== null) return -1;
+  if (bIndex !== null) return 1;
+  return a < b ? -1 : a === b ? 0 : 1;
+}
+
+const playerCollections = new WeakMap<
+  Player[],
+  { keys: string[]; rawKeys: string[] }
+>();
 
 function parsePlayers(data: unknown): Player[] {
   const players: Player[] = [];
   const keys: string[] = [];
-  for (const [key, value] of collectionEntries(data)) {
+  const entries = collectionEntries(data).sort(([a], [b]) =>
+    comparePlayerKeys(a, b),
+  );
+  for (const [key, value] of entries) {
     const player = parsePlayer(value);
     if (player) {
       players.push(player);
       keys.push(key);
     }
   }
-  playerChildKeys.set(players, keys);
+  // Allocation must account for rejected raw rows too. These are snapshot
+  // identities only: no raw values or optimistic command state are retained.
+  playerCollections.set(players, {
+    keys,
+    rawKeys: entries.map(([key]) => key),
+  });
   return players;
 }
 
 export function playerChildKey(players: Player[], index: number): string {
-  return playerChildKeys.get(players)?.[index] ?? String(index);
+  return playerCollections.get(players)?.keys[index] ?? String(index);
+}
+
+export function nextPlayerChildKey(players: Player[]): string {
+  const rawKeys =
+    playerCollections.get(players)?.rawKeys ?? Object.keys(players);
+  const last = rawKeys[rawKeys.length - 1];
+  if (last === undefined) return "0";
+  const index = playerIndex(last);
+  if (index !== null && index < Number.MAX_SAFE_INTEGER)
+    return String(index + 1);
+  // Append after every existing named child without rekeying any of them.
+  const key = index === null ? `${last}~` : "player";
+  if (new TextEncoder().encode(key).length > 768)
+    throw new Error("Ekki tókst að bæta leikmanni við: of langur gagnalykill.");
+  return key;
 }
 
 export function parseRoster(data: unknown): Roster {

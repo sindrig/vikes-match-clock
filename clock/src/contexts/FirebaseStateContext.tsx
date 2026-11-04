@@ -97,7 +97,7 @@ import {
   parsePerimeterBrightnessStatus,
   parsePerimeterBrightnessAuto,
 } from "./firebaseParsers";
-import { playerChildKey } from "./nestedParsers";
+import { nextPlayerChildKey, playerChildKey } from "./nestedParsers";
 import { applyStateDiff } from "../lib/stateDiff";
 
 const HALFTIME_DURATION_MS = 15 * 60 * 1000;
@@ -210,7 +210,9 @@ export function computeControllerDiff(
   return diff;
 }
 
-type ControllerUpdates = Partial<Omit<ControllerState, "currentAsset">> & {
+type ControllerUpdates = Partial<
+  Omit<ControllerState, "currentAsset" | "roster">
+> & {
   currentAsset?: null;
 };
 
@@ -305,13 +307,14 @@ interface FirebaseStateContextType {
   renderAsset: (asset: Asset | null) => Promise<void>;
   showNextAsset: () => void;
   remoteRefresh: () => void;
-  setRoster: (roster: Roster) => void;
+  // Deliberate replacement of the supplied side(s), never a read-model merge.
+  setRoster: (roster: Partial<Roster>) => void;
   editPlayer: (
     side: "home" | "away",
-    idx: number,
+    selection: number | string,
     updatedPlayer: Partial<Player>,
   ) => void;
-  deletePlayer: (side: "home" | "away", idx: number) => void;
+  deletePlayer: (side: "home" | "away", selection: number | string) => void;
   addPlayer: (side: "home" | "away") => void;
   clearRoster: () => void;
   selectTab: (tab: string) => void;
@@ -1798,6 +1801,8 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         (prev) => {
           if (updates.currentAsset != null)
             throw new Error("Use renderAsset to select playback.");
+          if ("roster" in updates)
+            throw new Error("Use roster commands to change players.");
           return { ...prev, ...updates };
         },
         "controller.update",
@@ -2224,72 +2229,91 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   }, [applyControllerUpdate]);
 
   const setRoster = useCallback(
-    (roster: Roster) => {
-      void applyControllerUpdate(
-        (prev) => ({
-          ...prev,
-          roster,
-        }),
-        "controller.set-roster",
-      );
+    (roster: Partial<Roster>) => {
+      void executeCommand("controller", "controller.set-roster", () => {
+        const current = controllerRef.current.roster;
+        const diff: Record<string, unknown> = {};
+        for (const side of ["home", "away"] as const) {
+          const players = roster[side];
+          if (players !== undefined && players !== current[side])
+            diff[`roster/${side}`] = players;
+        }
+        return diff;
+      });
     },
-    [applyControllerUpdate],
+    [executeCommand],
   );
 
   const editPlayer = useCallback(
-    (side: "home" | "away", idx: number, updatedPlayer: Partial<Player>) => {
-      void applyControllerUpdate((prev) => {
-        const roster = structuredClone(prev.roster);
-        if (!roster[side] || !roster[side][idx]) return prev;
-        roster[side][idx] = {
-          ...roster[side][idx],
-          ...updatedPlayer,
-        };
-        return { ...prev, roster };
-      }, "controller.edit-player");
+    (
+      side: "home" | "away",
+      selection: number | string,
+      updatedPlayer: Partial<Player>,
+    ) => {
+      void executeCommand("controller", "controller.edit-player", () => {
+        const players = controllerRef.current.roster[side];
+        const idx =
+          typeof selection === "number"
+            ? selection
+            : players.findIndex(
+                (_, i) => playerChildKey(players, i) === selection,
+              );
+        const player = players[idx];
+        if (!player) return {};
+        const path = `roster/${side}/${playerChildKey(players, idx)}`;
+        return Object.fromEntries(
+          Object.entries(updatedPlayer)
+            .filter(
+              ([field, value]) =>
+                value !== undefined && value !== player[field],
+            )
+            .map(([field, value]) => [`${path}/${field}`, value]),
+        );
+      });
     },
-    [applyControllerUpdate],
+    [executeCommand],
   );
 
   const deletePlayer = useCallback(
-    (side: "home" | "away", idx: number) => {
-      void applyControllerUpdate((prev) => {
-        const roster = structuredClone(prev.roster);
-        if (!roster[side]) return prev;
-        roster[side] = roster[side].filter((_: Player, i: number) => i !== idx);
-        return { ...prev, roster };
-      }, "controller.delete-player");
+    (side: "home" | "away", selection: number | string) => {
+      void executeCommand("controller", "controller.delete-player", () => {
+        const players = controllerRef.current.roster[side];
+        const idx =
+          typeof selection === "number"
+            ? selection
+            : players.findIndex(
+                (_, i) => playerChildKey(players, i) === selection,
+              );
+        return players[idx]
+          ? { [`roster/${side}/${playerChildKey(players, idx)}`]: null }
+          : {};
+      });
     },
-    [applyControllerUpdate],
+    [executeCommand],
   );
 
   const addPlayer = useCallback(
     (side: "home" | "away") => {
-      void applyControllerUpdate((prev) => {
-        const roster = structuredClone(prev.roster);
-        const players = roster[side] ?? [];
-        players.push({
-          name: "",
-          number: "",
-          show: false,
-          role: "",
-        });
-        roster[side] = players;
-        return { ...prev, roster };
-      }, "controller.add-player");
+      void executeCommand("controller", "controller.add-player", () => ({
+        [`roster/${side}/${nextPlayerChildKey(controllerRef.current.roster[side])}`]:
+          {
+            name: "",
+            number: "",
+            show: false,
+            role: "",
+          },
+      }));
     },
-    [applyControllerUpdate],
+    [executeCommand],
   );
 
   const clearRoster = useCallback(() => {
-    void applyControllerUpdate(
-      (prev) => ({
-        ...prev,
-        roster: { home: [], away: [] },
-      }),
-      "controller.clear-roster",
-    );
-  }, [applyControllerUpdate]);
+    // This is the explicit whole-roster clear, including rejected raw rows
+    // and roster-level metadata, even when the read projection is empty.
+    void executeCommand("controller", "controller.clear-roster", () => ({
+      roster: { home: [], away: [] },
+    }));
+  }, [executeCommand]);
 
   const selectTab = useCallback(
     (tab: string) => {
