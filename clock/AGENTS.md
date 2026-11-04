@@ -184,6 +184,20 @@ Do NOT reintroduce renderer-side mutations, optimistic expiry, or offline
 replay queues. See `openspec/changes/prevent-stale-session-mutations/` for the
 full design and the `e2e/stale-session.spec.ts` regression.
 
+That browser regression mounts the real App through the emulator-only
+`e2e/fixtures/stale-session.html` observer. It records actual 100 ms timer
+callbacks, subscription eligibility and SDK sends/acknowledgements; no hooks
+enter the production entrypoint. Fix Date before observation, process the
+deadline while offline, seed distinct authoritative B, and require connected
+core delivery plus eligibility before checking resync. An explicit core change
+drives recovery; the test does not certify unchanged-data reconnect behavior.
+Await retained-origin rejection and a current command with the captured A
+observation separately, then an acknowledged fresh audited write before reading
+backend B/queues. This keeps the generation CAS check meaningful behind the
+session guard and avoids unchanged-state polling as a negative-write barrier.
+The still-current case checks deferred completion/audit after resync, rebasing
+only the remaining simulated deadline when the real SDK refreshes its offset.
+
 ### Firebase Audit Trail (Breytingasaga)
 
 Every authenticated client mutation of shared match, controller, view,
