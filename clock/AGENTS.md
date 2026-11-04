@@ -857,6 +857,15 @@ altitude in radians, the same conversion the controller's preview uses),
 polls Open-Meteo cloud cover, applies hysteresis/slew, and dispatches
 ordinary integer commands through the existing worker.
 
+The gateway worker evaluates hysteresis/slew at admission and re-evaluates
+queued automatic targets after the previous write finishes verification or
+restoration. Equivalent automatic ticks share outstanding work so slow snapshots
+can complete; changing predictions refresh undispatched context, and targets
+within hysteresis withdraw obsolete undispatched auto work. Manual events and
+effective config changes still invalidate old auto work, including at equal
+percentages. Dispatched sequences retain their calibration context and drain
+before replacement work starts. See [brightness arbitration](../docs/brightness-arbitration.md).
+
 **`states/{location}/perimeter/brightnessAuto`** (controller writes, daemon
 reads; the whole node is replaced by each save, and `updatedAt` is a Firebase
 server timestamp):
@@ -919,12 +928,23 @@ server timestamp):
   to cloud cover 0.8).
 - A 24 h target-curve preview (`AutoBrightnessCurve`) samples the pure model
   (`src/lib/autoBrightness.ts` — unit-tested against the design-doc
-  reference vectors) every 15 minutes with SunCalc v1 sun positions at
+  reference vectors and the shared `docs/fixtures/auto-brightness-contract.json`)
+  every 15 minutes with SunCalc v1 sun positions at
   Fossvogur (64.117 N, −21.91 E; Iceland is UTC year-round). Cloud cover
   comes from an Open-Meteo forecast fetch (`fetchCloudForecast()`),
   attributed in the UI as "Spá frá Open-Meteo.com"; a failed fetch degrades
   to a clear-sky curve note. The
   daemon — not this preview — decides actual writes.
+
+The empirical clear-sky curve is continuous and nondecreasing over physical
+sun elevations −90°..90°: 0.5 lux at/below −6°, 400 at 0°, 120,000 at 90°.
+Daylight retains the sine exponent 1.15, offset/rescaled to join twilight;
+twilight interpolates 0.5..400 lux. See the authoritative design for the #253
+formula and rationale. Browser and daemon tests consume the same fixed vectors
+and range specifications, including dense checks around both joins and real
+sunset predictions under fixed clouds/config. This is a continuity correction,
+not a physical calibration or rollout qualification; the daemon's write policy
+and the physical qualification HOLD remain in effect.
 
 **Operator behavior** (`PerimeterControl.tsx` — manual mode):
 

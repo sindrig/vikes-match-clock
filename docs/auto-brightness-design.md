@@ -1,7 +1,8 @@
 # Automatic perimeter brightness — design (sun + weather prediction)
 
 Design date: 2026-09-22
-Status: scoped and agreed, not yet implemented
+Model revision: 2026-11-02, continuity correction (#253)
+Physical gateway qualification: **HOLD**
 
 ## Decisions made (scoping session)
 
@@ -64,16 +65,49 @@ irrelevant.
 
 ### Step 2 — clear-sky illuminance (lux) from elevation
 
-Piecewise approximation, tuned to typical clear-sky daylight values
-(~100,000 lux at high sun; civil twilight ≈ tens of lux):
+Continuous empirical approximation on the finite physical sun-elevation
+domain `−90° ≤ e ≤ 90°`. Retain the existing physical anchors: **0.5 lux at
+and below −6°**, **400 lux at the horizon**, and **120,000 lux overhead**:
 
 ```js
 function clearSkyLux(elevDeg) {
-  if (elevDeg >= 0) return 120000 * Math.sin((elevDeg * Math.PI) / 180) ** 1.15;
-  if (elevDeg >= -6) return 400 * ((elevDeg + 6) / 6); // civil twilight ramp
-  return 0.5;                                          // night ambient floor
+  if (elevDeg >= 0) {
+    return 400 + (120000 - 400) * Math.sin((elevDeg * Math.PI) / 180) ** 1.15;
+  }
+  if (elevDeg >= -6) return 0.5 + (400 - 0.5) * ((elevDeg + 6) / 6);
+  return 0.5; // night ambient floor
 }
 ```
+
+This is an empirical continuity correction, **not a new physical
+calibration**. Daylight is the affine interpolation from 400 to 120,000 lux
+using the existing `sin(e)^1.15` shape; retaining 120,000 as the multiplier
+after adding 400 would incorrectly raise the overhead anchor. Twilight is
+the linear interpolation from 0.5 to 400 lux. Both one-sided limits and the
+value at each join agree. The derivative need not agree across the joins.
+
+Each segment is nondecreasing in elevation, so a falling sun cannot brighten
+the prediction with fixed clouds and config. Relative to the previous
+daylight formula, the change is `400 · (1 − sin(e)^1.15)` lux: at most 400
+lux, tapering to zero overhead. Within twilight the increase is at most 0.5
+lux, removing the old zero-lux result at −6°. Night is unchanged.
+
+The defect was a daylight limit of zero meeting a twilight limit of 400 lux
+at sunset. With defaults and clear sky:
+
+| Elevation | Old clear lux | Corrected clear lux | Old target | Corrected target |
+| --------- | ------------- | ------------------- | ---------- | ---------------- |
+| +0.001°   | 0.404893      | 400.403543          | 3%         | 17%              |
+| 0°        | 0             | 400                 | 3%         | 17%              |
+| −0.001°   | 399.933333    | 399.933417          | 17%        | 17%              |
+| −6°       | 0             | 0.5                 | 3%         | 3%               |
+| +90°      | 120,000       | 120,000             | 100%       | 100%             |
+
+These are pure model targets; the daemon still owns auto-safe clamping,
+hysteresis, slew, arbitration and hardware dispatch. Removing a predicted
+14-point sunset increase does not establish a measured hardware change.
+Nonfinite or out-of-domain elevations are outside this model contract;
+normal SunCalc positions are within the physical domain.
 
 ### Step 3 — cloud multiplier (Kasten & Czeplak 1980)
 
@@ -84,9 +118,16 @@ irradiance/illuminance relative to clear sky:
 lux = clearSkyLux(e) · (1 − cloudWeight · 0.75 · c³)
 ```
 
-Fully overcast (`c = 1`) ≈ 25% of clear-sky light; `cloudWeight` (0..1, default
-1) is the operator knob for how much clouds should matter. Cubic on purpose:
-thin high clouds barely dim, only solid decks do.
+Fully overcast (`c = 1`) ≈ 25% of clear-sky light. The `cloudWeight` operator
+knob ranges from 0 to 1 (default 1) and controls how much clouds matter. Cubic
+on purpose: thin high clouds barely dim, only solid decks do.
+
+Both cloud fraction and weight are clamped to `[0,1]`; the resulting lux has
+a 0.5 floor, including overcast night. For fixed clouds/weight this operation
+preserves continuity and order. Configured percent bounds, ordered finite lux
+anchors (`luxMin < luxMax`) and positive exponent (0.05..2) likewise preserve
+order through the clamped power law and whole-percent rounding below. Rounding
+can produce plateaus or one-point steps; it cannot introduce sunset brightening.
 
 ### Step 4 — lux → percent (perceptual mapping + all the knobs)
 
@@ -99,32 +140,60 @@ percent = min + (max − min) · clamp((lux − luxMin) / (luxMax − luxMin), 0
 
 Defaults (Fossvogur, to be calibrated against manual overrides):
 
-| Parameter    | Default   | Meaning                                                        |
-|--------------|-----------|----------------------------------------------------------------|
-| `min`        | 3         | night floor (matches today's 3%)                               |
-| `max`        | 100       | ceiling; auto never exceeds it                                 |
-| `exponent`   | 0.35      | **"aggressiveness"**: lower = brighter earlier in the day      |
-| `cloudWeight`| 1.0       | 0 ignores clouds entirely, 1 is full Kasten-Czeplak            |
-| `luxMin`     | 5         | lux that maps onto `min` (night anchor)                        |
-| `luxMax`     | 100000    | lux that maps onto `max` (clear high-sun anchor)               |
+| Parameter     | Default | Meaning                                                   |
+| ------------- | ------- | --------------------------------------------------------- |
+| `min`         | 3       | night floor (matches today's 3%)                          |
+| `max`         | 100     | ceiling; auto never exceeds it                            |
+| `exponent`    | 0.35    | **"aggressiveness"**: lower = brighter earlier in the day |
+| `cloudWeight` | 1.0     | 0 ignores clouds entirely, 1 is full Kasten-Czeplak       |
+| `luxMin`      | 5       | lux that maps onto `min` (night anchor)                   |
+| `luxMax`      | 100000  | lux that maps onto `max` (clear high-sun anchor)          |
 
-### Computed reference table (2026-09-22, Fossvogur)
+### Computed reference table (2026-09-22, Fossvogur; corrected model)
 
 Produced by the reference implementation (validated against known sun
 positions: solstice noons +49.0°/+2.2°, tonight's sunset ≈ 19:35 UTC):
 
 | Time (UTC) | Sun elev | lux clear | lux c=0.5 | lux c=1.0 | % clear | % overcast |
-|------------|----------|-----------|-----------|-----------|---------|------------|
+| ---------- | -------- | --------- | --------- | --------- | ------- | ---------- |
 | 06:00      | −8.2°    | night     | night     | night     | 3       | 3          |
-| 09:00      | +10.9°   | 17,742    | 16,079    | 4,436     | 56      | 36         |
-| 12:00      | +24.6°   | 43,721    | 39,622    | 10,930    | 76      | 48         |
-| 18:00      | +8.9°    | 14,066    | 12,747    | 3,516     | 52      | 33         |
+| 09:00      | +10.9°   | 18,083    | 16,388    | 4,521     | 56      | 36         |
+| 12:00      | +24.6°   | 43,975    | 39,852    | 10,994    | 76      | 48         |
+| 18:00      | +8.9°    | 14,419    | 13,067    | 3,605     | 52      | 33         |
 | 19:30      | −0.8°    | 348       | 315       | 87        | 16      | 11         |
 | 21:00      | −10.3°   | night     | night     | night     | 3       | 3          |
 
 Shape sanity: clear noon ≈ 76%, solidly overcast noon ≈ 48%, dusk ≈ 11–16%,
 night floor 3%. The dusk ramp (18:00 → 21:00) is the exact part of the day —
-no weather needed to get it right.
+no weather needed to compute its sun-position component. At reference noon,
+clear lux increases by about 254.265 (0.582%) and overcast lux by 63.566;
+rounded targets remain 76% and 48%. Lux is computed from full SunCalc
+elevations before rounding, rather than the one-decimal values displayed here.
+
+### Cross-runtime contract
+
+The browser preview (`clock/src/lib/autoBrightness.ts`) and daemon
+(`perimeter-control/auto-brightness.js`) keep independent runtime modules.
+Both real model test suites consume
+[`fixtures/auto-brightness-contract.json`](fixtures/auto-brightness-contract.json):
+fixed lux/percent expectations, unchanged SunCalc 1.9.0 positions, cloud
+fraction/weight clamps, default config and boundary configs. This test-only
+fixture adds no package dependency, frontend runtime import or installer file.
+Cross-runtime agreement requires equal whole-percent targets, absolute lux
+error below `10^-8` and sun-position error below `10^-10` degrees. These are
+computational tolerances for JavaScript math, not physical accuracy claims;
+the 0.5/400/120,000 lux anchors are checked exactly.
+
+The suites check both one-sided limits down to `10^-9` degrees, sweep the
+physical domain at 0.1° intervals and ±0.1° around both joins at 0.0001°
+intervals. They check lux/percent bounds and nonbrightening as elevation falls
+for seven fixed cloud inputs and nine fixed configs (including exponent
+0.05/2, cloud weight 0/0.5/1, percent bounds/equality and low/high lux anchors).
+Real date predictions also traverse sunset and −6° every ten seconds; the
+browser's actual 15-minute preview is covered separately. The fixed vectors
+include noon, night and the corrected table. Agreement alone is insufficient:
+the old copies agreed on the same discontinuity, so continuity, anchors and
+monotonicity are independent requirements.
 
 ## Weather integration
 
@@ -166,7 +235,7 @@ GET https://api.open-meteo.com/v1/forecast
   "phase": "applied", "requestedPercent": 48, "appliedPercent": 48,
   "mode": "auto",              // "auto" | "manual"
   "predicted": {               // present when mode === "auto"
-    "lux": 10930, "sunElevationDeg": 24.6, "cloudCover": 1.0,
+    "lux": 10994, "sunElevationDeg": 24.6, "cloudCover": 1.0,
     "weatherAgeMin": 7, "weatherStale": false
   },
   "updatedAt": "<server timestamp>"
@@ -270,24 +339,32 @@ export function sunElevationDeg(date, lat, lng) {
 }
 
 export function clearSkyLux(elevDeg) {
-  if (elevDeg >= 0) return 120000 * Math.sin((elevDeg * Math.PI) / 180) ** 1.15;
-  if (elevDeg >= -6) return 400 * ((elevDeg + 6) / 6);
+  if (elevDeg >= 0) {
+    return 400 + (120000 - 400) * Math.sin((elevDeg * Math.PI) / 180) ** 1.15;
+  }
+  if (elevDeg >= -6) return 0.5 + (400 - 0.5) * ((elevDeg + 6) / 6);
   return 0.5;
 }
 
 export function applyCloud(lux, cloudFraction, cloudWeight = 1.0) {
   const c = Math.min(Math.max(cloudFraction, 0), 1);
-  return Math.max(lux * (1 - cloudWeight * 0.75 * c ** 3), 0.5);
+  const w = Math.min(Math.max(cloudWeight, 0), 1);
+  return Math.max(lux * (1 - w * 0.75 * c ** 3), 0.5);
 }
 
 export function luxToPercent(lux, cfg) {
-  const x = (Math.max(lux, cfg.luxMin) - cfg.luxMin) / (cfg.luxMax - cfg.luxMin);
+  const x =
+    (Math.max(lux, cfg.luxMin) - cfg.luxMin) / (cfg.luxMax - cfg.luxMin);
   const y = Math.min(Math.max(x, 0), 1) ** cfg.exponent;
   return Math.round(cfg.min + (cfg.max - cfg.min) * y);
 }
 
 export function predict(date, lat, lng, cloudFraction, cfg) {
-  const lux = applyCloud(clearSkyLux(sunElevationDeg(date, lat, lng)), cloudFraction, cfg.cloudWeight);
+  const lux = applyCloud(
+    clearSkyLux(sunElevationDeg(date, lat, lng)),
+    cloudFraction,
+    cfg.cloudWeight,
+  );
   return { lux, percent: luxToPercent(lux, cfg) };
 }
 ```
@@ -295,8 +372,8 @@ export function predict(date, lat, lng, cloudFraction, cfg) {
 Test vectors (same inputs as the reference table, defaults above):
 
 ```
-2026-09-22T12:00Z, c=0.0 → lux 43721, percent 76
-2026-09-22T12:00Z, c=1.0 → lux 10930, percent 48
+2026-09-22T12:00Z, c=0.0 → lux 43975, percent 76
+2026-09-22T12:00Z, c=1.0 → lux 10994, percent 48
 2026-09-22T19:30Z, c=0.5 → lux 315,   percent 16
 2026-09-22T21:00Z, any   → night,     percent 3 (min clamp)
 ```

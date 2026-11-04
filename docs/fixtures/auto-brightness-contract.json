@@ -1,0 +1,447 @@
+{
+  "description": "Empirical continuity correction #253; docs/auto-brightness-design.md. Fixed expectations from anchor interpolation, independent of either production module; SunCalc 1.9.0 positions retained from the reviewed baseline.",
+  "cloudFractions": [-1, 0, 0.25, 0.5, 0.8, 1, 2],
+  "physicalSweep": {
+    "from": 90,
+    "to": -90,
+    "step": 0.1
+  },
+  "joinSweep": {
+    "centers": [-6, 0],
+    "radius": 0.1,
+    "step": 0.0001
+  },
+  "sunsetSweep": {
+    "from": "2026-09-22T17:00:00Z",
+    "to": "2026-09-22T21:00:00Z",
+    "stepMs": 10000
+  },
+  "clearSkyCases": [
+    {
+      "elevationDeg": -90,
+      "lux": 0.5,
+      "defaultPercent": 3
+    },
+    {
+      "elevationDeg": -6.1,
+      "lux": 0.5,
+      "defaultPercent": 3
+    },
+    {
+      "elevationDeg": -6.001,
+      "lux": 0.5,
+      "defaultPercent": 3
+    },
+    {
+      "elevationDeg": -6.000001,
+      "lux": 0.5,
+      "defaultPercent": 3
+    },
+    {
+      "elevationDeg": -6,
+      "lux": 0.5,
+      "defaultPercent": 3
+    },
+    {
+      "elevationDeg": -5.999999,
+      "lux": 0.5000665833333426,
+      "defaultPercent": 3
+    },
+    {
+      "elevationDeg": -5.999,
+      "lux": 0.5665833333333555,
+      "defaultPercent": 3
+    },
+    {
+      "elevationDeg": -5.9,
+      "lux": 7.15833333333331,
+      "defaultPercent": 5
+    },
+    {
+      "elevationDeg": -3,
+      "lux": 200.25,
+      "defaultPercent": 14
+    },
+    {
+      "elevationDeg": -0.1,
+      "lux": 393.3416666666667,
+      "defaultPercent": 17
+    },
+    {
+      "elevationDeg": -0.001,
+      "lux": 399.93341666666663,
+      "defaultPercent": 17
+    },
+    {
+      "elevationDeg": -0.000001,
+      "lux": 399.9999334166667,
+      "defaultPercent": 17
+    },
+    {
+      "elevationDeg": 0,
+      "lux": 400,
+      "defaultPercent": 17
+    },
+    {
+      "elevationDeg": 0.000001,
+      "lux": 400.0001431825697,
+      "defaultPercent": 17
+    },
+    {
+      "elevationDeg": 0.001,
+      "lux": 400.4035433104175,
+      "defaultPercent": 17
+    },
+    {
+      "elevationDeg": 0.1,
+      "lux": 480.5174289679494,
+      "defaultPercent": 18
+    },
+    {
+      "elevationDeg": 1,
+      "lux": 1537.2731758596299,
+      "defaultPercent": 25
+    },
+    {
+      "elevationDeg": 10,
+      "lux": 16371.729421605349,
+      "defaultPercent": 54
+    },
+    {
+      "elevationDeg": 30,
+      "lux": 54294.77766412764,
+      "defaultPercent": 81
+    },
+    {
+      "elevationDeg": 60,
+      "lux": 101765.7892245359,
+      "defaultPercent": 100
+    },
+    {
+      "elevationDeg": 89.999,
+      "lux": 119999.99997905147,
+      "defaultPercent": 100
+    },
+    {
+      "elevationDeg": 90,
+      "lux": 120000,
+      "defaultPercent": 100
+    }
+  ],
+  "cloudCases": [
+    {
+      "lux": 400,
+      "fraction": 0,
+      "weight": 1,
+      "expectedLux": 400
+    },
+    {
+      "lux": 400,
+      "fraction": 0.5,
+      "weight": 1,
+      "expectedLux": 362.5
+    },
+    {
+      "lux": 400,
+      "fraction": 1,
+      "weight": 1,
+      "expectedLux": 100
+    },
+    {
+      "lux": 400,
+      "fraction": -1,
+      "weight": 1,
+      "expectedLux": 400
+    },
+    {
+      "lux": 400,
+      "fraction": 2,
+      "weight": 1,
+      "expectedLux": 100
+    },
+    {
+      "lux": 400,
+      "fraction": 1,
+      "weight": -1,
+      "expectedLux": 400
+    },
+    {
+      "lux": 400,
+      "fraction": 1,
+      "weight": 0,
+      "expectedLux": 400
+    },
+    {
+      "lux": 400,
+      "fraction": 1,
+      "weight": 0.5,
+      "expectedLux": 250
+    },
+    {
+      "lux": 400,
+      "fraction": 1,
+      "weight": 2,
+      "expectedLux": 100
+    },
+    {
+      "lux": 0.5,
+      "fraction": 1,
+      "weight": 1,
+      "expectedLux": 0.5
+    },
+    {
+      "lux": 1,
+      "fraction": 1,
+      "weight": 1,
+      "expectedLux": 0.5
+    }
+  ],
+  "luxInputs": [-1, 0, 0.5, 5, 100, 400, 50000, 100000, 120000, 1000000],
+  "configs": [
+    {
+      "name": "default",
+      "config": {
+        "enabled": false,
+        "min": 3,
+        "max": 100,
+        "exponent": 0.35,
+        "cloudWeight": 1,
+        "luxMin": 5,
+        "luxMax": 100000
+      },
+      "expectedPercents": [3, 3, 3, 3, 11, 17, 79, 100, 100, 100]
+    },
+    {
+      "name": "minimum-exponent",
+      "config": {
+        "enabled": false,
+        "min": 0,
+        "max": 100,
+        "exponent": 0.05,
+        "cloudWeight": 1,
+        "luxMin": 5,
+        "luxMax": 100000
+      },
+      "expectedPercents": [0, 0, 0, 0, 71, 76, 97, 100, 100, 100]
+    },
+    {
+      "name": "maximum-exponent",
+      "config": {
+        "enabled": false,
+        "min": 0,
+        "max": 100,
+        "exponent": 2,
+        "cloudWeight": 1,
+        "luxMin": 5,
+        "luxMax": 100000
+      },
+      "expectedPercents": [0, 0, 0, 0, 0, 0, 25, 100, 100, 100]
+    },
+    {
+      "name": "ignore-clouds",
+      "config": {
+        "enabled": false,
+        "min": 3,
+        "max": 100,
+        "exponent": 0.35,
+        "cloudWeight": 0,
+        "luxMin": 5,
+        "luxMax": 100000
+      },
+      "expectedPercents": [3, 3, 3, 3, 11, 17, 79, 100, 100, 100]
+    },
+    {
+      "name": "partial-clouds",
+      "config": {
+        "enabled": false,
+        "min": 3,
+        "max": 100,
+        "exponent": 0.35,
+        "cloudWeight": 0.5,
+        "luxMin": 5,
+        "luxMax": 100000
+      },
+      "expectedPercents": [3, 3, 3, 3, 11, 17, 79, 100, 100, 100]
+    },
+    {
+      "name": "bounded-percent",
+      "config": {
+        "enabled": false,
+        "min": 20,
+        "max": 40,
+        "exponent": 0.35,
+        "cloudWeight": 1,
+        "luxMin": 5,
+        "luxMax": 100000
+      },
+      "expectedPercents": [20, 20, 20, 20, 22, 23, 36, 40, 40, 40]
+    },
+    {
+      "name": "constant-percent",
+      "config": {
+        "enabled": false,
+        "min": 37,
+        "max": 37,
+        "exponent": 0.35,
+        "cloudWeight": 1,
+        "luxMin": 5,
+        "luxMax": 100000
+      },
+      "expectedPercents": [37, 37, 37, 37, 37, 37, 37, 37, 37, 37]
+    },
+    {
+      "name": "low-lux-anchors",
+      "config": {
+        "enabled": false,
+        "min": 1,
+        "max": 99,
+        "exponent": 0.35,
+        "cloudWeight": 1,
+        "luxMin": 0,
+        "luxMax": 400
+      },
+      "expectedPercents": [1, 1, 10, 22, 61, 99, 99, 99, 99, 99]
+    },
+    {
+      "name": "high-lux-anchors",
+      "config": {
+        "enabled": false,
+        "min": 0,
+        "max": 100,
+        "exponent": 0.35,
+        "cloudWeight": 1,
+        "luxMin": 120000,
+        "luxMax": 1000000
+      },
+      "expectedPercents": [0, 0, 0, 0, 0, 0, 0, 0, 0, 100]
+    }
+  ],
+  "predictions": [
+    {
+      "date": "2026-09-22T06:00:00Z",
+      "sunElevationDeg": -8.246461974580862,
+      "cloudFraction": 0,
+      "lux": 0.5,
+      "percent": 3
+    },
+    {
+      "date": "2026-09-22T06:00:00Z",
+      "sunElevationDeg": -8.246461974580862,
+      "cloudFraction": 0.5,
+      "lux": 0.5,
+      "percent": 3
+    },
+    {
+      "date": "2026-09-22T06:00:00Z",
+      "sunElevationDeg": -8.246461974580862,
+      "cloudFraction": 1,
+      "lux": 0.5,
+      "percent": 3
+    },
+    {
+      "date": "2026-09-22T09:00:00Z",
+      "sunElevationDeg": 10.93628272202275,
+      "cloudFraction": 0,
+      "lux": 18082.919897938787,
+      "percent": 56
+    },
+    {
+      "date": "2026-09-22T09:00:00Z",
+      "sunElevationDeg": 10.93628272202275,
+      "cloudFraction": 0.5,
+      "lux": 16387.646157507028,
+      "percent": 55
+    },
+    {
+      "date": "2026-09-22T09:00:00Z",
+      "sunElevationDeg": 10.93628272202275,
+      "cloudFraction": 1,
+      "lux": 4520.729974484697,
+      "percent": 36
+    },
+    {
+      "date": "2026-09-22T12:00:00Z",
+      "sunElevationDeg": 24.558526110472926,
+      "cloudFraction": 0,
+      "lux": 43974.771696506185,
+      "percent": 76
+    },
+    {
+      "date": "2026-09-22T12:00:00Z",
+      "sunElevationDeg": 24.558526110472926,
+      "cloudFraction": 0.5,
+      "lux": 39852.136849958726,
+      "percent": 73
+    },
+    {
+      "date": "2026-09-22T12:00:00Z",
+      "sunElevationDeg": 24.558526110472926,
+      "cloudFraction": 1,
+      "lux": 10993.692924126546,
+      "percent": 48
+    },
+    {
+      "date": "2026-09-22T18:00:00Z",
+      "sunElevationDeg": 8.918730426672125,
+      "cloudFraction": 0,
+      "lux": 14419.098257963691,
+      "percent": 52
+    },
+    {
+      "date": "2026-09-22T18:00:00Z",
+      "sunElevationDeg": 8.918730426672125,
+      "cloudFraction": 0.5,
+      "lux": 13067.307796279594,
+      "percent": 51
+    },
+    {
+      "date": "2026-09-22T18:00:00Z",
+      "sunElevationDeg": 8.918730426672125,
+      "cloudFraction": 1,
+      "lux": 3604.774564490923,
+      "percent": 33
+    },
+    {
+      "date": "2026-09-22T19:30:00Z",
+      "sunElevationDeg": -0.7821346126997082,
+      "cloudFraction": 0,
+      "lux": 347.92287037107775,
+      "percent": 16
+    },
+    {
+      "date": "2026-09-22T19:30:00Z",
+      "sunElevationDeg": -0.7821346126997082,
+      "cloudFraction": 0.5,
+      "lux": 315.3051012737892,
+      "percent": 16
+    },
+    {
+      "date": "2026-09-22T19:30:00Z",
+      "sunElevationDeg": -0.7821346126997082,
+      "cloudFraction": 1,
+      "lux": 86.98071759276944,
+      "percent": 11
+    },
+    {
+      "date": "2026-09-22T21:00:00Z",
+      "sunElevationDeg": -10.348738995156145,
+      "cloudFraction": 0,
+      "lux": 0.5,
+      "percent": 3
+    },
+    {
+      "date": "2026-09-22T21:00:00Z",
+      "sunElevationDeg": -10.348738995156145,
+      "cloudFraction": 0.5,
+      "lux": 0.5,
+      "percent": 3
+    },
+    {
+      "date": "2026-09-22T21:00:00Z",
+      "sunElevationDeg": -10.348738995156145,
+      "cloudFraction": 1,
+      "lux": 0.5,
+      "percent": 3
+    }
+  ]
+}
