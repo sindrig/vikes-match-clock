@@ -40,6 +40,7 @@ const ScreenSelectorButton = ({
   );
 };
 import { firebaseAuth } from "../firebaseAuth";
+import ReadNotice from "./ReadNotice";
 import MatchActionSettings from "./MatchActionSettings";
 import ThemeEditorModal from "./theme/ThemeEditor";
 import ClubOverrideList from "./ClubOverrideList";
@@ -54,6 +55,7 @@ import "./Controller.css";
 import {
   useController,
   useListeners,
+  useVenueMetadataStatus,
   useView,
 } from "../contexts/FirebaseStateContext";
 import {
@@ -69,6 +71,7 @@ const confirmRefresh = () => confirm("Are you absolutely sure?");
 const Controller = () => {
   const { controller, selectAssetView } = useController();
   const { screens, venues } = useListeners();
+  const metadataStatus = useVenueMetadataStatus();
   const {
     view: { themePreset, customPresets },
   } = useView();
@@ -81,6 +84,8 @@ const Controller = () => {
     setListenPrefix,
     logout,
     available,
+    availableStatus,
+    retryAvailable,
     setScreenKey,
     displayTarget,
     setDisplayTarget: setDisplayTargetFromContext,
@@ -203,7 +208,10 @@ const Controller = () => {
           <p className="initial-screen-card-desc">
             Veldu skjá til að birta stigatöflu
           </p>
-          {displayOptions.length === 0 ? (
+          <ReadNotice {...metadataStatus} />
+          {metadataStatus.status.phase === "loading" ? (
+            <p>Hleð skjám…</p>
+          ) : displayOptions.length === 0 ? (
             <p className="initial-screen-empty">Engir skjáir tiltækir</p>
           ) : (
             <div className="initial-screen-select-group">
@@ -304,9 +312,15 @@ const Controller = () => {
             Stjórnborð
           </Link>
         )}
-        {available === null ? (
+        <ReadNotice {...metadataStatus} />
+        {availableStatus && (
+          <ReadNotice status={availableStatus} retry={retryAvailable} />
+        )}
+        {availableStatus?.phase === "error" ||
+        metadataStatus.status.phase === "error" ? null : available === null ||
+          metadataStatus.status.phase === "loading" ? (
           <RingLoader color="#1675e0" size={60} />
-        ) : available.length === 0 ? (
+        ) : available.length === 0 || available.every((key) => !venues[key]) ? (
           <p>Engir skjáir tiltækir</p>
         ) : (
           <div className="screen-selector-buttons">

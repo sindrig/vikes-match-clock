@@ -13,11 +13,52 @@ this reference when changing the behavior it describes; see the
 
 **Firebase is the single source of truth.** There is no local state fallback.
 
-State is managed via React Context (`FirebaseStateContext`) which subscribes to Firebase Realtime Database:
+State is managed through domain React contexts in `FirebaseStateContext`, with
+one subscription owner for each runtime path:
 
 - **Read path**: Firebase `onValue()` subscriptions → React state updates
 - **Write path**: Actions call `set()`/`update()` on Firebase → Firebase triggers `onValue()` → React state updates
 - State is **never** updated directly by action functions; all state changes flow through Firebase subscriptions
+
+| Runtime owner                     | Subscription / hook                                                                                     |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Global venue metadata             | `locations`; `useListeners`, `useVenueMetadataStatus`                                                   |
+| Match/controller/view/overrides   | One listener each under `states/{location}`; `useMatch`, `useController`, `useView`, `useClubOverrides` |
+| Desired perimeter                 | One `states/{location}/perimeter` parent listener; `usePerimeter`                                       |
+| Authenticated hardware telemetry  | Separate `PerimeterTelemetryProvider`, `perimeter/{location}/brightnessStatus`; `usePerimeterTelemetry` |
+| Runtime availability and commands | `useFirebaseReadStatus`, `useMutationStatus`; existing session/connection machinery                     |
+
+The desired parent delivery parses power/tokens/styles, overlay, goal video,
+ad layout, media pairs, requested brightness and auto configuration together.
+There are no additional desired-child listeners. Hardware reports never enter
+the match context or its readiness gate. Distinct memoized context values and
+stable commands prevent unrelated context notifications, including during an
+ordinary provider render; an ordinary ancestor render can still render its
+unmemoized children. The aggregate `useFirebaseState` hook remains for explicit
+diagnostics/test composition, not production consumers or SDK ownership.
+
+Each venue/auth session scope masks the previous scope's data immediately,
+including a batched A → B → A. Data, cancellation and deadline callbacks also
+belong to a particular read attempt; late callbacks cannot populate a new
+scope or a retried attempt. Global metadata survives venue selection.
+
+Five selected-venue deliveries (match, controller, view, clubOverrides and
+perimeter) are required, including valid null/default/empty deliveries. A
+permission failure or **15-second initial-delivery deadline** exposes an
+actionable error and read retry rather than an endless spinner. Quiet loaded
+data has no heartbeat deadline. Metadata and authenticated selector grants
+have independent loading/error/retry states; an empty delivery is a completed
+empty selector, not a failed read. Read errors use safe guidance rather than
+raw SDK messages.
+
+A required fault after load retains the last delivered data for that scope,
+with a visible unavailable notice and locked commands. Explicit read retry
+reattaches all five required streams without unmounting the same-venue
+lifecycle or briefly replacing its current asset with null/default data. The
+first recovered controller view establishes a baseline and does not trigger
+automatic perimeter power. Retry is not write replay or server certification;
+the [existing freshness handshake](../session-mutation-boundary.md) still
+applies. Optional telemetry faults cannot block public output.
 
 Key files:
 
@@ -107,10 +148,10 @@ Empty `listenPrefix` blocks all write operations (prevents invalid paths like `s
 
 ## State Management
 
-| Context                | Purpose                                                               |
-| ---------------------- | --------------------------------------------------------------------- |
-| `FirebaseStateContext` | Shared state synced via Firebase (Match, Controller, View, Listeners) |
-| `LocalStateContext`    | Local app state (Auth, listen prefix)                                 |
+| Context                  | Purpose                                                                                 |
+| ------------------------ | --------------------------------------------------------------------------------------- |
+| Firebase domain contexts | Shared state and explicit read/mutation status, with independent notification ownership |
+| `LocalStateContext`      | Local app state (Auth, listen prefix)                                                   |
 
 **Note**: Redux was fully removed from this codebase. All state is managed via React Context.
 

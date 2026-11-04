@@ -15,7 +15,7 @@ import {
   isMatchResetDisabled,
   isHalftimeTransitionEligible,
 } from "../utils/matchUtils";
-import { useMatch, useFirebaseState } from "../contexts/FirebaseStateContext";
+import { useMatch, useMutationStatus } from "../contexts/FirebaseStateContext";
 
 const ClockManipulationButton = ({
   seconds,
@@ -122,7 +122,7 @@ const MatchActions = () => {
     startHalftimeCountdown,
     stopHalftimeCountdown,
   } = useMatch();
-  const { writeEligible } = useFirebaseState();
+  const { writeEligible } = useMutationStatus();
 
   const [showTimeDialog, setShowTimeDialog] = useState(false);
 

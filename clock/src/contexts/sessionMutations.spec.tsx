@@ -656,9 +656,9 @@ describe("initial subscription readiness and freshness handshake", () => {
       for (const { callback } of prior)
         callback({ val: () => ({ homeScore: 999 }) } as DataSnapshot);
     });
-    expect(currentApi.ready).toBe(true); // The rendered data can remain ready across ABA.
+    expect(currentApi.ready).toBe(false); // A new opaque scope masks the old venue projection.
     expect(currentApi.writeEligible).toBe(false);
-    expect(currentApi.match.homeScore).toBe(2);
+    expect(currentApi.match.homeScore).toBe(0);
     clearAttempts();
     await blocked();
     for (const leaf of required.filter((leaf) => leaf !== "perimeter"))

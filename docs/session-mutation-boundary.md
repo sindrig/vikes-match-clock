@@ -40,6 +40,24 @@ initial load whose snapshots all arrive disconnected without a pending
 recovery can also remain loading, even after connection arrival and another
 core delivery. These inherited delivery orders are not repaired here.
 
+Required subscription cancellation, registration failure or a 15-second
+missing-initial-delivery deadline retires the current read attempt and write
+eligibility synchronously. The UI reports the affected area and offers
+**read retry**. Late data/errors from either an old session scope or an older
+attempt cannot restore eligibility. A retry preserves same-scope rendered
+state and lifecycle deadlines, but requires all five new-attempt deliveries
+and the existing connection/visibility handshake. It never replays a rejected
+command or upgrades a retained callback to the new origin. It resets the
+automatic perimeter view-transition baseline, so recovery does not submit an
+initial power toggle. Already-due, still-current lifecycle generations retain
+their existing CAS behavior after eligibility returns.
+
+Global metadata, selector grants and optional hardware status have separate
+read status/retry ownership. None can clear pending core recovery or certify
+hardware success. The writer and its calculation refs still observe the same
+SDK instance, including synchronous local echoes and rollbacks; no additional
+cold reader or optimistic projection supplies command calculations.
+
 Callbacks must retain their original command function across asynchronous
 preparation. Do not replace it with a mutable ref to the newest callback: that
 would turn an old intention into a new command. The boundary rejects before

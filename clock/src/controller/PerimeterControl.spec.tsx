@@ -13,6 +13,7 @@ import PerimeterControl from "./PerimeterControl";
 import {
   useListeners,
   usePerimeter,
+  usePerimeterTelemetry,
   useView,
 } from "../contexts/FirebaseStateContext";
 import { useLocalState } from "../contexts/LocalStateContext";
@@ -22,7 +23,18 @@ import { parseLocations } from "../contexts/firebaseParsers";
 import { minimalPerimeterDisplay } from "../lib/venue.fixtures";
 
 vi.mock("../contexts/FirebaseStateContext", () => ({
-  useFirebaseState: vi.fn(() => ({ writeEligible: true })),
+  useMutationStatus: vi.fn(() => ({ writeEligible: true })),
+  usePerimeterTelemetry: () => ({
+    brightnessStatus: (
+      usePerimeter() as ReturnType<typeof usePerimeter> & {
+        brightnessStatus: ReturnType<
+          typeof usePerimeterTelemetry
+        >["brightnessStatus"];
+      }
+    ).brightnessStatus,
+    status: { phase: "ready" },
+    retry: vi.fn(),
+  }),
   usePerimeter: vi.fn(),
   useListeners: vi.fn(),
   useView: vi.fn(),
@@ -94,9 +106,12 @@ const defaultListeners = parseLocations({
 const mockSetPerimeterAdLayout =
   vi.fn<ReturnType<typeof usePerimeter>["setPerimeterAdLayout"]>();
 
+type PerimeterFixture = ReturnType<typeof usePerimeter> &
+  Pick<ReturnType<typeof usePerimeterTelemetry>, "brightnessStatus">;
+
 const createMockPerimeterReturn = (
-  overrides: Partial<ReturnType<typeof usePerimeter>> = {},
-): ReturnType<typeof usePerimeter> =>
+  overrides: Partial<PerimeterFixture> = {},
+): PerimeterFixture =>
   ({
     perimeter: { enabled: true, state: "off" },
     setPerimeterState: vi.fn(),
@@ -115,7 +130,7 @@ const createMockPerimeterReturn = (
     setPerimeterBrightnessAuto: vi.fn().mockResolvedValue(undefined),
     getServerTime: () => Date.now(),
     ...overrides,
-  }) as unknown as ReturnType<typeof usePerimeter>;
+  }) as unknown as PerimeterFixture;
 
 const createMockLocalState = (
   overrides: Partial<ReturnType<typeof useLocalState>> = {},
@@ -1465,7 +1480,7 @@ describe("PerimeterControl", () => {
           weatherStale: false,
         },
         ...overrides,
-      }) as ReturnType<typeof usePerimeter>["brightnessStatus"];
+      }) as ReturnType<typeof usePerimeterTelemetry>["brightnessStatus"];
 
     const openModal = () => {
       render(<PerimeterControl />);

@@ -24,6 +24,32 @@ acceptance, perimeter fixtures, mapping validation and WebGL geometry coverage.
 Queue helper tests use required
 imports so a missing export fails instead of silently skipping playback cases.
 
+`contexts/subscriptionDomains.spec.tsx` exercises listener ownership, context
+isolation and command identity, parent desired-state projection, full scope
+and attempt reset, required cancellation/deadlines/retry, optional telemetry,
+and same-venue lifecycle deadline retention. Keep synchronous SDK echoes and
+creation acknowledgements separate in mocks. Do not add phantom desired-child
+callbacks when adapting older fixtures to the sole parent subscription.
+
+The emulator-only `e2e/subscription-domains.spec.ts` mounts the actual App with
+Auth/RTDB SDKs and repository rules in namespace `vikes-match-clock-test`.
+It verifies public/authenticated read boundaries, actionable initial and
+post-load permission failures, unavailable initial reads, selector retry,
+rendered brightness reset, rapid SDK echoes, queue acknowledgement barriers
+and lifecycle fault/recovery. Core reads are public under repository rules:
+the denial cases temporarily install an isolated emulator rules overlay,
+read it back, then restore repository rules. A child denial cannot override
+an ancestor read grant. The fixture is outside the production entrypoint and
+must never run against shared Firebase.
+
+These scenarios need Auth and Database only; they do not qualify Storage,
+Functions, physical telemetry or unchanged-data automatic reconnect. Under
+resource coordination, wrap the complete lifecycle once, use one browser
+worker/zero retries and a static emulator-compiled bundle with explicit fixture
+entrypoints. A successful assertion with a failed lifecycle/cleanup is not a
+passing qualification. Compare acceptance probes with the exact source pin
+and use small disposable mutations to prove their failure sensitivity.
+
 ## Port Configuration
 
 Both Vite and Playwright support a `PORT` environment variable for custom port assignment:

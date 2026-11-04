@@ -94,11 +94,20 @@ import {
   parsePerimeterGoalVideo,
   parsePerimeterAdLayout,
   parsePerimeterBrightness,
-  parsePerimeterBrightnessStatus,
   parsePerimeterBrightnessAuto,
 } from "./firebaseParsers";
 import { nextPlayerChildKey, playerChildKey } from "./nestedParsers";
 import { applyStateDiff } from "../lib/stateDiff";
+import {
+  PerimeterTelemetryProvider,
+  usePerimeterTelemetry,
+} from "./PerimeterTelemetryContext";
+import {
+  ReadAttempt,
+  readFailure,
+  useSubscriptionRead,
+  type ReadStatus,
+} from "./subscriptionRead";
 
 const HALFTIME_DURATION_MS = 15 * 60 * 1000;
 
@@ -399,9 +408,177 @@ interface FirebaseStateContextType {
   ) => Promise<void>;
 }
 
-const FirebaseStateContext = createContext<FirebaseStateContextType | null>(
-  null,
-);
+type MatchApi = Pick<
+  FirebaseStateContextType,
+  | "match"
+  | "updateMatch"
+  | "startMatch"
+  | "pauseMatch"
+  | "resetMatch"
+  | "addGoal"
+  | "addPenalty"
+  | "removePenalty"
+  | "addToPenalty"
+  | "updateHalfLength"
+  | "adjustMatchTime"
+  | "setHalfStops"
+  | "matchTimeout"
+  | "removeTimeout"
+  | "buzz"
+  | "countdown"
+  | "startHalftimeCountdown"
+  | "stopHalftimeCountdown"
+  | "completeCountdownIfCurrent"
+  | "applyHalfStopIfCurrent"
+  | "removeTimeoutIfCurrent"
+  | "removePenaltyIfCurrent"
+  | "updateRedCards"
+  | "getServerTime"
+  | "writeEligible"
+>;
+const MatchContext = createContext<MatchApi | null>(null);
+type ControllerApi = Pick<
+  FirebaseStateContextType,
+  | "controller"
+  | "updateController"
+  | "selectView"
+  | "selectAssetView"
+  | "createQueue"
+  | "replaceQueue"
+  | "appendSubstitutionAndActivate"
+  | "deleteQueue"
+  | "renameQueue"
+  | "reorderQueues"
+  | "addItemsToQueue"
+  | "removeItemFromQueue"
+  | "reorderItemsInQueue"
+  | "updateQueueSettings"
+  | "playQueue"
+  | "activateQueue"
+  | "stopPlaying"
+  | "showItemNow"
+  | "setPlaying"
+  | "renderAsset"
+  | "showNextAsset"
+  | "completeAssetIfCurrent"
+  | "remoteRefresh"
+  | "setRoster"
+  | "editPlayer"
+  | "deletePlayer"
+  | "addPlayer"
+  | "clearRoster"
+  | "selectTab"
+>;
+const ControllerContext = createContext<ControllerApi | null>(null);
+type ViewApi = Pick<
+  FirebaseStateContextType,
+  | "view"
+  | "updateView"
+  | "setViewPort"
+  | "setBackground"
+  | "setIdleImage"
+  | "setIdleAd"
+  | "setBlackoutStart"
+  | "setBlackoutEnd"
+  | "setGoalGifSettings"
+  | "setTheme"
+  | "setThemePreset"
+  | "saveCustomPreset"
+  | "deleteCustomPreset"
+>;
+const ViewContext = createContext<ViewApi | null>(null);
+type ClubOverridesApi = Pick<
+  FirebaseStateContextType,
+  | "clubOverrides"
+  | "saveClubOverride"
+  | "commitClubOverride"
+  | "deleteClubOverride"
+>;
+const ClubOverridesContext = createContext<ClubOverridesApi | null>(null);
+type PerimeterApi = Pick<
+  FirebaseStateContextType,
+  | "perimeter"
+  | "setPerimeterState"
+  | "skipPerimeterCue"
+  | "restartPerimeterDisplays"
+  | "setPerimeterOverlay"
+  | "clearPerimeterOverlay"
+  | "setPerimeterAdLayout"
+  | "createPerimeterMediaPair"
+  | "setPerimeterMediaPairMainScreenAsset"
+  | "deletePerimeterMediaPair"
+  | "setPerimeterGoalVideo"
+  | "setPerimeterScorerCelebration"
+  | "setPerimeterIdleClock"
+  | "setPerimeterPlayerDisplayStyle"
+  | "setPerimeterSubstitutionStyle"
+  | "mediaPairs"
+  | "perimeterGoalVideo"
+  | "perimeterOverlay"
+  | "perimeterAdLayout"
+  | "perimeterBrightness"
+  | "setPerimeterBrightness"
+  | "perimeterBrightnessAuto"
+  | "setPerimeterBrightnessAuto"
+  | "getServerTime"
+  | "writeEligible"
+>;
+const PerimeterContext = createContext<PerimeterApi | null>(null);
+interface RuntimeReadStatus {
+  ready: boolean;
+  status: ReadStatus;
+  connected: boolean;
+  retry: () => void;
+}
+const RuntimeReadContext = createContext<RuntimeReadStatus | null>(null);
+type MutationStatus = Pick<
+  FirebaseStateContextType,
+  "writeEligible" | "writeFreshness" | "mutationError" | "dismissMutationError"
+>;
+const MutationStatusContext = createContext<MutationStatus | null>(null);
+const ListenersContext = createContext<ListenersState | null>(null);
+const MetadataStatusContext = createContext<{
+  status: ReadStatus;
+  retry: () => void;
+} | null>(null);
+const parseListeners = (raw: unknown) =>
+  parseLocations(raw) ?? defaultListeners;
+const alwaysCurrent = () => true;
+interface VenueData {
+  match: Match;
+  controller: ControllerState;
+  view: ViewState;
+  clubOverrides: Record<string, ClubOverride>;
+  perimeter: PerimeterState;
+  perimeterOverlay: PerimeterOverlay | null;
+  perimeterAdLayout: PerimeterAdLayout | null;
+  perimeterMediaPairs: Record<string, PerimeterMediaPair>;
+  perimeterGoalVideo: PerimeterGoalVideoConfig | null;
+  perimeterBrightness: number | null;
+  perimeterBrightnessAuto: PerimeterBrightnessAuto | null;
+}
+const initialVenueData = (): VenueData => ({
+  match: defaultMatch,
+  controller: defaultController,
+  view: defaultView,
+  clubOverrides: defaultClubOverrides,
+  perimeter: defaultPerimeter,
+  perimeterOverlay: null,
+  perimeterAdLayout: null,
+  perimeterMediaPairs: {},
+  perimeterGoalVideo: null,
+  perimeterBrightness: null,
+  perimeterBrightnessAuto: null,
+});
+interface VenueRead {
+  scope: object;
+  location: string;
+  authenticated: boolean;
+  uid?: string;
+  data: VenueData;
+  ready: boolean;
+  status: ReadStatus;
+}
 
 export const getStateWithAddedItems = (
   prev: ControllerState,
@@ -600,32 +777,58 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     });
   }, [session, listenPrefix, isAuthenticated, uid]);
   useLayoutEffect(() => () => session.invalidate(), [session]);
-  const [match, setMatch] = useState<Match>(defaultMatch);
-  const [controller, setController] =
-    useState<ControllerState>(defaultController);
-  const [view, setView] = useState<ViewState>(defaultView);
-  const [listeners, setListeners] = useState<ListenersState>(defaultListeners);
-  const [clubOverrides, setClubOverrides] =
-    useState<Record<string, ClubOverride>>(defaultClubOverrides);
-  const [perimeter, setPerimeter] = useState<PerimeterState>(defaultPerimeter);
-  const [perimeterOverlay, setOverlay] = useState<PerimeterOverlay | null>(
-    null,
-  );
-  const [perimeterAdLayout, setPerimeterAdLayoutState] =
-    useState<PerimeterAdLayout | null>(null);
-  const [perimeterMediaPairs, setMediaPairs] = useState<
-    Record<string, PerimeterMediaPair>
-  >({});
-  const [perimeterGoalVideo, setPerimeterGoalVideoState] =
-    useState<PerimeterGoalVideoConfig | null>(null);
-  const [perimeterBrightness, setPerimeterBrightnessState] = useState<
-    number | null
-  >(null);
-  const [perimeterBrightnessStatus, setPerimeterBrightnessStatus] =
-    useState<PerimeterBrightnessStatus | null>(null);
-  const [perimeterBrightnessAuto, setPerimeterBrightnessAutoState] =
-    useState<PerimeterBrightnessAuto | null>(null);
-  const [ready, setReady] = useState(!listenPrefix);
+  const [venueData, setVenueData] = useState<VenueRead>(() => ({
+    scope: origin.scope,
+    location: listenPrefix,
+    authenticated: isAuthenticated,
+    uid,
+    data: initialVenueData(),
+    ready: !listenPrefix,
+    status: { phase: listenPrefix ? "loading" : "idle" },
+  }));
+  if (
+    venueData.scope !== origin.scope ||
+    venueData.location !== listenPrefix ||
+    venueData.authenticated !== isAuthenticated ||
+    venueData.uid !== uid
+  ) {
+    setVenueData({
+      scope: origin.scope,
+      location: listenPrefix,
+      authenticated: isAuthenticated,
+      uid,
+      data: initialVenueData(),
+      ready: !listenPrefix,
+      status: { phase: listenPrefix ? "loading" : "idle" },
+    });
+  }
+  const {
+    match,
+    controller,
+    view,
+    clubOverrides,
+    perimeter,
+    perimeterOverlay,
+    perimeterAdLayout,
+    perimeterMediaPairs,
+    perimeterGoalVideo,
+    perimeterBrightness,
+    perimeterBrightnessAuto,
+  } = venueData.data;
+  const ready = venueData.ready;
+  const [readRevision, setReadRevision] = useState(0);
+  const readAttemptRef = useRef<ReadAttempt | null>(null);
+  const [firebaseConnected, setFirebaseConnected] = useState(true);
+  const [metadataScope] = useState(() => ({}));
+  const metadataRead = useSubscriptionRead({
+    scope: metadataScope,
+    path: "locations",
+    area: "staðsetningar",
+    initial: defaultListeners,
+    parse: parseListeners,
+    isCurrent: alwaysCurrent,
+  });
+  const listeners = metadataRead.value;
 
   // Freshness barrier: a browser may only submit shared-state mutations while
   // it has confirmed current Firebase state for the selected venue.
@@ -659,16 +862,15 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   const viewRef = useRef(view);
   const clubOverridesRef = useRef(clubOverrides);
   const serverTimeOffsetRef = useRef<number>(0);
-  const [prevListenPrefix, setPrevListenPrefix] = useState(listenPrefix);
-
-  // Reset ready when listenPrefix changes (using state comparison pattern per React docs)
-  if (prevListenPrefix !== listenPrefix) {
-    setPrevListenPrefix(listenPrefix);
-    setReady(!listenPrefix);
-    setPerimeterAdLayoutState(null);
-    setMediaPairs({});
-    setPerimeterGoalVideoState(null);
-  }
+  const perimeterMediaPairsRef = useRef(perimeterMediaPairs);
+  const retryReads = useCallback(() => {
+    readAttemptRef.current?.close();
+    readyScopeRef.current = null;
+    prevControllerViewRef.current = null;
+    session.setFreshness("loading");
+    setVenueData((previous) => ({ ...previous, status: { phase: "loading" } }));
+    setReadRevision((previous) => previous + 1);
+  }, [session]);
 
   // Marks the end of a resume/reconnect epoch: a core subscription has
   // delivered a snapshot after the tab became visible or online again.
@@ -775,21 +977,31 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   // subscription delivers again.
   useEffect(() => {
     const connectedRef = ref(database, ".info/connected");
-    const unsubConnected = onValue(connectedRef, (snapshot) => {
-      const connected = snapshot.val() === true;
+    const attempt = new ReadAttempt(() => true);
+    const receive = (connected: boolean) => {
+      if (!attempt.isCurrent()) return;
       firebaseConnectedRef.current = connected;
+      setFirebaseConnected(connected);
       if (connected) return;
       suspendedDropRef.current = true;
       if (!document.hidden && session.getSnapshot().freshness === "ready") {
         resyncPendingRef.current = true;
         setWriteFreshness("resyncing");
       }
-    });
-
-    return () => {
-      unsubConnected();
     };
-  }, [session, setWriteFreshness]);
+    try {
+      attempt.add(
+        onValue(
+          connectedRef,
+          (snapshot) => receive(snapshot.val() === true),
+          () => receive(false),
+        ),
+      );
+    } catch {
+      receive(false);
+    }
+    return attempt.close;
+  }, [session, setWriteFreshness, readRevision]);
 
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [pendingQueueCreations] = useState(() => new PendingQueueCreations());
@@ -854,306 +1066,163 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   );
 
   useEffect(() => {
-    const locationsRef = ref(database, "locations");
-    const unsubLocations = onValue(locationsRef, (snapshot) => {
-      const parsed = parseLocations(snapshot.val());
-      setListeners(parsed ?? defaultListeners);
-    });
-
-    return () => {
-      unsubLocations();
-    };
-  }, []);
-
-  useEffect(() => {
-    const offsetRef = ref(database, ".info/serverTimeOffset");
-    const unsubOffset = onValue(offsetRef, (snapshot) => {
-      const offset = snapshot.val() as unknown as number;
-      serverTimeOffsetRef.current = offset ?? 0;
-    });
-
-    return () => {
-      unsubOffset();
-    };
+    const attempt = new ReadAttempt(() => true);
+    try {
+      attempt.add(
+        onValue(ref(database, ".info/serverTimeOffset"), (snapshot) => {
+          if (!attempt.isCurrent()) return;
+          const offset: unknown = snapshot.val();
+          serverTimeOffsetRef.current =
+            typeof offset === "number" && Number.isFinite(offset) ? offset : 0;
+        }),
+      );
+    } catch {
+      // Time metadata is optional; retain the existing local-clock fallback.
+      serverTimeOffsetRef.current = 0;
+    }
+    return attempt.close;
   }, []);
 
   const scope = origin.scope;
   useEffect(() => {
     if (
-      listenPrefix &&
-      session.getSnapshot().location === listenPrefix &&
-      session.getSnapshot().scope === scope
-    ) {
-      // Reset the transition baseline so a new venue's loaded view is treated
-      // as an initial load, never a stale cross-venue transition.
-      prevControllerViewRef.current = null;
-      // A new venue is a fresh initial load: no resume epoch is pending.
-      // Unchanged cached core nodes need not emit again after reconnect;
-      // the remaining initial deliveries still complete the all-five gate.
-      resyncPendingRef.current = false;
-
-      let active = true;
-      const subscriptionScope = session.getSnapshot();
-      const isActive = () => {
-        const current = session.getSnapshot();
-        return active && current.scope === subscriptionScope.scope;
-      };
-
-      let matchReady = false;
-      let controllerReady = false;
-      let viewReady = false;
-      let clubOverridesReady = false;
-      let perimeterReady = false;
-
-      const checkReady = () => {
-        if (!isActive()) return;
-        if (
-          matchReady &&
-          controllerReady &&
-          viewReady &&
-          clubOverridesReady &&
-          perimeterReady
-        ) {
-          setReady(true);
-          readyScopeRef.current = subscriptionScope.scope;
-          // Readiness and resynchronization can finish in either order. An
-          // undropped resume also needs no extra core update once the last
-          // required initial snapshot arrives, even if it is non-core.
-          if (
-            (!resyncPendingRef.current ||
-              (!suspendedDropRef.current &&
-                session.getSnapshot().freshness === "resyncing")) &&
-            !document.hidden &&
-            firebaseConnectedRef.current
-          ) {
-            resyncPendingRef.current = false;
-            suspendedDropRef.current = false;
-            setWriteFreshness("ready");
-          }
-        }
-      };
-
-      const matchPath = `states/${listenPrefix}/match`;
-      const controllerPath = `states/${listenPrefix}/controller`;
-      const viewPath = `states/${listenPrefix}/view`;
-      const clubOverridesPath = `states/${listenPrefix}/clubOverrides`;
-      const perimeterPath = `states/${listenPrefix}/perimeter`;
-
-      const unsubMatch = onValue(
-        ref(database, matchPath),
-        (snapshot) => {
-          if (!isActive()) return;
-          const results = parseMatch(snapshot.val(), defaultMatch);
-          matchRef.current = results ?? defaultMatch;
-          setMatch(matchRef.current);
-          markSubscriptionDelivered();
-          if (!matchReady) {
-            matchReady = true;
-            checkReady();
-          }
-        },
-        (error) => console.error("Firebase match subscription error:", error),
-      );
-
-      const unsubController = onValue(
-        ref(database, controllerPath),
-        (snapshot) => {
-          if (!isActive()) return;
-          const results = parseController(snapshot.val(), defaultController);
-          controllerRef.current = results ?? defaultController;
-          setController(controllerRef.current);
-          markSubscriptionDelivered();
-          if (!controllerReady) {
-            controllerReady = true;
-            checkReady();
-          }
-        },
-        (error) =>
-          console.error("Firebase controller subscription error:", error),
-      );
-
-      const unsubView = onValue(
-        ref(database, viewPath),
-        (snapshot) => {
-          if (!isActive()) return;
-          const results = parseView(snapshot.val(), defaultView);
-          viewRef.current = results ?? defaultView;
-          setView(viewRef.current);
-          markSubscriptionDelivered();
-          if (!viewReady) {
-            viewReady = true;
-            checkReady();
-          }
-        },
-        (error) => console.error("Firebase view subscription error:", error),
-      );
-
-      const unsubClubOverrides = onValue(
-        ref(database, clubOverridesPath),
-        (snapshot) => {
-          if (!isActive()) return;
-          const results = parseClubOverrides(snapshot.val());
-          clubOverridesRef.current = results ?? defaultClubOverrides;
-          setClubOverrides(clubOverridesRef.current);
-          if (!clubOverridesReady) {
-            clubOverridesReady = true;
-            checkReady();
-          }
-        },
-        (error) =>
-          console.error("Firebase clubOverrides subscription error:", error),
-      );
-
-      const unsubPerimeter = onValue(
-        ref(database, perimeterPath),
-        (snapshot) => {
-          if (!isActive()) return;
-          const raw: unknown = snapshot.val();
-          setPerimeter(parsePerimeterState(raw) ?? defaultPerimeter);
-          const overlay =
-            raw && typeof raw === "object"
-              ? parsePerimeterOverlay(
-                  (raw as Record<string, unknown>).overlay ?? null,
-                  { location: listenPrefix, bucket: FIREBASE_STORAGE_BUCKET },
-                )
-              : null;
-          setOverlay(overlay);
-          // The operator-configured home-goal overlay media rides along on
-          // the same desired-state subscription (absent config is null and
-          // the goal button falls back to the legacy pair).
-          setPerimeterGoalVideoState(
-            parsePerimeterGoalVideo(
-              raw && typeof raw === "object"
-                ? ((raw as Record<string, unknown>).goalVideo ?? null)
-                : null,
-              { location: listenPrefix, bucket: FIREBASE_STORAGE_BUCKET },
-            ),
-          );
-          if (!perimeterReady) {
-            perimeterReady = true;
-            checkReady();
-          }
-        },
-        (error) =>
-          console.error("Firebase perimeter subscription error:", error),
-      );
-
-      const adLayoutPath = `states/${listenPrefix}/perimeter/adLayout`;
-      const unsubAdLayout = onValue(
-        ref(database, adLayoutPath),
-        (snapshot) => {
-          if (!isActive()) return;
-          const raw: unknown = snapshot.val();
-          setPerimeterAdLayoutState(
-            parsePerimeterAdLayout(raw, {
-              location: listenPrefix,
-              bucket: FIREBASE_STORAGE_BUCKET,
-            }),
-          );
-        },
-        (error) =>
-          console.error(
-            "Firebase perimeter adLayout subscription error:",
-            error,
+      !listenPrefix ||
+      session.getSnapshot().location !== listenPrefix ||
+      session.getSnapshot().scope !== scope
+    )
+      return;
+    prevControllerViewRef.current = null;
+    readyScopeRef.current = null;
+    resyncPendingRef.current = false;
+    const attempt = new ReadAttempt(
+      () => session.getSnapshot().scope === scope,
+    );
+    readAttemptRef.current = attempt;
+    const required = new Set([
+      "match",
+      "controller",
+      "view",
+      "clubOverrides",
+      "perimeter",
+    ]);
+    const fail = (area: string, error?: unknown) => {
+      if (!attempt.isCurrent()) return;
+      attempt.close();
+      readyScopeRef.current = null;
+      session.setFreshness("loading");
+      setVenueData((previous) => ({
+        ...previous,
+        status: readFailure(`${area} (${listenPrefix})`, error),
+      }));
+    };
+    attempt.deadline(() => fail([...required].join(", ")));
+    const delivered = (area: string) => {
+      if (!required.has(area)) return;
+      required.delete(area);
+      if (required.size > 0 || !attempt.isCurrent()) return;
+      attempt.delivered();
+      setVenueData((previous) => ({
+        ...previous,
+        ready: true,
+        status: { phase: "ready" },
+      }));
+      readyScopeRef.current = scope;
+      // Preserve the existing five-delivery/connection/recovery handshake.
+      if (
+        (!resyncPendingRef.current ||
+          (!suspendedDropRef.current &&
+            session.getSnapshot().freshness === "resyncing")) &&
+        !document.hidden &&
+        firebaseConnectedRef.current
+      ) {
+        resyncPendingRef.current = false;
+        suspendedDropRef.current = false;
+        setWriteFreshness("ready");
+      }
+    };
+    const publish = (data: Partial<VenueData>) =>
+      setVenueData((previous) => ({
+        ...previous,
+        data: { ...previous.data, ...data },
+      }));
+    const readers: Record<string, (raw: unknown) => void> = {
+      match: (raw) => {
+        matchRef.current = parseMatch(raw, defaultMatch) ?? defaultMatch;
+        publish({ match: matchRef.current });
+        markSubscriptionDelivered();
+      },
+      controller: (raw) => {
+        controllerRef.current =
+          parseController(raw, defaultController) ?? defaultController;
+        publish({ controller: controllerRef.current });
+        markSubscriptionDelivered();
+      },
+      view: (raw) => {
+        viewRef.current = parseView(raw, defaultView) ?? defaultView;
+        publish({ view: viewRef.current });
+        markSubscriptionDelivered();
+      },
+      clubOverrides: (raw) => {
+        clubOverridesRef.current =
+          parseClubOverrides(raw) ?? defaultClubOverrides;
+        publish({ clubOverrides: clubOverridesRef.current });
+      },
+      perimeter: (raw) => {
+        const child =
+          raw && typeof raw === "object"
+            ? (raw as Record<string, unknown>)
+            : {};
+        const mediaScope = {
+          location: listenPrefix,
+          bucket: FIREBASE_STORAGE_BUCKET,
+        };
+        const pairs = parsePerimeterMediaPairs(child.mediaPairs, mediaScope);
+        perimeterMediaPairsRef.current = pairs;
+        publish({
+          perimeter: parsePerimeterState(raw) ?? defaultPerimeter,
+          perimeterOverlay: parsePerimeterOverlay(
+            child.overlay ?? null,
+            mediaScope,
           ),
-      );
-
-      // Named perimeter media pairs: an operator-curated library of overlay
-      // pairs stored under states/{listenPrefix}/perimeter/mediaPairs.
-      const mediaPairsPath = `states/${listenPrefix}/perimeter/mediaPairs`;
-      const unsubMediaPairs = onValue(
-        ref(database, mediaPairsPath),
-        (snapshot) => {
-          if (!isActive()) return;
-          setMediaPairs(
-            parsePerimeterMediaPairs(snapshot.val(), {
-              location: listenPrefix,
-              bucket: FIREBASE_STORAGE_BUCKET,
-            }),
-          );
-        },
-        (error) =>
-          console.error(
-            "Firebase perimeter mediaPairs subscription error:",
-            error,
+          perimeterGoalVideo: parsePerimeterGoalVideo(
+            child.goalVideo ?? null,
+            mediaScope,
           ),
-      );
-
-      // Perimeter brightness (Vnnox): the controller's requested integer
-      // percentage under states/{location}/perimeter/brightness and the
-      // daemon-published status under perimeter/{location}/brightnessStatus.
-      // The status is daemon-owned and deliberately NOT part of readiness.
-      const brightnessPath = `states/${listenPrefix}/perimeter/brightness`;
-      const unsubBrightness = onValue(
-        ref(database, brightnessPath),
-        (snapshot) => {
-          if (!isActive()) return;
-          setPerimeterBrightnessState(parsePerimeterBrightness(snapshot.val()));
-        },
-        (error) =>
-          console.error(
-            "Firebase perimeter brightness subscription error:",
-            error,
+          perimeterAdLayout: parsePerimeterAdLayout(child.adLayout, mediaScope),
+          perimeterMediaPairs: pairs,
+          perimeterBrightness: parsePerimeterBrightness(child.brightness),
+          perimeterBrightnessAuto: parsePerimeterBrightnessAuto(
+            child.brightnessAuto,
           ),
-      );
-
-      const brightnessStatusPath = `perimeter/${listenPrefix}/brightnessStatus`;
-      const unsubBrightnessStatus = isAuthenticated
-        ? onValue(
-            ref(database, brightnessStatusPath),
+        });
+      },
+    };
+    for (const [area, receive] of Object.entries(readers)) {
+      if (!attempt.isCurrent()) break;
+      try {
+        attempt.add(
+          onValue(
+            ref(database, `states/${listenPrefix}/${area}`),
             (snapshot) => {
-              if (!isActive()) return;
-              setPerimeterBrightnessStatus(
-                parsePerimeterBrightnessStatus(snapshot.val()),
-              );
+              if (!attempt.isCurrent()) return;
+              receive(snapshot.val());
+              delivered(area);
             },
-            (error) =>
-              console.error(
-                "Firebase perimeter brightnessStatus subscription error:",
-                error,
-              ),
-          )
-        : () => undefined;
-
-      // Automatic-brightness desired config written by the controller and
-      // read by the perimeter-control daemon. Absent node = auto disabled.
-      const brightnessAutoPath = `states/${listenPrefix}/perimeter/brightnessAuto`;
-      const unsubBrightnessAuto = onValue(
-        ref(database, brightnessAutoPath),
-        (snapshot) => {
-          if (!isActive()) return;
-          setPerimeterBrightnessAutoState(
-            parsePerimeterBrightnessAuto(snapshot.val()),
-          );
-        },
-        (error) =>
-          console.error(
-            "Firebase perimeter brightnessAuto subscription error:",
-            error,
+            (error) => fail(area, error),
           ),
-      );
-
-      return () => {
-        active = false;
-        unsubMatch();
-        unsubController();
-        unsubView();
-        unsubClubOverrides();
-        unsubPerimeter();
-        unsubAdLayout();
-        unsubMediaPairs();
-        unsubBrightness();
-        unsubBrightnessStatus();
-        unsubBrightnessAuto();
-      };
+        );
+      } catch (error) {
+        fail(area, error);
+      }
     }
+    return attempt.close;
   }, [
-    isAuthenticated,
     listenPrefix,
+    scope,
+    session,
+    readRevision,
     markSubscriptionDelivered,
     setWriteFreshness,
-    session,
-    scope,
   ]);
 
   const applyMatchUpdate = useCallback(
@@ -2626,7 +2695,10 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         "perimeter.set-media-pair-main-screen",
         () => {
           if (
-            !Object.prototype.hasOwnProperty.call(perimeterMediaPairs, pairId)
+            !Object.prototype.hasOwnProperty.call(
+              perimeterMediaPairsRef.current,
+              pairId,
+            )
           )
             throw new Error("Jaðarefni fannst ekki.");
           const parsed =
@@ -2636,7 +2708,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
           return { [`mediaPairs/${pairId}/mainScreenAsset`]: parsed };
         },
       ),
-    [executeCommand, perimeterMediaPairs],
+    [executeCommand],
   );
 
   const deletePerimeterMediaPair = useCallback(
@@ -2687,15 +2759,9 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     return { ...view, vp: found.screen };
   }, [view, screenKey, listeners.screens, listenPrefix]);
 
-  const value = useMemo(
+  const matchValue = useMemo(
     () => ({
       match,
-      controller,
-      view: effectiveView,
-      listeners,
-      clubOverrides,
-      perimeter,
-      ready,
       updateMatch,
       startMatch,
       pauseMatch,
@@ -2717,11 +2783,41 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       applyHalfStopIfCurrent,
       removeTimeoutIfCurrent,
       removePenaltyIfCurrent,
-      completeAssetIfCurrent,
-      writeEligible,
-      writeFreshness,
       updateRedCards,
       getServerTime,
+      writeEligible,
+    }),
+    [
+      match,
+      updateMatch,
+      startMatch,
+      pauseMatch,
+      resetMatch,
+      addGoal,
+      addPenalty,
+      removePenalty,
+      addToPenalty,
+      updateHalfLength,
+      adjustMatchTime,
+      setHalfStops,
+      matchTimeout,
+      removeTimeout,
+      buzz,
+      countdown,
+      startHalftimeCountdown,
+      stopHalftimeCountdown,
+      completeCountdownIfCurrent,
+      applyHalfStopIfCurrent,
+      removeTimeoutIfCurrent,
+      removePenaltyIfCurrent,
+      updateRedCards,
+      getServerTime,
+      writeEligible,
+    ],
+  );
+  const controllerValue = useMemo(
+    () => ({
+      controller,
       updateController,
       selectView,
       selectAssetView,
@@ -2742,6 +2838,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       setPlaying,
       renderAsset,
       showNextAsset,
+      completeAssetIfCurrent,
       remoteRefresh,
       setRoster,
       editPlayer,
@@ -2749,6 +2846,42 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       addPlayer,
       clearRoster,
       selectTab,
+    }),
+    [
+      controller,
+      updateController,
+      selectView,
+      selectAssetView,
+      createQueue,
+      replaceQueue,
+      appendSubstitutionAndActivate,
+      deleteQueue,
+      renameQueue,
+      reorderQueues,
+      addItemsToQueue,
+      removeItemFromQueue,
+      reorderItemsInQueue,
+      updateQueueSettings,
+      playQueue,
+      activateQueue,
+      stopPlaying,
+      showItemNow,
+      setPlaying,
+      renderAsset,
+      showNextAsset,
+      completeAssetIfCurrent,
+      remoteRefresh,
+      setRoster,
+      editPlayer,
+      deletePlayer,
+      addPlayer,
+      clearRoster,
+      selectTab,
+    ],
+  );
+  const viewValue = useMemo(
+    () => ({
+      view: effectiveView,
       updateView,
       setViewPort,
       setBackground,
@@ -2761,17 +2894,40 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       setThemePreset,
       saveCustomPreset,
       deleteCustomPreset,
+    }),
+    [
+      effectiveView,
+      updateView,
+      setViewPort,
+      setBackground,
+      setIdleImage,
+      setIdleAd,
+      setBlackoutStart,
+      setBlackoutEnd,
+      setGoalGifSettings,
+      setTheme,
+      setThemePreset,
+      saveCustomPreset,
+      deleteCustomPreset,
+    ],
+  );
+  const clubOverridesValue = useMemo(
+    () => ({
+      clubOverrides,
       saveClubOverride,
       commitClubOverride,
-      mutationError,
-      dismissMutationError,
       deleteClubOverride,
+    }),
+    [clubOverrides, saveClubOverride, commitClubOverride, deleteClubOverride],
+  );
+  const perimeterValue = useMemo(
+    () => ({
+      perimeter,
       setPerimeterState,
       skipPerimeterCue,
       restartPerimeterDisplays,
       setPerimeterOverlay,
       clearPerimeterOverlay,
-      perimeterOverlay,
       setPerimeterAdLayout,
       createPerimeterMediaPair,
       setPerimeterMediaPairMainScreenAsset,
@@ -2781,366 +2937,165 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       setPerimeterIdleClock,
       setPerimeterPlayerDisplayStyle,
       setPerimeterSubstitutionStyle,
-      perimeterGoalVideo,
       mediaPairs: perimeterMediaPairs,
+      perimeterGoalVideo,
+      perimeterOverlay,
       perimeterAdLayout,
       perimeterBrightness,
-      perimeterBrightnessStatus,
       setPerimeterBrightness,
       perimeterBrightnessAuto,
       setPerimeterBrightnessAuto,
+      getServerTime,
+      writeEligible,
+    }),
+    [
+      perimeter,
+      setPerimeterState,
+      skipPerimeterCue,
+      restartPerimeterDisplays,
+      setPerimeterOverlay,
+      clearPerimeterOverlay,
+      setPerimeterAdLayout,
+      createPerimeterMediaPair,
+      setPerimeterMediaPairMainScreenAsset,
+      deletePerimeterMediaPair,
+      setPerimeterGoalVideo,
+      setPerimeterScorerCelebration,
+      setPerimeterIdleClock,
+      setPerimeterPlayerDisplayStyle,
+      setPerimeterSubstitutionStyle,
+      perimeterMediaPairs,
+      perimeterGoalVideo,
+      perimeterOverlay,
+      perimeterAdLayout,
+      perimeterBrightness,
+      setPerimeterBrightness,
+      perimeterBrightnessAuto,
+      setPerimeterBrightnessAuto,
+      getServerTime,
+      writeEligible,
+    ],
+  );
+  const mutationStatus = useMemo(
+    () => ({
+      writeEligible,
+      writeFreshness,
+      mutationError,
+      dismissMutationError,
+    }),
+    [writeEligible, writeFreshness, mutationError, dismissMutationError],
+  );
+  const readStatus = useMemo(
+    () => ({
+      ready,
+      status:
+        venueData.status.phase === "ready" && !firebaseConnected
+          ? readFailure("tengingu við Firebase")
+          : venueData.status,
+      connected: firebaseConnected,
+      retry: retryReads,
+    }),
+    [ready, venueData.status, firebaseConnected, retryReads],
+  );
+  const metadataStatus = useMemo(
+    () => ({ status: metadataRead.status, retry: metadataRead.retry }),
+    [metadataRead.status, metadataRead.retry],
+  );
+  return (
+    <ListenersContext.Provider value={listeners}>
+      <MetadataStatusContext.Provider value={metadataStatus}>
+        <RuntimeReadContext.Provider value={readStatus}>
+          <MutationStatusContext.Provider value={mutationStatus}>
+            <MatchContext.Provider value={matchValue}>
+              <ControllerContext.Provider value={controllerValue}>
+                <ViewContext.Provider value={viewValue}>
+                  <ClubOverridesContext.Provider value={clubOverridesValue}>
+                    <PerimeterContext.Provider value={perimeterValue}>
+                      <PerimeterTelemetryProvider
+                        session={session}
+                        scope={scope}
+                        location={listenPrefix}
+                        authenticated={isAuthenticated}
+                        uid={uid}
+                        connected={firebaseConnected}
+                      >
+                        {children}
+                      </PerimeterTelemetryProvider>
+                    </PerimeterContext.Provider>
+                  </ClubOverridesContext.Provider>
+                </ViewContext.Provider>
+              </ControllerContext.Provider>
+            </MatchContext.Provider>
+          </MutationStatusContext.Provider>
+        </RuntimeReadContext.Provider>
+      </MetadataStatusContext.Provider>
+    </ListenersContext.Provider>
+  );
+};
+
+function useDomain<T>(context: React.Context<T | null>): T {
+  const value = useContext(context);
+  if (!value) throw new Error("Firebase hooks require FirebaseStateProvider");
+  return value;
+}
+export const useMatch = () => useDomain(MatchContext);
+export const useController = () => useDomain(ControllerContext);
+export const useView = () => useDomain(ViewContext);
+export const useClubOverrides = () => useDomain(ClubOverridesContext);
+export const useListeners = () => useDomain(ListenersContext);
+export const useVenueMetadataStatus = () => useDomain(MetadataStatusContext);
+export const useFirebaseReadStatus = () => useDomain(RuntimeReadContext);
+export const useMutationStatus = () => useDomain(MutationStatusContext);
+export { usePerimeterTelemetry } from "./PerimeterTelemetryContext";
+export const usePerimeter = () => {
+  const value = useDomain(PerimeterContext);
+  return useMemo(
+    () => ({
+      ...value,
+      goalVideo: value.perimeterGoalVideo,
+      overlay: value.perimeterOverlay,
+      adLayout: value.perimeterAdLayout,
+      brightness: value.perimeterBrightness,
+      brightnessAuto: value.perimeterBrightnessAuto,
+    }),
+    [value],
+  );
+};
+// Explicit aggregate for diagnostics/test fixtures, never the backing context
+// of the narrow hooks and never a second SDK subscription owner.
+export const useFirebaseState = () => {
+  const match = useMatch();
+  const controller = useController();
+  const view = useView();
+  const clubOverrides = useClubOverrides();
+  const perimeter = useDomain(PerimeterContext);
+  const listeners = useListeners();
+  const mutation = useMutationStatus();
+  const { ready } = useFirebaseReadStatus();
+  const { brightnessStatus: perimeterBrightnessStatus } =
+    usePerimeterTelemetry();
+  return useMemo(
+    () => ({
+      ...match,
+      ...controller,
+      ...view,
+      ...clubOverrides,
+      ...perimeter,
+      listeners,
+      ...mutation,
+      ready,
+      perimeterBrightnessStatus,
     }),
     [
       match,
       controller,
-      effectiveView,
-      listeners,
+      view,
       clubOverrides,
       perimeter,
+      listeners,
+      mutation,
       ready,
-      updateMatch,
-      startMatch,
-      pauseMatch,
-      resetMatch,
-      addGoal,
-      addPenalty,
-      removePenalty,
-      addToPenalty,
-      updateHalfLength,
-      adjustMatchTime,
-      setHalfStops,
-      matchTimeout,
-      removeTimeout,
-      buzz,
-      countdown,
-      startHalftimeCountdown,
-      stopHalftimeCountdown,
-      completeCountdownIfCurrent,
-      applyHalfStopIfCurrent,
-      removeTimeoutIfCurrent,
-      removePenaltyIfCurrent,
-      completeAssetIfCurrent,
-      writeEligible,
-      writeFreshness,
-      updateRedCards,
-      getServerTime,
-      updateController,
-      selectView,
-      selectAssetView,
-      createQueue,
-      replaceQueue,
-      appendSubstitutionAndActivate,
-      deleteQueue,
-      renameQueue,
-      reorderQueues,
-      addItemsToQueue,
-      removeItemFromQueue,
-      reorderItemsInQueue,
-      updateQueueSettings,
-      playQueue,
-      activateQueue,
-      stopPlaying,
-      showItemNow,
-      setPlaying,
-      renderAsset,
-      showNextAsset,
-      remoteRefresh,
-      setRoster,
-      editPlayer,
-      deletePlayer,
-      addPlayer,
-      clearRoster,
-      selectTab,
-      updateView,
-      setViewPort,
-      setBackground,
-      setIdleImage,
-      setIdleAd,
-      setBlackoutStart,
-      setBlackoutEnd,
-      setGoalGifSettings,
-      setTheme,
-      setThemePreset,
-      saveCustomPreset,
-      deleteCustomPreset,
-      saveClubOverride,
-      commitClubOverride,
-      mutationError,
-      dismissMutationError,
-      deleteClubOverride,
-      setPerimeterState,
-      skipPerimeterCue,
-      restartPerimeterDisplays,
-      setPerimeterOverlay,
-      clearPerimeterOverlay,
-      perimeterOverlay,
-      setPerimeterAdLayout,
-      createPerimeterMediaPair,
-      setPerimeterMediaPairMainScreenAsset,
-      deletePerimeterMediaPair,
-      setPerimeterGoalVideo,
-      setPerimeterScorerCelebration,
-      setPerimeterIdleClock,
-      setPerimeterPlayerDisplayStyle,
-      setPerimeterSubstitutionStyle,
-      perimeterGoalVideo,
-      perimeterMediaPairs,
-      perimeterAdLayout,
-      perimeterBrightness,
       perimeterBrightnessStatus,
-      setPerimeterBrightness,
-      perimeterBrightnessAuto,
-      setPerimeterBrightnessAuto,
     ],
   );
-
-  return (
-    <FirebaseStateContext.Provider value={value}>
-      {children}
-    </FirebaseStateContext.Provider>
-  );
-};
-
-export const useFirebaseState = () => {
-  const context = useContext(FirebaseStateContext);
-  if (!context) {
-    throw new Error(
-      "useFirebaseState must be used within a FirebaseStateProvider",
-    );
-  }
-  return context;
-};
-
-export const useMatch = () => {
-  const {
-    match,
-    updateMatch,
-    startMatch,
-    pauseMatch,
-    resetMatch,
-    addGoal,
-    addPenalty,
-    removePenalty,
-    addToPenalty,
-    updateHalfLength,
-    adjustMatchTime,
-    setHalfStops,
-    matchTimeout,
-    removeTimeout,
-    buzz,
-    countdown,
-    startHalftimeCountdown,
-    stopHalftimeCountdown,
-    completeCountdownIfCurrent,
-    applyHalfStopIfCurrent,
-    removeTimeoutIfCurrent,
-    removePenaltyIfCurrent,
-    updateRedCards,
-    getServerTime,
-    writeEligible,
-  } = useFirebaseState();
-  return {
-    match,
-    updateMatch,
-    startMatch,
-    pauseMatch,
-    resetMatch,
-    addGoal,
-    addPenalty,
-    removePenalty,
-    addToPenalty,
-    updateHalfLength,
-    adjustMatchTime,
-    setHalfStops,
-    matchTimeout,
-    removeTimeout,
-    buzz,
-    countdown,
-    startHalftimeCountdown,
-    stopHalftimeCountdown,
-    completeCountdownIfCurrent,
-    applyHalfStopIfCurrent,
-    removeTimeoutIfCurrent,
-    removePenaltyIfCurrent,
-    updateRedCards,
-    getServerTime,
-    writeEligible,
-  };
-};
-
-export const useController = () => {
-  const {
-    controller,
-    updateController,
-    selectView,
-    selectAssetView,
-    createQueue,
-    replaceQueue,
-    appendSubstitutionAndActivate,
-    deleteQueue,
-    renameQueue,
-    reorderQueues,
-    addItemsToQueue,
-    removeItemFromQueue,
-    reorderItemsInQueue,
-    updateQueueSettings,
-    playQueue,
-    activateQueue,
-    stopPlaying,
-    showItemNow,
-    setPlaying,
-    renderAsset,
-    showNextAsset,
-    completeAssetIfCurrent,
-    remoteRefresh,
-    setRoster,
-    editPlayer,
-    deletePlayer,
-    addPlayer,
-    clearRoster,
-    selectTab,
-  } = useFirebaseState();
-  return {
-    controller,
-    updateController,
-    selectView,
-    selectAssetView,
-    createQueue,
-    replaceQueue,
-    appendSubstitutionAndActivate,
-    deleteQueue,
-    renameQueue,
-    reorderQueues,
-    addItemsToQueue,
-    removeItemFromQueue,
-    reorderItemsInQueue,
-    updateQueueSettings,
-    playQueue,
-    activateQueue,
-    stopPlaying,
-    showItemNow,
-    setPlaying,
-    renderAsset,
-    showNextAsset,
-    completeAssetIfCurrent,
-    remoteRefresh,
-    setRoster,
-    editPlayer,
-    deletePlayer,
-    addPlayer,
-    clearRoster,
-    selectTab,
-  };
-};
-
-export const useView = () => {
-  const {
-    view,
-    updateView,
-    setViewPort,
-    setBackground,
-    setIdleImage,
-    setIdleAd,
-    setBlackoutStart,
-    setBlackoutEnd,
-    setGoalGifSettings,
-    setTheme,
-    setThemePreset,
-    saveCustomPreset,
-    deleteCustomPreset,
-  } = useFirebaseState();
-  return {
-    view,
-    updateView,
-    setViewPort,
-    setBackground,
-    setIdleImage,
-    setIdleAd,
-    setBlackoutStart,
-    setBlackoutEnd,
-    setGoalGifSettings,
-    setTheme,
-    setThemePreset,
-    saveCustomPreset,
-    deleteCustomPreset,
-  };
-};
-
-export const useListeners = () => {
-  const { listeners } = useFirebaseState();
-  return listeners;
-};
-
-export const useClubOverrides = () => {
-  const {
-    clubOverrides,
-    saveClubOverride,
-    commitClubOverride,
-    deleteClubOverride,
-  } = useFirebaseState();
-  return {
-    clubOverrides,
-    saveClubOverride,
-    commitClubOverride,
-    deleteClubOverride,
-  };
-};
-
-export const usePerimeter = () => {
-  const {
-    perimeter,
-    setPerimeterState,
-    skipPerimeterCue,
-    restartPerimeterDisplays,
-    setPerimeterOverlay,
-    clearPerimeterOverlay,
-    setPerimeterAdLayout,
-    createPerimeterMediaPair,
-    setPerimeterMediaPairMainScreenAsset,
-    deletePerimeterMediaPair,
-    setPerimeterGoalVideo,
-    setPerimeterScorerCelebration,
-    setPerimeterIdleClock,
-    setPerimeterPlayerDisplayStyle,
-    setPerimeterSubstitutionStyle,
-    mediaPairs,
-    perimeterGoalVideo,
-    perimeterOverlay,
-    perimeterAdLayout,
-    perimeterBrightness,
-    perimeterBrightnessStatus,
-    setPerimeterBrightness,
-    perimeterBrightnessAuto,
-    setPerimeterBrightnessAuto,
-    getServerTime,
-    writeEligible,
-  } = useFirebaseState();
-  return {
-    perimeter,
-    setPerimeterState,
-    skipPerimeterCue,
-    restartPerimeterDisplays,
-    setPerimeterOverlay,
-    clearPerimeterOverlay,
-    setPerimeterAdLayout,
-    setPerimeterScorerCelebration,
-    setPerimeterIdleClock,
-    setPerimeterPlayerDisplayStyle,
-    setPerimeterSubstitutionStyle,
-    createPerimeterMediaPair,
-    setPerimeterMediaPairMainScreenAsset,
-    deletePerimeterMediaPair,
-    setPerimeterGoalVideo,
-    mediaPairs,
-    goalVideo: perimeterGoalVideo,
-    overlay: perimeterOverlay,
-    adLayout: perimeterAdLayout,
-    brightness: perimeterBrightness,
-    brightnessStatus: perimeterBrightnessStatus,
-    setPerimeterBrightness,
-    brightnessAuto: perimeterBrightnessAuto,
-    setPerimeterBrightnessAuto,
-    getServerTime,
-    writeEligible,
-  };
 };

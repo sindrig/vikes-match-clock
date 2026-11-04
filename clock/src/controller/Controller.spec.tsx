@@ -11,6 +11,10 @@ vi.mock("../contexts/FirebaseStateContext", () => ({
   useController: vi.fn(),
   useView: vi.fn(),
   useListeners: vi.fn(),
+  useVenueMetadataStatus: () => ({
+    status: { phase: "ready" },
+    retry: vi.fn(),
+  }),
   useClubOverrides: vi.fn(() => ({
     clubOverrides: {},
     saveClubOverride: vi.fn(),

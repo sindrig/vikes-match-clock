@@ -29,6 +29,18 @@ require that venue's opted-in gateway. `VENUES_WITHOUT_BRIGHTNESS` (currently
 `virkid`) excludes venues without a brightness controller; it is independent of
 browser media rendering.
 
+`usePerimeter` contains desired data and commands. `BrightnessSection` reads
+daemon reports separately through `usePerimeterTelemetry`; hardware updates
+do not context-invalidate match consumers. The telemetry owner attaches only
+for an authenticated selected venue and remains outside public App readiness.
+Venue/auth scope changes, disconnect and read errors clear the visible report;
+old callbacks cannot restore it across a venue/auth A → B → A or read retry.
+The panel offers read retry on unavailable/denied reports, independently of
+match recovery. There is no inactivity timeout on an unchanged valid report.
+An SDK delivery remains a report with the daemon's timestamp, not proof of a
+new hardware verification, and an acknowledged desired write never fabricates
+an applied percentage.
+
 ## Perimeter Automatic Brightness (sun + weather prediction)
 
 The mode control (`Handvirkt %` / `Sjálfvirkt`) edits configuration; the gateway
