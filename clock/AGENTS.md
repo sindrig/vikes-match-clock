@@ -854,6 +854,15 @@ altitude in radians, the same conversion the controller's preview uses),
 polls Open-Meteo cloud cover, applies hysteresis/slew, and dispatches
 ordinary integer commands through the existing worker.
 
+The gateway worker evaluates hysteresis/slew at admission and re-evaluates
+queued automatic targets after the previous write finishes verification or
+restoration. Equivalent automatic ticks share outstanding work so slow snapshots
+can complete; changing predictions refresh undispatched context, and targets
+within hysteresis withdraw obsolete undispatched auto work. Manual events and
+effective config changes still invalidate old auto work, including at equal
+percentages. Dispatched sequences retain their calibration context and drain
+before replacement work starts. See [brightness arbitration](../docs/brightness-arbitration.md).
+
 **`states/{location}/perimeter/brightnessAuto`** (controller writes, daemon
 reads; the whole node is replaced by each save, and `updatedAt` is a Firebase
 server timestamp):
