@@ -272,6 +272,12 @@ class FakeAutoController {
   get autoConfig() {
     return this._config;
   }
+  get autoReady() {
+    return true;
+  }
+  get autoRevision() {
+    return 0;
+  }
   get lastAppliedPercent() {
     return 50;
   }
@@ -281,8 +287,13 @@ class FakeAutoController {
   async publishPrediction(prediction) {
     this.predictions.push(prediction);
   }
-  requestAuto(percent, prediction) {
-    this.autoRequests.push({ percent, prediction });
+  requestAuto(targetPercent, prediction, autoRevision, { maxSlew }) {
+    this.autoRequests.push({
+      targetPercent,
+      prediction,
+      autoRevision,
+      maxSlew,
+    });
     return true;
   }
 }
@@ -326,15 +337,21 @@ test("scheduler tick publishes the predicted readout without writes in shadow mo
   assert.deepEqual(controller.autoRequests, []);
 });
 
-test("enabled auto enqueues one hysteresis/slew-bounded write per tick", async () => {
-  const weather = new FakeWeather({ cloudCover: 0.0, ageMs: 60_000, stale: false });
-  // lastAppliedPercent is 50; clear noon targets 76 (delta 16 > slew 15).
+test("enabled scheduler submits one target with its revision and slew bound per tick", async () => {
+  const weather = new FakeWeather({
+    cloudCover: 0.0,
+    ageMs: 60_000,
+    stale: false,
+  });
+  // The real worker applies hysteresis/slew to this target at admission/drain.
   const { controller, scheduler } = makeScheduler({ enabled: true }, weather);
   await scheduler.tick();
   assert.equal(controller.autoRequests.length, 1);
   assert.deepEqual(controller.autoRequests[0], {
-    percent: 65,
+    targetPercent: 76,
     prediction: controller.predictions[0],
+    autoRevision: 0,
+    maxSlew: AUTO_MAX_SLEW,
   });
 });
 

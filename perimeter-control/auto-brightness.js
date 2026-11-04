@@ -242,10 +242,11 @@ export function calibrationEntry(source, percent, prediction, ts) {
 
 // The daemon-side scheduler: ticks every `tickMs`, computes the prediction
 // for the current instant, publishes it to the brightness status (shadow
-// mode — no writes while `brightnessAuto.enabled` is false), and enqueues at
-// most one hysteresis/slew-bounded write per tick into the serialized
-// brightness worker when auto is enabled. Never throws: any internal error
-// holds the last applied value instead of snapping to an extreme.
+// mode — no writes while `brightnessAuto.enabled` is false), and submits at
+// most one target per tick to the serialized brightness worker. The worker
+// applies hysteresis/slew both at admission and after earlier work drains.
+// Never throws: any internal error holds the last applied value instead of
+// snapping to an extreme.
 export class AutoBrightnessScheduler {
   constructor({
     controller,
@@ -268,6 +269,7 @@ export class AutoBrightnessScheduler {
     this._timer = null;
     this._stopping = false;
     this._ticking = false;
+    this._refreshPending = false;
   }
 
   // Starts the weather polling loop and the tick timer. Safe to call once.
@@ -279,6 +281,7 @@ export class AutoBrightnessScheduler {
 
   stop() {
     this._stopping = true;
+    this._refreshPending = false;
     if (this._timer) {
       clearInterval(this._timer);
       this._timer = null;
@@ -287,9 +290,14 @@ export class AutoBrightnessScheduler {
   }
 
   // Immediate recompute (used when the perimeter turns on and when the
-  // operator enables auto). Serialized with the interval tick so ticks can
-  // never overlap; a skipped concurrent tick waits for the next one.
+  // operator changes auto config). Coalesce refreshes during a suspended tick
+  // into one follow-up so the new intent is recomputed without overlapping it.
   refresh() {
+    if (this._stopping) return;
+    if (this._ticking) {
+      this._refreshPending = true;
+      return;
+    }
     void this.tick();
   }
 
@@ -306,11 +314,17 @@ export class AutoBrightnessScheduler {
       );
     } finally {
       this._ticking = false;
+      if (this._refreshPending && !this._stopping) {
+        this._refreshPending = false;
+        this.refresh();
+      }
     }
   }
 
   async _runTick() {
+    if (!this._controller.autoReady) return;
     const cfg = this._controller.autoConfig;
+    const autoRevision = this._controller.autoRevision;
     const weather = this._weather.snapshot();
     const prediction = predict(
       this._clock(),
@@ -331,18 +345,15 @@ export class AutoBrightnessScheduler {
     };
     await this._controller.publishPrediction(predictionBlock);
 
-    if (!cfg.enabled) return; // shadow mode: predict + publish only
+    if (this._stopping || !cfg.enabled) return; // shadow: predict + publish only
     if (this._skipWhenOff && this._controller.perimeterState !== "on") {
       return;
     }
-    const next = nextAutoWrite(
+    this._controller.requestAuto(
       prediction.percent,
-      this._controller.lastAppliedPercent,
-      cfg,
+      predictionBlock,
+      autoRevision,
       { maxSlew: this._maxSlew },
     );
-    if (next.write) {
-      this._controller.requestAuto(next.percent, predictionBlock);
-    }
   }
 }

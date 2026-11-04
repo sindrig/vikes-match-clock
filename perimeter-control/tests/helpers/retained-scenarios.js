@@ -96,6 +96,7 @@ export async function runScenario(entrypoint, scenario) {
     controller.startPreview?.();
     if (automatic) {
       await settle(); // Startup weather poll + status seed.
+      command.emit(null); // Initial retained brightness subscription snapshot.
       power.emit("off");
       const auto = db.refs.get(config.autoBrightnessPath);
       auto.emit({ enabled: true });

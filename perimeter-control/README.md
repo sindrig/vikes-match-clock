@@ -198,6 +198,14 @@ has started; once a write has started the sequence is irreversible and finishes
 (verifies or restores) before the newer request is picked up. Pre-write
 transient failures retry with bounded exponential backoff.
 
+The worker owns request identity and automatic-source admission. It rechecks
+supersession after awaited snapshots and immediately before dispatch; manual
+intent invalidates suspended automatic ticks before awaiting the Firebase
+disable update. With the auto feature enabled, retained automatic mode governs
+startup after both initial subscriptions and the prior applied baseline settle.
+See the [arbitration contract and local regression proof](../docs/brightness-arbitration.md)
+for startup ordering and the irreversible dispatch boundary.
+
 ### Configuration
 
 See `perimeter-control.env.example` for the full list of environment
