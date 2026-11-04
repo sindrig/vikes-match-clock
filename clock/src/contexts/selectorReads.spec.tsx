@@ -75,7 +75,7 @@ function mount() {
 function grant() {
   const entry = subscriptions
     .filter((item) => item.active && item.path === `auth/${sdkUser?.uid}`)
-    .at(-1);
+    .pop();
   if (!entry) throw new Error("No active grant subscription");
   return entry;
 }
