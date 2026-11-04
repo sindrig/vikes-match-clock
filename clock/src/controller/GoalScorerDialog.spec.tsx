@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import {
+  act,
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+} from "@testing-library/react";
 import GoalScorerDialog from "./GoalScorerDialog";
 import {
   useController,
@@ -45,6 +51,25 @@ const PLAYERS = [
   { id: 7, name: "Anna", number: 8, show: true, role: "MF" },
 ] as never[];
 
+const PLAYER_ASSET = {
+  type: "player",
+  key: "https://storage.example.com/player-fagn.png",
+  name: "Jón",
+  number: 7,
+  overlay: { text: "" },
+  teamName: "Víkingur R",
+};
+
+function deferred() {
+  let resolve!: () => void;
+  let reject!: (error: Error) => void;
+  const promise = new Promise<void>((done, fail) => {
+    resolve = done;
+    reject = fail;
+  });
+  return { promise, resolve, reject };
+}
+
 const setupContexts = (mapping: unknown = minimalPerimeterDisplay) => {
   mockedUseController.mockReturnValue({
     renderAsset,
@@ -60,14 +85,7 @@ const setupContexts = (mapping: unknown = minimalPerimeterDisplay) => {
   mockedUseRemoteSettings.mockReturnValue({
     listenPrefix: "vikuti",
   } as unknown as ReturnType<typeof useRemoteSettings>);
-  mockedGetPlayerAssetObject.mockResolvedValue({
-    type: "player",
-    key: "https://storage.example.com/player-fagn.png",
-    name: "Jón",
-    number: 7,
-    overlay: { text: "" },
-    teamName: "Víkingur R",
-  } as never);
+  mockedGetPlayerAssetObject.mockResolvedValue(PLAYER_ASSET);
 };
 
 const renderDialog = (props: Record<string, unknown> = {}) =>
@@ -84,6 +102,8 @@ const renderDialog = (props: Record<string, unknown> = {}) =>
 
 beforeEach(() => {
   vi.clearAllMocks();
+  renderAsset.mockResolvedValue(undefined);
+  setPerimeterOverlay.mockResolvedValue(undefined);
   setupContexts();
 });
 
@@ -182,6 +202,118 @@ describe("GoalScorerDialog", () => {
   });
 
   // -- Shared behavior -------------------------------------------------------
+
+  it.each([
+    ["media", false],
+    ["media", true],
+    ["main-screen", false],
+    ["main-screen", true],
+    ["perimeter", false],
+    ["perimeter", true],
+  ] as const)(
+    "ignores a dismissed selection's late %s completion (failure: %s)",
+    async (stage, failure) => {
+      const pending = deferred();
+      const onClose = vi.fn();
+      if (stage === "media") {
+        mockedGetPlayerAssetObject.mockReturnValueOnce(
+          pending.promise.then(() => PLAYER_ASSET),
+        );
+      } else if (stage === "main-screen") {
+        renderAsset.mockReturnValueOnce(pending.promise);
+      } else {
+        setPerimeterOverlay.mockReturnValueOnce(pending.promise);
+      }
+      const dialog = (open: boolean) => (
+        <GoalScorerDialog
+          open={open}
+          players={PLAYERS}
+          teamName="Víkingur R"
+          onClose={onClose}
+        />
+      );
+      const mounted = render(dialog(true));
+      fireEvent.click(screen.getByText("Jón"));
+      const delayed =
+        stage === "media"
+          ? mockedGetPlayerAssetObject
+          : stage === "main-screen"
+            ? renderAsset
+            : setPerimeterOverlay;
+      await waitFor(() => expect(delayed).toHaveBeenCalledTimes(1));
+
+      fireEvent.click(screen.getByRole("button", { name: "Close" }));
+      expect(onClose).toHaveBeenCalledTimes(1);
+      mounted.rerender(dialog(false));
+      mounted.rerender(dialog(true));
+      onClose.mockClear();
+      await act(async () => {
+        if (failure) pending.reject(new Error("Old selection failed"));
+        else pending.resolve();
+        await pending.promise.catch(() => undefined);
+      });
+
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      expect(renderAsset).toHaveBeenCalledTimes(stage === "media" ? 0 : 1);
+      expect(setPerimeterOverlay).toHaveBeenCalledTimes(
+        stage === "perimeter" ? 1 : 0,
+      );
+      fireEvent.click(screen.getByText("Anna"));
+      await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+      expect(setPerimeterOverlay).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          player: { id: "7", name: "Anna", number: "8" },
+        }),
+      );
+    },
+  );
+
+  it("does not close a newer selection when an earlier acknowledgement arrives", async () => {
+    const first = deferred();
+    const second = deferred();
+    const onClose = vi.fn();
+    setPerimeterOverlay
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise);
+    renderDialog({ onClose });
+    fireEvent.click(screen.getByText("Jón"));
+    await waitFor(() => expect(setPerimeterOverlay).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByText("Anna"));
+    await waitFor(() => expect(setPerimeterOverlay).toHaveBeenCalledTimes(2));
+
+    await act(async () => {
+      first.resolve();
+      await first.promise;
+    });
+    expect(onClose).not.toHaveBeenCalled();
+    await act(async () => {
+      second.resolve();
+      await second.promise;
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["main-screen", "perimeter"])(
+    "keeps a rejected %s selection open with an error and permits an explicit retry",
+    async (stage) => {
+      const onClose = vi.fn();
+      const writer =
+        stage === "main-screen" ? renderAsset : setPerimeterOverlay;
+      writer.mockRejectedValueOnce(new Error("Save blocked"));
+      renderDialog({ onClose });
+      fireEvent.click(screen.getByText("Jón"));
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        "Save blocked",
+      );
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.getByRole("dialog")).toBeVisible();
+
+      fireEvent.click(screen.getByText("Jón"));
+      await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    },
+  );
 
   it("does not wait for the goal background before rendering the player", async () => {
     let resolveBackground: (() => void) | undefined;

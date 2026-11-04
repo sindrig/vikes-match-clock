@@ -64,6 +64,8 @@ const ACTION_LABELS: Record<string, string> = {
   "perimeter.clear-overlay": "Jaðaroverlay hreinsað",
   "perimeter.set-ad-layout": "Jaðarútlit sett",
   "perimeter.set-goal-video": "Markamyndband stillt",
+  "perimeter.set-brightness": "Bjartleiki stilltur",
+  "perimeter.set-brightness-auto": "Sjálfvirkur bjartleiki stilltur",
   "perimeter.create-media-pair": "Jaðarefni búið til",
   "perimeter.set-media-pair-main-screen": "Stórskjárefni tengt jaðarefni",
   "perimeter.delete-media-pair": "Jaðarefni fjarlægt",

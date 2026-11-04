@@ -7,12 +7,13 @@ import React, {
   useCallback,
   useRef,
   useMemo,
+  useLayoutEffect,
+  useSyncExternalStore,
 } from "react";
 import { database, storageHelpers, FIREBASE_STORAGE_BUCKET } from "../firebase";
 import {
   ref,
   onValue,
-  set,
   runTransaction,
   serverTimestamp,
 } from "firebase/database";
@@ -48,11 +49,9 @@ import {
 import {
   firebaseDatabase,
   generateClubOverrideId,
-  saveClubOverride as firebaseSaveClubOverride,
-  deleteClubOverride as firebaseDeleteClubOverride,
-  AuditEventPayload,
+  type AuditEventPayload,
 } from "../firebaseDatabase";
-import { getOrCreateSessionId } from "../lib/sessionId";
+import { MutationSession, type WriteFreshness } from "../lib/mutationSession";
 import { validateBrightnessAutoConfig } from "../lib/autoBrightness";
 import { Sports, DEFAULT_HALFSTOPS, VIEWS } from "../constants";
 import { msUntilMatchStart } from "../utils/timeUtils";
@@ -96,11 +95,6 @@ import {
 } from "./firebaseParsers";
 
 const HALFTIME_DURATION_MS = 15 * 60 * 1000;
-
-// Freshness barrier states for authenticated mutations. Firebase remains the
-// single source of truth; this only decides whether THIS browser may submit a
-// command based on its subscription epoch.
-type WriteFreshness = "loading" | "ready" | "hidden" | "offline" | "resyncing";
 
 const normalizeClubKey = (name: string): string => name.replace(/\.+$/, "");
 
@@ -268,7 +262,7 @@ interface FirebaseStateContextType {
   stopPlaying: () => void;
   showItemNow: (asset: Asset) => void;
   setPlaying: (playing: boolean) => void;
-  renderAsset: (asset: Asset | null) => void;
+  renderAsset: (asset: Asset | null) => Promise<void>;
   showNextAsset: () => void;
   removeAssetAfterTimeout: () => void;
   remoteRefresh: () => void;
@@ -306,18 +300,28 @@ interface FirebaseStateContextType {
   }) => void;
   setTheme: (theme: ThemeConfig | undefined) => void;
   setThemePreset: (preset: string | undefined) => void;
-  saveCustomPreset: (id: string, preset: CustomPreset) => void;
+  saveCustomPreset: (id: string, preset: CustomPreset) => Promise<void>;
   deleteCustomPreset: (id: string) => void;
 
   saveClubOverride: (
     override: Omit<ClubOverride, "logoUrl"> & { logoFile: File },
   ) => Promise<void>;
+  commitClubOverride: (
+    id: string,
+    override: ClubOverride,
+    action:
+      | "clubOverrides.create"
+      | "clubOverrides.update"
+      | "clubOverrides.save",
+  ) => Promise<void>;
+  mutationError: string | null;
+  dismissMutationError: () => void;
   deleteClubOverride: (id: string) => Promise<void>;
 
   setPerimeterState: (state: PerimeterState["state"]) => void;
   skipPerimeterCue: () => void;
   restartPerimeterDisplays: () => void;
-  setPerimeterOverlay: (overlay: PerimeterOverlay) => void;
+  setPerimeterOverlay: (overlay: PerimeterOverlay) => Promise<void>;
   clearPerimeterOverlay: () => void;
   setPerimeterAdLayout: (layout: PerimeterAdLayout | null) => Promise<void>;
   createPerimeterMediaPair: (
@@ -475,9 +479,9 @@ interface FirebaseStateProviderProps {
   isAuthenticated: boolean;
   screenKey: string | null;
   // Authenticated operator identity (Firebase Auth UID) used for audit events.
-  // Required in production whenever isAuthenticated is true; absent only in
-  // tests/development where firebaseDatabase is mocked.
+  // An authenticated command requires a nonempty UID, including in tests.
   uid?: string;
+  mutationSession?: MutationSession;
 }
 
 export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
@@ -486,7 +490,31 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   isAuthenticated,
   screenKey,
   uid,
+  mutationSession,
 }) => {
+  const [ownSession] = useState(
+    () =>
+      new MutationSession({
+        location: listenPrefix,
+        authenticated: isAuthenticated,
+        uid,
+      }),
+  );
+  const session = mutationSession ?? ownSession;
+  const origin = useSyncExternalStore(session.subscribe, session.getSnapshot);
+  const writeFreshness = origin.freshness;
+  const setWriteFreshness = useCallback(
+    (freshness: typeof writeFreshness) => session.setFreshness(freshness),
+    [session],
+  );
+  useLayoutEffect(() => {
+    session.setScope({
+      location: listenPrefix,
+      authenticated: isAuthenticated,
+      uid,
+    });
+  }, [session, listenPrefix, isAuthenticated, uid]);
+  useLayoutEffect(() => () => session.invalidate(), [session]);
   const [match, setMatch] = useState<Match>(defaultMatch);
   const [controller, setController] =
     useState<ControllerState>(defaultController);
@@ -527,8 +555,6 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   // Eligibility is a barrier, NOT a second state store: Firebase remains the
   // single source of truth, and rendered values are unchanged. It only decides
   // whether THIS browser may submit a command.
-  const [writeFreshness, setWriteFreshness] =
-    useState<WriteFreshness>("loading");
   const resyncPendingRef = useRef(false);
   // Current Firebase connectivity, mirrored from `/.info/connected`. This is
   // the authoritative signal for whether the existing subscription epoch is
@@ -540,7 +566,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   // restore eligibility immediately; a resume after a real drop must wait for
   // a post-reconnect subscription delivery.
   const suspendedDropRef = useRef(false);
-  const writeFreshnessRef = useRef<WriteFreshness>("loading");
+  const readyScopeRef = useRef<object | null>(null);
 
   const matchRef = useRef(match);
   const controllerRef = useRef(controller);
@@ -554,7 +580,6 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   if (prevListenPrefix !== listenPrefix) {
     setPrevListenPrefix(listenPrefix);
     setReady(!listenPrefix);
-    setWriteFreshness("loading");
     setPerimeterAdLayoutState(null);
     setMediaPairs({});
     setPerimeterGoalVideoState(null);
@@ -564,17 +589,24 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   // delivered a snapshot after the tab became visible or online again.
   const markSubscriptionDelivered = useCallback(() => {
     if (!resyncPendingRef.current) return;
+    if (!firebaseConnectedRef.current) return;
+    // Active subscription callbacks may prove resynchronization before all
+    // initial venue snapshots arrive. Keep that proof; checkReady still owns
+    // the all-required-snapshots gate for this scope.
     resyncPendingRef.current = false;
     suspendedDropRef.current = false;
-    // A core subscription delivery after a resume is proof the SDK
-    // re-synchronized with current server state (a live-connection data
-    // change or a reconnect re-sync), so the client is eligible again.
+    // A connected core delivery satisfies the existing recovery policy.
+    // onValue does not expose server/cache provenance; this barrier does not
+    // independently certify server freshness.
     // `navigator.onLine` is intentionally not consulted: it is unreliable and
     // a genuinely offline client simply never receives a delivery.
-    if (typeof document === "undefined" || !document.hidden) {
+    if (
+      readyScopeRef.current === session.getSnapshot().scope &&
+      (typeof document === "undefined" || !document.hidden)
+    ) {
       setWriteFreshness("ready");
     }
-  }, []);
+  }, [session, setWriteFreshness]);
 
   // Initial load becomes write-eligible inside checkReady (below), once all
   // required venue subscriptions have delivered — so no render-time ref reads
@@ -591,6 +623,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     // delivery that will not come when no data changed while the tab was away.
     const restoreAfterUndroppedResume = () => {
       if (document.hidden) return;
+      if (readyScopeRef.current !== session.getSnapshot().scope) return;
       if (firebaseConnectedRef.current && !suspendedDropRef.current) {
         resyncPendingRef.current = false;
         suspendedDropRef.current = false;
@@ -600,7 +633,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     const onVisibilityChange = () => {
       if (document.hidden) {
         resyncPendingRef.current = false;
-        suspendedDropRef.current = false;
+        suspendedDropRef.current ||= !firebaseConnectedRef.current;
         setWriteFreshness("hidden");
       } else {
         resyncPendingRef.current = true;
@@ -610,11 +643,12 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     };
     const onPageHide = () => {
       resyncPendingRef.current = false;
-      suspendedDropRef.current = false;
+      suspendedDropRef.current ||= !firebaseConnectedRef.current;
       setWriteFreshness("hidden");
     };
     const onOffline = () => {
       resyncPendingRef.current = true;
+      suspendedDropRef.current ||= !firebaseConnectedRef.current;
       setWriteFreshness("offline");
     };
     const onOnline = () => {
@@ -632,7 +666,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       window.removeEventListener("offline", onOffline);
       window.removeEventListener("online", onOnline);
     };
-  }, []);
+  }, [session, setWriteFreshness]);
 
   // A freshly loaded client that stays visible/online is eligible. This also
   // covers venues that never transitioned through an explicit resume epoch.
@@ -640,23 +674,13 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   // controllers may ever become write-eligible, so unauthenticated displays
   // never appear capable of mutating shared state (and MatchLifecycle never
   // attempts conditional transitions for them).
-  const writeEligible = isAuthenticated && writeFreshness === "ready";
-
-  useEffect(() => {
-    matchRef.current = match;
-  }, [match]);
-  useEffect(() => {
-    controllerRef.current = controller;
-  }, [controller]);
-  useEffect(() => {
-    viewRef.current = view;
-  }, [view]);
-  useEffect(() => {
-    clubOverridesRef.current = clubOverrides;
-  }, [clubOverrides]);
-  useEffect(() => {
-    writeFreshnessRef.current = writeFreshness;
-  }, [writeFreshness]);
+  const writeEligible =
+    isAuthenticated &&
+    origin.authenticated &&
+    Boolean(uid) &&
+    origin.location === listenPrefix &&
+    origin.uid === uid &&
+    writeFreshness === "ready";
 
   // Track real Firebase connectivity (`.info/connected`), the authoritative
   // signal for whether the current subscription epoch is still live. A drop
@@ -670,9 +694,8 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       const connected = snapshot.val() === true;
       firebaseConnectedRef.current = connected;
       if (connected) return;
-      if (document.hidden || writeFreshnessRef.current !== "ready") {
-        suspendedDropRef.current = true;
-      } else {
+      suspendedDropRef.current = true;
+      if (!document.hidden && session.getSnapshot().freshness === "ready") {
         resyncPendingRef.current = true;
         setWriteFreshness("resyncing");
       }
@@ -681,23 +704,51 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     return () => {
       unsubConnected();
     };
+  }, [session, setWriteFreshness]);
+
+  const [mutationError, setMutationError] = useState<string | null>(null);
+  const dismissMutationError = useCallback(() => setMutationError(null), []);
+  const reportMutationError = useCallback((error: unknown) => {
+    console.error("Shared-state command failed:", error);
+    setMutationError(
+      error instanceof Error ? error.message : "Ekki tókst að vista breytingu.",
+    );
   }, []);
 
-  // Builds the identity payload for an audited mutation, or null when the
-  // provider is not in a position to write (unauthenticated or no venue).
-  // Every successful authenticated mutation MUST carry an audit record, so
-  // callers skip the write entirely when this returns null.
-  const makeAudit = useCallback(
-    (stateArea: AuditStateArea, action: string): AuditEventPayload | null => {
-      if (!listenPrefix || !isAuthenticated) return null;
-      return {
-        uid: uid ?? "",
-        sessionId: getOrCreateSessionId(),
-        action,
-        stateArea,
-      };
+  // The only ordinary shared-state submission boundary. The origin is bound
+  // to this render, so a retained handler never acquires a newer epoch. Check
+  // before reading refs and again immediately before calling the SDK writer.
+  const executeCommand = useCallback(
+    (
+      stateArea: AuditStateArea,
+      action: string,
+      prepare: () => Record<string, unknown>,
+    ): Promise<void> => {
+      let submission: Promise<void>;
+      try {
+        session.assertCurrent(origin);
+        const diff = prepare();
+        const audit = session.audit(origin, stateArea, action);
+        submission =
+          Object.keys(diff).length > 0
+            ? firebaseDatabase.writeAudited(
+                origin.location,
+                stateArea,
+                diff,
+                audit,
+              )
+            : Promise.resolve();
+      } catch (error) {
+        submission = Promise.reject(
+          error instanceof Error ? error : new Error(String(error)),
+        );
+      }
+      // Legacy button actions can ignore the promise safely. Awaiting editors
+      // still receive the original rejection and retain their local drafts.
+      void submission.catch(reportMutationError);
+      return submission;
     },
-    [isAuthenticated, listenPrefix, uid],
+    [session, origin, reportMutationError],
   );
 
   useEffect(() => {
@@ -724,13 +775,27 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     };
   }, []);
 
+  const scope = origin.scope;
   useEffect(() => {
-    if (listenPrefix) {
+    if (
+      listenPrefix &&
+      session.getSnapshot().location === listenPrefix &&
+      session.getSnapshot().scope === scope
+    ) {
       // Reset the transition baseline so a new venue's loaded view is treated
       // as an initial load, never a stale cross-venue transition.
       prevControllerViewRef.current = null;
       // A new venue is a fresh initial load: no resume epoch is pending.
+      // Unchanged cached core nodes need not emit again after reconnect;
+      // the remaining initial deliveries still complete the all-five gate.
       resyncPendingRef.current = false;
+
+      let active = true;
+      const subscriptionScope = session.getSnapshot();
+      const isActive = () => {
+        const current = session.getSnapshot();
+        return active && current.scope === subscriptionScope.scope;
+      };
 
       let matchReady = false;
       let controllerReady = false;
@@ -739,6 +804,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       let perimeterReady = false;
 
       const checkReady = () => {
+        if (!isActive()) return;
         if (
           matchReady &&
           controllerReady &&
@@ -747,14 +813,18 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
           perimeterReady
         ) {
           setReady(true);
-          // Initial load becomes write-eligible once all required venue
-          // subscriptions have delivered (unless a hide/offline event raced
-          // in before the last delivery).
+          readyScopeRef.current = subscriptionScope.scope;
+          // Readiness and resynchronization can finish in either order. An
+          // undropped resume also needs no extra core update once the last
+          // required initial snapshot arrives, even if it is non-core.
           if (
-            !resyncPendingRef.current &&
+            (!resyncPendingRef.current ||
+              (!suspendedDropRef.current &&
+                session.getSnapshot().freshness === "resyncing")) &&
             !document.hidden &&
             firebaseConnectedRef.current
           ) {
+            resyncPendingRef.current = false;
             suspendedDropRef.current = false;
             setWriteFreshness("ready");
           }
@@ -770,12 +840,10 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       const unsubMatch = onValue(
         ref(database, matchPath),
         (snapshot) => {
+          if (!isActive()) return;
           const results = parseMatch(snapshot.val(), defaultMatch);
-          if (results) {
-            setMatch(results);
-          } else {
-            setMatch(defaultMatch);
-          }
+          matchRef.current = results ?? defaultMatch;
+          setMatch(matchRef.current);
           markSubscriptionDelivered();
           if (!matchReady) {
             matchReady = true;
@@ -788,8 +856,10 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       const unsubController = onValue(
         ref(database, controllerPath),
         (snapshot) => {
+          if (!isActive()) return;
           const results = parseController(snapshot.val(), defaultController);
-          setController(results ?? defaultController);
+          controllerRef.current = results ?? defaultController;
+          setController(controllerRef.current);
           markSubscriptionDelivered();
           if (!controllerReady) {
             controllerReady = true;
@@ -803,8 +873,10 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       const unsubView = onValue(
         ref(database, viewPath),
         (snapshot) => {
+          if (!isActive()) return;
           const results = parseView(snapshot.val(), defaultView);
-          setView(results ?? defaultView);
+          viewRef.current = results ?? defaultView;
+          setView(viewRef.current);
           markSubscriptionDelivered();
           if (!viewReady) {
             viewReady = true;
@@ -817,8 +889,10 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       const unsubClubOverrides = onValue(
         ref(database, clubOverridesPath),
         (snapshot) => {
+          if (!isActive()) return;
           const results = parseClubOverrides(snapshot.val());
-          setClubOverrides(results ?? defaultClubOverrides);
+          clubOverridesRef.current = results ?? defaultClubOverrides;
+          setClubOverrides(clubOverridesRef.current);
           if (!clubOverridesReady) {
             clubOverridesReady = true;
             checkReady();
@@ -831,6 +905,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       const unsubPerimeter = onValue(
         ref(database, perimeterPath),
         (snapshot) => {
+          if (!isActive()) return;
           const raw: unknown = snapshot.val();
           setPerimeter(parsePerimeterState(raw) ?? defaultPerimeter);
           const overlay =
@@ -865,6 +940,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       const unsubAdLayout = onValue(
         ref(database, adLayoutPath),
         (snapshot) => {
+          if (!isActive()) return;
           const raw: unknown = snapshot.val();
           setPerimeterAdLayoutState(
             parsePerimeterAdLayout(raw, {
@@ -886,6 +962,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       const unsubMediaPairs = onValue(
         ref(database, mediaPairsPath),
         (snapshot) => {
+          if (!isActive()) return;
           setMediaPairs(
             parsePerimeterMediaPairs(snapshot.val(), {
               location: listenPrefix,
@@ -908,6 +985,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       const unsubBrightness = onValue(
         ref(database, brightnessPath),
         (snapshot) => {
+          if (!isActive()) return;
           setPerimeterBrightnessState(parsePerimeterBrightness(snapshot.val()));
         },
         (error) =>
@@ -922,6 +1000,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         ? onValue(
             ref(database, brightnessStatusPath),
             (snapshot) => {
+              if (!isActive()) return;
               setPerimeterBrightnessStatus(
                 parsePerimeterBrightnessStatus(snapshot.val()),
               );
@@ -940,6 +1019,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       const unsubBrightnessAuto = onValue(
         ref(database, brightnessAutoPath),
         (snapshot) => {
+          if (!isActive()) return;
           setPerimeterBrightnessAutoState(
             parsePerimeterBrightnessAuto(snapshot.val()),
           );
@@ -952,6 +1032,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       );
 
       return () => {
+        active = false;
         unsubMatch();
         unsubController();
         unsubView();
@@ -964,196 +1045,139 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         unsubBrightnessAuto();
       };
     }
-  }, [isAuthenticated, listenPrefix, markSubscriptionDelivered]);
+  }, [
+    isAuthenticated,
+    listenPrefix,
+    markSubscriptionDelivered,
+    setWriteFreshness,
+    session,
+    scope,
+  ]);
 
   const applyMatchUpdate = useCallback(
-    (getNewState: (prev: Match) => Match, action: string) => {
-      if (!listenPrefix) return;
-
-      const prev = matchRef.current;
-      const newState = getNewState(prev);
-      if (isAuthenticated && writeEligible) {
-        matchRef.current = newState;
-
-        // Compute diff: only send changed fields to avoid Firebase
-        // emulator issues with full-object update() calls
+    (getNewState: (prev: Match) => Match, action: string) =>
+      executeCommand("match", action, () => {
+        const prev = matchRef.current;
+        const next = getNewState(prev);
         const diff: Record<string, unknown> = {};
-        for (const key of Object.keys(newState) as (keyof Match)[]) {
-          const oldVal = prev[key];
-          const newVal = newState[key];
-          if (oldVal !== newVal) {
-            diff[key] = newVal;
-          }
+        for (const key of Object.keys(next) as (keyof Match)[]) {
+          if (prev[key] !== next[key]) diff[key] = next[key];
         }
-
-        if (Object.keys(diff).length > 0) {
-          const audit = makeAudit("match", action);
-          if (audit) {
-            firebaseDatabase
-              .writeAudited(listenPrefix, "match", diff, audit)
-              .catch(console.error);
-          }
-        }
-      }
-    },
-    [isAuthenticated, listenPrefix, writeEligible, makeAudit],
+        return diff;
+      }),
+    [executeCommand],
   );
 
   const applyControllerUpdate = useCallback(
-    (
-      getNewState: (prev: ControllerState) => ControllerState,
-      action: string,
-    ) => {
-      if (!listenPrefix) return;
-
-      const prev = controllerRef.current;
-      const newState = getNewState(prev);
-      if (isAuthenticated && writeEligible) {
-        controllerRef.current = newState;
-
-        const diff = computeControllerDiff(prev, newState);
-
-        if (Object.keys(diff).length > 0) {
-          const audit = makeAudit("controller", action);
-          if (audit) {
-            firebaseDatabase
-              .writeAudited(listenPrefix, "controller", diff, audit)
-              .catch(console.error);
-          }
-        }
-      }
-    },
-    [isAuthenticated, listenPrefix, writeEligible, makeAudit],
+    (getNewState: (prev: ControllerState) => ControllerState, action: string) =>
+      executeCommand("controller", action, () => {
+        const prev = controllerRef.current;
+        return computeControllerDiff(prev, getNewState(prev));
+      }),
+    [executeCommand],
   );
 
   const applyViewUpdate = useCallback(
-    (getNewState: (prev: ViewState) => ViewState, action: string) => {
-      if (!listenPrefix) return;
-
-      const prev = viewRef.current;
-      const newState = getNewState(prev);
-      if (isAuthenticated && writeEligible) {
-        viewRef.current = newState;
-
+    (getNewState: (prev: ViewState) => ViewState, action: string) =>
+      executeCommand("view", action, () => {
+        const prev = viewRef.current;
+        const next = getNewState(prev);
         const diff: Record<string, unknown> = {};
-        for (const key of Object.keys(newState) as (keyof ViewState)[]) {
-          const oldVal = prev[key];
-          const newVal = newState[key];
-          if (oldVal !== newVal) {
-            // Firebase update() rejects undefined; use null to delete a key
-            diff[key] = newVal === undefined ? null : newVal;
-          }
+        for (const key of Object.keys(next) as (keyof ViewState)[]) {
+          if (prev[key] !== next[key]) diff[key] = next[key] ?? null;
         }
-
-        // Also detect keys removed from newState (present in prev, absent in new)
         for (const key of Object.keys(prev) as (keyof ViewState)[]) {
-          if (!(key in newState) && !(key in diff) && prev[key] !== undefined) {
-            diff[key] = null;
-          }
+          if (!(key in next) && prev[key] !== undefined) diff[key] = null;
         }
-
-        if (Object.keys(diff).length > 0) {
-          const audit = makeAudit("view", action);
-          if (audit) {
-            firebaseDatabase
-              .writeAudited(listenPrefix, "view", diff, audit)
-              .catch(console.error);
-          }
-        }
-      }
-    },
-    [isAuthenticated, listenPrefix, writeEligible, makeAudit],
+        return diff;
+      }),
+    [executeCommand],
   );
 
   const updateMatch = useCallback(
-    (updates: Partial<Match>) => {
-      if (!listenPrefix || !isAuthenticated || !writeEligible) return;
+    (updates: Partial<Match>) =>
+      executeCommand("match", "match.update", () => {
+        const prev = matchRef.current;
+        const newState: Match = { ...prev, ...updates };
+        const clubIdsMap = clubIds as Record<string, string>;
+        const normalizeTeamName = (name: string): string => {
+          const override = findClubOverrideByName(
+            clubOverridesRef.current,
+            name,
+          );
+          if (override) return override.name;
+          if (clubIdsMap[name]) return name;
+          const stripped = normalizeClubKey(name);
+          if (clubIdsMap[stripped]) return stripped;
+          return name;
+        };
+        const lookupClubId = (name: string): string =>
+          findClubOverrideByName(clubOverridesRef.current, name)?.clubId ??
+          clubIdsMap[name] ??
+          clubIdsMap[normalizeClubKey(name)] ??
+          "0";
+        if (newState.homeTeam) {
+          newState.homeTeam = normalizeTeamName(newState.homeTeam);
+        }
+        if (newState.awayTeam) {
+          newState.awayTeam = normalizeTeamName(newState.awayTeam);
+        }
+        newState.homeTeamId = newState.homeTeam
+          ? parseInt(lookupClubId(newState.homeTeam), 10)
+          : 0;
+        newState.awayTeamId = newState.awayTeam
+          ? parseInt(lookupClubId(newState.awayTeam), 10)
+          : 0;
 
-      const prev = matchRef.current;
-      const newState: Match = { ...prev, ...updates };
-      const clubIdsMap = clubIds as Record<string, string>;
-      const normalizeTeamName = (name: string): string => {
-        const override = findClubOverrideByName(clubOverridesRef.current, name);
-        if (override) return override.name;
-        if (clubIdsMap[name]) return name;
-        const stripped = normalizeClubKey(name);
-        if (clubIdsMap[stripped]) return stripped;
-        return name;
-      };
-      const lookupClubId = (name: string): string =>
-        findClubOverrideByName(clubOverridesRef.current, name)?.clubId ??
-        clubIdsMap[name] ??
-        clubIdsMap[normalizeClubKey(name)] ??
-        "0";
-      if (newState.homeTeam) {
-        newState.homeTeam = normalizeTeamName(newState.homeTeam);
-      }
-      if (newState.awayTeam) {
-        newState.awayTeam = normalizeTeamName(newState.awayTeam);
-      }
-      newState.homeTeamId = newState.homeTeam
-        ? parseInt(lookupClubId(newState.homeTeam), 10)
-        : 0;
-      newState.awayTeamId = newState.awayTeam
-        ? parseInt(lookupClubId(newState.awayTeam), 10)
-        : 0;
+        if (Number.isNaN(newState.injuryTime)) {
+          newState.injuryTime = 0;
+        }
 
-      if (Number.isNaN(newState.injuryTime)) {
-        newState.injuryTime = 0;
-      }
+        if (!Object.values(Sports).includes(newState.matchType)) {
+          newState.matchType = Sports.Football;
+        }
 
-      if (!Object.values(Sports).includes(newState.matchType)) {
-        newState.matchType = Sports.Football;
-      }
+        if (newState.matchType !== prev.matchType) {
+          newState.halfStops = DEFAULT_HALFSTOPS[newState.matchType];
+        }
 
-      if (newState.matchType !== prev.matchType) {
-        newState.halfStops = DEFAULT_HALFSTOPS[newState.matchType];
-      }
+        if (newState.started && !prev.started) {
+          newState.buzzer = false;
+        }
 
-      if (newState.started && !prev.started) {
-        newState.buzzer = false;
-      }
+        const partialData: Record<string, unknown> = {};
+        for (const key of Object.keys(updates) as (keyof Match)[]) {
+          partialData[key] = newState[key];
+        }
 
-      const partialData: Record<string, unknown> = {};
-      for (const key of Object.keys(updates) as (keyof Match)[]) {
-        partialData[key] = newState[key];
-      }
+        if ("homeTeam" in updates) {
+          partialData.homeTeamId = newState.homeTeamId;
+        }
+        if ("awayTeam" in updates) {
+          partialData.awayTeamId = newState.awayTeamId;
+        }
+        if (
+          ("homeTeam" in updates || "awayTeam" in updates) &&
+          !("ksiMatchId" in updates)
+        ) {
+          partialData.ksiMatchId = null;
+        }
+        if ("ksiMatchId" in updates) {
+          partialData.ksiMatchId = newState.ksiMatchId ?? null;
+        }
+        if ("matchType" in updates && newState.matchType !== prev.matchType) {
+          partialData.halfStops = newState.halfStops;
+        }
+        if ("injuryTime" in updates && Number.isNaN(updates.injuryTime)) {
+          partialData.injuryTime = 0;
+        }
+        if ("started" in updates && newState.started && !prev.started) {
+          partialData.buzzer = false;
+        }
 
-      if ("homeTeam" in updates) {
-        partialData.homeTeamId = newState.homeTeamId;
-      }
-      if ("awayTeam" in updates) {
-        partialData.awayTeamId = newState.awayTeamId;
-      }
-      if (
-        ("homeTeam" in updates || "awayTeam" in updates) &&
-        !("ksiMatchId" in updates)
-      ) {
-        partialData.ksiMatchId = null;
-      }
-      if ("ksiMatchId" in updates) {
-        partialData.ksiMatchId = newState.ksiMatchId ?? null;
-      }
-      if ("matchType" in updates && newState.matchType !== prev.matchType) {
-        partialData.halfStops = newState.halfStops;
-      }
-      if ("injuryTime" in updates && Number.isNaN(updates.injuryTime)) {
-        partialData.injuryTime = 0;
-      }
-      if ("started" in updates && newState.started && !prev.started) {
-        partialData.buzzer = false;
-      }
-
-      matchRef.current = newState;
-
-      const audit = makeAudit("match", "match.update");
-      if (audit) {
-        firebaseDatabase
-          .writeAudited(listenPrefix, "match", partialData, audit)
-          .catch(console.error);
-      }
-    },
-    [isAuthenticated, listenPrefix, writeEligible, makeAudit],
+        return partialData;
+      }),
+    [executeCommand],
   );
 
   const getServerTime = useCallback(
@@ -1181,12 +1205,13 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       getNewState: (prev: Match) => Match,
       action: string,
     ): Promise<boolean> => {
-      if (!listenPrefix || !isAuthenticated || !writeEligible) return false;
-
-      const dbRef = ref(database, `states/${listenPrefix}/match`);
+      if (!session.isCurrent(origin)) return false;
+      let audit: AuditEventPayload;
       let committed = false;
       let committedDiff: Record<string, unknown> = {};
       try {
+        audit = session.audit(origin, "match", action);
+        const dbRef = ref(database, `states/${origin.location}/match`);
         // Firebase may re-invoke the update function on concurrent writes.
         // Only the final invocation's outcome decides whether the transaction
         // committed, so trust result.committed rather than a flag set inside a
@@ -1194,6 +1219,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         // so an aborted final attempt never audits a stale diff.
         const result = await runTransaction(dbRef, (currentData) => {
           committedDiff = {};
+          if (!session.isCurrent(origin)) return;
           const prev = parseMatch(currentData as unknown, matchRef.current);
           if (!prev) {
             return; // abort: no authoritative state to compare against
@@ -1233,18 +1259,15 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       }
 
       if (committed && Object.keys(committedDiff).length > 0) {
-        const audit = makeAudit("match", action);
-        if (audit) {
-          firebaseDatabase
-            .writeAuditOnly(listenPrefix, "match", committedDiff, audit)
-            .catch((error) =>
-              console.error("Failed to record audit for transition:", error),
-            );
-        }
+        firebaseDatabase
+          .writeAuditOnly(origin.location, "match", committedDiff, audit)
+          .catch((error) =>
+            console.error("Failed to record audit for transition:", error),
+          );
       }
       return committed;
     },
-    [isAuthenticated, listenPrefix, writeEligible, makeAudit],
+    [session, origin],
   );
 
   const applyControllerConditionalTransition = useCallback(
@@ -1253,17 +1276,19 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       getNewState: (prev: ControllerState) => ControllerState,
       action: string,
     ): Promise<boolean> => {
-      if (!listenPrefix || !isAuthenticated || !writeEligible) return false;
-
-      const dbRef = ref(database, `states/${listenPrefix}/controller`);
+      if (!session.isCurrent(origin)) return false;
+      let audit: AuditEventPayload;
       let committed = false;
       let committedDiff: Record<string, unknown> = {};
       try {
+        audit = session.audit(origin, "controller", action);
+        const dbRef = ref(database, `states/${origin.location}/controller`);
         // See applyMatchConditionalTransition: trust result.committed and
         // reset the candidate diff on each retry so an aborted final attempt
         // neither reports success nor emits an audit.
         const result = await runTransaction(dbRef, (currentData) => {
           committedDiff = {};
+          if (!session.isCurrent(origin)) return;
           const prev = parseController(
             currentData as unknown,
             controllerRef.current,
@@ -1298,18 +1323,15 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       }
 
       if (committed && Object.keys(committedDiff).length > 0) {
-        const audit = makeAudit("controller", action);
-        if (audit) {
-          firebaseDatabase
-            .writeAuditOnly(listenPrefix, "controller", committedDiff, audit)
-            .catch((error) =>
-              console.error("Failed to record audit for transition:", error),
-            );
-        }
+        firebaseDatabase
+          .writeAuditOnly(origin.location, "controller", committedDiff, audit)
+          .catch((error) =>
+            console.error("Failed to record audit for transition:", error),
+          );
       }
       return committed;
     },
-    [isAuthenticated, listenPrefix, writeEligible, makeAudit],
+    [session, origin],
   );
 
   const startMatch = useCallback(() => {
@@ -1363,7 +1385,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   );
 
   const resetMatch = useCallback(() => {
-    applyMatchUpdate(
+    void applyMatchUpdate(
       (prev) => ({
         ...prev,
         started: 0,
@@ -1384,7 +1406,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   const addGoal = useCallback(
     (team: "home" | "away") => {
-      applyMatchUpdate((prev) => {
+      void applyMatchUpdate((prev) => {
         const scoreKeys = { home: "homeScore", away: "awayScore" } as const;
         const key = scoreKeys[team];
         return { ...prev, [key]: prev[key] + 1 };
@@ -1395,7 +1417,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   const addPenalty = useCallback(
     (team: "home" | "away", key: string, penaltyLength: number) => {
-      applyMatchUpdate((prev) => {
+      void applyMatchUpdate((prev) => {
         const penaltyKeys = { home: "home2min", away: "away2min" } as const;
         const stateKey = penaltyKeys[team];
         const collection = [...prev[stateKey]];
@@ -1412,7 +1434,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   const removePenalty = useCallback(
     (key: string) => {
-      applyMatchUpdate((prev) => {
+      void applyMatchUpdate((prev) => {
         const homeHasKey = prev.home2min.some((t) => t.key === key);
         const awayHasKey = prev.away2min.some((t) => t.key === key);
         return {
@@ -1431,7 +1453,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   const addToPenalty = useCallback(
     (key: string, toAdd: number) => {
-      applyMatchUpdate((prev) => {
+      void applyMatchUpdate((prev) => {
         const homeHasKey = prev.home2min.some((t) => t.key === key);
         const awayHasKey = prev.away2min.some((t) => t.key === key);
         const mapFn = (t: TwoMinPenalty) =>
@@ -1450,7 +1472,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   const updateHalfLength = useCallback(
     (currentValue: number, newValue: string) => {
-      applyMatchUpdate((prev) => {
+      void applyMatchUpdate((prev) => {
         const newValueParsed = newValue === "" ? 0 : parseInt(newValue, 10);
         if (Number.isNaN(newValueParsed) || newValueParsed < 0) {
           return prev;
@@ -1475,7 +1497,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         deltaMs < 0
           ? "match.correct-time-backward"
           : "match.correct-time-forward";
-      applyMatchUpdate((prev) => {
+      void applyMatchUpdate((prev) => {
         const base = roundMillisToSeconds(prev.timeElapsed);
         const next = Math.max(base + deltaMs, 0);
         return { ...prev, timeElapsed: next };
@@ -1486,7 +1508,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   const setHalfStops = useCallback(
     (halfStops: number[], mode: InjuryTimeDisplayMode) => {
-      applyMatchUpdate(
+      void applyMatchUpdate(
         (prev) => ({
           ...prev,
           halfStops,
@@ -1500,7 +1522,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   const matchTimeout = useCallback(
     (team: "home" | "away") => {
-      applyMatchUpdate((prev) => {
+      void applyMatchUpdate((prev) => {
         const timeoutKeys = {
           home: "homeTimeouts",
           away: "awayTimeouts",
@@ -1517,7 +1539,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   );
 
   const removeTimeout = useCallback(() => {
-    applyMatchUpdate(
+    void applyMatchUpdate(
       (prev) => ({ ...prev, timeout: 0 }),
       "match.remove-timeout",
     );
@@ -1525,7 +1547,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   const buzz = useCallback(
     (on: boolean) => {
-      applyMatchUpdate(
+      void applyMatchUpdate(
         (prev) => ({
           ...prev,
           buzzer: on ? getServerTime() : false,
@@ -1537,7 +1559,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   );
 
   const countdown = useCallback(() => {
-    applyMatchUpdate((prev) => {
+    void applyMatchUpdate((prev) => {
       if (
         !prev.matchStartTime ||
         typeof prev.matchStartTime !== "string" ||
@@ -1562,7 +1584,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   }, [applyMatchUpdate, getServerTime]);
 
   const startHalftimeCountdown = useCallback(() => {
-    applyMatchUpdate((prev) => {
+    void applyMatchUpdate((prev) => {
       if (!isHalftimeTransitionEligible(prev)) return prev;
       return {
         ...prev,
@@ -1575,7 +1597,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   }, [applyMatchUpdate, getServerTime]);
 
   const stopHalftimeCountdown = useCallback(() => {
-    applyMatchUpdate((prev) => {
+    void applyMatchUpdate((prev) => {
       const newState: Match = {
         ...prev,
         started: 0,
@@ -1670,7 +1692,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   const updateRedCards = useCallback(
     (home: number, away: number) => {
-      applyMatchUpdate(
+      void applyMatchUpdate(
         (prev) => ({
           ...prev,
           homeRedCards: home,
@@ -1684,7 +1706,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   const updateController = useCallback(
     (updates: Partial<ControllerState>) => {
-      applyControllerUpdate(
+      void applyControllerUpdate(
         (prev) => ({
           ...prev,
           ...updates,
@@ -1697,7 +1719,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   const selectView = useCallback(
     (view: string) => {
-      applyControllerUpdate(
+      void applyControllerUpdate(
         (prev) => ({ ...prev, view }),
         "controller.select-view",
       );
@@ -1707,7 +1729,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   const selectAssetView = useCallback(
     (assetView: string) => {
-      applyControllerUpdate(
+      void applyControllerUpdate(
         (prev) => ({ ...prev, assetView }),
         "controller.select-asset-view",
       );
@@ -1718,7 +1740,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   const createQueue = useCallback(
     (name: string, options?: { cycle?: boolean }) => {
       const queueId = `queue-${crypto.randomUUID()}`;
-      applyControllerUpdate((prev) => {
+      void applyControllerUpdate((prev) => {
         const existingOrders = Object.values(prev.queues).map((q) => q.order);
         const nextOrder = existingOrders.length
           ? Math.max(...existingOrders) + 1
@@ -1744,7 +1766,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   const deleteQueue = useCallback(
     (queueId: string) => {
-      applyControllerUpdate((prev) => {
+      void applyControllerUpdate((prev) => {
         if (!prev.queues[queueId]) return prev;
         const queues = { ...prev.queues };
         delete queues[queueId];
@@ -1763,7 +1785,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   const renameQueue = useCallback(
     (queueId: string, name: string) => {
-      applyControllerUpdate((prev) => {
+      void applyControllerUpdate((prev) => {
         const queue = prev.queues[queueId];
         if (!queue) return prev;
         return {
@@ -1777,7 +1799,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   const reorderQueues = useCallback(
     (orderedIds: string[]) => {
-      applyControllerUpdate((prev) => {
+      void applyControllerUpdate((prev) => {
         if (!orderedIds.length) return prev;
         const queues = { ...prev.queues };
         const listedIds = new Set(orderedIds);
@@ -1808,7 +1830,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   const addItemsToQueue = useCallback(
     (queueId: string, assets: Asset[]) => {
-      applyControllerUpdate(
+      void applyControllerUpdate(
         (prev) => getStateWithAddedItems(prev, queueId, assets),
         "controller.add-items-to-queue",
       );
@@ -1818,7 +1840,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   const removeItemFromQueue = useCallback(
     (queueId: string, assetKey: string) => {
-      applyControllerUpdate((prev) => {
+      void applyControllerUpdate((prev) => {
         const queue = prev.queues[queueId];
         if (!queue) return prev;
         const idx = queue.items.map((item) => item.key).indexOf(assetKey);
@@ -1849,7 +1871,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   const reorderItemsInQueue = useCallback(
     (queueId: string, items: Asset[]) => {
-      applyControllerUpdate((prev) => {
+      void applyControllerUpdate((prev) => {
         const queue = prev.queues[queueId];
         if (!queue) return prev;
         const filteredItems = items.filter(
@@ -1894,7 +1916,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
         Pick<QueueState, "autoPlay" | "imageSeconds" | "cycle">
       >,
     ) => {
-      applyControllerUpdate((prev) => {
+      void applyControllerUpdate((prev) => {
         const queue = prev.queues[queueId];
         if (!queue) return prev;
         const nextState = {
@@ -1915,7 +1937,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   const playQueue = useCallback(
     (queueId: string) => {
-      applyControllerUpdate((prev) => {
+      void applyControllerUpdate((prev) => {
         return getStateShowingNextAsset({
           ...prev,
           activeQueueId: queueId,
@@ -1927,7 +1949,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   const activateQueue = useCallback(
     (queueId: string) => {
-      applyControllerUpdate(
+      void applyControllerUpdate(
         (prev) => ({
           ...prev,
           activeQueueId: queueId,
@@ -1939,7 +1961,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   );
 
   const stopPlaying = useCallback(() => {
-    applyControllerUpdate(
+    void applyControllerUpdate(
       (prev) => ({ ...prev, playing: false }),
       "controller.stop-playing",
     );
@@ -1947,7 +1969,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   const setPlaying = useCallback(
     (playing: boolean) => {
-      applyControllerUpdate(
+      void applyControllerUpdate(
         (prev) => ({ ...prev, playing }),
         "controller.set-playing",
       );
@@ -1957,7 +1979,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   const renderAsset = useCallback(
     (asset: Asset | null) => {
-      applyControllerUpdate(
+      return applyControllerUpdate(
         (prev) => ({
           ...prev,
           currentAsset: asset ? { asset, time: null } : null,
@@ -1972,20 +1994,20 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   const showItemNow = useCallback(
     (asset: Asset) => {
-      renderAsset(asset);
+      void renderAsset(asset);
     },
     [renderAsset],
   );
 
   const showNextAsset = useCallback(() => {
-    applyControllerUpdate(
+    void applyControllerUpdate(
       (prev) => getStateShowingNextAsset(prev),
       "controller.show-next-asset",
     );
   }, [applyControllerUpdate]);
 
   const removeAssetAfterTimeout = useCallback(() => {
-    applyControllerUpdate((prev) => {
+    void applyControllerUpdate((prev) => {
       const activeQueue = prev.activeQueueId
         ? prev.queues[prev.activeQueueId]
         : null;
@@ -2003,7 +2025,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   }, [applyControllerUpdate]);
 
   const remoteRefresh = useCallback(() => {
-    applyControllerUpdate(
+    void applyControllerUpdate(
       (prev) => ({
         ...prev,
         refreshToken: (Math.random() + 1).toString(36).substring(2),
@@ -2014,7 +2036,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   const setRoster = useCallback(
     (roster: Roster) => {
-      applyControllerUpdate(
+      void applyControllerUpdate(
         (prev) => ({
           ...prev,
           roster,
@@ -2027,7 +2049,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   const editPlayer = useCallback(
     (side: "home" | "away", idx: number, updatedPlayer: Partial<Player>) => {
-      applyControllerUpdate((prev) => {
+      void applyControllerUpdate((prev) => {
         const roster = structuredClone(prev.roster);
         if (!roster[side] || !roster[side][idx]) return prev;
         roster[side][idx] = {
@@ -2042,7 +2064,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   const deletePlayer = useCallback(
     (side: "home" | "away", idx: number) => {
-      applyControllerUpdate((prev) => {
+      void applyControllerUpdate((prev) => {
         const roster = structuredClone(prev.roster);
         if (!roster[side]) return prev;
         roster[side] = roster[side].filter((_: Player, i: number) => i !== idx);
@@ -2054,7 +2076,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   const addPlayer = useCallback(
     (side: "home" | "away") => {
-      applyControllerUpdate((prev) => {
+      void applyControllerUpdate((prev) => {
         const roster = structuredClone(prev.roster);
         const players = roster[side] ?? [];
         players.push({
@@ -2071,7 +2093,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   );
 
   const clearRoster = useCallback(() => {
-    applyControllerUpdate(
+    void applyControllerUpdate(
       (prev) => ({
         ...prev,
         roster: { home: [], away: [] },
@@ -2082,7 +2104,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   const selectTab = useCallback(
     (tab: string) => {
-      applyControllerUpdate(
+      void applyControllerUpdate(
         (prev) => ({ ...prev, tab }),
         "controller.select-tab",
       );
@@ -2092,21 +2114,21 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   const updateView = useCallback(
     (updates: Partial<ViewState>) => {
-      applyViewUpdate((prev) => ({ ...prev, ...updates }), "view.update");
+      void applyViewUpdate((prev) => ({ ...prev, ...updates }), "view.update");
     },
     [applyViewUpdate],
   );
 
   const setViewPort = useCallback(
     (vp: ViewPort) => {
-      applyViewUpdate((prev) => ({ ...prev, vp }), "view.set-viewport");
+      void applyViewUpdate((prev) => ({ ...prev, vp }), "view.set-viewport");
     },
     [applyViewUpdate],
   );
 
   const setBackground = useCallback(
     (background: string) => {
-      applyViewUpdate(
+      void applyViewUpdate(
         (prev) => ({ ...prev, background }),
         "view.set-background",
       );
@@ -2116,7 +2138,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   const setIdleImage = useCallback(
     (idleImage: string) => {
-      applyViewUpdate(
+      void applyViewUpdate(
         (prev) => ({ ...prev, idleImage }),
         "view.set-idle-image",
       );
@@ -2126,14 +2148,14 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   const setIdleAd = useCallback(
     (idleAd: string | null) => {
-      applyViewUpdate((prev) => ({ ...prev, idleAd }), "view.set-idle-ad");
+      void applyViewUpdate((prev) => ({ ...prev, idleAd }), "view.set-idle-ad");
     },
     [applyViewUpdate],
   );
 
   const setBlackoutStart = useCallback(
     (blackoutStart: string | undefined) => {
-      applyViewUpdate(
+      void applyViewUpdate(
         (prev) => ({ ...prev, blackoutStart }),
         "view.set-blackout-start",
       );
@@ -2143,7 +2165,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   const setBlackoutEnd = useCallback(
     (blackoutEnd: string | undefined) => {
-      applyViewUpdate(
+      void applyViewUpdate(
         (prev) => ({ ...prev, blackoutEnd }),
         "view.set-blackout-end",
       );
@@ -2159,7 +2181,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       showGoalscorerName?: boolean;
       showGoalscorerNumber?: boolean;
     }) => {
-      applyViewUpdate(
+      void applyViewUpdate(
         (prev) => ({ ...prev, ...settings }),
         "view.set-goal-gif-settings",
       );
@@ -2169,14 +2191,14 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   const setTheme = useCallback(
     (theme: ThemeConfig | undefined) => {
-      applyViewUpdate((prev) => ({ ...prev, theme }), "view.set-theme");
+      void applyViewUpdate((prev) => ({ ...prev, theme }), "view.set-theme");
     },
     [applyViewUpdate],
   );
 
   const setThemePreset = useCallback(
     (preset: string | undefined) => {
-      applyViewUpdate(
+      void applyViewUpdate(
         (prev) => ({ ...prev, themePreset: preset }),
         "view.set-theme-preset",
       );
@@ -2186,7 +2208,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   const saveCustomPreset = useCallback(
     (id: string, preset: CustomPreset) => {
-      applyViewUpdate((prev) => {
+      return applyViewUpdate((prev) => {
         const existing = prev.customPresets ?? {};
         return {
           ...prev,
@@ -2199,7 +2221,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
 
   const deleteCustomPreset = useCallback(
     (id: string) => {
-      applyViewUpdate((prev) => {
+      void applyViewUpdate((prev) => {
         if (!prev.customPresets?.[id]) return prev;
 
         const updated = { ...prev.customPresets };
@@ -2212,346 +2234,204 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     [applyViewUpdate],
   );
 
+  // The form owns compression and Storage upload; RTDB submission and audit
+  // identity always belong to the same render-bound command executor.
+  const commitClubOverride = useCallback(
+    (
+      id: string,
+      override: ClubOverride,
+      action:
+        | "clubOverrides.create"
+        | "clubOverrides.update"
+        | "clubOverrides.save",
+    ) => executeCommand("clubOverrides", action, () => ({ [id]: override })),
+    [executeCommand],
+  );
+
   const saveClubOverride = useCallback(
     async (override: Omit<ClubOverride, "logoUrl"> & { logoFile: File }) => {
-      if (!writeEligible) return;
-      const audit = makeAudit("clubOverrides", "clubOverrides.save");
-      if (!audit) return;
-
-      try {
-        const id = generateClubOverrideId();
-        const storagePath = `${listenPrefix}/club-logos/${id}`;
-
-        // Upload logo file to Storage
-        await storageHelpers.uploadBytes(storagePath, override.logoFile);
-
-        // Get download URL
-        const logoUrl = await storageHelpers.getDownloadURL(storagePath);
-
-        // Create ClubOverride object with download URL
-        const clubOverride: ClubOverride = {
+      session.assertCurrent(origin);
+      const id = generateClubOverrideId();
+      const storagePath = `${origin.location}/club-logos/${id}`;
+      await storageHelpers.uploadBytes(storagePath, override.logoFile);
+      const logoUrl = await storageHelpers.getDownloadURL(storagePath);
+      await commitClubOverride(
+        id,
+        {
           name: override.name,
           clubId: override.clubId,
           logoUrl,
           isOverride: override.isOverride,
-        };
-
-        // Write to RTDB (atomic with its audit record)
-        await firebaseSaveClubOverride(listenPrefix, id, clubOverride, audit);
-      } catch (error) {
-        console.error("Error saving club override:", error);
-        throw error;
-      }
+        },
+        "clubOverrides.save",
+      );
     },
-    [listenPrefix, makeAudit, writeEligible],
+    [session, origin, commitClubOverride],
   );
 
   const deleteClubOverride = useCallback(
     async (id: string) => {
-      if (!writeEligible) return;
-      const audit = makeAudit("clubOverrides", "clubOverrides.delete");
-      if (!audit) return;
-
-      try {
-        await firebaseDeleteClubOverride(listenPrefix, id, audit);
-      } catch (error) {
-        console.error("Error deleting club override:", error);
-        throw error;
-      }
+      await executeCommand("clubOverrides", "clubOverrides.delete", () => ({
+        [id]: null,
+      }));
+      await storageHelpers.deleteObject(`${origin.location}/club-logos/${id}`);
     },
-    [listenPrefix, makeAudit, writeEligible],
+    [executeCommand, origin.location],
   );
 
   const setPerimeterState = useCallback(
-    (state: PerimeterState["state"]) => {
-      if (!writeEligible) return;
-      const audit = makeAudit("perimeter", "perimeter.set-state");
-      if (!audit) return;
-
-      firebaseDatabase
-        .writeAudited(listenPrefix, "perimeter", { state }, audit)
-        .catch(console.error);
-    },
-    [makeAudit, listenPrefix, writeEligible],
+    (state: PerimeterState["state"]): Promise<void> =>
+      executeCommand("perimeter", "perimeter.set-state", () => {
+        return { state };
+      }),
+    [executeCommand],
   );
 
-  // Skip-forward command for web perimeter displays: a fresh opaque token
-  // under the desired perimeter state tells every subscribed display to
-  // advance its base timeline to the next ad column immediately. The token
-  // content is irrelevant — only that it differs from the previous value.
-  const skipPerimeterCue = useCallback(() => {
-    if (!writeEligible) return;
-    const audit = makeAudit("perimeter", "perimeter.skip-cue");
-    if (!audit) return;
+  const skipPerimeterCue = useCallback(
+    (): Promise<void> =>
+      executeCommand("perimeter", "perimeter.skip-cue", () => {
+        return { skipCue: crypto.randomUUID() };
+      }),
+    [executeCommand],
+  );
 
-    firebaseDatabase
-      .writeAudited(
-        listenPrefix,
-        "perimeter",
-        { skipCue: crypto.randomUUID() },
-        audit,
-      )
-      .catch(console.error);
-  }, [makeAudit, listenPrefix, writeEligible]);
-
-  // Remote restart command for web perimeter displays: a fresh opaque token
-  // under the desired perimeter state tells every subscribed display to
-  // perform a full page reload. The token content is irrelevant — only that
-  // it differs from the previous value.
-  const restartPerimeterDisplays = useCallback(() => {
-    if (!writeEligible) return;
-    const audit = makeAudit("perimeter", "perimeter.restart-displays");
-    if (!audit) return;
-
-    firebaseDatabase
-      .writeAudited(
-        listenPrefix,
-        "perimeter",
-        { refreshToken: crypto.randomUUID() },
-        audit,
-      )
-      .catch(console.error);
-  }, [makeAudit, listenPrefix, writeEligible]);
+  const restartPerimeterDisplays = useCallback(
+    (): Promise<void> =>
+      executeCommand("perimeter", "perimeter.restart-displays", () => {
+        return { refreshToken: crypto.randomUUID() };
+      }),
+    [executeCommand],
+  );
 
   const setPerimeterOverlay = useCallback(
-    (overlay: PerimeterOverlay) => {
-      if (!writeEligible) return;
-      const audit = makeAudit("perimeter", "perimeter.set-overlay");
-      if (!audit) return;
-
-      firebaseDatabase
-        .writeAudited(listenPrefix, "perimeter", { overlay }, audit)
-        .catch(console.error);
-    },
-    [makeAudit, listenPrefix, writeEligible],
+    (overlay: PerimeterOverlay): Promise<void> =>
+      executeCommand("perimeter", "perimeter.set-overlay", () => {
+        return { overlay };
+      }),
+    [executeCommand],
   );
 
-  const clearPerimeterOverlay = useCallback(() => {
-    if (!writeEligible) return;
-    const audit = makeAudit("perimeter", "perimeter.clear-overlay");
-    if (!audit) return;
-
-    firebaseDatabase
-      .writeAudited(listenPrefix, "perimeter", { overlay: null }, audit)
-      .catch(console.error);
-  }, [makeAudit, listenPrefix, writeEligible]);
+  const clearPerimeterOverlay = useCallback(
+    (): Promise<void> =>
+      executeCommand("perimeter", "perimeter.clear-overlay", () => {
+        return { overlay: null };
+      }),
+    [executeCommand],
+  );
 
   const setPerimeterAdLayout = useCallback(
-    (layout: PerimeterAdLayout | null): Promise<void> => {
-      if (!writeEligible) return Promise.resolve();
-      const audit = makeAudit("perimeter", "perimeter.set-ad-layout");
-      if (!audit) return Promise.resolve();
-      // Let rejections propagate: the controller keeps its editor open and
-      // shows an actionable error instead of silently treating a failed write
-      // as saved.
-      return firebaseDatabase.writeAudited(
-        listenPrefix,
-        "perimeter",
-        { adLayout: layout },
-        audit,
-      );
-    },
-    [makeAudit, listenPrefix, writeEligible],
+    (layout: PerimeterAdLayout | null): Promise<void> =>
+      executeCommand("perimeter", "perimeter.set-ad-layout", () => {
+        return { adLayout: layout };
+      }),
+    [executeCommand],
   );
 
-  // Operator-configured home-goal overlay media. A null write clears the
-  // config so the goal button falls back to the legacy goal-48/goal-40 pair.
   const setPerimeterGoalVideo = useCallback(
-    (config: PerimeterGoalVideoConfig | null): Promise<void> => {
-      if (!writeEligible) return Promise.resolve();
-      const audit = makeAudit("perimeter", "perimeter.set-goal-video");
-      if (!audit) return Promise.resolve();
-      return firebaseDatabase.writeAudited(
-        listenPrefix,
-        "perimeter",
-        { goalVideo: config },
-        audit,
-      );
-    },
-    [makeAudit, listenPrefix, writeEligible],
+    (config: PerimeterGoalVideoConfig | null): Promise<void> =>
+      executeCommand("perimeter", "perimeter.set-goal-video", () => {
+        return { goalVideo: config };
+      }),
+    [executeCommand],
   );
 
-  // Goal-scorer celebration style for web perimeter displays. The write is a
-  // single desired-state child; displays fall back to the default style when
-  // the value is absent or invalid, and the Firebase subscription (not local
-  // state) is the source of the selected value.
   const setPerimeterScorerCelebration = useCallback(
-    (style: ScorerCelebrationStyle): Promise<void> => {
-      if (!writeEligible) return Promise.resolve();
-      const audit = makeAudit("perimeter", "perimeter.set-scorer-celebration");
-      if (!audit) return Promise.resolve();
-      return firebaseDatabase.writeAudited(
-        listenPrefix,
-        "perimeter",
-        { scorerCelebration: style },
-        audit,
-      );
-    },
-    [makeAudit, listenPrefix, writeEligible],
+    (style: ScorerCelebrationStyle): Promise<void> =>
+      executeCommand("perimeter", "perimeter.set-scorer-celebration", () => {
+        return { scorerCelebration: style };
+      }),
+    [executeCommand],
   );
 
   const setPerimeterIdleClock = useCallback(
-    (enabled: boolean): Promise<void> => {
-      if (!writeEligible)
-        return Promise.reject(new Error("State is not ready."));
-      const audit = makeAudit("perimeter", "perimeter.set-idle-clock");
-      if (!audit) return Promise.reject(new Error("Not authorized."));
-      return firebaseDatabase.writeAudited(
-        listenPrefix,
-        "perimeter",
-        { idleClock: enabled },
-        audit,
-      );
-    },
-    [makeAudit, listenPrefix, writeEligible],
+    (enabled: boolean): Promise<void> =>
+      executeCommand("perimeter", "perimeter.set-idle-clock", () => {
+        return { idleClock: enabled };
+      }),
+    [executeCommand],
   );
 
-  // Player-band presentation style for web perimeter displays. Same
-  // audited single-child write semantics as the scorer celebration style.
   const setPerimeterPlayerDisplayStyle = useCallback(
-    (style: PlayerBandStyle): Promise<void> => {
-      if (!writeEligible) return Promise.resolve();
-      const audit = makeAudit(
-        "perimeter",
-        "perimeter.set-player-display-style",
-      );
-      if (!audit) return Promise.resolve();
-      return firebaseDatabase.writeAudited(
-        listenPrefix,
-        "perimeter",
-        { playerDisplayStyle: style },
-        audit,
-      );
-    },
-    [makeAudit, listenPrefix, writeEligible],
+    (style: PlayerBandStyle): Promise<void> =>
+      executeCommand("perimeter", "perimeter.set-player-display-style", () => {
+        return { playerDisplayStyle: style };
+      }),
+    [executeCommand],
   );
 
-  // Substitution-band presentation style for web perimeter displays. Same
-  // audited single-child write semantics as the other style fields.
   const setPerimeterSubstitutionStyle = useCallback(
-    (style: SubstitutionBandStyle): Promise<void> => {
-      if (!writeEligible) return Promise.resolve();
-      const audit = makeAudit("perimeter", "perimeter.set-substitution-style");
-      if (!audit) return Promise.resolve();
-      return firebaseDatabase.writeAudited(
-        listenPrefix,
-        "perimeter",
-        { substitutionStyle: style },
-        audit,
-      );
-    },
-    [makeAudit, listenPrefix, writeEligible],
+    (style: SubstitutionBandStyle): Promise<void> =>
+      executeCommand("perimeter", "perimeter.set-substitution-style", () => {
+        return { substitutionStyle: style };
+      }),
+    [executeCommand],
   );
 
   const setPerimeterBrightness = useCallback(
-    (percent: number): Promise<void> => {
-      if (!listenPrefix || !isAuthenticated || !writeEligible) {
-        return Promise.resolve();
-      }
-      if (!Number.isInteger(percent) || percent < 0 || percent > 100) {
-        console.warn(`Ignoring invalid brightness request: ${percent}`);
-        return Promise.resolve();
-      }
-      // Let rejections propagate so the controller can clear its pending
-      // state when a write fails instead of waiting forever on the
-      // subscription (no optimistic local state).
-      return set(
-        ref(database, `states/${listenPrefix}/perimeter/brightness`),
-        percent,
-      );
-    },
-    [isAuthenticated, listenPrefix, writeEligible],
+    (percent: number): Promise<void> =>
+      executeCommand("perimeter", "perimeter.set-brightness", () => {
+        if (!Number.isInteger(percent) || percent < 0 || percent > 100)
+          throw new Error("Ógildur bjartleiki (0–100).");
+        return { brightness: percent };
+      }),
+    [executeCommand],
   );
 
-  // Writes the whole automatic-brightness desired config (single node write,
-  // the daemon's only source of auto parameters). Validation mirrors the
-  // brightnessAuto rules; rejections propagate so the controller can clear
-  // its pending state instead of waiting forever on the subscription.
   const setPerimeterBrightnessAuto = useCallback(
-    (config: PerimeterBrightnessAutoConfig): Promise<void> => {
-      if (!listenPrefix || !isAuthenticated || !writeEligible) {
-        return Promise.resolve();
-      }
-      const validationError = validateBrightnessAutoConfig(config);
-      if (validationError) {
-        console.warn(
-          `Ignoring invalid brightnessAuto request: ${validationError}`,
-        );
-        return Promise.resolve();
-      }
-      return set(
-        ref(database, `states/${listenPrefix}/perimeter/brightnessAuto`),
-        {
-          enabled: config.enabled,
-          min: config.min,
-          max: config.max,
-          exponent: config.exponent,
-          cloudWeight: config.cloudWeight,
-          luxMin: config.luxMin,
-          luxMax: config.luxMax,
-          updatedAt: serverTimestamp(),
-        },
-      );
-    },
-    [isAuthenticated, listenPrefix, writeEligible],
+    (config: PerimeterBrightnessAutoConfig): Promise<void> =>
+      executeCommand("perimeter", "perimeter.set-brightness-auto", () => {
+        const validationError = validateBrightnessAutoConfig(config);
+        if (validationError) throw new Error(validationError);
+        return {
+          brightnessAuto: {
+            enabled: config.enabled,
+            min: config.min,
+            max: config.max,
+            exponent: config.exponent,
+            cloudWeight: config.cloudWeight,
+            luxMin: config.luxMin,
+            luxMax: config.luxMax,
+            updatedAt: serverTimestamp(),
+          },
+        };
+      }),
+    [executeCommand],
   );
 
   const createPerimeterMediaPair = useCallback(
-    (pairId: string, pair: PerimeterMediaPair): Promise<void> => {
-      if (!writeEligible) return Promise.resolve();
-      const audit = makeAudit("perimeter", "perimeter.create-media-pair");
-      if (!audit) return Promise.resolve();
-      // Let rejections propagate so the create dialog can surface failures.
-      return firebaseDatabase.writeAudited(
-        listenPrefix,
-        "perimeter",
-        { [`mediaPairs/${pairId}`]: pair },
-        audit,
-      );
-    },
-    [makeAudit, listenPrefix, writeEligible],
+    (pairId: string, pair: PerimeterMediaPair): Promise<void> =>
+      executeCommand("perimeter", "perimeter.create-media-pair", () => {
+        return { [`mediaPairs/${pairId}`]: pair };
+      }),
+    [executeCommand],
   );
 
   const setPerimeterMediaPairMainScreenAsset = useCallback(
-    (pairId: string, asset: MainScreenMediaAsset | null): Promise<void> => {
-      if (!writeEligible)
-        return Promise.reject(new Error("State is not ready."));
-      if (!Object.prototype.hasOwnProperty.call(perimeterMediaPairs, pairId)) {
-        return Promise.reject(new Error("Jaðarefni fannst ekki."));
-      }
-      const parsed = asset === null ? null : parseMainScreenMediaAsset(asset);
-      if (parsed === undefined) {
-        return Promise.reject(new Error("Ógilt myndefni fyrir stórskjá."));
-      }
-      const audit = makeAudit(
+    (pairId: string, asset: MainScreenMediaAsset | null): Promise<void> =>
+      executeCommand(
         "perimeter",
         "perimeter.set-media-pair-main-screen",
-      );
-      if (!audit) return Promise.reject(new Error("Not authorized."));
-      return firebaseDatabase.writeAudited(
-        listenPrefix,
-        "perimeter",
-        { [`mediaPairs/${pairId}/mainScreenAsset`]: parsed },
-        audit,
-      );
-    },
-    [listenPrefix, makeAudit, perimeterMediaPairs, writeEligible],
+        () => {
+          if (
+            !Object.prototype.hasOwnProperty.call(perimeterMediaPairs, pairId)
+          )
+            throw new Error("Jaðarefni fannst ekki.");
+          const parsed =
+            asset === null ? null : parseMainScreenMediaAsset(asset);
+          if (parsed === undefined)
+            throw new Error("Ógilt myndefni fyrir stórskjá.");
+          return { [`mediaPairs/${pairId}/mainScreenAsset`]: parsed };
+        },
+      ),
+    [executeCommand, perimeterMediaPairs],
   );
 
   const deletePerimeterMediaPair = useCallback(
-    (pairId: string): Promise<void> => {
-      if (!writeEligible) return Promise.resolve();
-      const audit = makeAudit("perimeter", "perimeter.delete-media-pair");
-      if (!audit) return Promise.resolve();
-      // Removes only the Firebase library record; Storage assets are kept.
-      return firebaseDatabase.writeAudited(
-        listenPrefix,
-        "perimeter",
-        { [`mediaPairs/${pairId}`]: null },
-        audit,
-      );
-    },
-    [makeAudit, listenPrefix, writeEligible],
+    (pairId: string): Promise<void> =>
+      executeCommand("perimeter", "perimeter.delete-media-pair", () => {
+        return { [`mediaPairs/${pairId}`]: null };
+      }),
+    [executeCommand],
   );
 
   // Auto-start/stop the perimeter LEDs on view transitions: entering the match
@@ -2569,9 +2449,9 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     if (!perimeter.enabled) return;
 
     if (prevView === VIEWS.idle && nextView === VIEWS.match) {
-      setPerimeterState("on");
+      void setPerimeterState("on");
     } else if (nextView === VIEWS.idle) {
-      setPerimeterState("off");
+      void setPerimeterState("off");
     }
   }, [
     ready,
@@ -2668,6 +2548,9 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       saveCustomPreset,
       deleteCustomPreset,
       saveClubOverride,
+      commitClubOverride,
+      mutationError,
+      dismissMutationError,
       deleteClubOverride,
       setPerimeterState,
       skipPerimeterCue,
@@ -2766,6 +2649,9 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       saveCustomPreset,
       deleteCustomPreset,
       saveClubOverride,
+      commitClubOverride,
+      mutationError,
+      dismissMutationError,
       deleteClubOverride,
       setPerimeterState,
       skipPerimeterCue,
@@ -2969,11 +2855,16 @@ export const useListeners = () => {
 };
 
 export const useClubOverrides = () => {
-  const { clubOverrides, saveClubOverride, deleteClubOverride } =
-    useFirebaseState();
+  const {
+    clubOverrides,
+    saveClubOverride,
+    commitClubOverride,
+    deleteClubOverride,
+  } = useFirebaseState();
   return {
     clubOverrides,
     saveClubOverride,
+    commitClubOverride,
     deleteClubOverride,
   };
 };

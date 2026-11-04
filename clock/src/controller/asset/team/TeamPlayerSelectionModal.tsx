@@ -13,6 +13,7 @@ interface TeamPlayerSelectionModalProps {
   onSelect: (player: Player) => void;
   /** Optional instruction text shown below the title */
   instruction?: string;
+  error?: string | null;
 }
 
 const TeamPlayerSelectionModal: React.FC<TeamPlayerSelectionModalProps> = ({
@@ -22,6 +23,7 @@ const TeamPlayerSelectionModal: React.FC<TeamPlayerSelectionModalProps> = ({
   players,
   onSelect,
   instruction,
+  error,
 }) => {
   const byNumber = (a: Player, b: Player): number =>
     (Number(a.number) || Infinity) - (Number(b.number) || Infinity);
@@ -55,6 +57,7 @@ const TeamPlayerSelectionModal: React.FC<TeamPlayerSelectionModalProps> = ({
         <Modal.Title>{title}</Modal.Title>
       </Modal.Header>
       <Modal.Body>
+        {error && <p role="alert">{error}</p>}
         {instruction && (
           <p className="player-select-instruction">{instruction}</p>
         )}

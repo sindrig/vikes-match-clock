@@ -71,7 +71,7 @@ export default function useGlobalShortcuts() {
           if (hasQueueItems) {
             showNextAsset();
           } else if (hasCurrentAsset) {
-            renderAsset(null);
+            void renderAsset(null);
           }
         }
       }

@@ -9,6 +9,7 @@ const renderWithProviders = (component: React.ReactElement) => {
   return render(
     <LocalStateProvider>
       <FirebaseStateProvider
+        uid="operator"
         listenPrefix=""
         isAuthenticated={false}
         screenKey={null}

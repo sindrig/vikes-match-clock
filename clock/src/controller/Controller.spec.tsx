@@ -1,3 +1,4 @@
+import { MutationSession } from "../lib/mutationSession";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import Controller from "./Controller";
@@ -89,6 +90,11 @@ const defaultViewport = {
 function setupState1() {
   mockedUseAuth.mockReturnValue({ isLoaded: true, isEmpty: true });
   mockedUseLocalState.mockReturnValue({
+    logout: () => firebaseAuth.logout(),
+    mutationSession: new MutationSession({
+      location: "",
+      authenticated: false,
+    }),
     email: "",
     setEmail: vi.fn(),
     password: "",
@@ -127,6 +133,11 @@ function setupState1() {
 function setupState2() {
   mockedUseAuth.mockReturnValue({ isLoaded: true, isEmpty: true });
   mockedUseLocalState.mockReturnValue({
+    logout: () => firebaseAuth.logout(),
+    mutationSession: new MutationSession({
+      location: "",
+      authenticated: false,
+    }),
     email: "",
     setEmail: vi.fn(),
     password: "",
@@ -167,6 +178,11 @@ function setupState3() {
     email: "test@test.com",
   });
   mockedUseLocalState.mockReturnValue({
+    logout: () => firebaseAuth.logout(),
+    mutationSession: new MutationSession({
+      location: "",
+      authenticated: false,
+    }),
     email: "test@test.com",
     setEmail: vi.fn(),
     password: "",
@@ -221,6 +237,11 @@ function setupScreenSelector(
     email: "test@test.com",
   });
   mockedUseLocalState.mockReturnValue({
+    logout: () => firebaseAuth.logout(),
+    mutationSession: new MutationSession({
+      location: "",
+      authenticated: false,
+    }),
     email: "test@test.com",
     setEmail: vi.fn(),
     password: "",

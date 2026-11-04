@@ -39,13 +39,13 @@ This architecture eliminates several classes of bugs:
 
 When an authenticated controller calls an action (e.g., `startMatch()`):
 
-1. Action computes new state from current `ref.current`
-2. Action writes to Firebase via `firebaseDatabase.syncState()`
+1. The render-bound command checks its current session/venue/freshness epoch before reading subscription refs
+2. `executeCommand` checks again immediately before an atomic `firebaseDatabase.writeAudited()` submission
 3. Firebase triggers `onValue()` callback
 4. React state updates from Firebase snapshot
 5. UI re-renders with new state
 
-**Important**: Unauthenticated clients are read-only. All write operations check `isAuthenticated` before proceeding.
+**Important**: Unauthenticated clients are read-only. Ordinary commands require a current Auth SDK UID, ready freshness, and the same command-origin epoch. Ref values change only on Firebase subscription deliveries. See [the command contract and complete mutation inventory](../docs/session-mutation-boundary.md).
 
 ### Multi-Controller Behavior
 
@@ -76,7 +76,8 @@ asset, so it is not a blind mutation. It submits the generation-conditional
 precondition rejects it unless the current asset/queue still matches.
 
 **2. Freshness barrier.** An authenticated client is only write-eligible while
-it has confirmed current Firebase state. `FirebaseStateContext` tracks
+it satisfies the subscription readiness/recovery policy.
+`FirebaseStateContext` tracks
 `writeFreshness` (`loading | ready | hidden | offline | resyncing`); the client
 becomes ineligible on `visibilitychange`→hidden, `pagehide`, offline, or an
 observed `/.info/connected` drop while eligible, and returns to `ready` once a
@@ -84,9 +85,31 @@ core subscription delivers a post-resume/reconnect snapshot. A resume whose
 Firebase connection never dropped (no `/.info/connected` false observed while
 suspended and still connected on return) restores `ready` immediately, because
 the existing subscription epoch is still current and no `onValue` delivery
-would otherwise fire when no data changed. Eligibility is gated on
-`writeEligible` (`writeFreshness === "ready"`); `navigator.onLine` is never
-consulted — `/.info/connected` is the authoritative connectivity signal. Stale
+would otherwise fire when no data changed. Initial readiness separately requires
+all five current-scope subscriptions (match, controller, view, clubOverrides,
+perimeter). A connected core delivery during loading records resynchronization
+proof without enabling writes early; the last required snapshot may then finish
+readiness, including a non-core delivery. If an undropped resume follows the
+initial core deliveries, the last required snapshot completes readiness without
+another core update. New subscription scopes start without a pending recovery;
+a Firebase disconnect sets pending only while visible and already ready,
+without erasing a recovery already pending from a suspension/offline event.
+Thus a partial initial load may finish on its remaining snapshot after a
+cached reconnect even when unchanged core nodes do not emit again. Connection
+arrival alone never unlocks writes. Already-pending recovery still needs a
+connected current-scope core delivery; non-core and prior-scope deliveries
+cannot clear it. This restores the baseline initial-load policy, not a new
+server freshness guarantee: SDK `onValue` does not expose server/cache
+provenance. A settled reconnect with unchanged core state can still remain
+resyncing, and initial snapshots all delivered while disconnected without a
+pending recovery can still stall. Those inherited delivery orders are outside
+this repair. Rendering exposes
+`writeEligible`; submission also checks the synchronously updated `MutationSession`
+and its render-bound origin. Hide/resume, venue changes (including A → B → A),
+and logout/login permanently obsolete retained callbacks. The Auth SDK UID is
+read at submission; React callback/effect updates are not a safety gate.
+Repeated suspension signals preserve an observed Firebase disconnect until
+resynchronization. `navigator.onLine` is never consulted — `/.info/connected` is the authoritative connectivity signal. Stale
 attempts are dropped, never queued for replay. The UI surfaces this via
 `ResyncNotice` (`controller/ResyncNotice.tsx`) and disables primary match
 controls while resyncing.
@@ -187,7 +210,8 @@ an `update()` value object cannot contain keys with `/`, so writing the diff as
 a whole node value would be rejected or clobber sibling state.
 
 **Conditional (CAS) transitions** — automatic lifecycle transitions
-(`MatchLifecycle`) and generation-conditional explicit commands do NOT use
+(`MatchLifecycle`) and generation-conditional explicit commands share current-session
+eligibility (also checked on transaction retries) but do NOT use
 `writeAudited`. They run a `runTransaction` on the state subtree to atomically
 re-validate the observed generation precondition and commit the mutation, then
 append exactly one audit record via `firebaseDatabase.writeAuditOnly` (audit
@@ -222,15 +246,18 @@ audit record.
   `perimeter.set-scorer-celebration`,
   `perimeter.set-player-display-style`, `perimeter.set-substitution-style`.
 - Club overrides use `clubOverrides.create|update|save|delete` (both the
-  context actions and `ClubOverrideForm.tsx`, which builds its own audit
-  payload).
+  context actions and `ClubOverrideForm.tsx`, through `commitClubOverride`).
+- Brightness/config use `perimeter.set-brightness` and
+  `perimeter.set-brightness-auto`; auto config retains its server timestamp.
 
 **Identity** — `FirebaseStateProvider` accepts a `uid` prop (passed from
 `index.tsx` as `auth.uid`) for the accountable operator. `getOrCreateSessionId()`
 in `lib/sessionId.ts` returns one opaque UUID per browser session, stored in
 `sessionStorage` (regenerated per session, survives reloads, never an identity
-substitute). `makeAudit()` builds the payload and skips the write entirely when
-the provider cannot write.
+substitute). `MutationSession.audit()` owns that identity and validates the
+current command origin. `executeCommand` rejects obsolete/ineligible commands before any writer
+call; save APIs propagate rejection and keep drafts open. Void button adapters
+explicitly discard the centrally reported promise without unhandled rejections.
 
 **Firebase rules** (`firebase-rules.json`) — `audit/{location}` reads require
 venue authorization; event creation requires the same authorization, all
@@ -827,7 +854,7 @@ server timestamp):
 
 - `brightnessAuto` — `PerimeterBrightnessAuto | null`; the Firebase-synced
   desired auto config (`null` = disabled).
-- `setPerimeterBrightnessAuto(config)` — authenticated single-node write of
+- `setPerimeterBrightnessAuto(config)` — authenticated, audited whole-node write of
   the whole config with `updatedAt: serverTimestamp()`; rejects invalid
   configs locally without writing (rejections propagate so the UI can clear
   its pending state).
@@ -897,6 +924,16 @@ published web mapping. The main-screen reveal is submitted first. Missing or
 invalid mappings, unsafe player identifiers, missing numbers, and empty names
 never produce a perimeter scorer command; the independent main-screen reveal
 continues through the existing player/portrait fallback path.
+
+Scorer selection remains open until the main-screen and applicable perimeter
+writes acknowledge success. A rejection keeps the current dialog open with an
+error for explicit retry. Each selection owns its asynchronous continuation:
+dismissal, unmounting, or a newer selection retires the old continuation, so
+late media/write results cannot submit further commands, close a reopened
+dialog, or replace its error. Already-submitted writes remain irrevocable.
+Browser journeys must wait for the completed selection's dialog to disappear
+before adding another goal, and use normal button actionability; a forced
+click can hit the still-visible modal during its exit animation.
 
 The dialog and shared `TeamPlayerSelectionModal` have no generated-media
 readiness labels. There is no preparation panel, roster-signature effect,
@@ -1601,7 +1638,12 @@ All properties are CSS value strings. Grouped by display area:
 - **Editing a custom preset** updates it directly (no copy behavior)
 - **Creating a new preset** creates a blank custom preset with `DEFAULT_THEME` values
 - **Deleting** a custom preset removes it from Firebase; if it was active, falls back to Default
-- **Renaming** custom presets is supported via double-click on the preset name
+- **Renaming** custom presets uses the pencil button. Completion belongs to
+  the submitting edit instance, draft revision, submission, modal lifetime,
+  and session scope. Late success/failure cannot close or change feedback on
+  a newer, reopened, or same-ID revised draft. Enter followed by blur submits
+  once, including a blur after reopening. A matching rejected save keeps its
+  draft/error and permits an explicit Enter retry.
 
 #### Key Files
 

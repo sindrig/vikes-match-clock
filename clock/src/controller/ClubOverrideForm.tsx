@@ -4,13 +4,9 @@ import { FileUploader } from "react-drag-drop-files";
 import Compress from "compress.js";
 import clubIdsMap from "../club-ids";
 import { storageHelpers } from "../firebase";
-import {
-  saveClubOverride as firebaseSaveClubOverride,
-  generateClubOverrideId,
-  type AuditEventPayload,
-} from "../firebaseDatabase";
-import { useRemoteSettings, useAuth } from "../contexts/LocalStateContext";
-import { getOrCreateSessionId } from "../lib/sessionId";
+import { generateClubOverrideId } from "../firebaseDatabase";
+import { useRemoteSettings } from "../contexts/LocalStateContext";
+import { useClubOverrides } from "../contexts/FirebaseStateContext";
 import type { ClubOverride } from "../types";
 
 const FILE_TYPES = ["SVG", "PNG", "JPG", "JPEG", "WEBP"];
@@ -46,7 +42,7 @@ const ClubOverrideForm = ({
   editOverride,
 }: ClubOverrideFormProps) => {
   const { listenPrefix } = useRemoteSettings();
-  const { uid } = useAuth();
+  const { commitClubOverride } = useClubOverrides();
 
   const isEditMode = editOverride !== undefined;
   const isLocked = editOverride?.override.isOverride ?? false;
@@ -56,6 +52,7 @@ const ClubOverrideForm = ({
   const [clubId, setClubId] = useState("-1");
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const resetForm = useCallback(() => {
     setCreateMode("custom");
@@ -63,6 +60,7 @@ const ClubOverrideForm = ({
     setClubId("-1");
     setLogoFile(null);
     setIsLoading(false);
+    setError(null);
   }, []);
 
   const handleEntered = useCallback(() => {
@@ -100,14 +98,8 @@ const ClubOverrideForm = ({
     if (!listenPrefix || !isValid) return;
 
     setIsLoading(true);
+    setError(null);
     try {
-      const audit: AuditEventPayload = {
-        uid: uid ?? "",
-        sessionId: getOrCreateSessionId(),
-        action: isEditMode ? "clubOverrides.update" : "clubOverrides.create",
-        stateArea: "clubOverrides",
-      };
-
       if (isEditMode && editOverride) {
         const id = editOverride.id;
         let logoUrl = editOverride.override.logoUrl;
@@ -127,7 +119,7 @@ const ClubOverrideForm = ({
           logoUrl,
           isOverride: editOverride.override.isOverride,
         };
-        await firebaseSaveClubOverride(listenPrefix, id, clubOverride, audit);
+        await commitClubOverride(id, clubOverride, "clubOverrides.update");
       } else {
         if (!logoFile) return;
         const compressed = await compressIfNeeded(logoFile);
@@ -144,12 +136,15 @@ const ClubOverrideForm = ({
           logoUrl,
           isOverride: createMode === "bundled",
         };
-        await firebaseSaveClubOverride(listenPrefix, id, clubOverride, audit);
+        await commitClubOverride(id, clubOverride, "clubOverrides.create");
       }
 
       handleClose();
     } catch (error) {
       console.error("Error saving club override:", error);
+      setError(
+        error instanceof Error ? error.message : "Ekki tókst að vista lið.",
+      );
     } finally {
       setIsLoading(false);
     }
@@ -162,7 +157,7 @@ const ClubOverrideForm = ({
     name,
     clubId,
     createMode,
-    uid,
+    commitClubOverride,
     handleClose,
   ]);
 
@@ -177,6 +172,7 @@ const ClubOverrideForm = ({
         <Modal.Title>{isEditMode ? "Breyta liði" : "Nýtt lið"}</Modal.Title>
       </Modal.Header>
       <Modal.Body>
+        {error && <p role="alert">{error}</p>}
         {!isEditMode && (
           <div style={{ marginBottom: 16 }}>
             <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
