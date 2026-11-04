@@ -9,9 +9,9 @@ vi.mock("../../../api/client", () => ({
   getLineups: vi.fn(),
 }));
 
-vi.mock("../../../lib/matchUtils", () => ({
+vi.mock("../../../lib/matchUtils", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../lib/matchUtils")>()),
   transformLineups: vi.fn(),
-  getTeamId: vi.fn(),
 }));
 
 // Mock Firebase context hooks
@@ -38,7 +38,7 @@ import {
 } from "../../../contexts/FirebaseStateContext";
 import { useRemoteSettings } from "../../../contexts/LocalStateContext";
 import { getMatches, getMatchInfo, getLineups } from "../../../api/client";
-import { transformLineups, getTeamId } from "../../../lib/matchUtils";
+import { transformLineups } from "../../../lib/matchUtils";
 import type { Roster } from "../../../types";
 
 const mockedUseController = vi.mocked(useController);
@@ -49,7 +49,6 @@ const mockedGetMatches = vi.mocked(getMatches);
 const mockedGetMatchInfo = vi.mocked(getMatchInfo);
 const mockedGetLineups = vi.mocked(getLineups);
 const mockedTransformLineups = vi.mocked(transformLineups);
-const mockedGetTeamId = vi.mocked(getTeamId);
 
 describe("TodaysMatches", () => {
   const mockSetRoster = vi.fn();
@@ -68,6 +67,14 @@ describe("TodaysMatches", () => {
     } as unknown as ReturnType<typeof useMatch>);
 
     mockedUseListeners.mockReturnValue({
+      venues: {
+        vikinni: {
+          label: "Test Screen",
+          pitchIds: [],
+          config: {},
+          screens: {},
+        },
+      },
       screens: [
         {
           screen: {
@@ -85,8 +92,6 @@ describe("TodaysMatches", () => {
     mockedUseRemoteSettings.mockReturnValue({
       listenPrefix: "vikinni",
     } as unknown as ReturnType<typeof useRemoteSettings>);
-
-    mockedGetTeamId.mockReturnValue(2492);
   });
 
   describe("Initial render", () => {

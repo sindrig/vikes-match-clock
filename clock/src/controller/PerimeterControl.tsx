@@ -351,7 +351,7 @@ const GOAL_VIDEO_TARGETS = [
 const GoalVideoSection = () => {
   const { goalVideo, setPerimeterGoalVideo } = usePerimeter();
   const { listenPrefix } = useLocalState();
-  const { screens } = useListeners();
+  const { venues } = useListeners();
 
   const [showEdit, setShowEdit] = useState(false);
   const [draft, setDraft] = useState<Record<string, PerimeterOverlayFile>>({});
@@ -359,9 +359,8 @@ const GoalVideoSection = () => {
   const [error, setError] = useState<string | null>(null);
 
   const perimeterConfiguration = useMemo(
-    () =>
-      screens.find((screen) => screen.key === listenPrefix)?.perimeterDisplay,
-    [listenPrefix, screens],
+    () => venues[listenPrefix]?.perimeterDisplay,
+    [listenPrefix, venues],
   );
   const targets = useMemo(
     () =>
@@ -1367,7 +1366,7 @@ const PerimeterControl = ({ standalone = false }: { standalone?: boolean }) => {
     appliedAdLayoutError,
   } = usePerimeter();
   const { listenPrefix } = useLocalState();
-  const { screens } = useListeners();
+  const { venues } = useListeners();
 
   const [open, setOpen] = useState(false);
   const [now, setNow] = useState(0);
@@ -1382,9 +1381,8 @@ const PerimeterControl = ({ standalone = false }: { standalone?: boolean }) => {
   const [writeError, setWriteError] = useState<string | null>(null);
 
   const perimeterConfiguration = useMemo(
-    () =>
-      screens.find((screen) => screen.key === listenPrefix)?.perimeterDisplay,
-    [listenPrefix, screens],
+    () => venues[listenPrefix]?.perimeterDisplay,
+    [listenPrefix, venues],
   );
   const isWebVenue = perimeterConfiguration?.renderer === "web";
   const webLanes = useMemo(

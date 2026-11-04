@@ -275,15 +275,37 @@ export interface FirebaseAuthState {
   email?: string | null;
 }
 
-// Listeners state type
+export interface VenueConfig {
+  [field: string]: unknown;
+  homeTeam?: number;
+}
+
+export interface VenueScreen extends ViewPort {
+  [field: string]: unknown;
+}
+
+// Validated locations/{location} metadata, shared by admin and runtime.
+export interface Venue {
+  [field: string]: unknown;
+  // Original snapshot for metadata edits; runtime decisions use validated fields.
+  document?: Readonly<Record<string, unknown>>;
+  label: string;
+  pitchIds: number[];
+  config: VenueConfig;
+  // Keep Firebase child keys so edits also work with sparse arrays and maps.
+  screens: Record<string, VenueScreen>;
+  perimeterDisplay?: PerimeterDisplayConfig;
+}
+
+// Venue metadata is independent of the flattened scoreboard selector entries.
 export interface ListenersState {
   available: string[];
+  venues: Record<string, Venue>;
   screens: Array<{
     screen: ViewPort;
     label: string;
     key: string;
-    pitchIds?: string[];
-    teamId?: number;
+    pitchIds?: number[];
     perimeterDisplay?: PerimeterDisplayConfig;
   }>;
 }

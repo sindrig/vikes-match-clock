@@ -169,6 +169,7 @@ const defaultView: ViewState = {
 
 const defaultListeners: ListenersState = {
   available: [],
+  venues: {},
   screens: [],
 };
 
@@ -604,18 +605,11 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   // composition; every known venue without one — including all existing
   // Resolume venues with no published mapping — keeps the prepared-file
   // pipeline (daemon geometry, preparation status, retry). While the
-  // locations snapshot has not delivered (or the venue carries no screens),
+  // locations snapshot has not delivered,
   // the venue is unknown and is treated as legacy Resolume so an
   // unrecognized venue never silently loses the scorer machinery.
-  const isResolumeVenue = useMemo(() => {
-    const venueScreens = listeners.screens.filter(
-      (entry) => entry.key === listenPrefix,
-    );
-    if (venueScreens.length === 0) return true;
-    return venueScreens.every(
-      (entry) => entry.perimeterDisplay?.renderer !== "web",
-    );
-  }, [listeners.screens, listenPrefix]);
+  const isResolumeVenue =
+    listeners.venues[listenPrefix]?.perimeterDisplay?.renderer !== "web";
 
   // Freshness barrier: a browser may only submit shared-state mutations while
   // it has confirmed current Firebase state for the selected venue.
@@ -816,9 +810,7 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
     const locationsRef = ref(database, "locations");
     const unsubLocations = onValue(locationsRef, (snapshot) => {
       const parsed = parseLocations(snapshot.val());
-      if (parsed) {
-        setListeners(parsed);
-      }
+      setListeners(parsed ?? defaultListeners);
     });
 
     return () => {

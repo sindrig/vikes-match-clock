@@ -51,29 +51,16 @@ import type {
   PerimeterRegion,
   PerimeterRect,
   PerimeterRegionTransform,
+  ListenersState,
+  Venue,
+  VenueConfig,
+  VenueScreen,
 } from "../types";
 import { Sports, DEFAULT_THEME } from "../constants";
+import { parsePitchIds, parseVenueId } from "../lib/venue";
 import { validatePerimeterMapping } from "../perimeter/perimeterMapping";
 
-interface LocationData {
-  label: string;
-  screens: Array<{
-    style: { height: number; width: number };
-    fontSize?: string;
-    name: string;
-    key: string;
-  }>;
-  pitchIds?: string[];
-  perimeterDisplay?: PerimeterDisplayConfig;
-}
-
-export interface ParsedScreen {
-  screen: LocationData["screens"][0];
-  label: string;
-  key: string;
-  pitchIds?: string[];
-  perimeterDisplay?: PerimeterDisplayConfig;
-}
+export type ParsedScreen = ListenersState["screens"][number];
 
 function parseRect(data: unknown): PerimeterRect | undefined {
   if (!data || typeof data !== "object") return undefined;
@@ -254,42 +241,93 @@ export function parsePerimeterDisplay(
   return validatePerimeterMapping(config).valid ? config : undefined;
 }
 
-export function parseLocations(data: unknown): {
-  available: string[];
-  screens: ParsedScreen[];
-} | null {
+function isMetadataRecord(data: unknown): data is Record<string, unknown> {
+  return data !== null && typeof data === "object" && !Array.isArray(data);
+}
+
+function screenDimension(value: unknown, fallback: number): number {
+  const number = typeof value === "string" ? Number(value) : value;
+  return typeof number === "number" && Number.isFinite(number) && number > 0
+    ? number
+    : fallback;
+}
+
+function parseVenueScreen(data: unknown): VenueScreen | null {
+  if (!isMetadataRecord(data)) return null;
+  const { style, fontSize, ...metadata } = data;
+  const rawStyle = isMetadataRecord(style) ? style : {};
+  return {
+    ...metadata,
+    key: typeof data.key === "string" ? data.key : "",
+    name: typeof data.name === "string" ? data.name : "",
+    style: {
+      ...rawStyle,
+      width: screenDimension(rawStyle.width, 512),
+      height: screenDimension(rawStyle.height, 400),
+    },
+    ...(typeof fontSize === "string" ? { fontSize } : {}),
+  };
+}
+
+export function parseVenue(data: unknown, key: string): Venue | null {
+  if (!isMetadataRecord(data)) return null;
+  const { perimeterDisplay: rawMapping, ...metadata } = data;
+  const rawConfig = isMetadataRecord(data.config) ? data.config : {};
+  const config: VenueConfig = { ...rawConfig };
+  delete config.homeTeam;
+  const homeTeam = parseVenueId(rawConfig.homeTeam);
+  if (homeTeam !== undefined) config.homeTeam = homeTeam;
+  const screens = Object.fromEntries(
+    data.screens && typeof data.screens === "object"
+      ? Object.entries(data.screens).flatMap(([screenKey, raw]) => {
+          const screen = parseVenueScreen(raw);
+          return screen ? [[screenKey, screen]] : [];
+        })
+      : [],
+  );
+  const perimeterDisplay = parsePerimeterDisplay(rawMapping);
+  return {
+    ...metadata,
+    document: data,
+    label:
+      typeof data.label === "string"
+        ? data.label
+        : typeof data.name === "string"
+          ? data.name
+          : key,
+    pitchIds: parsePitchIds(data.pitchIds),
+    config,
+    screens,
+    ...(perimeterDisplay ? { perimeterDisplay } : {}),
+  };
+}
+
+export function parseLocations(data: unknown): ListenersState | null {
   if (!data || typeof data !== "object") return null;
 
-  const locations = data as Record<string, unknown>;
-  const available = Object.keys(locations);
+  const venues: Record<string, Venue> = Object.fromEntries(
+    Object.entries(data).flatMap(([key, value]) => {
+      const venue = parseVenue(value, key);
+      return venue ? [[key, venue]] : [];
+    }),
+  );
   const screens: ParsedScreen[] = [];
 
-  for (const [key, value] of Object.entries(locations)) {
-    if (!value || typeof value !== "object") continue;
-    const loc = value as Record<string, unknown>;
-
-    const label = typeof loc.label === "string" ? loc.label : key;
-    const locScreens = Array.isArray(loc.screens) ? loc.screens : [];
-    const pitchIds = Array.isArray(loc.pitchIds)
-      ? (loc.pitchIds as string[])
-      : undefined;
-    const perimeterDisplay = parsePerimeterDisplay(loc.perimeterDisplay);
-
-    for (const screen of locScreens) {
-      if (screen && typeof screen === "object") {
-        const parsedScreen: ParsedScreen = {
-          screen: screen as ParsedScreen["screen"],
-          label,
-          key,
-          pitchIds,
-        };
-        if (perimeterDisplay) parsedScreen.perimeterDisplay = perimeterDisplay;
-        screens.push(parsedScreen);
-      }
+  for (const [key, venue] of Object.entries(venues)) {
+    for (const screen of Object.values(venue.screens)) {
+      screens.push({
+        screen,
+        label: venue.label,
+        key,
+        pitchIds: venue.pitchIds,
+        ...(venue.perimeterDisplay
+          ? { perimeterDisplay: venue.perimeterDisplay }
+          : {}),
+      });
     }
   }
 
-  return { available, screens };
+  return { available: Object.keys(venues), venues, screens };
 }
 
 function parseTwoMinArray(arr: unknown): TwoMinPenalty[] {

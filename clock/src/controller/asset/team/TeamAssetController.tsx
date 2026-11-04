@@ -37,7 +37,7 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
     showItemNow,
   } = useController();
   const { roster } = controller;
-  const { screens } = useListeners();
+  const { venues } = useListeners();
   const { view } = useView();
   const { listenPrefix } = useRemoteSettings();
 
@@ -65,7 +65,7 @@ const TeamAssetController = (props: OwnProps): React.JSX.Element => {
   const refetchRoster = (): void => {
     if (!match.ksiMatchId) return;
     setLoading(true);
-    const teamId = getTeamId(screens, listenPrefix);
+    const teamId = getTeamId(venues, listenPrefix);
     void getLineups({
       path: { teamId, matchId: match.ksiMatchId },
     })

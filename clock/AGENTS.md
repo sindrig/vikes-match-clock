@@ -1682,6 +1682,37 @@ silently override the entrance opacity or palette.
   standalone perimeter manager (web venues only), adjacent to the
   Markasvör section, with the same pending-write disable pattern.
 
+### Venue Metadata
+
+`parseVenue()` / `parseLocations()` in `firebaseParsers.ts` provide the shared
+validated `Venue` model for `LocationsManager` and runtime. The locations
+subscription exposes `useListeners().venues[locationKey]` independently of
+the flattened scoreboard `screens` selector entries. Read venue configuration
+and perimeter mappings from `venues`, including for perimeter-only venues.
+Screen entries retain their existing labels, keys, viewports and mapping
+projection; authenticated selectors still use the operator's allowed locations.
+
+`config.homeTeam` selects the KSI team for today's matches, match reports and
+roster refetches. Team and pitch IDs normalize positive safe integers and
+legacy decimal strings to numbers; missing/invalid home-team IDs alone use
+the historical 2492 fallback. Screen definitions accept Firebase arrays,
+sparse arrays and keyed maps, retaining child keys for edits. Admin saves
+patch changed metadata leaves (including mapping publications) and clear only
+`config/homeTeam` when that field is emptied, preserving unknown venue,
+config, screen and mapping metadata. Reads never migrate persisted documents.
+`Venue.document` retains the original snapshot solely for metadata edits;
+mapping edits retain legacy aliases/array indices and fully write missing
+defaulted objects on first edit.
+
+`LocationsManager` derives its editor remount keys from the venue key and known
+editable fields only. Unrelated metadata snapshots preserve open panels and
+unsaved drafts; changes to known venue/screen/mapping fields still refresh the
+editor, and a different venue key starts a separate draft. Screen drafts and
+save comparisons also project only editable fields, so saving after an unknown
+config, screen or style metadata update cannot restore stale metadata from the
+draft. Leaf writes still use the latest canonical `Venue.document` for stored
+paths and defaulted branches.
+
 ### The `listenPrefix` System
 
 The `listenPrefix` (e.g., `"vikinni"`, `"hasteinsvollur"`) determines which Firebase path the instance subscribes to:
@@ -2449,8 +2480,9 @@ that materializes an editable draft (first screen as a single logical screen,
 20 s cue default) so a first mapping can be bootstrapped and published from
 the UI instead of a hand-written Firebase document. The editor keeps changes
 in a local draft, can show a calibration
-preview, validates exact source coverage, and publishes a new revision as one
-complete Firebase document. Its Playback control edits the base-ads cue
+preview, validates exact source coverage, and publishes a new revision in one
+atomic metadata update that preserves unknown fields. Its Playback control
+edits the base-ads cue
 length in seconds (stored as `playback.cueDurationMs`, defaulting to 20 s
 when absent); validation rejects non-positive durations, and short videos
 loop while long ones speed up to fit the configured cue. Besides the generic
