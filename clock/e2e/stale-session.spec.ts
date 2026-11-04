@@ -10,6 +10,7 @@ import {
   closeSettings,
 } from "./fixtures/test-helpers";
 import { request as playwrightRequest } from "@playwright/test";
+import type { Asset } from "../src/types";
 
 // Deterministic regression for the stale-session incident: a phone session
 // suspended with a pre-match countdown (generation A) must not be able to
@@ -215,14 +216,14 @@ test.describe("Stale session mutation safety", () => {
       .getByText("Match", { exact: true })
       .click();
 
-    const asset = {
+    const asset: Asset = {
       key: "stale-image",
-      type: "image",
+      type: "IMAGE",
       url: "https://example.com/stale.png",
     };
-    const queueItem = {
+    const queueItem: Asset = {
       key: "queue-item-1",
-      type: "image",
+      type: "IMAGE",
       url: "https://example.com/q1.png",
     };
     await writeController({
