@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
@@ -22,6 +23,147 @@ import {
 const LAT = 64.117;
 const LNG = -21.91;
 
+// The browser suite reads the same fixed expectations without installing this
+// package. Only tests depend on the repository fixture, never installed code.
+const contract = JSON.parse(
+  readFileSync(
+    new URL(
+      "../../docs/fixtures/auto-brightness-contract.json",
+      import.meta.url,
+    ),
+    "utf8",
+  ),
+);
+
+test("shared contract preserves the documented daemon defaults", () => {
+  const { enabled, ...config } = contract.configs[0].config;
+  assert.equal(enabled, false);
+  assert.deepEqual(DEFAULT_AUTO_CONFIG, config);
+});
+
+for (const { elevationDeg, lux, defaultPercent } of contract.clearSkyCases) {
+  test(`shared contract: ${elevationDeg} degrees -> ${lux} lux / ${defaultPercent}%`, () => {
+    assert.ok(Math.abs(clearSkyLux(elevationDeg) - lux) < 1e-8);
+    assert.equal(
+      luxToPercent(
+        applyCloud(clearSkyLux(elevationDeg), 0),
+        DEFAULT_AUTO_CONFIG,
+      ),
+      defaultPercent,
+    );
+  });
+}
+
+for (const { lux, fraction, weight, expectedLux } of contract.cloudCases) {
+  test(`shared contract: cloud fraction ${fraction}, weight ${weight}, ${lux} lux`, () => {
+    assert.ok(Math.abs(applyCloud(lux, fraction, weight) - expectedLux) < 1e-8);
+  });
+}
+
+for (const { name, config, expectedPercents } of contract.configs) {
+  test(`shared contract: config boundaries ${name}`, () => {
+    contract.luxInputs.forEach((lux, index) => {
+      assert.equal(luxToPercent(lux, config), expectedPercents[index]);
+    });
+  });
+}
+
+for (const row of contract.predictions) {
+  test(`shared contract: predict(${row.date}, cloud=${row.cloudFraction})`, () => {
+    const result = predict(
+      new Date(row.date),
+      LAT,
+      LNG,
+      row.cloudFraction,
+      DEFAULT_AUTO_CONFIG,
+    );
+    assert.ok(Math.abs(result.sunElevationDeg - row.sunElevationDeg) < 1e-10);
+    assert.ok(Math.abs(result.lux - row.lux) < 1e-8);
+    assert.equal(result.percent, row.percent);
+  });
+}
+
+for (const [elevation, lux] of [
+  [-6, 0.5],
+  [0, 400],
+]) {
+  test(`clearSkyLux has the same one-sided limit at ${elevation} degrees`, () => {
+    assert.equal(clearSkyLux(elevation), lux);
+    for (const direction of [-1, 1]) {
+      let previousError = Infinity;
+      for (const epsilon of [1e-1, 1e-3, 1e-6, 1e-9]) {
+        const error = Math.abs(
+          clearSkyLux(elevation + direction * epsilon) - lux,
+        );
+        assert.ok(error <= previousError);
+        previousError = error;
+      }
+      assert.ok(previousError < 1e-6);
+    }
+  });
+}
+
+const sweeps = [
+  { name: "physical sun domain", ...contract.physicalSweep },
+  ...contract.joinSweep.centers.map((center) => ({
+    name: `join at ${center} degrees`,
+    from: center + contract.joinSweep.radius,
+    to: center - contract.joinSweep.radius,
+    step: contract.joinSweep.step,
+  })),
+];
+
+for (const { name, from, to, step } of sweeps) {
+  test(`bounded, nonbrightening on falling elevation: ${name}`, () => {
+    const clearValues = Array.from(
+      { length: Math.round((from - to) / step) + 1 },
+      (_, index) => clearSkyLux(from - index * step),
+    );
+    let previousClear = Infinity;
+    for (const lux of clearValues) {
+      assert.ok(Number.isFinite(lux) && lux >= 0.5 && lux <= 120000);
+      assert.ok(lux <= previousClear);
+      previousClear = lux;
+    }
+    for (const { config } of contract.configs) {
+      for (const cloud of contract.cloudFractions) {
+        let previousLux = Infinity;
+        let previousPercent = Infinity;
+        for (const clear of clearValues) {
+          const lux = applyCloud(clear, cloud, config.cloudWeight);
+          const percent = luxToPercent(lux, config);
+          assert.ok(lux >= 0.5 && lux <= previousLux);
+          assert.ok(Number.isInteger(percent));
+          assert.ok(percent >= config.min && percent <= config.max);
+          assert.ok(percent <= previousPercent);
+          previousLux = lux;
+          previousPercent = percent;
+        }
+      }
+    }
+  });
+}
+
+test("real predictions do not brighten through sunset or the night join", () => {
+  const start = Date.parse(contract.sunsetSweep.from);
+  const end = Date.parse(contract.sunsetSweep.to);
+  assert.ok(sunElevationDeg(new Date(start), LAT, LNG) > 0);
+  assert.ok(sunElevationDeg(new Date(end), LAT, LNG) < -6);
+  for (const { config } of contract.configs) {
+    for (const cloud of contract.cloudFractions) {
+      let previousLux = Infinity;
+      let previousPercent = Infinity;
+      for (let time = start; time <= end; time += contract.sunsetSweep.stepMs) {
+        const result = predict(new Date(time), LAT, LNG, cloud, config);
+        assert.ok(result.lux <= previousLux);
+        assert.ok(result.percent <= previousPercent);
+        previousLux = result.lux;
+        previousPercent = result.percent;
+      }
+    }
+  }
+});
+
 // -- sun elevation ------------------------------------------------------------
 
 test("sun elevation matches validated reference positions", () => {
@@ -38,13 +180,13 @@ test("sun elevation matches validated reference positions", () => {
 
 test("clearSkyLux covers high sun, civil twilight, and the night floor", () => {
   // The validated clear-sky value at the reference table's noon elevation
-  // (24.5643…°, printed as 24.6 in the rounded table).
+  // (24.5585…°, printed as 24.6 in the rounded table).
   const noonElev = sunElevationDeg(new Date("2026-09-22T12:00:00Z"), LAT, LNG);
-  assert.equal(Math.round(clearSkyLux(noonElev)), 43721);
-  // Linear civil-twilight ramp: elev -3 -> 400 * (3/6) = 200 lux.
-  assert.equal(clearSkyLux(-3), 200);
-  assert.equal(clearSkyLux(0), 0);
-  assert.equal(clearSkyLux(-6), 0);
+  assert.equal(Math.round(clearSkyLux(noonElev)), 43975);
+  // The midpoint of the 0.5 -> 400 lux civil-twilight ramp.
+  assert.equal(clearSkyLux(-3), 200.25);
+  assert.equal(clearSkyLux(0), 400);
+  assert.equal(clearSkyLux(-6), 0.5);
   assert.equal(clearSkyLux(-6.5), 0.5);
   assert.equal(clearSkyLux(-10.3), 0.5);
 });
@@ -52,7 +194,7 @@ test("clearSkyLux covers high sun, civil twilight, and the night floor", () => {
 // -- cloud multiplier -----------------------------------------------------------
 
 test("applyCloud follows the Kasten-Czeplak cubic with weight and clamps", () => {
-  const clear = 10930;
+  const clear = 10994;
   // Fully overcast ≈ 25% of clear-sky light.
   const overcast = applyCloud(clear, 1);
   assert.ok(Math.abs(overcast - clear * 0.25) < 1e-9);
@@ -75,10 +217,10 @@ test("luxToPercent anchors the power law at luxMin and luxMax", () => {
   assert.equal(luxToPercent(cfg.luxMax * 10, cfg), cfg.max);
   assert.equal(luxToPercent(0, cfg), cfg.min);
   // Monotonic between the anchors; the validated clear-noon anchor is 76%.
-  const mid = luxToPercent(43721, cfg);
-  assert.ok(mid > luxToPercent(10930, cfg));
+  const mid = luxToPercent(43975, cfg);
+  assert.ok(mid > luxToPercent(10994, cfg));
   assert.ok(mid < cfg.max);
-  assert.equal(luxToPercent(43721, cfg), 76);
+  assert.equal(luxToPercent(43975, cfg), 76);
 });
 
 // -- full prediction -------------------------------------------------------------
@@ -86,11 +228,17 @@ test("luxToPercent anchors the power law at luxMin and luxMax", () => {
 test("predict reproduces the design doc's validated test vectors", () => {
   const cfg = { ...DEFAULT_AUTO_CONFIG };
   const noon = predict(new Date("2026-09-22T12:00:00Z"), LAT, LNG, 0.0, cfg);
-  assert.equal(Math.round(noon.lux), 43721);
+  assert.equal(Math.round(noon.lux), 43975);
   assert.equal(noon.percent, 76);
 
-  const overcast = predict(new Date("2026-09-22T12:00:00Z"), LAT, LNG, 1.0, cfg);
-  assert.equal(Math.round(overcast.lux), 10930);
+  const overcast = predict(
+    new Date("2026-09-22T12:00:00Z"),
+    LAT,
+    LNG,
+    1.0,
+    cfg,
+  );
+  assert.equal(Math.round(overcast.lux), 10994);
   assert.equal(overcast.percent, 48);
 
   const dusk = predict(new Date("2026-09-22T19:30:00Z"), LAT, LNG, 0.5, cfg);
@@ -299,7 +447,10 @@ class FakeAutoController {
 }
 
 // A scheduler over a fake controller; defaults clock to clear-sky noon.
-function makeScheduler({ enabled = false, state = "on", skipWhenOff = true } = {}, weather) {
+function makeScheduler(
+  { enabled = false, state = "on", skipWhenOff = true } = {},
+  weather,
+) {
   const controller = new FakeAutoController({
     enabled,
     ...DEFAULT_AUTO_CONFIG,
@@ -327,7 +478,7 @@ test("scheduler tick publishes the predicted readout without writes in shadow mo
   await scheduler.tick();
   assert.equal(controller.predictions.length, 1);
   const block = controller.predictions[0];
-  assert.equal(block.lux, 10930);
+  assert.equal(block.lux, 10994);
   assert.equal(block.percent, 48);
   assert.equal(block.sunElevationDeg, 24.6);
   assert.equal(block.cloudCover, 1.0);
@@ -356,7 +507,11 @@ test("enabled scheduler submits one target with its revision and slew bound per 
 });
 
 test("auto writes are skipped while the perimeter state is off", async () => {
-  const weather = new FakeWeather({ cloudCover: 0.0, ageMs: 60_000, stale: false });
+  const weather = new FakeWeather({
+    cloudCover: 0.0,
+    ageMs: 60_000,
+    stale: false,
+  });
   const { controller, scheduler } = makeScheduler(
     { enabled: true, state: "off" },
     weather,
@@ -367,7 +522,11 @@ test("auto writes are skipped while the perimeter state is off", async () => {
 });
 
 test("skipWhenOff=false allows auto writes while the perimeter is off", async () => {
-  const weather = new FakeWeather({ cloudCover: 0.0, ageMs: 60_000, stale: false });
+  const weather = new FakeWeather({
+    cloudCover: 0.0,
+    ageMs: 60_000,
+    stale: false,
+  });
   const { controller, scheduler } = makeScheduler(
     { enabled: true, state: "off", skipWhenOff: false },
     weather,
@@ -377,7 +536,11 @@ test("skipWhenOff=false allows auto writes while the perimeter is off", async ()
 });
 
 test("stale weather flags the prediction and omits the age", async () => {
-  const weather = new FakeWeather({ cloudCover: 0.8, ageMs: null, stale: true });
+  const weather = new FakeWeather({
+    cloudCover: 0.8,
+    ageMs: null,
+    stale: true,
+  });
   const { controller, scheduler } = makeScheduler({ enabled: false }, weather);
   await scheduler.tick();
   const block = controller.predictions[0];

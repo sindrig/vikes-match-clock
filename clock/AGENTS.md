@@ -925,12 +925,23 @@ server timestamp):
   to cloud cover 0.8).
 - A 24 h target-curve preview (`AutoBrightnessCurve`) samples the pure model
   (`src/lib/autoBrightness.ts` — unit-tested against the design-doc
-  reference vectors) every 15 minutes with SunCalc v1 sun positions at
+  reference vectors and the shared `docs/fixtures/auto-brightness-contract.json`)
+  every 15 minutes with SunCalc v1 sun positions at
   Fossvogur (64.117 N, −21.91 E; Iceland is UTC year-round). Cloud cover
   comes from an Open-Meteo forecast fetch (`fetchCloudForecast()`),
   attributed in the UI as "Spá frá Open-Meteo.com"; a failed fetch degrades
   to a clear-sky curve note. The
   daemon — not this preview — decides actual writes.
+
+The empirical clear-sky curve is continuous and nondecreasing over physical
+sun elevations −90°..90°: 0.5 lux at/below −6°, 400 at 0°, 120,000 at 90°.
+Daylight retains the sine exponent 1.15, offset/rescaled to join twilight;
+twilight interpolates 0.5..400 lux. See the authoritative design for the #253
+formula and rationale. Browser and daemon tests consume the same fixed vectors
+and range specifications, including dense checks around both joins and real
+sunset predictions under fixed clouds/config. This is a continuity correction,
+not a physical calibration or rollout qualification; the daemon's write policy
+and the physical qualification HOLD remain in effect.
 
 **Operator behavior** (`PerimeterControl.tsx` — manual mode):
 

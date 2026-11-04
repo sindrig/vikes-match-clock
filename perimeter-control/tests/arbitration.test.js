@@ -283,7 +283,7 @@ test(
         lux,
         cloudCover,
       })),
-      [{ source: "auto", percent: 65, lux: 39622, cloudCover: 0.5 }],
+      [{ source: "auto", percent: 65, lux: 39852, cloudCover: 0.5 }],
     );
     assert.equal(f.device.filter(([op]) => op === "cabinets").length, 1);
   },

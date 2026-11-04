@@ -60,12 +60,14 @@ export function sunElevationDeg(date, lat, lng) {
   return (SunCalc.getPosition(date, lat, lng).altitude * 180) / Math.PI;
 }
 
-// Clear-sky illuminance (lux) from the sun's elevation, tuned to typical
-// clear-sky daylight values (~100,000 lux at high sun; civil twilight ≈ tens
-// of lux; a small night ambient floor below).
+// Continuous empirical curve for physical sun elevations (-90..90 degrees):
+// 0.5 lux at/below -6, 400 at the horizon, 120000 overhead. Keep the daytime
+// exponent 1.15; the offset joins daylight to twilight without a sunset jump.
 export function clearSkyLux(elevDeg) {
-  if (elevDeg >= 0) return 120000 * Math.sin((elevDeg * Math.PI) / 180) ** 1.15;
-  if (elevDeg >= -6) return 400 * ((elevDeg + 6) / 6); // civil twilight ramp
+  if (elevDeg >= 0) {
+    return 400 + (120000 - 400) * Math.sin((elevDeg * Math.PI) / 180) ** 1.15;
+  }
+  if (elevDeg >= -6) return 0.5 + (400 - 0.5) * ((elevDeg + 6) / 6);
   return 0.5; // night ambient floor
 }
 
@@ -83,7 +85,8 @@ export function applyCloud(lux, cloudFraction, cloudWeight = 1.0) {
 // Power-law lux→percent mapping between two anchor points (luxMin maps to
 // min, luxMax maps to max). Lower `exponent` is brighter earlier in the day.
 export function luxToPercent(lux, cfg) {
-  const x = (Math.max(lux, cfg.luxMin) - cfg.luxMin) / (cfg.luxMax - cfg.luxMin);
+  const x =
+    (Math.max(lux, cfg.luxMin) - cfg.luxMin) / (cfg.luxMax - cfg.luxMin);
   const y = Math.min(Math.max(x, 0), 1) ** cfg.exponent;
   return Math.round(cfg.min + (cfg.max - cfg.min) * y);
 }
