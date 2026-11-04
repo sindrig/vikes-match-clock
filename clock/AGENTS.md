@@ -1958,14 +1958,24 @@ For a persistent workspace-owned server, use `bash scripts/dev-server.sh start 8
 
 For isolated local development and CI, use Firebase Emulator:
 
+No live credentials or Firebase login are required. Pass `VITE_USE_EMULATOR=true`
+explicitly at Vite startup/build time or to Playwright. The default development
+server otherwise uses shared staging Firebase. A default production build
+previewed on localhost uses production Firebase unless emulator mode was
+compiled in; changing preview mode/environment cannot change that bundle.
+See [Firebase selection](../docs/environment.md#firebase-selection) for the
+mode/hostname precedence and restart/rebuild boundary.
+See [the environment contract](../docs/environment.md) for loaders and the
+separate match/weather API routing (the emulator flag changes Firebase only).
+
 ```bash
-# Start emulator (from project root)
+# Auth/Database-only work (from project root); add storage/functions when needed.
 firebase emulators:start --only auth,database --project vikes-match-clock-test
 
 # Or use Docker
 docker-compose up -d
 
-# Run app with emulator
+# From clock/, run app with emulator
 VITE_USE_EMULATOR=true pnpm start
 
 # Run e2e tests with emulator
@@ -1979,23 +1989,25 @@ Emulator ports:
 
 - Auth: 9099
 - Database: 9000
+- Storage: 9199
+- Functions: 5001
 - UI: 4000
 
 ### Test Credentials
 
-E2E tests that require authentication use the `TEST_CREDENTIALS` environment variable.
+The current `e2e/fixtures/test-helpers.ts` creates synthetic users in the local
+Auth emulator and logs in with those fixture values. It does not read
+`TEST_CREDENTIALS` or fall back to a staging account. Run E2E with the local
+services and `VITE_USE_EMULATOR=true`; never use those fixtures against shared
+Firebase.
 
-**Format**: `EMAIL;PASSWORD` (semicolon-separated)
-
-**Local development**:
-
-```bash
-pnpm e2e
-```
-
-If `TEST_CREDENTIALS` is not set, tests fall back to default staging credentials.
-
-**GitHub Actions**: The `TEST_CREDENTIALS` secret must be configured in the repository settings. Format is the same: `EMAIL;PASSWORD`.
+For separately authorized staging browser checks, retrieve an account from a
+project maintainer. Tooling that expects `TEST_CREDENTIALS` uses the format
+`EMAIL;PASSWORD` (quoted because of the semicolon). Load it into that process's
+shell explicitly or through optional direnv as described in
+[the environment contract](../docs/environment.md#shared-staging-login).
+Do not assume credentials are present in another worktree, and do not print
+their values. Missing access means obtain access or use the emulator.
 
 To log in manually (use playwright):
 
@@ -2046,7 +2058,7 @@ The asset E2E tests (`e2e/assets.spec.ts`) use these selectors for the multi-que
 
 ### Independent Browser Sessions
 
-Controller/display tests may need two independent browser sessions. Tabs on the same origin within one context/profile share localStorage and Firebase auth persistence; opening another ordinary window in the same profile does not isolate them. Different staging URL subpaths also share these keys. Separate local ports have distinct origins but still default to the same staging Firebase project.
+Controller/display tests may need two independent browser sessions. Tabs on the same origin within one context/profile share localStorage and Firebase auth persistence; opening another ordinary window in the same profile does not isolate them. Different staging URL subpaths also share these keys. Separate local ports have distinct origins; default Vite development servers on those ports still use the same staging Firebase project. Production builds previewed locally follow the [mode/hostname selection](../docs/environment.md#firebase-selection) instead.
 
 Use Playwright's test runner with a separate context per role:
 
