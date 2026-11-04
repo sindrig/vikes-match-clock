@@ -1,5 +1,10 @@
 # TypeScript Conversion - Next Steps
 
+> Historical `typescript-convert` notes, not a current task list or permission
+> to relax lint rules. Redux paths and branch status below describe that time.
+> Use the [Clock entrypoint](clock/AGENTS.md) and [task index](docs/README.md)
+> for maintained commands and documentation obligations.
+
 ## Current Status
 
 The TypeScript conversion on the `typescript-convert` branch is **functionally complete** - the code compiles successfully and builds without errors. However, there are many ESLint warnings that should be addressed before merging.
@@ -9,11 +14,12 @@ The TypeScript conversion on the `typescript-convert` branch is **functionally c
 **Branch:** `typescript-convert`
 
 **Modified files (not staged):**
+
 - clock/.eslintrc.js
-- clock/src/actions/*.ts (controller, global, match, remote, view)
+- clock/src/actions/\*.ts (controller, global, match, remote, view)
 - clock/src/controller/LoginPage.tsx
-- clock/src/controller/asset/*.tsx (multiple files)
-- clock/src/reducers/*.ts (controller, listeners, match, remote, view)
+- clock/src/controller/asset/\*.tsx (multiple files)
+- clock/src/reducers/\*.ts (controller, listeners, match, remote, view)
 - clock/src/registerServiceWorker.ts
 - clock/src/screens/Idle.tsx
 - clock/src/store.ts
@@ -66,6 +72,7 @@ The TypeScript conversion on the `typescript-convert` branch is **functionally c
 ## Recommended Approach
 
 ### Option A: Fix All Warnings (Recommended)
+
 1. Start with `no-explicit-any` - define proper types for Redux state, actions, and component props
 2. Fix `unbound-method` - convert to arrow functions or add `.bind()`
 3. Fix `no-floating-promises` - add proper async/await or void operators
@@ -74,6 +81,7 @@ The TypeScript conversion on the `typescript-convert` branch is **functionally c
 6. Commit all changes
 
 ### Option B: Quick Path
+
 1. Run tests to ensure functionality: `cd clock && pnpm test`
 2. Commit current state with warnings
 3. Create follow-up issues/tasks for ESLint cleanup

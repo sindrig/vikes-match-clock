@@ -1,5 +1,12 @@
 # Windows kiosk
 
+Developers: start at the [scoped guide](AGENTS.md) for platform prerequisites,
+commands and qualification limits. This README owns operator behavior and the
+release procedure; the [task index](../docs/README.md) routes cross-project work.
+Capture review images under ignored `screenshots/`, never commit screenshots;
+intentional icons/installer artwork remain source assets. See
+[screenshot handling](../docs/screenshots.md).
+
 The kiosk starts automatically at sign-in and opens fullscreen on its last-used
 monitor. To change screens, focus the kiosk and press **Win + Shift + Left/Right
 Arrow**, then restart it to confirm the choice was remembered.

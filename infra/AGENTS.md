@@ -2,6 +2,23 @@
 
 Terraform-managed AWS infrastructure with modular design and OIDC-based GitHub Actions authentication.
 
+## Prerequisites and navigation
+
+The root [`.terraform-version`](../.terraform-version) selects Terraform **1.6.1**.
+Use Docker for the Lambda module's Python 3.12 packaging and an approved AWS
+CLI/SDK session for remote state and operator work. No checkout task implicitly
+logs in or provisions infrastructure. Read the
+[environment contract](../docs/environment.md#manual-aws-staging-operations)
+before access/deployment work; Firebase authentication is separate from AWS OIDC.
+
+From the repository root, `terraform fmt -check -recursive infra` checks local
+formatting. Init/validate/plan require their relevant providers/backend setup;
+apply changes state and requires explicit scope. Do not apply to recover access.
+The [task index](../docs/README.md#operations-and-platforms) links deployment and
+platform ownership. Update this guide for stack/command changes, the environment
+contract for loaders, and [API preparation](../docs/api-client-preparation.md)
+when schema-generation procedures change.
+
 ## Directory Structure
 
 ```
@@ -16,12 +33,12 @@ infra/
 
 ## Terraform States
 
-| State | S3 Key | Purpose |
-|-------|--------|---------|
-| access | `vikes-match-clock/access/terraform.tfstate` | GitHub OIDC provider, IAM roles |
+| State        | S3 Key                                             | Purpose                                    |
+| ------------ | -------------------------------------------------- | ------------------------------------------ |
+| access       | `vikes-match-clock/access/terraform.tfstate`       | GitHub OIDC provider, IAM roles            |
 | devpod-creds | `vikes-match-clock/devpod-creds/terraform.tfstate` | IAM user + creds for devpod staging deploy |
-| prod | `vikes-match-clock/terraform.tfstate` | Production infrastructure |
-| staging | `vikes-match-clock/staging/terraform.tfstate` | Staging infrastructure |
+| prod         | `vikes-match-clock/terraform.tfstate`              | Production infrastructure                  |
+| staging      | `vikes-match-clock/staging/terraform.tfstate`      | Staging infrastructure                     |
 
 All states use the `vikes-misc-tf-state` S3 bucket in `eu-west-1`.
 
@@ -32,18 +49,20 @@ keys in those jobs. This claim is specific to CI: local operators use separately
 approved AWS credentials, and the legacy `devpod-creds` stack creates a static
 IAM access key. Firebase deployment authentication is separate.
 
-| Role | Assumable By | Purpose |
-|------|--------------|---------|
-| `github-master-deploy` | `sindrig/vikes-match-clock:ref:refs/heads/master` | Production deployments |
-| `github-staging-deploy` | `sindrig/vikes-match-clock:pull_request` | Staging deployments |
+| Role                    | Assumable By                                      | Purpose                |
+| ----------------------- | ------------------------------------------------- | ---------------------- |
+| `github-master-deploy`  | `sindrig/vikes-match-clock:ref:refs/heads/master` | Production deployments |
+| `github-staging-deploy` | `sindrig/vikes-match-clock:pull_request`          | Staging deployments    |
 
 Both roles have:
+
 - S3 read access to terraform state bucket (for `terraform output`)
 - S3/CloudFront permissions for their respective environments (attached by web module)
 
 ## Web Module (`modules/web/`)
 
 Reusable module that creates:
+
 - CloudFront + S3 CDN for frontend
 - API Gateway (HTTP) with custom domain
 - Lambda functions: clock-api-v3
@@ -53,20 +72,20 @@ Reusable module that creates:
 
 ### Variables
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `stage` | Environment name | `prod`, `staging` |
-| `frontend_domain` | CloudFront domain | `klukka.irdn.is` |
-| `api_domain` | API Gateway domain | `clock-api.irdn.is` |
+| Variable           | Description                                | Example                |
+| ------------------ | ------------------------------------------ | ---------------------- |
+| `stage`            | Environment name                           | `prod`, `staging`      |
+| `frontend_domain`  | CloudFront domain                          | `klukka.irdn.is`       |
+| `api_domain`       | API Gateway domain                         | `clock-api.irdn.is`    |
 | `deploy_role_name` | IAM role name to attach deploy permissions | `github-master-deploy` |
 
 ### Outputs
 
-| Output | Description |
-|--------|-------------|
-| `frontend_bucket` | S3 bucket name for frontend assets |
-| `cloudfront_distribution_id` | CloudFront distribution ID |
-| `api_endpoint` | Full API URL |
+| Output                       | Description                        |
+| ---------------------------- | ---------------------------------- |
+| `frontend_bucket`            | S3 bucket name for frontend assets |
+| `cloudfront_distribution_id` | CloudFront distribution ID         |
+| `api_endpoint`               | Full API URL                       |
 
 ## Applying Changes
 
@@ -105,6 +124,7 @@ The `prod/moves.tf` file contains `moved {}` blocks from the original flat struc
 ## Lambda Source Paths
 
 Lambda functions are built from `clock-api/` directory. The module uses relative paths:
+
 ```hcl
 source_path = "${path.module}/../../../clock-api/v3"
 ```
@@ -114,4 +134,3 @@ Lambdas are built in Docker (`build_in_docker = true`) for consistent Python dep
 ## VPC Configuration
 
 The `clock-api-v3` Lambda does NOT run in VPC (only calls external APIs: Analyticom, vedur.is, OpenWeatherMap). This is important to note as it simplifies networking and avoids VPC interface endpoint costs.
-

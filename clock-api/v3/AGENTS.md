@@ -2,6 +2,22 @@
 
 FastAPI application wrapping the Analyticom KSI REST API for match data and weather. Deployed as a single Lambda behind API Gateway via Lambda Web Adapter (LWA) + uvicorn.
 
+## Prerequisites and task navigation
+
+Use **Python 3.12** in an isolated virtual environment, with pip and
+`requirements-dev.txt` (which includes production dependencies). Frontend
+Node/pnpm is needed only when regenerating the TypeScript SDK; Docker is needed
+for the Terraform Lambda packaging path, not mocked API tests or schema export.
+No AWS login is needed for schema export, health or mocked tests. Live upstream
+calls use the approved AWS credential chain and lazy SSM access described by the
+[environment contract](../../docs/environment.md#api-secrets).
+
+The [task index](../../docs/README.md) routes cross-project changes. Update this
+guide for endpoints/setup, [KSI lifecycle](../../docs/ksi-roster-lifecycle.md) for
+request ownership/budgets, and [API preparation](../../docs/api-client-preparation.md)
+for schema/client rules. Team names/IDs must retain the frontend's
+[normalization and API-scope contract](../../docs/clock/assets-and-rosters.md#team-id-system--match-data-pipeline).
+
 ## Architecture
 
 ```
@@ -100,8 +116,18 @@ Setup:
 
 ```bash
 cd clock-api/v3
-pip install -r requirements-dev.txt
+python -m pip install -r requirements-dev.txt
 ```
+
+For a deliberately configured local API, from this directory:
+
+```bash
+python -m uvicorn app.main:app --port 8000
+```
+
+This starts the app without fetching keys; match/weather requests may contact
+live upstreams. Mock those requests for isolated frontend work. `run.sh` is the
+Lambda environment launcher, not a credential/bootstrap script.
 
 Running tests:
 

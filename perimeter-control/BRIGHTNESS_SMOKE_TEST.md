@@ -186,8 +186,9 @@ Current rules allow public desired-state reads, require venue authorization
 for state writes and telemetry/audit reads, and deny client telemetry writes.
 Audit creation requires the same venue permission and `uid == auth.uid`;
 updates/deletes are denied. Rules do not require state/audit pairing. The
-current brightness UI setters use direct `set()` rather than `writeAuditedState()`;
-these REST commands deliberately provide the atomic audit record. They do
+current brightness UI setters use the current-session/origin-gated audited
+command boundary. These REST commands likewise provide the atomic audit record;
+the rules do not prove pairing. See [audit limits](../docs/clock/audit.md#limits). They do
 not claim that the UI or daemon's Admin writes are audited by those rules.
 
 For the smoke test only, the installed service must already have correct

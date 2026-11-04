@@ -1,151 +1,149 @@
 # Vikes Match Clock
 
-A match clock application for Víkingur football club stadiums. Displays match information, time, and weather on stadium screens.
+Match clock, stadium displays and operator tools for Víkingur. Start with the
+[project map](README.md#project-map), then the scoped guide for the code being
+changed. The [task index](docs/README.md) points to canonical contracts and the
+document that must change with each subsystem.
 
-## Project Structure
+## Project structure
 
-- **clock/**: React app - match clock display and control interface (see `clock/AGENTS.md` for details)
-- **clock-api/**: Python Lambda API for match data and weather
-- **admin/**: Nuxt.js admin interface for match control (newer alternative to clock's controller)
-- **infra/**: Terraform infrastructure configuration
+- [Clock](clock/AGENTS.md): React scoreboard, controller, web perimeter and
+  [React administration](clock/src/admin/AGENTS.md) in the same Vite app.
+- [API v3](clock-api/v3/AGENTS.md): Python FastAPI match/weather Lambda.
+- [Functions](functions/AGENTS.md): Firebase administration, audit retention and
+  temporarily retained generated-scorer backend.
+- [Brightness gateway](perimeter-control/AGENTS.md): Node service for Vnnox
+  brightness, weather prediction and listener recovery. Browser media is web-only.
+- [Kiosk](kiosk/AGENTS.md): Windows Rust/Tauri wrapper loading the hosted app.
+- [Infrastructure](infra/AGENTS.md): Terraform AWS stacks. [Emulators](firebase.json),
+  [workspace scripts](scripts/) and [asset utilities](utils/README.md) support these units.
+
+## Commands and environment
+
+Use **pnpm** for local JavaScript work. Clock CI uses pnpm 10; the gateway pins
+12.16.1. Functions has no package-manager version pin and still has two lockfiles
+and npm-based CI; do not infer alignment or rewrite them during unrelated work.
+See each scoped guide for commands, prerequisites and that limitation.
+
+For credential-free frontend work, from the repository root:
+
+```bash
+cd clock
+corepack pnpm@10.34.9 install --frozen-lockfile
+corepack pnpm@10.34.9 run generate-api-client
+# Local Firebase services must already be running for this isolated target:
+VITE_USE_EMULATOR=true PORT=4500 corepack pnpm@10.34.9 start
 ```
-├── clock/              # React frontend application
-├── clock-api/          # Python Lambda functions
-│   └── v3/             # FastAPI API — match data + weather (see clock-api/v3/AGENTS.md)
-├── infra/              # Terraform infrastructure (see infra/AGENTS.md)
-└── .github/workflows/  # CI/CD pipelines
-```
 
-## Environments
+`start` and `build` generate the ignored SDK from committed
+`clock-api/v3/openapi.json`. Standalone lint/tests/type checks need generation
+first. Never hand-edit or commit `clock/src/api/client/`. API contract changes
+must export and commit OpenAPI before regeneration; see
+[API preparation](docs/api-client-preparation.md).
 
-| Environment | Frontend URL | API URL | Deployed From |
-|-------------|--------------|---------|---------------|
-| Production | klukka.irdn.is | clock-api.irdn.is | `master` branch |
-| Staging | staging-klukka.irdn.is | clock-api-staging.irdn.is | PRs with `sandbox-deploy` label |
+The [environment contract](docs/environment.md) is canonical for loaders,
+credentials and selection. Default Vite development targets **shared staging**;
+a default production build previewed on localhost targets **production**.
+Compile/start with `VITE_USE_EMULATOR=true` for isolation. Preview-time variables
+cannot change a built bundle. Match/weather API routing is separate from Firebase.
+No home directory, automatic login or credential file is a checkout prerequisite.
 
-## Key Technologies
+## Critical invariants
 
-- **Frontend**: React (in `clock/` directory)
-- **Backend**: Python 3.12 Lambda functions (FastAPI + Lambda Web Adapter)
-- **Infrastructure**: Terraform with S3 backend
-- **CI/CD**: GitHub Actions AWS deployments use OIDC (no static AWS keys in those jobs); local operator credentials are separate
-- **Real-time**: Firebase Realtime Database for screen state management
+- **`halfStops` stores MINUTES**, e.g. `[45, 90, 105, 120]`; conversion to
+  milliseconds happens inside Clock. Fixtures must use the same units.
+- **Firebase is authoritative; no optimistic shared-state or calculation-ref
+  updates.** Reads are validated; parsers never repair persisted data.
+- Commands require the **current session and original command origin**, a
+  current Auth SDK UID and freshness eligibility. Retain that command through
+  async work; stale commands reject without replay. Lifecycle changes use CAS;
+  [playback occurrences](docs/playback-occurrences.md) distinguish replay from
+  media identity. Already-submitted SDK writes cannot be revoked.
+- [Nested parsing](docs/nested-state-boundary.md) preserves valid siblings,
+  unknown metadata and **raw roster child identity**. Filtered indexes cannot
+  replace raw keys. Keep manual/foreign players and coaches structurally valid.
+- [Team IDs](docs/clock/assets-and-rosters.md#team-id-system--match-data-pipeline)
+  must match KSI identities and the configured API team scope. Keep override-first
+  lookup and trailing-dot name
+  normalization; `-1` and `0` retain their distinct meanings.
+- Preserve version-1 file/version-2 semantic perimeter commands, media pairs,
+  mapping compatibility keys, generation backfill and immutable Storage
+  generations. Resolume is retired; no missing-mapping media fallback exists.
+- **#241 Phase 2 is pending:** retain `prepareGoalScorerMedia`, its export,
+  tests, sharp and rules until client rollout/refresh and separately qualified
+  removal. Follow the [rollout hold](docs/web-only-perimeter-rollout.md).
+- Ordinary shared-state writes and audit are atomic; CAS state and its audit
+  append are separate. [Audit limitations](docs/clock/audit.md) and ordinary
+  multi-controller **last-write-wins** remain; coordinate shared venue edits.
 
-## Deployment
+## Code style
 
-Deployments are automatic:
+Prettier: 2 spaces, semicolons, double quotes. Python: Black, line length 79,
+skip string normalization. External imports precede internal imports; alphabetize
+within groups. Use camelCase (JS/TS), PascalCase (components), snake_case (Python).
+Handle async failures and validate Firebase data at its ingestion boundary.
 
-- Push to `master` → deploys to production
-- Add `sandbox-deploy` label to PR → deploys to staging
+**CRITICAL: `eslint-disable` is not a fix.** Fix the code and types. If the rule
+is wrong for the project, discuss the global configuration; if stuck, stop and
+ask for help. A one-off suppression requires explicit user approval and a
+comment documenting a genuine false positive. Use lookup objects instead of
+unnecessary type assertions, proper types/`unknown` instead of `any`, and correct
+hook dependencies. Format touched files; run checks appropriate to the change.
 
-The workflow uses OIDC to assume IAM roles, then fetches infrastructure details from Terraform outputs.
+## Testing and screenshots
 
-## Environment and Credentials
+[Clock testing](docs/clock/testing.md) covers Vitest, Playwright, provider mocks
+and independent browser contexts. Emulator fixtures create synthetic accounts;
+never run them against shared Firebase. Live staging checks require separate
+maintainer-approved access from the environment contract. HTTP shell success
+alone does not verify rendered app behavior.
 
-See [the environment contract](docs/environment.md) for credential-free frontend/emulator work, shared staging login, API secrets, manual AWS access and gateway setup. No specific home directory, credential file or automatic login is required for a checkout. Optional direnv loads this worktree's `.envrc-local` as dotenv; `.envrc-local.example` contains commented placeholders. Existing Python/SSO operator helpers require explicit opt-in. Missing credentials lead to maintainer access guidance, not infrastructure application.
+Capture review images under ignored **`screenshots/`**; never commit screenshots.
+Intentional source artwork (club crests, fonts, kiosk installer assets) is a
+separate reviewed input, not a captured proof image. Follow the canonical
+[screenshot procedure](docs/screenshots.md) for environment checks and authorized
+uploads. No shared state, deployment or hardware action is implied by a docs edit.
 
-## Code Style
+## Documentation updates
 
-- **Package manager**: pnpm only (enforced by preinstall hook)
-- **Formatting**: Prettier (2 spaces, semi, double quotes). Format before committing
-- **Clock (TypeScript/React)**: React Context for state management, Firebase for sync. ESLint airbnb-style with Prettier
-- **Python**: Black formatter (79 char line length, skip string normalization per pyproject.toml)
-- **Imports**: Group by external packages, then internal modules; alphabetize within groups
-- **Naming**: camelCase (JS/TS), PascalCase (components), snake_case (Python)
-- **Error handling**: Use try/catch for async operations, validate Firebase responses
+Update the canonical reference selected by the [task index](docs/README.md)
+when behavior changes; update entrypoints only when navigation, commands or
+critical invariants change. Keep historical evidence marked as such. Moving
+material does not complete fresh-checkout verification (#257), OpenSpec
+reconciliation (#259), client rollout, or physical qualification.
 
-### ESLint Rules (CRITICAL)
+## Previous section links
 
-**`eslint-disable` is not an acceptable fix.** Instead:
-1. Fix the underlying code to satisfy the rule
-2. If the rule is genuinely wrong for this codebase, discuss disabling it globally in eslint config
-3. If you cannot fix without eslint-disable, STOP and ask for help
+Stable anchors from the earlier guide remain below; each group points to the
+current canonical reference. New detail belongs there.
 
-**Exception**: With explicit user approval AND documented justification, a one-off eslint-disable may be acceptable for genuine false positives. This should be rare.
+<a id="environments"></a>
+<a id="key-technologies"></a>
+<a id="deployment"></a>
+<a id="environment-and-credentials"></a>
+<a id="eslint-rules-critical"></a>
+<a id="architecture-notes"></a>
 
-Common fixable patterns:
-- `@typescript-eslint/no-unnecessary-type-assertion` → Use lookup objects instead of template literal type assertions
-- `@typescript-eslint/no-explicit-any` → Define proper types or use `unknown`
-- `react-hooks/*` → Restructure effect dependencies properly
+[Task index](docs/README.md).
 
-## Architecture Notes
+<a id="firebase-state-sync-clock"></a>
+<a id="automatic-perimeter-brightness-controller--daemon"></a>
 
-### Firebase State Sync (clock/)
-- **Single source of truth**: Firebase is authoritative for all synced state
-- **No optimistic updates**: All state changes flow through Firebase subscriptions (write → Firebase → onValue → state)
-- **No hydration guards**: 100% Firebase means no local state to hydrate
-- **Type-safe parsing**: All Firebase snapshots validated through `firebaseParsers.ts`
+[session mutation boundary](docs/session-mutation-boundary.md).
 
-### Automatic Perimeter Brightness (controller + daemon)
-- Design doc: `docs/auto-brightness-design.md` (authoritative for schema,
-  model formulas, and rollout phases)
-- Controller side (clock/): mode control + parameter editors + 24 h curve
-  preview in `clock/src/controller/PerimeterControl.tsx`, pure model in
-  `clock/src/lib/autoBrightness.ts` (SunCalc v1 + Open-Meteo), write path
-  `states/{location}/perimeter/brightnessAuto` via
-  `setPerimeterBrightnessAuto` in `FirebaseStateContext.tsx`
-- Daemon side (perimeter-control/): prediction, hysteresis/slew, weather
-  fetch, and the actual brightness writes — see `clock/AGENTS.md` and the
-  design doc for the division of responsibility
+<a id="team-id-system-club-idsts--ksi-analyticom-api"></a>
+<a id="multi-controller-support"></a>
 
-### Team ID System (club-ids.ts ↔ KSI Analyticom API)
+[assets and rosters](docs/clock/assets-and-rosters.md).
 
-The match data pipeline depends on team IDs matching between the frontend and the KSI Analyticom API:
+<a id="testing-patterns"></a>
+<a id="unit-tests"></a>
+<a id="e2e-tests"></a>
 
-1. **`club-ids.ts`** maps team display names → KSI Analyticom IDs (e.g., `"Víkingur R": "2492"`)
-2. **`updateMatch()`** in `FirebaseStateContext.tsx` resolves `homeTeamId`/`awayTeamId` from `club-ids.ts` when a team name is set
-3. **`api.ts`** fetches lineups from the API, which returns players keyed by API team IDs: `{ [String(match.homeTeam.id)]: Player[], ... }`
-4. **`TeamAssetController.tsx`** looks up players via `String(match.homeTeamId)` — if `club-ids.ts` has wrong IDs, this lookup silently returns nothing
+[testing](docs/clock/testing.md).
 
-**Name normalization**: The API sometimes returns team names with trailing dots (e.g., "Víkingur R.") while `club-ids.ts` stores them without. The `lookupClubId()` helper in `FirebaseStateContext.tsx` strips trailing dots as a fallback.
+<a id="taking-screenshots-for-prs"></a>
+<a id="workflow"></a>
+<a id="important-notes"></a>
 
-**Teams not in KSI** (combined teams, foreign clubs, national teams) have ID `"-1"` in `club-ids.ts`. They remain selectable but won't match API data.
-
-**Authoritative source for IDs**: https://www.ksi.is/felagslid/adildarfelog/ — each team link contains `felag?id=XXXX`.
-
-### Multi-Controller Support
-- Multiple controllers can connect to the same `listenPrefix`
-- Uses **last-write-wins** semantics (no conflict resolution)
-- Coordinate with team to avoid simultaneous edits in production
-- See `clock/AGENTS.md` for known limitations and edge cases
-
-## Testing Patterns
-
-### Unit Tests
-- Vitest for React component and utility tests
-- Mock Firebase with `vi.mock("firebase/database", ...)`
-- Use `@testing-library/react` for component testing
-
-### E2E Tests
-- Playwright for browser automation
-- Emulator E2E fixtures create their own synthetic accounts; they do not need live credentials or consume `TEST_CREDENTIALS`.
-- For authorized shared staging browser checks, retrieve an account from a project maintainer. Browser tooling may consume shell `TEST_CREDENTIALS` (format: `EMAIL;PASSWORD`); load it explicitly as described in [the environment contract](docs/environment.md#shared-staging-login), without printing it. Do not assume another worktree contains credentials.
-- For independent sessions, use separate browser contexts/profiles (Playwright runner or context APIs exposed by the available browser tool). Same-origin tabs in one context share storage/auth; see `clock/AGENTS.md`.
-
-## Taking Screenshots for PRs
-
-The default Vite development server connects to **staging Firebase** unless emulator mode is enabled at startup. A default production build served on localhost with `pnpm preview` connects to **production Firebase** unless emulator mode was compiled in. Check [Firebase selection](docs/environment.md#firebase-selection) before authenticated screenshot work; changing preview mode or environment requires rebuilding to change compiled selection.
-
-### Workflow
-
-1. **Start the dev server** using the `dev-server` skill (defaults to port 8000): `bash scripts/dev-server.sh start 8000` from this worktree's root. Vite persists in a dedicated tmux session for this physical worktree and port. Use `status 8000` to see the handle/PID and `.dev-server/8000.log`; use `stop 8000` to stop only that session. An occupied port fails; choose another explicit port. The helper needs Bash, Git, Node, tmux and installed clock dependencies; follow the skill's API-client preparation and browser verification steps.
-2. **Log in using available browser tooling** (Playwright runner, Playwright tools or Paseo), when shared staging access is authorized: Navigate to `http://localhost:8000`, use the maintainer-provided staging account loaded for this session without printing it, click "Innskrá", then select a screen (e.g., "Víkin úti Skjár"). Inspect rendered content, console errors and failed requests; an HTML title alone only verifies the shell. Coordinate authenticated shared-staging actions with other users. Use the emulator for credential-free isolated state checks.
-3. **Take a screenshot** using the available tool's actual API or Playwright's page/locator screenshot API. Save locally under the gitignored `screenshots/` directory (e.g., `screenshots/my-screenshot.png`).
-4. **Upload to the staging S3 bucket** for hosting (GitHub doesn't support programmatic image uploads):
-   Load approved AWS access and staging metadata in the upload shell using [the environment contract](docs/environment.md#manual-aws-staging-operations). Upload only when authorized.
-   ```bash
-   : "${STAGING_BUCKET:?Obtain staging upload access and bucket metadata from the maintainer.}"
-   TIMESTAMP=$(date +%s)
-   aws s3 cp screenshots/my-screenshot.png "s3://$STAGING_BUCKET/pr-images/<ISSUE>-<name>-${TIMESTAMP}.png" --region eu-west-1
-   ```
-5. **Reference in PR body or comment**:
-   ```
-   ![Description](https://staging-klukka.irdn.is/pr-images/<ISSUE>-<name>-<TIMESTAMP>.png)
-   ```
-
-### Important notes
-
-- **NEVER commit screenshots or images to the git repository.** Always upload to the staging S3 bucket and reference via URL. The `screenshots/` directory is gitignored.
-- Always include a timestamp in the filename — CloudFront caches aggressively and will serve stale images if you reuse a path.
-- The manual staging skill's root `aws s3 rm` excludes `pr-images/`. CI's root deployment uses `delete-removed: true` without that exclusion configured, so image persistence is not guaranteed. Root deployments can also remove subpath bundles; subpaths share staging Firebase and same-origin browser storage (see `.opencode/skills/deploy-staging/SKILL.md`).
-- The dev server uses Vite HMR, so CSS/JS changes are reflected immediately without restart — just take a new screenshot after editing.
+[screenshots](docs/screenshots.md).

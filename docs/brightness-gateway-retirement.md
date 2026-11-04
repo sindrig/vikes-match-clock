@@ -1,5 +1,10 @@
 # Brightness gateway retirement (#240)
 
+This is implementation/verification history, not the current installation
+entrypoint. Use the [gateway guide](../perimeter-control/AGENTS.md) and
+[runtime README](../perimeter-control/README.md) for maintained commands and
+behavior; original baseline counts and review-stage holds below are provenance.
+
 The original implementation was stacked on reviewed PR #272:
 `audit/264-portable-environment` at
 `7b110a5df3a697866f79fe9d6e18d15f6999d8fe`. After that prerequisite merged,
@@ -150,10 +155,10 @@ The actual venue service Node binary must still be checked during separately
 authorized host qualification; the container binary/fixture unit is the only
 executable qualified here.
 
-The brightness arbitration/model work in #252/#253 is unchanged. Weather
-request timeout/cancellation work in #254 / open PR #270 is **not in this base**;
-provider stalls remain an existing limitation. Do not attribute its deadline
-or cancellation behavior to this retirement. Frontend/Functions retirement
-belongs to #241. Windows/physical output requires its own qualification record.
-The coordinator verifies before PR publication, then a fresh independent review
-follows. There is no merge authority.
+The original retirement did not implement the independently reviewed #252/#253
+arbitration/model work or #254 weather timeout/cancellation. Those changes are
+now integrated; see the runtime README for current behavior and remaining
+cancellation limits. Frontend retirement is also merged, while
+[#241 backend Phase 2 remains pending](web-only-perimeter-rollout.md).
+Windows/physical output still requires its own qualification record. Historical
+software evidence here supplies neither deployment nor hardware authority.

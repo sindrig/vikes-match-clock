@@ -8,16 +8,16 @@ mocked gateway tests do not qualify Windows output or physical brightness.
 
 ## Test Record
 
-| Field | Result |
-| --- | --- |
-| Operator / date | |
-| Windows build | |
-| Chromium version | |
-| GPU / driver | |
-| Mapping revision | |
-| Framebuffer dimensions | |
-| Maximum tested texture dimensions | |
-| Persistent quota / usage | |
+| Field                             | Result |
+| --------------------------------- | ------ |
+| Operator / date                   |        |
+| Windows build                     |        |
+| Chromium version                  |        |
+| GPU / driver                      |        |
+| Mapping revision                  |        |
+| Framebuffer dimensions            |        |
+| Maximum tested texture dimensions |        |
+| Persistent quota / usage          |        |
 
 ## Qualification Steps
 
@@ -31,10 +31,10 @@ mocked gateway tests do not qualify Windows output or physical brightness.
 8. Run a paired video playlist for at least two hours. Record cue-boundary drift, dropped frames, decoder errors, GPU memory growth, and whether the final cue loops correctly.
 9. Show, replace, and clear an overlay while the base playlist is running. Confirm the base clock continues and visibility changes are atomic.
 10. Goal-scorer overlay cases (after the venue's controller is cleared to emit
-    version-2 semantic commands — see `clock/AGENTS.md`):
+    version-2 semantic commands — see [media and scorer semantics](../docs/clock/perimeter-media.md)):
     a. Select a scorer with a `players/{id}-fagn.png` celebration image. The band repeats `[portrait | number | name]` at each overlay logical screen's native dimensions above the advancing base.
-    b. Select a scorer whose celebration image is missing or undecodable. The band uses the venue crest (`{location}/crest.png`).
-    c. Temporarily remove both source objects and select a scorer. Confirm the previously visible overlay is retained (or the base stays unobscured on a cold start) and the failure appears in the Skjáarvillur panel with a safe message.
+    b. With one portrait missing/undecodable, confirm the other remains visible. With both unavailable, confirm fallback to the venue crest (`{location}/crest.png`); with that also unavailable, confirm the bundled home-team crest. Use controlled fixtures rather than deleting live media.
+    c. With every source unavailable in a controlled fixture (including the bundled crest), confirm the previous overlay is retained (or base on cold start) and a safe failure appears in the Skjáarvillur panel. Also confirm two usable portraits alternate once per second.
     d. Select a scorer with a long name (over 3x band height at nominal size). Confirm the name shrinks to the minimum before truncating and repeated units never overlap.
     e. Clear the active overlay. Confirm every scorer target is removed atomically and the base playlist resumes.
     f. Power the perimeter off and on with a scorer active. Confirm black while off and the composed scorer restored when powered on.
@@ -47,6 +47,10 @@ Attach the calibration screenshot, browser console log, storage estimate, codec
 matrix, and long-run timing notes to the deployment record. Qualify each
 venue separately before publishing replacement output; record every result
 and the last qualified web configuration.
+
+Capture review images under ignored `screenshots/` and never commit screenshots;
+follow [screenshot handling](../docs/screenshots.md) for authorized uploads.
+This does not prohibit intentional source artwork changes in their own paths.
 
 An authorized rollback restores the last qualified web mapping/media revision
 and kiosk configuration. If no qualified web output is available, keep the
