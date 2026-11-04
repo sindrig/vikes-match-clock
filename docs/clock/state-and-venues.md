@@ -60,6 +60,11 @@ automatic perimeter power. Retry is not write replay or server certification;
 the [existing freshness handshake](../session-mutation-boundary.md) still
 applies. Optional telemetry faults cannot block public output.
 
+Hardware telemetry has a separate opaque connection lifetime. A known disconnect
+retires it synchronously, even when false → true is batched into one render, so
+old callbacks cannot publish while awaiting effect cleanup. The reconnected
+telemetry owner must deliver its own read; this does not satisfy core freshness.
+
 Key files:
 
 - `contexts/FirebaseStateContext.tsx`: Main state provider with Firebase subscriptions and write operations

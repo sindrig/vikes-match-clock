@@ -515,6 +515,93 @@ describe("required read faults and recovery", () => {
 });
 
 describe("scope and optional telemetry", () => {
+  it.each(["delivery", "cancellation"])(
+    "synchronously retires telemetry across a batched connection drop/reconnect (%s)",
+    async (drop) => {
+      mount();
+      const path = "perimeter/A/brightnessStatus";
+      const old = subscriptions.find(
+        (entry) => entry.active && entry.path === path,
+      )!;
+      const retained = api.setPerimeterBrightness;
+      const late = snapshot(path);
+      const readLate = vi.spyOn(late, "val").mockReturnValue(report(99));
+      expect(telemetry.brightnessStatus?.appliedPercent).toBe(20);
+      withheld.add(path);
+      act(() => {
+        if (drop === "delivery") {
+          values.set(".info/connected", false);
+          emit(".info/connected");
+        } else {
+          fail(".info/connected");
+        }
+        // This runs before React can render or clean up the old effect.
+        old.data(late);
+        old.error?.(new Error("late telemetry cancellation"));
+        expect(readLate).not.toHaveBeenCalled();
+        values.set(".info/connected", true);
+        emit(".info/connected");
+      });
+      expect(telemetry.brightnessStatus).toBeNull();
+      expect(telemetry.status.phase).toBe("loading");
+      expect(old.active).toBe(false);
+      expect(
+        subscriptions.filter((entry) => entry.active && entry.path === path),
+      ).toHaveLength(1);
+      expect(status.ready).toBe(true);
+      expect(api.writeEligible).toBe(false);
+      act(() => {
+        old.data(late);
+        values.set(path, report(35));
+        emit(path);
+      });
+      expect(readLate).not.toHaveBeenCalled();
+      expect(telemetry.brightnessStatus?.appliedPercent).toBe(35);
+      expect(api.writeEligible).toBe(false);
+      expect(firebaseDatabase.writeAudited).not.toHaveBeenCalled();
+      act(() => emit("states/A/match"));
+      expect(api.writeEligible).toBe(true);
+      await act(async () => {
+        await expect(retained(50)).rejects.toBeInstanceOf(
+          MutationRejectedError,
+        );
+      });
+      const current = api.setPerimeterBrightness;
+      act(() => {
+        values.set(path, report(40));
+        emit(path);
+      });
+      expect(api.setPerimeterBrightness).toBe(current);
+      await act(async () => current(60));
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("clears an ordinary disconnect and requires its new telemetry owner after reconnect", () => {
+    mount();
+    const path = "perimeter/A/brightnessStatus";
+    act(() => {
+      values.set(".info/connected", false);
+      emit(".info/connected");
+    });
+    expect(telemetry.brightnessStatus).toBeNull();
+    expect(telemetry.status.phase).toBe("error");
+    withheld.add(path);
+    act(() => {
+      values.set(".info/connected", true);
+      emit(".info/connected");
+    });
+    expect(telemetry.brightnessStatus).toBeNull();
+    expect(telemetry.status.phase).toBe("loading");
+    act(() => {
+      values.set(path, report(45));
+      emit(path);
+    });
+    expect(telemetry.brightnessStatus?.appliedPercent).toBe(45);
+    expect(api.writeEligible).toBe(false);
+    expect(firebaseDatabase.writeAudited).not.toHaveBeenCalled();
+  });
+
   it("masks telemetry on a direct UID prop change before layout synchronizes the session", () => {
     const session = new MutationSession({
       location: "A",

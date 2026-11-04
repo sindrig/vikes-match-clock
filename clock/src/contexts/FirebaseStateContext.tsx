@@ -819,6 +819,10 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   const [readRevision, setReadRevision] = useState(0);
   const readAttemptRef = useRef<ReadAttempt | null>(null);
   const [firebaseConnected, setFirebaseConnected] = useState(true);
+  const [telemetryConnection, setTelemetryConnection] = useState<object>(
+    () => ({}),
+  );
+  const telemetryConnectionRef = useRef(telemetryConnection);
   const [metadataScope] = useState(() => ({}));
   const metadataRead = useSubscriptionRead({
     scope: metadataScope,
@@ -849,6 +853,12 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
   // still live; `navigator.onLine` only reflects browser network state and is
   // not a reliable readiness gate.
   const firebaseConnectedRef = useRef(true);
+  const isTelemetryConnectionCurrent = useCallback(
+    (connection: object) =>
+      firebaseConnectedRef.current &&
+      telemetryConnectionRef.current === connection,
+    [],
+  );
   // True when the Firebase connection was observed dropping while the client
   // was suspended (hidden/offline). A resume that never observed a drop can
   // restore eligibility immediately; a resume after a real drop must wait for
@@ -983,6 +993,11 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
       firebaseConnectedRef.current = connected;
       setFirebaseConnected(connected);
       if (connected) return;
+      // Retire optional hardware callbacks before React's effect cleanup.
+      // A new identity survives even a batched false -> true delivery.
+      const connection = {};
+      telemetryConnectionRef.current = connection;
+      setTelemetryConnection(connection);
       suspendedDropRef.current = true;
       if (!document.hidden && session.getSnapshot().freshness === "ready") {
         resyncPendingRef.current = true;
@@ -3018,6 +3033,8 @@ export const FirebaseStateProvider: React.FC<FirebaseStateProviderProps> = ({
                         authenticated={isAuthenticated}
                         uid={uid}
                         connected={firebaseConnected}
+                        connection={telemetryConnection}
+                        isConnectionCurrent={isTelemetryConnectionCurrent}
                       >
                         {children}
                       </PerimeterTelemetryProvider>

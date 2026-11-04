@@ -35,6 +35,12 @@ do not context-invalidate match consumers. The telemetry owner attaches only
 for an authenticated selected venue and remains outside public App readiness.
 Venue/auth scope changes, disconnect and read errors clear the visible report;
 old callbacks cannot restore it across a venue/auth A → B → A or read retry.
+Every known connection drop synchronously retires the telemetry connection
+lifetime, including false → true within one React batch. Callbacks from that
+lifetime cannot publish before effect cleanup; the reconnected owner must deliver
+its own read before showing a report. This is independent of the five required
+reads and the command freshness/origin handshake: telemetry or connection arrival
+alone cannot restore command eligibility.
 The panel offers read retry on unavailable/denied reports, independently of
 match recovery. There is no inactivity timeout on an unchanged valid report.
 An SDK delivery remains a report with the daemon's timestamp, not proof of a

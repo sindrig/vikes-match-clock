@@ -31,6 +31,8 @@ export function PerimeterTelemetryProvider({
   authenticated,
   uid,
   connected,
+  connection,
+  isConnectionCurrent,
 }: {
   children: ReactNode;
   session: MutationSession;
@@ -39,22 +41,33 @@ export function PerimeterTelemetryProvider({
   authenticated: boolean;
   uid?: string;
   connected: boolean;
+  connection: object;
+  isConnectionCurrent: (connection: object) => boolean;
 }) {
   // A connection drop clears the visible report, independently of the match
   // recovery policy. Reattachment can only publish this venue's own SDK read.
   const readScope = useMemo(
-    () => ({ scope, location, authenticated, uid, connected }),
-    [scope, location, authenticated, uid, connected],
+    () => ({ scope, location, authenticated, uid, connected, connection }),
+    [scope, location, authenticated, uid, connected, connection],
   );
   const isCurrent = useCallback(() => {
     const current = session.getSnapshot();
     return (
+      isConnectionCurrent(connection) &&
       current.scope === scope &&
       current.location === location &&
       current.authenticated === authenticated &&
       current.uid === uid
     );
-  }, [session, scope, location, authenticated, uid]);
+  }, [
+    session,
+    scope,
+    location,
+    authenticated,
+    uid,
+    connection,
+    isConnectionCurrent,
+  ]);
   const enabled = Boolean(location && authenticated && connected);
   const read = useSubscriptionRead({
     scope: readScope,
