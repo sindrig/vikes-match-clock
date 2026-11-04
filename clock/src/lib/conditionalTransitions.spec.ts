@@ -292,6 +292,7 @@ describe("penaltyExpiryTransition", () => {
 
 describe("timedAssetCompletionPrecondition", () => {
   const observed = {
+    occurrenceId: null,
     assetKey: "img-1",
     time: 3,
     activeQueueId: "q-1",
@@ -305,7 +306,7 @@ describe("timedAssetCompletionPrecondition", () => {
       activeQueueId: "q-1",
       playing: true,
     };
-    expect(timedAssetCompletionPrecondition(observed)(prev)).toBe(true);
+    expect(timedAssetCompletionPrecondition(observed)(prev, prev)).toBe(true);
   });
 
   it("rejects when the current asset changed (a newer one is showing)", () => {
@@ -315,7 +316,7 @@ describe("timedAssetCompletionPrecondition", () => {
       activeQueueId: "q-1",
       playing: true,
     };
-    expect(timedAssetCompletionPrecondition(observed)(prev)).toBe(false);
+    expect(timedAssetCompletionPrecondition(observed)(prev, prev)).toBe(false);
   });
 
   it("rejects when the queue was consumed or changed", () => {
@@ -325,12 +326,15 @@ describe("timedAssetCompletionPrecondition", () => {
       activeQueueId: null,
       playing: false,
     };
-    expect(timedAssetCompletionPrecondition(observed)(prev)).toBe(false);
+    expect(timedAssetCompletionPrecondition(observed)(prev, prev)).toBe(false);
   });
 
   it("rejects when there is no current asset", () => {
-    expect(timedAssetCompletionPrecondition(observed)(baseController)).toBe(
-      false,
-    );
+    expect(
+      timedAssetCompletionPrecondition(observed)(
+        baseController,
+        baseController,
+      ),
+    ).toBe(false);
   });
 });

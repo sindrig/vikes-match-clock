@@ -370,6 +370,48 @@ describe("MatchLifecycle", () => {
   });
 
   describe("timed asset completion", () => {
+    it("gives repeated one-item selections fresh timers and keeps old settlements out of the new guard", async () => {
+      let finishFirst: (committed: boolean) => void = () => undefined;
+      let finishSecond: (committed: boolean) => void = () => undefined;
+      const complete = vi
+        .fn()
+        .mockImplementationOnce(
+          () =>
+            new Promise<boolean>((resolve) => {
+              finishFirst = resolve;
+            }),
+        )
+        .mockImplementationOnce(
+          () =>
+            new Promise<boolean>((resolve) => {
+              finishSecond = resolve;
+            }),
+        );
+      const current = { asset: { key: "A", type: "IMAGE" }, time: 1 };
+      const h = setup({
+        currentAsset: { ...current, occurrenceId: "A1" },
+        activeQueueId: "q",
+        playing: true,
+        completeAssetIfCurrent: complete,
+      });
+      advanceTicks(10);
+      expect(complete).toHaveBeenCalledTimes(1);
+      h.set({ currentAsset: { ...current, occurrenceId: "A2" } });
+      h.rerender();
+      advanceTicks(9);
+      expect(complete).toHaveBeenCalledTimes(1);
+      advanceTicks(1);
+      expect(complete).toHaveBeenCalledTimes(2);
+      finishFirst(true);
+      await flushPromises();
+      advanceTicks(10);
+      expect(complete).toHaveBeenCalledTimes(2);
+      finishSecond(true);
+      await flushPromises();
+      advanceTicks(10);
+      expect(complete).toHaveBeenCalledTimes(2);
+    });
+
     it("advances a looping video at the queue duration, not before", async () => {
       const h = setup({
         match: makeMatch(),
@@ -385,6 +427,7 @@ describe("MatchLifecycle", () => {
       expect(h.fns.completeAssetIfCurrent).not.toHaveBeenCalled();
       advanceTicks(1);
       expect(h.fns.completeAssetIfCurrent).toHaveBeenCalledExactlyOnceWith({
+        occurrenceId: null,
         assetKey: "ad.mp4",
         time: 5,
         activeQueueId: "q1",
@@ -457,6 +500,7 @@ describe("MatchLifecycle", () => {
       h.rerender();
       expect(h.fns.completeAssetIfCurrent).toHaveBeenCalledTimes(1);
       expect(h.fns.completeAssetIfCurrent).toHaveBeenCalledWith({
+        occurrenceId: null,
         assetKey: "a1",
         time: 5,
         activeQueueId: "q1",

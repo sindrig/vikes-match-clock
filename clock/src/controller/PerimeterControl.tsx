@@ -38,7 +38,7 @@ import {
   PerimeterAdLayout,
   PerimeterAdLayoutColumn,
   PerimeterAdLayoutFile,
-  PerimeterAppliedAdFile,
+  PerimeterAdLane,
   PerimeterOverlayFile,
   PerimeterBrightnessAutoConfig,
   ScorerCelebrationStyle,
@@ -61,7 +61,6 @@ import {
   validateBrightnessAutoConfig,
   CloudCoverForecast,
 } from "../lib/autoBrightness";
-import GoalScorerPreparation from "./GoalScorerPreparation";
 import PerimeterDisplayReports from "./PerimeterDisplayReports";
 import PerimeterFileThumb from "./PerimeterFileThumb";
 import {
@@ -71,7 +70,6 @@ import {
 } from "../firebase";
 import "./PerimeterControl.css";
 
-const STALE_MS = 15 * 60 * 1000;
 const MAX_UPLOAD_BYTES = 250 * 1024 * 1024;
 const MAX_AD_COLUMNS = 20;
 
@@ -79,13 +77,6 @@ const MAX_AD_COLUMNS = 20;
 // Vnnox/UCenter daemon applies or verifies the requested percentage), so the
 // Bjartleiki jaðarskjás section would be dead UI there.
 const VENUES_WITHOUT_BRIGHTNESS = new Set(["virkid"]);
-
-const PHASE_LABELS: Record<string, string> = {
-  loading: "Hleður",
-  playing: "Spilar",
-  error: "Villa",
-  idle: "Í bið",
-};
 
 const BRIGHTNESS_PHASE_LABELS: Record<string, string> = {
   pending: "Í bið",
@@ -95,19 +86,10 @@ const BRIGHTNESS_PHASE_LABELS: Record<string, string> = {
   shadow: "Samanburður",
 };
 
-const formatTimestamp = (updatedAt: number | null): string => {
-  if (updatedAt === null) return "";
-  return new Date(updatedAt).toLocaleTimeString("is-IS", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-};
-
 interface SortableColumnProps {
   column: PerimeterAdLayoutColumn;
   columnIndex: number;
-  lanes: { id: string; name: string }[];
-  appliedFiles: Record<string, PerimeterAppliedAdFile> | undefined;
+  lanes: PerimeterAdLane[];
   onDelete: (columnId: string) => void;
   disabled?: boolean;
 }
@@ -116,7 +98,6 @@ const SortableColumn = ({
   column,
   columnIndex,
   lanes,
-  appliedFiles,
   onDelete,
   disabled,
 }: SortableColumnProps) => {
@@ -167,22 +148,14 @@ const SortableColumn = ({
         <div className="perimeter-column-files">
           {lanes.map((lane) => {
             const file = column.files[lane.id];
-            const applied = appliedFiles?.[lane.id];
             return (
               <div key={lane.id} className="perimeter-file-card">
                 <div className="perimeter-file-lane-label">{lane.name}</div>
                 {file ? (
                   <>
-                    <PerimeterFileThumb
-                      name={applied?.name ?? file.name}
-                      source={file.source}
-                      appliedThumbnail={applied?.thumbnail}
-                    />
-                    <div
-                      className="perimeter-file-name"
-                      title={applied?.name ?? file.name}
-                    >
-                      {applied?.name ?? file.name}
+                    <PerimeterFileThumb name={file.name} source={file.source} />
+                    <div className="perimeter-file-name" title={file.name}>
+                      {file.name}
                     </div>
                   </>
                 ) : (
@@ -340,9 +313,8 @@ const FilePicker = ({
 };
 
 // Canonical home-goal overlay targets. The keys are the shared overlay layer
-// ids consumed by both the web runtime (via the published mapping's
-// compatibilityKeys.overlay) and the Resolume daemon; labels fall back to the
-// established 48/40 screen names when no web mapping is published.
+// keys consumed by the web runtime via compatibilityKeys.overlay. Labels
+// use the published logical screens, preserving the version-1 file protocol.
 const GOAL_VIDEO_TARGETS = [
   { key: "2", fallbackLabel: "48 skjáir" },
   { key: "4", fallbackLabel: "40 skjáir" },
@@ -351,7 +323,7 @@ const GOAL_VIDEO_TARGETS = [
 const GoalVideoSection = () => {
   const { goalVideo, setPerimeterGoalVideo } = usePerimeter();
   const { listenPrefix } = useLocalState();
-  const { screens } = useListeners();
+  const { venues } = useListeners();
 
   const [showEdit, setShowEdit] = useState(false);
   const [draft, setDraft] = useState<Record<string, PerimeterOverlayFile>>({});
@@ -359,9 +331,8 @@ const GoalVideoSection = () => {
   const [error, setError] = useState<string | null>(null);
 
   const perimeterConfiguration = useMemo(
-    () =>
-      screens.find((screen) => screen.key === listenPrefix)?.perimeterDisplay,
-    [listenPrefix, screens],
+    () => venues[listenPrefix]?.perimeterDisplay,
+    [listenPrefix, venues],
   );
   const targets = useMemo(
     () =>
@@ -455,7 +426,7 @@ const GoalVideoSection = () => {
           ))
         )}
       </div>
-      {error && (
+      {error && !showEdit && (
         <span className="perimeter-status-error">
           Ekki tókst að vista: {error}
         </span>
@@ -472,6 +443,7 @@ const GoalVideoSection = () => {
           <Modal.Title>Markamyndband</Modal.Title>
         </Modal.Header>
         <Modal.Body>
+          {error && <p role="alert">{error}</p>}
           <p className="perimeter-add-hint">
             Veldu skrá fyrir hvern jaðarskjá úr listanum eða hlaðið upp nýrri
             skrá.
@@ -1356,21 +1328,16 @@ const SubstitutionStyleSection = () => {
 const PerimeterControl = ({ standalone = false }: { standalone?: boolean }) => {
   const {
     perimeter,
-    getServerTime,
     setPerimeterState,
     skipPerimeterCue,
     restartPerimeterDisplays,
     setPerimeterAdLayout,
     adLayout,
-    appliedAdLayout,
-    appliedAdLayoutLoaded,
-    appliedAdLayoutError,
   } = usePerimeter();
   const { listenPrefix } = useLocalState();
-  const { screens } = useListeners();
+  const { venues } = useListeners();
 
   const [open, setOpen] = useState(false);
-  const [now, setNow] = useState(0);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [addSelections, setAddSelections] = useState<
     Record<string, PerimeterAdLayoutFile>
@@ -1382,34 +1349,22 @@ const PerimeterControl = ({ standalone = false }: { standalone?: boolean }) => {
   const [writeError, setWriteError] = useState<string | null>(null);
 
   const perimeterConfiguration = useMemo(
-    () =>
-      screens.find((screen) => screen.key === listenPrefix)?.perimeterDisplay,
-    [listenPrefix, screens],
+    () => venues[listenPrefix]?.perimeterDisplay,
+    [listenPrefix, venues],
   );
   const isWebVenue = perimeterConfiguration?.renderer === "web";
-  const webLanes = useMemo(
+  const lanes = useMemo(
     () =>
-      Object.entries(perimeterConfiguration?.compatibilityKeys.base ?? {}).map(
-        ([id, logicalScreenId]) => ({
-          id,
-          name:
-            perimeterConfiguration?.logicalScreens[logicalScreenId]?.name ?? id,
-        }),
-      ),
-    [perimeterConfiguration],
+      Object.entries(
+        isWebVenue ? perimeterConfiguration.compatibilityKeys.base : {},
+      ).map(([id, logicalScreenId]) => ({
+        id,
+        name:
+          perimeterConfiguration?.logicalScreens[logicalScreenId]?.name ?? id,
+      })),
+    [isWebVenue, perimeterConfiguration],
   );
-  const lanes = appliedAdLayout?.lanes ?? (isWebVenue ? webLanes : []);
   const columns = useMemo(() => adLayout?.columns ?? [], [adLayout?.columns]);
-  const appliedColumnsMap = useMemo(() => {
-    const map: Record<
-      string,
-      { files: Record<string, PerimeterAppliedAdFile> }
-    > = {};
-    for (const col of appliedAdLayout?.columns ?? []) {
-      map[col.id] = { files: col.files };
-    }
-    return map;
-  }, [appliedAdLayout?.columns]);
 
   // Mutating handlers read the latest desired columns through this ref so a
   // write that is still settling (the Firebase subscription has not yet caught
@@ -1430,12 +1385,6 @@ const PerimeterControl = ({ standalone = false }: { standalone?: boolean }) => {
   // The revision that was current when the in-flight write began. Mutating
   // controls stay disabled until the desired subscription moves past it.
   const beforeRevisionRef = useRef<string | null>(null);
-
-  const revisionMismatch =
-    !isWebVenue &&
-    adLayout?.revision !== undefined &&
-    appliedAdLayout?.revision !== undefined &&
-    adLayout.revision !== appliedAdLayout.revision;
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -1489,7 +1438,6 @@ const PerimeterControl = ({ standalone = false }: { standalone?: boolean }) => {
   };
 
   const openDialog = () => {
-    setNow(getServerTime());
     setOpen(true);
     setShowAddDialog(false);
     setAddSelections({});
@@ -1504,12 +1452,6 @@ const PerimeterControl = ({ standalone = false }: { standalone?: boolean }) => {
     beforeRevisionRef.current !== null &&
     adLayout?.revision === beforeRevisionRef.current;
   const busy = writePending || writeSettling;
-
-  const isStale =
-    now > 0 &&
-    !isWebVenue &&
-    appliedAdLayout?.updatedAt != null &&
-    now - appliedAdLayout.updatedAt > STALE_MS;
 
   const handleDragStart = (event: DragStartEvent) => {
     if (busy) return;
@@ -1546,7 +1488,7 @@ const PerimeterControl = ({ standalone = false }: { standalone?: boolean }) => {
     const allSelected = lanes.every(
       (lane) => addSelections[lane.id] !== undefined,
     );
-    if (!allSelected) return;
+    if (lanes.length === 0 || !allSelected) return;
     if (columnsRef.current.length >= MAX_AD_COLUMNS) return;
 
     const newColumn: PerimeterAdLayoutColumn = {
@@ -1573,61 +1515,27 @@ const PerimeterControl = ({ standalone = false }: { standalone?: boolean }) => {
     <>
       {isWebVenue && <PerimeterDisplayReports />}
       {!VENUES_WITHOUT_BRIGHTNESS.has(listenPrefix) && <BrightnessSection />}
-      <GoalVideoSection />
+      {isWebVenue && <GoalVideoSection />}
       {isWebVenue && <ScorerCelebrationSection />}
       {isWebVenue && <IdleClockSection />}
       {isWebVenue && <NightBlackoutSection />}
       {isWebVenue && <PlayerBandStyleSection />}
       {isWebVenue && <SubstitutionStyleSection />}
-      {!isWebVenue && <GoalScorerPreparation />}
-      {!isWebVenue && !appliedAdLayoutLoaded ? (
-        <div className="perimeter-preview-state">
-          <Loader content="Sæki forskoðun..." />
+      {!isWebVenue ? (
+        <div className="perimeter-no-lanes">
+          <p className="perimeter-empty-text">Jaðarskjár er ekki stilltur.</p>
           <p className="perimeter-hint">
-            Forskoðunin er sjálfkrafa sótt þegar daemoninn ræsir og eftir að
-            jaðarskjárinn er kveiktur.
+            Birta þarf gilda vefstillingu fyrir staðsetninguna í Staðsetningar.
           </p>
         </div>
-      ) : !isWebVenue && appliedAdLayout === undefined ? (
-        appliedAdLayoutError ? (
-          <div className="perimeter-error-state">
-            <div className="perimeter-error-badge">Villa</div>
-            <p className="perimeter-error-message">{appliedAdLayoutError}</p>
-          </div>
-        ) : (
-          <div className="perimeter-preview-state">
-            <p className="perimeter-empty-text">
-              Engin forskoðun hefur verið birt enn.
-            </p>
-            <p className="perimeter-hint">
-              Forskoðunin er sjálfkrafa sótt þegar daemoninn ræsir og eftir að
-              jaðarskjárinn er kveiktur.
-            </p>
-          </div>
-        )
       ) : (
         <div className="perimeter-layout-board">
           {/* Status Bar */}
           <div className="perimeter-status-bar">
-            {isWebVenue ? (
-              <Badge
-                content="Web"
-                className="perimeter-phase-badge phase-playing"
-              />
-            ) : (
-              <Badge
-                content={
-                  PHASE_LABELS[appliedAdLayout?.phase ?? "idle"] ??
-                  appliedAdLayout?.phase
-                }
-                className={`perimeter-phase-badge phase-${appliedAdLayout?.phase ?? "idle"}`}
-              />
-            )}
-            {!isWebVenue && appliedAdLayout?.error && (
-              <span className="perimeter-status-error">
-                {appliedAdLayout?.error}
-              </span>
-            )}
+            <Badge
+              content="Web"
+              className="perimeter-phase-badge phase-playing"
+            />
             {writeError && (
               <span className="perimeter-status-error">
                 Ekki tókst að vista: {writeError}
@@ -1636,22 +1544,7 @@ const PerimeterControl = ({ standalone = false }: { standalone?: boolean }) => {
             <span className="perimeter-lanes-count">
               {lanes.length} {lanes.length === 1 ? "röð" : "raðir"}
             </span>
-            {revisionMismatch && (
-              <span className="perimeter-revision-pending">
-                Uppfærslu beðið
-              </span>
-            )}
-            {!isWebVenue && !revisionMismatch && appliedAdLayout?.revision && (
-              <span className="perimeter-revision-live">Lifandi</span>
-            )}
           </div>
-
-          {isStale && (
-            <div className="perimeter-stale">
-              Staða jaðarskjás er gömul (uppfærð kl.{" "}
-              {formatTimestamp(appliedAdLayout?.updatedAt ?? null)}).
-            </div>
-          )}
 
           {!lanesConfigured ? (
             <div className="perimeter-no-lanes">
@@ -1659,7 +1552,7 @@ const PerimeterControl = ({ standalone = false }: { standalone?: boolean }) => {
                 Engar raðir eru stilltar fyrir jaðarskjáinn.
               </p>
               <p className="perimeter-hint">
-                Raðir eru skilgreindar í stillingum daemonins.
+                Raðir eru skilgreindar í birtri vefstillingu staðsetningarinnar.
               </p>
             </div>
           ) : columns.length === 0 ? (
@@ -1690,20 +1583,16 @@ const PerimeterControl = ({ standalone = false }: { standalone?: boolean }) => {
                   items={columns.map((c) => c.id)}
                   strategy={horizontalListSortingStrategy}
                 >
-                  {columns.map((column, idx) => {
-                    const appliedCol = appliedColumnsMap[column.id];
-                    return (
-                      <SortableColumn
-                        key={column.id}
-                        column={column}
-                        columnIndex={idx}
-                        lanes={lanes}
-                        appliedFiles={appliedCol?.files}
-                        onDelete={handleDeleteColumn}
-                        disabled={busy}
-                      />
-                    );
-                  })}
+                  {columns.map((column, idx) => (
+                    <SortableColumn
+                      key={column.id}
+                      column={column}
+                      columnIndex={idx}
+                      lanes={lanes}
+                      onDelete={handleDeleteColumn}
+                      disabled={busy}
+                    />
+                  ))}
                 </SortableContext>
               </div>
               <DragOverlay
@@ -1728,9 +1617,6 @@ const PerimeterControl = ({ standalone = false }: { standalone?: boolean }) => {
                       <div className="perimeter-column-files">
                         {lanes.map((lane) => {
                           const file = activeDragColumn.files[lane.id];
-                          const appliedCol =
-                            appliedColumnsMap[activeDragColumn.id];
-                          const applied = appliedCol?.files?.[lane.id];
                           return (
                             <div key={lane.id} className="perimeter-file-card">
                               <div className="perimeter-file-lane-label">
@@ -1739,15 +1625,14 @@ const PerimeterControl = ({ standalone = false }: { standalone?: boolean }) => {
                               {file ? (
                                 <>
                                   <PerimeterFileThumb
-                                    name={applied?.name ?? file.name}
+                                    name={file.name}
                                     source={file.source}
-                                    appliedThumbnail={applied?.thumbnail}
                                   />
                                   <div
                                     className="perimeter-file-name"
-                                    title={applied?.name ?? file.name}
+                                    title={file.name}
                                   >
-                                    {applied?.name ?? file.name}
+                                    {file.name}
                                   </div>
                                 </>
                               ) : (
@@ -1800,6 +1685,7 @@ const PerimeterControl = ({ standalone = false }: { standalone?: boolean }) => {
               <Modal.Title>Nýr dálkur</Modal.Title>
             </Modal.Header>
             <Modal.Body>
+              {writeError && <p role="alert">{writeError}</p>}
               <p className="perimeter-add-hint">
                 Veldu skrá fyrir hverja röð úr listanum eða hlaðið upp nýrri
                 skrá.
@@ -1909,7 +1795,7 @@ const PerimeterControl = ({ standalone = false }: { standalone?: boolean }) => {
         <div className="theme-trigger-info">
           <span className="theme-trigger-label">Jaðarskjár</span>
           <span className="theme-trigger-preset">
-            Forskoðun á klippum (endurnýjast sjálfkrafa)
+            Umsýsla auglýsinga og bjartleika
           </span>
         </div>
         <Button size="sm" appearance="primary" onClick={openDialog}>

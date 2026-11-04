@@ -68,7 +68,11 @@ describe("ImageList", () => {
         },
       ]);
       expect(onAddAssets.mock.calls[0]?.[0][0]?.key).toEqual(
-        expect.any(String),
+        `venue/images/${name}`,
+      );
+      fireEvent.click(await screen.findByLabelText(name));
+      expect(onAddAssets.mock.calls[1]?.[0]).toEqual(
+        onAddAssets.mock.calls[0]?.[0],
       );
     },
   );

@@ -1,7 +1,5 @@
 import os
 
-from fastapi.testclient import TestClient
-
 from app.main import app
 
 
@@ -12,14 +10,12 @@ class TestAppConfig:
     def test_app_has_correct_root_path(self):
         assert app.root_path == ""
 
-    def test_health_endpoint_responds(self):
-        client = TestClient(app)
+    def test_health_endpoint_responds(self, client):
         response = client.get("/v3/health")
         assert response.status_code == 200
         assert response.json() == {"status": "ok"}
 
-    def test_cors_middleware_configured(self):
-        client = TestClient(app)
+    def test_cors_middleware_configured(self, client):
         response = client.options(
             "/v3/health",
             headers={
