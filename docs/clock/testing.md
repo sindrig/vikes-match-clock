@@ -32,7 +32,7 @@ creation acknowledgements separate in mocks. Do not add phantom desired-child
 callbacks when adapting older fixtures to the sole parent subscription.
 
 The emulator-only `e2e/subscription-domains.spec.ts` mounts the actual App with
-Auth/RTDB SDKs and repository rules in namespace `vikes-match-clock-test`.
+Auth/RTDB/Storage SDKs and repository rules in namespace `vikes-match-clock-test`.
 It verifies public/authenticated read boundaries, actionable initial and
 post-load permission failures, unavailable initial reads, selector retry,
 rendered brightness reset, rapid SDK echoes, queue acknowledgement barriers
@@ -42,13 +42,23 @@ read it back, then restore repository rules. A child denial cannot override
 an ancestor read grant. The fixture is outside the production entrypoint and
 must never run against shared Firebase.
 
-These scenarios need Auth and Database only; they do not qualify Storage,
-Functions, physical telemetry or unchanged-data automatic reconnect. Under
+These full-App scenarios require responsive Auth, Database and Storage. Install
+the repository Storage rules and wait for HTTP readiness as well as the explicit
+RTDB rules readback. The public case awaits the anonymous scoreboard-ad listing's
+real 403, checks denied anonymous and allowed authenticated SDK listings, and
+retains page-error assertions for both roles. A pending Storage request is not a
+clean startup. These scenarios do not qualify Functions, physical telemetry or
+unchanged-data automatic reconnect. Under
 resource coordination, wrap the complete lifecycle once, use one browser
 worker/zero retries and a static emulator-compiled bundle with explicit fixture
 entrypoints. A successful assertion with a failed lifecycle/cleanup is not a
 passing qualification. Compare acceptance probes with the exact source pin
 and use small disposable mutations to prove their failure sensitivity.
+
+`utils/AdImage.spec.tsx` covers optional listing/URL failures, authorized rotation,
+scope masking and late completions after a venue/type change or unmount. The
+full-App Storage case also covers the inherited anonymous optional-ad rejection;
+handling that rejection does not change Storage authorization.
 
 ## Port Configuration
 

@@ -16,7 +16,7 @@ import {
   useLocalState,
 } from "../../src/contexts/LocalStateContext";
 import type { TimedAssetCompletionObservation } from "../../src/lib/conditionalTransitions";
-import { app, auth, database } from "../../src/firebase";
+import { app, auth, database, storageHelpers } from "../../src/firebase";
 import { firebaseDatabase } from "../../src/firebaseDatabase";
 import "../../src/index.css";
 
@@ -127,6 +127,7 @@ export const harness = {
   settle: () => Promise.all(submitted),
   rawRead: (path: string) => result(get(ref(database, path))),
   rawWrite: (path: string) => result(set(ref(database, path), 99)),
+  rawStorageList: (path: string) => result(storageHelpers.listAll(path)),
   holdAcknowledgements: () => {
     hold = true;
   },

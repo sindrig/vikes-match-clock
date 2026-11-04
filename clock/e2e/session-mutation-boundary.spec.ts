@@ -261,7 +261,13 @@ for (const boundary of [
       await eligible(page);
     }
     await page.evaluate(() => window.sessionMutationHarness.releaseMedia());
-    await expect(page.getByRole("alert")).toContainText("Ekki tókst að vista");
+    const scorer = page.getByRole("dialog", {
+      name: "Markaskorari — Víkingur R",
+      exact: true,
+    });
+    await expect(scorer.getByRole("alert")).toContainText(
+      "Ekki tókst að vista",
+    );
     await noAttempts(page, before);
     expect(await rest("GET", `states/${other}`)).toEqual(otherBefore);
     if (boundary === "offline") {

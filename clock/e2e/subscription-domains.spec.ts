@@ -178,8 +178,22 @@ test("public display survives denied optional telemetry and real rules preserve 
   page,
   browser,
 }) => {
+  const anonymousAds = page.waitForResponse((response) => {
+    const url = new URL(response.url());
+    return (
+      url.origin === "http://127.0.0.1:9199" &&
+      url.pathname === `/v0/b/${namespace}.appspot.com/o` &&
+      url.searchParams.get("prefix") === `${venue}/smallAds/`
+    );
+  });
   await boot(page, { login: false });
   await ready(page, false);
+  expect((await anonymousAds).status()).toBe(403);
+  expect(
+    await page.evaluate(() =>
+      window.subscriptionDomains.rawStorageList("audit247-a/smallAds"),
+    ),
+  ).toBe("denied");
   expect(
     await page.evaluate(() =>
       window.subscriptionDomains.rawRead(
@@ -205,6 +219,11 @@ test("public display survives denied optional telemetry and real rules preserve 
     const operator = await context.newPage();
     await boot(operator);
     await ready(operator);
+    expect(
+      await operator.evaluate(() =>
+        window.subscriptionDomains.rawStorageList("audit247-a/smallAds"),
+      ),
+    ).toBe("accepted");
     await expect
       .poll(() =>
         operator.evaluate(
