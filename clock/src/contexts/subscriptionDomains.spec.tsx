@@ -191,10 +191,21 @@ beforeEach(() => {
     const path = String(reference);
     const next = change(values.get(path) ?? null);
     if (next === undefined)
-      return Promise.resolve({ committed: false, snapshot: snapshot(path) });
+      return Promise.resolve({
+        committed: false,
+        snapshot: snapshot(path),
+        toJSON: () => ({
+          committed: false,
+          snapshot: values.get(path) ?? null,
+        }),
+      });
     values.set(path, next);
     emit(path);
-    return Promise.resolve({ committed: true, snapshot: snapshot(path) });
+    return Promise.resolve({
+      committed: true,
+      snapshot: snapshot(path),
+      toJSON: () => ({ committed: true, snapshot: next }),
+    });
   });
 });
 afterEach(() => {
@@ -428,14 +439,16 @@ describe("required read faults and recovery", () => {
 
   it("cleans partially registered listeners after synchronous cancellation", () => {
     const original = vi.mocked(onValue).getMockImplementation()!;
-    vi.mocked(onValue).mockImplementation((reference, callback, cancel) => {
-      if (
-        String(reference) === "states/A/controller" &&
-        typeof cancel === "function"
-      )
-        cancel(new Error("unavailable"));
-      return original(reference, callback, cancel);
-    });
+    vi.mocked(onValue).mockImplementation(
+      (reference, callback, cancel, options) => {
+        if (
+          String(reference) === "states/A/controller" &&
+          typeof cancel === "function"
+        )
+          cancel(new Error("unavailable"));
+        return original(reference, callback, cancel, options);
+      },
+    );
     mount();
     expect(status.status.phase).toBe("error");
     expect(
@@ -447,11 +460,13 @@ describe("required read faults and recovery", () => {
 
   it("cleans the attempt when SDK registration throws before returning an unsubscribe", () => {
     const original = vi.mocked(onValue).getMockImplementation()!;
-    vi.mocked(onValue).mockImplementation((reference, callback, cancel) => {
-      if (String(reference) === "states/A/controller")
-        throw new Error("private registration detail");
-      return original(reference, callback, cancel);
-    });
+    vi.mocked(onValue).mockImplementation(
+      (reference, callback, cancel, options) => {
+        if (String(reference) === "states/A/controller")
+          throw new Error("private registration detail");
+        return original(reference, callback, cancel, options);
+      },
+    );
     mount();
     expect(screen.getByRole("alert")).toHaveTextContent("controller");
     expect(screen.getByRole("alert")).not.toHaveTextContent(
