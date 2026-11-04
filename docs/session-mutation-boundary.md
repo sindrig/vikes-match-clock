@@ -73,6 +73,82 @@ synchronous SDK subscription echoes also advance these refs between rapid
 ordinary commands: two goals, queue edits and preset saves preserve both
 accepted actions without waiting for React to render or server acknowledgements.
 
+## Queue intents and compound callers (#243)
+
+Prepare media before submitting an intent, and retain the command captured
+before preparation starts. `createQueue(name, items = [], options?)` and
+`replaceQueue(name, items, options?)` return `Promise<string>`; an ID is usable
+only after the audited write succeeds. A rejected submission rejects the
+promise. Creation includes every initial item in its one update/audit event.
+The board's explicit empty-queue button still creates an empty cycling queue.
+
+`replaceQueue` resolves the first matching name from the current subscription
+inside the executor, then deletes that queue and creates its complete
+replacement in one update. It keeps the previous delete/create semantics:
+the replacement has a new ID, default settings (team callers set `cycle:
+false`) and an order after the remaining queues. Replacing the active queue
+clears playback and the current asset in that same update. Preparation or
+submission failure leaves the previous backend queue and playback intact.
+
+`appendSubstitutionAndActivate({ side, outgoing, incoming, asset })` resolves
+both selected players against the current subscribed roster and rejects if
+either is absent, both resolve to the same player, the outgoing player is no
+longer on the pitch (`show`), or the incoming player is no longer eligible
+(`!show && number != null`). These checks run at submission, after media
+preparation, using current subscription values rather than the selected copies.
+A rejected intent makes no queue, roster or audit submission. Overlapping
+preparations cannot reuse an outgoing or incoming player after an accepted
+command's SDK echo; independent and ordered substitutions still use those
+echoes before React rerenders. It creates or appends to
+`Skiptingar`, activates it, and writes both roster `show` leaves in one
+`controller.append-substitution-and-activate` update/audit. It retains an
+existing queue's settings, order and items and does not advance, clear or
+restart the current asset or change `playing`. New substitution queues are
+non-cycling. Asset names, full names, in/out semantics and home reveal
+backgrounds retain their existing meanings.
+
+Existing queue edits diff individual fields (`queues/{id}/name`, `order`,
+`items`, `autoPlay`, `imageSeconds`, `cycle`). Only creation and intentional
+deletion write whole queue nodes. Renames, ordering and independent settings
+therefore cannot restore stale items or unrelated autoplay settings. Item
+arrays and explicit replacement/deletion still have last-write-wins semantics;
+this is not multi-controller conflict resolution.
+
+An SDK local echo is not a durable creation acknowledgement. The executor
+registers pending queue creations before calling the SDK, so reentrant commands
+also see the dependency. A command reading that queue waits for its creation
+to settle, then recomputes from current subscription refs, including current
+roster eligibility and the original command origin. Rejected creations are
+never copied back from a saved diff: named intents resolve the restored state
+or create a complete new queue containing only their own initial items.
+Explicit ID operations reject when the queue disappeared. Multiple waiters
+recheck dependencies on each settlement. Session/freshness changes reject
+waiting commands immediately even if an acknowledgement never arrives; they
+are not replayed. This stores acknowledgement lifetimes only, leaves
+independent actions usable, and preserves leaf writes for durable metadata.
+
+| Caller                                                                | Previous compound writes                                              | Intent and preparation ownership                                                                                                                  |
+| --------------------------------------------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AssetController` / URL and playlist picker                           | create → append                                                       | `useQueuePickerActions` captures the gesture's commands before awaiting media; `createQueue(name, items)` submits once                            |
+| `MediaManager` / image and MP4 picker                                 | create → append                                                       | Same picker helper; selected media and its command origin stay together until save or dismissal                                                   |
+| `TeamAssetController.addTeamToQueue`                                  | delete → create → await media → append                                | Await every player asset first, reject an incomplete preparation, then call the retained `replaceQueue` once; return to the board only on success |
+| `useHomeTeamQuickActions` (team tab and match shortcuts, either side) | two roster edits → await media → create if needed → append → activate | Await both cards, then call the retained `appendSubstitutionAndActivate` once                                                                     |
+
+Picker drafts keep their captured commands across rerenders. Awaiting create,
+append and show operations preserves the draft and exposes failure feedback;
+an empty board's failed automatic create opens a retryable dialog. Completion
+of an older save only closes its own draft. Neither picker nor intent APIs
+advance shared calculation refs. Rapid actions use actual SDK subscription
+echoes, before React has rerendered.
+
+Independent roster editing/import, the board's empty create, queue playback,
+and paired main-screen/perimeter overlay controls are not queue-assembly
+chains. Their existing ownership remains. Storage preparation and its existing
+fallbacks are preserved; these queue commands neither upload nor delete media.
+Version-1/2 perimeter media, saved pairs and venue mappings are unaffected.
+Playback occurrence identity (#244), CAS generations/latches and the inherited
+unchanged-reconnect stalls described above remain separate work.
+
 ## Ordinary mutation inventory
 
 All methods below reach the same executor. The parameterized inventory in
@@ -82,13 +158,13 @@ accepted commands and zero ordinary/audit/SDK attempts for retained commands.
 to `commitClubOverride`. Club form create/update also delegate there. No direct
 club, brightness, or configuration writer bypass remains.
 
-| State area     | Entry points                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Match          | `updateMatch`, `resetMatch`, `addGoal`, `addPenalty`, `removePenalty`, `addToPenalty`, `updateHalfLength`, `adjustMatchTime`, `setHalfStops`, `matchTimeout`, `removeTimeout`, `buzz`, `countdown`, `startHalftimeCountdown`, `stopHalftimeCountdown`, `updateRedCards`                                                                                                                                                                                   |
-| Controller     | `updateController`, `selectView`, `selectAssetView`, `createQueue`, `deleteQueue`, `renameQueue`, `reorderQueues`, `addItemsToQueue`, `removeItemFromQueue`, `reorderItemsInQueue`, `updateQueueSettings`, `playQueue`, `activateQueue`, `stopPlaying`, `showItemNow`, `setPlaying`, `renderAsset`, `showNextAsset`, `removeAssetAfterTimeout`, `remoteRefresh`, `setRoster`, `editPlayer`, `deletePlayer`, `addPlayer`, `clearRoster`, `selectTab`       |
-| View           | `updateView`, `setViewPort`, `setBackground`, `setIdleImage`, `setIdleAd`, `setBlackoutStart`, `setBlackoutEnd`, `setGoalGifSettings`, `setTheme`, `setThemePreset`, `saveCustomPreset`, `deleteCustomPreset`                                                                                                                                                                                                                                             |
-| Club overrides | `saveClubOverride`, `commitClubOverride` (create/update/save), `deleteClubOverride`                                                                                                                                                                                                                                                                                                                                                                       |
-| Perimeter      | `setPerimeterState`, `skipPerimeterCue`, `restartPerimeterDisplays`, `setPerimeterOverlay`, `clearPerimeterOverlay`, `setPerimeterAdLayout`, `setPerimeterGoalVideo`, `setPerimeterScorerCelebration`, `setPerimeterIdleClock`, `setPerimeterPlayerDisplayStyle`, `setPerimeterSubstitutionStyle`, `setPerimeterBrightness`, `setPerimeterBrightnessAuto`, `createPerimeterMediaPair`, `setPerimeterMediaPairMainScreenAsset`, `deletePerimeterMediaPair` |
+| State area     | Entry points                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Match          | `updateMatch`, `resetMatch`, `addGoal`, `addPenalty`, `removePenalty`, `addToPenalty`, `updateHalfLength`, `adjustMatchTime`, `setHalfStops`, `matchTimeout`, `removeTimeout`, `buzz`, `countdown`, `startHalftimeCountdown`, `stopHalftimeCountdown`, `updateRedCards`                                                                                                                                                                                                                              |
+| Controller     | `updateController`, `selectView`, `selectAssetView`, `createQueue`, `replaceQueue`, `appendSubstitutionAndActivate`, `deleteQueue`, `renameQueue`, `reorderQueues`, `addItemsToQueue`, `removeItemFromQueue`, `reorderItemsInQueue`, `updateQueueSettings`, `playQueue`, `activateQueue`, `stopPlaying`, `showItemNow`, `setPlaying`, `renderAsset`, `showNextAsset`, `removeAssetAfterTimeout`, `remoteRefresh`, `setRoster`, `editPlayer`, `deletePlayer`, `addPlayer`, `clearRoster`, `selectTab` |
+| View           | `updateView`, `setViewPort`, `setBackground`, `setIdleImage`, `setIdleAd`, `setBlackoutStart`, `setBlackoutEnd`, `setGoalGifSettings`, `setTheme`, `setThemePreset`, `saveCustomPreset`, `deleteCustomPreset`                                                                                                                                                                                                                                                                                        |
+| Club overrides | `saveClubOverride`, `commitClubOverride` (create/update/save), `deleteClubOverride`                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Perimeter      | `setPerimeterState`, `skipPerimeterCue`, `restartPerimeterDisplays`, `setPerimeterOverlay`, `clearPerimeterOverlay`, `setPerimeterAdLayout`, `setPerimeterGoalVideo`, `setPerimeterScorerCelebration`, `setPerimeterIdleClock`, `setPerimeterPlayerDisplayStyle`, `setPerimeterSubstitutionStyle`, `setPerimeterBrightness`, `setPerimeterBrightnessAuto`, `createPerimeterMediaPair`, `setPerimeterMediaPairMainScreenAsset`, `deletePerimeterMediaPair`                                            |
 
 Automatic perimeter power changes, keyboard controls, scorer/player/team media
 continuations, queue controls, theme editors, and all other consumers call these
@@ -122,3 +198,14 @@ in `vikes-match-clock-test`, verifies real SDK denials, and requires independent
 HTTP-ready Storage. Run with `VITE_USE_EMULATOR=true` and all lifecycle processes
 inside the resource-coordination wrapper when working under that constraint.
 The fixture is outside the production entrypoint and build.
+
+`clock/e2e/queue-intents.spec.ts` extends that local fixture with the actual
+team, substitution and picker callers. It checks an independent SDK observer,
+one-update audit attribution, preparation/permission failures, old-queue
+preservation, explicit save retries, delayed remote metadata deliveries, rapid
+SDK echoes, playback compatibility and obsolete media continuations. Storage
+object identity, version-1 media pairs and venue mappings are checked for
+preservation. The preparation-fault test injects a synchronous exception;
+ordinary media preparation still reads the real Storage emulator. Missing
+photos remain supported text-only cards. Browser hide/pagehide/offline signals
+are deterministic events, rather than physical OS suspension.

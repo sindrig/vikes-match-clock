@@ -19,10 +19,18 @@ import GoalScorerDialog from "../../src/controller/GoalScorerDialog";
 import PerimeterControl from "../../src/controller/PerimeterControl";
 import ResyncNotice from "../../src/controller/ResyncNotice";
 import ThemeEditorModal from "../../src/controller/theme/ThemeEditor";
+import AssetController from "../../src/controller/asset/AssetController";
+import TeamAssetController from "../../src/controller/asset/team/TeamAssetController";
+import HomeTeamQuickActions from "../../src/controller/HomeTeamQuickActions";
+import MediaManager from "../../src/controller/media/MediaManager";
+import QueuePicker from "../../src/controller/asset/queue/QueuePicker";
+import { useQueuePickerActions } from "../../src/controller/asset/queue/useQueuePickerActions";
+import { getPlayerAssetObject } from "../../src/controller/asset/team/assetHelpers";
 import { DEFAULT_THEME } from "../../src/constants";
 import { DEFAULT_BRIGHTNESS_AUTO_CONFIG } from "../../src/lib/autoBrightness";
 import type { CountdownCompletionObservation } from "../../src/lib/conditionalTransitions";
 import "../../src/index.css";
+import "rsuite/dist/rsuite.min.css";
 
 if (app.options.projectId !== "vikes-match-clock-test") {
   throw new Error("Session mutation fixture requires local emulators.");
@@ -37,6 +45,7 @@ const counts = {
   mediaWaiting: 0,
   succeeded: 0,
   failed: 0,
+  navigated: 0,
 };
 let api: Api;
 let local: LocalApi;
@@ -44,12 +53,32 @@ let retained: Api;
 let openScorer: () => void;
 let openClub: () => void;
 let openTheme: () => void;
+let preparePicker: () => void;
+let failPreparation = false;
+const observations: unknown[] = [];
+let stopObserving: () => void = () => undefined;
 let connected = false;
 onValue(ref(database, ".info/connected"), (snapshot) => {
   connected = snapshot.val() === true;
 });
-let mediaGate: Promise<void> | null = null;
-let releaseMedia: () => void = () => undefined;
+const mediaGates = new Map<
+  string,
+  { promise: Promise<void>; release: () => void }
+>();
+let holdAcknowledgements = false;
+const acknowledgements: {
+  received: boolean;
+  delivered: boolean;
+  status: string;
+  release?: () => void;
+}[] = [];
+const playlistResponses = new Map<
+  string,
+  (response: {
+    result: { items: { contentDetails: { videoId: string } }[] };
+  }) => void
+>();
+let activeMediaGate = "default";
 const originalAudited = firebaseDatabase.writeAudited;
 const originalAuditOnly = firebaseDatabase.writeAuditOnly;
 firebaseDatabase.writeAudited = (...args) => {
@@ -82,17 +111,48 @@ for (const name of ["put", "merge"] as const) {
   const original = server[name].bind(server);
   server[name] = (...args) => {
     counts.sdk.push(`${name}:${String(args[0])}`);
+    const callback = args[2] as ((...result: unknown[]) => void) | undefined;
+    if (
+      holdAcknowledgements &&
+      name === "merge" &&
+      typeof callback === "function"
+    ) {
+      const acknowledgement: (typeof acknowledgements)[number] = {
+        received: false,
+        delivered: false,
+        status: "pending",
+      };
+      acknowledgements.push(acknowledgement);
+      // Delay only delivery to the SDK. The real emulator still decides the
+      // outcome, commits state/audit atomically and delivers subscription echoes.
+      args[2] = (...result: unknown[]) => {
+        acknowledgement.received = true;
+        acknowledgement.status = String(result[0]);
+        acknowledgement.release = () => {
+          acknowledgement.delivered = true;
+          callback(...result);
+        };
+      };
+    }
     return original(...args);
   };
 }
 const originalDownload = storageHelpers.getDownloadURL;
-storageHelpers.getDownloadURL = async (path) => {
-  const result = await originalDownload(path);
-  if (mediaGate && (/\/players\//.test(path) || /\/club-logos\//.test(path))) {
-    counts.mediaWaiting++;
-    await mediaGate;
+storageHelpers.getDownloadURL = (path) => {
+  // A synchronous preparation fault (before a promise exists), separate from
+  // missing player photos, which intentionally fall back to text-only cards.
+  if (failPreparation && /\/players\//.test(path)) {
+    failPreparation = false;
+    throw new Error("Injected media preparation failure");
   }
-  return result;
+  const gate = mediaGates.get(activeMediaGate);
+  return originalDownload(path).then(async (result) => {
+    if (gate && (/\/players\//.test(path) || /\/club-logos\//.test(path))) {
+      counts.mediaWaiting++;
+      await gate.promise;
+    }
+    return result;
+  });
 };
 function hidden(value: boolean) {
   Object.defineProperty(document, "hidden", { configurable: true, value });
@@ -111,6 +171,60 @@ export const harness = {
     connected,
   }),
   counts,
+  holdAcknowledgements: () => {
+    holdAcknowledgements = true;
+  },
+  acknowledgements: () =>
+    acknowledgements.map(({ received, delivered, status }) => ({
+      received,
+      delivered,
+      status,
+    })),
+  releaseAcknowledgement: (index: number) => {
+    const acknowledgement = acknowledgements[index];
+    if (!acknowledgement?.release || acknowledgement.delivered)
+      throw new Error(`Acknowledgement ${String(index)} is not held.`);
+    acknowledgement.release();
+  },
+  installPlaylists: () => {
+    window.gapi = {
+      load: (_api, callback) => callback(),
+      client: {
+        init: () => Promise.resolve(),
+        request: ({ params }) =>
+          new Promise((resolve) => {
+            const id = params.playlistId;
+            if (!id) throw new Error("Missing playlist ID.");
+            playlistResponses.set(id, resolve);
+          }),
+      },
+    };
+  },
+  pendingPlaylists: () => [...playlistResponses.keys()],
+  releasePlaylist: (id: string, videoId: string) => {
+    const resolve = playlistResponses.get(id);
+    if (!resolve) throw new Error(`Playlist ${id} was not requested.`);
+    playlistResponses.delete(id);
+    resolve({ result: { items: [{ contentDetails: { videoId } }] } });
+  },
+  get commands() {
+    return api;
+  },
+  get retainedCommands() {
+    return retained;
+  },
+  observations,
+  observe: (location: string) => {
+    stopObserving();
+    observations.length = 0;
+    stopObserving = onValue(ref(database, `states/${location}`), (snapshot) => {
+      observations.push(snapshot.val());
+    });
+  },
+  failPreparation: () => {
+    failPreparation = true;
+  },
+  preparePicker: () => preparePicker(),
   reset: () => {
     counts.ordinary = 0;
     counts.auditOnly = 0;
@@ -118,6 +232,7 @@ export const harness = {
     counts.mediaWaiting = 0;
     counts.succeeded = 0;
     counts.failed = 0;
+    counts.navigated = 0;
   },
   login: (email: string, password: string) =>
     signInWithEmailAndPassword(auth, email, password).then(() => undefined),
@@ -144,14 +259,17 @@ export const harness = {
   // Pure SDK disconnect/reconnect, without browser offline/online events.
   disconnect: () => goOffline(database),
   reconnect: () => goOnline(database),
-  armMedia: () => {
-    mediaGate = new Promise((resolve) => {
-      releaseMedia = resolve;
+  armMedia: (id = "default") => {
+    let release: () => void = () => undefined;
+    const promise = new Promise<void>((resolve) => {
+      release = resolve;
     });
+    mediaGates.set(id, { promise, release });
+    activeMediaGate = id;
   },
-  releaseMedia: () => {
-    releaseMedia();
-    mediaGate = null;
+  releaseMedia: (id = "default") => {
+    mediaGates.get(id)?.release();
+    mediaGates.delete(id);
   },
   retain: () => {
     retained = api;
@@ -176,9 +294,8 @@ export const harness = {
       enabled: true,
     });
   },
-  queueRoundTrip: () => {
-    const id = api.createQueue("Fresh queue");
-    api.addItemsToQueue(id, [
+  queueRoundTrip: async () => {
+    const id = await api.createQueue("Fresh queue", [
       {
         type: "NO_IMAGE_PLAYER",
         key: "fresh-player",
@@ -193,8 +310,10 @@ export const harness = {
   rapidOrdinary: async () => {
     api.addGoal("home");
     api.addGoal("home");
-    const first = api.createQueue("First rapid queue");
-    const second = api.createQueue("Second rapid queue");
+    const [first, second] = await Promise.all([
+      api.createQueue("First rapid queue"),
+      api.createQueue("Second rapid queue"),
+    ]);
     for (const key of ["rapid-one", "rapid-two"]) {
       api.addItemsToQueue(first, [{ type: "NO_IMAGE_PLAYER", key, name: key }]);
     }
@@ -217,6 +336,16 @@ export const harness = {
       () => "accepted",
       () => "denied",
     ),
+  storageRead: (path: string) =>
+    storageHelpers.getDownloadURL(path).then(
+      () => "accepted",
+      () => "denied",
+    ),
+  storageWrite: (path: string) =>
+    storageHelpers.uploadBytes(path, new Uint8Array([1])).then(
+      () => "accepted",
+      () => "denied",
+    ),
 };
 export type SessionMutationHarness = typeof harness;
 declare global {
@@ -225,6 +354,23 @@ declare global {
   }
 }
 window.sessionMutationHarness = harness;
+
+function PreparedPicker() {
+  const { controller } = useFirebaseState();
+  const { listenPrefix } = useLocalState();
+  const { pending, selectAssets } = useQueuePickerActions();
+  useLayoutEffect(() => {
+    preparePicker = () =>
+      selectAssets([
+        getPlayerAssetObject({
+          listenPrefix,
+          teamName: "Víkingur R",
+          player: { id: 10, name: "Jón", number: 7 },
+        }),
+      ]);
+  }, [selectAssets, listenPrefix]);
+  return pending && <QueuePicker queues={controller.queues} {...pending} />;
+}
 
 function Controls() {
   const value = useFirebaseState();
@@ -239,6 +385,27 @@ function Controls() {
     openClub = () => setClub(true);
     openTheme = () => setTheme(true);
   }, [value, localValue]);
+  const queueFixture = new URLSearchParams(window.location.search).get(
+    "queues",
+  );
+  if (queueFixture)
+    return (
+      <>
+        <output data-testid="eligibility">{String(value.writeEligible)}</output>
+        <ResyncNotice />
+        {queueFixture === "team" && (
+          <TeamAssetController
+            previousView={() => {
+              counts.navigated++;
+            }}
+          />
+        )}
+        {queueFixture === "sub" && <HomeTeamQuickActions />}
+        {queueFixture === "asset" && <AssetController />}
+        {queueFixture === "media" && value.writeEligible && <MediaManager />}
+        {queueFixture === "prepared" && <PreparedPicker />}
+      </>
+    );
   return (
     <>
       <output data-testid="eligibility">{String(value.writeEligible)}</output>
