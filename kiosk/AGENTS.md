@@ -15,8 +15,12 @@ guide for command/platform changes; use the [task index](../docs/README.md).
 Production target: **Windows with MSVC**, Rust stable/Cargo, Visual Studio C++
 build tools and Windows SDK, plus **WebView2** (the installer embeds its
 bootstrapper). The runtime-link check needs PowerShell and Visual Studio's
-`dumpbin`. Node 22 runs probe tests; Python >= 3.11 runs release-preparation
-tests. CI uses Python 3.12 and installs/builds through the Tauri action.
+`dumpbin`. Node 22 runs probe tests.
+
+Release-preparation tests require **Python >= 3.11, Git and Bash on PATH**,
+including the PATH inherited by the Python process. CI runs these tests on
+**Ubuntu with Python 3.12**; the separate **Windows** job runs the Node/Rust
+tests and installs/builds through the Tauri action.
 
 From the repository root, these tests use local fixtures:
 

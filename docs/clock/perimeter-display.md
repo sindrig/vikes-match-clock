@@ -32,8 +32,13 @@ resolved only from the active Firebase Storage bucket and must include an
 immutable Storage `generation`. Legacy ad-layout records remain parseable for
 admin migration but are rejected by web playback until generations are
 backfilled. `PersistentMediaCache` keys entries by bucket, object path, and
-generation, replaces stale generations atomically, and reports quota or
-persistence failures without imposing an arbitrary playlist-size limit.
+generation. Persistent Cache Storage replacement is not atomic: after a
+successful download, old-generation entries for the same object are deleted
+before awaiting the new `cache.put()`, so a failed put can leave neither
+generation cached. This is separate from the prepared runtime swap described
+below, which retains active decoded media during preparation.
+Quota or persistence failures are reported without imposing an arbitrary
+playlist-size limit.
 Unauthenticated displays subscribe only to the public desired-state paths;
 daemon-owned `perimeter/{location}` telemetry subscriptions are started only
 for authenticated controllers so public screens do not generate permission
