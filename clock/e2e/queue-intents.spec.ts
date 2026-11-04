@@ -170,15 +170,16 @@ async function oneAudit(page: Page, action: string) {
   expect(event).toMatchObject({ uid, action });
   expect(event?.sessionId).toBeTruthy();
   expect(Math.abs((event?.timestamp ?? 0) - Date.now())).toBeLessThan(30000);
-  expect(
-    await page.evaluate(() => window.sessionMutationHarness.counts),
-  ).toMatchObject({
-    ordinary: 1,
-    auditOnly: 0,
-    sdk: ["merge:/"],
-    succeeded: 1,
-    failed: 0,
-  });
+  // The REST audit can arrive before the browser receives its SDK acknowledgement.
+  await expect
+    .poll(() => page.evaluate(() => window.sessionMutationHarness.counts))
+    .toMatchObject({
+      ordinary: 1,
+      auditOnly: 0,
+      sdk: ["merge:/"],
+      succeeded: 1,
+      failed: 0,
+    });
 }
 async function noAttempts(page: Page, before: unknown, otherBefore: unknown) {
   expect(
