@@ -836,7 +836,7 @@ describe("firebaseParsers", () => {
 
     it("parses currentAsset object", () => {
       const currentAsset = {
-        asset: { key: "a1", type: "image" },
+        asset: { key: "a1", type: "IMAGE" },
         time: 5000,
       };
       const data = {

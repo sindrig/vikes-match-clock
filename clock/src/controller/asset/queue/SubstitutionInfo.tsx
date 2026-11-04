@@ -5,11 +5,9 @@ const SubstitutionInfo = () => {
   const { controller } = useController();
   const { currentAsset } = controller;
 
-  if (!currentAsset) return null;
+  if (currentAsset?.asset.type !== "SUB") return null;
 
   const { subIn, subOut } = currentAsset.asset;
-  if (!subIn || !subOut) return null;
-
   const teamName = subIn.teamName || subOut.teamName || "";
 
   const formatPlayer = (name?: string, number?: number | string) => {

@@ -1,4 +1,21 @@
-import { isPlaybackOccurrenceId } from "../lib/playbackOccurrence";
+import {
+  isRecord,
+  parseAssetCollection,
+  parseCurrentAsset,
+  parsePenaltyCollection,
+  parseRoster,
+  parseViewPort,
+} from "./nestedParsers";
+
+export {
+  parseAsset,
+  parseAssetOverlay,
+  parseCurrentAsset,
+  parsePlayer,
+  parseRoster,
+  parseTwoMinPenalty,
+  parseViewPort,
+} from "./nestedParsers";
 import type {
   Match,
   InjuryTimeDisplayMode,
@@ -7,10 +24,7 @@ import type {
   ThemeConfig,
   CustomPreset,
   ClubOverride,
-  TwoMinPenalty,
-  Asset,
   MainScreenMediaAsset,
-  ViewPort,
   QueueState,
   PerimeterState,
   ScorerCelebrationStyle,
@@ -232,28 +246,13 @@ function isMetadataRecord(data: unknown): data is Record<string, unknown> {
   return data !== null && typeof data === "object" && !Array.isArray(data);
 }
 
-function screenDimension(value: unknown, fallback: number): number {
-  const number = typeof value === "string" ? Number(value) : value;
-  return typeof number === "number" && Number.isFinite(number) && number > 0
-    ? number
-    : fallback;
-}
-
 function parseVenueScreen(data: unknown): VenueScreen | null {
   if (!isMetadataRecord(data)) return null;
-  const { style, fontSize, ...metadata } = data;
-  const rawStyle = isMetadataRecord(style) ? style : {};
-  return {
-    ...metadata,
-    key: typeof data.key === "string" ? data.key : "",
-    name: typeof data.name === "string" ? data.name : "",
-    style: {
-      ...rawStyle,
-      width: screenDimension(rawStyle.width, 512),
-      height: screenDimension(rawStyle.height, 400),
-    },
-    ...(typeof fontSize === "string" ? { fontSize } : {}),
-  };
+  return parseViewPort(data, {
+    key: "",
+    name: "",
+    style: { width: 512, height: 400 },
+  });
 }
 
 export function parseVenue(data: unknown, key: string): Venue | null {
@@ -317,38 +316,10 @@ export function parseLocations(data: unknown): ListenersState | null {
   return { available: Object.keys(venues), venues, screens };
 }
 
-function parseTwoMinArray(arr: unknown): TwoMinPenalty[] {
-  if (!Array.isArray(arr)) return [];
-  const result: TwoMinPenalty[] = [];
-  for (const item of arr) {
-    if (
-      item &&
-      typeof item === "object" &&
-      "atTimeElapsed" in item &&
-      "key" in item &&
-      "penaltyLength" in item
-    ) {
-      result.push(item as TwoMinPenalty);
-    }
-  }
-  return result;
-}
-
-function parseAssetArray(arr: unknown): Asset[] {
-  if (!Array.isArray(arr)) return [];
-  const result: Asset[] = [];
-  for (const item of arr) {
-    if (item && typeof item === "object" && "key" in item && "type" in item) {
-      result.push(item as Asset);
-    }
-  }
-  return result;
-}
-
 export function parseMatch(data: unknown, defaultMatch: Match): Match | null {
-  if (!data || typeof data !== "object") return null;
+  if (!isRecord(data)) return null;
 
-  const raw = data as Record<string, unknown>;
+  const raw = data;
 
   return {
     ...defaultMatch,
@@ -366,9 +337,13 @@ export function parseMatch(data: unknown, defaultMatch: Match): Match | null {
       typeof raw.timeElapsed === "number"
         ? raw.timeElapsed
         : defaultMatch.timeElapsed,
-    halfStops: Array.isArray(raw.halfStops)
-      ? (raw.halfStops as number[])
-      : defaultMatch.halfStops,
+    halfStops:
+      raw.halfStops && typeof raw.halfStops === "object"
+        ? Object.values(raw.halfStops).filter(
+            (value: unknown): value is number =>
+              typeof value === "number" && Number.isFinite(value),
+          )
+        : defaultMatch.halfStops,
     homeTeam:
       typeof raw.homeTeam === "string" ? raw.homeTeam : defaultMatch.homeTeam,
     awayTeam:
@@ -393,8 +368,8 @@ export function parseMatch(data: unknown, defaultMatch: Match): Match | null {
     matchStartTime:
       typeof raw.matchStartTime === "string" ? raw.matchStartTime : undefined,
     ksiMatchId: typeof raw.ksiMatchId === "number" ? raw.ksiMatchId : undefined,
-    home2min: parseTwoMinArray(raw.home2min),
-    away2min: parseTwoMinArray(raw.away2min),
+    home2min: parsePenaltyCollection(raw.home2min),
+    away2min: parsePenaltyCollection(raw.away2min),
     timeout:
       typeof raw.timeout === "number" ? raw.timeout : defaultMatch.timeout,
     homeTimeouts:
@@ -451,39 +426,13 @@ function parseInjuryTimeDisplayMode(
   return defaultMatch.injuryTimeDisplayMode;
 }
 
-export function parseCurrentAsset(
-  data: unknown,
-): ControllerState["currentAsset"] {
-  if (!data || typeof data !== "object" || Array.isArray(data)) return null;
-  const raw = data as Record<string, unknown>;
-  if (!raw.asset || typeof raw.asset !== "object" || Array.isArray(raw.asset))
-    return null;
-  const asset = raw.asset as Record<string, unknown>;
-  if (typeof asset.key !== "string" || typeof asset.type !== "string")
-    return null;
-  const hasId = Object.prototype.hasOwnProperty.call(raw, "occurrenceId");
-  if (hasId && !isPlaybackOccurrenceId(raw.occurrenceId)) return null;
-  if (
-    raw.time != null &&
-    (typeof raw.time !== "number" || !Number.isFinite(raw.time) || raw.time < 0)
-  )
-    return null;
-  return {
-    asset: asset as unknown as Asset,
-    time: typeof raw.time === "number" ? raw.time : null,
-    ...(isPlaybackOccurrenceId(raw.occurrenceId)
-      ? { occurrenceId: raw.occurrenceId }
-      : {}),
-  };
-}
-
 export function parseController(
   data: unknown,
   defaultController: ControllerState,
 ): ControllerState | null {
-  if (!data || typeof data !== "object") return null;
+  if (!isRecord(data)) return null;
 
-  const raw = data as Record<string, unknown>;
+  const raw = data;
 
   return {
     ...defaultController,
@@ -503,17 +452,7 @@ export function parseController(
         ? raw.assetView
         : defaultController.assetView,
     view: typeof raw.view === "string" ? raw.view : defaultController.view,
-    roster:
-      raw.roster && typeof raw.roster === "object"
-        ? {
-            home: Array.isArray((raw.roster as { home?: unknown }).home)
-              ? (raw.roster as { home: ControllerState["roster"]["home"] }).home
-              : defaultController.roster.home,
-            away: Array.isArray((raw.roster as { away?: unknown }).away)
-              ? (raw.roster as { away: ControllerState["roster"]["away"] }).away
-              : defaultController.roster.away,
-          }
-        : defaultController.roster,
+    roster: parseRoster(raw.roster),
     currentAsset: parseCurrentAsset(raw.currentAsset),
     refreshToken:
       typeof raw.refreshToken === "string"
@@ -569,15 +508,12 @@ export function parseView(
   data: unknown,
   defaultView: ViewState,
 ): ViewState | null {
-  if (!data || typeof data !== "object") return null;
+  if (!isRecord(data)) return null;
 
-  const raw = data as Record<string, unknown>;
+  const raw = data;
 
   return {
-    vp:
-      raw.vp && typeof raw.vp === "object"
-        ? (raw.vp as ViewPort)
-        : defaultView.vp,
+    vp: parseViewPort(raw.vp, defaultView.vp),
     background:
       typeof raw.background === "string"
         ? raw.background
@@ -653,19 +589,27 @@ export function parseQueueMap(data: unknown): Record<string, QueueState> {
   const result: Record<string, QueueState> = {};
 
   for (const [key, value] of Object.entries(raw)) {
-    if (!value || typeof value !== "object") continue;
+    if (!isRecord(value)) continue;
 
-    const entry = value as Record<string, unknown>;
+    const entry = value;
 
     result[key] = {
+      ...entry,
       id: typeof entry.id === "string" ? entry.id : key,
       name: typeof entry.name === "string" ? entry.name : key,
-      items: parseAssetArray(entry.items),
+      items: parseAssetCollection(entry.items),
       autoPlay: typeof entry.autoPlay === "boolean" ? entry.autoPlay : false,
       imageSeconds:
-        typeof entry.imageSeconds === "number" ? entry.imageSeconds : 3,
+        typeof entry.imageSeconds === "number" &&
+        Number.isFinite(entry.imageSeconds) &&
+        entry.imageSeconds >= 0
+          ? entry.imageSeconds
+          : 3,
       cycle: typeof entry.cycle === "boolean" ? entry.cycle : false,
-      order: typeof entry.order === "number" ? entry.order : 0,
+      order:
+        typeof entry.order === "number" && Number.isFinite(entry.order)
+          ? entry.order
+          : 0,
     };
   }
 

@@ -1,31 +1,19 @@
 import { storageHelpers } from "../../../firebase";
 import assetTypes from "../AssetTypes";
-import { Player } from "../../../types";
-
-interface Overlay {
-  text: string;
-  blink?: boolean;
-  effect?: string;
-}
+import type {
+  AssetOverlay,
+  MotmAsset,
+  Player,
+  PlayerCardAsset,
+} from "../../../types";
 
 interface PlayerAssetParams {
   listenPrefix: string;
   player: Player;
   teamName: string;
-  overlay?: Overlay;
+  overlay?: AssetOverlay;
   preferExt?: string;
   preferType?: string;
-}
-
-interface PlayerAsset {
-  type: string;
-  key: string;
-  name: string;
-  number?: number | string;
-  role?: string;
-  overlay: Overlay;
-  teamName: string;
-  originalAssetType?: string;
 }
 
 export const getPlayerAssetObject = async ({
@@ -35,15 +23,15 @@ export const getPlayerAssetObject = async ({
   overlay,
   preferExt,
   preferType,
-}: PlayerAssetParams): Promise<PlayerAsset | null> => {
+}: PlayerAssetParams): Promise<PlayerCardAsset | null> => {
   if (!player.name || player.id === undefined) {
     return null;
   }
   const imageType = preferType || "png";
   const playerAssetObjectFromPromise = async (
     p: Promise<string>,
-    fallback: () => Promise<PlayerAsset | null>,
-  ): Promise<PlayerAsset | null> => {
+    fallback: () => Promise<PlayerCardAsset | null>,
+  ): Promise<PlayerCardAsset | null> => {
     try {
       return {
         type: assetTypes.PLAYER,
@@ -100,7 +88,7 @@ export const getMOTMAsset = async ({
   listenPrefix,
   player,
   teamName,
-}: MOTMParams): Promise<PlayerAsset | null> => {
+}: MOTMParams): Promise<MotmAsset | null> => {
   const playerAssetObject = await getPlayerAssetObject({
     listenPrefix,
     player,

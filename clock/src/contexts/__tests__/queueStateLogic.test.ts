@@ -13,8 +13,8 @@ function firebaseQueue(
     id: "q1",
     name: "Main Queue",
     items: [
-      { key: "a1", type: "image" },
-      { key: "a2", type: "video" },
+      { key: "a1", type: "IMAGE" },
+      { key: "a2", type: "VIDEO" },
     ],
     autoPlay: true,
     imageSeconds: 5,
@@ -24,8 +24,8 @@ function firebaseQueue(
   };
 }
 
-function makeAsset(key: string, type = "image"): Asset {
-  return { key, type };
+function makeAsset(key: string): Asset {
+  return { key, type: "IMAGE" };
 }
 
 function makeControllerState(
@@ -99,8 +99,8 @@ describe("parseQueueMap", () => {
 
   it("preserves asset details in queue items", () => {
     const items = [
-      { key: "a1", type: "image", url: "https://example.com/img.png" },
-      { key: "a2", type: "video", name: "Sponsor clip" },
+      { key: "a1", type: "IMAGE", url: "https://example.com/img.png" },
+      { key: "a2", type: "VIDEO", name: "Sponsor clip" },
     ];
     const data = { q1: firebaseQueue({ items }) };
     const result = parseQueueMap(data);
@@ -181,7 +181,7 @@ describe("parseQueueMap", () => {
   it("uses queue key as fallback for missing id and name", () => {
     const data = {
       q1: firebaseQueue(),
-      q2: { items: [{ key: "a1", type: "image" }] },
+      q2: { items: [{ key: "a1", type: "IMAGE" }] },
     };
     const result = parseQueueMap(data);
 
@@ -192,12 +192,13 @@ describe("parseQueueMap", () => {
     const data = {
       q1: firebaseQueue({
         items: [
-          { key: "a1", type: "image" },
+          { key: "a1", type: "IMAGE" },
           null,
           "invalid",
           { key: "a2" },
-          { type: "video" },
-          { key: "a3", type: "text" },
+          { type: "VIDEO" },
+          { key: "a3", type: "URL" },
+          { key: "unsupported", type: "text" },
         ],
       }),
     };

@@ -2,6 +2,7 @@ import React from "react";
 import { getBackground } from "../../constants";
 import { useView } from "../../contexts/FirebaseStateContext";
 import { isVideoUrl } from "../../utils/matchUtils";
+import { viewportStyle } from "../../lib/viewport";
 
 import "./Substitution.css";
 
@@ -26,7 +27,7 @@ const Substitution = ({
     console.error("Children should have length 2, received ", children);
   }
   const style: React.CSSProperties = {
-    ...vp.style,
+    ...viewportStyle(vp),
     ...getBackground(background),
   };
   return (

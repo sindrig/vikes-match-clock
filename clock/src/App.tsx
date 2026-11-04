@@ -36,6 +36,7 @@ import assetTypes from "./controller/asset/AssetTypes";
 import { isVideoUrl, resolveGoalBackground } from "./utils/matchUtils";
 import PerimeterDisplay from "./perimeter/PerimeterDisplay";
 import { FIREBASE_STORAGE_BUCKET } from "./firebase";
+import { viewportStyle } from "./lib/viewport";
 
 import "./App.css";
 
@@ -301,7 +302,7 @@ function App() {
             backgroundPosition: "center",
           }
         : {}),
-      ...vp.style,
+      ...viewportStyle(vp),
       ...themeCssVars,
     };
 
@@ -350,7 +351,7 @@ function App() {
           <div className="App" style={style}>
             {renderAppContents()}
             {asset ? (
-              <div className="overlay-container" style={vp.style}>
+              <div className="overlay-container" style={viewportStyle(vp)}>
                 <PlaybackAsset current={asset} />
               </div>
             ) : null}
@@ -454,7 +455,10 @@ function App() {
                     >
                       {renderAppContents()}
                       {asset ? (
-                        <div className="overlay-container" style={vp.style}>
+                        <div
+                          className="overlay-container"
+                          style={viewportStyle(vp)}
+                        >
                           <PlaybackAsset current={asset} />
                         </div>
                       ) : null}
@@ -487,7 +491,7 @@ function App() {
           <div className="App" style={style}>
             {renderAppContents()}
             {asset ? (
-              <div className="overlay-container" style={vp.style}>
+              <div className="overlay-container" style={viewportStyle(vp)}>
                 <PlaybackAsset current={asset} />
               </div>
             ) : null}

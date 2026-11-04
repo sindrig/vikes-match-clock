@@ -1068,7 +1068,7 @@ describe("FirebaseStateContext", () => {
           />
         </FirebaseStateProvider>,
       );
-      const asset = { type: "image", key: "asset-1" };
+      const asset = { type: "IMAGE", key: "asset-1" };
       act(() => {
         void controllerApi!.renderAsset(asset as unknown as Asset);
       });
@@ -3941,7 +3941,7 @@ describe("FirebaseStateContext integration", () => {
         view: "idle",
         roster: { home: [], away: [] },
         currentAsset: {
-          asset: { type: "image", key: "asset-1" },
+          asset: { type: "IMAGE", key: "asset-1" },
           time: 1,
         },
         refreshToken: "",

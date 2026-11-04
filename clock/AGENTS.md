@@ -23,6 +23,8 @@ Key files:
 - `FirebaseStateContext.tsx`: Main state provider with Firebase subscriptions and write operations
 - `LocalStateContext.tsx`: Local settings (auth, listen prefix) with localStorage persistence
 - `firebaseParsers.ts`: Type-safe runtime validators for Firebase snapshot data
+- `nestedParsers.ts`: Canonical structural asset/current playback, roster/player,
+  penalty and viewport parsers; shared discriminated asset model in `types.ts`
 - `firebase.ts`: Firebase initialization with emulator support
 - `firebaseDatabase.ts`: Low-level Firebase write operations
 
@@ -227,8 +229,9 @@ eligibility (also checked on transaction retries) but do NOT use
 re-validate the observed generation precondition and commit the mutation, then
 append exactly one audit record via `firebaseDatabase.writeAuditOnly` (audit
 only, no state). A transaction returning `undefined` aborts (obsolete/duplicate
-attempt). The transaction's returned node strips `undefined` optional fields so
-Firebase does not reject the write.
+attempt). The transaction applies only its audited diff to the raw authoritative
+node, omitting undefined update values. Unchanged parsed/defaulted collections
+and unknown metadata are not written back as an incidental migration.
 
 **Retry-safe commit** — the CAS helpers (`applyMatchConditionalTransition`,
 `applyControllerConditionalTransition` in `FirebaseStateContext.tsx`) treat the
@@ -1128,10 +1131,10 @@ token, or audit event is created by band behavior (regression e2e:
   yield a valid identity**, otherwise no band renders.
 - Any other type, `null` current asset, or any invalid identity drops the
   band and the base ad deck shows through.
-- Derivation validates runtime object and field types (including both SUB
-  sides) because the controller subscription does not deeply parse assets.
-  Malformed names, image keys, team names, or shirt numbers yield no band
-  rather than throwing from the display effect.
+- Structural validation (including both leaf SUB cards) uses the canonical
+  current-asset parser shared with the controller subscription. Derivation
+  adds the band's name/number/team presentation restrictions downstream.
+  Invalid identities yield no band rather than throwing from the display.
 
 **Image chain** (`perimeter/bandSource.ts`, `PlayerBandSourceLoader`): the
 identity's own image reference (a download URL, fetched through the
@@ -1307,6 +1310,23 @@ Local settings (auth, listen prefix) are stored in `localStorage` via `LocalStat
 ### 1. The Asset System (`src/controller/asset/`)
 
 The "Asset" system is a flexible overlay engine for non-match content.
+
+`types.ts` owns the seven discriminated asset variants shared by producers and
+renderers. `contexts/nestedParsers.ts` validates their consumed fields, nested
+overlays, current playback, players/rosters, penalties and viewport dimensions
+at ingestion; `firebaseParsers.ts` composes/re-exports that boundary. Wrong
+non-null field types reject only their owning entry. Firebase arrays and
+object-shaped collections retain valid siblings; optional null player/card
+fields normalize to absence, unnamed manual players to an empty name, and
+missing/null playback duration to null. Manual string IDs, foreign names,
+non-digit shirt text, coaches and partial player cards remain structurally
+valid. Unknown entry metadata survives accepted read/write round trips.
+Substitution leaf commands use the original Firebase roster child keys,
+retained outside the serialized model, rather than filtered array indexes.
+Readers do not repair persisted state or generate playback IDs. Presentation
+limits remain downstream; viewport CSS projection omits structured metadata
+without deleting it from the admin model. See the
+[producer/reader inventory and normalization policy](../docs/nested-state-boundary.md).
 
 **Intent**: Display advertisements, starting lineups, player cards, substitutions, or custom text/videos over the scoreboard or during idle time.
 

@@ -22,6 +22,8 @@ import ClubOverrideForm from "../controller/ClubOverrideForm";
 import ThemeEditorModal from "../controller/theme/ThemeEditor";
 import GoalScorerDialog from "../controller/GoalScorerDialog";
 import { getPlayerAssetObject } from "../controller/asset/team/assetHelpers";
+import { PlaybackAsset, useDeferredAsset } from "../controller/asset/Asset";
+import Team from "../controller/asset/team/Team";
 import { useHomeTeamQuickActions } from "../controller/asset/team/useHomeTeamQuickActions";
 import { useQueuePickerActions } from "../controller/asset/queue/useQueuePickerActions";
 import { storageHelpers } from "../firebase";
@@ -30,6 +32,7 @@ import { firebaseDatabase } from "../firebaseDatabase";
 import { DEFAULT_BRIGHTNESS_AUTO_CONFIG } from "../lib/autoBrightness";
 import { MutationRejectedError } from "../lib/mutationSession";
 import { minimalPerimeterDisplay } from "../lib/venue.fixtures";
+import MatchLifecycle from "../match/MatchLifecycle";
 import type { ClubOverride } from "../types";
 import {
   FirebaseStateProvider,
@@ -117,7 +120,7 @@ const substitution = {
   side: "home" as const,
   outgoing: player,
   incoming: benchPlayer,
-  asset: { type: "SUB", key: "sub", subIn: asset, subOut: asset },
+  asset: { type: "SUB" as const, key: "sub", subIn: asset, subOut: asset },
 };
 const override: ClubOverride = {
   name: "Draft Club",
@@ -2286,4 +2289,173 @@ it("fails a conditional command before submission when audit identity is unavail
   });
   noAttempts();
   expect(read("states/A/match/countdown")).toBe(true);
+});
+
+function NestedDisplay() {
+  const { controller } = useFirebaseState();
+  const current = useDeferredAsset(controller.currentAsset);
+  return (
+    <>
+      {current && <PlaybackAsset current={current} />}
+      <Team teamName="homeTeam" />
+      <MatchLifecycle />
+    </>
+  );
+}
+
+describe("nested data at subscription and conditional-write boundaries", () => {
+  it("renders a mixed roster and rejects malformed media/penalties with no SDK or audit attempt", async () => {
+    write("states/A/controller/currentAsset", {
+      asset: { ...asset, background: { not: "a media URL" } },
+      time: 0.001,
+    });
+    write("states/A/controller/roster/home", [
+      player,
+      null,
+      { name: { invalid: true }, number: 9 },
+      { name: "Foreign coach", id: "foreign-coach", role: "Þjálfari" },
+    ]);
+    write("states/A/match/home2min", [
+      { key: "bad", atTimeElapsed: [], penaltyLength: false },
+      { key: "good", atTimeElapsed: 0, penaltyLength: 120000 },
+    ]);
+    const before = structuredClone(data);
+    mount(<NestedDisplay />);
+    await waitFor(() => expect(currentApi.writeEligible).toBe(true));
+    expect(screen.getByText("Foreign coach")).toBeInTheDocument();
+    expect(currentApi.controller.roster.home).toHaveLength(2);
+    expect(currentApi.match.home2min).toHaveLength(1);
+    await act(() => new Promise((resolve) => setTimeout(resolve, 250)));
+    noAttempts();
+    expect(data).toEqual(before);
+  });
+
+  it.each([
+    [
+      null,
+      { name: {}, number: 2 },
+      { ...player, note: { source: "old" } },
+      benchPlayer,
+    ],
+    {
+      7: { ...player, note: { source: "old" } },
+      10: { name: {} },
+      25: benchPlayer,
+    },
+    {
+      outgoing: { ...player, note: { source: "old" } },
+      broken: false,
+      incoming: benchPlayer,
+    },
+  ])(
+    "writes substitution flags at original Firebase child keys: %j",
+    async (players) => {
+      write("states/A/controller/roster/home", players);
+      mount();
+      clearAttempts();
+      await act(async () => {
+        await currentApi.appendSubstitutionAndActivate(substitution);
+      });
+      const offKey = Array.isArray(players)
+        ? "2"
+        : "7" in players
+          ? "7"
+          : "outgoing";
+      const onKey = Array.isArray(players)
+        ? "3"
+        : "25" in players
+          ? "25"
+          : "incoming";
+      const changes = vi.mocked(firebaseDatabase.writeAudited).mock
+        .calls[0]![2];
+      expect(changes).toMatchObject({
+        [`roster/home/${offKey}/show`]: false,
+        [`roster/home/${onKey}/show`]: true,
+      });
+      expect(read(`states/A/controller/roster/home/${offKey}/show`)).toBe(
+        false,
+      );
+      expect(read(`states/A/controller/roster/home/${onKey}/show`)).toBe(true);
+      expect(read(`states/A/controller/roster/home/${offKey}/note`)).toEqual({
+        source: "old",
+      });
+      expect(firebaseDatabase.writeAudited).toHaveBeenCalledTimes(1);
+      expect(runTransaction).not.toHaveBeenCalled();
+    },
+  );
+
+  it("preserves raw unrelated collections and metadata during a valid legacy completion", async () => {
+    write("states/A/controller", {
+      playing: false,
+      currentAsset: { asset, time: null, annotation: { source: "legacy" } },
+      roster: {
+        home: { 9: player, 15: { name: {} } },
+        away: { 40: benchPlayer },
+        note: "keep",
+      },
+      queues: {
+        saved: {
+          items: { 4: asset, 9: { type: "SUB", key: "bad" } },
+          note: { source: "saved" },
+        },
+        corrupt: [],
+      },
+      custom: { revision: 17 },
+    });
+    const before = structuredClone(read("states/A/controller"));
+    mount();
+    clearAttempts();
+    await act(async () => {
+      expect(
+        await currentApi.completeAssetIfCurrent({
+          occurrenceId: null,
+          assetKey: asset.key,
+          time: null,
+          activeQueueId: null,
+          playing: false,
+        }),
+      ).toBe(true);
+    });
+    expect(read("states/A/controller")).toEqual({
+      ...object(before),
+      currentAsset: null,
+    });
+    expect(firebaseDatabase.writeAuditOnly).toHaveBeenCalledExactlyOnceWith(
+      "A",
+      "controller",
+      { currentAsset: null },
+      expect.objectContaining({ action: "controller.complete-asset" }),
+    );
+  });
+
+  it("does not rewrite a sparse penalty collection when completing a countdown", async () => {
+    write("states/A/match", {
+      started: 100,
+      countdown: true,
+      halftimeCountdown: false,
+      home2min: {
+        9: { key: "p", atTimeElapsed: 0, penaltyLength: 120000, note: "keep" },
+        40: { invalid: true },
+      },
+      custom: { source: "legacy" },
+    });
+    const before = object(structuredClone(read("states/A/match")));
+    mount();
+    clearAttempts();
+    await act(async () => {
+      expect(
+        await currentApi.completeCountdownIfCurrent({
+          started: 100,
+          countdown: true,
+          halftimeCountdown: false,
+        }),
+      ).toBe(true);
+    });
+    expect(read("states/A/match")).toEqual({
+      ...before,
+      started: 0,
+      countdown: false,
+    });
+    expect(firebaseDatabase.writeAuditOnly).toHaveBeenCalledTimes(1);
+  });
 });

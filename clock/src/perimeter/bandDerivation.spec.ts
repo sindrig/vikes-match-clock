@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { bandRequestKey, deriveBandRequest } from "./bandDerivation";
-import type { CurrentAsset } from "../types";
 
-function assetOf(asset: CurrentAsset["asset"]): CurrentAsset {
+function assetOf(asset: unknown) {
   return { asset, time: null };
 }
 
 describe("deriveBandRequest", () => {
   const validPlayer = {
     type: "PLAYER",
+    key: "https://example.com/player.png",
     name: "Jón",
     number: 7,
     teamName: "Víkingur R",
@@ -24,6 +24,19 @@ describe("deriveBandRequest", () => {
   ])(
     "rejects malformed identity fields in players and both SUB sides: %j",
     (invalid) => {
+      expect(deriveBandRequest({ asset: validPlayer })).toMatchObject({
+        kind: "player",
+      });
+      expect(
+        deriveBandRequest({
+          asset: {
+            type: "SUB",
+            key: "sub",
+            subIn: validPlayer,
+            subOut: validPlayer,
+          },
+        }),
+      ).toMatchObject({ kind: "substitution" });
       const player = { ...validPlayer, ...invalid };
       expect(deriveBandRequest({ asset: player })).toBeNull();
       for (const side of ["subIn", "subOut"]) {
@@ -31,6 +44,7 @@ describe("deriveBandRequest", () => {
           deriveBandRequest({
             asset: {
               type: "SUB",
+              key: "https://example.com/player.png",
               subIn: validPlayer,
               subOut: validPlayer,
               [side]: player,
@@ -51,6 +65,7 @@ describe("deriveBandRequest", () => {
           deriveBandRequest({
             asset: {
               type: "SUB",
+              key: "https://example.com/player.png",
               subIn: validPlayer,
               subOut: validPlayer,
               [side]: value,
@@ -93,6 +108,7 @@ describe("deriveBandRequest", () => {
       deriveBandRequest(
         assetOf({
           type: "NO_IMAGE_PLAYER",
+          key: "custom-10-Jón",
           name: "Jón",
           number: "10",
           teamName: "Víkingur R",
@@ -176,6 +192,7 @@ describe("deriveBandRequest", () => {
     const request = deriveBandRequest(
       assetOf({
         type: "PLAYER",
+        key: "https://example.com/photo.png",
         name: "Jón",
         number: " 7 ",
         teamName: "Víkingur R",
@@ -192,6 +209,7 @@ describe("deriveBandRequest", () => {
       deriveBandRequest(
         assetOf({
           type: "PLAYER",
+          key: "https://example.com/player.png",
           name: "Jón",
           teamName: "Víkingur R",
         }),
@@ -204,6 +222,7 @@ describe("deriveBandRequest", () => {
       deriveBandRequest(
         assetOf({
           type: "PLAYER",
+          key: "https://example.com/player.png",
           name: "Jón",
           number: 12345,
           teamName: "Víkingur R",
@@ -217,6 +236,7 @@ describe("deriveBandRequest", () => {
       deriveBandRequest(
         assetOf({
           type: "PLAYER",
+          key: "https://example.com/player.png",
           name: "   ",
           number: 7,
           teamName: "Víkingur R",
@@ -230,6 +250,7 @@ describe("deriveBandRequest", () => {
       deriveBandRequest(
         assetOf({
           type: "PLAYER",
+          key: "https://example.com/player.png",
           name: "x".repeat(81),
           number: 7,
           teamName: "Víkingur R",
@@ -243,6 +264,7 @@ describe("deriveBandRequest", () => {
       deriveBandRequest(
         assetOf({
           type: "PLAYER",
+          key: "https://example.com/player.png",
           name: "Jón",
           number: 7,
         }),
@@ -255,6 +277,7 @@ describe("deriveBandRequest", () => {
       deriveBandRequest(
         assetOf({
           type: "PLAYER",
+          key: "https://example.com/player.png",
           name: "Jón",
           number: 7,
           teamName: "Víkingur R",
@@ -311,6 +334,7 @@ describe("deriveBandRequest", () => {
           key: "sub-key",
           subIn: {
             type: "PLAYER",
+            key: "https://example.com/player.png",
             name: "Jón",
             number: 7,
             teamName: "Víkingur R",
@@ -328,12 +352,14 @@ describe("deriveBandRequest", () => {
           key: "sub-key",
           subIn: {
             type: "PLAYER",
+            key: "https://example.com/player.png",
             name: "Jón",
             number: 7,
             teamName: "Víkingur R",
           },
           subOut: {
             type: "PLAYER",
+            key: "https://example.com/player.png",
             name: "Siggi",
             number: "12a",
             teamName: "Víkingur R",
