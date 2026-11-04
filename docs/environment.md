@@ -13,7 +13,7 @@ unless explicitly chosen by the operator.
 | API schema export, health and mocked tests      | None; isolated Python environment                                                                         | Real match/weather requests require the API access described below.                                                                                      |
 | Live API match/weather requests                 | AWS SDK credential chain with access to the required SSM parameters                                       | The API process fetches keys lazily from SSM; it does not load keys from dotenv.                                                                         |
 | AWS staging upload/deployment                   | Approved AWS CLI credentials plus staging bucket/distribution metadata                                    | CI uses OIDC. A manual operator supplies an existing session/profile or approved credential file.                                                        |
-| Gateway daemon/hardware                         | Operator-supplied Firebase service account, optional overlay SSH key and Vnnox credential                 | Separate host installation and hardware authorization; never required for frontend/emulator work.                                                        |
+| Gateway daemon/hardware                         | Operator-supplied Firebase service account and Vnnox credential                                           | Separate host installation and hardware authorization; never required for frontend/emulator work.                                                        |
 
 ## Loaders and file formats
 
@@ -188,13 +188,13 @@ recovery or general bootstrap step. See [infrastructure guidance](../infra/AGENT
 
 Gateway credentials are independent of staging browser and AWS deploy access.
 Ask the gateway/project maintainer for the approved Firebase service-account
-file and, where used, overlay SSH key and current device login from the
+file and current Vnnox device login from the
 existing credential store. Do not assume a vendor/default login or generate
 replacement credentials as a missing-file fallback.
 
 Follow [gateway installation/configuration](../perimeter-control/README.md#prerequisites)
 only when host/service and hardware work is authorized. The installer takes
-explicit credential file paths, installs them under `/etc/perimeter-control/`
+an explicit service-account file path, installs it under `/etc/perimeter-control/`
 and starts a daemon that can apply live state. For brightness, configure the
 retrieved username and either `PERIMETER_VNNOX_PASSWORD_SOURCE=env` with
 `PERIMETER_VNNOX_PASSWORD`, or `=file` with
@@ -203,3 +203,9 @@ environment example documents the remaining device identity requirements;
 brightness stays disabled until opted in. Do not start the daemon to check
 credential presence. Any credential previously exposed in documentation
 needs a separate owner assessment; this contract does not rotate credentials.
+
+All venues use browser media playback. The gateway retains physical brightness
+and requires Node >= 22 plus the pinned pnpm through Corepack. It no longer
+requires media-host SSH access or an asset cache. Existing unused keys, caches,
+media and compatibility records are preserved; retirement does not authorize
+cleanup or hardware qualification. Keep the Vnnox/UCenter connectivity route.

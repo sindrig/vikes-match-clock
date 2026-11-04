@@ -309,6 +309,17 @@ retained).
 
 ### Perimeter Control
 
+All venues are **web-only**; Resolume is unsupported. The gateway retirement
+(#240) leaves browser playback, media/compatibility records, kiosk and CORS
+tooling intact. `perimeter-control/` now runs only physical Vnnox brightness,
+the optional sun/weather scheduler and Firebase listener recovery. It no longer
+publishes media previews, overlay/ad-layout/import status or overlay geometry.
+Existing telemetry remains untouched, including active brightness status and
+calibration. Any Resolume execution details below describe historical behavior
+or remaining legacy frontend/Functions consumers pending #241; do not recreate
+the media executor or use it as a rollback target. Hardware qualification is
+**HOLD**. See [the gateway guide](../perimeter-control/README.md).
+
 #### Web Perimeter Display
 
 The local display target is persisted separately from Firebase in
@@ -360,6 +371,7 @@ All venues use the web renderer. The fourth Firebase state subtree,
 `states/{location}/perimeter`, carries the admin-managed `enabled` flag and
 operator-controlled `state: "on" | "off"`. `parsePerimeterState()` validates
 both; `setPerimeterState()` writes only the desired power state.
+The power state also gates automatic physical brightness in the gateway.
 
 `PerimeterControl.tsx` is the standalone management page for a venue with a
 published web mapping. Venues without a valid mapping retain the settings
@@ -381,6 +393,20 @@ Entering match view from idle turns the perimeter on; returning to idle turns
 it off, only when enabled and after initial readiness. The transition baseline
 still prevents commands on initial load or venue changes. All writes retain
 the existing Firebase subscription, auditing, and write-eligibility behavior.
+
+**Gateway** (`perimeter-control/` at repo root): the systemd-managed Node >= 22
+service authenticates using the same Firebase service-account path and consumes
+the power state through the Admin SDK's WebSocket transport. Valid changes feed
+the automatic-brightness on/off gate; browser displays handle media playback.
+The periodic listener refresh republishes the last brightness status without
+replaying device writes. Manual/automatic brightness, weather fallback,
+calibration and the serialized snapshot → write → verify → restore worker
+remain intact. Shutdown stops scheduling and awaits an irreversible write's
+verification/restoration, bounded by the existing 30-second process grace.
+No legacy media flag can enable an executor. The installer uses pinned pnpm
+and a frozen lockfile, preserves `/etc/perimeter-control/` configuration, and
+prunes only the five retired installed media modules. See
+`perimeter-control/README.md` for installation and operation.
 
 This is frontend retirement **Phase 1 of #241**. The independent Functions
 deployment must retain the preparation service until this client has rolled
@@ -2153,6 +2179,7 @@ no-ops for drafts lacking the expected logical screens. See
 remain historical references. Runtime mappings now accept only
 `renderer: "web"`; missing/invalid mappings are unconfigured, with no inferred
 geometry.
+Gateway retirement does not publish mapping changes or qualify physical output.
 
 Public Storage reads are limited to `{location}/perimeter/`,
 `{location}/perimeter-overlays/`, the venue crest (`{location}/crest.png`),
@@ -2200,6 +2227,8 @@ venue's web mapping so the selector stops offering Perimeter, then select a
 qualified display configuration. Missing mappings remain unconfigured and do
 not activate another playback path. Do not delete the prior cached revision
 until the replacement has been qualified.
+The retired Resolume executor is not a rollback target. Keep the Vnnox/UCenter
+route available for physical brightness.
 
 **Storage CORS (one-time bucket configuration)**: unlike `<img>` tags elsewhere
 in the app, the perimeter media loader downloads via `fetch()` into Cache

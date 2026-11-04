@@ -1,5 +1,5 @@
 [Unit]
-Description=Perimeter Resolume control (vikuti perimeter LEDs)
+Description=Perimeter brightness gateway (Vnnox perimeter LEDs)
 Wants=network-online.target
 After=network-online.target
 
@@ -12,9 +12,6 @@ Environment=HOME=/tmp
 ExecStart=@NODE_BIN@ /opt/perimeter-control/index.js
 Restart=always
 RestartSec=5
-
-# The overlay asset cache must stay writable under ProtectSystem=strict.
-ReadWritePaths=/var/cache/perimeter-control
 
 # Hardening. Note: MemoryDenyWriteExecute is intentionally omitted because
 # Node/V8 needs to allocate writable+executable memory for JIT compilation.

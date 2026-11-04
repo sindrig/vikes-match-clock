@@ -3,19 +3,18 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Perimeter Resolume control daemon (Víkin perimeter LEDs)",
+  "description": "Perimeter brightness gateway (Vnnox, Firebase and sun/weather prediction)",
+  "packageManager": "pnpm@12.16.1",
   "engines": {
-    "node": ">=18.17"
+    "node": ">=22"
   },
   "scripts": {
+    "preinstall": "node --input-type=module -e \"if (!process.env.npm_config_user_agent?.startsWith('pnpm/')) { console.error('Use pnpm to install perimeter-control'); process.exit(1); }\"",
     "start": "node index.js",
-    "test": "node --test"
+    "test": "node --test --test-concurrency=1"
   },
   "dependencies": {
-    "@google-cloud/storage": "^7.22.0",
     "firebase-admin": "^14.2.0",
-    "jpeg-js": "^0.4.4",
-    "pngjs": "^7.0.0",
     "suncalc": "1.9.0"
   }
 }
