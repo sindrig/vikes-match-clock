@@ -185,7 +185,7 @@ describe("PerimeterMediaPairs", () => {
         ...(type === "VIDEO" ? { loop: true } : {}),
       });
       expect(shown?.key).toBeTypeOf("string");
-      expect(shown?.key).not.toBe(asset.key);
+      expect(shown?.key).toBe(asset.key);
       expect(mockSetPerimeterOverlay).toHaveBeenCalledWith(
         expect.objectContaining({
           columns: [{ durationMs: 10000, files: pair.files }],
@@ -193,7 +193,7 @@ describe("PerimeterMediaPairs", () => {
       );
       const firstKey: unknown = mockShowItemNow.mock.calls[0]?.[0];
       fireEvent.click(screen.getByRole("button", { name: "Sýna" }));
-      expect(mockShowItemNow.mock.calls[1]?.[0]).not.toEqual(firstKey);
+      expect(mockShowItemNow.mock.calls[1]?.[0]).toEqual(firstKey);
     },
   );
 

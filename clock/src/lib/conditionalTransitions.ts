@@ -1,18 +1,19 @@
 import { Match, ControllerState } from "../types";
+import { matchesPlaybackOccurrence } from "./playbackOccurrence";
 
 // Conditional automatic-transition primitives.
 //
 // Every automatic lifecycle event (countdown completion, half-stop, timeout
 // expiry, penalty expiry, timed-asset completion) is expressed as a
 // { precondition, transition } pair. The precondition pins the transition to
-// the exact authoritative generation the caller observed, using EXISTING
-// identities only:
+// the exact authoritative generation the caller observed, using existing
+// identities for match timers, and a dedicated playback occurrence:
 //
 //   - countdown/half-stop: `started` + `countdown` + `halftimeCountdown`
 //   - timeout: the `timeout` timestamp
 //   - penalty: the penalty key + creation data (`atTimeElapsed`,
 //     `penaltyLength`)
-//   - timed asset: the current asset identity + active queue
+//   - timed asset: occurrence ID + current asset and queue context
 //
 // A precondition that fails against current authoritative state means the
 // transition is obsolete (a newer generation started) and MUST leave state
@@ -84,6 +85,9 @@ export function penaltyExpiryPrecondition(
 }
 
 export interface TimedAssetCompletionObservation {
+  // Explicit null represents validated legacy playback. Missing/invalid IDs
+  // are never inferred to be legacy observations.
+  occurrenceId: string | null;
   assetKey: string;
   time: number | null;
   activeQueueId: string | null;
@@ -92,13 +96,19 @@ export interface TimedAssetCompletionObservation {
 
 export function timedAssetCompletionPrecondition(
   observed: TimedAssetCompletionObservation,
-): (prev: ControllerState) => boolean {
-  return (prev) => {
+): (prev: ControllerState, rawData: unknown) => boolean {
+  return (prev, rawData) => {
     const current = prev.currentAsset;
+    if (!rawData || typeof rawData !== "object") return false;
+    const raw = rawData as Record<string, unknown>;
     return (
       !!current &&
+      matchesPlaybackOccurrence(raw.currentAsset, observed.occurrenceId) &&
       current.asset.key === observed.assetKey &&
       current.time === observed.time &&
+      (raw.activeQueueId === undefined ? null : raw.activeQueueId) ===
+        observed.activeQueueId &&
+      (raw.playing === undefined ? false : raw.playing) === observed.playing &&
       prev.activeQueueId === observed.activeQueueId &&
       prev.playing === observed.playing
     );

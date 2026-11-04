@@ -58,7 +58,7 @@ function makeQueue(overrides: Partial<QueueState> = {}): QueueState {
 }
 
 let getStateShowingNextAsset:
-  | ((state: ControllerState) => ControllerState)
+  | ((state: ControllerState, occurrenceId: string) => ControllerState)
   | undefined;
 
 try {
@@ -402,7 +402,7 @@ describe.skipIf(!getStateShowingNextAsset)(
   "getStateShowingNextAsset (queue-aware)",
   () => {
     function nextAsset(state: ControllerState): ControllerState {
-      return getStateShowingNextAsset!(state);
+      return getStateShowingNextAsset!(state, "selected-occurrence");
     }
 
     it("is a no-op when activeQueueId is null", () => {

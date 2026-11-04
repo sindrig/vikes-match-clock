@@ -177,8 +177,8 @@ const PerimeterMediaPairs: React.FC = () => {
   const showPair = (pair: PerimeterMediaPair) => {
     if (!canMutate) return;
     if (pair.mainScreenAsset) {
-      // A new playback identity restarts even the same video on repeated Sýna.
-      showItemNow({ ...pair.mainScreenAsset, key: crypto.randomUUID() });
+      // The selection writer assigns playback identity; library media stays stable.
+      showItemNow(pair.mainScreenAsset);
     }
     void setPerimeterOverlay({
       version: 1,

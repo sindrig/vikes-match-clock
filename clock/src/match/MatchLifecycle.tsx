@@ -260,7 +260,12 @@ const MatchLifecycle = () => {
       assetDueTime.current = null;
       return;
     }
-    const generation = `${currentAsset.asset.key}:${currentAsset.time}:${controller.activeQueueId}`;
+    const generation = JSON.stringify([
+      currentAsset.occurrenceId === undefined ? "legacy" : "identified",
+      currentAsset.occurrenceId ?? currentAsset.asset.key,
+      currentAsset.time,
+      controller.activeQueueId,
+    ]);
     if (assetGeneration.current !== generation) {
       assetGeneration.current = generation;
       assetDueTime.current = getServerTime() + currentAsset.time * 1000;
@@ -277,13 +282,18 @@ const MatchLifecycle = () => {
     if (getServerTime() >= (assetDueTime.current ?? Infinity)) {
       inFlightAsset.current = generation;
       void completeAssetIfCurrent({
+        occurrenceId:
+          currentAsset.occurrenceId === undefined
+            ? null
+            : currentAsset.occurrenceId,
         assetKey: currentAsset.asset.key,
         time: currentAsset.time,
         activeQueueId: controller.activeQueueId,
         playing: controller.playing,
       }).then((committed) => {
-        inFlightAsset.current = null;
-        if (committed) firedAsset.current = generation;
+        if (inFlightAsset.current === generation) inFlightAsset.current = null;
+        if (committed && assetGeneration.current === generation)
+          firedAsset.current = generation;
       });
     }
   }, [

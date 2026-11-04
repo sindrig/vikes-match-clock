@@ -16,7 +16,7 @@ import MatchActions from "./controller/MatchActions";
 import MatchCountdownDisplay from "./controller/MatchCountdownDisplay";
 import HomeTeamQuickActions from "./controller/HomeTeamQuickActions";
 import RefreshHandler from "./controller/RefreshHandler";
-import AssetComponent, { useDeferredAsset } from "./controller/asset/Asset";
+import { PlaybackAsset, useDeferredAsset } from "./controller/asset/Asset";
 import PlaybackBar from "./controller/asset/queue/PlaybackBar";
 import SubstitutionInfo from "./controller/asset/queue/SubstitutionInfo";
 import GoalScorerDialog from "./controller/GoalScorerDialog";
@@ -351,7 +351,7 @@ function App() {
             {renderAppContents()}
             {asset ? (
               <div className="overlay-container" style={vp.style}>
-                <AssetComponent asset={asset.asset} time={asset.time} />
+                <PlaybackAsset current={asset} />
               </div>
             ) : null}
           </div>
@@ -455,10 +455,7 @@ function App() {
                       {renderAppContents()}
                       {asset ? (
                         <div className="overlay-container" style={vp.style}>
-                          <AssetComponent
-                            asset={asset.asset}
-                            time={asset.time}
-                          />
+                          <PlaybackAsset current={asset} />
                         </div>
                       ) : null}
                     </div>
@@ -491,7 +488,7 @@ function App() {
             {renderAppContents()}
             {asset ? (
               <div className="overlay-container" style={vp.style}>
-                <AssetComponent asset={asset.asset} time={asset.time} />
+                <PlaybackAsset current={asset} />
               </div>
             ) : null}
           </div>

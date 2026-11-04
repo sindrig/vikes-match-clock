@@ -146,8 +146,10 @@ and paired main-screen/perimeter overlay controls are not queue-assembly
 chains. Their existing ownership remains. Storage preparation and its existing
 fallbacks are preserved; these queue commands neither upload nor delete media.
 Version-1/2 perimeter media, saved pairs and venue mappings are unaffected.
-Playback occurrence identity (#244), CAS generations/latches and the inherited
-unchanged-reconnect stalls described above remain separate work.
+Playback occurrence identity uses the [bounded occurrence protocol](playback-occurrences.md).
+Queue metadata/activation preserves current playback identity, and all actual
+selections/advances assign a fresh ID. Inherited unchanged-reconnect stalls remain
+outside this repair.
 
 ## Ordinary mutation inventory
 
@@ -158,13 +160,13 @@ accepted commands and zero ordinary/audit/SDK attempts for retained commands.
 to `commitClubOverride`. Club form create/update also delegate there. No direct
 club, brightness, or configuration writer bypass remains.
 
-| State area     | Entry points                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Match          | `updateMatch`, `resetMatch`, `addGoal`, `addPenalty`, `removePenalty`, `addToPenalty`, `updateHalfLength`, `adjustMatchTime`, `setHalfStops`, `matchTimeout`, `removeTimeout`, `buzz`, `countdown`, `startHalftimeCountdown`, `stopHalftimeCountdown`, `updateRedCards`                                                                                                                                                                                                                              |
-| Controller     | `updateController`, `selectView`, `selectAssetView`, `createQueue`, `replaceQueue`, `appendSubstitutionAndActivate`, `deleteQueue`, `renameQueue`, `reorderQueues`, `addItemsToQueue`, `removeItemFromQueue`, `reorderItemsInQueue`, `updateQueueSettings`, `playQueue`, `activateQueue`, `stopPlaying`, `showItemNow`, `setPlaying`, `renderAsset`, `showNextAsset`, `removeAssetAfterTimeout`, `remoteRefresh`, `setRoster`, `editPlayer`, `deletePlayer`, `addPlayer`, `clearRoster`, `selectTab` |
-| View           | `updateView`, `setViewPort`, `setBackground`, `setIdleImage`, `setIdleAd`, `setBlackoutStart`, `setBlackoutEnd`, `setGoalGifSettings`, `setTheme`, `setThemePreset`, `saveCustomPreset`, `deleteCustomPreset`                                                                                                                                                                                                                                                                                        |
-| Club overrides | `saveClubOverride`, `commitClubOverride` (create/update/save), `deleteClubOverride`                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| Perimeter      | `setPerimeterState`, `skipPerimeterCue`, `restartPerimeterDisplays`, `setPerimeterOverlay`, `clearPerimeterOverlay`, `setPerimeterAdLayout`, `setPerimeterGoalVideo`, `setPerimeterScorerCelebration`, `setPerimeterIdleClock`, `setPerimeterPlayerDisplayStyle`, `setPerimeterSubstitutionStyle`, `setPerimeterBrightness`, `setPerimeterBrightnessAuto`, `createPerimeterMediaPair`, `setPerimeterMediaPairMainScreenAsset`, `deletePerimeterMediaPair`                                            |
+| State area     | Entry points                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Match          | `updateMatch`, `resetMatch`, `addGoal`, `addPenalty`, `removePenalty`, `addToPenalty`, `updateHalfLength`, `adjustMatchTime`, `setHalfStops`, `matchTimeout`, `removeTimeout`, `buzz`, `countdown`, `startHalftimeCountdown`, `stopHalftimeCountdown`, `updateRedCards`                                                                                                                                                                                                   |
+| Controller     | `updateController`, `selectView`, `selectAssetView`, `createQueue`, `replaceQueue`, `appendSubstitutionAndActivate`, `deleteQueue`, `renameQueue`, `reorderQueues`, `addItemsToQueue`, `removeItemFromQueue`, `reorderItemsInQueue`, `updateQueueSettings`, `playQueue`, `activateQueue`, `stopPlaying`, `showItemNow`, `setPlaying`, `renderAsset`, `showNextAsset`, `remoteRefresh`, `setRoster`, `editPlayer`, `deletePlayer`, `addPlayer`, `clearRoster`, `selectTab` |
+| View           | `updateView`, `setViewPort`, `setBackground`, `setIdleImage`, `setIdleAd`, `setBlackoutStart`, `setBlackoutEnd`, `setGoalGifSettings`, `setTheme`, `setThemePreset`, `saveCustomPreset`, `deleteCustomPreset`                                                                                                                                                                                                                                                             |
+| Club overrides | `saveClubOverride`, `commitClubOverride` (create/update/save), `deleteClubOverride`                                                                                                                                                                                                                                                                                                                                                                                       |
+| Perimeter      | `setPerimeterState`, `skipPerimeterCue`, `restartPerimeterDisplays`, `setPerimeterOverlay`, `clearPerimeterOverlay`, `setPerimeterAdLayout`, `setPerimeterGoalVideo`, `setPerimeterScorerCelebration`, `setPerimeterIdleClock`, `setPerimeterPlayerDisplayStyle`, `setPerimeterSubstitutionStyle`, `setPerimeterBrightness`, `setPerimeterBrightnessAuto`, `createPerimeterMediaPair`, `setPerimeterMediaPairMainScreenAsset`, `deletePerimeterMediaPair`                 |
 
 Automatic perimeter power changes, keyboard controls, scorer/player/team media
 continuations, queue controls, theme editors, and all other consumers call these
@@ -209,3 +211,10 @@ preservation. The preparation-fault test injects a synchronous exception;
 ordinary media preparation still reads the real Storage emulator. Missing
 photos remain supported text-only cards. Browser hide/pagehide/offline signals
 are deterministic events, rather than physical OS suspension.
+
+Playback completion additionally checks raw occurrence presence: explicit legacy
+observations match only absent IDs, while identified observations match the
+exact ID. Malformed present IDs cannot acquire legacy eligibility through
+parsing. The unused blind timeout-completion action was removed; renderers use
+`completeAssetIfCurrent`. The existing session/pending-queue submission barriers
+and CAS audit/retry limits are unchanged.
