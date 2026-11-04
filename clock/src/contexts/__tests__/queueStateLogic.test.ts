@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { parseQueueMap } from "../firebaseParsers";
 import {
   computeControllerDiff,
+  getStateShowingNextAsset,
   maybeAutoDeleteQueue,
 } from "../FirebaseStateContext";
 import type { ControllerState, QueueState, Asset } from "../../types";
@@ -55,18 +56,6 @@ function makeQueue(overrides: Partial<QueueState> = {}): QueueState {
     order: 0,
     ...overrides,
   };
-}
-
-let getStateShowingNextAsset:
-  | ((state: ControllerState, occurrenceId: string) => ControllerState)
-  | undefined;
-
-try {
-  const mod = await import("../FirebaseStateContext");
-  getStateShowingNextAsset = (mod as unknown as Record<string, unknown>)
-    .getStateShowingNextAsset as typeof getStateShowingNextAsset;
-} catch {
-  getStateShowingNextAsset = undefined;
 }
 
 describe("parseQueueMap", () => {
@@ -186,6 +175,15 @@ describe("parseQueueMap", () => {
     const result = parseQueueMap(data);
 
     expect(result).toHaveProperty("q1");
+    expect(result.q2).toEqual({
+      id: "q2",
+      name: "q2",
+      items: [{ key: "a1", type: "IMAGE" }],
+      autoPlay: false,
+      imageSeconds: 3,
+      cycle: false,
+      order: 1,
+    });
   });
 
   it("filters invalid items within a queue's items array", () => {
@@ -399,263 +397,260 @@ describe("computeControllerDiff", () => {
   });
 });
 
-describe.skipIf(!getStateShowingNextAsset)(
-  "getStateShowingNextAsset (queue-aware)",
-  () => {
-    function nextAsset(state: ControllerState): ControllerState {
-      return getStateShowingNextAsset!(state, "selected-occurrence");
-    }
+describe("getStateShowingNextAsset (queue-aware)", () => {
+  function nextAsset(state: ControllerState): ControllerState {
+    return getStateShowingNextAsset(state, "selected-occurrence");
+  }
 
-    it("is a no-op when activeQueueId is null", () => {
-      const state = makeControllerState({
-        activeQueueId: null,
-        queues: { q1: makeQueue({ items: [makeAsset("a1")] }) },
-      });
-
-      const result = nextAsset(state);
-      expect(result.currentAsset).toBeNull();
-      expect(result.playing).toBe(false);
+  it("is a no-op when activeQueueId is null", () => {
+    const state = makeControllerState({
+      activeQueueId: null,
+      queues: { q1: makeQueue({ items: [makeAsset("a1")] }) },
     });
 
-    it("is a no-op when activeQueueId references non-existent queue", () => {
-      const state = makeControllerState({
-        activeQueueId: "missing",
-        queues: {},
-      });
+    const result = nextAsset(state);
+    expect(result.currentAsset).toBeNull();
+    expect(result.playing).toBe(false);
+  });
 
-      const result = nextAsset(state);
-      expect(result.currentAsset).toBeNull();
-      expect(result.playing).toBe(false);
+  it("is a no-op when activeQueueId references non-existent queue", () => {
+    const state = makeControllerState({
+      activeQueueId: "missing",
+      queues: {},
     });
 
-    it("sets playing=false and currentAsset=null for empty active queue", () => {
-      const state = makeControllerState({
-        activeQueueId: "q1",
-        queues: { q1: makeQueue({ id: "q1", items: [] }) },
-      });
+    const result = nextAsset(state);
+    expect(result.currentAsset).toBeNull();
+    expect(result.playing).toBe(false);
+  });
 
-      const result = nextAsset(state);
-      expect(result.playing).toBe(false);
-      expect(result.currentAsset).toBeNull();
+  it("sets playing=false and currentAsset=null for empty active queue", () => {
+    const state = makeControllerState({
+      activeQueueId: "q1",
+      queues: { q1: makeQueue({ id: "q1", items: [] }) },
     });
 
-    it("pops first item and sets currentAsset with time when autoPlay is on", () => {
-      const items = [makeAsset("a1"), makeAsset("a2"), makeAsset("a3")];
-      const state = makeControllerState({
-        activeQueueId: "q1",
-        queues: {
-          q1: makeQueue({
-            id: "q1",
-            items,
-            autoPlay: true,
-            imageSeconds: 7,
-          }),
-        },
-      });
+    const result = nextAsset(state);
+    expect(result.playing).toBe(false);
+    expect(result.currentAsset).toBeNull();
+  });
 
-      const result = nextAsset(state);
-
-      expect(result.currentAsset).not.toBeNull();
-      expect(result.currentAsset!.asset.key).toBe("a1");
-      expect(result.currentAsset!.time).toBe(7);
-      expect(result.playing).toBe(true);
-
-      const queue = result.queues.q1!;
-      expect(queue.items[0]!.key).toBe("a2");
+  it("pops first item and sets currentAsset with time when autoPlay is on", () => {
+    const items = [makeAsset("a1"), makeAsset("a2"), makeAsset("a3")];
+    const state = makeControllerState({
+      activeQueueId: "q1",
+      queues: {
+        q1: makeQueue({
+          id: "q1",
+          items,
+          autoPlay: true,
+          imageSeconds: 7,
+        }),
+      },
     });
 
-    it("re-adds popped item to end of queue when cycle is on", () => {
-      const items = [makeAsset("a1"), makeAsset("a2")];
-      const state = makeControllerState({
-        activeQueueId: "q1",
-        queues: {
-          q1: makeQueue({
-            id: "q1",
-            items,
-            autoPlay: true,
-            imageSeconds: 5,
-            cycle: true,
-          }),
-        },
-      });
+    const result = nextAsset(state);
 
-      const result = nextAsset(state);
+    expect(result.currentAsset).not.toBeNull();
+    expect(result.currentAsset!.asset.key).toBe("a1");
+    expect(result.currentAsset!.time).toBe(7);
+    expect(result.playing).toBe(true);
 
-      expect(result.currentAsset!.asset.key).toBe("a1");
+    const queue = result.queues.q1!;
+    expect(queue.items[0]!.key).toBe("a2");
+  });
 
-      const queue = result.queues.q1!;
-      expect(queue.items).toHaveLength(2);
-      expect(queue.items[0]!.key).toBe("a2");
-      expect(queue.items[1]!.key).toBe("a1");
+  it("re-adds popped item to end of queue when cycle is on", () => {
+    const items = [makeAsset("a1"), makeAsset("a2")];
+    const state = makeControllerState({
+      activeQueueId: "q1",
+      queues: {
+        q1: makeQueue({
+          id: "q1",
+          items,
+          autoPlay: true,
+          imageSeconds: 5,
+          cycle: true,
+        }),
+      },
     });
 
-    it("keeps single item cycling when cycle is on", () => {
-      const items = [makeAsset("a1")];
-      const state = makeControllerState({
-        activeQueueId: "q1",
-        queues: {
-          q1: makeQueue({
-            id: "q1",
-            items,
-            autoPlay: true,
-            imageSeconds: 5,
-            cycle: true,
-          }),
-        },
-      });
+    const result = nextAsset(state);
 
-      const result = nextAsset(state);
+    expect(result.currentAsset!.asset.key).toBe("a1");
 
-      expect(result.currentAsset!.asset.key).toBe("a1");
-      expect(result.queues.q1!.items).toHaveLength(1);
-      expect(result.queues.q1!.items[0]!.key).toBe("a1");
+    const queue = result.queues.q1!;
+    expect(queue.items).toHaveLength(2);
+    expect(queue.items[0]!.key).toBe("a2");
+    expect(queue.items[1]!.key).toBe("a1");
+  });
+
+  it("keeps single item cycling when cycle is on", () => {
+    const items = [makeAsset("a1")];
+    const state = makeControllerState({
+      activeQueueId: "q1",
+      queues: {
+        q1: makeQueue({
+          id: "q1",
+          items,
+          autoPlay: true,
+          imageSeconds: 5,
+          cycle: true,
+        }),
+      },
     });
 
-    it("removes item from queue without re-adding when cycle is off", () => {
-      const items = [makeAsset("a1"), makeAsset("a2")];
-      const state = makeControllerState({
-        activeQueueId: "q1",
-        queues: {
-          q1: makeQueue({
-            id: "q1",
-            items,
-            autoPlay: true,
-            imageSeconds: 5,
-            cycle: false,
-          }),
-        },
-      });
+    const result = nextAsset(state);
 
-      const result = nextAsset(state);
+    expect(result.currentAsset!.asset.key).toBe("a1");
+    expect(result.queues.q1!.items).toHaveLength(1);
+    expect(result.queues.q1!.items[0]!.key).toBe("a1");
+  });
 
-      expect(result.currentAsset!.asset.key).toBe("a1");
-      expect(result.queues.q1!.items).toHaveLength(1);
-      expect(result.queues.q1!.items[0]!.key).toBe("a2");
+  it("removes item from queue without re-adding when cycle is off", () => {
+    const items = [makeAsset("a1"), makeAsset("a2")];
+    const state = makeControllerState({
+      activeQueueId: "q1",
+      queues: {
+        q1: makeQueue({
+          id: "q1",
+          items,
+          autoPlay: true,
+          imageSeconds: 5,
+          cycle: false,
+        }),
+      },
     });
 
-    it("empties queue when last item popped with cycle off", () => {
-      const items = [makeAsset("a1")];
-      const state = makeControllerState({
-        activeQueueId: "q1",
-        queues: {
-          q1: makeQueue({
-            id: "q1",
-            items,
-            autoPlay: true,
-            imageSeconds: 5,
-            cycle: false,
-          }),
-        },
-      });
+    const result = nextAsset(state);
 
-      const result = nextAsset(state);
+    expect(result.currentAsset!.asset.key).toBe("a1");
+    expect(result.queues.q1!.items).toHaveLength(1);
+    expect(result.queues.q1!.items[0]!.key).toBe("a2");
+  });
 
-      expect(result.currentAsset!.asset.key).toBe("a1");
-      expect(result.queues.q1).toBeDefined();
-      expect(result.queues.q1!.items).toHaveLength(0);
+  it("empties queue when last item popped with cycle off", () => {
+    const items = [makeAsset("a1")];
+    const state = makeControllerState({
+      activeQueueId: "q1",
+      queues: {
+        q1: makeQueue({
+          id: "q1",
+          items,
+          autoPlay: true,
+          imageSeconds: 5,
+          cycle: false,
+        }),
+      },
     });
 
-    it("sets currentAsset without time when autoPlay is off", () => {
-      const items = [makeAsset("a1"), makeAsset("a2")];
-      const state = makeControllerState({
-        activeQueueId: "q1",
-        queues: {
-          q1: makeQueue({
-            id: "q1",
-            items,
-            autoPlay: false,
-            imageSeconds: 5,
-          }),
-        },
-      });
+    const result = nextAsset(state);
 
-      const result = nextAsset(state);
+    expect(result.currentAsset!.asset.key).toBe("a1");
+    expect(result.queues.q1).toBeDefined();
+    expect(result.queues.q1!.items).toHaveLength(0);
+  });
 
-      expect(result.currentAsset).not.toBeNull();
-      expect(result.currentAsset!.asset.key).toBe("a1");
-      expect(result.currentAsset!.time).toBeNull();
+  it("sets currentAsset without time when autoPlay is off", () => {
+    const items = [makeAsset("a1"), makeAsset("a2")];
+    const state = makeControllerState({
+      activeQueueId: "q1",
+      queues: {
+        q1: makeQueue({
+          id: "q1",
+          items,
+          autoPlay: false,
+          imageSeconds: 5,
+        }),
+      },
     });
 
-    it("returns a new state object without mutating the original", () => {
-      const items = [makeAsset("a1"), makeAsset("a2")];
-      const original = makeControllerState({
-        activeQueueId: "q1",
-        queues: {
-          q1: makeQueue({
-            id: "q1",
-            items,
-            autoPlay: true,
-            imageSeconds: 5,
-            cycle: true,
-          }),
-        },
-      });
+    const result = nextAsset(state);
 
-      const result = nextAsset(original);
+    expect(result.currentAsset).not.toBeNull();
+    expect(result.currentAsset!.asset.key).toBe("a1");
+    expect(result.currentAsset!.time).toBeNull();
+  });
 
-      expect(result).not.toBe(original);
-      expect(original.queues.q1!.items).toHaveLength(2);
-      expect(original.queues.q1!.items[0]!.key).toBe("a1");
+  it("returns a new state object without mutating the original", () => {
+    const items = [makeAsset("a1"), makeAsset("a2")];
+    const original = makeControllerState({
+      activeQueueId: "q1",
+      queues: {
+        q1: makeQueue({
+          id: "q1",
+          items,
+          autoPlay: true,
+          imageSeconds: 5,
+          cycle: true,
+        }),
+      },
     });
 
-    it("deletes empty non-cycling queue and nulls activeQueueId", () => {
-      const state = makeControllerState({
-        activeQueueId: "q1",
-        queues: {
-          q1: makeQueue({ id: "q1", items: [], cycle: false }),
-        },
-      });
+    const result = nextAsset(original);
 
-      const result = nextAsset(state);
+    expect(result).not.toBe(original);
+    expect(original.queues.q1!.items).toHaveLength(2);
+    expect(original.queues.q1!.items[0]!.key).toBe("a1");
+  });
 
-      expect(result.activeQueueId).toBeNull();
-      expect(result.queues.q1).toBeUndefined();
-      expect(result.playing).toBe(false);
-      expect(result.currentAsset).toBeNull();
+  it("deletes empty non-cycling queue and nulls activeQueueId", () => {
+    const state = makeControllerState({
+      activeQueueId: "q1",
+      queues: {
+        q1: makeQueue({ id: "q1", items: [], cycle: false }),
+      },
     });
 
-    it("preserves empty cycling queue and keeps activeQueueId", () => {
-      const state = makeControllerState({
-        activeQueueId: "q1",
-        queues: {
-          q1: makeQueue({ id: "q1", items: [], cycle: true }),
-        },
-      });
+    const result = nextAsset(state);
 
-      const result = nextAsset(state);
+    expect(result.activeQueueId).toBeNull();
+    expect(result.queues.q1).toBeUndefined();
+    expect(result.playing).toBe(false);
+    expect(result.currentAsset).toBeNull();
+  });
 
-      expect(result.activeQueueId).toBe("q1");
-      expect(result.queues.q1).toBeDefined();
-      expect(result.queues.q1!.items).toHaveLength(0);
-      expect(result.playing).toBe(false);
-      expect(result.currentAsset).toBeNull();
+  it("preserves empty cycling queue and keeps activeQueueId", () => {
+    const state = makeControllerState({
+      activeQueueId: "q1",
+      queues: {
+        q1: makeQueue({ id: "q1", items: [], cycle: true }),
+      },
     });
 
-    it("plays last item from non-cycling queue, keeps queue with 0 items and activeQueueId", () => {
-      const state = makeControllerState({
-        activeQueueId: "q1",
-        queues: {
-          q1: makeQueue({
-            id: "q1",
-            items: [makeAsset("a1")],
-            autoPlay: true,
-            imageSeconds: 5,
-            cycle: false,
-          }),
-        },
-      });
+    const result = nextAsset(state);
 
-      const result = nextAsset(state);
+    expect(result.activeQueueId).toBe("q1");
+    expect(result.queues.q1).toBeDefined();
+    expect(result.queues.q1!.items).toHaveLength(0);
+    expect(result.playing).toBe(false);
+    expect(result.currentAsset).toBeNull();
+  });
 
-      expect(result.currentAsset).not.toBeNull();
-      expect(result.currentAsset!.asset.key).toBe("a1");
-      expect(result.queues.q1).toBeDefined();
-      expect(result.queues.q1!.items).toHaveLength(0);
-      expect(result.activeQueueId).toBe("q1");
-      expect(result.playing).toBe(false);
+  it("plays last item from non-cycling queue, keeps queue with 0 items and activeQueueId", () => {
+    const state = makeControllerState({
+      activeQueueId: "q1",
+      queues: {
+        q1: makeQueue({
+          id: "q1",
+          items: [makeAsset("a1")],
+          autoPlay: true,
+          imageSeconds: 5,
+          cycle: false,
+        }),
+      },
     });
-  },
-);
+
+    const result = nextAsset(state);
+
+    expect(result.currentAsset).not.toBeNull();
+    expect(result.currentAsset!.asset.key).toBe("a1");
+    expect(result.queues.q1).toBeDefined();
+    expect(result.queues.q1!.items).toHaveLength(0);
+    expect(result.activeQueueId).toBe("q1");
+    expect(result.playing).toBe(false);
+  });
+});
 
 describe("maybeAutoDeleteQueue", () => {
   it("returns state unchanged when queue does not exist", () => {
