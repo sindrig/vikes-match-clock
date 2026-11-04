@@ -7,7 +7,7 @@ import {
 
 describe("published perimeter mapping fixtures", () => {
   it.each([
-    ["Víkin Resolume", capturedVikinConfiguration],
+    ["Víkin web", capturedVikinConfiguration],
     ["second stadium web", secondStadiumWebConfiguration],
   ])("validates the %s mapping", (_name, configuration) => {
     expect(validatePerimeterMapping(configuration)).toEqual({
@@ -16,8 +16,8 @@ describe("published perimeter mapping fixtures", () => {
     });
   });
 
-  it("keeps Víkin on the Resolume renderer boundary", () => {
-    expect(capturedVikinConfiguration.renderer).toBe("resolume");
+  it("uses the web renderer at both venues", () => {
+    expect(capturedVikinConfiguration.renderer).toBe("web");
     expect(secondStadiumWebConfiguration.renderer).toBe("web");
   });
 });

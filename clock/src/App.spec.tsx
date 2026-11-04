@@ -206,13 +206,10 @@ function setupState3(
   } as unknown as ReturnType<typeof useRemoteSettings>);
   mockedUsePerimeter.mockReturnValue({
     perimeter: { enabled: false, state: "off" },
-    preview: null,
-    previewLoaded: false,
     setPerimeterState: vi.fn(),
     setPerimeterOverlay: vi.fn(),
     clearPerimeterOverlay: vi.fn(),
     overlay: null,
-    overlayStatus: null,
     getServerTime: vi.fn(),
   } as unknown as ReturnType<typeof usePerimeter>);
   return { setListenPrefix, setScreenKey };

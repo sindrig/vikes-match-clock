@@ -701,6 +701,28 @@ describe("Controller", () => {
       expect(screen.getByTestId("perimeter-control")).toBeInTheDocument();
     });
 
+    it.each([
+      { ...minimalPerimeterDisplay, regions: [] },
+      { ...minimalPerimeterDisplay, renderer: "resolume" },
+    ])(
+      "keeps brightness management reachable for an invalid web mapping %j",
+      (mapping) => {
+        setupState3();
+        mockedUseListeners.mockReturnValue(
+          parseLocations({
+            vikinni: {
+              label: "Víkin",
+              screens: [{ name: "Main" }],
+              perimeterDisplay: mapping,
+            },
+          })!,
+        );
+        render(<Controller />);
+        fireEvent.click(screen.getByRole("button", { name: "Stillingar" }));
+        expect(screen.getByTestId("perimeter-control")).toBeInTheDocument();
+      },
+    );
+
     it("does not render PerimeterControl inside the settings modal for a venue with a published mapping", () => {
       setupState3();
       mockedUseListeners.mockReturnValue({

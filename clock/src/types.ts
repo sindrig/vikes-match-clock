@@ -310,10 +310,10 @@ export interface ListenersState {
   }>;
 }
 
-// Published venue geometry for a browser or Resolume perimeter installation.
+// Published venue geometry for a web perimeter installation.
 // This lives under locations/{location}/perimeterDisplay and is independent
 // from the desired runtime state under states/{location}.
-export type PerimeterRenderer = "web" | "resolume";
+export type PerimeterRenderer = "web";
 export type PerimeterRotation = 0 | 90 | 180 | 270;
 
 export interface PerimeterRect {
@@ -380,7 +380,7 @@ export type DisplayTarget =
   | { kind: "scoreboard"; screenKey: string }
   | { kind: "perimeter" };
 
-// Perimeter LED (Resolume) state type
+// Perimeter LED desired state
 export interface PerimeterState {
   enabled: boolean;
   state: "on" | "off";
@@ -424,27 +424,6 @@ export type ScorerCelebrationStyle =
   | "wave"
   | "procession"
   | "cutout";
-
-// A single clip in the perimeter composition preview.
-export interface PerimeterClip {
-  id: number | null;
-  filename: string;
-  thumbnail?: string;
-}
-
-// A Resolume column in the perimeter composition preview.
-export interface PerimeterColumn {
-  id: number | null;
-  name: string;
-  clips: PerimeterClip[];
-}
-
-// Read-only snapshot of the Resolume composition, published by the
-// perimeter-control daemon to `perimeter/{location}`.
-export interface PerimeterPreview {
-  updatedAt: number | null;
-  columns: PerimeterColumn[];
-}
 
 // -- Perimeter overlay (goal-triggered video sequences) ----------------------
 
@@ -505,20 +484,6 @@ export interface PerimeterGoalVideoConfig {
   files: Record<string, PerimeterOverlayFile>;
 }
 
-export type PerimeterOverlayPhase =
-  | "downloading"
-  | "copying"
-  | "loading"
-  | "playing"
-  | "error";
-
-export interface PerimeterOverlayStatus {
-  commandId: string | null;
-  phase: PerimeterOverlayPhase;
-  activeColumn: number;
-  error: string | null;
-}
-
 // An ordinary image/video selected from the main-screen media library.
 export interface MainScreenMediaAsset extends Asset {
   type: "IMAGE" | "VIDEO";
@@ -558,36 +523,10 @@ export interface PerimeterAdLayout {
   columns: PerimeterAdLayoutColumn[];
 }
 
-// Daemon-published lane metadata
+// Ad lane derived from the published web mapping
 export interface PerimeterAdLane {
   id: string;
   name: string;
-}
-
-// Applied file with daemon-resolved thumbnail
-export interface PerimeterAppliedAdFile {
-  name: string;
-  thumbnail?: string; // base64 data URL
-}
-
-// Applied column: which deck columns hold this ad, and the per-lane files.
-// The deck autopilot cycles these columns; the daemon only deploys content.
-export interface PerimeterAppliedAdColumn {
-  id: string; // uuid matching desired column
-  deckColumns: number[]; // 1-based deck column indices holding this ad
-  files: Record<string, PerimeterAppliedAdFile>;
-}
-
-export type PerimeterAdPhase = "loading" | "playing" | "error" | "idle";
-
-// Daemon-published applied layout at perimeter/{location}/adLayout
-export interface PerimeterAppliedAdLayout {
-  lanes: PerimeterAdLane[];
-  revision: string; // matching the applied desired revision
-  phase: PerimeterAdPhase;
-  error: string | null;
-  updatedAt: number; // Firebase server timestamp
-  columns: PerimeterAppliedAdColumn[];
 }
 
 // -- Audit trail --------------------------------------------------------------
@@ -691,86 +630,6 @@ export interface PerimeterBrightnessStatus {
   // parses as "manual" for backward compatibility.
   mode: PerimeterBrightnessAutoMode;
   predicted?: PerimeterBrightnessPredicted;
-}
-
-// -- Perimeter overlay target geometry ---------------------------------------
-
-// A single configured overlay target published by the perimeter-control daemon
-// to `perimeter/{location}/overlayGeometry`. Media preparation renders output
-// that matches these native dimensions instead of duplicated frontend sizes.
-export interface PerimeterOverlayTarget {
-  layerId: string;
-  label: string;
-  targetFolder: string;
-  width: number;
-  height: number;
-}
-
-// Daemon-published geometry at `perimeter/{location}/overlayGeometry`.
-// `revision` changes whenever the daemon's configured layers, target folders,
-// or clip canvases change, so preparation requests can key their output to it.
-export interface PerimeterOverlayGeometry {
-  revision: string;
-  updatedAt: number;
-  targets: PerimeterOverlayTarget[];
-}
-
-// -- Goal-scorer perimeter media preparation ---------------------------------
-
-// Request written by the controller to
-// `states/{location}/perimeter/goalScorerPreparation`. It snapshots the
-// eligible home players so the preparation job is tied to the requested
-// roster, not a later roster mutation.
-export interface GoalScorerPreparationRequestPlayer {
-  id: string;
-  name: string;
-  number?: number | string;
-}
-
-export interface GoalScorerPreparationRequest {
-  jobId: string;
-  rosterSignature: string;
-  players: GoalScorerPreparationRequestPlayer[];
-}
-
-// Overall phase of a preparation job, published by the Cloud Function to
-// `perimeter/{location}/goalScorerPreparation`.
-export type GoalScorerPreparationPhase = "preparing" | "ready" | "failed";
-
-// Per-player outcome: personalized ready, crest fallback ready, still
-// preparing, unavailable (no valid player identifier), or failed.
-export type GoalScorerPlayerStatus =
-  | "preparing"
-  | "ready"
-  | "fallback"
-  | "unavailable"
-  | "failed";
-
-// Per-player preparation result. `files` holds the two validated
-// `PerimeterOverlayFile` sources (one per overlay layer) for `ready` and
-// `fallback` outcomes; it is absent for `preparing`, `unavailable`, and
-// `failed`.
-export interface GoalScorerPreparationPlayerResult {
-  status: GoalScorerPlayerStatus;
-  error: string | null;
-  files?: Record<string, PerimeterOverlayFile>;
-}
-
-// Daemon-owned preparation status. Read-only to clients; the frontend only
-// presents this Firebase-synchronized status and never infers readiness from
-// Storage listings.
-export interface GoalScorerPreparationStatus {
-  jobId: string;
-  rosterSignature?: string;
-  phase: GoalScorerPreparationPhase;
-  readyCount: number;
-  fallbackCount: number;
-  unavailableCount: number;
-  failedCount: number;
-  total: number;
-  updatedAt: number;
-  error: string | null;
-  players: Record<string, GoalScorerPreparationPlayerResult>;
 }
 
 // Root state type
