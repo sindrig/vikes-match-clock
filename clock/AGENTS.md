@@ -1349,7 +1349,26 @@ interface QueueState {
 | `dndUtils` | `queue/dndUtils.ts` | DnD ID namespacing + `typedCollisionDetection` (see **Drag-and-Drop Collision Detection** below) |
 
 **State operations** (in `FirebaseStateContext.tsx`):
-`createQueue`, `deleteQueue`, `renameQueue`, `reorderQueues`, `addItemsToQueue`, `removeItemFromQueue`, `reorderItemsInQueue`, `updateQueueSettings`, `playQueue`, `stopPlaying`, `showItemNow`
+`createQueue`, `replaceQueue`, `appendSubstitutionAndActivate`, `deleteQueue`, `renameQueue`, `reorderQueues`, `addItemsToQueue`, `removeItemFromQueue`, `reorderItemsInQueue`, `updateQueueSettings`, `playQueue`, `stopPlaying`, `showItemNow`
+
+Create/replace with initial items and substitution (including both roster
+flags) are single audited intents. Existing queue fields are written as leaf
+paths; metadata edits never replace items or unrelated autoplay settings.
+Only subscription callbacks update shared calculation refs. See the
+[queue intent contract and caller inventory](../docs/session-mutation-boundary.md#queue-intents-and-compound-callers-243).
+
+SDK local echoes do not prove that a newly created queue is durable.
+`PendingQueueCreations` tracks only in-flight creation acknowledgements,
+registered before the SDK call (including synchronous/reentrant echoes).
+Commands targeting a pending queue wait for settlement, then recompute their
+diff and player eligibility from current subscription refs with their original
+command origin. Named replacement/substitution can resolve the restored queue
+or create a complete new queue after denial; explicit ID operations reject if
+that queue disappeared. Overlapping waiters check dependencies again, and
+session changes cancel waiting commands immediately, even without an ack.
+Independent creations and operations on durable queues remain available and
+keep leaf diffs. There is no shadow queue state, timeout, offline replay or
+general server conflict resolution.
 
 #### QueuePicker Behavior
 
@@ -1360,6 +1379,19 @@ interface QueueState {
 3. **"Ný biðröð"** (primary button at bottom) — creates a new queue and adds the asset
 
 Special case: **0 queues** → auto-creates "Biðröð 1" and adds the item (no dialog shown).
+
+`useQueuePickerActions` owns each draft's media and the commands captured
+before asynchronous preparation. Rerenders cannot give an old draft a newer
+venue/session origin. Create-with-items and append are awaited; rejected
+saves retain the draft and display an error. A failed automatic create on an
+empty board opens the dialog for explicit retry. Each draft has a unique
+`draftId`; `QueuePicker` keys its inner component by that ID so pending/error
+feedback, the immediate submission guard and automatic-create tracking belong
+only to that draft, including identical-assets A → B → A selections. An older
+completion cannot close or unlock a newer draft or replace its error. A ready
+draft remains usable while a newer selection prepares; once the newer media
+is ready, an older preparation cannot replace that draft. Newer selections
+and unmounting also retire obsolete preparation errors.
 
 The old "Birta strax" / "Setja í biðröð" radio buttons in MediaManager were removed. `ImageList` no longer has a `displayNow` prop — it always calls `onAddAssets`, which opens QueuePicker.
 
@@ -1403,18 +1435,33 @@ is no transcoding.
 
 #### createQueue Options
 
-`createQueue(name, options?)` accepts an optional `options` parameter:
+`createQueue(name, items = [], options?)` creates all initial items in one
+audited update and returns a `Promise<string>` that resolves to its ID only
+after submission succeeds:
 
 ```typescript
-createQueue(name: string, options?: { cycle?: boolean })
+createQueue(name: string, items?: Asset[], options?: { cycle?: boolean }): Promise<string>
 ```
 
 - `cycle` defaults to `true` (loop by default for most queues)
 - Team queues pass `{ cycle: false }` since lineup sequences shouldn't loop
 
+Never chain create/append/activate to assemble an operator action. Use
+`replaceQueue(name, items, options?)` for a named team replacement and
+`appendSubstitutionAndActivate` for substitutions. These remain ordinary
+current-origin commands, separate from generation-conditional playback CAS.
+
 #### Team Queue Integration
 
 `TeamAssetController.tsx` renders a "Setja lið í biðröð" button above each team (home/away) separately. Clicking it creates a named queue (e.g., "Víkingur R") containing that team's starting lineup as player card assets. The queue is created with `cycle: false` since lineup presentations are one-shot sequences.
+
+All player media is prepared first, then the retained `replaceQueue` command
+creates/replaces the complete queue in one update. Preparation failure leaves
+the old queue intact. Submission failure is shown without leaving the team
+view. Replacement retains the old delete/create placement (new ID, after the
+remaining queues) and clears playback only if the replaced queue was active.
+Successful navigation runs directly after acknowledgement while the initiating
+action still owns the team view, without a deferred navigation timer.
 
 #### Manual Roster Creation (Resolve Roster)
 
@@ -1453,9 +1500,40 @@ Firebase-backed behavior.
   `showPlayerCard(player, teamKey)` and `showMOTM(player, teamKey)` operations.
 - The substitution flow preserves the established sequence: on-pitch
   (`show: true`) players for the outgoing step, eligible off-pitch players
-  (`!show && number != null`) for the incoming step, `editPlayer` roster status
-  updates, trimming of last names on the generated assets, `Skiptingar` queue
-  creation/append/activation, and the home-team reveal background on assets.
+  (`!show && number != null`) for the incoming step, trimming of last names on
+  the generated assets and the home-team reveal background. Both cards prepare
+  before the retained `appendSubstitutionAndActivate` command submits the
+  `Skiptingar` queue creation/append/activation and both roster status leaves
+  together. At submission, both players are resolved from the current subscribed
+  roster: outgoing must still have `show`, and incoming must still satisfy
+  `!show && number != null`. An absent, identical or ineligible selection rejects
+  the entire intent before any queue, roster or audit write. This also rejects
+  overlapping preparations that reuse a player after another substitution's
+  SDK echo, while independent and ordered substitutions remain eligible. The
+  existing current asset and playing flag are preserved. Current substitution
+  failures are shown in the team/shortcut box; player-card and MOTM failures
+  are passed to the open selection modal's `error` prop so feedback stays
+  visible above its backdrop and selection can be retried. The shared modal
+  renders its alert in the fixed header outside the scrolling player list,
+  keeping current feedback visible at lower roster rows without moving
+  keyboard focus. Player-card and
+  MOTM operations await their retained
+  `renderAsset` command before reporting success. Each player selection owns its
+  media and UI continuation: dismissal, replacement, a newer selection or
+  unmounting retires it. Submitted acknowledgements can close or report errors
+  only for that selection in its original mutation session (including venue or
+  auth A → B → A). Already-submitted writes remain irrevocable. An origin
+  rejection before submission still explains why the current draft could not
+  save. The hook's `beginAction` is also used by the Lið tab's inline
+  player/MOTM, lineup replacement and roster-fetch feedback. New actions,
+  dismissal and unmounting retire older feedback across those callers;
+  delayed substitution failures cannot overwrite a newer player error.
+  Closed substitution actions report failures only within their original
+  mutation session, including rejections after delayed media preparation.
+  Retirement gates UI feedback only: an independent substitution or lineup
+  replacement still reaches its retained command and current-roster/session
+  validation. Roster-fetch loading has a separate request lifetime so its
+  completion releases its spinner without clearing a newer action's error.
 - **Corrected SUB field semantics**: `subIn` carries the player **coming
   on** and `subOut` the player **going off** (the persisted fields were
   previously inverted from their meaning). The creation site builds
@@ -1880,14 +1958,24 @@ For a persistent workspace-owned server, use `bash scripts/dev-server.sh start 8
 
 For isolated local development and CI, use Firebase Emulator:
 
+No live credentials or Firebase login are required. Pass `VITE_USE_EMULATOR=true`
+explicitly at Vite startup/build time or to Playwright. The default development
+server otherwise uses shared staging Firebase. A default production build
+previewed on localhost uses production Firebase unless emulator mode was
+compiled in; changing preview mode/environment cannot change that bundle.
+See [Firebase selection](../docs/environment.md#firebase-selection) for the
+mode/hostname precedence and restart/rebuild boundary.
+See [the environment contract](../docs/environment.md) for loaders and the
+separate match/weather API routing (the emulator flag changes Firebase only).
+
 ```bash
-# Start emulator (from project root)
+# Auth/Database-only work (from project root); add storage/functions when needed.
 firebase emulators:start --only auth,database --project vikes-match-clock-test
 
 # Or use Docker
 docker-compose up -d
 
-# Run app with emulator
+# From clock/, run app with emulator
 VITE_USE_EMULATOR=true pnpm start
 
 # Run e2e tests with emulator
@@ -1901,23 +1989,25 @@ Emulator ports:
 
 - Auth: 9099
 - Database: 9000
+- Storage: 9199
+- Functions: 5001
 - UI: 4000
 
 ### Test Credentials
 
-E2E tests that require authentication use the `TEST_CREDENTIALS` environment variable.
+The current `e2e/fixtures/test-helpers.ts` creates synthetic users in the local
+Auth emulator and logs in with those fixture values. It does not read
+`TEST_CREDENTIALS` or fall back to a staging account. Run E2E with the local
+services and `VITE_USE_EMULATOR=true`; never use those fixtures against shared
+Firebase.
 
-**Format**: `EMAIL;PASSWORD` (semicolon-separated)
-
-**Local development**:
-
-```bash
-pnpm e2e
-```
-
-If `TEST_CREDENTIALS` is not set, tests fall back to default staging credentials.
-
-**GitHub Actions**: The `TEST_CREDENTIALS` secret must be configured in the repository settings. Format is the same: `EMAIL;PASSWORD`.
+For separately authorized staging browser checks, retrieve an account from a
+project maintainer. Tooling that expects `TEST_CREDENTIALS` uses the format
+`EMAIL;PASSWORD` (quoted because of the semicolon). Load it into that process's
+shell explicitly or through optional direnv as described in
+[the environment contract](../docs/environment.md#shared-staging-login).
+Do not assume credentials are present in another worktree, and do not print
+their values. Missing access means obtain access or use the emulator.
 
 To log in manually (use playwright):
 
@@ -1968,7 +2058,7 @@ The asset E2E tests (`e2e/assets.spec.ts`) use these selectors for the multi-que
 
 ### Independent Browser Sessions
 
-Controller/display tests may need two independent browser sessions. Tabs on the same origin within one context/profile share localStorage and Firebase auth persistence; opening another ordinary window in the same profile does not isolate them. Different staging URL subpaths also share these keys. Separate local ports have distinct origins but still default to the same staging Firebase project.
+Controller/display tests may need two independent browser sessions. Tabs on the same origin within one context/profile share localStorage and Firebase auth persistence; opening another ordinary window in the same profile does not isolate them. Different staging URL subpaths also share these keys. Separate local ports have distinct origins; default Vite development servers on those ports still use the same staging Firebase project. Production builds previewed locally follow the [mode/hostname selection](../docs/environment.md#firebase-selection) instead.
 
 Use Playwright's test runner with a separate context per role:
 

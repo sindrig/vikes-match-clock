@@ -28,7 +28,7 @@ A match clock application for Víkingur football club stadiums. Displays match i
 - **Frontend**: React (in `clock/` directory)
 - **Backend**: Python 3.12 Lambda functions (FastAPI + Lambda Web Adapter)
 - **Infrastructure**: Terraform with S3 backend
-- **CI/CD**: GitHub Actions with OIDC authentication (no static AWS keys)
+- **CI/CD**: GitHub Actions AWS deployments use OIDC (no static AWS keys in those jobs); local operator credentials are separate
 - **Real-time**: Firebase Realtime Database for screen state management
 
 ## Deployment
@@ -39,6 +39,10 @@ Deployments are automatic:
 - Add `sandbox-deploy` label to PR → deploys to staging
 
 The workflow uses OIDC to assume IAM roles, then fetches infrastructure details from Terraform outputs.
+
+## Environment and Credentials
+
+See [the environment contract](docs/environment.md) for credential-free frontend/emulator work, shared staging login, API secrets, manual AWS access and gateway setup. No specific home directory, credential file or automatic login is required for a checkout. Optional direnv loads this worktree's `.envrc-local` as dotenv; `.envrc-local.example` contains commented placeholders. Existing Python/SSO operator helpers require explicit opt-in. Missing credentials lead to maintainer access guidance, not infrastructure application.
 
 ## Code Style
 
@@ -114,22 +118,23 @@ The match data pipeline depends on team IDs matching between the frontend and th
 
 ### E2E Tests
 - Playwright for browser automation
-- `TEST_CREDENTIALS` env var for authentication (format: `EMAIL;PASSWORD`)
-- **Credentials location**: The main worktree's `.envrc-local` contains `TEST_CREDENTIALS` for staging login. Source this file or extract the email/password from it.
+- Emulator E2E fixtures create their own synthetic accounts; they do not need live credentials or consume `TEST_CREDENTIALS`.
+- For authorized shared staging browser checks, retrieve an account from a project maintainer. Browser tooling may consume shell `TEST_CREDENTIALS` (format: `EMAIL;PASSWORD`); load it explicitly as described in [the environment contract](docs/environment.md#shared-staging-login), without printing it. Do not assume another worktree contains credentials.
 - For independent sessions, use separate browser contexts/profiles (Playwright runner or context APIs exposed by the available browser tool). Same-origin tabs in one context share storage/auth; see `clock/AGENTS.md`.
 
 ## Taking Screenshots for PRs
 
-The local dev server connects to the **staging Firebase database** by default (no emulator flag needed), so you can log in with real credentials and see real match state — making it ideal for capturing screenshots of UI changes.
+The default Vite development server connects to **staging Firebase** unless emulator mode is enabled at startup. A default production build served on localhost with `pnpm preview` connects to **production Firebase** unless emulator mode was compiled in. Check [Firebase selection](docs/environment.md#firebase-selection) before authenticated screenshot work; changing preview mode or environment requires rebuilding to change compiled selection.
 
 ### Workflow
 
 1. **Start the dev server** using the `dev-server` skill (defaults to port 8000): `bash scripts/dev-server.sh start 8000` from this worktree's root. Vite persists in a dedicated tmux session for this physical worktree and port. Use `status 8000` to see the handle/PID and `.dev-server/8000.log`; use `stop 8000` to stop only that session. An occupied port fails; choose another explicit port. The helper needs Bash, Git, Node, tmux and installed clock dependencies; follow the skill's API-client preparation and browser verification steps.
-2. **Log in using available browser tooling** (Playwright runner, Playwright tools or Paseo): Navigate to `http://localhost:8000`, enter credentials from the main worktree's `.envrc-local` (`TEST_CREDENTIALS` format: `EMAIL;PASSWORD`) without printing them, click "Innskrá", then select a screen (e.g., "Víkin úti Skjár"). Inspect rendered content, console errors and failed requests; an HTML title alone only verifies the shell. Coordinate authenticated shared-staging actions with other users.
+2. **Log in using available browser tooling** (Playwright runner, Playwright tools or Paseo), when shared staging access is authorized: Navigate to `http://localhost:8000`, use the maintainer-provided staging account loaded for this session without printing it, click "Innskrá", then select a screen (e.g., "Víkin úti Skjár"). Inspect rendered content, console errors and failed requests; an HTML title alone only verifies the shell. Coordinate authenticated shared-staging actions with other users. Use the emulator for credential-free isolated state checks.
 3. **Take a screenshot** using the available tool's actual API or Playwright's page/locator screenshot API. Save locally under the gitignored `screenshots/` directory (e.g., `screenshots/my-screenshot.png`).
 4. **Upload to the staging S3 bucket** for hosting (GitHub doesn't support programmatic image uploads):
+   Load approved AWS access and staging metadata in the upload shell using [the environment contract](docs/environment.md#manual-aws-staging-operations). Upload only when authorized.
    ```bash
-   source /home/dev/vikes-creds.txt
+   : "${STAGING_BUCKET:?Obtain staging upload access and bucket metadata from the maintainer.}"
    TIMESTAMP=$(date +%s)
    aws s3 cp screenshots/my-screenshot.png "s3://$STAGING_BUCKET/pr-images/<ISSUE>-<name>-${TIMESTAMP}.png" --region eu-west-1
    ```

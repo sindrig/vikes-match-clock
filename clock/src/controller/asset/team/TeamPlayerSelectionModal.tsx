@@ -55,9 +55,9 @@ const TeamPlayerSelectionModal: React.FC<TeamPlayerSelectionModalProps> = ({
     >
       <Modal.Header>
         <Modal.Title>{title}</Modal.Title>
+        {error && <p role="alert">{error}</p>}
       </Modal.Header>
       <Modal.Body>
-        {error && <p role="alert">{error}</p>}
         {instruction && (
           <p className="player-select-instruction">{instruction}</p>
         )}
