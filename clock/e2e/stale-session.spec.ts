@@ -1,358 +1,381 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import type { Page } from "@playwright/test";
 import {
   test,
   expect,
   ONE_MINUTE,
-  FakeClock,
   TEST_LISTEN_PREFIX,
   ensureEmulatorUser,
   clearEmulatorData,
   loginWithEmulatorUser,
-  closeSettings,
 } from "./fixtures/test-helpers";
-import { request as playwrightRequest } from "@playwright/test";
-import type { Asset } from "../src/types";
+import type { Asset, CurrentAsset } from "../src/types";
+import type { StaleSessionHarness } from "./fixtures/stale-session-harness";
 
-// Deterministic regression for the stale-session incident: a phone session
-// suspended with a pre-match countdown (generation A) must not be able to
-// pause or rewind a newer running match generation (generation B) when it
-// resumes. We model the stale state deliberately rather than rely on the
-// OS tab-freezing heuristics:
-//
-//   1. A "phone" browser context loads countdown generation A and is then
-//      taken OFFLINE with its page clock frozen, so it retains generation A
-//      and never observes generation B.
-//   2. The authoritative emulator is advanced through halftime into a running
-//      generation B (REST writes stand in for the operator).
-//   3. The stale phone's clock is advanced past the countdown end while it is
-//      still offline, firing the obsolete countdown-end `pauseMatch` from its
-//      generation-A render. Because the phone is offline, the stale mutation
-//      is queued locally.
-//   4. The phone is brought back online. Firebase applies the queued stale
-//      mutation against current generation B state.
-//   5. We assert generation B is still running at its current elapsed time.
-//
-// On the current implementation this reproduces the bug (the stale write
-// pauses generation B). After the fix the write is rejected / never queued
-// and generation B remains running.
+const namespace = "vikes-match-clock-test";
+const owner = {
+  Authorization: "Bearer owner",
+  "Content-Type": "application/json",
+};
+type State = {
+  match: Record<string, unknown>;
+  controller: Record<string, unknown>;
+};
+const pageErrors = new WeakMap<Page, string[]>();
 
-const STALE_MATCH_START = "14:15";
-const GEN_A_COUNTDOWN_MS = 15 * ONE_MINUTE;
-// Time the "operator" has been running the second half when the phone
-// resumes, matching the audit's ~83:32 elapsed clock.
-const GEN_B_ELAPSED_MS = 38 * ONE_MINUTE + 32 * 1000;
+async function rest(method: string, path: string, data?: unknown) {
+  const response = await fetch(
+    `http://127.0.0.1:9000/${path}.json?ns=${namespace}`,
+    {
+      method,
+      headers: owner,
+      ...(data === undefined ? {} : { body: JSON.stringify(data) }),
+    },
+  );
+  expect(response.ok, `${method} ${path}: ${response.status}`).toBe(true);
+  return response.json() as Promise<unknown>;
+}
+const statePath = `states/${TEST_LISTEN_PREFIX}`;
+const state = () => rest("GET", statePath) as Promise<State>;
+const snapshot = (
+  page: Page,
+): Promise<ReturnType<StaleSessionHarness["snapshot"]>> =>
+  page.evaluate(() => window.staleSessionHarness.snapshot());
+async function proof(page: Page, phase: string) {
+  await test.info().attach(phase, {
+    contentType: "application/json",
+    body: JSON.stringify({
+      browser: await snapshot(page),
+      backend: await state(),
+    }),
+  });
+}
+
+async function boot(page: Page) {
+  const errors: string[] = [];
+  pageErrors.set(page, errors);
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.addInitScript(() => {
+    localStorage.clear();
+    localStorage.setItem("clock_sync", "true");
+  });
+  // Keep SDK auth/retry timers running with a fixed Date. Network and
+  // subscription deliveries remain real throughout the journey.
+  const now = new Date();
+  await page.clock.install({ time: now });
+  await page.clock.setFixedTime(now);
+  await page.route(/^https?:\/\/(?!localhost[:/]|127\.0\.0\.1[:/])/, (route) =>
+    route.abort(),
+  );
+  await page.route("**/stale-session-*.svg", (route) =>
+    route.fulfill({
+      contentType: "image/svg+xml",
+      body: '<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"><rect width="8" height="8" fill="red"/></svg>',
+    }),
+  );
+  await page.goto("/e2e/fixtures/stale-session.html");
+  await loginWithEmulatorUser(page);
+  await expect
+    .poll(() => snapshot(page))
+    .toMatchObject({ connected: true, eligible: true, freshness: "ready" });
+  // Rules readback alone is insufficient: the actual signed-in SDK must be
+  // unable to write a different venue, before counters are reset at capture.
+  await expect(
+    page.evaluate(() => window.staleSessionHarness.deny()),
+  ).rejects.toThrow(/PERMISSION_DENIED/i);
+}
+
+async function disconnect(page: Page) {
+  await page.context().setOffline(true);
+  // Explicit SDK transport shutdown makes /.info/connected observable without
+  // depending on Chromium's treatment of an already-open WebSocket.
+  await page.evaluate(() => window.staleSessionHarness.disconnect());
+  await expect
+    .poll(() => snapshot(page))
+    .toMatchObject({ connected: false, eligible: false, freshness: "offline" });
+}
+
+async function processDeadline(page: Page, deadline: number) {
+  const before = await snapshot(page);
+  expect(before.ticks.length).toBeGreaterThanOrEqual(2);
+  // Advance to the due moment plus one lifecycle/renderer tick, rather than
+  // five minutes of callbacks. Every previously registered 100 ms callback
+  // must run, including MatchLifecycle's due-check driver.
+  const delta = Math.max(0, deadline - before.serverTime);
+  const time = await page.evaluate(() => Date.now());
+  await page.clock.setFixedTime(time + delta);
+  await page.clock.runFor(delta + 100);
+  await expect
+    .poll(async () => {
+      const after = await snapshot(page);
+      return before.ticks.every(
+        (ticks, index) => (after.ticks[index] ?? 0) > ticks,
+      );
+    })
+    .toBe(true);
+  expect((await snapshot(page)).serverTime).toBeGreaterThanOrEqual(deadline);
+}
+
+async function resync(page: Page) {
+  await page.context().setOffline(false);
+  await page.evaluate(() => window.staleSessionHarness.reconnect());
+  await expect.poll(() => snapshot(page)).toMatchObject({ connected: true });
+  // An unchanged SDK reconnect need not deliver core data. A distinct core
+  // update is explicit resync proof, not a claim to repair that inherited limit.
+  await rest("PATCH", `${statePath}/match`, { awayScore: 1 });
+  await expect
+    .poll(() => snapshot(page))
+    .toMatchObject({
+      eligible: true,
+      freshness: "ready",
+      match: { awayScore: 1 },
+    });
+  await proof(page, "authoritative-resync");
+}
+
+async function rejectOldCompletion(page: Page, kind: "countdown" | "asset") {
+  // A retained command exercises the obsolete session-origin boundary. Then
+  // use the CURRENT command with the captured A observation: otherwise that
+  // earlier boundary would make a removed generation CAS guard vacuous.
+  for (const origin of ["retained", "current"] as const) {
+    const committed = await page.evaluate(
+      ({ kind, origin }) => window.staleSessionHarness.complete(kind, origin),
+      { kind, origin },
+    );
+    expect(committed, `${origin} ${kind} completion of A must reject`).toBe(
+      false,
+    );
+  }
+}
+
+async function checkpoint(page: Page) {
+  await page.evaluate(() => window.staleSessionHarness.checkpoint());
+  await expect
+    .poll(() => snapshot(page))
+    .toMatchObject({ match: { injuryTime: 1 } });
+  const { writes } = await snapshot(page);
+  expect(
+    writes,
+    "only the acknowledged fresh checkpoint may submit a write",
+  ).toEqual([{ path: "/", status: "ok" }]);
+  const audit = (await rest("GET", `audit/${TEST_LISTEN_PREFIX}`)) as Record<
+    string,
+    { action: string }
+  >;
+  expect(Object.values(audit).map((event) => event.action)).toEqual([
+    "match.update",
+  ]);
+}
 
 test.describe("Stale session mutation safety", () => {
-  // These tests drive a full login, a fake clock, and a real Firebase
-  // emulator reconnection after going offline. On CI (slower runners) the
-  // default 30s test timeout is flaky, so give them headroom.
   test.describe.configure({ timeout: 60000 });
-
   test.beforeAll(async () => {
+    const rules = JSON.parse(
+      readFileSync(resolve(__dirname, "../../firebase-rules.json"), "utf8"),
+    ) as unknown;
+    await rest("PUT", ".settings/rules", rules);
+    expect(await rest("GET", ".settings/rules")).toEqual(rules);
     await ensureEmulatorUser();
   });
-
   test.beforeEach(async () => {
     await clearEmulatorData();
+    await rest("PUT", `audit/${TEST_LISTEN_PREFIX}`, null);
+    await rest("PATCH", `${statePath}/controller`, { view: "match" });
   });
-
-  async function emulatorState(): Promise<{
-    match: Record<string, unknown>;
-    controller: Record<string, unknown>;
-  }> {
-    const ctx = await playwrightRequest.newContext();
-    try {
-      const res = await ctx.get(
-        `http://127.0.0.1:9000/states/${TEST_LISTEN_PREFIX}.json?ns=vikes-match-clock-test`,
-      );
-      const json = (await res.json()) as {
-        match: Record<string, unknown>;
-        controller: Record<string, unknown>;
-      };
-      return json;
-    } finally {
-      await ctx.dispose();
-    }
-  }
-
-  async function writeMatch(partial: Record<string, unknown>): Promise<void> {
-    const ctx = await playwrightRequest.newContext();
-    try {
-      await ctx.patch(
-        `http://127.0.0.1:9000/states/${TEST_LISTEN_PREFIX}/match.json?ns=vikes-match-clock-test`,
-        { headers: { Authorization: "Bearer owner" }, data: partial },
-      );
-    } finally {
-      await ctx.dispose();
-    }
-  }
-
-  async function writeController(
-    partial: Record<string, unknown>,
-  ): Promise<void> {
-    const ctx = await playwrightRequest.newContext();
-    try {
-      await ctx.patch(
-        `http://127.0.0.1:9000/states/${TEST_LISTEN_PREFIX}/controller.json?ns=vikes-match-clock-test`,
-        { headers: { Authorization: "Bearer owner" }, data: partial },
-      );
-    } finally {
-      await ctx.dispose();
-    }
-  }
-
-  async function emulatorControllerState(): Promise<{
-    currentAsset: unknown;
-    playing: boolean;
-    activeQueueId: unknown;
-    queues: Record<string, { items: unknown[] }>;
-  }> {
-    const state = await emulatorState();
-    const ctl = state.controller as Record<string, unknown>;
-    return {
-      currentAsset: ctl.currentAsset ?? null,
-      playing: Boolean(ctl.playing),
-      activeQueueId: ctl.activeQueueId ?? null,
-      queues: (ctl.queues as Record<string, { items: unknown[] }>) ?? {},
-    };
-  }
+  test.afterEach(async ({ page }) => {
+    await test.info().attach("session-deliveries", {
+      contentType: "application/json",
+      body: JSON.stringify(
+        await page.evaluate(() => window.staleSessionHarness?.deliveries),
+      ),
+    });
+    expect(pageErrors.get(page) ?? []).toEqual([]);
+  });
 
   test("suspended stale countdown cannot pause a newer running match", async ({
     page,
   }) => {
-    // --- Phase 1: phone context loads countdown generation A ---
-    await page.addInitScript(() => {
-      localStorage.clear();
-      localStorage.setItem("clock_sync", "true");
+    await boot(page);
+    const started = (await snapshot(page)).serverTime + 1000;
+    await rest("PATCH", `${statePath}/match`, {
+      started,
+      countdown: true,
+      halftimeCountdown: false,
     });
-    const phoneClock = new FakeClock(new Date(2025, 3, 10, 14, 0, 0));
-    await page.clock.setFixedTime(phoneClock.time);
-    await page.goto("/");
-    await loginWithEmulatorUser(page);
-    // Configure the pre-match start time in the settings modal, then switch to
-    // Match view and start the pre-match countdown. The app computes the
-    // countdown's `started` from its own getServerTime(), so generation A is
-    // internally consistent (deterministic under the fake clock).
-    await page.getByRole("button", { name: "Stillingar" }).click();
-    await page.locator(".match-start-time-selector").fill(STALE_MATCH_START);
-    await closeSettings(page);
-    await page
-      .locator(".view-mode-buttons")
-      .getByText("Match", { exact: true })
-      .click();
-    await page.getByText("Hefja niðurtalningu").click();
-    await phoneClock.advance(page, 1000);
-    // Countdown generation A is now active (started in the future).
-    await expect(page.locator(".matchclock")).toContainText(/14:5\d/);
+    await expect
+      .poll(() => snapshot(page))
+      .toMatchObject({ match: { started, countdown: true }, eligible: true });
+    await processDeadline(page, started - 500);
+    await expect(page.locator(".matchclock")).not.toHaveText("00:00");
+    expect((await snapshot(page)).serverTime).toBeLessThan(started);
+    await page.evaluate(() => window.staleSessionHarness.capture());
+    await proof(page, "observed-countdown-A");
 
-    // Capture generation A's authoritative `started` timestamp.
-    const genAStarted = (await emulatorState()).match.started as number;
-    expect(genAStarted).toBeGreaterThan(phoneClock.time);
-
-    // --- Phase 2: isolate the phone (offline + frozen) so it keeps gen A ---
-    const context = page.context();
-    await context.setOffline(true);
-
-    // --- Phase 3: operator advances emulator through halftime to gen B ---
-    // Complete generation A, play the first half, advance halftime, and start
-    // a running second half (generation B) at the current elapsed time.
-    const genBStarted = phoneClock.time + GEN_A_COUNTDOWN_MS + GEN_B_ELAPSED_MS;
-    await writeMatch({
-      started: 0,
+    await disconnect(page);
+    const genB = {
+      started: started + 1,
       countdown: false,
       halftimeCountdown: false,
-      timeElapsed: 45 * ONE_MINUTE,
+      timeElapsed: 83 * ONE_MINUTE + 32000,
       halfStops: [90, 105, 120],
+    };
+    await rest("PATCH", `${statePath}/match`, genB);
+    const authoritativeB = (await state()).match;
+    await processDeadline(page, started);
+    await expect(page.locator(".matchclock")).toHaveText("00:00");
+    expect(await snapshot(page)).toMatchObject({
+      eligible: false,
+      match: { started, countdown: true },
+      writes: [],
     });
-    await writeMatch({
-      started: genBStarted,
-      countdown: false,
-      halftimeCountdown: false,
-      timeElapsed: GEN_B_ELAPSED_MS,
-      halfStops: [90, 105, 120],
+    await proof(page, "overdue-offline-A-with-authoritative-B");
+
+    await resync(page);
+    await expect.poll(() => snapshot(page)).toMatchObject({ match: genB });
+    await processDeadline(page, (await snapshot(page)).serverTime);
+    await rejectOldCompletion(page, "countdown");
+    await checkpoint(page);
+    expect((await state()).match).toEqual({
+      ...authoritativeB,
+      awayScore: 1,
+      injuryTime: 1,
     });
-    let state = await emulatorState();
-    expect(state.match.started).toBe(genBStarted);
-    expect(state.match.countdown).toBe(false);
-
-    // --- Phase 4: resume the stale phone (still offline), fire the stale
-    // countdown-end callback. The phone's local matchRef is still gen A, so
-    // its pauseMatch computes `{ started: 0 }` and queues it offline. ---
-    await phoneClock.advance(page, GEN_A_COUNTDOWN_MS + ONE_MINUTE);
-    await page.waitForTimeout(500);
-
-    // --- Phase 5: bring the phone online; the queued stale write is applied
-    // against the authoritative gen B state. ---
-    await context.setOffline(false);
-    await page.waitForTimeout(1500);
-
-    // --- Assert: generation B must remain running, unchanged. ---
-    state = await emulatorState();
-    expect(state.match.started).toBe(genBStarted);
-    expect(state.match.countdown).toBe(false);
-
-    // The running clock must not be reset/paused at the 45:00 second-half
-    // base (the incident symptom). Exact rendered time depends on the fake
-    // clock's server-time offset after reconnect, so assert on the pause
-    // symptom rather than a specific elapsed value.
     await expect(page.locator(".matchclock")).not.toHaveText("45:00");
+    await proof(page, "resynced-B-after-settled-stale-completions");
   });
 
-  test("suspended stale timed-asset callbacks do not consume the queue or clear the current asset", async ({
+  test("suspended stale timed-asset callbacks cannot consume the queue or clear newer B", async ({
     page,
   }) => {
-    // --- Phase 1: phone context renders a timed current asset (image) with an
-    // active autoplay queue (generation A). The asset's `time` schedules a
-    // `removeAssetAfterTimeout` timer in the Asset renderer. ---
-    await page.addInitScript(() => {
-      localStorage.clear();
-      localStorage.setItem("clock_sync", "true");
+    await boot(page);
+    const image = (key: string): Asset => ({
+      key,
+      type: "IMAGE",
+      url: new URL(`/stale-session-${key}.svg`, page.url()).href,
     });
-    const phoneClock = new FakeClock(new Date(2025, 3, 10, 14, 0, 0));
-    await page.clock.setFixedTime(phoneClock.time);
-    await page.goto("/");
-    await loginWithEmulatorUser(page);
-    await page
-      .locator(".view-mode-buttons")
-      .getByText("Match", { exact: true })
-      .click();
-
-    const asset: Asset = {
-      key: "stale-image",
-      type: "IMAGE",
-      url: "https://example.com/stale.png",
+    const currentA: CurrentAsset = {
+      asset: image("a"),
+      time: 3,
+      occurrenceId: "stale-occurrence-a",
     };
-    const queueItem: Asset = {
-      key: "queue-item-1",
-      type: "IMAGE",
-      url: "https://example.com/q1.png",
+    const currentB: CurrentAsset = {
+      asset: image("b"),
+      time: 3,
+      occurrenceId: "newer-occurrence-b",
     };
-    await writeController({
-      currentAsset: { asset, time: 3 },
+    const queue = {
+      id: "queue-1",
+      name: "Q",
+      items: [image("q1"), image("q2")],
+      autoPlay: true,
+      imageSeconds: 3,
+      cycle: false,
+      order: 0,
+    };
+    await rest("PATCH", `${statePath}/controller`, {
+      currentAsset: currentA,
       playing: true,
-      activeQueueId: "queue-1",
-      queues: {
-        "queue-1": {
-          id: "queue-1",
-          name: "Q",
-          items: [queueItem],
-          autoPlay: true,
-          imageSeconds: 3,
-          cycle: false,
-          order: 0,
-        },
-      },
+      activeQueueId: queue.id,
+      queues: { [queue.id]: queue },
     });
-    // The phone renders the overlay asset and schedules the 3s expiry timer.
-    await expect(page.locator(".overlay-container")).toBeVisible({
-      timeout: 10000,
+    await expect
+      .poll(() => snapshot(page))
+      .toMatchObject({
+        controller: { currentAsset: currentA },
+        eligible: true,
+      });
+    await expect(page.locator('.overlay-container img[alt="a"]')).toBeVisible();
+    await processDeadline(page, (await snapshot(page)).serverTime);
+    const observedAt = (await snapshot(page)).serverTime;
+    await page.evaluate(() => window.staleSessionHarness.capture());
+    await proof(page, "observed-timed-asset-A");
+
+    await disconnect(page);
+    // B really replaces A on the server while the phone still observes A.
+    await rest("PATCH", `${statePath}/controller`, { currentAsset: currentB });
+    const authoritativeB = (await state()).controller;
+    expect(authoritativeB.currentAsset).toEqual(currentB);
+    await processDeadline(page, observedAt + 3000);
+    expect(await snapshot(page)).toMatchObject({
+      eligible: false,
+      controller: { currentAsset: currentA },
+      writes: [],
     });
+    await proof(page, "overdue-offline-A-with-authoritative-asset-B");
 
-    // --- Phase 2: isolate the phone (offline + frozen) so it keeps gen A ---
-    const context = page.context();
-    await context.setOffline(true);
-
-    // --- Phase 3: the authoritative emulator is generation B and still holds
-    // the current asset with an intact queue (nothing consumed). ---
-    let ctl = await emulatorControllerState();
-    expect(ctl.currentAsset).not.toBeNull();
-    expect(ctl.playing).toBe(true);
-    expect(ctl.queues["queue-1"]?.items).toHaveLength(1);
-
-    // --- Phase 4: resume the stale phone and advance its clock past the
-    // asset expiry. `runFor` fires the pending one-shot `setTimeout` that the
-    // stale gen-A renderer scheduled, so the delayed
-    // `removeAssetAfterTimeout` runs while offline and its stale mutation is
-    // queued locally. ---
-    await page.clock.runFor(5 * ONE_MINUTE);
-    await page.waitForTimeout(500);
-
-    // --- Phase 5: bring the phone online; the queued stale asset write is
-    // applied against authoritative gen B controller state. ---
-    await context.setOffline(false);
-    await page.waitForTimeout(1500);
-
-    // --- Assert: the authoritative current asset and queue are untouched. ---
-    ctl = await emulatorControllerState();
-    expect(ctl.currentAsset).not.toBeNull();
-    expect(ctl.playing).toBe(true);
-    expect(ctl.queues["queue-1"]?.items).toHaveLength(1);
+    await resync(page);
+    await expect
+      .poll(() => snapshot(page))
+      .toMatchObject({ controller: { currentAsset: currentB } });
+    await expect(page.locator('.overlay-container img[alt="b"]')).toBeVisible();
+    await processDeadline(page, (await snapshot(page)).serverTime);
+    await rejectOldCompletion(page, "asset");
+    await checkpoint(page);
+    expect((await state()).controller).toEqual(authoritativeB);
+    await proof(page, "newer-B-and-whole-queue-preserved");
   });
 
   test("still-current countdown completes after resync once the client is eligible", async ({
     page,
   }) => {
-    // A countdown generation that is still authoritative when the phone
-    // resumes must NOT stay stuck: the lifecycle coordinator defers the due
-    // transition while the client is ineligible (offline) and completes it as
-    // soon as the freshness barrier clears and the client is ready to write
-    // again.
-    //
-    // getServerTime() is derived from the real server time via Firebase's
-    // serverTimeOffset, so a fake page clock cannot make a countdown "due"
-    // after resync (the offset is recomputed on reconnect). Instead this test
-    // seeds a still-current countdown whose `started` is a few seconds in the
-    // future in real server time:
-    //
-    //   1. The phone loads and observes the running countdown (not yet due).
-    //   2. It goes offline; generation A remains authoritative and, in real
-    //      time, `started` passes → the countdown becomes due while the phone
-    //      is ineligible.
-    //   3. The phone comes back online; after resync it is eligible again and
-    //      generation A is still current (real time has passed `started`), so
-    //      the countdown must complete.
-    //   4. We assert the countdown completed (started 0, countdown false)
-    //      rather than remaining latched-but-stuck on the expired generation.
-    //
-    // The emulator does not re-deliver unchanged subscription data on a raw
-    // WebSocket reconnect, so after the phone comes back online we deliver the
-    // post-resume authoritative snapshot explicitly with an innocuous match
-    // write (`timeElapsed`). This mirrors production Firebase, which re-fires
-    // the current value on reconnect and drives the client back to "ready".
-    await page.addInitScript(() => {
-      localStorage.clear();
-      localStorage.setItem("clock_sync", "true");
-    });
-    await page.goto("/");
-    await loginWithEmulatorUser(page);
-
-    // Seed a still-current countdown that becomes due ~15s from now (real
-    // server time), letting the phone observe it while it is still running.
-    const started = Date.now() + 15000;
-    await writeMatch({
+    await boot(page);
+    const started = (await snapshot(page)).serverTime + 1000;
+    await rest("PATCH", `${statePath}/match`, {
       started,
       countdown: true,
       halftimeCountdown: false,
-      timeElapsed: 0,
-      halfStops: [45, 90, 105, 120],
     });
-    await page.waitForTimeout(1000);
-    let state = await emulatorState();
-    expect(state.match.started).toBe(started);
-    expect(state.match.countdown).toBe(true);
+    await expect
+      .poll(() => snapshot(page))
+      .toMatchObject({ match: { started, countdown: true }, eligible: true });
+    await processDeadline(page, started - 500);
+    await expect(page.locator(".matchclock")).not.toHaveText("00:00");
+    expect((await snapshot(page)).serverTime).toBeLessThan(started);
+    await page.evaluate(() => window.staleSessionHarness.capture());
+    await proof(page, "observed-still-current-countdown");
+    await disconnect(page);
+    await processDeadline(page, started);
+    await expect(page.locator(".matchclock")).toHaveText("00:00");
+    expect(await snapshot(page)).toMatchObject({
+      eligible: false,
+      match: { started, countdown: true },
+      writes: [],
+    });
+    expect((await state()).match).toMatchObject({ started, countdown: true });
+    await proof(page, "current-countdown-overdue-while-ineligible");
 
-    // --- Phase 2: isolate the phone while the countdown is still running. ---
-    const context = page.context();
-    await context.setOffline(true);
-
-    // --- Phase 3: wait out the countdown in real time while the phone is
-    // ineligible (offline). The lifecycle must defer the due transition, so
-    // generation A is left untouched. ---
-    await page.waitForTimeout(16000);
-    state = await emulatorState();
-    expect(state.match.started).toBe(started);
-    expect(state.match.countdown).toBe(true);
-
-    // --- Phase 4: resume. After resync the client is eligible again and the
-    // still-current generation A must complete rather than stay stuck. ---
-    await context.setOffline(false);
-    await page.waitForTimeout(3000);
-    await writeMatch({ timeElapsed: 1 });
-    await page.waitForTimeout(2000);
-
-    // --- Assert: the countdown completed (the due transition was retried, not
-    // dropped, once eligibility returned). ---
-    state = await emulatorState();
-    expect(state.match.started).toBe(0);
-    expect(state.match.countdown).toBe(false);
+    await resync(page);
+    // Reconnection recomputes the SDK serverTimeOffset. Rebase the simulated
+    // deadline against that actual offset; do not replace getServerTime or
+    // wait fifteen real seconds for the same generation to expire again.
+    await processDeadline(page, started);
+    await expect
+      .poll(() => state())
+      .toMatchObject({
+        match: {
+          started: 0,
+          countdown: false,
+          halftimeCountdown: false,
+          timeElapsed: 0,
+        },
+      });
+    await expect
+      .poll(async () => {
+        const audit = (await rest(
+          "GET",
+          `audit/${TEST_LISTEN_PREFIX}`,
+        )) as Record<string, { action: string }> | null;
+        return Object.values(audit ?? {}).map((event) => event.action);
+      })
+      .toEqual(["match.complete-countdown"]);
+    await processDeadline(page, (await snapshot(page)).serverTime);
+    await expect
+      .poll(async () => (await snapshot(page)).writes)
+      .toEqual([
+        { path: `/${statePath}/match`, status: "ok" },
+        { path: "/", status: "ok" },
+      ]);
+    await proof(page, "still-current-countdown-committed-after-resync");
   });
 });
