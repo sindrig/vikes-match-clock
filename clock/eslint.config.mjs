@@ -12,7 +12,6 @@ export default tseslint.config(
       "dist/**",
       "node_modules/**",
       "src/club-ids.js",
-      "src/registerServiceWorker.js",
       "src/lib/idb-keyval.js",
       "*.config.js",
       "*.config.ts",
