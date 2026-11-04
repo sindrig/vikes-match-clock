@@ -1,3 +1,4 @@
+import { MutationSession } from "./lib/mutationSession";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import App from "./App";
@@ -100,6 +101,11 @@ const defaultViewport = {
 
 function setupState1() {
   mockedUseLocalState.mockReturnValue({
+    logout: () => firebaseAuth.logout(),
+    mutationSession: new MutationSession({
+      location: "",
+      authenticated: false,
+    }),
     auth: { isLoaded: true, isEmpty: true },
     listenPrefix: "",
     setListenPrefix: vi.fn(),
@@ -133,6 +139,11 @@ function setupState2(
   const setScreenKey =
     overrides?.setScreenKey ?? vi.fn<(vp: unknown) => void>();
   mockedUseLocalState.mockReturnValue({
+    logout: () => firebaseAuth.logout(),
+    mutationSession: new MutationSession({
+      location: "",
+      authenticated: false,
+    }),
     auth: { isLoaded: true, isEmpty: true },
     listenPrefix: "vikinni",
     setListenPrefix,
@@ -169,6 +180,11 @@ function setupState3(
   const setScreenKey =
     overrides?.setScreenKey ?? vi.fn<(vp: unknown) => void>();
   mockedUseLocalState.mockReturnValue({
+    logout: () => firebaseAuth.logout(),
+    mutationSession: new MutationSession({
+      location: "",
+      authenticated: false,
+    }),
     auth: { isLoaded: true, isEmpty: false, email: "test@test.com" },
     listenPrefix: "vikinni",
     setListenPrefix,
@@ -206,13 +222,10 @@ function setupState3(
   } as unknown as ReturnType<typeof useRemoteSettings>);
   mockedUsePerimeter.mockReturnValue({
     perimeter: { enabled: false, state: "off" },
-    preview: null,
-    previewLoaded: false,
     setPerimeterState: vi.fn(),
     setPerimeterOverlay: vi.fn(),
     clearPerimeterOverlay: vi.fn(),
     overlay: null,
-    overlayStatus: null,
     getServerTime: vi.fn(),
   } as unknown as ReturnType<typeof usePerimeter>);
   return { setListenPrefix, setScreenKey };
@@ -456,6 +469,11 @@ describe("App", () => {
   describe("fontSize propagation", () => {
     it("sets root font-size from vp.fontSize", () => {
       mockedUseLocalState.mockReturnValue({
+        logout: () => firebaseAuth.logout(),
+        mutationSession: new MutationSession({
+          location: "",
+          authenticated: false,
+        }),
         auth: { isLoaded: true, isEmpty: true },
         listenPrefix: "vikinni",
         setListenPrefix: vi.fn(),
@@ -491,6 +509,11 @@ describe("App", () => {
 
     it("resets root font-size on unmount", () => {
       mockedUseLocalState.mockReturnValue({
+        logout: () => firebaseAuth.logout(),
+        mutationSession: new MutationSession({
+          location: "",
+          authenticated: false,
+        }),
         auth: { isLoaded: true, isEmpty: true },
         listenPrefix: "vikinni",
         setListenPrefix: vi.fn(),
@@ -539,6 +562,11 @@ describe("App", () => {
 
     it("stops scaling root font-size when a display logs in", () => {
       mockedUseLocalState.mockReturnValue({
+        logout: () => firebaseAuth.logout(),
+        mutationSession: new MutationSession({
+          location: "",
+          authenticated: false,
+        }),
         auth: { isLoaded: true, isEmpty: true },
         listenPrefix: "vikinni",
         setListenPrefix: vi.fn(),
@@ -574,6 +602,11 @@ describe("App", () => {
   describe("Loading spinner", () => {
     it("shows spinner when listenPrefix is set but firebase is not ready", () => {
       mockedUseLocalState.mockReturnValue({
+        logout: () => firebaseAuth.logout(),
+        mutationSession: new MutationSession({
+          location: "",
+          authenticated: false,
+        }),
         auth: { isLoaded: true, isEmpty: true },
         listenPrefix: "vikinni",
         setListenPrefix: vi.fn(),
@@ -600,6 +633,11 @@ describe("App", () => {
 
     it("shows the boot spinner on a black background", () => {
       mockedUseLocalState.mockReturnValue({
+        logout: () => firebaseAuth.logout(),
+        mutationSession: new MutationSession({
+          location: "",
+          authenticated: false,
+        }),
         auth: { isLoaded: true, isEmpty: true },
         listenPrefix: "vikinni",
         setListenPrefix: vi.fn(),
@@ -627,6 +665,11 @@ describe("App", () => {
 
     it("shows spinner when auth is not yet loaded", () => {
       mockedUseLocalState.mockReturnValue({
+        logout: () => firebaseAuth.logout(),
+        mutationSession: new MutationSession({
+          location: "",
+          authenticated: false,
+        }),
         auth: { isLoaded: false, isEmpty: true },
         listenPrefix: "vikinni",
         setListenPrefix: vi.fn(),

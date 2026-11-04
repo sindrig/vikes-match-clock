@@ -1,18 +1,25 @@
-import React, { useEffect, useRef } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { Modal, Button, Divider } from "rsuite";
 import { QueueState, Asset } from "../../../types";
 import "./QueuePicker.css";
 
-interface QueuePickerProps {
+export interface QueuePickerProps {
+  draftId: string;
   queues: Record<string, QueueState>;
   assets: Asset[];
-  onShowNow: (assets: Asset[]) => void;
-  onAddToQueue: (queueId: string, assets: Asset[]) => void;
-  onCreateAndAdd: (queueName: string, assets: Asset[]) => void;
+  onShowNow: (assets: Asset[]) => void | Promise<void>;
+  onAddToQueue: (queueId: string, assets: Asset[]) => void | Promise<void>;
+  onCreateAndAdd: (queueName: string, assets: Asset[]) => void | Promise<void>;
   onClose: () => void;
 }
 
-const QueuePicker: React.FC<QueuePickerProps> = ({
+const QueuePickerDraft: React.FC<QueuePickerProps> = ({
   queues,
   assets,
   onShowNow,
@@ -23,6 +30,35 @@ const QueuePicker: React.FC<QueuePickerProps> = ({
   const queueIds = Object.keys(queues);
   const queueCount = queueIds.length;
   const prevAssetsRef = useRef<Record<string, boolean>>({});
+  const submitting = useRef(false);
+  const active = useRef(true);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
+  useLayoutEffect(() => {
+    active.current = true;
+    return () => {
+      active.current = false;
+    };
+  }, []);
+  const submit = useCallback(async (action: () => void | Promise<void>) => {
+    if (!active.current || submitting.current) return;
+    submitting.current = true;
+    setPending(true);
+    setError("");
+    try {
+      await action();
+    } catch (failure) {
+      if (!active.current) return;
+      setError(
+        failure instanceof Error
+          ? failure.message
+          : "Ekki tókst að vista biðröð.",
+      );
+    } finally {
+      submitting.current = false;
+      if (active.current) setPending(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (assets.length === 0) return;
@@ -43,11 +79,11 @@ const QueuePicker: React.FC<QueuePickerProps> = ({
     prevAssetsRef.current = assetSignature;
 
     if (queueCount === 0) {
-      onCreateAndAdd("Biðröð 1", assets);
+      void submit(() => onCreateAndAdd("Biðröð 1", assets));
     }
-  }, [queueCount, assets, onCreateAndAdd]);
+  }, [queueCount, assets, onCreateAndAdd, submit]);
 
-  if (queueCount === 0) {
+  if (queueCount === 0 && !error) {
     return null;
   }
 
@@ -59,13 +95,15 @@ const QueuePicker: React.FC<QueuePickerProps> = ({
         <Modal.Title>Veldu aðgerð</Modal.Title>
       </Modal.Header>
       <Modal.Body>
+        {error && <p role="alert">{error}</p>}
         <div className="queue-picker-list">
           <Button
             appearance="primary"
             color="green"
             block
             size="lg"
-            onClick={() => onShowNow(assets)}
+            disabled={pending}
+            onClick={() => void submit(() => onShowNow(assets))}
           >
             Sýna
           </Button>
@@ -75,7 +113,8 @@ const QueuePicker: React.FC<QueuePickerProps> = ({
               key={q.id}
               appearance="ghost"
               block
-              onClick={() => onAddToQueue(q.id, assets)}
+              disabled={pending}
+              onClick={() => void submit(() => onAddToQueue(q.id, assets))}
             >
               {q.name || q.id}
             </Button>
@@ -83,9 +122,10 @@ const QueuePicker: React.FC<QueuePickerProps> = ({
           <Button
             appearance="primary"
             block
+            loading={pending}
             onClick={() => {
               const newName = `Biðröð ${queueCount + 1}`;
-              onCreateAndAdd(newName, assets);
+              void submit(() => onCreateAndAdd(newName, assets));
             }}
           >
             Ný biðröð
@@ -95,5 +135,11 @@ const QueuePicker: React.FC<QueuePickerProps> = ({
     </Modal>
   );
 };
+
+// Pending state, feedback and the synchronous click guard belong to one
+// selection, even when another draft contains the exact same asset objects.
+const QueuePicker: React.FC<QueuePickerProps> = (props) => (
+  <QueuePickerDraft key={props.draftId} {...props} />
+);
 
 export default QueuePicker;

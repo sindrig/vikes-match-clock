@@ -231,8 +231,8 @@ The brightness feature can run an `automatic` mode that replaces the operator's
 5–6 manual brightness changes per match with a prediction computed **in this
 daemon**: the sun's altitude at the screen's location (exact, offline math via
 SunCalc 1.9.0) and cloud cover at that location from **Open-Meteo**
-(free for non-commercial use — attribution required: *"Weather data by
-Open-Meteo.com"*). The controller UI only writes mode and parameters; predicted
+(free for non-commercial use — attribution required: _"Weather data by
+Open-Meteo.com"_). The controller UI only writes mode and parameters; predicted
 values flow through the same snapshot → write → verify → restore worker as
 manual commands. The model (empirical curve: clear-sky lux from elevation,
 Kasten & Czeplak cloud multiplier, power-law lux→percent mapping) is documented
@@ -241,12 +241,12 @@ reference test vectors in that doc are encoded in `tests/auto-brightness.test.js
 
 ### Paths
 
-| Path                                                | Writer     | Purpose                                                                       |
-| --------------------------------------------------- | ---------- | ----------------------------------------------------------------------------- |
-| `states/{location}/perimeter/brightnessAuto`        | Controller | Auto mode config: `{ enabled, min, max, exponent, cloudWeight, luxMin, luxMax, updatedAt }` |
-| `perimeter/{location}/brightnessStatus`             | Daemon     | Extended with `mode` (`"auto"`) and a live `predicted` readout; a fresh daemon with no worker history publishes a `shadow`-phase prediction document |
-| `perimeter/{location}/brightnessCalibration`        | Daemon     | Append-only fit log: `{ ts, source: "auto"\|"manual", percent, lux, sunElevationDeg, cloudCover }` |
-| `states/{location}/perimeter/brightness`            | Controller + Daemon | Unchanged: auto writes are ordinary integer commands into this path    |
+| Path                                         | Writer              | Purpose                                                                                                                                              |
+| -------------------------------------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `states/{location}/perimeter/brightnessAuto` | Controller          | Auto mode config: `{ enabled, min, max, exponent, cloudWeight, luxMin, luxMax, updatedAt }`                                                          |
+| `perimeter/{location}/brightnessStatus`      | Daemon              | Extended with `mode` (`"auto"`) and a live `predicted` readout; a fresh daemon with no worker history publishes a `shadow`-phase prediction document |
+| `perimeter/{location}/brightnessCalibration` | Daemon              | Append-only fit log: `{ ts, source: "auto"\|"manual", percent, lux, sunElevationDeg, cloudCover }`                                                   |
+| `states/{location}/perimeter/brightness`     | Controller + Daemon | Unchanged: auto writes are ordinary integer commands into this path                                                                                  |
 
 The `predicted` block is `{ lux, percent, sunElevationDeg, cloudCover,
 weatherAgeMin, weatherStale }` — the live readout the controller shows. It is
@@ -273,7 +273,7 @@ against the operator's manual values during rollout).
 - **Errors are contained:** any internal tick failure holds the last applied
   value; weather problems degrade to the last cached cloud fraction, and after
   **3 h stale** to a conservative fixed fraction of 0.8 with `weatherStale:
-  true` in the status (dimming is safer than glaring over Reykjavík on an
+true` in the status (dimming is safer than glaring over Reykjavík on an
   overcast day). The daemon never blocks or throws on weather problems.
 - **Enabled but incomplete** (invalid `PERIMETER_LAT`/`PERIMETER_LNG`, or
   `PERIMETER_BRIGHTNESS_ENABLED` not true) publishes a configuration-caused
@@ -287,7 +287,7 @@ against the operator's manual values during rollout).
   payload shapes, so manual-only operation cannot regress.
 - With the flag on, worker status documents gain extra fields (`mode`,
   `predicted`) that older controllers ignore gracefully: the legacy parser
-  builds its own object and only rejects unknown *phases*. The one
+  builds its own object and only rejects unknown _phases_. The one
   not-parseable shape is the fresh-daemon `shadow` document (prediction
   published before any write); it is inert for manual operation and the
   updated controller renders it as the `Samanburður` badge. Enable the
@@ -323,6 +323,15 @@ elevation and irrelevant). Tuning knobs — `PERIMETER_AUTO_TICK_SECONDS` (60),
 `perimeter-control.env.example`. Venue egress to `api.open-meteo.com` must be
 reachable from the gateway box.
 
+Weather requests have a separate **10-second deadline** covering both response
+headers and the complete JSON body (`OpenMeteoCloudCover`'s `requestTimeoutMs`
+constructor option). A timeout preserves the cached value and its age, allowing
+the next scheduled poll to try again. `stop()` aborts the active request and
+prevents further polling until `start()`. Restarting polls immediately; late
+results from an earlier request cannot update the cache or release the new
+request's guard. Providers that ignore `AbortSignal` cannot hold up the poller,
+but their underlying work cannot be forcibly terminated.
+
 ## Tests
 
 From `perimeter-control/`, with Node >= 22 and Corepack:
@@ -333,11 +342,22 @@ corepack pnpm test
 ```
 
 Tests run one file at a time and use mocks/temporary installation fixtures.
-The retained worker, auto model, weather and Vnnox suites are unchanged.
+The retained worker, auto model and Vnnox suites remain; the weather suite also
+covers the separately reviewed deadline/cancellation fix.
 Gateway integration scenarios cover power gating, manual and auto writes,
 weather fallback, calibration, status recovery and irreversible-write drain.
 Installer unit fixtures stub user/service/dependency operations; they never
 install an actual systemd service. Hardware acceptance remains on HOLD.
+
+Weather-only tests need no dependency installation. From `perimeter-control/`:
+
+```bash
+node --test tests/weather.test.js
+```
+
+These cover healthy/cache/stale behavior, cancellation-ignoring providers,
+stop/restart races, and real HTTP stalls on loopback with ephemeral ports.
+They do not contact Open-Meteo, Firebase, or hardware.
 
 The opt-in real-pnpm proof runs the installer against synthetic existing
 installations, twice per successful layout. It checks same- and cross-filesystem

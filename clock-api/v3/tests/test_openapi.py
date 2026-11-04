@@ -38,6 +38,7 @@ def test_export_and_health_are_offline_and_preserve_tracked_contract(tmp_path):
         env={
             "PATH": os.defpath,
             "PYTHONPATH": str(api_dir),
+            "PYTHONDONTWRITEBYTECODE": "1",
             "PYTHONNOUSERSITE": "1",
             "AWS_CONFIG_FILE": str(tmp_path / "no-aws-config"),
             "AWS_SHARED_CREDENTIALS_FILE": str(tmp_path / "no-credentials"),

@@ -8,19 +8,15 @@ import {
   parseCustomPresets,
   parseClubOverrides,
   parsePerimeterState,
-  parsePerimeterPreview,
   parsePerimeterOverlay,
   buildGoalScorerOverlayCommand,
   parsePerimeterMediaPairs,
   parseMainScreenMediaAsset,
   parsePerimeterGoalVideo,
   parsePerimeterAdLayout,
-  parsePerimeterAppliedAdLayout,
   parsePerimeterBrightness,
   parsePerimeterBrightnessStatus,
   parsePerimeterBrightnessAuto,
-  parsePerimeterOverlayGeometry,
-  parseGoalScorerPreparationStatus,
   parsePerimeterDisplay,
 } from "./firebaseParsers";
 import { Sports, DEFAULT_HALFSTOPS, DEFAULT_THEME } from "../constants";
@@ -97,12 +93,12 @@ describe("firebaseParsers", () => {
 
     it("handles array input (coerces to object)", () => {
       const result = parseLocations([]);
-      expect(result).toEqual({ available: [], screens: [] });
+      expect(result).toEqual({ available: [], venues: {}, screens: [] });
     });
 
     it("returns empty object with empty input", () => {
       const result = parseLocations({});
-      expect(result).toEqual({ available: [], screens: [] });
+      expect(result).toEqual({ available: [], venues: {}, screens: [] });
     });
 
     it("parses single location with screens", () => {
@@ -131,6 +127,7 @@ describe("firebaseParsers", () => {
         },
         label: "Viken",
         key: "viken",
+        pitchIds: [],
       });
     });
 
@@ -217,15 +214,15 @@ describe("firebaseParsers", () => {
               key: "main",
             },
           ],
-          pitchIds: ["pitch1", "pitch2"],
+          pitchIds: [102, "103"],
         },
       };
 
       const result = parseLocations(data);
-      expect(result!.screens[0]!.pitchIds).toEqual(["pitch1", "pitch2"]);
+      expect(result!.screens[0]!.pitchIds).toEqual([102, 103]);
     });
 
-    it("omits pitchIds when not present", () => {
+    it("defaults pitchIds to an empty list when not present", () => {
       const data = {
         viken: {
           label: "Viken",
@@ -240,7 +237,7 @@ describe("firebaseParsers", () => {
       };
 
       const result = parseLocations(data);
-      expect(result!.screens[0]!.pitchIds).toBeUndefined();
+      expect(result!.screens[0]!.pitchIds).toEqual([]);
     });
 
     it("skips invalid location values", () => {
@@ -1556,100 +1553,6 @@ describe("firebaseParsers", () => {
     });
   });
 
-  describe("parsePerimeterPreview", () => {
-    it("returns undefined for null or non-object input", () => {
-      expect(parsePerimeterPreview(null)).toBeUndefined();
-      expect(parsePerimeterPreview(undefined)).toBeUndefined();
-      expect(parsePerimeterPreview("x")).toBeUndefined();
-      expect(parsePerimeterPreview(12)).toBeUndefined();
-    });
-
-    it("parses columns, clips, filenames and thumbnails", () => {
-      const result = parsePerimeterPreview({
-        updatedAt: 1723392000000,
-        columns: [
-          {
-            id: 1,
-            name: "Column 1",
-            clips: [
-              {
-                id: 12,
-                filename: "sponsor-loop.mp4",
-                thumbnail: "data:image/jpeg;base64,abc",
-              },
-              { id: 13, filename: "logo.png" },
-            ],
-          },
-        ],
-      });
-      expect(result).toEqual({
-        updatedAt: 1723392000000,
-        columns: [
-          {
-            id: 1,
-            name: "Column 1",
-            clips: [
-              {
-                id: 12,
-                filename: "sponsor-loop.mp4",
-                thumbnail: "data:image/jpeg;base64,abc",
-              },
-              { id: 13, filename: "logo.png", thumbnail: undefined },
-            ],
-          },
-        ],
-      });
-    });
-
-    it("treats a missing updatedAt as null", () => {
-      expect(parsePerimeterPreview({ columns: [] })).toEqual({
-        updatedAt: null,
-        columns: [],
-      });
-    });
-
-    it("drops clips without a filename and columns without a name", () => {
-      const result = parsePerimeterPreview({
-        columns: [
-          { id: 1, name: "Column 1", clips: [{ id: 2 }] },
-          { id: 3, name: "", clips: [{ id: 4, filename: "x.mp4" }] },
-          { id: 5, name: "Column 3", clips: null },
-        ],
-      });
-      expect(result).toEqual({
-        updatedAt: null,
-        columns: [
-          { id: 1, name: "Column 1", clips: [] },
-          { id: 5, name: "Column 3", clips: [] },
-        ],
-      });
-    });
-
-    it("ignores malformed column and clip entries", () => {
-      const result = parsePerimeterPreview({
-        columns: [
-          "junk",
-          {
-            id: 1,
-            name: "Column 1",
-            clips: [{ id: 2, filename: "a.mp4" }, null, "junk"],
-          },
-        ],
-      });
-      expect(result!.columns).toHaveLength(1);
-      expect(result!.columns[0].clips).toHaveLength(1);
-      expect(result!.columns[0].clips[0].filename).toBe("a.mp4");
-    });
-
-    it("falls back to null ids when a numeric id is missing", () => {
-      const result = parsePerimeterPreview({
-        columns: [{ name: "Column 1", clips: [{ filename: "a.mp4" }] }],
-      });
-      expect(result!.columns[0].id).toBeNull();
-      expect(result!.columns[0].clips[0].id).toBeNull();
-    });
-  });
-
   describe("parsePerimeterAdLayout", () => {
     const validLayout = {
       version: 1,
@@ -1933,145 +1836,6 @@ describe("firebaseParsers", () => {
         ],
       };
       expect(parsePerimeterAdLayout(clash)).toBeNull();
-    });
-  });
-
-  describe("parsePerimeterAppliedAdLayout", () => {
-    const validApplied = {
-      lanes: [
-        { id: "1", name: "48 skjair" },
-        { id: "3", name: "40 skjair" },
-      ],
-      revision: "rev-abc",
-      phase: "playing",
-      error: null,
-      updatedAt: 1723392000000,
-      columns: [
-        {
-          id: "col-1",
-          deckColumns: [1, 2, 3],
-          files: {
-            "1": {
-              name: "ad-48.png",
-              thumbnail: "data:image/png;base64,abc",
-            },
-            "3": {
-              name: "ad-40.mp4",
-            },
-          },
-        },
-      ],
-    };
-
-    it("parses a valid applied layout", () => {
-      const result = parsePerimeterAppliedAdLayout(validApplied);
-      expect(result).toBeDefined();
-      expect(result!.revision).toBe("rev-abc");
-      expect(result!.phase).toBe("playing");
-      expect(result!.lanes).toHaveLength(2);
-      expect(result!.columns).toHaveLength(1);
-      expect(result!.columns[0]?.deckColumns).toEqual([1, 2, 3]);
-    });
-
-    it("returns undefined for non-object input", () => {
-      expect(parsePerimeterAppliedAdLayout(null)).toBeUndefined();
-      expect(parsePerimeterAppliedAdLayout("string")).toBeUndefined();
-      expect(parsePerimeterAppliedAdLayout(123)).toBeUndefined();
-    });
-
-    it("defaults invalid phase to idle", () => {
-      const result = parsePerimeterAppliedAdLayout({
-        ...validApplied,
-        phase: "invalid-phase",
-      });
-      expect(result!.phase).toBe("idle");
-    });
-
-    it("defaults missing phase to idle", () => {
-      const noPhase = { ...validApplied };
-      delete (noPhase as Record<string, unknown>).phase;
-      const result = parsePerimeterAppliedAdLayout(noPhase);
-      expect(result!.phase).toBe("idle");
-    });
-
-    it("defaults a legacy staging phase to idle", () => {
-      const result = parsePerimeterAppliedAdLayout({
-        ...validApplied,
-        phase: "staging",
-      });
-      expect(result!.phase).toBe("idle");
-    });
-
-    it("uses Date.now() when updatedAt is missing", () => {
-      const noTimestamp = { ...validApplied };
-      delete (noTimestamp as Record<string, unknown>).updatedAt;
-      const before = Date.now();
-      const result = parsePerimeterAppliedAdLayout(noTimestamp);
-      const after = Date.now();
-      expect(result!.updatedAt).toBeGreaterThanOrEqual(before);
-      expect(result!.updatedAt).toBeLessThanOrEqual(after);
-    });
-
-    it("parses deckColumns and filters invalid entries", () => {
-      const result = parsePerimeterAppliedAdLayout({
-        ...validApplied,
-        columns: [
-          {
-            id: "col-1",
-            deckColumns: [1, 2, -3, 0, 4.5, 5],
-            files: {
-              "1": { name: "ad-48.png" },
-            },
-          },
-        ],
-      });
-      expect(result!.columns[0]?.deckColumns).toEqual([1, 2, 5]);
-    });
-
-    it("defaults to an empty deckColumns array when absent", () => {
-      const noDeck = { ...validApplied };
-      delete (noDeck.columns[0] as Record<string, unknown>).deckColumns;
-      const result = parsePerimeterAppliedAdLayout(noDeck);
-      expect(result!.columns[0]?.deckColumns).toEqual([]);
-    });
-
-    it("drops columns with invalid filenames", () => {
-      const badApplied = {
-        ...validApplied,
-        columns: [
-          {
-            id: "col-bad",
-            deckColumns: [1],
-            files: {
-              "1": {
-                name: "..",
-              },
-            },
-          },
-        ],
-      };
-      const result = parsePerimeterAppliedAdLayout(badApplied);
-      expect(result!.columns).toHaveLength(0);
-    });
-
-    it("preserves lanes with valid id and name", () => {
-      const result = parsePerimeterAppliedAdLayout(validApplied);
-      expect(result!.lanes[0]).toEqual({ id: "1", name: "48 skjair" });
-    });
-
-    it("drops lanes with missing id or name", () => {
-      const withBadLanes = {
-        ...validApplied,
-        lanes: [
-          { id: "1", name: "Good" },
-          { id: "", name: "No Id" },
-          { id: "3", name: "" },
-          null,
-        ],
-      };
-      const result = parsePerimeterAppliedAdLayout(withBadLanes);
-      expect(result!.lanes).toHaveLength(1);
-      expect(result!.lanes[0]?.id).toBe("1");
     });
   });
 
@@ -3107,7 +2871,7 @@ describe("parsePerimeterDisplay", () => {
   const capturedVikinConfiguration = {
     version: 1,
     revision: "vikin-capture-1",
-    renderer: "resolume",
+    renderer: "web",
     framebuffer: { width: 8448, height: 192, background: "black" },
     logicalScreens: {
       "screen-48": {
@@ -3183,6 +2947,7 @@ describe("parsePerimeterDisplay", () => {
   it.each([
     ["missing revision", { revision: "" }],
     ["unknown renderer", { renderer: "canvas" }],
+    ["retired renderer", { renderer: "resolume" }],
     ["missing framebuffer", { framebuffer: null }],
     ["missing source coverage", { regions: [] }],
   ])("rejects %s", (_label, override) => {
@@ -3205,247 +2970,6 @@ describe("parsePerimeterDisplay", () => {
         perimeterDisplay: capturedVikinConfiguration,
       },
     });
-    expect(result?.screens[0]?.perimeterDisplay?.renderer).toBe("resolume");
-  });
-});
-
-describe("parsePerimeterOverlayGeometry", () => {
-  const validGeometry = {
-    revision: "abc123",
-    updatedAt: 1723392000000,
-    targets: [
-      {
-        layerId: "2",
-        label: "48 skjáir",
-        targetFolder: "48",
-        width: 4608,
-        height: 192,
-      },
-      {
-        layerId: "4",
-        label: "40 skjáir",
-        targetFolder: "40",
-        width: 3840,
-        height: 192,
-      },
-    ],
-  };
-
-  it("parses valid daemon-published geometry", () => {
-    expect(parsePerimeterOverlayGeometry(validGeometry)).toEqual(validGeometry);
-  });
-
-  it("rejects an absent/missing geometry document", () => {
-    expect(parsePerimeterOverlayGeometry(null)).toBeNull();
-    expect(parsePerimeterOverlayGeometry(undefined)).toBeNull();
-    expect(parsePerimeterOverlayGeometry("nope")).toBeNull();
-  });
-
-  it("rejects malformed top-level documents", () => {
-    expect(parsePerimeterOverlayGeometry({})).toBeNull();
-    expect(
-      parsePerimeterOverlayGeometry({
-        revision: "",
-        updatedAt: 1,
-        targets: [],
-      }),
-    ).toBeNull();
-    expect(
-      parsePerimeterOverlayGeometry({
-        revision: "r",
-        updatedAt: "x",
-        targets: [],
-      }),
-    ).toBeNull();
-    expect(
-      parsePerimeterOverlayGeometry({
-        revision: "r",
-        updatedAt: 1,
-        targets: {},
-      }),
-    ).toBeNull();
-  });
-
-  it("drops malformed targets but keeps the rest", () => {
-    const result = parsePerimeterOverlayGeometry({
-      ...validGeometry,
-      targets: [
-        validGeometry.targets[0],
-        { layerId: "", label: "x", targetFolder: "48", width: 1, height: 1 },
-        {
-          layerId: "4",
-          label: "40 skjáir",
-          targetFolder: "40",
-          width: 0,
-          height: 192,
-        },
-        { layerId: "9", label: "x", targetFolder: "48" },
-      ],
-    });
-    expect(result?.targets).toEqual([validGeometry.targets[0]]);
-  });
-
-  it("returns an empty targets list for a document with no valid targets", () => {
-    const result = parsePerimeterOverlayGeometry({
-      ...validGeometry,
-      targets: [{ layerId: "9", label: "x", targetFolder: "48" }],
-    });
-    expect(result?.targets).toEqual([]);
-    expect(result?.revision).toBe("abc123");
-  });
-
-  it("reflects changed geometry (different revision and targets)", () => {
-    const changed = {
-      revision: "def456",
-      updatedAt: 1723392001000,
-      targets: [
-        {
-          layerId: "2",
-          label: "48 skjáir",
-          targetFolder: "48",
-          width: 5120,
-          height: 192,
-        },
-      ],
-    };
-    const parsed = parsePerimeterOverlayGeometry(changed);
-    expect(parsed?.revision).toBe("def456");
-    expect(parsed?.targets[0].width).toBe(5120);
-  });
-});
-
-describe("parseGoalScorerPreparationStatus", () => {
-  const bucket = "vikes-match-clock-firebase.appspot.com";
-  const status = {
-    jobId: "job-1",
-    phase: "ready",
-    readyCount: 1,
-    fallbackCount: 1,
-    unavailableCount: 0,
-    failedCount: 0,
-    total: 2,
-    updatedAt: 1723392000000,
-    error: null,
-    players: {
-      "10": {
-        status: "ready",
-        error: null,
-        files: {
-          "2": {
-            name: "10-ready-48.png",
-            source: `gs://${bucket}/vikuti/perimeter-overlays/prep/job-1/10/2.png`,
-          },
-          "4": {
-            name: "10-ready-40.png",
-            source: `gs://${bucket}/vikuti/perimeter-overlays/prep/job-1/10/4.png`,
-          },
-        },
-      },
-      "7": {
-        status: "fallback",
-        error: null,
-        files: {
-          "2": {
-            name: "7-fallback-48.png",
-            source: `gs://${bucket}/vikuti/perimeter-overlays/prep/job-1/7/2.png`,
-          },
-          "4": {
-            name: "7-fallback-40.png",
-            source: `gs://${bucket}/vikuti/perimeter-overlays/prep/job-1/7/4.png`,
-          },
-        },
-      },
-    },
-  };
-
-  it("parses a valid ready/fallback status", () => {
-    const result = parseGoalScorerPreparationStatus(status, {
-      location: "vikuti",
-      bucket,
-    });
-    expect(result).not.toBeNull();
-    expect(result?.jobId).toBe("job-1");
-    expect(result?.phase).toBe("ready");
-    expect(result?.players["10"].status).toBe("ready");
-    expect(result?.players["10"].files?.["2"].name).toBe("10-ready-48.png");
-    expect(result?.players["7"].status).toBe("fallback");
-  });
-
-  it("rejects absent/missing status", () => {
-    expect(parseGoalScorerPreparationStatus(null)).toBeNull();
-    expect(parseGoalScorerPreparationStatus(undefined)).toBeNull();
-    expect(parseGoalScorerPreparationStatus("nope")).toBeNull();
-  });
-
-  it("rejects malformed top-level status", () => {
-    expect(parseGoalScorerPreparationStatus({})).toBeNull();
-    expect(
-      parseGoalScorerPreparationStatus({ ...status, jobId: "" }),
-    ).toBeNull();
-    expect(
-      parseGoalScorerPreparationStatus({ ...status, phase: "bogus" }),
-    ).toBeNull();
-    expect(
-      parseGoalScorerPreparationStatus({ ...status, updatedAt: "x" }),
-    ).toBeNull();
-  });
-
-  it("drops a ready player whose files are malformed", () => {
-    const malformed = {
-      ...status,
-      players: {
-        "10": {
-          status: "ready",
-          error: null,
-          files: {
-            "2": { name: "x.png", source: "gs://not-the-bucket/x.png" },
-          },
-        },
-      },
-    };
-    const result = parseGoalScorerPreparationStatus(malformed, {
-      location: "vikuti",
-      bucket,
-    });
-    expect(result?.players["10"]).toBeUndefined();
-  });
-
-  it("drops a player with an unknown status", () => {
-    const result = parseGoalScorerPreparationStatus(
-      {
-        ...status,
-        players: { "10": { status: "bogus", error: null } },
-      },
-      { location: "vikuti", bucket },
-    );
-    expect(result?.players).toEqual({});
-  });
-
-  it("parses preparing/unavailable/failed players without files", () => {
-    const preparing = {
-      jobId: "job-2",
-      phase: "preparing",
-      readyCount: 0,
-      fallbackCount: 0,
-      unavailableCount: 1,
-      failedCount: 1,
-      total: 3,
-      updatedAt: 1723392000000,
-      error: null,
-      players: {
-        "1": { status: "preparing", error: null },
-        "2": { status: "unavailable", error: "no id" },
-        "3": { status: "failed", error: "render error" },
-      },
-    };
-    const result = parseGoalScorerPreparationStatus(preparing, {
-      location: "vikuti",
-      bucket,
-    });
-    expect(result?.phase).toBe("preparing");
-    expect(result?.players["1"].status).toBe("preparing");
-    expect(result?.players["2"].status).toBe("unavailable");
-    expect(result?.players["3"].status).toBe("failed");
-    expect(result?.players["3"].files).toBeUndefined();
+    expect(result?.screens[0]?.perimeterDisplay?.renderer).toBe("web");
   });
 });

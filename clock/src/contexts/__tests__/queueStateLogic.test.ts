@@ -58,7 +58,7 @@ function makeQueue(overrides: Partial<QueueState> = {}): QueueState {
 }
 
 let getStateShowingNextAsset:
-  | ((state: ControllerState) => ControllerState)
+  | ((state: ControllerState, occurrenceId: string) => ControllerState)
   | undefined;
 
 try {
@@ -320,7 +320,7 @@ describe("parseQueueMap", () => {
 });
 
 describe("computeControllerDiff", () => {
-  it("writes a nested queue path for a single queue update", () => {
+  it("writes only the renamed leaf, preserving independent queue fields", () => {
     const prev = makeControllerState({
       queues: {
         q1: makeQueue({ id: "q1", name: "Queue 1" }),
@@ -337,9 +337,7 @@ describe("computeControllerDiff", () => {
 
     const diff = computeControllerDiff(prev, next);
 
-    expect(diff["queues/q1"]).toEqual(next.queues.q1);
-    expect(diff["queues/q2"]).toBeUndefined();
-    expect(diff.queues).toBeUndefined();
+    expect(diff).toEqual({ "queues/q1/name": "Updated" });
   });
 
   it("writes null for deleted queues", () => {
@@ -404,7 +402,7 @@ describe.skipIf(!getStateShowingNextAsset)(
   "getStateShowingNextAsset (queue-aware)",
   () => {
     function nextAsset(state: ControllerState): ControllerState {
-      return getStateShowingNextAsset!(state);
+      return getStateShowingNextAsset!(state, "selected-occurrence");
     }
 
     it("is a no-op when activeQueueId is null", () => {

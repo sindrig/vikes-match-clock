@@ -23,11 +23,12 @@ test.describe("Asset Overlay System", () => {
     await loginWithEmulatorUser(page);
   });
 
-  test("adds a URL asset to the queue and displays queue count", async ({
+  test("adds a URL asset, plays its queue, shows the playback bar and stops", async ({
     page,
   }) => {
     const assetController = page.locator(".asset-controller");
     await expect(page.getByText("Engin biðröð")).toBeVisible();
+    await expect(assetController.getByLabel("Play Queue")).toHaveCount(0);
 
     await assetController
       .locator('input[type="text"]')
@@ -37,6 +38,16 @@ test.describe("Asset Overlay System", () => {
     const queueColumn = assetController.locator(".queue-column");
     await expect(queueColumn).toHaveCount(1);
     await expect(queueColumn.locator(".queue-item")).toHaveCount(1);
+    const playButton = queueColumn.getByLabel("Play Queue");
+    await expect(playButton).toBeVisible();
+    await playButton.click();
+    await expect(page.locator(".overlay-container")).toBeVisible();
+    await expect(page.getByTestId("playback-bar")).toBeVisible();
+    await expect(page.getByText("Hreinsa virkt overlay")).not.toBeVisible();
+
+    await page.getByLabel("Stop playback").click();
+    await expect(page.getByTestId("playback-bar")).not.toBeVisible();
+    await expect(page.locator(".overlay-container")).not.toBeVisible();
   });
 
   test("adds multiple assets to the queue", async ({ page }) => {
@@ -93,29 +104,6 @@ test.describe("Asset Overlay System", () => {
     await expect(page.getByText("Engin biðröð")).toBeVisible();
   });
 
-  test("shows Birta button when queue has items", async ({ page }) => {
-    const assetController = page.locator(".asset-controller");
-    await expect(assetController.getByLabel("Play Queue")).toHaveCount(0);
-
-    await assetController
-      .locator('input[type="text"]')
-      .fill("https://www.youtube.com/watch?v=test1");
-    await assetController.getByText("Bæta við").click();
-
-    const playButton = assetController
-      .locator(".queue-column")
-      .getByLabel("Play Queue");
-    await expect(playButton).toBeVisible();
-
-    // Clicking play on a single-item queue shows the overlay
-    // (the item is consumed immediately, so we verify the overlay appeared)
-    await playButton.click();
-    await expect(page.locator(".overlay-container")).toBeVisible();
-    // With an active queue, the playback bar should appear instead of the
-    // clear overlay button
-    await expect(page.getByTestId("playback-bar")).toBeVisible();
-  });
-
   test("toggles autoplay and loop options", async ({ page }) => {
     const assetController = page.locator(".asset-controller");
 
@@ -146,43 +134,6 @@ test.describe("Asset Overlay System", () => {
     await expect(loopToggle).toHaveAttribute("data-checked", "true");
     await loopToggle.click();
     await expect(loopToggle).not.toHaveAttribute("data-checked", "true");
-  });
-
-  test("shows playback bar when queue is active", async ({ page }) => {
-    const assetController = page.locator(".asset-controller");
-    await assetController
-      .locator('input[type="text"]')
-      .fill("https://www.youtube.com/watch?v=test1");
-    await assetController.getByText("Bæta við").click();
-    await assetController
-      .locator(".queue-column")
-      .getByLabel("Play Queue")
-      .click();
-
-    await expect(page.getByTestId("playback-bar")).toBeVisible();
-    await expect(page.getByText("Hreinsa virkt overlay")).not.toBeVisible();
-  });
-
-  test("stops playback and clears overlay when stop button is clicked", async ({
-    page,
-  }) => {
-    const assetController = page.locator(".asset-controller");
-    await assetController
-      .locator('input[type="text"]')
-      .fill("https://www.youtube.com/watch?v=test1");
-    await assetController.getByText("Bæta við").click();
-    await assetController
-      .locator(".queue-column")
-      .getByLabel("Play Queue")
-      .click();
-
-    await expect(page.getByTestId("playback-bar")).toBeVisible();
-    await expect(page.locator(".overlay-container")).toBeVisible();
-
-    await page.getByLabel("Stop playback").click();
-
-    await expect(page.getByTestId("playback-bar")).not.toBeVisible();
-    await expect(page.locator(".overlay-container")).not.toBeVisible();
   });
 
   test("shows clear overlay button for non-queue asset", async ({ page }) => {
