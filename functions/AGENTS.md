@@ -59,6 +59,8 @@ Mocked unit tests need no live credentials. Rules suites are **skipped** unless
 `RUN_RULES_TESTS=true`; a passing default run does not prove authorization rules.
 For local integration, use Firebase CLI, Java **21**, Node 22 and the root
 [emulator configuration](../firebase.json) with project `vikes-match-clock-test`.
+The [local quickstart](../docs/quickstart.md) owns the complete setup and
+synthetic login/upload/callable journey.
 Compile Functions before starting its emulator; code is loaded from `lib/index.js`.
 Auth 9099, Database 9000, Storage 9199 and Functions 5001 are separate services.
 Start only required services, wait for each needed endpoint, and read back

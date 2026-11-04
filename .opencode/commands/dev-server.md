@@ -1,5 +1,5 @@
 ---
-description: Start a workspace-owned clock dev server on an explicit port (default 8000), bound to 0.0.0.0
+description: Start a workspace-owned clock dev server on an explicit port (default 4600), bound to 0.0.0.0
 ---
 
 Load the "dev-server" skill and follow its instructions to start the clock dev server.

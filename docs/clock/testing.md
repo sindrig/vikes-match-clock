@@ -1,7 +1,9 @@
 # Clock development and testing
 
-Use [API preparation](../api-client-preparation.md) for generated SDK setup and
-the [environment contract](../environment.md) for credentials and target selection.
+Use the [local quickstart](../quickstart.md) for fresh-checkout setup and the
+complete frontend/API/emulator journey, [API preparation](../api-client-preparation.md)
+for SDK/schema ownership, and the [environment contract](../environment.md) for
+credentials and target selection.
 The commands below are task recipes, not a record that they were executed.
 
 Code paths in backticks are relative to `clock/src/` unless qualified. Update
@@ -28,10 +30,10 @@ Both Vite and Playwright support a `PORT` environment variable for custom port a
 
 ```bash
 # Run dev server on custom port (defaults to 3000)
-PORT=4500 pnpm start
+PORT=4600 VITE_USE_EMULATOR=true pnpm start --strictPort
 
 # Run e2e tests on custom port (defaults to 3000)
-PORT=4500 VITE_USE_EMULATOR=true pnpm e2e
+PORT=4600 VITE_USE_EMULATOR=true pnpm e2e
 ```
 
 **Why this matters**: If port 3000 is already in use (e.g., multiple developers, parallel projects), tests will fail with connection errors. Use a custom port to avoid conflicts.
@@ -42,16 +44,24 @@ PORT=4500 VITE_USE_EMULATOR=true pnpm e2e
 - `playwright.config.ts` calculates `baseURL` from `process.env.PORT` and passes it to the webServer config
 - The current Clock CI uses port 3000 (no `PORT` set)
 
-For a persistent workspace-owned server, use `bash scripts/dev-server.sh start 4500` from the repository root (default port 8000, unlike plain `pnpm start`). The helper needs Bash/Git/Node/tmux and an already generated SDK; it runs the installed Vite CLI with an explicit port and `--strictPort`, and keeps logs in `.dev-server/<port>.log`. Use `status <port>` to identify its worktree/session/PID and `stop <port>` to close only that worktree/port's session. It preserves Vite's cache and does not own servers started by Playwright or other launchers. Stop it before moving/deleting a worktree. See the [server procedure](../../.opencode/skills/dev-server/SKILL.md) for preparation and HTTP/browser verification.
+For a persistent workspace-owned server, use `bash scripts/dev-server.sh start 4600` from the repository root (default port **4600**, unlike plain `pnpm start`). The helper needs Bash/Git/Node/tmux and an already generated SDK; it runs the installed Vite CLI with an explicit port and `--strictPort`, and keeps logs in `.dev-server/<port>.log`. Use `status <port>` to identify its worktree/session/PID and `stop <port>` to close only that worktree/port's session. It preserves Vite's cache and does not own servers started by Playwright or other launchers. Stop it before moving/deleting a worktree. See the [server procedure](../../.opencode/skills/dev-server/SKILL.md) for preparation and HTTP/browser verification.
 The helper inherits selection at startup: use `VITE_USE_EMULATOR=true` on its
 start command for isolation. It invokes Vite directly rather than `pnpm start`.
 
 ## Firebase Emulator
 
-For isolated local development and CI, use Firebase Emulator. Install Firebase
-CLI and Java 21, as in CI. Node 22 runs Functions; compile `functions/lib`
-before including the Functions emulator. Playwright needs Chromium and browser
-system libraries. These prerequisites do not require live credentials.
+Follow the [quickstart's full service setup](../quickstart.md#3-prepare-and-start-all-four-firebase-emulators)
+for Java 21, Node 22, compiled Functions, the four ports, namespace rules and
+independent readiness checks. Start fewer services only for a deliberately
+limited test; Auth/Database alone do not verify uploads or callable Functions.
+The credential-free synthetic browser journey is in that same guide.
+
+Playwright needs Chromium and browser system libraries. From **`clock/`**,
+download the matching browser with `corepack pnpm@10.34.9 exec playwright install chromium`.
+On Linux, install the host libraries required by Playwright separately (its
+`install-deps chromium` command needs host package-manager privileges). Reusing
+a preinstalled browser/libraries is valid, but record it; it is not proof of
+a fresh-machine bootstrap.
 
 No live credentials or Firebase login are required. Pass `VITE_USE_EMULATOR=true`
 explicitly at Vite startup/build time or to Playwright. The default development
@@ -64,20 +74,8 @@ See [the environment contract](../environment.md) for loaders and the
 separate match/weather API routing (the emulator flag changes Firebase only).
 
 ```bash
-# Auth/Database-only work (from project root); add storage/functions when needed.
-firebase emulators:start --only auth,database --project vikes-match-clock-test
-
-# Alternative: the checked-in Docker Compose service (see limitation below).
-docker compose up -d
-
-# From clock/, run app with emulator
-VITE_USE_EMULATOR=true pnpm start
-
-# Run e2e tests with emulator
-VITE_USE_EMULATOR=true pnpm e2e
-
-# Run e2e tests with emulator on custom port
-PORT=4500 VITE_USE_EMULATOR=true pnpm e2e
+# Working directory: clock/, with SDK and the required emulators ready.
+PORT=4600 VITE_USE_EMULATOR=true corepack pnpm@10.34.9 e2e --workers=1
 ```
 
 The current Docker recipe installs Java/CLI and uses Functions `npm ci` inside
@@ -85,13 +83,10 @@ the container. That inherited workflow/toolchain mismatch is not repaired here;
 prefer explicit local services for a controlled environment and do not count a
 listed recipe as fresh-checkout validation.
 
-Emulator ports:
-
-- Auth: 9099
-- Database: 9000
-- Storage: 9199
-- Functions: 5001
-- UI: 4000
+Playwright reuses an existing server outside CI. Stop your own staging-connected
+Vite before running this command: passing the emulator flag to the test process
+does not change an already running server's environment. A fresh context alone
+does not fix the server target. See [port configuration](#port-configuration).
 
 ## Test Credentials
 

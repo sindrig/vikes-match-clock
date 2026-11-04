@@ -9,17 +9,17 @@ changing behavior, rather than growing this entrypoint into a second manual.
 
 Use Node 22.12+ and pnpm for the frontend; CI uses Node 22 and pnpm 10.
 `corepack pnpm@10.34.9` is the verified local preparation version, not a new
-repository-wide pin. Commands below run from **`clock/`**:
+repository-wide pin. Use the [local quickstart](../docs/quickstart.md) for a
+fresh checkout and the complete frontend/API/emulator journey. Focused commands
+below run from **`clock/`**:
 
 ```bash
-corepack pnpm@10.34.9 install --frozen-lockfile
 corepack pnpm@10.34.9 run generate-api-client
 corepack pnpm@10.34.9 lint
 corepack pnpm@10.34.9 test
 corepack pnpm@10.34.9 build
 # With local Firebase services running:
-VITE_USE_EMULATOR=true PORT=4500 corepack pnpm@10.34.9 start
-VITE_USE_EMULATOR=true PORT=4500 corepack pnpm@10.34.9 e2e --workers=1
+VITE_USE_EMULATOR=true PORT=4600 corepack pnpm@10.34.9 e2e --workers=1
 ```
 
 `start`/`build` generate the SDK before Vite/TypeScript. On a fresh checkout,
@@ -50,7 +50,7 @@ For emulator work, install Firebase CLI and Java 21; Functions work also needs
 its Node 22 dependencies and compiled `functions/lib`. Playwright needs Chromium
 and the host's browser libraries. See [testing setup](../docs/clock/testing.md)
 for service selection, ready checks, synthetic accounts and context isolation.
-The persistent helper is `bash scripts/dev-server.sh start 4500` from the root
+The persistent helper is `bash scripts/dev-server.sh start 4600` from the root
 (Bash/Git/Node/tmux required); it invokes Vite directly, so generate the SDK first
 and pass emulator selection to its start process. Stop only your own worktree/port.
 
