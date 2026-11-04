@@ -20,6 +20,7 @@ import {
   parsePerimeterDisplay,
 } from "./firebaseParsers";
 import { Sports, DEFAULT_HALFSTOPS, DEFAULT_THEME } from "../constants";
+import { minimalPerimeterDisplay } from "../lib/venue.fixtures";
 import type {
   Match,
   ControllerState,
@@ -2952,7 +2953,7 @@ describe("parsePerimeterDisplay", () => {
     ["missing source coverage", { regions: [] }],
   ])("rejects %s", (_label, override) => {
     expect(
-      parsePerimeterDisplay({ ...capturedVikinConfiguration, ...override }),
+      parsePerimeterDisplay({ ...minimalPerimeterDisplay, ...override }),
     ).toBeUndefined();
   });
 
@@ -2967,9 +2968,14 @@ describe("parsePerimeterDisplay", () => {
             style: { width: 1920, height: 1080 },
           },
         ],
-        perimeterDisplay: capturedVikinConfiguration,
+        perimeterDisplay: minimalPerimeterDisplay,
       },
     });
-    expect(result?.screens[0]?.perimeterDisplay?.renderer).toBe("web");
+    expect(result?.screens[0]?.perimeterDisplay).toEqual(
+      minimalPerimeterDisplay,
+    );
+    expect(result?.venues.vikuti?.perimeterDisplay).toEqual(
+      minimalPerimeterDisplay,
+    );
   });
 });

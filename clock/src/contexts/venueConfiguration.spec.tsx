@@ -57,6 +57,7 @@ type Subscription = (snapshot: DataSnapshot) => unknown;
 const subscriptions = new Map<string, Set<Subscription>>();
 const fetchMock = vi.fn<typeof fetch>();
 let locations: RecordData;
+let perimeterDisplayFixture: typeof minimalPerimeterDisplay;
 
 const snapshot = (value: unknown): DataSnapshot =>
   ({ val: () => value }) as DataSnapshot;
@@ -146,6 +147,7 @@ const apiMatch = {
 beforeEach(() => {
   vi.clearAllMocks();
   subscriptions.clear();
+  perimeterDisplayFixture = structuredClone(minimalPerimeterDisplay);
   locations = {
     "test-venue": {
       label: "Test venue",
@@ -355,7 +357,7 @@ describe("admin drafts across venue snapshots", () => {
     storedVenue().screens = [
       { key: "main", name: "Main", style: { width: 512, height: 400 } },
     ];
-    storedVenue().perimeterDisplay = minimalPerimeterDisplay;
+    storedVenue().perimeterDisplay = perimeterDisplayFixture;
     renderVenue({ admin: true });
     fireEvent.click(screen.getByText("Test venue"));
     fireEvent.change(screen.getByLabelText("Heimalið (ID)"), {
@@ -455,7 +457,7 @@ describe("saved venue configuration to generated API requests", () => {
 
   it("uses a legacy string ID for match-report info and lineups without any screens", async () => {
     storedVenue().config = { homeTeam: "2058" };
-    storedVenue().perimeterDisplay = minimalPerimeterDisplay;
+    storedVenue().perimeterDisplay = perimeterDisplayFixture;
     vi.spyOn(window, "prompt").mockReturnValue("501");
     fetchMock.mockResolvedValueOnce(Response.json(apiMatch));
     fetchMock.mockResolvedValueOnce(Response.json({ home: {}, away: {} }));
@@ -559,7 +561,7 @@ describe("admin metadata roundtrip", () => {
         futureScreen: true,
       },
     };
-    const { compatibilityKeys, ...mapping } = minimalPerimeterDisplay;
+    const { compatibilityKeys, ...mapping } = perimeterDisplayFixture;
     storedVenue().perimeterDisplay = {
       ...mapping,
       compatibility: { ...compatibilityKeys, futureKeys: { key: "value" } },
@@ -616,10 +618,10 @@ describe("admin metadata roundtrip", () => {
 
   it("keeps mapping drafts and publishes without reverting incoming unknown mapping metadata", async () => {
     storedVenue().perimeterDisplay = {
-      ...minimalPerimeterDisplay,
+      ...perimeterDisplayFixture,
       futureMapping: true,
-      playback: { ...minimalPerimeterDisplay.playback, futurePlayback: true },
-      regions: [{ ...minimalPerimeterDisplay.regions[0], futureRegion: true }],
+      playback: { ...perimeterDisplayFixture.playback, futurePlayback: true },
+      regions: [{ ...perimeterDisplayFixture.regions[0], futureRegion: true }],
     };
     renderVenue({ admin: true });
     fireEvent.click(screen.getByText("Test venue"));
@@ -675,8 +677,8 @@ describe("admin metadata roundtrip", () => {
   });
 
   it("edits legacy region aliases and defaulted playback without losing compatibility metadata", async () => {
-    const region = minimalPerimeterDisplay.regions[0]!;
-    const { compatibilityKeys, playback, ...mapping } = minimalPerimeterDisplay;
+    const region = perimeterDisplayFixture.regions[0]!;
+    const { compatibilityKeys, playback, ...mapping } = perimeterDisplayFixture;
     storedVenue().perimeterDisplay = {
       ...mapping,
       framebuffer: { ...mapping.framebuffer, width: 3 },

@@ -2043,6 +2043,20 @@ mockedHook.mockReturnValue({ ... } as unknown as ReturnType<typeof useHook>);
 
 ## Testing & Development
 
+### Provider Unit Tests
+
+Each top-level block in `contexts/FirebaseStateContext.spec.tsx` registers
+the shared mock setup and cleanup. Setup resets implementations and pending
+one-shot overrides before installing subscription deliveries, audited writes
+and authoritative CAS behavior; cleanup unmounts consumers and restores spies
+and document visibility. Blocks must pass with name filters and shuffled order.
+Use `lib/venue.fixtures.ts`'s two-pixel mapping for unrelated metadata and
+subscription tests; venue metadata integration tests clone it per test so mock
+Firebase writes cannot mutate another test's geometry. Keep the real-size parser
+acceptance, perimeter fixtures, mapping validation and WebGL geometry coverage.
+Queue helper tests use required
+imports so a missing export fails instead of silently skipping playback cases.
+
 ### Port Configuration
 
 Both Vite and Playwright support a `PORT` environment variable for custom port assignment:

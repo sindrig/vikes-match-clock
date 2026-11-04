@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, act, waitFor } from "@testing-library/react";
+import { render, act, cleanup, waitFor } from "@testing-library/react";
 import {
   onValue,
   ref,
@@ -139,6 +139,11 @@ const setDocumentHidden = (hidden: boolean) => {
   document.dispatchEvent(new Event("visibilitychange"));
 };
 
+const originalHiddenDescriptor = Object.getOwnPropertyDescriptor(
+  document,
+  "hidden",
+);
+
 // Wraps a custom onValue data resolver so the provider's `/.info/connected`
 // subscription reports a live connection (otherwise `firebaseConnectedRef`
 // stays false and the client never becomes write-eligible). The resolver
@@ -155,74 +160,85 @@ const withConnectedInfo =
     return vi.fn();
   };
 
-describe("FirebaseStateContext", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockDbState.clear();
-    mockOnValueCallbacks.clear();
-    vi.mocked(ref).mockImplementation((_, path) => path as never);
+const setupProviderMocks = () => {
+  vi.resetAllMocks();
+  setDocumentHidden(false);
+  mockDbState.clear();
+  mockOnValueCallbacks.clear();
+  vi.mocked(firebaseDatabase.writeAuditOnly).mockResolvedValue(undefined);
+  vi.mocked(ref).mockImplementation((_, path) => path as never);
 
-    vi.mocked(onValue).mockImplementation((reference, callback) => {
-      const path = String(reference);
-      mockOnValueCallbacks.set(path, callback);
-      // `/.info/connected` is connected by default so readiness tests pass
-      // without special-casing; tests override it by re-invoking the callback.
-      const state =
-        path === ".info/connected" ? true : (mockDbState.get(path) ?? null);
-      callback({
-        val: () => state,
-      } as never);
-      return vi.fn();
-    });
+  vi.mocked(onValue).mockImplementation((reference, callback) => {
+    const path = String(reference);
+    mockOnValueCallbacks.set(path, callback);
+    // `/.info/connected` is connected by default so readiness tests pass
+    // without special-casing; tests override it by re-invoking the callback.
+    const state =
+      path === ".info/connected" ? true : (mockDbState.get(path) ?? null);
+    callback({
+      val: () => state,
+    } as never);
+    return vi.fn();
+  });
 
-    // Ordinary commands only advance observed refs through subscriptions,
-    // just like the SDK. Model that delivery instead of relying on shadow
-    // state changes inside the provider's write functions.
-    vi.mocked(firebaseDatabase.writeAudited).mockImplementation(
-      (prefix, area, diff) => {
-        const path = `states/${prefix}/${area}`;
-        const current = mockDbState.get(path);
-        const next: Record<string, unknown> =
-          current && typeof current === "object"
-            ? structuredClone(current as Record<string, unknown>)
-            : {};
-        for (const [key, value] of Object.entries(diff)) {
-          const parts = key.split("/");
-          const leaf = parts.pop();
-          if (!leaf) throw new Error("Missing update leaf");
-          let node = next;
-          for (const part of parts) {
-            const child = node[part];
-            if (!child || typeof child !== "object") node[part] = {};
-            node = node[part] as Record<string, unknown>;
-          }
-          if (value === null) delete node[leaf];
-          else node[leaf] = value;
+  // Ordinary commands only advance observed refs through subscriptions,
+  // just like the SDK. Model that delivery instead of relying on shadow
+  // state changes inside the provider's write functions.
+  vi.mocked(firebaseDatabase.writeAudited).mockImplementation(
+    (prefix, area, diff) => {
+      const path = `states/${prefix}/${area}`;
+      const current = mockDbState.get(path);
+      const next: Record<string, unknown> =
+        current && typeof current === "object"
+          ? structuredClone(current as Record<string, unknown>)
+          : {};
+      for (const [key, value] of Object.entries(diff)) {
+        const parts = key.split("/");
+        const leaf = parts.pop();
+        if (!leaf) throw new Error("Missing update leaf");
+        let node = next;
+        for (const part of parts) {
+          const child = node[part];
+          if (!child || typeof child !== "object") node[part] = {};
+          node = node[part] as Record<string, unknown>;
         }
-        mockDbState.set(path, next);
-        mockOnValueCallbacks.get(path)?.({ val: () => next } as DataSnapshot);
-        return Promise.resolve();
-      },
-    );
-
-    // Emulate a compare-and-set transaction against the in-memory
-    // authoritative state. Returning `undefined` from the update function
-    // aborts the transaction (obsolete/duplicate attempt).
-    vi.mocked(runTransaction).mockImplementation((dbRef, updateFn) => {
-      const path = String(dbRef);
-      const current = mockDbState.get(path) ?? null;
-      const next = updateFn(current);
-      if (next === undefined) {
-        return { committed: false, snapshot: { val: () => current } };
+        if (value === null) delete node[leaf];
+        else node[leaf] = value;
       }
       mockDbState.set(path, next);
-      return { committed: true, snapshot: { val: () => next } };
-    });
-  });
+      mockOnValueCallbacks.get(path)?.({ val: () => next } as DataSnapshot);
+      return Promise.resolve();
+    },
+  );
 
-  afterEach(() => {
-    setDocumentHidden(false);
+  // Emulate a compare-and-set transaction against the in-memory
+  // authoritative state. Returning `undefined` from the update function
+  // aborts the transaction (obsolete/duplicate attempt).
+  vi.mocked(runTransaction).mockImplementation((dbRef, updateFn) => {
+    const path = String(dbRef);
+    const current = mockDbState.get(path) ?? null;
+    const next = updateFn(current);
+    if (next === undefined) {
+      return { committed: false, snapshot: { val: () => current } };
+    }
+    mockDbState.set(path, next);
+    return { committed: true, snapshot: { val: () => next } };
   });
+};
+
+const cleanupProviderMocks = () => {
+  cleanup();
+  vi.restoreAllMocks();
+  if (originalHiddenDescriptor) {
+    Object.defineProperty(document, "hidden", originalHiddenDescriptor);
+  } else {
+    Reflect.deleteProperty(document, "hidden");
+  }
+};
+
+describe("FirebaseStateContext", () => {
+  beforeEach(setupProviderMocks);
+  afterEach(cleanupProviderMocks);
 
   describe("empty listenPrefix protection", () => {
     it("blocks match updates when listenPrefix is empty", () => {
@@ -3829,6 +3845,9 @@ describe("FirebaseStateContext", () => {
 });
 
 describe("FirebaseStateContext integration", () => {
+  beforeEach(setupProviderMocks);
+  afterEach(cleanupProviderMocks);
+
   describe("conditional transitions (multi-controller convergence)", () => {
     it("commits a current countdown completion once with one audit, and rejects an obsolete duplicate attempt", async () => {
       // Authoritative state: an active pre-match countdown generation.
@@ -3878,8 +3897,6 @@ describe("FirebaseStateContext integration", () => {
         countdown: true,
         halftimeCountdown: false,
       };
-
-      vi.mocked(firebaseDatabase.writeAuditOnly).mockClear();
 
       // First controller completes the countdown.
       await act(async () => {
@@ -3953,7 +3970,10 @@ describe("FirebaseStateContext integration", () => {
       });
 
       expect(mockDbState.get("states/test-location/controller")).toEqual(
-        expect.objectContaining({ futureControllerField: "preserve-me" }),
+        expect.objectContaining({
+          currentAsset: null,
+          futureControllerField: "preserve-me",
+        }),
       );
     });
 
@@ -4004,7 +4024,6 @@ describe("FirebaseStateContext integration", () => {
       // The helper must trust the transaction's final `committed` result (and
       // reset its candidate diff), so the aborted attempt reports false and
       // writes no audit.
-      vi.mocked(firebaseDatabase.writeAuditOnly).mockClear();
       vi.mocked(runTransaction).mockImplementation((dbRef, updateFn) => {
         // Retry 1: authoritative state still matches the observed generation.
         const firstCurrent = mockDbState.get(String(dbRef)) ?? null;
@@ -4081,10 +4100,6 @@ describe("FirebaseStateContext integration", () => {
           />
         </FirebaseStateProvider>,
       );
-
-      // Reset the audit mock explicitly: mocks created in the vi.mock factory
-      // are not always reset by the shared clearAllMocks between tests.
-      vi.mocked(firebaseDatabase.writeAuditOnly).mockClear();
 
       await act(async () => {
         const committed = await matchApi!.removeTimeoutIfCurrent({
