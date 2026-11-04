@@ -5,17 +5,16 @@ The tracked contract is `clock-api/v3/openapi.json`. The TypeScript SDK in
 
 ## Frontend checkout
 
-With Node and pnpm installed, from the repository root:
+Follow the [local quickstart](quickstart.md) for prerequisite installation order,
+explicit working directories, distinct frontend/API ports and isolated Firebase.
+For SDK preparation alone, with Clock dependencies installed, from **`clock/`**:
 
 ```bash
-cd clock
-pnpm install --frozen-lockfile
-pnpm start
-# Or: pnpm build
+corepack pnpm@10.34.9 run generate-api-client
 ```
 
-Both commands explicitly run `pnpm run generate-api-client` before
-Vite/TypeScript. They require no Python, AWS configuration, or running API.
+`start` and `build` also run `pnpm run generate-api-client` before
+Vite/TypeScript. Generation requires no Python, AWS configuration, or running API.
 Package installation may need the package registry; generation reads only the
 committed schema. Standalone lint/tests/type checks should be preceded by
 `pnpm run generate-api-client` on a fresh checkout.

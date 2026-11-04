@@ -19,11 +19,12 @@ among those inputs. A blanket ban on source images would break asset maintenance
    Emulator selection does not isolate match/weather API requests.
 2. Prepare the SDK using [API preparation](api-client-preparation.md). For a
    persistent local server, from the root use
-   `VITE_USE_EMULATOR=true bash scripts/dev-server.sh start 4500` with the local
+   `VITE_USE_EMULATOR=true bash scripts/dev-server.sh start 4600` with the local
    services already running. The helper requires Bash, Git, Node, tmux and
-   installed Clock dependencies; it invokes Vite directly. Use `status 4500`
-   to identify its handle/log and `stop 4500` for only that worktree/port. Its
-   default port is 8000; choose explicitly to avoid the local API on 8000.
+   installed Clock dependencies; it invokes Vite directly. Use `status 4600`
+   to identify its handle/log and `stop 4600` for only that worktree/port. Its
+   default port is 4600, leaving port 8000 for the local API. Use the
+   [quickstart](quickstart.md) for full service setup.
 3. Use the browser tooling actually available, or Playwright's page/locator
    screenshot API. Use synthetic emulator accounts for isolated state checks.
    Separately authorized shared-staging login uses the maintainer-approved

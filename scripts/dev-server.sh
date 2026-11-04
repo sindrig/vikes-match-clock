@@ -3,12 +3,12 @@
 set -euo pipefail
 
 usage() {
-  echo "Usage: bash scripts/dev-server.sh {start|status|stop} [port (default: 8000)]" >&2
+  echo "Usage: bash scripts/dev-server.sh {start|status|stop} [port (default: 4600)]" >&2
   exit 2
 }
 
 action=${1:-}
-port=${2:-8000}
+port=${2:-4600}
 [[ $# -ge 1 && $# -le 2 ]] || usage
 [[ "$action" == start || "$action" == status || "$action" == stop ]] || usage
 [[ "$port" =~ ^[1-9][0-9]{0,4}$ ]] || usage

@@ -83,15 +83,23 @@ test("workspace-owned dev server lifecycle", async (t) => {
   const handles = new Map();
 
   async function run(workspace, action, port, extraEnv = {}) {
-    if (/^[1-9][0-9]{0,4}$/.test(String(port)) && Number(port) <= 65535) {
-      handles.set(`${workspace}:${port}`, { workspace, port });
+    const selectedPort = port ?? 4600;
+    if (
+      /^[1-9][0-9]{0,4}$/.test(String(selectedPort)) &&
+      Number(selectedPort) <= 65535
+    ) {
+      handles.set(`${workspace}:${selectedPort}`, {
+        workspace,
+        port: selectedPort,
+      });
     }
+    const args = [path.join(workspace, "scripts/dev-server.sh"), action];
+    if (port !== undefined) args.push(String(port));
     try {
-      const result = await exec(
-        "bash",
-        [path.join(workspace, "scripts/dev-server.sh"), action, String(port)],
-        { env: { ...env, ...extraEnv }, timeout: 25000 },
-      );
+      const result = await exec("bash", args, {
+        env: { ...env, ...extraEnv },
+        timeout: 25000,
+      });
       return { code: 0, ...result };
     } catch (error) {
       if (typeof error.code !== "number") throw error;
@@ -152,6 +160,39 @@ test("workspace-owned dev server lifecycle", async (t) => {
   const portA = await freePort();
   let portB = await freePort();
   while (portA === portB) portB = await freePort();
+
+  await t.test(
+    "default port preserves the API and emulator logging",
+    async () => {
+      const api = http.createServer((req, res) => {
+        res.end(JSON.stringify({ status: "ok" }));
+      });
+      api.listen(8000, "127.0.0.1");
+      await once(api, "listening");
+      const logging = http.createServer((req, res) => {
+        res.end(JSON.stringify({ service: "emulator logging" }));
+      });
+      try {
+        logging.listen(4500, "127.0.0.1");
+        await once(logging, "listening");
+        const started = await run(a, "start");
+        assert.equal(started.code, 0);
+        assert.match(started.stdout, /Port: 4600/);
+        assert.equal((await response(4600)).cwd, path.join(a, "clock"));
+        assert.deepEqual(await response(8000), { status: "ok" });
+        assert.deepEqual(await response(4500), { service: "emulator logging" });
+        assert.match((await run(a, "status")).stdout, /Running; PID:/);
+        assert.equal((await run(a, "stop")).code, 0);
+        await waitStopped(4600);
+        assert.deepEqual(await response(8000), { status: "ok" });
+        assert.deepEqual(await response(4500), { service: "emulator logging" });
+      } finally {
+        await run(a, "stop");
+        await new Promise((resolve) => logging.close(resolve));
+        await new Promise((resolve) => api.close(resolve));
+      }
+    },
+  );
 
   await t.test(
     "independent handles, logs, environments and scoped stop",

@@ -9,23 +9,23 @@ Start the Vite dev server for the `clock/` React app on a user-specified port, e
 
 Use the repository's `scripts/dev-server.sh` helper from this worktree. It needs Bash, Git, Node, tmux and installed clock dependencies (pnpm). It launches the installed Vite CLI directly in a detached tmux session; it does not use `nohup`. If a required tool is missing, report it or install development tooling within the user's authorized scope.
 
-Frontend preparation needs no credentials. Read [the environment contract](../../../docs/environment.md) for optional direnv, explicit `VITE_USE_EMULATOR=true` selection and staging login retrieval. The emulator flag switches Firebase only; `localhost` match/weather requests still target a local API on port 8000. If running that API, choose a different frontend port, for example 4500. Do not read secret files or initiate login just to start the frontend. Existing operator Python/SSO helpers are opt-in, never prerequisites here.
+Frontend preparation needs no credentials. Follow the [local quickstart](../../../docs/quickstart.md) for fresh-checkout dependencies, SDK order and the full emulator journey. Read [the environment contract](../../../docs/environment.md) for optional direnv, explicit `VITE_USE_EMULATOR=true` selection and staging login retrieval. The emulator flag switches Firebase only; `localhost` match/weather requests still target a local API on port **8000**. The frontend helper defaults to **4600**, leaving that API port free. Do not read secret files or initiate login just to start the frontend. Existing operator Python/SSO helpers are opt-in, never prerequisites here.
 
 ## Steps
 
 ### 1. Determine the port
 
-- The user provides a port number as an argument (e.g. `/dev-server 8000`).
-- If no port is provided, default to **8000**.
+- The user provides a port number as an argument (e.g. `/dev-server 4600`).
+- If no port is provided, default to **4600**. Reserve 8000 for the local API and 4500 for Firebase CLI emulator logging.
 
 ### 2. Inspect this workspace's server
 
 ```bash
-# Working directory: repository root; replace 8000 with the chosen port throughout
-bash scripts/dev-server.sh status 8000
+# Working directory: repository root; replace 4600 with the chosen frontend port throughout
+bash scripts/dev-server.sh status 4600
 ```
 
-An exit status of 1 with `Stopped` means there is no managed session for this worktree/port. Reuse an existing session when appropriate. To restart it explicitly, run `bash scripts/dev-server.sh stop 8000` first. Never kill by process name, kill a process just because it owns the requested port, or stop another workspace's session.
+An exit status of 1 with `Stopped` means there is no managed session for this worktree/port. Reuse an existing session only when its startup selection is appropriate. To switch a staging-connected session to emulators, stop it with `bash scripts/dev-server.sh stop 4600` and start a new session with the emulator flag. Passing a new flag to an already running session does not reconfigure it. Never kill by process name, kill a process just because it owns the requested port, or stop another workspace's session.
 
 ### 3. Generate the API client
 
@@ -33,7 +33,7 @@ The project uses `@hey-api/openapi-ts` to generate a TypeScript API client from 
 
 ```bash
 # Working directory: clock/
-pnpm generate-api-client
+corepack pnpm@10.34.9 run generate-api-client
 ```
 
 Verify that `clock/src/api/client/index.ts` exists after generation. If the command fails, report the error to the user.
@@ -44,7 +44,7 @@ The helper identifies the physical worktree and port, uses a dedicated tmux sock
 
 ```bash
 # Working directory: repository root
-bash scripts/dev-server.sh start 8000
+VITE_USE_EMULATOR=true bash scripts/dev-server.sh start 4600
 ```
 
 The current environment is inherited when starting a new session, including `VITE_USE_EMULATOR=true` when requested. An existing session keeps its original environment; stop/start it to change settings. Do not assume a worktree or port isolates Firebase: the default development server uses shared staging Firebase. Production builds previewed locally use production Firebase unless emulator mode was compiled in; changing preview mode/environment requires rebuilding to change compiled selection. See [Firebase selection](../../../docs/environment.md#firebase-selection). Avoid authenticated actions against shared state unless authorized.
@@ -54,7 +54,7 @@ The current environment is inherited when starting a new session, including `VIT
 The helper waits up to 15 seconds for Vite to report a listening URL. If startup is not confirmed, inspect the reported log and status; a slow session may still be running. Stop it with the scoped command if abandoning the attempt. Check HTTP separately:
 
 ```bash
-curl --fail --silent --show-error --max-time 5 http://localhost:8000/ | rg -o '<title>[^<]*</title>'
+curl --fail --silent --show-error --max-time 5 http://localhost:4600/ | rg -o '<title>[^<]*</title>'
 ```
 
 Expected shell title: `<title>VikesClock</title>`. A 200 response/title proves only that Vite serves the HTML shell. It does **not** prove that JavaScript imports, React, API calls, authentication or Firebase synchronization work. Inspect this workspace's log for transform/import errors.
@@ -63,7 +63,7 @@ Expected shell title: `<title>VikesClock</title>`. A 200 response/title proves o
 
 Use the browser tools actually available in the session (for example Playwright or Paseo navigation, snapshots, console logs and screenshots), or a local Playwright runner. If no usable browser is available, report **HTTP shell checked; application verification not performed** and the reason.
 
-1. Navigate to `http://localhost:8000/`.
+1. Navigate to `http://localhost:4600/`.
 2. Inspect rendered application content (clock display or "Stillingar"), rather than just the HTML title or an empty root element.
 3. Check browser console errors and failed module/network requests. Record what was exercised; a rendered clock alone does not verify authenticated controls or cross-client sync.
 4. Capture a screenshot when relevant; follow the root guide's image handling rules and the user's limits on external uploads.
@@ -83,15 +83,16 @@ Summarize:
 Inspect the workspace log for errors and share only relevant lines with secrets redacted. To stop this server, from this worktree:
 
 ```bash
-bash scripts/dev-server.sh stop 8000
+bash scripts/dev-server.sh stop 4600
 ```
 
 This closes only this worktree/port's tmux session. Other ports and worktrees remain running. Logs remain after stopping and are replaced when a new session starts, including a failed Vite startup. Stop sessions before deleting or moving a worktree; moving it changes its handle. Servers launched manually or by other tools are not owned by this helper: use their original terminal/session handle to stop them.
 
-To check lifecycle isolation without frontend dependencies, Firebase or a browser, run `node --test scripts/dev-server.test.mjs` from the repository root (requires Bash, Git, Node and tmux). It exercises disposable linked worktrees and local HTTP fixtures under the user cache, then stops their scoped sessions and removes the fixtures. It checks PID identity, stale state, occupied ports, startup failures and timeout cleanup; it does not verify the application.
+To check lifecycle isolation without frontend dependencies, Firebase or a browser, run `node --test scripts/dev-server.test.mjs` from the repository root (requires Bash, Git, Node and tmux). It exercises disposable linked worktrees and local HTTP fixtures under the user cache, then stops their scoped sessions and removes the fixtures. It checks the default frontend alongside an API fixture on 8000, PID identity, stale state, occupied ports, startup failures and timeout cleanup; it does not verify the application.
 
 ## Important notes
 
-- The `vite.config.ts` has `allowedHosts: true` so any hostname works (e.g. `devpod-*` hostnames)
+- `vite.config.ts` permits custom hosts with `allowedHosts: true`, but a devpod/custom hostname selects the production API. Emulator endpoints are the browser's loopback. For the isolated recipe, forward frontend/API/all four emulator ports and open `http://localhost:4600/`; see the environment contract.
 - The server persists in tmux after the invoking shell ends; it does not survive a reboot
 - The helper prints a proposed local URL; consult Vite's log for any configured base path and network URL
+- Restart OpenCode after pulling changed skill guidance so the session loads it.

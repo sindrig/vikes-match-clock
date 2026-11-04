@@ -25,15 +25,10 @@ Use **pnpm** for local JavaScript work. Clock CI uses pnpm 10; the gateway pins
 and npm-based CI; do not infer alignment or rewrite them during unrelated work.
 See each scoped guide for commands, prerequisites and that limitation.
 
-For credential-free frontend work, from the repository root:
-
-```bash
-cd clock
-corepack pnpm@10.34.9 install --frozen-lockfile
-corepack pnpm@10.34.9 run generate-api-client
-# Local Firebase services must already be running for this isolated target:
-VITE_USE_EMULATOR=true PORT=4500 corepack pnpm@10.34.9 start
-```
+Use the [local quickstart](docs/quickstart.md) for credential-free setup in any
+checkout/worktree: SDK first, frontend **4600**, API **8000**, and the complete
+Auth/Database/Storage/Functions flow with synthetic login, upload and callable
+verification. Scoped guides own subsystem contracts and focused checks.
 
 `start` and `build` generate the ignored SDK from committed
 `clock-api/v3/openapi.json`. Standalone lint/tests/type checks need generation

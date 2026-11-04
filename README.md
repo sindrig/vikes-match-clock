@@ -18,23 +18,14 @@ The operator controller, administration and public displays share one React app.
 
 ## Local frontend
 
-With Node 22.12+ and Corepack, from the repository root (the verified reference
-version is 22.23.3):
+Follow the [local quickstart](docs/quickstart.md) for prerequisites, ignored SDK
+generation, frontend **4600**, API **8000**, and all four Firebase emulators
+with synthetic login, uploads and callable Functions. Frontend generation/build
+needs no Python, AWS or live login.
 
-```bash
-cd clock
-corepack pnpm@10.34.9 install --frozen-lockfile
-corepack pnpm@10.34.9 build
-```
-
-This build needs no Python, AWS or live login. It prepares the ignored SDK
-from the committed OpenAPI schema. Follow [API preparation](docs/api-client-preparation.md)
-for standalone checks and API contract changes.
-
-Before starting a browser, read the [environment contract](docs/environment.md).
-Default development uses shared staging Firebase; a default production build
-previewed locally uses production. Emulator selection must be set at startup
-or build time. [Clock testing](docs/clock/testing.md) covers isolated services.
+The [environment contract](docs/environment.md) owns target selection: default
+development uses shared staging Firebase, and a default production preview on
+localhost uses production. Set emulator selection at startup/build time.
 
 ## Environments
 

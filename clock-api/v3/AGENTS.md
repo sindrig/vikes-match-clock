@@ -64,7 +64,11 @@ clock-api/v3/
 | POST   | `/{teamId}/resolve-roster`              | Resolve shirt numbers to player names from recent match history               |
 | GET    | `/weather?lat=&lon=`                    | Weather at coordinates (OpenWeatherMap with vedur.is fallback)                |
 
-Note: App is mounted at `root_path="/v3"`, so full production paths are `/v3/health`, `/v3/{team_id}/matches/...`, etc.
+These paths are relative to the actual `APIRouter(prefix="/v3")`, not a
+`root_path` mount. Both local and production routes include `/v3`, for example
+`/v3/health`. The generated SDK includes that prefix in endpoint paths; configure
+its base URL at the API origin (`http://localhost:8000/` locally), without a
+second `/v3`. Frontend port 4600 and API port 8000 are distinct; Vite has no proxy.
 
 ## External APIs
 
@@ -112,12 +116,9 @@ credential chain; key values are not loaded from dotenv. See
 [the environment contract](../../docs/environment.md#api-secrets) for access
 requirements and credential-free alternatives.
 
-Setup:
-
-```bash
-cd clock-api/v3
-python -m pip install -r requirements-dev.txt
-```
+Use the [local quickstart](../../docs/quickstart.md) for Python 3.12 selection,
+an owned virtual environment, dependencies and combined frontend/emulator setup.
+The following commands assume that environment's Python and **`clock-api/v3/`**.
 
 For a deliberately configured local API, from this directory:
 
@@ -171,7 +172,7 @@ for isolated setup and the offline export regression test.
 - httpx mocking: `respx` for async httpx calls
 - Endpoint testing: `TestClient` with dependency overrides
 - Weather mocking: Mock both OpenWeatherMap and vedur.is to test fallback chain
-- App config testing: Verify FastAPI setup, CORS, root_path, run.sh existence
+- App config testing: Verify FastAPI setup, CORS, `/v3` router prefix, run.sh existence
 
 ## Related
 

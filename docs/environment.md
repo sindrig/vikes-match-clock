@@ -61,9 +61,10 @@ only when that action is intended. Portable tasks need neither helper.
 
 ## Credential-free frontend and emulator work
 
-Use [API preparation](api-client-preparation.md) for dependency/tool setup;
-Python and AWS are unnecessary for the frontend. No credential file or direnv
-is required for generation/build/lint/unit tests.
+Use the [local quickstart](quickstart.md) for the complete frontend/API and
+four-emulator setup. [API preparation](api-client-preparation.md) owns SDK/schema
+order. Python and AWS are unnecessary for the frontend. No credential file or
+direnv is required for generation/build/lint/unit tests.
 
 ### Firebase selection
 
@@ -85,21 +86,11 @@ setting the flag or changing `--mode` only when starting preview is too late.
 The hostname check happens in the browser; the mode and emulator flag come
 from development-server startup or the build, not the preview environment.
 
-For Firebase emulator work, start the required local services with the test
-project `vikes-match-clock-test`, then start Vite from `clock/`:
-
-```bash
-# Bash, working directory: clock/. Emulator services must already be running.
-VITE_USE_EMULATOR=true PORT=4500 pnpm start
-# Or, with services running, let Playwright start Vite on that port:
-VITE_USE_EMULATOR=true PORT=4500 pnpm e2e
-```
-
-See [the emulator configuration](../firebase.json), [Docker service](../docker-compose.yml),
-and [clock guidance](../clock/AGENTS.md#firebase-emulator). Auth (9099), Database
-(9000), Storage (9199) and Functions (5001) are separate local services; start
-those required by the feature. Neither a live staging login nor Firebase CLI
-login is required for local emulators. E2E fixtures target local emulator
+The [quickstart](quickstart.md#3-prepare-and-start-all-four-firebase-emulators)
+starts Auth (9099), Database (9000), Storage (9199) and Functions (5001) with
+project `vikes-match-clock-test`, compiles Functions, and verifies readiness and
+rules in the app's namespace. Neither a live staging login nor Firebase CLI
+login is required. E2E fixtures target local emulator
 endpoints and seed their own users/data; `TEST_CREDENTIALS` is not their login
 source. Never point those fixtures at shared Firebase.
 
@@ -109,8 +100,19 @@ separately by [apiConfig.ts](../clock/src/apiConfig.ts): `localhost` and
 API, and other hostnames use production. For isolated work, mock API requests
 as the tests do, or run a deliberately configured local API. Firebase emulator
 mode alone does not provide match/weather API data or isolate other network
-requests. Use a different frontend port (for example 4500) when the API owns
-8000; the workspace helper also defaults to 8000 unless given an explicit port.
+requests. Use a different frontend port (for example 4600) when the API owns
+8000; the workspace helper defaults to frontend port **4600**, also avoiding
+Firebase CLI's reserved logging port 4500. Plain Vite and
+Playwright retain port 3000 unless `PORT` is supplied. There is no Vite API proxy
+or environment-variable override for the hostname-based API selection.
+
+On a remote dev host, the emulator SDK endpoints still mean **the browser's**
+`127.0.0.1`, not the machine serving Vite. Forward frontend 4600, API 8000 and all
+four emulator ports to the browser machine and open `http://localhost:4600/` for
+this isolated path. A custom/devpod hostname falls through to the production
+API even with `VITE_USE_EMULATOR=true`; Vite's `allowedHosts` only permits serving
+the frontend. Do not treat that hostname as local API routing. Preview uses the
+same browser-hostname API routing independently of its compiled Firebase mode.
 
 ## Shared staging login
 
