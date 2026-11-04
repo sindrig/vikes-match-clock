@@ -9,6 +9,8 @@ Start the Vite dev server for the `clock/` React app on a user-specified port, e
 
 Use the repository's `scripts/dev-server.sh` helper from this worktree. It needs Bash, Git, Node, tmux and installed clock dependencies (pnpm). It launches the installed Vite CLI directly in a detached tmux session; it does not use `nohup`. If a required tool is missing, report it or install development tooling within the user's authorized scope.
 
+Frontend preparation needs no credentials. Read [the environment contract](../../../docs/environment.md) for optional direnv, explicit `VITE_USE_EMULATOR=true` selection and staging login retrieval. The emulator flag switches Firebase only; `localhost` match/weather requests still target a local API on port 8000. If running that API, choose a different frontend port, for example 4500. Do not read secret files or initiate login just to start the frontend. Existing operator Python/SSO helpers are opt-in, never prerequisites here.
+
 ## Steps
 
 ### 1. Determine the port
@@ -45,7 +47,7 @@ The helper identifies the physical worktree and port, uses a dedicated tmux sock
 bash scripts/dev-server.sh start 8000
 ```
 
-The current environment is inherited when starting a new session, including `VITE_USE_EMULATOR=true` when requested. An existing session keeps its original environment; stop/start it to change settings. Do not assume a worktree or port isolates Firebase: development defaults to shared staging Firebase. Avoid authenticated actions against shared state unless authorized.
+The current environment is inherited when starting a new session, including `VITE_USE_EMULATOR=true` when requested. An existing session keeps its original environment; stop/start it to change settings. Do not assume a worktree or port isolates Firebase: the default development server uses shared staging Firebase. Production builds previewed locally use production Firebase unless emulator mode was compiled in; changing preview mode/environment requires rebuilding to change compiled selection. See [Firebase selection](../../../docs/environment.md#firebase-selection). Avoid authenticated actions against shared state unless authorized.
 
 ### 5. Check the HTTP shell
 
