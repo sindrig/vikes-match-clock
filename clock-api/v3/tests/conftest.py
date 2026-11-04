@@ -1,15 +1,30 @@
+from unittest.mock import patch
+
 import pytest
 import pytest_asyncio
 from fastapi.testclient import TestClient
-from unittest.mock import patch
 
+from app import dependencies
 from app.main import app
 from app.services.ksi import KsiClient
 
 
 @pytest.fixture
 def client():
-    return TestClient(app)
+    with TestClient(app) as client:
+        yield client
+
+
+@pytest.fixture
+def ksi_capacity():
+    return dependencies.KSI_KEY_LOOKUP_CAPACITY
+
+
+@pytest_asyncio.fixture
+async def app_lifespan(monkeypatch, ksi_capacity):
+    monkeypatch.setattr(dependencies, "KSI_KEY_LOOKUP_CAPACITY", ksi_capacity)
+    async with app.router.lifespan_context(app):
+        yield app.state.ksi_key_lookups
 
 
 @pytest.fixture

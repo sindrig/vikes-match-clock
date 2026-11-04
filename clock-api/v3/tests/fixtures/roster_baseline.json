@@ -1,0 +1,742 @@
+{
+  "mixed-history": {
+    "players": [
+      {
+        "shirtNumber": 13,
+        "captain": true,
+        "goalkeeper": true,
+        "startingLineup": true,
+        "person": {
+          "id": 1013,
+          "name": "Newest Keeper",
+          "firstName": "Newest",
+          "lastName": "Jónsson"
+        }
+      },
+      {
+        "shirtNumber": 2,
+        "captain": true,
+        "goalkeeper": false,
+        "startingLineup": true,
+        "person": {
+          "id": 2002,
+          "name": "Older Two",
+          "firstName": "Older",
+          "lastName": "Jónsson"
+        }
+      },
+      {
+        "shirtNumber": 3,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": true,
+        "person": {
+          "id": 3003,
+          "name": "Oldest 3",
+          "firstName": "Oldest",
+          "lastName": "Jónsson"
+        }
+      },
+      {
+        "shirtNumber": 4,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": true,
+        "person": {
+          "id": 3004,
+          "name": "Oldest 4",
+          "firstName": "Oldest",
+          "lastName": "Jónsson"
+        }
+      },
+      {
+        "shirtNumber": 5,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": true,
+        "person": {
+          "id": 3005,
+          "name": "Oldest 5",
+          "firstName": "Oldest",
+          "lastName": "Jónsson"
+        }
+      },
+      {
+        "shirtNumber": 6,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": true,
+        "person": {
+          "id": 3006,
+          "name": "Oldest 6",
+          "firstName": "Oldest",
+          "lastName": "Jónsson"
+        }
+      },
+      {
+        "shirtNumber": 7,
+        "captain": true,
+        "goalkeeper": false,
+        "startingLineup": true,
+        "person": {
+          "id": 1007,
+          "name": "Newest Seven",
+          "firstName": "Newest",
+          "lastName": "Jónsson"
+        }
+      },
+      {
+        "shirtNumber": 8,
+        "captain": true,
+        "goalkeeper": true,
+        "startingLineup": true,
+        "person": {
+          "id": 2008,
+          "name": "Flat Eight",
+          "firstName": null,
+          "lastName": null
+        }
+      },
+      {
+        "shirtNumber": 9,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": true,
+        "person": {
+          "id": 1009,
+          "name": "Newest Nine",
+          "firstName": "Newest",
+          "lastName": "Jónsson"
+        }
+      },
+      {
+        "shirtNumber": 10,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": true,
+        "person": {
+          "id": 3010,
+          "name": "Oldest 10",
+          "firstName": "Oldest",
+          "lastName": "Jónsson"
+        }
+      },
+      {
+        "shirtNumber": 11,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": true,
+        "person": {
+          "id": 3011,
+          "name": "Oldest 11",
+          "firstName": "Oldest",
+          "lastName": "Jónsson"
+        }
+      },
+      {
+        "shirtNumber": 12,
+        "captain": false,
+        "goalkeeper": true,
+        "startingLineup": false,
+        "person": {
+          "id": 1012,
+          "name": "Newest Twelve",
+          "firstName": "Newest",
+          "lastName": "Jónsson"
+        }
+      },
+      {
+        "shirtNumber": 23,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": false,
+        "person": {
+          "id": 3023,
+          "name": "Oldest 23",
+          "firstName": "Oldest",
+          "lastName": "Jónsson"
+        }
+      }
+    ],
+    "officials": []
+  },
+  "unresolved-with-flags": {
+    "players": [
+      {
+        "shirtNumber": 13,
+        "captain": true,
+        "goalkeeper": true,
+        "startingLineup": true,
+        "person": {
+          "id": 1013,
+          "name": "Newest Keeper",
+          "firstName": "Newest",
+          "lastName": "Jónsson"
+        }
+      },
+      {
+        "shirtNumber": 2,
+        "captain": true,
+        "goalkeeper": false,
+        "startingLineup": true,
+        "person": {
+          "id": 2002,
+          "name": "Older Two",
+          "firstName": "Older",
+          "lastName": "Jónsson"
+        }
+      },
+      {
+        "shirtNumber": 3,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": true,
+        "person": {
+          "id": 0,
+          "name": "#3",
+          "firstName": null,
+          "lastName": null
+        }
+      },
+      {
+        "shirtNumber": 4,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": true,
+        "person": {
+          "id": 0,
+          "name": "#4",
+          "firstName": null,
+          "lastName": null
+        }
+      },
+      {
+        "shirtNumber": 5,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": true,
+        "person": {
+          "id": 0,
+          "name": "#5",
+          "firstName": null,
+          "lastName": null
+        }
+      },
+      {
+        "shirtNumber": 6,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": true,
+        "person": {
+          "id": 0,
+          "name": "#6",
+          "firstName": null,
+          "lastName": null
+        }
+      },
+      {
+        "shirtNumber": 7,
+        "captain": true,
+        "goalkeeper": false,
+        "startingLineup": true,
+        "person": {
+          "id": 1007,
+          "name": "Newest Seven",
+          "firstName": "Newest",
+          "lastName": "Jónsson"
+        }
+      },
+      {
+        "shirtNumber": 8,
+        "captain": true,
+        "goalkeeper": true,
+        "startingLineup": true,
+        "person": {
+          "id": 2008,
+          "name": "Flat Eight",
+          "firstName": null,
+          "lastName": null
+        }
+      },
+      {
+        "shirtNumber": 9,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": true,
+        "person": {
+          "id": 1009,
+          "name": "Newest Nine",
+          "firstName": "Newest",
+          "lastName": "Jónsson"
+        }
+      },
+      {
+        "shirtNumber": 10,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": true,
+        "person": {
+          "id": 0,
+          "name": "#10",
+          "firstName": null,
+          "lastName": null
+        }
+      },
+      {
+        "shirtNumber": 11,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": true,
+        "person": {
+          "id": 0,
+          "name": "#11",
+          "firstName": null,
+          "lastName": null
+        }
+      },
+      {
+        "shirtNumber": 12,
+        "captain": false,
+        "goalkeeper": true,
+        "startingLineup": false,
+        "person": {
+          "id": 1012,
+          "name": "Newest Twelve",
+          "firstName": "Newest",
+          "lastName": "Jónsson"
+        }
+      },
+      {
+        "shirtNumber": 23,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": false,
+        "person": {
+          "id": 0,
+          "name": "#23",
+          "firstName": null,
+          "lastName": null
+        }
+      }
+    ],
+    "officials": []
+  },
+  "empty-history": {
+    "players": [
+      {
+        "shirtNumber": 13,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": true,
+        "person": {
+          "id": 0,
+          "name": "#13",
+          "firstName": null,
+          "lastName": null
+        }
+      },
+      {
+        "shirtNumber": 2,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": true,
+        "person": {
+          "id": 0,
+          "name": "#2",
+          "firstName": null,
+          "lastName": null
+        }
+      },
+      {
+        "shirtNumber": 3,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": true,
+        "person": {
+          "id": 0,
+          "name": "#3",
+          "firstName": null,
+          "lastName": null
+        }
+      },
+      {
+        "shirtNumber": 4,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": true,
+        "person": {
+          "id": 0,
+          "name": "#4",
+          "firstName": null,
+          "lastName": null
+        }
+      },
+      {
+        "shirtNumber": 5,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": true,
+        "person": {
+          "id": 0,
+          "name": "#5",
+          "firstName": null,
+          "lastName": null
+        }
+      },
+      {
+        "shirtNumber": 6,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": true,
+        "person": {
+          "id": 0,
+          "name": "#6",
+          "firstName": null,
+          "lastName": null
+        }
+      },
+      {
+        "shirtNumber": 7,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": true,
+        "person": {
+          "id": 0,
+          "name": "#7",
+          "firstName": null,
+          "lastName": null
+        }
+      },
+      {
+        "shirtNumber": 8,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": true,
+        "person": {
+          "id": 0,
+          "name": "#8",
+          "firstName": null,
+          "lastName": null
+        }
+      },
+      {
+        "shirtNumber": 9,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": true,
+        "person": {
+          "id": 0,
+          "name": "#9",
+          "firstName": null,
+          "lastName": null
+        }
+      },
+      {
+        "shirtNumber": 10,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": true,
+        "person": {
+          "id": 0,
+          "name": "#10",
+          "firstName": null,
+          "lastName": null
+        }
+      },
+      {
+        "shirtNumber": 11,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": true,
+        "person": {
+          "id": 0,
+          "name": "#11",
+          "firstName": null,
+          "lastName": null
+        }
+      }
+    ],
+    "officials": []
+  },
+  "fully-resolved-newest": {
+    "players": [
+      {
+        "shirtNumber": 1,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": true,
+        "person": {
+          "id": 3001,
+          "name": "Oldest 1",
+          "firstName": "Oldest",
+          "lastName": "Jónsson"
+        }
+      },
+      {
+        "shirtNumber": 2,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": true,
+        "person": {
+          "id": 3002,
+          "name": "Oldest 2",
+          "firstName": "Oldest",
+          "lastName": "Jónsson"
+        }
+      },
+      {
+        "shirtNumber": 3,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": true,
+        "person": {
+          "id": 3003,
+          "name": "Oldest 3",
+          "firstName": "Oldest",
+          "lastName": "Jónsson"
+        }
+      },
+      {
+        "shirtNumber": 4,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": true,
+        "person": {
+          "id": 3004,
+          "name": "Oldest 4",
+          "firstName": "Oldest",
+          "lastName": "Jónsson"
+        }
+      },
+      {
+        "shirtNumber": 5,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": true,
+        "person": {
+          "id": 3005,
+          "name": "Oldest 5",
+          "firstName": "Oldest",
+          "lastName": "Jónsson"
+        }
+      },
+      {
+        "shirtNumber": 6,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": true,
+        "person": {
+          "id": 3006,
+          "name": "Oldest 6",
+          "firstName": "Oldest",
+          "lastName": "Jónsson"
+        }
+      },
+      {
+        "shirtNumber": 7,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": true,
+        "person": {
+          "id": 3007,
+          "name": "Oldest 7",
+          "firstName": "Oldest",
+          "lastName": "Jónsson"
+        }
+      },
+      {
+        "shirtNumber": 8,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": true,
+        "person": {
+          "id": 3008,
+          "name": "Oldest 8",
+          "firstName": "Oldest",
+          "lastName": "Jónsson"
+        }
+      },
+      {
+        "shirtNumber": 9,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": true,
+        "person": {
+          "id": 3009,
+          "name": "Oldest 9",
+          "firstName": "Oldest",
+          "lastName": "Jónsson"
+        }
+      },
+      {
+        "shirtNumber": 10,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": true,
+        "person": {
+          "id": 3010,
+          "name": "Oldest 10",
+          "firstName": "Oldest",
+          "lastName": "Jónsson"
+        }
+      },
+      {
+        "shirtNumber": 11,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": true,
+        "person": {
+          "id": 3011,
+          "name": "Oldest 11",
+          "firstName": "Oldest",
+          "lastName": "Jónsson"
+        }
+      },
+      {
+        "shirtNumber": 12,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": false,
+        "person": {
+          "id": 3012,
+          "name": "Oldest 12",
+          "firstName": "Oldest",
+          "lastName": "Jónsson"
+        }
+      },
+      {
+        "shirtNumber": 13,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": false,
+        "person": {
+          "id": 3013,
+          "name": "Oldest 13",
+          "firstName": "Oldest",
+          "lastName": "Jónsson"
+        }
+      },
+      {
+        "shirtNumber": 14,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": false,
+        "person": {
+          "id": 3014,
+          "name": "Oldest 14",
+          "firstName": "Oldest",
+          "lastName": "Jónsson"
+        }
+      },
+      {
+        "shirtNumber": 15,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": false,
+        "person": {
+          "id": 3015,
+          "name": "Oldest 15",
+          "firstName": "Oldest",
+          "lastName": "Jónsson"
+        }
+      },
+      {
+        "shirtNumber": 16,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": false,
+        "person": {
+          "id": 3016,
+          "name": "Oldest 16",
+          "firstName": "Oldest",
+          "lastName": "Jónsson"
+        }
+      },
+      {
+        "shirtNumber": 17,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": false,
+        "person": {
+          "id": 3017,
+          "name": "Oldest 17",
+          "firstName": "Oldest",
+          "lastName": "Jónsson"
+        }
+      },
+      {
+        "shirtNumber": 18,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": false,
+        "person": {
+          "id": 3018,
+          "name": "Oldest 18",
+          "firstName": "Oldest",
+          "lastName": "Jónsson"
+        }
+      },
+      {
+        "shirtNumber": 19,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": false,
+        "person": {
+          "id": 3019,
+          "name": "Oldest 19",
+          "firstName": "Oldest",
+          "lastName": "Jónsson"
+        }
+      },
+      {
+        "shirtNumber": 20,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": false,
+        "person": {
+          "id": 3020,
+          "name": "Oldest 20",
+          "firstName": "Oldest",
+          "lastName": "Jónsson"
+        }
+      },
+      {
+        "shirtNumber": 21,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": false,
+        "person": {
+          "id": 3021,
+          "name": "Oldest 21",
+          "firstName": "Oldest",
+          "lastName": "Jónsson"
+        }
+      },
+      {
+        "shirtNumber": 22,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": false,
+        "person": {
+          "id": 3022,
+          "name": "Oldest 22",
+          "firstName": "Oldest",
+          "lastName": "Jónsson"
+        }
+      },
+      {
+        "shirtNumber": 23,
+        "captain": false,
+        "goalkeeper": false,
+        "startingLineup": false,
+        "person": {
+          "id": 3023,
+          "name": "Oldest 23",
+          "firstName": "Oldest",
+          "lastName": "Jónsson"
+        }
+      }
+    ],
+    "officials": []
+  }
+}

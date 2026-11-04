@@ -59,7 +59,7 @@ Automatic shared progression will be moved to a lifecycle coordinator/action lay
 
 Alternative considered: retain component side effects and add `document.visibilityState` checks. Rejected because visibility checks cover only one stale path, remain vulnerable to reconnect races, and leave rendering unexpectedly authoritative.
 
-### 3. Identify timer generations using existing authoritative fields
+### 3. Identify timer generations using authoritative fields
 
 Clock commands will carry preconditions derived from existing state, primarily the observed `started` timestamp plus the relevant mode/record identity:
 
@@ -67,11 +67,19 @@ Clock commands will carry preconditions derived from existing state, primarily t
 - match pause: expected running `started` value;
 - timeout completion: expected `timeout` timestamp;
 - penalty completion: expected penalty key and creation data;
-- timed asset completion: expected current asset identity and active queue generation.
+- timed asset completion: explicit playback occurrence ID plus current asset, duration and queue context.
+
+Issue #244 establishes that reusable asset fields repeat on A → B → A. New
+selections/replays/advances therefore write `currentAsset.occurrenceId`. A bounded
+legacy observation is accepted only while the raw field is truly absent and the
+existing tuple matches; every successor is identified. Malformed IDs never fall
+back to legacy, and readers never mint IDs. See
+[the occurrence contract](../../../docs/playback-occurrences.md) for compatibility,
+rollout and the unchanged old-binary limitation.
 
 No persistent owner field is added. The `started`/timeout timestamp or command identity already changes when a new generation begins, so it acts as a compare token.
 
-Alternative considered: add a general numeric revision to every state area. Deferred because existing identities appear sufficient for the affected timer transitions and avoid a migration. If implementation reveals an asset lacks stable identity, add the narrowest command revision needed rather than a global owner.
+Alternative considered: add a general numeric revision to every state area. Deferred in favor of match timer identities and the narrow playback occurrence field. If implementation reveals an asset lacks stable identity, add the narrowest command revision needed rather than a global owner.
 
 ### 4. Revalidate automatic commands against Firebase before writing
 
@@ -113,7 +121,7 @@ Brightness remains an independent perimeter command. Opening its modal is read-o
 - **[Transactions and atomic audit writes may conflict]** → Resolve this in an implementation spike before broad refactoring; preserve audit atomicity even if a small trusted callable is required.
 - **[Two contexts may race nondeterministically in E2E]** → Expose deterministic test-only lifecycle hooks or use controlled emulator writes/network routing, never production test flags that alter behavior.
 - **[Freshness barrier could briefly disable controls during normal reconnects]** → Surface a concise resynchronizing state and restore controls immediately after current snapshots arrive; never replay clicks made while blocked.
-- **[Existing queued asset model lacks a universal generation token]** → Use current asset key plus active queue/current item identity where adequate; add a narrow revision only if the regression test demonstrates ambiguity.
+- **[Existing queued asset model lacks a universal generation token]** → The A → B → A regression demonstrates ambiguity; use the narrow occurrence protocol, including bounded legacy matching.
 
 ## Migration Plan
 

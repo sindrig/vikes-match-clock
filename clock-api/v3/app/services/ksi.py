@@ -5,9 +5,9 @@ from app.models.matches import (
     LineupsResponse,
     Match,
     MatchEvent,
+    Person,
     TeamLineup,
     TeamPlayer,
-    Person,
 )
 
 
@@ -28,54 +28,30 @@ class KsiClient:
         )
 
     async def get_matches(self, date: str, utc_offset: int) -> list[Match]:
-        response = await self.client.get(
+        response = await self._get(
             f"/api/live/matchList/{date}/{utc_offset}",
-            headers={"API_KEY": self.api_key},
-            params={"teamIdFilter": self.team_id},
         )
-        self._check_response(response)
         return [Match.model_validate(m) for m in response.json()]
 
     async def get_lineups(self, match_id: int) -> LineupsResponse:
-        response = await self.client.get(
-            f"/api/live/match/{match_id}/lineups",
-            headers={"API_KEY": self.api_key},
-            params={"teamIdFilter": self.team_id},
-        )
-        self._check_response(response)
+        response = await self._get(f"/api/live/match/{match_id}/lineups")
         return LineupsResponse.model_validate(response.json())
 
     async def get_events(self, match_id: int) -> list[MatchEvent]:
-        response = await self.client.get(
-            f"/api/live/match/{match_id}/events",
-            headers={"API_KEY": self.api_key},
-            params={"teamIdFilter": self.team_id},
-        )
-        self._check_response(response)
+        response = await self._get(f"/api/live/match/{match_id}/events")
         return [MatchEvent.model_validate(e) for e in response.json()]
 
     async def get_match_info(self, match_id: int) -> Match:
-        response = await self.client.get(
-            f"/api/live/match/{match_id}",
-            headers={"API_KEY": self.api_key},
-            params={"teamIdFilter": self.team_id},
-        )
-        self._check_response(response)
+        response = await self._get(f"/api/live/match/{match_id}")
         return Match.model_validate(response.json())
 
     async def get_past_matches(self) -> list[Match]:
         if self.past_matches is not None:
             return self.past_matches
-        response = await self.client.get(
+        response = await self._get(
             f"/api/live/team/{self.team_id}/matches/paginated/past/0",
-            headers={"API_KEY": self.api_key},
-            params={
-                "page": 1,
-                "pageSize": 10,
-                "teamIdFilter": self.team_id,
-            },
+            params={"page": 1, "pageSize": 10},
         )
-        self._check_response(response)
         data = response.json()
         matches = data.get("result", []) if isinstance(data, dict) else data
         self.past_matches = sorted(
@@ -89,19 +65,23 @@ class KsiClient:
         self, starters: list[int], substitutes: list[int]
     ) -> TeamLineup:
         matches = await self.get_past_matches()
+        unresolved = set(starters) | set(substitutes)
         seen: dict[int, TeamPlayer] = {}
         for match in matches:
+            if self.team_id not in (match.homeTeam.id, match.awayTeam.id):
+                continue
             lineups = await self.get_lineups(match.id)
             if match.homeTeam.id == self.team_id:
                 team_lineup = lineups.home
-            elif match.awayTeam.id == self.team_id:
-                team_lineup = lineups.away
             else:
-                continue
+                team_lineup = lineups.away
             for player in team_lineup.players:
                 num = player.shirtNumber
-                if num is not None and num not in seen:
+                if num is not None and num in unresolved:
                     seen[num] = player
+                    unresolved.remove(num)
+            if not unresolved:
+                break
 
         goalkeeper = starters[0]
         ordered_numbers = [
@@ -135,5 +115,25 @@ class KsiClient:
                 )
         return TeamLineup(players=players, officials=[])
 
-    async def close(self):
+    async def _get(
+        self, path: str, params: dict[str, int] | None = None
+    ) -> httpx.Response:
+        try:
+            response = await self.client.get(
+                path,
+                headers={"API_KEY": self.api_key},
+                params={"teamIdFilter": self.team_id, **(params or {})},
+            )
+        except httpx.TimeoutException as error:
+            raise HTTPException(
+                status_code=504, detail="KSI request timed out"
+            ) from error
+        except httpx.RequestError as error:
+            raise HTTPException(
+                status_code=502, detail="Upstream API request failed"
+            ) from error
+        self._check_response(response)
+        return response
+
+    async def close(self) -> None:
         await self.client.aclose()

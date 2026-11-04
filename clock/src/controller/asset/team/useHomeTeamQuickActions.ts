@@ -1,19 +1,18 @@
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 
 import {
   useController,
   useMatch,
   useView,
 } from "../../../contexts/FirebaseStateContext";
-import { useRemoteSettings } from "../../../contexts/LocalStateContext";
+import { useLocalState } from "../../../contexts/LocalStateContext";
+import { MutationRejectedError } from "../../../lib/mutationSession";
 import assetTypes from "../AssetTypes";
-import { Asset, Player } from "../../../types";
+import { Player } from "../../../types";
 import { getMOTMAsset, getPlayerAssetObject } from "./assetHelpers";
 
 type TeamKey = "homeTeam" | "awayTeam";
 type QuickActionMode = null | "subOff" | "subOn" | "playerCard" | "motm";
-
-const SUBS_QUEUE_NAME = "Skiptingar";
 
 const trimLastName = (player: Player): Player => ({
   ...player,
@@ -25,34 +24,52 @@ const trimLastName = (player: Player): Player => ({
 
 export function useHomeTeamQuickActions() {
   const { match } = useMatch();
-  const {
-    controller,
-    editPlayer,
-    createQueue,
-    addItemsToQueue,
-    activateQueue,
-    showItemNow,
-  } = useController();
+  const { controller, appendSubstitutionAndActivate, renderAsset } =
+    useController();
   const { view } = useView();
-  const { listenPrefix } = useRemoteSettings();
+  const { listenPrefix, mutationSession } = useLocalState();
   const { roster } = controller;
+
+  const [error, setError] = useState("");
 
   const [modalMode, setModalMode] = useState<QuickActionMode>(null);
   const [subSide, setSubSide] = useState<"home" | "away">("home");
   const [subOffPlayer, setSubOffPlayer] = useState<Player | null>(null);
+  const currentSelection = useRef<symbol | null>(null);
+  useLayoutEffect(
+    () => () => {
+      currentSelection.current = null;
+    },
+    [],
+  );
 
-  const addSubToQueue = (asset: Asset): void => {
-    const existingQueue = Object.values(controller.queues).find(
-      (q) => q.name === SUBS_QUEUE_NAME,
-    );
-    const queueId = existingQueue
-      ? existingQueue.id
-      : createQueue(SUBS_QUEUE_NAME, { cycle: false });
-    addItemsToQueue(queueId, [asset]);
-    activateQueue(queueId);
+  const retireSelection = (): void => {
+    currentSelection.current = null;
+    setError("");
   };
 
-  const showPlayerCard = (player: Player, teamKey: TeamKey): Promise<void> => {
+  // Shared with the team tab: feedback belongs to the latest explicit action,
+  // even when an independent substitution is still preparing or committing.
+  const beginAction = () => {
+    const selection = Symbol();
+    currentSelection.current = selection;
+    const origin = mutationSession.getSnapshot();
+    const isSelected = () => currentSelection.current === selection;
+    const ownsUI = () => isSelected() && mutationSession.isCurrent(origin);
+    setError("");
+    return {
+      isSelected,
+      ownsUI,
+      canReport: (failure: unknown) =>
+        isSelected() && (failure instanceof MutationRejectedError || ownsUI()),
+    };
+  };
+
+  const showPlayerCard = (
+    player: Player,
+    teamKey: TeamKey,
+    isSelected = () => true,
+  ): Promise<void> => {
     const actualTeamName =
       teamKey === "homeTeam" ? match.homeTeam : match.awayTeam;
     return (async () => {
@@ -61,17 +78,21 @@ export function useHomeTeamQuickActions() {
         teamName: actualTeamName,
         listenPrefix,
       });
-      if (!playerAsset) return;
+      if (!playerAsset || !isSelected()) return;
       const homeRevealBg = view.homeTeamRevealBackground;
       const assetWithBg =
         teamKey === "homeTeam" && homeRevealBg
           ? { ...playerAsset, background: homeRevealBg }
           : playerAsset;
-      showItemNow(assetWithBg);
+      await renderAsset(assetWithBg);
     })();
   };
 
-  const showMOTM = (player: Player, teamKey: TeamKey): Promise<void> => {
+  const showMOTM = (
+    player: Player,
+    teamKey: TeamKey,
+    isSelected = () => true,
+  ): Promise<void> => {
     const actualTeamName =
       teamKey === "homeTeam" ? match.homeTeam : match.awayTeam;
     return (async () => {
@@ -80,28 +101,31 @@ export function useHomeTeamQuickActions() {
         teamName: actualTeamName,
         listenPrefix,
       });
-      if (!motmAsset) return;
+      if (!motmAsset || !isSelected()) return;
       const homeRevealBg = view.homeTeamRevealBackground;
       const assetWithBg =
         teamKey === "homeTeam" && homeRevealBg
           ? { ...motmAsset, background: homeRevealBg }
           : motmAsset;
-      showItemNow(assetWithBg);
+      await renderAsset(assetWithBg);
     })();
   };
 
   const openSubModal = (side: "home" | "away"): void => {
+    retireSelection();
     setSubSide(side);
     setSubOffPlayer(null);
     setModalMode("subOff");
   };
 
   const openPlayerCardModal = (): void => {
+    retireSelection();
     setSubOffPlayer(null);
     setModalMode("playerCard");
   };
 
   const openMOTMModal = (): void => {
+    retireSelection();
     setSubOffPlayer(null);
     setModalMode("motm");
   };
@@ -113,55 +137,58 @@ export function useHomeTeamQuickActions() {
 
   const handleSubOnSelect = (player: Player): void => {
     if (!subOffPlayer) return;
+    const outgoing = subOffPlayer;
     const side = subSide;
-    const teamKey: TeamKey = side === "home" ? "homeTeam" : "awayTeam";
     const actualTeamName = side === "home" ? match.homeTeam : match.awayTeam;
-    const players = roster[side] || [];
-
-    const offIdx = players.findIndex(
-      (p) => p.number === subOffPlayer.number && p.name === subOffPlayer.name,
-    );
-    const onIdx = players.findIndex(
-      (p) => p.number === player.number && p.name === player.name,
-    );
-    if (offIdx !== -1) editPlayer(side, offIdx, { show: false });
-    if (onIdx !== -1) editPlayer(side, onIdx, { show: true });
-
+    // Capture before the first await. Never use a ref to a newer command here.
+    const commit = appendSubstitutionAndActivate;
+    const action = beginAction();
     setModalMode(null);
 
-    const subOffTrimmed = trimLastName(subOffPlayer);
-    const subOnTrimmed = trimLastName(player);
-
     void (async () => {
-      // Corrected semantics: `subIn` carries the player coming on, `subOut`
-      // the player going off. Consumers render the pair in that order.
-      const subInObj = await getPlayerAssetObject({
-        player: subOnTrimmed,
-        teamName: actualTeamName,
-        listenPrefix,
-      });
-      const subOutObj = await getPlayerAssetObject({
-        player: subOffTrimmed,
-        teamName: actualTeamName,
-        listenPrefix,
-      });
-      if (!subInObj || !subOutObj) return;
-      const homeRevealBg = view.homeTeamRevealBackground;
-      const isHome = teamKey === "homeTeam";
-      const finalSubIn =
-        isHome && homeRevealBg
+      try {
+        const [subInObj, subOutObj] = await Promise.all([
+          getPlayerAssetObject({
+            player: trimLastName(player),
+            teamName: actualTeamName,
+            listenPrefix,
+          }),
+          getPlayerAssetObject({
+            player: trimLastName(outgoing),
+            teamName: actualTeamName,
+            listenPrefix,
+          }),
+        ]);
+        if (!subInObj || !subOutObj)
+          throw new Error("Ekki tókst að undirbúa skiptingu.");
+        const homeRevealBg =
+          side === "home" ? view.homeTeamRevealBackground : null;
+        const finalSubIn = homeRevealBg
           ? { ...subInObj, background: homeRevealBg }
           : subInObj;
-      const finalSubOut =
-        isHome && homeRevealBg
+        const finalSubOut = homeRevealBg
           ? { ...subOutObj, background: homeRevealBg }
           : subOutObj;
-      addSubToQueue({
-        type: assetTypes.SUB,
-        subIn: { ...finalSubIn, fullName: player.name },
-        subOut: { ...finalSubOut, fullName: subOffPlayer.name },
-        key: `sub-${subInObj.key}-${subOutObj.key}`,
-      });
+        await commit({
+          side,
+          outgoing,
+          incoming: player,
+          asset: {
+            type: assetTypes.SUB,
+            subIn: { ...finalSubIn, fullName: player.name },
+            subOut: { ...finalSubOut, fullName: outgoing.name },
+            key: `sub-${subInObj.key}-${subOutObj.key}`,
+          },
+        });
+      } catch (failure) {
+        // Retiring feedback must not cancel a still-valid substitution intent.
+        if (!action.ownsUI()) return;
+        setError(
+          failure instanceof Error
+            ? failure.message
+            : "Ekki tókst að vista skiptingu.",
+        );
+      }
     })();
   };
 
@@ -204,19 +231,37 @@ export function useHomeTeamQuickActions() {
       handleSubOffSelect(player);
     } else if (modalMode === "subOn") {
       handleSubOnSelect(player);
-    } else if (modalMode === "playerCard") {
-      void showPlayerCard(player, "homeTeam").then(() => closeModal());
-    } else if (modalMode === "motm") {
-      void showMOTM(player, "homeTeam").then(() => closeModal());
+    } else if (modalMode === "playerCard" || modalMode === "motm") {
+      const action = beginAction();
+      const show = modalMode === "playerCard" ? showPlayerCard : showMOTM;
+      void show(player, "homeTeam", action.isSelected)
+        .then(() => {
+          if (action.ownsUI()) closeModal();
+        })
+        .catch((failure: unknown) => {
+          // A current draft can explain an origin rejection before submission.
+          // A submitted write's late feedback belongs only to its old session.
+          if (action.canReport(failure)) reportError(failure);
+        });
     }
   };
 
+  const reportError = (failure: unknown): void => {
+    setError(
+      failure instanceof Error
+        ? failure.message
+        : "Ekki tókst að birta leikmann.",
+    );
+  };
+
   const closeModal = (): void => {
+    retireSelection();
     setModalMode(null);
     setSubOffPlayer(null);
   };
 
   return {
+    error,
     modalMode,
     modalTitle: getModalTitle(),
     modalInstruction: getModalInstruction(),
@@ -228,5 +273,6 @@ export function useHomeTeamQuickActions() {
     closeModal,
     showPlayerCard,
     showMOTM,
+    beginAction,
   };
 }

@@ -14,7 +14,7 @@ const identityTransform = (zIndex: number) => ({
 export const capturedVikinConfiguration: PerimeterDisplayConfig = {
   version: 1,
   revision: "vikin-capture-1",
-  renderer: "resolume",
+  renderer: "web",
   framebuffer: { width: 8448, height: 192, background: "black" },
   logicalScreens: {
     "screen-48": {

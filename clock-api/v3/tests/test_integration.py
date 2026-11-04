@@ -25,9 +25,11 @@ def mock_ksi_client():
 def test_client(mock_ksi_client):
     app.dependency_overrides[get_ksi_client] = lambda: mock_ksi_client
 
-    yield TestClient(app)
-
-    app.dependency_overrides.clear()
+    try:
+        with TestClient(app) as client:
+            yield client
+    finally:
+        app.dependency_overrides.clear()
 
 
 @pytest.mark.skip(reason="Placeholder test")

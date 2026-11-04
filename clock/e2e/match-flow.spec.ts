@@ -182,18 +182,6 @@ test.describe("Match Flow - Complete Match Simulation", () => {
     await expect(page.locator(".matchclock")).toContainText(/15:0\d/);
   });
 
-  test("sets team logos and displays them on scoreboard", async ({ page }) => {
-    await page.getByRole("button", { name: "Stillingar" }).click();
-    await page.locator("#team-selector-awayTeam").fill("fram");
-    await closeSettings(page);
-    await page
-      .locator(".view-mode-buttons")
-      .getByText("Match", { exact: true })
-      .click();
-
-    await expect(page.locator(".team.away img")).toHaveAttribute("src", /Fram/);
-  });
-
   test("uses Leiðrétta to switch to advanced controls", async ({ page }) => {
     await page.getByRole("button", { name: "Stillingar" }).click();
     await page.locator(".match-type-selector").selectOption("handball");

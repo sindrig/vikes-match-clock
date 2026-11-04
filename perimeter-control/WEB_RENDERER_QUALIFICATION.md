@@ -1,8 +1,10 @@
 # Windows/Chromium Web Renderer Qualification
 
-Complete this checklist on the production kiosk before changing a venue's
-published `perimeterDisplay.renderer` to `web`. Record the date, Windows build,
-Chromium version, GPU, and configuration revision with the results.
+All venues use browser playback; Resolume is unsupported. Complete this
+checklist on the production kiosk for separately authorized renderer/mapping
+changes. Record the date, Windows build, Chromium version, GPU, and
+configuration revision with the results. **Qualification for #240: HOLD** —
+mocked gateway tests do not qualify Windows output or physical brightness.
 
 ## Test Record
 
@@ -42,10 +44,12 @@ Chromium version, GPU, and configuration revision with the results.
 ## Evidence
 
 Attach the calibration screenshot, browser console log, storage estimate, codec
-matrix, and long-run timing notes to the deployment record. Do not enable the
-second stadium until every step has a recorded result and the rollback target
-is known.
+matrix, and long-run timing notes to the deployment record. Qualify each
+venue separately before publishing replacement output; record every result
+and the last qualified web configuration.
 
-Rollback is configuration-only: publish or remove the venue's `web` mapping so
-the public Perimeter option disappears, then reconnect the physical output to
-its previous playback path. Víkin remains `resolume` during this qualification.
+An authorized rollback restores the last qualified web mapping/media revision
+and kiosk configuration. If no qualified web output is available, keep the
+output off pending operator recovery. The retired Resolume executor is not a
+rollback target. Preserve existing media, compatibility records and the
+Vnnox/UCenter brightness route throughout qualification.

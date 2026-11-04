@@ -10,6 +10,7 @@ import { ref, onValue } from "firebase/database";
 import { firebaseAuth } from "../firebaseAuth";
 import { database } from "../firebase";
 import type { DisplayTarget } from "../types";
+import { MutationSession } from "../lib/mutationSession";
 
 export interface FirebaseAuthState {
   isLoaded: boolean;
@@ -22,6 +23,8 @@ interface LocalStateContextType {
   // Auth state
   auth: FirebaseAuthState;
   isAdmin: boolean;
+  mutationSession: MutationSession;
+  logout: () => Promise<void>;
 
   // Remote settings
   listenPrefix: string;
@@ -128,6 +131,13 @@ export function LocalStateProvider({ children }: { children: ReactNode }) {
   });
 
   const [available, setAvailable] = useState<string[] | null>(null);
+  const [mutationSession] = useState(
+    () =>
+      new MutationSession(
+        { location: listenPrefix, authenticated: false },
+        () => firebaseAuth.getCurrentUser()?.uid,
+      ),
+  );
 
   // Admin state
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
@@ -169,8 +179,21 @@ export function LocalStateProvider({ children }: { children: ReactNode }) {
 
   // Persist setters
   const setListenPrefix = (newPrefix: string) => {
+    mutationSession.setLocation(newPrefix);
     setListenPrefixState(newPrefix);
     localStorage.setItem(LISTEN_PREFIX_KEY, newPrefix);
+  };
+
+  const logout = (): Promise<void> => {
+    mutationSession.setAuth(false);
+    return firebaseAuth.logout().catch((error: unknown) => {
+      // A failed sign-out must not revive old commands or leave the still
+      // authenticated operator permanently locked out. Re-enter via a new
+      // subscription scope using the SDK's actual user.
+      const user = firebaseAuth.getCurrentUser();
+      mutationSession.setAuth(Boolean(user), user?.uid);
+      throw error;
+    });
   };
 
   const setDisplayTarget = (target: DisplayTarget | null) => {
@@ -199,6 +222,7 @@ export function LocalStateProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const unsubscribe = firebaseAuth.onAuthStateChanged((user: User | null) => {
       const authState = firebaseAuth.userToAuthState(user);
+      mutationSession.setAuth(!authState.isEmpty, authState.uid);
       setAuth(authState);
 
       // Expose UID on window for E2E tests
@@ -207,7 +231,7 @@ export function LocalStateProvider({ children }: { children: ReactNode }) {
       }
     });
     return () => unsubscribe();
-  }, []);
+  }, [mutationSession]);
 
   // Available Locations Listener
   useEffect(() => {
@@ -254,6 +278,8 @@ export function LocalStateProvider({ children }: { children: ReactNode }) {
   const value = {
     auth,
     isAdmin,
+    mutationSession,
+    logout,
     listenPrefix,
     setListenPrefix,
     available,
