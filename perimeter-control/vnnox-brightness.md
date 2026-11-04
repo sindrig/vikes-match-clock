@@ -3,10 +3,13 @@
 Reverse-engineering notes for the **Vnnox/UCenter** web UI behind
 `http://localhost:81` (proxied via `vikin-gateway`'s nginx to
 `10.182.45.40:19999`), which is how the perimeter LED screens' **brightness**
-is edited by hand. Goal of this doc: capture whether we can read/set
-brightness programmatically, how, and how safe that is. Everything below was
-learned with **read-only probes only** — no brightness write was ever
-executed.
+is edited by hand. This is historical protocol evidence, not a current device
+inventory or physical qualification record. The original investigation used
+read-only probes; later write-shape observations are identified below. No live
+operation is part of the current documentation verification. **Physical
+qualification remains HOLD.** Use the [executable smoke/restoration
+procedure](BRIGHTNESS_SMOKE_TEST.md) for current ownership, authentication and
+exact rollback; its commands have local mock verification only.
 
 ## Topology
 
@@ -56,7 +59,7 @@ Notes:
 - The `protocol` header must be `http` (the linkType). `G4A` returns
   `code:500 "failed"`.
 
-## Brightness reads (read-only, verified)
+## Brightness reads (historical read-only observations)
 
 ### Screen-level brightness (what the toolbar slider edits)
 
@@ -72,8 +75,9 @@ headers: Authorization: <token>
 { "ratio": 450, "ratioScale": 10000 }
 ```
 
-Brightness percent = `ratio * 100 / ratioScale` → 4.5% currently. The MVR
-screen reads `{ratio: 0, ratioScale: 0}` (off).
+Brightness percent = `ratio * 100 / ratioScale` → 4.5% in this observation.
+The MVR screen read `{ratio: 0, ratioScale: 0}`; preserve its raw readback,
+do not divide by that zero scale or assume it remains unchanged today.
 
 ### Cabinet-level brightness (per sending unit)
 
@@ -85,22 +89,22 @@ headers: Authorization: <token>
          protocol: http
 ```
 
-→ 40 cabinets, each with `cabinetDisplayParam.brightness` (currently all
+→ 40 cabinets, each with `cabinetDisplayParam.brightness` (observed all
 `{ratio: 450, ratioScale: 10000}` = 4.5%, uniform). Also contains
 `brightnessOverdrive`, `peakBrightness`, `colorTemperature`, `gamma`,
 `displayMode`, `testPattern`, etc.
 
-## Brightness write (reconstructed from the UI bundle + verified live)
+## Brightness write (historical UI reconstruction and write observation)
 
 Both the toolbar slider and the engineering/correction panel call the same
 endpoint; only the `guidList` scope differs.
 
 ```
-POST http://localhost:81/unico/v1/ucenter/cabinet/brightness
-headers: Authorization: <token>
-         ip: 10.182.45.40
-         port: 8088
-         protocol: http
+POST <selected-UCenter-base-URL>/unico/v1/ucenter/cabinet/brightness
+headers: Authorization: <device-scoped-token>
+         ip: <selected-device-IP>
+         port: <selected-device-port>
+         protocol: <selected-device-linkType>
 body: {
   "brightness": {
     "nitType": 0,
@@ -109,7 +113,7 @@ body: {
     "nit": 0
   },
   "list": [],                            // empty = all cabinets on the screen
-  "guidList": ["75f3072e-4940-4682-a91c-44edf697b1ca"]  // screen GUID
+  "guidList": ["<confirmed-perimeter-screen-GUID>"]  // exactly one target
 }
 ```
 
@@ -118,8 +122,9 @@ An earlier draft of this doc claimed writes take a `0--1` fraction with
 `ratioScale: 1`; that was wrong. This device's firmware **rejects a
 fractional float** — `ratio: 0.3` fails with
 `{"code":500,"data":{"Field":"brightness.ratio","Value":"number 0.3"}}`. The
-write endpoint's `ratio` field is an integer (read-scale, 10000). Verified live:
-`ratio 3000 / ratioScale 10000` writes 30% and the readback confirms it.
+write endpoint's `ratio` field is an integer (read-scale, 10000). The historical
+write observation recorded `ratio 3000 / ratioScale 10000` as 30% with matching
+readback; this is not evidence that the current gateway procedure was executed.
 
 ## Safety assessment
 
@@ -130,8 +135,9 @@ write endpoint's `ratio` field is an integer (read-scale, 10000). Verified live:
   (`ratio: 3000, ratioScale: 10000` = 30%). Never send a fractional float
   (`ratio: 0.3`) — the device rejects it with code 500. Percent
   × 100 = ratio at this scale.
-- Snapshot-before-write is easy: read `cabinet/info-v2` (and/or
-  `normal-screen`) first, then restore on failure.
+- Snapshot before writing: use the configured GUID's `normal-screen` brightness
+  as the restoration source and retain cabinet metadata as diagnostics. Restore
+  and independently read back raw fields after testing, including on failure.
 
 **Risks:**
 
@@ -147,38 +153,53 @@ write endpoint's `ratio` field is an integer (read-scale, 10000). Verified live:
 4. **Flaky box** — the UCenter (`:19999`) intermittently refused connections /
    returned empty responses / 502s during probing, then recovered. Retry
    logic and `Connection: close` help.
-5. **Overrides** — today nothing overrides the set ratio
+5. **Overrides** — the historical probe found nothing overriding the set ratio
    (`brightnessOverdrive` off, `ambientLightCompensation` 0), so ratio →
    actual brightness is 1:1. If auto-brightness / overdrive gets enabled the
    mapping changes.
 6. **Scope discipline** — the live perimeter screen must be targeted by its
-   exact GUID; the MVR screen (0%) must not be clobbered.
+   exact GUID; all non-target screens, including MVR, must remain untouched.
 
-**Safe pattern to implement later:** login → snapshot (`cabinet/info-v2` +
-`normal-screen`) → convert pct→ratio → write to the whitelisted perimeter
-GUID → poll/verify → restore from snapshot on any failure.
+**Current worker:** login → screen snapshot + cabinet diagnostics → convert
+integer command to ratio → scoped write → poll/verify; on a dispatched-write
+failure, best-effort `restoreBrightness(snapshot)` before failed status.
+Requests are serialized and irreversible work drains on stop; see
+[arbitration](../docs/brightness-arbitration.md). The automatic scheduler enters
+this same worker directly, without writing the manual command path.
 
-**Rollback:** a snapshot is read-scaled (`ratio` scaled by `ratioScale`, e.g.
-`{ratio: 450, ratioScale: 10000}` for 4.5%), which is almost never an exact
-whole integer percentage. The daemon's own `restoreBrightness()` re-applies
-the snapshot bit-for-bit at its read scale (which is the same scale the write
-endpoint accepts) — this is the only supported rollback path and is exactly
-what the daemon already does automatically on a failed write. Do
-**not** attempt to "reapply the snapshot percentage" by hand through the
-`states/{location}/perimeter/brightness` command path: that path only accepts
-whole integer percentages (see `parseBrightnessCommand`), so a fractional
-snapshot (e.g. the 4.5% above) cannot be represented and rounding it would not
-restore the exact pre-write value. A manual rollback of a _whole-percentage_
-snapshot may go through the controller/command path; a manual rollback of a
-_fractional_ snapshot must go through Vnnox/UCenter directly (the toolbar
-slider or the raw `cabinet/brightness` write documented above).
+**Exact rollback for integer and fractional snapshots:** use the
+[executable procedure](BRIGHTNESS_SMOKE_TEST.md#4-restore-intent-and-exact-hardware-leave-the-worker-stopped).
+After stopping/draining all writers, restore saved Firebase intent using an
+environment-explicit, authenticated and audited root PATCH, then call the
+actual client's `restoreBrightness(saved.hardware)` directly while the worker
+stays stopped. It sends the saved `ratio`, `ratioScale`, `nit` and `nitType`
+unchanged, `list: []` and `guidList: [configuredPerimeterGuid]`. The guide
+independently compares all four fields on readback and every non-target screen.
+Do not infer exact restoration from a successful POST or daemon status.
+
+A 4.5% snapshot needs `ratio: 450`, `ratioScale: 10000`, plus its saved nit
+fields. The integer-only controller cannot represent it. Even an integer
+percentage command resets scale/nit fields to the command defaults and is not
+a general exact restore. Neither rounding, a toolbar slider, nor converting
+to a `0–1` ratio substitutes for replaying the snapshot. Raw restoration
+preserves another saved scale too; firmware acceptance beyond the historical
+10000-scale observation remains a physical qualification question.
+
+The direct hardware step makes no Firebase request, so it remains executable
+if Firebase intent restoration fails. Leave the worker stopped and resolve
+intent before resume. Disabling the worker first and then submitting a
+controller command cannot restore hardware. A resumed worker may replay a
+saved manual integer or generate fresh auto targets; that is a separate
+ownership decision, not part of exact restoration. Browser media playback is
+independent; never restore a retired Resolume executor.
 
 ## Operational gotchas
 
 - The UCenter is only reachable through `localhost:81` (nginx) from this
   host; the device API is also reachable directly on `10.182.45.40:8088`.
-- Token is a JWT with a far-future `exp`; no refresh observed within a
-  session.
+- The historical device token was a JWT; no refresh was observed within that
+  session. Treat rejection as authentication failure, not as a reason to
+  reuse captured tokens or assume a current token is indefinitely valid.
 - During this exploration the UCenter process briefly stopped responding
   (connection refused on `:19999`) then recovered on its own — unrelated to
   any write (none were made), but treat it as a flaky endpoint.
