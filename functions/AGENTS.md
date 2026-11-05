@@ -15,7 +15,23 @@ pnpm build
 pnpm test --maxWorkers=1 --no-file-parallelism
 ```
 
-`build` is `tsc`; `lib/` is ignored compiled output, never a source edit.
+`build` removes this package's generated `lib/`, typechecks all `src` (including
+tests) without emitting, then compiles production modules and source maps with
+`tsconfig.build.json`. `pnpm typecheck` runs the full no-emit check separately.
+`lib/` is ignored compiled output, never a source edit.
+
+Build is now **one-shot** and rejects arguments, including previously forwarded
+`--watch` flags. Use `pnpm build` again after edits. Stop any owned compiler
+watcher or Functions emulator before rebuilding, then restart the emulator when
+the build succeeds. The driver resolves its package/compiler paths itself and
+also works when invoked from another directory.
+
+Production-only output is guaranteed after a successful build. The unchanged
+base config's `compileOnSave` or a direct full-project `tsc` can emit tests again;
+stop those writers before building/packaging. CI explicitly builds before deploy;
+direct Firebase deployment has no configured predeploy build. This command does
+not establish remote packaging/install parity or qualify external watch setups.
+
 Native `sharp` dependencies must install for the target OS/architecture; render
 tests exercise actual image composition as well as mocked service tests.
 
