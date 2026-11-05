@@ -165,6 +165,17 @@ cleanup fails explicitly. Owner-token requests are trusted local setup/cleanup,
 never evidence of client authorization. No Firebase runtime endpoint override
 or relaxed rule is needed for these fixtures.
 
+Repeated owned account removal accepts only HTTP 400 with the exact Auth error
+`USER_NOT_FOUND` as already absent. Other errors and uncertain transports still
+fail cleanup. UID ownership is retained after Auth deletion so a later cleanup
+can retry a failed grant or admin-flag removal.
+
+The shared login helper selects the owned venue's `Display 1` with an escaped,
+anchored accessible name that permits only the optional numeric `tengd`
+connection badge. Presence can change between visibility and click. Perimeter,
+`Display 10` and other venues remain outside that locator; independent display
+and controller contexts remain required.
+
 `seedInvitations` writes only registered owned child keys. It never replaces or
 clears the invitations collection. The real admin callable still creates its
 own generated IDs; the fixture discovers those by its owned recipient and
@@ -206,12 +217,16 @@ Keep #232 open for that follow-up.
 Focused fixture safety controls use a transport model and actual
 `functions/src/adminWrite.ts` source with injected in-memory Firebase
 dependencies and browser request events. They cover committed signup response
-loss and a held post-authorization invitation commit. These are source/model
-controls, not real emulator or browser integration. From `clock/`, with Node 22
-and Clock dependencies prepared:
+loss, repeated/partial cleanup and a held post-authorization invitation commit.
+Selector controls execute the actual login function and `ScreenSelectorButton`
+source with its stylesheet at zero, one and two connections, including badge
+arrival between visibility and click and unrelated button decoys. These use a
+native DOM and modeled Page/presence hook; they are not real browser integration.
+These source/model controls do not qualify real emulator behavior. From
+`clock/`, with Node 22 and Clock dependencies prepared:
 
 ```bash
-node --experimental-transform-types --test --test-concurrency=1 tests/local-fixture.test.mjs tests/fixture-cleanup-source.test.mjs
+node --experimental-transform-types --test --test-concurrency=1 tests/local-fixture.test.mjs tests/fixture-cleanup-source.test.mjs tests/fixture-selector.test.mjs
 ```
 
 These native controls and focused E2E typed lint remain manual checks, outside

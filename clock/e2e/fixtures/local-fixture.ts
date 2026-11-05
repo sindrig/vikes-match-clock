@@ -542,7 +542,12 @@ export class LocalFixture {
           { localId: uid },
           true,
         );
-        if (result.status !== 200)
+        // Retain UID ownership for retries of failed grant/admin removals, even
+        // after Auth deletion succeeded. Only checked absence is idempotent.
+        const absent =
+          result.status === 400 &&
+          record(record(result.body).error).message === "USER_NOT_FOUND";
+        if (result.status !== 200 && !absent)
           throw new Error(`Local fixture Auth delete: HTTP ${result.status}.`);
       });
     }

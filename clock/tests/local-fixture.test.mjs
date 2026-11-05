@@ -79,9 +79,12 @@ function model() {
     if (url.pathname.endsWith(":delete")) {
       assert.equal(init.headers.Authorization, "Bearer owner");
       for (const [email, account] of accounts) {
-        if (account.localId === data.localId) accounts.delete(email);
+        if (account.localId === data.localId) {
+          accounts.delete(email);
+          return json({});
+        }
       }
-      return json({});
+      return json({ error: { message: "USER_NOT_FOUND" } }, 400);
     }
     if (url.pathname.endsWith(":signUp") && accounts.has(data.email)) {
       return json({ error: { message: "EMAIL_EXISTS" } }, 400);
@@ -392,6 +395,119 @@ test("cleanup continues after a failed owned delete without touching foreign res
   assert(!server.database.has("locations/" + venue));
   assert.equal(server.accounts.size, 0);
 });
+
+test("transport model: repeated cleanup accepts only checked absence of its owned account", async (t) => {
+  enableEmulator(t);
+  const server = model();
+  const fixture = new LocalFixture("repeat-cleanup", "0", server.transport);
+  const uid = await fixture.createUser(fixture.email("operator"), "synthetic");
+  await fixture.database("PUT", `auth/${uid}`, { owned: true });
+  await fixture.database("PUT", `admins/${uid}`, true);
+  await fixture.cleanup();
+  await fixture.cleanup();
+  assert.equal(server.accounts.size, 0);
+  assert.equal(server.database.size, 0);
+  assert.deepEqual(
+    server.requests
+      .filter((request) => request.url.includes(":delete"))
+      .map((request) => request.data),
+    [{ localId: uid }, { localId: uid }],
+  );
+});
+
+for (const area of ["auth", "admins"]) {
+  test(`transport model: retry removes failed ${area} after Auth deletion without losing ownership`, async (t) => {
+    enableEmulator(t);
+    const server = model();
+    let failRemoval = true;
+    const fixture = new LocalFixture("partial-cleanup", "0", (url, init) => {
+      if (
+        failRemoval &&
+        init.method === "DELETE" &&
+        new URL(url).pathname.startsWith(`/${area}/`)
+      )
+        return Promise.resolve(json({ error: "private-failure" }, 503));
+      return server.transport(url, init);
+    });
+    const email = fixture.email("operator");
+    const uid = await fixture.createUser(email, "synthetic");
+    const foreign = new LocalFixture("foreign-cleanup", "0", server.transport);
+    const foreignEmail = foreign.email("operator");
+    const foreignUid = await foreign.createUser(foreignEmail, "synthetic");
+    await foreign.database("PUT", `auth/${foreignUid}`, { keep: true });
+    await foreign.database("PUT", `admins/${foreignUid}`, true);
+    const foreignBefore = [...server.database];
+    await fixture.database("PUT", `auth/${uid}`, { owned: true });
+    await fixture.database("PUT", `admins/${uid}`, true);
+    await assert.rejects(fixture.cleanup(), /HTTP 503/);
+    assert.equal(server.accounts.has(email), false, "Auth delete succeeded");
+    assert(server.database.has(`${area}/${uid}`), "failed record remains");
+    failRemoval = false;
+    await fixture.cleanup();
+    await fixture.cleanup();
+    assert.deepEqual([...server.database], foreignBefore);
+    assert.deepEqual([...server.accounts.keys()], [foreignEmail]);
+    assert.deepEqual(
+      server.requests
+        .filter((request) => request.url.includes(":delete"))
+        .map((request) => request.data.localId),
+      [uid, uid, uid],
+      "only the owned UID is retried",
+    );
+  });
+}
+
+test("transport model: other Auth delete errors remain fatal and can be retried", async (t) => {
+  enableEmulator(t);
+  for (const [body, status] of [
+    [{ error: { message: "MISSING_ID_TOKEN" } }, 400],
+    [{ error: { message: "PROJECT_DISABLED" } }, 400],
+    [{ error: { message: "USER_NOT_FOUND : unexpected detail" } }, 400],
+    [{ message: "USER_NOT_FOUND" }, 400],
+    [{ error: ["USER_NOT_FOUND"] }, 400],
+    [{ error: { message: "USER_NOT_FOUND" } }, 500],
+  ]) {
+    const server = model();
+    let failRemoval = true;
+    const fixture = new LocalFixture("delete-negative", "0", (url, init) => {
+      if (failRemoval && url.includes(":delete"))
+        return Promise.resolve(json(body, status));
+      return server.transport(url, init);
+    });
+    const email = fixture.email("operator");
+    await fixture.createUser(email, "synthetic");
+    await assert.rejects(fixture.cleanup(), /local fixture/i);
+    assert(server.accounts.has(email));
+    failRemoval = false;
+    await fixture.cleanup();
+    assert.equal(server.accounts.size, 0);
+  }
+});
+
+for (const committed of [false, true]) {
+  test(`transport model: lost Auth deletion response (committed=${committed}) fails, then converges`, async (t) => {
+    enableEmulator(t);
+    const server = model();
+    let loseResponse = true;
+    const fixture = new LocalFixture("delete-loss", "0", async (url, init) => {
+      if (loseResponse && url.includes(":delete")) {
+        if (committed) await server.transport(url, init);
+        throw new Error("private-delete-transport");
+      }
+      return server.transport(url, init);
+    });
+    const email = fixture.email("operator");
+    await fixture.createUser(email, "synthetic");
+    await assert.rejects(fixture.cleanup(), (error) => {
+      assert(!error.message.includes("private"));
+      return /transport\/response failed/.test(error.message);
+    });
+    assert.equal(server.accounts.has(email), !committed);
+    loseResponse = false;
+    await fixture.cleanup();
+    assert.equal(server.accounts.size, 0);
+  });
+}
 
 test("Storage cleanup rejects a foreign object returned by a faulty listing", async (t) => {
   enableEmulator(t);

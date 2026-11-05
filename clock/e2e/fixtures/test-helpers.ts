@@ -113,8 +113,10 @@ export async function loginWithEmulatorUser(page: Page): Promise<void> {
     true,
   );
   const screenButton = page.getByRole("button", {
-    name: `${TEST_LOCATION_LABEL} Display 1`,
-    exact: true,
+    // Presence can arrive between visibility and click; only its badge may vary.
+    name: new RegExp(
+      `^${TEST_LOCATION_LABEL.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} Display 1(?: \\d+ tengd)?$`,
+    ),
   });
   await screenButton.waitFor({ state: "visible", timeout: 15000 });
   await screenButton.click();
