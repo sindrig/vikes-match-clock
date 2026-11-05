@@ -1,9 +1,16 @@
 // Emulator-only entrypoint; excluded from the production build.
-import { useLayoutEffect } from "react";
-import { createRoot } from "react-dom/client";
+import { deleteApp } from "firebase/app";
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { ref, runTransaction, set } from "firebase/database";
-import { app, auth, database } from "../../src/firebase";
+import {
+  goOffline,
+  onValue,
+  ref,
+  runTransaction,
+  set,
+} from "firebase/database";
+import { useLayoutEffect } from "react";
+import { createRoot, type Root } from "react-dom/client";
+
 import {
   FirebaseStateProvider,
   useFirebaseState,
@@ -16,52 +23,451 @@ import {
   PlaybackAsset,
   useDeferredAsset,
 } from "../../src/controller/asset/Asset";
+import { app, auth, database } from "../../src/firebase";
+import { firebaseDatabase } from "../../src/firebaseDatabase";
 import type { TimedAssetCompletionObservation } from "../../src/lib/conditionalTransitions";
 import type { ControllerState } from "../../src/types";
+import {
+  assertPlaybackFixtureTarget,
+  parsePlaybackFixtureInput,
+  type PlaybackFixtureInput,
+} from "./playback-fixture-input";
 
-if (app.options.projectId !== "vikes-match-clock-test")
-  throw new Error("Local emulators required");
 type Api = ReturnType<typeof useFirebaseState>;
-let api: Api;
-const location = "audit244";
-let hold = false;
+type ServerCallback = (status: string, data?: unknown) => void;
+type ServerMethod = (
+  path: string,
+  data: unknown,
+  callback?: ServerCallback,
+  hash?: string,
+) => void;
+type SdkSend = {
+  method: "put" | "merge";
+  path: string;
+  received: boolean;
+  delivered: boolean;
+  status: string;
+};
+
+async function beforeDeadline<T>(
+  promise: Promise<T>,
+  deadline: number,
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    if (Date.now() >= deadline)
+      throw new Error("Playback completion deadline expired.");
+    const result = await Promise.race([
+      promise,
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(
+          () => reject(new Error("Playback completion deadline expired.")),
+          deadline - Date.now(),
+        );
+      }),
+    ]);
+    if (Date.now() > deadline)
+      throw new Error("Playback completion deadline expired.");
+    return result;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Test-only instrumentation, including the callback continuations which may
+// submit a transaction retry or its separate audit. A missing callback stays
+// pending; local SDK echoes and deletion/closure never acknowledge a send.
+class PlaybackProducers {
+  readonly sends: SdkSend[] = [];
+  readonly failures: string[] = [];
+  private readonly operations = new Set<Promise<unknown>>();
+  private submitting = 0;
+  private invocations = 0;
+  private readonly audits = new Set<Promise<unknown>>();
+  private readonly pendingSdk = new Set<SdkSend>();
+  private readonly changes = new Set<() => void>();
+
+  changed() {
+    for (const notify of this.changes) notify();
+  }
+
+  track<T>(
+    action: () => Promise<T>,
+    audit = false,
+    expectedRejection: (error: unknown) => boolean = () => false,
+  ): Promise<T> {
+    const pending = audit ? this.audits : this.operations;
+    // Register before invoking the original. Synchronous exceptions and rejected
+    // operations remain failures, while an acknowledged expected denial is known.
+    let resolve: (value: T | PromiseLike<T>) => void = () => undefined;
+    let reject: (reason: unknown) => void = () => undefined;
+    const promise = new Promise<T>((accept, decline) => {
+      resolve = accept;
+      reject = decline;
+    });
+    pending.add(promise);
+    try {
+      const original = action();
+      void original.then(resolve, reject);
+    } catch (error: unknown) {
+      reject(error);
+    }
+    void promise.then(
+      () => {
+        pending.delete(promise);
+        this.changed();
+      },
+      (error: unknown) => {
+        if (!expectedRejection(error)) this.failures.push("Operation failed.");
+        pending.delete(promise);
+        this.changed();
+      },
+    );
+    return promise;
+  }
+
+  invoke(action: () => void) {
+    // These original APIs return void. Account for synchronous submission and
+    // keep observing their actual audited-helper/SDK promises; do not invent a
+    // resolved command promise in place of the original acknowledgement.
+    this.submitting++;
+    this.invocations++;
+    try {
+      action();
+    } catch (error: unknown) {
+      this.failures.push("Void command failed.");
+      throw error;
+    } finally {
+      this.submitting--;
+      this.changed();
+    }
+  }
+
+  send(method: "put" | "merge", path: string) {
+    const send: SdkSend = {
+      method,
+      path,
+      received: false,
+      delivered: false,
+      status: "pending",
+    };
+    this.sends.push(send);
+    this.pendingSdk.add(send);
+    return send;
+  }
+
+  acknowledge(send: SdkSend, status: string, deliver: () => void) {
+    send.received = true;
+    send.status = status;
+    try {
+      deliver(); // May synchronously submit the next real SDK attempt.
+      send.delivered = true;
+    } finally {
+      if (send.delivered) this.pendingSdk.delete(send);
+      else this.failures.push("SDK callback failed.");
+      this.changed();
+    }
+  }
+
+  snapshot() {
+    return {
+      pendingCommands: this.operations.size + this.submitting,
+      invocations: this.invocations,
+      pendingAudits: this.audits.size,
+      pendingSdk: this.pendingSdk.size,
+      sends: this.sends.map((send) => ({ ...send })),
+      failures: [...this.failures],
+    };
+  }
+
+  async drain(deadline: number) {
+    for (;;) {
+      // Deliver promise continuations of observed SDK callbacks before declaring
+      // idle; their original command may append an audit after transaction commit.
+      await beforeDeadline(
+        Promise.allSettled([...this.operations, ...this.audits]),
+        deadline,
+      );
+      await Promise.resolve();
+      if (!this.pendingSdk.size && !this.operations.size && !this.audits.size) {
+        if (this.failures.length) throw new Error("Playback producer failed.");
+        return;
+      }
+      await new Promise<void>((resolve, reject) => {
+        const notify = () => {
+          clearTimeout(timer);
+          this.changes.delete(notify);
+          resolve();
+        };
+        const timer = setTimeout(
+          () => {
+            this.changes.delete(notify);
+            reject(new Error("Playback producer completion deadline expired."));
+          },
+          Math.max(0, deadline - Date.now()),
+        );
+        this.changes.add(notify);
+      });
+    }
+  }
+}
+
+// Loading the page exposes only read-only provenance. No ref, patch, provider,
+// prefix assignment or login happens until initialize validates both inputs.
+const input = parsePlaybackFixtureInput(new URL(window.location.href));
+const target = Object.freeze({
+  compiledEmulator: import.meta.env.VITE_USE_EMULATOR === "true",
+  projectId: app.options.projectId,
+  databaseURL: app.options.databaseURL,
+  storageBucket: app.options.storageBucket,
+  auth: auth.emulatorConfig,
+});
+const producers = new PlaybackProducers();
 const held: (() => void)[] = [];
 const hashes: string[] = [];
 const statuses: string[] = [];
-ref(database);
-type ServerMethod = (...args: unknown[]) => unknown;
-const server = (
-  database as unknown as { _repoInternal: { server_: { put: ServerMethod } } }
-)._repoInternal.server_;
-const put = server.put.bind(server);
-server.put = (...args) => {
-  // Gate actual SDK transaction sends, preserving the SDK's hash, retries and
-  // emulator decision. No mocked transaction or REST CAS substitutes.
-  if (typeof args[3] === "string") {
-    hashes.push(args[3]);
-    const callback = args[2] as (...result: unknown[]) => void;
-    args[2] = (...result: unknown[]) => {
-      statuses.push(String(result[0]));
-      callback(...result);
-    };
-    if (hold) {
-      held.push(() => {
-        put(...args);
-      });
-      return;
+const subscriptions: (() => void)[] = [];
+const objectUrls = new Set<string>();
+let api: Api | undefined;
+let root: Root | undefined;
+let initialized = false;
+let retiring = false;
+let disposed = false;
+let connected = false;
+let rawController: unknown = null;
+let rawAudit: unknown = null;
+let controllerDeliveries = 0;
+let auditDeliveries = 0;
+let hold: "transaction" | "audit" | undefined;
+let restore: () => void = () => undefined;
+let disposePromise: Promise<void> | undefined;
+
+function requireActive() {
+  if (!initialized || retiring)
+    throw new Error("Playback fixture is not active.");
+}
+function commands() {
+  requireActive();
+  if (input.role === "observer" || !api)
+    throw new Error("No writable playback provider.");
+  return api;
+}
+
+function readFailed() {
+  producers.failures.push("Playback subscription cancelled.");
+  producers.changed();
+}
+
+function interceptSdk() {
+  ref(database); // Initialize the actual lazy SDK repository after admission.
+  const server = (
+    database as unknown as {
+      _repoInternal: { server_: { put: ServerMethod; merge: ServerMethod } };
     }
+  )._repoInternal.server_;
+  if (typeof server.put !== "function" || typeof server.merge !== "function")
+    throw new Error("Unsupported playback SDK transport.");
+  const originalPut = server.put;
+  const originalMerge = server.merge;
+  for (const method of ["put", "merge"] as const) {
+    const original = server[method];
+    server[method] = (path, data, callback, hash) => {
+      if (typeof callback !== "function") {
+        producers.failures.push("Unobservable SDK submission.");
+        throw new Error("Playback SDK callback is required.");
+      }
+      const send = producers.send(method, path);
+      const conditional = method === "put" && typeof hash === "string";
+      if (conditional) hashes.push(hash);
+      const wrapped: ServerCallback = function (
+        this: unknown,
+        status,
+        response,
+      ) {
+        if (conditional) statuses.push(status);
+        if (
+          status !== "ok" &&
+          status !== "datastale" &&
+          !(
+            status === "permission_denied" &&
+            path === `states/${input.deniedVenue}/controller/playing`
+          ) &&
+          !(
+            status === "permission_denied" &&
+            path === `/states/${input.deniedVenue}/controller/playing`
+          )
+        )
+          producers.failures.push("Unexpected SDK acknowledgement.");
+        producers.acknowledge(send, status, () =>
+          Reflect.apply(callback, this, [status, response]),
+        );
+      };
+      const submit = () =>
+        Reflect.apply(original, server, [path, data, wrapped, hash]);
+      const audit =
+        method === "merge" &&
+        path === "/" &&
+        data !== null &&
+        typeof data === "object" &&
+        Object.keys(data).some((key) =>
+          key.startsWith(`audit/${input.venue}/`),
+        );
+      if (
+        (hold === "transaction" && conditional) ||
+        (hold === "audit" && audit)
+      ) {
+        held.push(submit);
+        return;
+      }
+      return submit();
+    };
   }
-  return put(...args);
-};
+  const originalAudited = firebaseDatabase.writeAudited;
+  const originalAuditOnly = firebaseDatabase.writeAuditOnly;
+  firebaseDatabase.writeAudited = (...args) =>
+    producers.track(() =>
+      Reflect.apply(originalAudited, firebaseDatabase, args),
+    );
+  firebaseDatabase.writeAuditOnly = (...args) =>
+    producers.track(
+      () => Reflect.apply(originalAuditOnly, firebaseDatabase, args),
+      true,
+    );
+  const originalObjectUrl = URL.createObjectURL.bind(URL);
+  const objectUrlDescriptor = Object.getOwnPropertyDescriptor(
+    URL,
+    "createObjectURL",
+  );
+  if (!objectUrlDescriptor) throw new Error("Unsupported object URL API.");
+  if (input.role === "display") {
+    URL.createObjectURL = (object) => {
+      const url = Reflect.apply(originalObjectUrl, URL, [object]);
+      objectUrls.add(url);
+      return url;
+    };
+  }
+  restore = () => {
+    server.put = originalPut;
+    server.merge = originalMerge;
+    firebaseDatabase.writeAudited = originalAudited;
+    firebaseDatabase.writeAuditOnly = originalAuditOnly;
+    Object.defineProperty(URL, "createObjectURL", objectUrlDescriptor);
+  };
+}
+
+function trackCommands(value: Api): Api {
+  // Each wrapper retains this render's actual function. Never forward an old
+  // intention to a mutable ref holding a newer command origin.
+  return {
+    ...value,
+    addItemsToQueue: (...args) =>
+      producers.track(() => value.addItemsToQueue(...args)),
+    completeAssetIfCurrent: (...args) =>
+      producers.track(() => value.completeAssetIfCurrent(...args)),
+    renderAsset: (...args) => producers.track(() => value.renderAsset(...args)),
+    showNextAsset: (...args) =>
+      producers.invoke(() => value.showNextAsset(...args)),
+    updateQueueSettings: (...args) =>
+      producers.invoke(() => value.updateQueueSettings(...args)),
+  };
+}
+
+function release() {
+  hold = undefined;
+  held.splice(0).forEach((send) => send());
+}
+
 const harness = {
-  get commands() {
-    return api;
+  input,
+  target,
+  initialize(expected: PlaybackFixtureInput) {
+    assertPlaybackFixtureTarget(target);
+    const parsed = parsePlaybackFixtureInput(new URL(window.location.href));
+    if (
+      initialized ||
+      retiring ||
+      Object.keys(expected).length !== 4 ||
+      expected.fixtureId !== input.fixtureId ||
+      expected.venue !== input.venue ||
+      expected.deniedVenue !== input.deniedVenue ||
+      expected.role !== input.role ||
+      parsed.fixtureId !== input.fixtureId ||
+      parsed.venue !== input.venue ||
+      parsed.deniedVenue !== input.deniedVenue ||
+      parsed.role !== input.role
+    )
+      throw new Error("Playback fixture initialization mismatch.");
+    localStorage.setItem("clock_listenPrefix", input.venue);
+    initialized = true;
+    if (input.role !== "observer") interceptSdk();
+    subscriptions.push(
+      onValue(
+        ref(database, ".info/connected"),
+        (snapshot) => {
+          connected = snapshot.val() === true;
+        },
+        readFailed,
+      ),
+    );
+    if (input.role === "observer") {
+      subscriptions.push(
+        onValue(
+          ref(database, `states/${input.venue}/controller`),
+          (snapshot) => {
+            rawController = snapshot.val() as unknown;
+            controllerDeliveries++;
+          },
+          readFailed,
+        ),
+      );
+    } else {
+      const element = document.getElementById("root");
+      if (!element) throw new Error("Missing playback fixture root.");
+      root = createRoot(element);
+      root.render(
+        <LocalStateProvider>
+          <Bridge />
+        </LocalStateProvider>,
+      );
+    }
   },
-  snapshot: () => ({ controller: api.controller, eligible: api.writeEligible }),
-  login: (email: string, password: string) =>
-    signInWithEmailAndPassword(auth, email, password).then(() => undefined),
+  get commands() {
+    return commands();
+  },
+  snapshot: () => ({
+    controller: api?.controller ?? null,
+    eligible: api?.writeEligible ?? false,
+    uid: auth.currentUser?.uid ?? null,
+    connected,
+    rawController,
+    rawAudit,
+    controllerDeliveries,
+    auditDeliveries,
+  }),
+  lifecycle: () => ({ ...producers.snapshot(), held: held.length, disposed }),
+  login(email: string, password: string, uid: string) {
+    requireActive();
+    if (email !== `e2e-playback-${input.fixtureId}@example.test`)
+      throw new Error("Playback account does not belong to this fixture.");
+    return producers.track(async () => {
+      const result = await signInWithEmailAndPassword(auth, email, password);
+      if (result.user.uid !== uid || auth.currentUser?.uid !== uid)
+        throw new Error("Playback Auth identity mismatch.");
+      if (input.role === "observer")
+        subscriptions.push(
+          onValue(
+            ref(database, `audit/${input.venue}`),
+            (snapshot) => {
+              rawAudit = snapshot.val() as unknown;
+              auditDeliveries++;
+            },
+            readFailed,
+          ),
+        );
+    });
+  },
   observe: (): TimedAssetCompletionObservation => {
-    const { currentAsset, activeQueueId, playing } = api.controller;
+    const { currentAsset, activeQueueId, playing } = commands().controller;
     if (!currentAsset) throw new Error("No current playback");
     return {
       occurrenceId:
@@ -74,15 +480,13 @@ const harness = {
       playing,
     };
   },
-  arm: () => {
-    hold = true;
+  arm: (kind: "transaction" | "audit" = "transaction") => {
+    commands();
+    hold = kind;
     hashes.length = 0;
     statuses.length = 0;
   },
-  release: () => {
-    hold = false;
-    held.splice(0).forEach((send) => send());
-  },
+  release,
   get held() {
     return held.length;
   },
@@ -95,32 +499,92 @@ const harness = {
   result: undefined as boolean | undefined,
   compete: (observation: TimedAssetCompletionObservation) => {
     harness.result = undefined;
-    void api.completeAssetIfCurrent(observation).then((result) => {
-      harness.result = result;
-    });
+    void commands()
+      .completeAssetIfCurrent(observation)
+      .then(
+        (result) => {
+          harness.result = result;
+        },
+        () => {
+          // The tracked original rejection makes retirement fail as well.
+        },
+      );
   },
-  deny: () =>
-    set(ref(database, "states/audit244-denied/controller/playing"), true),
-  // Reviewed-base tuple check and non-autoplay completion branch, using the
-  // real SDK/rules. The test disables autoplay after selecting timed media,
-  // so it does not depend on null-duration normalization absent in old code.
-  oldComplete: (observed: TimedAssetCompletionObservation) =>
-    runTransaction(
-      ref(database, `states/${location}/controller`),
-      (raw: ControllerState | null) => {
-        if (
-          !raw?.currentAsset ||
-          raw.currentAsset.asset.key !== observed.assetKey ||
-          raw.currentAsset.time !== observed.time ||
-          raw.activeQueueId !== observed.activeQueueId ||
-          raw.playing !== observed.playing
-        )
-          return;
-        if (raw.activeQueueId && raw.queues[raw.activeQueueId]?.autoPlay)
-          return;
-        return { ...raw, currentAsset: null };
-      },
-    ).then((result) => result.committed),
+  deny: () => {
+    commands();
+    const first = producers.sends.length;
+    return producers.track(
+      () =>
+        set(
+          ref(database, `states/${input.deniedVenue}/controller/playing`),
+          true,
+        ),
+      false,
+      (error) =>
+        error instanceof Error &&
+        /permission_denied/i.test(error.message) &&
+        producers.sends
+          .slice(first)
+          .some(
+            (send) =>
+              send.delivered &&
+              send.status === "permission_denied" &&
+              send.path.replace(/^\//, "") ===
+                `states/${input.deniedVenue}/controller/playing`,
+          ),
+    );
+  },
+  // Original tuple-only/non-autoplay old binary, with only its root migrated.
+  oldComplete: (observed: TimedAssetCompletionObservation) => {
+    commands();
+    return producers.track(() =>
+      runTransaction(
+        ref(database, `states/${input.venue}/controller`),
+        (raw: ControllerState | null) => {
+          if (
+            !raw?.currentAsset ||
+            raw.currentAsset.asset.key !== observed.assetKey ||
+            raw.currentAsset.time !== observed.time ||
+            raw.activeQueueId !== observed.activeQueueId ||
+            raw.playing !== observed.playing
+          )
+            return;
+          if (raw.activeQueueId && raw.queues[raw.activeQueueId]?.autoPlay)
+            return;
+          return { ...raw, currentAsset: null };
+        },
+      ).then((result) => result.committed),
+    );
+  },
+  dispose(timeoutMs: number) {
+    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > 20000)
+      return Promise.reject(new Error("Invalid playback disposal bound."));
+    if (disposePromise) return disposePromise;
+    retiring = true;
+    const deadline = Date.now() + timeoutMs;
+    disposePromise = (async () => {
+      try {
+        root?.unmount();
+      } catch {
+        producers.failures.push("Playback provider unmount failed.");
+      } finally {
+        root = undefined;
+        // Retiring the provider cannot revoke an already submitted SDK send.
+        release();
+      }
+      await producers.drain(deadline);
+      subscriptions.splice(0).forEach((unsubscribe) => unsubscribe());
+      for (const key of ["oldVideo", "oldEnd", "oldGif", "youtubePlayers"])
+        Reflect.deleteProperty(window, key);
+      restore();
+      for (const url of objectUrls) URL.revokeObjectURL(url);
+      objectUrls.clear();
+      goOffline(database);
+      await beforeDeadline(deleteApp(app), deadline);
+      disposed = true;
+    })();
+    return disposePromise;
+  },
 };
 declare global {
   interface Window {
@@ -128,13 +592,17 @@ declare global {
   }
 }
 window.playbackHarness = harness;
+function Display() {
+  const value = useFirebaseState();
+  const rendered = useDeferredAsset(value.controller.currentAsset);
+  return <>{rendered && <PlaybackAsset current={rendered} />}</>;
+}
 function Screen() {
   const value = useFirebaseState();
   useLayoutEffect(() => {
-    api = value;
+    api = trackCommands(value);
   }, [value]);
-  const rendered = useDeferredAsset(value.controller.currentAsset);
-  return <>{rendered && <PlaybackAsset current={rendered} />}</>;
+  return input.role === "display" ? <Display /> : null;
 }
 function Bridge() {
   const local = useLocalState();
@@ -150,8 +618,3 @@ function Bridge() {
     </FirebaseStateProvider>
   );
 }
-createRoot(document.getElementById("root")!).render(
-  <LocalStateProvider>
-    <Bridge />
-  </LocalStateProvider>,
-);

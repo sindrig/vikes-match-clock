@@ -233,12 +233,48 @@ browser SDK reads, immutable generations, pixel/timing assertions and separate
 controller/display contexts remain real integration boundaries.
 
 This is the conservative fixture slice of #232. The bespoke session, queue,
-playback, nested-state and subscription-domain fixtures still have fixed roots
+nested-state and subscription-domain fixtures still have fixed roots
 and/or namespace-wide rule installs/overlays. Per-test media isolation, exclusive
 overlay lifecycles and worker-crash recovery remain follow-up work.
 One worker is the default everywhere. No two-worker safety, sharding/report
 aggregation, repeated performance result or complete deployment gate is claimed.
 Keep #232 open for that follow-up.
+
+Playback's eight serial cases now allocate case-owned LocalFixture venues,
+account and a distinct ungranted denial destination, including retries and worker
+restarts. Query input, browser storage, legacy tuple writer, raw reads and negative
+SDK writes share one validated immutable identity. They keep logical occurrence,
+queue and media IDs unchanged. The custom fixture stays inert until its actual
+served emulator target and identity are admitted; a process flag alone cannot
+configure an already built bundle. The namespace-wide canonical RTDB installer
+remains global and requires the external serialized lifecycle. This migration
+does not establish global rules exclusion or worker/parent crash recovery.
+
+Controller, display and read-only SDK observer use independent browser contexts.
+Blobs are created and decoded in the display context; controller selections
+persist their original URL, including replay. The observer never supplies writer
+calculation refs. Real SDK hashes, datastale retries, local echoes/rollback,
+current-command stale-observation rejection, the old tuple-only writer limitation
+and actual native/GIF/YouTube-double media oracles remain intact.
+
+Playback-only instrumentation tracks original put/merge callbacks, explicit
+command/transaction promises and the separate CAS audit promise. A known denied
+write is terminal only after the actual SDK acknowledgement. Fixture retirement
+unmounts producers, releases original held sends, drains acknowledgements/audits
+while clients remain open, then closes contexts and retires owned data under one
+shared twenty-second deadline. Unknown/lost completion or failed setup/cleanup
+fails qualification; absence after deletion or browser closure is not completion.
+The finally path also runs after attachment failures. This does not certify
+Functions/Auth-trigger quiescence or revoke already submitted SDK work.
+
+The focused playback safety controls execute actual fixture source with modeled
+SDK/Page dependencies and pure input validation. They are source/model proof,
+not real browser/authorization evidence. A focused real playback lifecycle needs
+Auth, Database, Storage and Chromium; an approved component run omitting Functions
+must explicitly omit callable/trigger claims. Use the host guard for the entire
+lifecycle, one worker/zero retries, canonical rules readback and real allow/deny
+controls. Preserve all 166 registrations and keep #232 open for remaining B2/C,
+controlled repetition, topology benchmarks, attributable reports and gate work.
 
 Focused fixture safety controls use a transport model and actual
 `functions/src/adminWrite.ts` source with injected in-memory Firebase
@@ -258,7 +294,7 @@ These source/model controls do not qualify real emulator behavior. From
 `clock/`, with Node 22 and Clock dependencies prepared:
 
 ```bash
-node --experimental-transform-types --test --test-concurrency=1 tests/local-fixture.test.mjs tests/fixture-cleanup-source.test.mjs tests/fixture-selector.test.mjs tests/storage-fixture-imports.test.mjs
+node --experimental-transform-types --test --test-concurrency=1 tests/local-fixture.test.mjs tests/fixture-cleanup-source.test.mjs tests/fixture-selector.test.mjs tests/storage-fixture-imports.test.mjs tests/playback-fixture.test.mjs
 ```
 
 These native controls and focused E2E typed lint remain manual checks, outside

@@ -1,191 +1,513 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { inflateSync } from "node:zlib";
-import { expect, test, type Page } from "@playwright/test";
-import type { TimedAssetCompletionObservation } from "../src/lib/conditionalTransitions";
-import type { ControllerState } from "../src/types";
-import type {} from "./fixtures/playback-occurrence-harness";
+import {
+  expect,
+  test as base,
+  type Browser,
+  type BrowserContext,
+  type Page,
+} from "@playwright/test";
 
-test.describe.configure({ mode: "serial", timeout: 60000 });
-const namespace = "vikes-match-clock-test";
-const venue = "audit244";
-const email = "audit244@example.test";
-const password = "audit244-emulator-only";
+import type { TimedAssetCompletionObservation } from "../src/lib/conditionalTransitions";
+import type { Asset } from "../src/types";
+import type {} from "./fixtures/emulator-target";
+import {
+  assertBrowserEmulatorTarget,
+  assertLocalFixtureUrl,
+  EMULATOR_PROJECT,
+  initializeExecutionToken,
+  LocalFixture,
+  record,
+  requireEmulatorSelection,
+} from "./fixtures/local-fixture";
+import type {} from "./fixtures/playback-occurrence-harness";
+import {
+  assertPlaybackFixtureTarget,
+  parsePlaybackFixtureInput,
+  type PlaybackFixtureInput,
+  type PlaybackFixtureRole,
+} from "./fixtures/playback-fixture-input";
+
+const password = "playback-emulator-only";
 const asset = {
   key: "A",
   type: "IMAGE",
   url: "data:image/gif;base64,R0lGODlhAQABAIAAAP8AAAAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==",
-};
-const rules = JSON.parse(
+} satisfies Asset;
+const rules: unknown = JSON.parse(
   readFileSync(resolve(__dirname, "../../firebase-rules.json"), "utf8"),
-) as unknown;
-async function rest(
-  method: string,
-  path: string,
-  body?: unknown,
-): Promise<unknown> {
-  const response = await fetch(
-    `http://127.0.0.1:9000/${path}.json?ns=${namespace}`,
-    {
-      method,
-      headers: {
-        Authorization: "Bearer owner",
-        "Content-Type": "application/json",
-      },
-      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+);
+
+// This installer is still GLOBAL to the namespace. Only the external serialized
+// emulator lifecycle may make it exclusive; owned case roots do not isolate it.
+async function canonicalRules(method: "GET" | "PUT") {
+  requireEmulatorSelection();
+  const url = `http://127.0.0.1:9000/.settings/rules.json?ns=${EMULATOR_PROJECT}`;
+  assertLocalFixtureUrl(url);
+  const response = await fetch(url, {
+    method,
+    redirect: "manual",
+    signal: AbortSignal.timeout(5000),
+    headers: {
+      Authorization: "Bearer owner",
+      "Content-Type": "application/json",
     },
-  );
-  expect(response.ok).toBe(true);
-  return response.json();
-}
-async function controller() {
-  return (await rest("GET", `states/${venue}/controller`)) as ControllerState;
-}
-async function bootstrap(page: Page) {
-  await page.route(/^https?:\/\/(?!localhost[:/]|127\.0\.0\.1[:/])/, (route) =>
-    route.abort(),
-  );
-  await page.addInitScript(() => {
-    localStorage.setItem("clock_listenPrefix", "audit244");
+    ...(method === "PUT" ? { body: JSON.stringify(rules) } : {}),
   });
-  await page.goto("/e2e/fixtures/playback-occurrences.html");
-  await page.waitForFunction(() => Boolean(window.playbackHarness));
-  await page.evaluate(
-    ({ email, password }) => window.playbackHarness.login(email, password),
-    { email, password },
-  );
-  await expect
-    .poll(() => page.evaluate(() => window.playbackHarness.snapshot().eligible))
-    .toBe(true);
+  if (response.status !== 200)
+    throw new Error(`Canonical playback rules: HTTP ${response.status}.`);
+  const body = await response.text();
+  if (body.length > 1024 * 1024) throw new Error("Oversized rules response.");
+  const parsed: unknown = JSON.parse(body);
+  return parsed;
 }
-test.beforeAll(async () => {
-  await rest("PUT", ".settings/rules", rules);
-  expect(await rest("GET", ".settings/rules")).toEqual(rules);
-  const response = await fetch(
-    "http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signUp?key=test-api-key",
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password, returnSecureToken: true }),
-    },
+
+async function verifyServedTarget(page: Page) {
+  await page.route("**/*", (route) =>
+    ["localhost", "127.0.0.1"].includes(new URL(route.request().url()).hostname)
+      ? route.continue()
+      : route.abort(),
   );
-  expect(response.ok).toBe(true);
-  const account = (await response.json()) as { localId: string };
-  await rest("PUT", `auth/${account.localId}`, { [venue]: true });
-});
-test.beforeEach(async () => {
-  await rest("PUT", `states/${venue}`, {
-    match: {
-      homeTeam: "Víkingur R",
-      awayTeam: "Valur",
-      started: 0,
-      countdown: false,
-      timeElapsed: 0,
-      halfStops: [45, 90],
-      matchType: "football",
-    },
-    controller: {
-      view: "idle",
-      assetView: "assets",
-      activeQueueId: "q",
-      playing: true,
-      currentAsset: { asset, time: 30 },
-      queues: {
-        q: {
-          id: "q",
-          name: "Cycle",
-          items: [asset],
-          autoPlay: true,
-          imageSeconds: 30,
-          cycle: true,
-          order: 0,
+  await page.goto("/e2e/fixtures/emulator-target.html");
+  await page.waitForFunction(() => Boolean(window.__e2eEmulatorTarget));
+  assertBrowserEmulatorTarget(
+    await page.evaluate(() => window.__e2eEmulatorTarget),
+  );
+  await page.goto("about:blank");
+}
+
+type RawController = {
+  currentAsset?: {
+    asset: { key: string; type?: string; url?: string };
+    occurrenceId?: unknown;
+    time?: number | null;
+  } | null;
+  queues: Record<string, { items: unknown[]; autoPlay?: boolean }>;
+};
+function assertRawController(value: unknown): asserts value is RawController {
+  const controller = record(value);
+  for (const value of Object.values(record(controller.queues))) {
+    const queue = record(value);
+    if (
+      !Array.isArray(queue.items) ||
+      (queue.autoPlay !== undefined && typeof queue.autoPlay !== "boolean")
+    )
+      throw new Error("Invalid raw playback queue.");
+  }
+  if (controller.currentAsset != null) {
+    const current = record(controller.currentAsset);
+    const asset = record(current.asset);
+    if (
+      typeof asset.key !== "string" ||
+      (asset.type !== undefined && typeof asset.type !== "string") ||
+      (asset.url !== undefined && typeof asset.url !== "string") ||
+      (current.time != null && typeof current.time !== "number")
+    )
+      throw new Error("Invalid raw playback asset.");
+  }
+  // occurrenceId deliberately stays unknown: malformed persisted IDs must be
+  // observed unchanged rather than repaired/filtered by a fixture parser.
+}
+
+async function until<T>(
+  action: () => Promise<T>,
+  deadline: number,
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    if (Date.now() >= deadline)
+      throw new Error("Playback teardown deadline expired.");
+    const result = await Promise.race([
+      action(),
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(
+          () =>
+            reject(new Error("Playback fixture teardown deadline expired.")),
+          Math.max(0, deadline - Date.now()),
+        );
+      }),
+    ]);
+    if (Date.now() > deadline)
+      throw new Error("Playback teardown deadline expired.");
+    return result;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function ownedPlayback(browser: Browser) {
+  requireEmulatorSelection();
+  const fixture = new LocalFixture(
+    initializeExecutionToken(),
+    process.env.PW_TEST_WORKER_INDEX ?? process.env.TEST_WORKER_INDEX ?? "0",
+  );
+  const venue = fixture.venue("playback");
+  const deniedVenue = fixture.venue("playback-denied");
+  const email = fixture.email("playback");
+  const clients: {
+    context: BrowserContext;
+    page?: Page;
+    input?: PlaybackFixtureInput;
+    finish?: () => void;
+    fail?: () => void;
+    producer?: Promise<void>;
+  }[] = [];
+  let uid = "";
+  let targetAdmitted = false;
+  const rest = (
+    method: "GET" | "PUT" | "DELETE",
+    path: string,
+    data?: unknown,
+  ) => fixture.database(method, path, data);
+  const controller = async () => {
+    const raw = await rest("GET", `states/${venue}/controller`);
+    assertRawController(raw);
+    return raw;
+  };
+  const client = async (role: PlaybackFixtureRole) => {
+    const context = await browser.newContext();
+    const entry: (typeof clients)[number] = { context };
+    clients.push(entry); // Own it before page creation or navigation can fail.
+    const page = await context.newPage();
+    entry.page = page;
+    const url = new URL(
+      "/e2e/fixtures/playback-occurrences.html",
+      base.info().project.use.baseURL,
+    );
+    url.search = new URLSearchParams({
+      fixture: fixture.id,
+      prefix: venue,
+      denied: deniedVenue,
+      role,
+    }).toString();
+    entry.input = parsePlaybackFixtureInput(url);
+    await verifyServedTarget(page);
+    return page;
+  };
+  const bootstrap = async (page: Page) => {
+    const entry = clients.find((entry) => entry.page === page);
+    if (!entry?.input || entry.producer)
+      throw new Error("Unowned or already initialized playback page.");
+    const url = new URLSearchParams({
+      fixture: entry.input.fixtureId,
+      prefix: entry.input.venue,
+      denied: entry.input.deniedVenue,
+      role: entry.input.role,
+    });
+    await page.goto(
+      `/e2e/fixtures/playback-occurrences.html?${url.toString()}`,
+    );
+    await page.waitForFunction(() => Boolean(window.playbackHarness));
+    const descriptor = await page.evaluate(() => ({
+      input: window.playbackHarness.input,
+      target: window.playbackHarness.target,
+    }));
+    assertBrowserEmulatorTarget(descriptor.target);
+    assertPlaybackFixtureTarget(descriptor.target);
+    expect(descriptor.input).toEqual(entry.input);
+    const lifetime = new Promise<void>((resolve, reject) => {
+      entry.finish = resolve;
+      entry.fail = () =>
+        reject(new Error("Playback client outcome uncertain."));
+    });
+    entry.producer = fixture.trackMutation(() => lifetime);
+    void entry.producer.catch(() => {
+      // LocalFixture retains the uncertain producer; cleanup must fail too.
+    });
+    await page.evaluate(
+      (input) => window.playbackHarness.initialize(input),
+      entry.input,
+    );
+    await page.evaluate(
+      ({ email, password, uid }) =>
+        window.playbackHarness.login(email, password, uid),
+      { email, password, uid },
+    );
+    if (entry.input.role === "observer") {
+      await expect
+        .poll(() => page.evaluate(() => window.playbackHarness.snapshot()))
+        .toMatchObject({ connected: true });
+      await expect
+        .poll(() =>
+          page.evaluate(
+            () => window.playbackHarness.snapshot().controllerDeliveries,
+          ),
+        )
+        .toBeGreaterThan(0);
+      await expect
+        .poll(() =>
+          page.evaluate(
+            () => window.playbackHarness.snapshot().auditDeliveries,
+          ),
+        )
+        .toBeGreaterThan(0);
+    } else {
+      await expect
+        .poll(() => page.evaluate(() => window.playbackHarness.snapshot()))
+        .toMatchObject({ connected: true, eligible: true, uid });
+    }
+  };
+  const cleanup = async () => {
+    const deadline = Date.now() + 20000;
+    const failures: string[] = [];
+    // Writable clients drain before the independent observer closes, and before
+    // LocalFixture retires backend data. Every stage shares this deadline.
+    for (const entry of [...clients].sort(
+      (a, b) =>
+        Number(a.input?.role === "observer") -
+        Number(b.input?.role === "observer"),
+    )) {
+      if (entry.producer && entry.page) {
+        try {
+          await until(
+            () =>
+              entry.page!.evaluate(
+                (timeout) => window.playbackHarness.dispose(timeout),
+                Math.max(1, deadline - Date.now()),
+              ),
+            deadline,
+          );
+          entry.finish?.();
+          await entry.producer;
+        } catch {
+          entry.fail?.();
+          failures.push("Playback client disposal incomplete.");
+        }
+      }
+      try {
+        const closing = entry.context.close();
+        void closing.catch(() => undefined);
+        await until(() => closing, deadline);
+      } catch {
+        failures.push("Playback context close incomplete.");
+      }
+    }
+    try {
+      if (targetAdmitted)
+        await until(
+          () => fixture.cleanup(Math.max(1, deadline - Date.now())),
+          deadline,
+        );
+    } catch {
+      failures.push("Playback owned resource cleanup incomplete.");
+    }
+    if (failures.length) throw new Error(failures.join("\n"));
+  };
+  try {
+    const page = await client("controller"); // Read-only selection before seeding.
+    targetAdmitted = true;
+    const invitations = await rest("GET", "invitations");
+    for (const value of Object.values(
+      invitations === null ? {} : record(invitations),
+    )) {
+      if (
+        value !== null &&
+        typeof value === "object" &&
+        "email" in value &&
+        typeof value.email === "string" &&
+        value.email.trim().toLowerCase() === email
+      )
+        throw new Error("Playback email already has an invitation.");
+    }
+    uid = await fixture.createUser(email, password);
+    await rest("PUT", `auth/${uid}/${venue}`, true);
+    expect(await rest("GET", `auth/${uid}/${venue}`)).toBe(true);
+    expect(await rest("GET", `auth/${uid}/${deniedVenue}`)).toBeNull();
+    await rest("PUT", `states/${venue}`, {
+      match: {
+        homeTeam: "Víkingur R",
+        awayTeam: "Valur",
+        started: 0,
+        countdown: false,
+        timeElapsed: 0,
+        halfStops: [45, 90],
+        matchType: "football",
+      },
+      controller: {
+        view: "idle",
+        assetView: "assets",
+        activeQueueId: "q",
+        playing: true,
+        currentAsset: { asset, time: 30 },
+        queues: {
+          q: {
+            id: "q",
+            name: "Cycle",
+            items: [asset],
+            autoPlay: true,
+            imageSeconds: 30,
+            cycle: true,
+            order: 0,
+          },
         },
+        roster: { home: [], away: [] },
       },
-      roster: { home: [], away: [] },
-    },
-    view: { background: "Default" },
-    clubOverrides: {},
-    perimeter: { enabled: false },
-  });
-  await rest("PUT", `audit/${venue}`, null);
+      view: { background: "Default" },
+      clubOverrides: {},
+      perimeter: { enabled: false },
+    });
+    await rest("PUT", `audit/${venue}`, null);
+    const observer = await client("observer");
+    await bootstrap(observer);
+    const settle = async (...pages: Page[]) => {
+      for (const page of pages)
+        await expect
+          .poll(() => page.evaluate(() => window.playbackHarness.lifecycle()))
+          .toMatchObject({
+            pendingCommands: 0,
+            pendingAudits: 0,
+            pendingSdk: 0,
+            held: 0,
+            failures: [],
+          });
+      const raw = await controller();
+      const audit = await rest("GET", `audit/${venue}`);
+      await expect
+        .poll(() => observer.evaluate(() => window.playbackHarness.snapshot()))
+        .toMatchObject({ rawController: raw, rawAudit: audit });
+    };
+    return {
+      fixture,
+      venue,
+      deniedVenue,
+      uid,
+      page,
+      observer,
+      client,
+      bootstrap,
+      rest,
+      controller,
+      settle,
+      cleanup,
+    };
+  } catch (error: unknown) {
+    try {
+      await cleanup();
+    } catch {
+      throw new Error("Playback setup and owned cleanup failed.");
+    }
+    throw error;
+  }
+}
+
+type PlaybackCase = Awaited<ReturnType<typeof ownedPlayback>>;
+const test = base.extend<{ playback: PlaybackCase }>({
+  playback: async ({ browser }, provide, testInfo) => {
+    const playback = await ownedPlayback(browser);
+    try {
+      await testInfo.attach("playback-ownership", {
+        contentType: "application/json",
+        body: JSON.stringify({
+          fixture: playback.fixture.id,
+          venue: playback.venue,
+          deniedVenue: playback.deniedVenue,
+          worker: testInfo.workerIndex,
+          titlePath: testInfo.titlePath,
+          retry: testInfo.retry,
+          repeatEachIndex: testInfo.repeatEachIndex,
+        }),
+      });
+      await provide(playback);
+    } finally {
+      await playback.cleanup();
+    }
+  },
+});
+
+test.describe.configure({ mode: "serial", timeout: 60000 });
+test.beforeAll(async ({ browser }) => {
+  requireEmulatorSelection();
+  const context = await browser.newContext();
+  try {
+    await verifyServedTarget(await context.newPage());
+  } finally {
+    await context.close();
+  }
+  await canonicalRules("PUT");
+  expect(await canonicalRules("GET")).toEqual(rules);
 });
 
 for (const initialId of [null, "identified-A"]) {
   test(`real SDK competing ${initialId === null ? "legacy" : "identified"} completions commit once, including a forced hash conflict`, async ({
-    browser,
-    page,
+    playback,
   }) => {
+    const { page, bootstrap, client, rest, venue, controller, settle } =
+      playback;
     if (initialId)
-      await rest("PATCH", `states/${venue}/controller/currentAsset`, {
-        occurrenceId: initialId,
-      });
-    const other = await browser.newContext();
-    try {
-      const second = await other.newPage();
-      await bootstrap(page);
-      await bootstrap(second);
-      const observed = await page.evaluate(() =>
-        window.playbackHarness.observe(),
+      await rest(
+        "PUT",
+        `states/${venue}/controller/currentAsset/occurrenceId`,
+        initialId,
       );
-      expect(observed.occurrenceId).toBe(initialId);
-      for (const client of [page, second]) {
-        await client.evaluate((observation) => {
-          window.playbackHarness.arm();
-          window.playbackHarness.compete(observation);
-        }, observed);
-        await expect
-          .poll(() => client.evaluate(() => window.playbackHarness.held))
-          .toBe(1);
-      }
-      expect(await page.evaluate(() => window.playbackHarness.hashes)).toEqual(
-        await second.evaluate(() => window.playbackHarness.hashes),
-      );
-      await page.evaluate(() => window.playbackHarness.release());
+    const second = await client("controller");
+    await bootstrap(page);
+    await bootstrap(second);
+    const observed = await page.evaluate(() =>
+      window.playbackHarness.observe(),
+    );
+    expect(observed.occurrenceId).toBe(initialId);
+    for (const client of [page, second]) {
+      await client.evaluate((observation) => {
+        window.playbackHarness.arm();
+        window.playbackHarness.compete(observation);
+      }, observed);
       await expect
-        .poll(() => page.evaluate(() => window.playbackHarness.result))
-        .toBe(true);
-      await second.evaluate(() => window.playbackHarness.release());
-      await expect
-        .poll(() => second.evaluate(() => window.playbackHarness.result))
-        .toBe(false);
-      const after = await controller();
-      expect(after.currentAsset?.occurrenceId).toEqual(expect.any(String));
-      expect(after.currentAsset?.occurrenceId).not.toBe(initialId);
-      expect(after.currentAsset?.asset).toEqual(asset);
-      expect(after.queues.q?.items).toEqual([asset]);
-      expect(
-        Object.keys((await rest("GET", `audit/${venue}`)) as object),
-      ).toHaveLength(1);
-      await expect
-        .poll(() =>
-          second.evaluate(
-            () =>
-              window.playbackHarness.commands.controller.currentAsset
-                ?.occurrenceId,
-          ),
-        )
-        .toBe(after.currentAsset?.occurrenceId);
-      expect(
-        await second.evaluate(() => window.playbackHarness.hashes),
-      ).toHaveLength(1);
-      expect(
-        await second.evaluate(() => window.playbackHarness.statuses),
-      ).toContain("datastale");
-      expect(
-        await second.evaluate(
-          (old) => window.playbackHarness.commands.completeAssetIfCurrent(old),
-          observed,
-        ),
-      ).toBe(false);
-    } finally {
-      await other.close();
+        .poll(() => client.evaluate(() => window.playbackHarness.held))
+        .toBe(1);
     }
+    expect(await page.evaluate(() => window.playbackHarness.hashes)).toEqual(
+      await second.evaluate(() => window.playbackHarness.hashes),
+    );
+    await page.evaluate(() => window.playbackHarness.release());
+    await expect
+      .poll(() => page.evaluate(() => window.playbackHarness.result))
+      .toBe(true);
+    await second.evaluate(() => window.playbackHarness.release());
+    await expect
+      .poll(() => second.evaluate(() => window.playbackHarness.result))
+      .toBe(false);
+    await settle(page, second);
+    const after = await controller();
+    expect(after.currentAsset?.occurrenceId).toEqual(expect.any(String));
+    expect(after.currentAsset?.occurrenceId).not.toBe(initialId);
+    expect(after.currentAsset?.asset).toEqual(asset);
+    expect(after.queues.q?.items).toEqual([asset]);
+    expect(
+      Object.keys((await rest("GET", `audit/${venue}`)) as object),
+    ).toHaveLength(1);
+    await expect
+      .poll(() =>
+        second.evaluate(
+          () =>
+            window.playbackHarness.commands.controller.currentAsset
+              ?.occurrenceId,
+        ),
+      )
+      .toBe(after.currentAsset?.occurrenceId);
+    expect(
+      await second.evaluate(() => window.playbackHarness.hashes),
+    ).toHaveLength(1);
+    expect(
+      await second.evaluate(() => window.playbackHarness.statuses),
+    ).toContain("datastale");
+    expect(
+      await second.evaluate(() => window.playbackHarness.snapshot().eligible),
+    ).toBe(true);
+    expect(
+      await second.evaluate(
+        (old) => window.playbackHarness.commands.completeAssetIfCurrent(old),
+        observed,
+      ),
+    ).toBe(false);
+    await settle(page, second);
   });
 }
 
 test("A to B to A rejects the old observation and preserves URLs and keys", async ({
-  page,
+  playback,
 }) => {
+  const { page, bootstrap, controller, settle } = playback;
   await bootstrap(page);
   const first = await page.evaluate(() => window.playbackHarness.observe());
   const next = { ...asset, key: "B" };
@@ -207,6 +529,9 @@ test("A to B to A rejects the old observation and preserves URLs and keys", asyn
     .toBe("A");
   const before = await controller();
   expect(
+    await page.evaluate(() => window.playbackHarness.snapshot().eligible),
+  ).toBe(true);
+  expect(
     await page.evaluate(
       (old) => window.playbackHarness.commands.completeAssetIfCurrent(old),
       first,
@@ -220,19 +545,26 @@ test("A to B to A rejects the old observation and preserves URLs and keys", asyn
       current,
     ),
   ).toBe(true);
+  await settle(page);
 });
 
 test("malformed present IDs never become eligible legacy observations and real SDK rules still deny unauthorized writes", async ({
-  page,
+  playback,
 }) => {
+  const { page, bootstrap, rest, venue, deniedVenue, controller, settle } =
+    playback;
   await bootstrap(page);
   await expect(
     page.evaluate(() => window.playbackHarness.deny()),
   ).rejects.toThrow(/permission_denied/i);
+  await settle(page);
+  expect(await rest("GET", `states/${deniedVenue}`)).toBeNull();
   for (const id of ["", " ", false, 7, { unexpected: true }]) {
-    await rest("PATCH", `states/${venue}/controller/currentAsset`, {
-      occurrenceId: id,
-    });
+    await rest(
+      "PUT",
+      `states/${venue}/controller/currentAsset/occurrenceId`,
+      id,
+    );
     await expect
       .poll(() =>
         page.evaluate(
@@ -248,6 +580,9 @@ test("malformed present IDs never become eligible legacy observations and real S
       playing: true,
     };
     expect(
+      await page.evaluate(() => window.playbackHarness.snapshot().eligible),
+    ).toBe(true);
+    expect(
       await page.evaluate(
         (observation) =>
           window.playbackHarness.commands.completeAssetIfCurrent(observation),
@@ -259,12 +594,14 @@ test("malformed present IDs never become eligible legacy observations and real S
       id,
     );
   }
+  await settle(page);
   expect(await rest("GET", `audit/${venue}`)).toBeNull();
 });
 
 test("unchanged rules permit an old writer to clear replayed identified media: documented mixed-binary limit", async ({
-  page,
+  playback,
 }) => {
+  const { page, bootstrap, controller, settle } = playback;
   await bootstrap(page);
   await page.evaluate(() => window.playbackHarness.commands.showNextAsset());
   await expect
@@ -284,6 +621,9 @@ test("unchanged rules permit an old writer to clear replayed identified media: d
     .poll(async () => (await controller()).queues.q?.autoPlay)
     .toBe(false);
   expect(
+    await page.evaluate(() => window.playbackHarness.snapshot().eligible),
+  ).toBe(true);
+  expect(
     await page.evaluate(
       (observation) =>
         window.playbackHarness.commands.completeAssetIfCurrent(observation),
@@ -296,12 +636,17 @@ test("unchanged rules permit an old writer to clear replayed identified media: d
       old,
     ),
   ).toBe(true);
+  await settle(page);
   expect((await controller()).currentAsset ?? null).toBeNull();
 });
 
 test("native video replay remounts with the same source and an old actual onEnded cannot clear it", async ({
-  page,
+  playback,
 }) => {
+  const { bootstrap, client, controller, settle } = playback;
+  const commandPage = playback.page;
+  const page = await client("display");
+  await bootstrap(commandPage);
   await bootstrap(page);
   const url = await page.evaluate(async () => {
     const canvas = document.createElement("canvas");
@@ -309,30 +654,36 @@ test("native video replay remounts with the same source and an old actual onEnde
     canvas.height = 32;
     const context = canvas.getContext("2d")!;
     const stream = canvas.captureStream(10);
-    const recorder = new MediaRecorder(stream, {
-      mimeType: "video/webm;codecs=vp8",
-    });
-    const chunks: BlobPart[] = [];
-    recorder.ondataavailable = (event) => {
-      chunks.push(event.data);
-    };
-    const done = new Promise<void>((resolve) => {
-      recorder.onstop = () => resolve();
-    });
-    recorder.start();
-    const timer = setInterval(() => {
-      context.fillStyle = "red";
-      context.fillRect(0, 0, 32, 32);
-    }, 50);
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    recorder.stop();
-    await done;
-    clearInterval(timer);
-    stream.getTracks().forEach((track) => track.stop());
-    return URL.createObjectURL(new Blob(chunks, { type: "video/webm" }));
+    let recorder: MediaRecorder | undefined;
+    let timer: ReturnType<typeof setInterval> | undefined;
+    try {
+      recorder = new MediaRecorder(stream, {
+        mimeType: "video/webm;codecs=vp8",
+      });
+      const chunks: BlobPart[] = [];
+      recorder.ondataavailable = (event) => {
+        chunks.push(event.data);
+      };
+      const done = new Promise<void>((resolve) => {
+        recorder!.onstop = () => resolve();
+      });
+      recorder.start();
+      timer = setInterval(() => {
+        context.fillStyle = "red";
+        context.fillRect(0, 0, 32, 32);
+      }, 50);
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      recorder.stop();
+      await done;
+      return URL.createObjectURL(new Blob(chunks, { type: "video/webm" }));
+    } finally {
+      clearInterval(timer);
+      if (recorder?.state === "recording") recorder.stop();
+      stream.getTracks().forEach((track) => track.stop());
+    }
   });
-  const media = { key: "native-video", type: "VIDEO", url };
-  await page.evaluate(
+  const media = { key: "native-video", type: "VIDEO", url } satisfies Asset;
+  await commandPage.evaluate(
     (asset) => window.playbackHarness.commands.renderAsset(asset),
     media,
   );
@@ -357,7 +708,7 @@ test("native video replay remounts with the same source and an old actual onEnde
   await page.route("**/held-replacement.png", () => {
     /* Deliberately pending until the deferred render is replaced. */
   });
-  await page.evaluate(() =>
+  await commandPage.evaluate(() =>
     window.playbackHarness.commands.renderAsset({
       key: "B",
       type: "IMAGE",
@@ -371,13 +722,20 @@ test("native video replay remounts with the same source and an old actual onEnde
         (window as unknown as { oldVideo: HTMLVideoElement }).oldVideo,
     ),
   ).toBe(true);
+  await expect
+    .poll(() => page.evaluate(() => window.playbackHarness.snapshot()))
+    .toMatchObject({
+      eligible: true,
+      controller: { currentAsset: { asset: { key: "B" } } },
+    });
   const deferred = await controller();
   await page.evaluate(() => {
     (window as unknown as { oldEnd: () => void }).oldEnd();
   });
   await page.waitForTimeout(100);
+  await settle(commandPage, page);
   expect(await controller()).toEqual(deferred);
-  await page.evaluate(
+  await commandPage.evaluate(
     (asset) => window.playbackHarness.commands.renderAsset(asset),
     media,
   );
@@ -391,10 +749,19 @@ test("native video replay remounts with the same source and an old actual onEnde
     )
     .toBe(true);
   const before = await controller();
+  await expect
+    .poll(() => page.evaluate(() => window.playbackHarness.snapshot()))
+    .toMatchObject({
+      eligible: true,
+      controller: {
+        currentAsset: { occurrenceId: before.currentAsset?.occurrenceId },
+      },
+    });
   await page.evaluate(() => {
     (window as unknown as { oldEnd: () => void }).oldEnd();
   });
   await page.waitForTimeout(100);
+  await settle(commandPage, page);
   expect(await controller()).toEqual(before);
   expect(await page.locator("#root video").getAttribute("src")).toBe(url);
   expect(
@@ -407,11 +774,16 @@ test("native video replay remounts with the same source and an old actual onEnde
       timeout: 10000,
     })
     .toBeNull();
+  await settle(commandPage, page);
 });
 
 test("animated GIF replay restarts with identical persisted media identity", async ({
-  page,
+  playback,
 }) => {
+  const { bootstrap, client, controller, settle } = playback;
+  const commandPage = playback.page;
+  const page = await client("display");
+  await bootstrap(commandPage);
   await bootstrap(page);
   const url = await page.evaluate(() => {
     const bytes = [
@@ -470,7 +842,7 @@ test("animated GIF replay restarts with identical persisted media identity", asy
       new Blob([new Uint8Array(bytes)], { type: "image/gif" }),
     );
   });
-  const media = { key: "animated-gif", type: "IMAGE", url };
+  const media = { key: "animated-gif", type: "IMAGE", url } satisfies Asset;
   const pixel = async () => {
     const box = await page.locator("#root img").boundingBox();
     if (!box) return [];
@@ -494,7 +866,7 @@ test("animated GIF replay restarts with identical persisted media identity", asy
     }
     return [...inflateSync(Buffer.concat(chunks)).subarray(1, 4)];
   };
-  await page.evaluate(
+  await commandPage.evaluate(
     (asset) => window.playbackHarness.commands.renderAsset(asset),
     media,
   );
@@ -502,17 +874,33 @@ test("animated GIF replay restarts with identical persisted media identity", asy
   await expect
     .poll(pixel, { intervals: [100], timeout: 2500 })
     .toEqual([0, 255, 0]);
-  await page.evaluate(
+  await page.evaluate(() =>
+    Object.assign(window, { oldGif: document.querySelector("#root img") }),
+  );
+  await commandPage.evaluate(
     (asset) => window.playbackHarness.commands.renderAsset(asset),
     media,
   );
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          document.querySelector("#root img") !==
+          (window as unknown as { oldGif: HTMLImageElement }).oldGif,
+      ),
+    )
+    .toBe(true);
   expect(await pixel()).toEqual([255, 0, 0]);
   expect((await controller()).currentAsset?.asset).toEqual(media);
+  await settle(commandPage, page);
 });
 
 test("real browser react-youtube recreates the player and captures old end callbacks with an offline API double", async ({
-  page,
+  playback,
 }) => {
+  const { bootstrap, client, controller, settle } = playback;
+  const commandPage = playback.page;
+  const page = await client("display");
   await page.addInitScript(() => {
     type Options = {
       videoId: string;
@@ -556,17 +944,18 @@ test("real browser react-youtube recreates the player and captures old end callb
     }
     Object.assign(window, { YT: { Player }, youtubePlayers: players });
   });
+  await bootstrap(commandPage);
   await bootstrap(page);
   const media = {
     key: "https://www.youtube.com/watch?v=jNQXAC9IVRw",
     type: "URL",
-  };
-  await page.evaluate(
+  } satisfies Asset;
+  await commandPage.evaluate(
     (asset) => window.playbackHarness.commands.renderAsset(asset),
     media,
   );
   await expect(page.locator("#root iframe")).toHaveCount(1);
-  await page.evaluate(
+  await commandPage.evaluate(
     (asset) => window.playbackHarness.commands.renderAsset(asset),
     media,
   );
@@ -598,8 +987,12 @@ test("real browser react-youtube recreates the player and captures old end callb
     { videoId: "jNQXAC9IVRw", destroyed: false },
   ]);
   await page.waitForTimeout(100);
+  await settle(commandPage, page);
   expect(await controller()).toEqual(before);
   expect(before.currentAsset?.asset).toEqual(media);
+  expect(
+    await page.evaluate(() => window.playbackHarness.snapshot().eligible),
+  ).toBe(true);
   await page.evaluate(() =>
     (
       window as unknown as { youtubePlayers: { end: () => void }[] }
@@ -608,4 +1001,5 @@ test("real browser react-youtube recreates the player and captures old end callb
   await expect
     .poll(async () => (await controller()).currentAsset ?? null)
     .toBeNull();
+  await settle(commandPage, page);
 });
