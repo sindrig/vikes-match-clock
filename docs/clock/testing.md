@@ -119,10 +119,10 @@ the container. That inherited workflow/toolchain mismatch is not repaired here;
 prefer explicit local services for a controlled environment and do not count a
 listed recipe as fresh-checkout validation.
 
-Playwright reuses an existing server outside CI. Stop your own staging-connected
-Vite before running this command: passing the emulator flag to the test process
-does not change an already running server's environment. A fresh context alone
-does not fix the server target. See [port configuration](#port-configuration).
+Playwright starts a fresh server outside CI and refuses to reuse an existing
+one. Choose a free owned port; do not stop another worktree's server. Passing
+the emulator flag to the test process cannot change an already running server
+or a compiled bundle. See [port configuration](#port-configuration).
 
 ## Test Credentials
 
@@ -131,6 +131,121 @@ Auth emulator and logs in with those fixture values. It does not read
 `TEST_CREDENTIALS` or fall back to a staging account. Run E2E with the local
 services and `VITE_USE_EMULATOR=true`; never use those fixtures against shared
 Firebase.
+
+### Shared fixture ownership and emulator guards
+
+Playwright configuration requires `VITE_USE_EMULATOR=true` and creates an
+execution token inherited by workers. The shared helper adds the worker index
+and a fresh worker incarnation to its venue, synthetic account and invitation
+identities. A restarted worker or another invocation cannot reuse those mutable
+roots merely by choosing worker 0. `VIKES_E2E_EXECUTION` can supply an explicit
+run token for an orchestrator; it must be a short alphanumeric/hyphen/underscore
+identifier, not credentials. Keep test titles independent of the run token.
+
+Before a shared-helper page logs in or mounts App, it loads the test-only
+`emulator-target.html` probe and inspects the actual served Firebase project,
+database URL, bucket and Auth emulator connection. Nonlocal network requests
+are blocked during that probe. A process flag alone is insufficient; a stale
+production/staging bundle fails before application mutations. Static emulator
+test bundles must explicitly include this probe entry as well as the fixtures
+used by their selected tests. The production entrypoint imports none of them.
+
+Fixture REST requests use literal loopback endpoints, an explicit test namespace
+and bucket, bounded requests, checked response shapes/statuses and no redirects.
+Errors omit payloads, response bodies and tokens. Signup only handles the exact
+expected `EMAIL_EXISTS` response by signing the owned account in; other errors
+fail. The fixture registers pending email ownership before signup transport.
+It rejects another signup for that email until the first outcome is resolved.
+If signup commits but its response is lost or invalid, teardown looks up that
+exact email through the checked local Auth API, validates the returned email
+and UID, then removes its grants, admin flag and Auth account by UID. It retains
+no password or ID token for cleanup and never resets global Auth. An absent or
+invalid lookup cannot certify that an uncertain signup will never commit;
+cleanup fails explicitly. Owner-token requests are trusted local setup/cleanup,
+never evidence of client authorization. No Firebase runtime endpoint override
+or relaxed rule is needed for these fixtures.
+
+Repeated owned account removal accepts only HTTP 400 with the exact Auth error
+`USER_NOT_FOUND` as already absent. Other errors and uncertain transports still
+fail cleanup. UID ownership is retained after Auth deletion so a later cleanup
+can retry a failed grant or admin-flag removal.
+
+The shared login helper selects the owned venue's `Display 1` with an escaped,
+anchored accessible name that permits only the optional numeric `tengd`
+connection badge. Presence can change between visibility and click. Perimeter,
+`Display 10` and other venues remain outside that locator; independent display
+and controller contexts remain required.
+
+`seedInvitations` writes only registered owned child keys. It never replaces or
+clears the invitations collection. The real admin callable still creates its
+own generated IDs; the fixture discovers those by its owned recipient and
+creator identities. Admin tests use separate owned role emails, select the exact
+venue key rendered by the current name-or-key admin model, and check the set of
+persisted true grants with an unrelated venue ordered before it. Another
+fixture's invitation and venue must survive setup and invitation teardown,
+including test failure paths.
+
+RTDB omits an empty invitation `locations` object on readback. The fixture
+returns an empty grant map for that absent child, while malformed present values
+still fail discovery and cleanup. Registered IDs still require an owned recipient;
+discovered generated IDs require both an owned recipient and creator. Transport
+controls model this empty-child omission for seeded and generated invitations,
+including later valid siblings and preservation of foreign records.
+
+Fixture writes and signup calls register producers before transport. Shared
+helper pages also observe the actual SDK `adminWrite` submissions, without
+replacing the real callable. Admin invitation teardown and page teardown wait
+for those responses while the page is still open. After closing worker browser
+contexts, final cleanup drains submitted producers before its owned invitation
+discovery, so a late authorized handler's generated ID is included. A lost,
+aborted or malformed callable response leaves completion uncertain and fails
+cleanup; context closure or removal of an admin flag cannot prove that a
+previously authorized handler has finished. New fixture writes are rejected
+once final retirement starts. Each REST request is bounded to five seconds and
+final cleanup, including producer completion, shares a twenty-second bound.
+An unresolved producer or an exceeded bound is incomplete cleanup, even if
+best-effort removal finds no records.
+
+Worker teardown retires only its registered
+venue/state/audit/telemetry/presence children, account grants/admin flags/Auth
+users, invitation IDs and Storage object prefixes. Cleanup failures fail the
+worker; they are not silently ignored. `clearEmulatorData` remains the legacy
+name for resetting that worker's state and location baseline before a case; it
+does not reset other data or provide per-test Storage isolation.
+
+This is the conservative fixture slice of #232. The bespoke session, queue,
+playback, nested-state and subscription-domain fixtures still have fixed roots
+and/or namespace-wide rule installs/overlays. The perimeter suites retain their
+import-time Storage rule setup, so collecting tests can contact the emulator.
+One worker is the default everywhere. No two-worker safety, sharding/report
+aggregation, repeated performance result or complete deployment gate is claimed.
+Keep #232 open for that follow-up.
+
+Focused fixture safety controls use a transport model and actual
+`functions/src/adminWrite.ts` source with injected in-memory Firebase
+dependencies and browser request events. They cover committed signup response
+loss, repeated/partial cleanup and a held post-authorization invitation commit.
+Selector controls execute the actual login function and `ScreenSelectorButton`
+source with its stylesheet at zero, one and two connections, including badge
+arrival between visibility and click and unrelated button decoys. These use a
+native DOM and modeled Page/presence hook; they are not real browser integration.
+These source/model controls do not qualify real emulator behavior. From
+`clock/`, with Node 22 and Clock dependencies prepared:
+
+```bash
+node --experimental-transform-types --test --test-concurrency=1 tests/local-fixture.test.mjs tests/fixture-cleanup-source.test.mjs tests/fixture-selector.test.mjs
+```
+
+These native controls and focused E2E typed lint remain manual checks, outside
+the current CI gates. The E2E TypeScript project has existing diagnostics and
+is not a passing whole-project type gate; check focused repairs without claiming
+that unrelated E2E/source typing is clean.
+
+Actual admin/callable and full-suite qualification needs owned Auth, Database,
+Storage and Functions services, canonical rules in the app namespace, and the
+real served App. Use `--workers=1 --retries=0` for those qualification runs.
+Independent controller/display roles retain separate browser contexts; the
+worker fixture does not merge their auth or local storage.
 
 For separately authorized staging browser checks, retrieve an account from a
 project maintainer. Tooling that expects `TEST_CREDENTIALS` uses the format
