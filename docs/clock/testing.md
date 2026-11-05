@@ -119,10 +119,10 @@ the container. That inherited workflow/toolchain mismatch is not repaired here;
 prefer explicit local services for a controlled environment and do not count a
 listed recipe as fresh-checkout validation.
 
-Playwright reuses an existing server outside CI. Stop your own staging-connected
-Vite before running this command: passing the emulator flag to the test process
-does not change an already running server's environment. A fresh context alone
-does not fix the server target. See [port configuration](#port-configuration).
+Playwright starts a fresh server outside CI and refuses to reuse an existing
+one. Choose a free owned port; do not stop another worktree's server. Passing
+the emulator flag to the test process cannot change an already running server
+or a compiled bundle. See [port configuration](#port-configuration).
 
 ## Test Credentials
 
@@ -131,6 +131,69 @@ Auth emulator and logs in with those fixture values. It does not read
 `TEST_CREDENTIALS` or fall back to a staging account. Run E2E with the local
 services and `VITE_USE_EMULATOR=true`; never use those fixtures against shared
 Firebase.
+
+### Shared fixture ownership and emulator guards
+
+Playwright configuration requires `VITE_USE_EMULATOR=true` and creates an
+execution token inherited by workers. The shared helper adds the worker index
+and a fresh worker incarnation to its venue, synthetic account and invitation
+identities. A restarted worker or another invocation cannot reuse those mutable
+roots merely by choosing worker 0. `VIKES_E2E_EXECUTION` can supply an explicit
+run token for an orchestrator; it must be a short alphanumeric/hyphen/underscore
+identifier, not credentials. Keep test titles independent of the run token.
+
+Before a shared-helper page logs in or mounts App, it loads the test-only
+`emulator-target.html` probe and inspects the actual served Firebase project,
+database URL, bucket and Auth emulator connection. Nonlocal network requests
+are blocked during that probe. A process flag alone is insufficient; a stale
+production/staging bundle fails before application mutations. Static emulator
+test bundles must explicitly include this probe entry as well as the fixtures
+used by their selected tests. The production entrypoint imports none of them.
+
+Fixture REST requests use literal loopback endpoints, an explicit test namespace
+and bucket, bounded requests, checked response shapes/statuses and no redirects.
+Errors omit payloads, response bodies and tokens. Signup only handles the exact
+expected `EMAIL_EXISTS` response by signing the owned account in; other errors
+fail. Owner-token requests are trusted local setup/cleanup, never evidence of
+client authorization. No Firebase runtime endpoint override or relaxed rule is
+needed for these fixtures.
+
+`seedInvitations` writes only registered owned child keys. It never replaces or
+clears the invitations collection. The real admin callable still creates its
+own generated IDs; the fixture discovers those by its owned recipient and
+creator identities. Admin tests use separate owned role emails, select the exact
+venue key rendered by the current name-or-key admin model, and check the set of
+persisted true grants with an unrelated venue ordered before it. Another
+fixture's invitation and venue must survive setup and invitation teardown,
+including test failure paths.
+
+Worker teardown closes its browser contexts, then retires only its registered
+venue/state/audit/telemetry/presence children, account grants/admin flags/Auth
+users, invitation IDs and Storage object prefixes. Cleanup failures fail the
+worker; they are not silently ignored. `clearEmulatorData` remains the legacy
+name for resetting that worker's state and location baseline before a case; it
+does not reset other data or provide per-test Storage isolation.
+
+This is the conservative fixture slice of #232. The bespoke session, queue,
+playback, nested-state and subscription-domain fixtures still have fixed roots
+and/or namespace-wide rule installs/overlays. The perimeter suites retain their
+import-time Storage rule setup, so collecting tests can contact the emulator.
+One worker is the default everywhere. No two-worker safety, sharding/report
+aggregation, repeated performance result or complete deployment gate is claimed.
+Keep #232 open for that follow-up.
+
+Focused fixture safety controls use a transport model, not mocked browser
+integration. From `clock/`, with Node 22:
+
+```bash
+node --experimental-transform-types --test --test-concurrency=1 tests/local-fixture.test.mjs
+```
+
+Actual admin/callable and full-suite qualification needs owned Auth, Database,
+Storage and Functions services, canonical rules in the app namespace, and the
+real served App. Use `--workers=1 --retries=0` for those qualification runs.
+Independent controller/display roles retain separate browser contexts; the
+worker fixture does not merge their auth or local storage.
 
 For separately authorized staging browser checks, retrieve an account from a
 project maintainer. Tooling that expects `TEST_CREDENTIALS` uses the format

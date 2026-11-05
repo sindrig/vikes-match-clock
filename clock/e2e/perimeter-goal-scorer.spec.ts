@@ -10,6 +10,7 @@ import {
   TEST_LISTEN_PREFIX,
   clearEmulatorData,
   ensureEmulatorUser,
+  loginWithEmulatorUser,
   test,
 } from "./fixtures/test-helpers";
 
@@ -293,44 +294,6 @@ async function holdScorerAcknowledgement(page: Page, playerId: string) {
   };
 }
 
-// Controller login for a venue that also offers a Perimeter entry: the
-// scoreboard button ("{label} {screen name}") is targeted exactly so the
-// strict-mode locator does not collide with the Perimeter button.
-async function loginController(page: Page): Promise<void> {
-  await page.getByPlaceholder("E-mail").waitFor({ state: "visible" });
-  await page.getByPlaceholder("E-mail").fill(`e2e-test-0@test.com`);
-  await page.getByPlaceholder("Lykilorð").fill("testpassword123");
-  await page.getByRole("button", { name: "Innskrá", exact: true }).click();
-  await page.waitForFunction(
-    () =>
-      (window as unknown as { __firebaseAuthUID?: string }).__firebaseAuthUID,
-    null,
-    { timeout: 15000 },
-  );
-  const realUID = await page.evaluate(
-    () =>
-      (window as unknown as { __firebaseAuthUID?: string }).__firebaseAuthUID ??
-      null,
-  );
-  if (!realUID) throw new Error("No Firebase auth UID after login.");
-  await fetch(
-    `http://127.0.0.1:9000/auth/${realUID}/${TEST_LISTEN_PREFIX}.json?ns=vikes-match-clock-test`,
-    {
-      method: "PUT",
-      headers: OWNER_HEADERS,
-      body: "true",
-    },
-  );
-  const scoreboardButton = page.getByRole("button", {
-    name: `Test Location ${TEST_LISTEN_PREFIX.replace("test-location-", "")} Display 1`,
-  });
-  await scoreboardButton.waitFor({ state: "visible", timeout: 15000 });
-  await scoreboardButton.click();
-  await page
-    .getByRole("button", { name: "Biðröð" })
-    .waitFor({ state: "visible", timeout: 10000 });
-}
-
 test.describe("Web perimeter goal scorer", () => {
   let storageEnv: RulesTestEnvironment;
 
@@ -474,7 +437,7 @@ test.describe("Web perimeter goal scorer", () => {
 
       // -- The controller selects a scorer --------------------------------
       await clockPage.goto("/");
-      await loginController(clockPage);
+      await loginWithEmulatorUser(clockPage);
       await clockPage
         .locator(".view-mode-buttons")
         .getByText("Match", { exact: true })
@@ -599,7 +562,7 @@ test.describe("Web perimeter goal scorer", () => {
       .getByTestId("score-buttons-home")
       .getByRole("button", { name: "+", exact: true });
     await clockPage.goto("/");
-    await loginController(clockPage);
+    await loginWithEmulatorUser(clockPage);
     await homeGoal.click();
     await scorerDialog
       .getByRole("button", { name: "7 Jón", exact: true })

@@ -1,5 +1,13 @@
 import { defineConfig, devices } from "@playwright/test";
 
+import {
+  initializeExecutionToken,
+  requireEmulatorSelection,
+} from "./e2e/fixtures/local-fixture";
+
+requireEmulatorSelection();
+initializeExecutionToken();
+
 const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 const baseURL = `http://localhost:${port}`;
 
@@ -8,8 +16,8 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  // Use single worker in CI for stability with Firebase emulator
-  workers: process.env.CI ? 1 : undefined,
+  // Bespoke suites and global rules overlays still require one browser worker.
+  workers: 1,
   reporter: "html",
   use: {
     baseURL,
@@ -30,7 +38,7 @@ export default defineConfig({
     : {
         command: "pnpm start",
         url: baseURL,
-        reuseExistingServer: true,
+        reuseExistingServer: false,
         timeout: 120 * 1000,
         stdout: "pipe",
         stderr: "pipe",

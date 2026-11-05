@@ -1,24 +1,28 @@
-import { test as base, expect, Page, request } from "@playwright/test";
+import { expect, test as base, type Page, type Route } from "@playwright/test";
+
+import {
+  assertBrowserEmulatorTarget,
+  initializeExecutionToken,
+  LocalFixture,
+  requireEmulatorSelection,
+  type Invitation,
+} from "./local-fixture";
+import type {} from "./emulator-target";
 
 export const ONE_MINUTE = 60000;
 export const SECOND = 1000;
 
-const WORKER_ID =
-  process.env.PW_TEST_WORKER_INDEX ??
-  process.env.TEST_WORKER_INDEX ??
-  process.pid.toString();
-export const TEST_LISTEN_PREFIX = `test-location-${WORKER_ID}`;
-const TEST_EMAIL = `e2e-test-${WORKER_ID}@test.com`;
+const workerIndex =
+  process.env.PW_TEST_WORKER_INDEX ?? process.env.TEST_WORKER_INDEX ?? "0";
+export const emulatorFixture = new LocalFixture(
+  initializeExecutionToken(),
+  workerIndex,
+);
+export const TEST_LISTEN_PREFIX = emulatorFixture.venue();
+export const TEST_LOCATION_LABEL = `Test Location ${emulatorFixture.id}`;
+export const TEST_EMAIL = emulatorFixture.email("operator");
 const TEST_PASSWORD = "testpassword123";
-const EMAIL_PREFIX = TEST_EMAIL.split("@")[0];
-
-// The Firebase RTDB emulator enforces firebase-rules.json security rules even
-// on plain REST calls with no auth token. Test helpers seed data as a trusted
-// harness, not as any particular signed-in user, so they must use the
-// emulator's documented rules-bypass token. Without this header, seeding
-// writes below fail silently (responses aren't checked) and tests relying on
-// that seeded data hang/timeout instead of failing fast.
-const OWNER_HEADERS = { Authorization: "Bearer owner" };
+const verifiedPages = new WeakSet<Page>();
 
 export class FakeClock {
   constructor(private currentTime: Date) {}
@@ -32,183 +36,146 @@ export class FakeClock {
 }
 
 async function clearEmulatorData(): Promise<void> {
-  const apiContext = await request.newContext();
-  try {
-    await apiContext.delete(
-      `http://127.0.0.1:9000/states/${TEST_LISTEN_PREFIX}.json?ns=vikes-match-clock-test`,
-      { headers: OWNER_HEADERS },
-    );
-    await apiContext.delete(
-      `http://127.0.0.1:9000/states/${EMAIL_PREFIX}.json?ns=vikes-match-clock-test`,
-      { headers: OWNER_HEADERS },
-    );
-
-    // Create initial locations data that persists across test runs
-    await apiContext.put(
-      `http://127.0.0.1:9000/locations/${TEST_LISTEN_PREFIX}.json?ns=vikes-match-clock-test`,
-      {
-        headers: OWNER_HEADERS,
-        data: {
-          label: `Test Location ${WORKER_ID}`,
-          screens: [
-            {
-              name: "Display 1",
-            },
-          ],
-        },
+  requireEmulatorSelection();
+  await emulatorFixture.database("DELETE", `states/${TEST_LISTEN_PREFIX}`);
+  await emulatorFixture.database("PUT", `locations/${TEST_LISTEN_PREFIX}`, {
+    label: TEST_LOCATION_LABEL,
+    screens: [{ name: "Display 1" }],
+  });
+  await emulatorFixture.database("PUT", `states/${TEST_LISTEN_PREFIX}`, {
+    match: {
+      homeScore: 0,
+      awayScore: 0,
+      started: 0,
+      timeElapsed: 0,
+      halfStops: [45, 90, 105, 120],
+      homeTeam: "Víkingur R",
+      awayTeam: "",
+      homeTeamId: 103,
+      awayTeamId: 0,
+      injuryTime: 0,
+      matchType: "football",
+      home2min: [],
+      away2min: [],
+      timeout: 0,
+      homeTimeouts: 0,
+      awayTimeouts: 0,
+      buzzer: false,
+      countdown: false,
+      injuryTimeDisplayMode: "full",
+    },
+    controller: {
+      queues: {},
+      activeQueueId: null,
+      playing: false,
+      assetView: "assets",
+      view: "idle",
+      roster: { home: [], away: [] },
+      currentAsset: null,
+      refreshToken: "",
+    },
+    view: {
+      vp: {
+        style: { height: 1080, width: 1920 },
+        name: "1080p",
+        key: "viken",
       },
-    );
-
-    // Create initial state data for test-location so Firebase listeners don't hang
-    await apiContext.put(
-      `http://127.0.0.1:9000/states/${TEST_LISTEN_PREFIX}.json?ns=vikes-match-clock-test`,
-      {
-        headers: OWNER_HEADERS,
-        data: {
-          match: {
-            homeScore: 0,
-            awayScore: 0,
-            started: 0,
-            timeElapsed: 0,
-            halfStops: [45, 90, 105, 120],
-            homeTeam: "Víkingur R",
-            awayTeam: "",
-            homeTeamId: 103,
-            awayTeamId: 0,
-            injuryTime: 0,
-            matchType: "football",
-            home2min: [],
-            away2min: [],
-            timeout: 0,
-            homeTimeouts: 0,
-            awayTimeouts: 0,
-            buzzer: false,
-            countdown: false,
-            injuryTimeDisplayMode: "full",
-          },
-          controller: {
-            queues: {},
-            activeQueueId: null,
-            playing: false,
-            assetView: "assets",
-            view: "idle",
-            roster: { home: [], away: [] },
-            currentAsset: null,
-            refreshToken: "",
-          },
-          view: {
-            vp: {
-              style: { height: 1080, width: 1920 },
-              name: "1080p",
-              key: "viken",
-            },
-            background: "Default",
-          },
-        },
-      },
-    );
-  } catch {}
-  await apiContext.dispose();
-}
-
-async function retryFetch(
-  fn: () => Promise<void>,
-  retries = 10,
-  delayMs = 1000,
-): Promise<void> {
-  for (let i = 0; i < retries; i++) {
-    try {
-      await fn();
-      return;
-    } catch (err: unknown) {
-      const isConnRefused =
-        err instanceof Error && /ECONNREFUSED/.test(err.message);
-      if (!isConnRefused || i === retries - 1) throw err;
-      await new Promise((r) => setTimeout(r, delayMs));
-    }
-  }
+      background: "Default",
+    },
+  });
 }
 
 async function ensureEmulatorUser(): Promise<void> {
-  const apiContext = await request.newContext();
-  try {
-    await retryFetch(async () => {
-      await apiContext.post(
-        "http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signUp?key=test-api-key",
-        {
-          data: {
-            email: TEST_EMAIL,
-            password: TEST_PASSWORD,
-            returnSecureToken: true,
-          },
-        },
-      );
-    });
-  } catch {
-    // User may already exist, ignore error
-  }
-  await apiContext.dispose();
+  await emulatorFixture.createUser(TEST_EMAIL, TEST_PASSWORD);
 }
 
 export async function loginWithEmulatorUser(page: Page): Promise<void> {
-  // Wait for login form to appear
+  if (!verifiedPages.has(page)) {
+    throw new Error(
+      "Fixture login requires a page with verified emulator selection.",
+    );
+  }
   await page
     .getByPlaceholder("E-mail")
     .waitFor({ state: "visible", timeout: 15000 });
   await page.getByPlaceholder("E-mail").fill(TEST_EMAIL);
   await page.getByPlaceholder("Lykilorð").fill(TEST_PASSWORD);
   await page.getByRole("button", { name: "Innskrá", exact: true }).click();
-
-  await page.waitForFunction(() => (window as any).__firebaseAuthUID, null, {
+  await page.waitForFunction(() => Boolean(window.__firebaseAuthUID), null, {
     timeout: 15000,
   });
-
-  const realUID = await page.evaluate(() => {
-    return (window as any).__firebaseAuthUID || null;
-  });
-
-  if (!realUID) {
-    throw new Error(
-      "Could not get UID from Firebase Auth. Auth may not be properly initialized.",
-    );
-  }
-
-  // Create auth entry for the test user in Firebase
-  // This tells the app which locations are available for this user
-  const apiContext = await request.newContext();
-  try {
-    await apiContext.put(
-      `http://127.0.0.1:9000/auth/${realUID}/${TEST_LISTEN_PREFIX}.json?ns=vikes-match-clock-test`,
-      {
-        headers: OWNER_HEADERS,
-        data: true,
-      },
-    );
-  } finally {
-    await apiContext.dispose();
-  }
-
+  const uid = await page.evaluate(() => window.__firebaseAuthUID);
+  if (!uid) throw new Error("Missing Firebase UID after fixture login.");
+  await emulatorFixture.database(
+    "PUT",
+    `auth/${uid}/${TEST_LISTEN_PREFIX}`,
+    true,
+  );
   const screenButton = page.getByRole("button", {
-    name: new RegExp(`Test Location ${WORKER_ID}`),
+    name: `${TEST_LOCATION_LABEL} Display 1`,
+    exact: true,
   });
   await screenButton.waitFor({ state: "visible", timeout: 15000 });
-  await screenButton.click({ force: true });
-
-  // After clicking the screen button, the app will:
-  // 1. Set listenPrefix
-  // 2. Load Firebase data for that location
-  // 3. Render the display + Controller UI
-  // Wait for the Controller Nav tabs to appear (Biðröð is the default tab)
-
+  await screenButton.click();
   await page
     .getByRole("button", { name: "Biðröð" })
     .waitFor({ state: "visible", timeout: 10000 });
 }
 
-export const test = base.extend<{
-  clockPage: Page;
-}>({
-  clockPage: async ({ page }, use) => {
+async function verifyServedEmulators(page: Page) {
+  // The flag alone cannot reconfigure an already running/built app. Probe the
+  // actual served Firebase singleton before any application login or command.
+  const localOnly = (route: Route) => {
+    const url = new URL(route.request().url());
+    return ["localhost", "127.0.0.1"].includes(url.hostname)
+      ? route.continue()
+      : route.abort();
+  };
+  await page.route("**/*", localOnly);
+  try {
+    await page.goto("/e2e/fixtures/emulator-target.html");
+    await page.waitForFunction(
+      () => Boolean(window.__e2eEmulatorTarget),
+      null,
+      { timeout: 10000 },
+    );
+    assertBrowserEmulatorTarget(
+      await page.evaluate(() => window.__e2eEmulatorTarget),
+    );
+    await page.goto("about:blank");
+    verifiedPages.add(page);
+  } finally {
+    await page.unroute("**/*", localOnly);
+  }
+}
+
+export const test = base.extend<
+  { clockPage: Page },
+  { ownedResources: LocalFixture }
+>({
+  ownedResources: [
+    async ({ browser }, provide) => {
+      requireEmulatorSelection();
+      try {
+        await provide(emulatorFixture);
+      } finally {
+        // This browser belongs to this Playwright worker, including role contexts
+        // explicitly created by its tests. Close them before retiring owned data.
+        try {
+          for (const context of browser.contexts()) await context.close();
+        } finally {
+          await emulatorFixture.cleanup();
+        }
+      }
+    },
+    { scope: "worker", auto: true, timeout: 30000 },
+  ],
+  page: async ({ page, ownedResources }, provide) => {
+    expect(ownedResources).toBe(emulatorFixture);
+    await verifyServedEmulators(page);
+    await provide(page);
+  },
+  clockPage: async ({ page }, provide) => {
     await page.addInitScript(() => {
       if (sessionStorage.getItem("e2e-clock-page-initialized") === null) {
         localStorage.clear();
@@ -216,66 +183,26 @@ export const test = base.extend<{
         sessionStorage.setItem("e2e-clock-page-initialized", "true");
       }
     });
-
     await page.clock.setFixedTime(new Date(2025, 3, 10, 12, 0, 0));
-
-    await use(page);
+    await provide(page);
   },
 });
 
 export async function seedAdmins(uid: string, isAdmin = true): Promise<void> {
-  const apiContext = await request.newContext();
-  try {
-    await apiContext.put(
-      `http://127.0.0.1:9000/admins/${uid}.json?ns=vikes-match-clock-test`,
-      { headers: OWNER_HEADERS, data: isAdmin },
-    );
-  } finally {
-    await apiContext.dispose();
-  }
+  await emulatorFixture.database("PUT", `admins/${uid}`, isAdmin);
 }
 
 export async function seedInvitations(
-  invitations: Record<
-    string,
-    {
-      email: string;
-      locations: Record<string, boolean>;
-      createdBy: string;
-      createdAt: number;
-    }
-  >,
+  invitations: Record<string, Invitation>,
 ): Promise<void> {
-  const apiContext = await request.newContext();
-  try {
-    await apiContext.put(
-      `http://127.0.0.1:9000/invitations.json?ns=vikes-match-clock-test`,
-      { headers: OWNER_HEADERS, data: invitations },
-    );
-  } finally {
-    await apiContext.dispose();
-  }
+  await emulatorFixture.seedInvitations(invitations);
 }
 
 export async function createEmulatorUser(
   email: string,
   password: string,
 ): Promise<string> {
-  const apiContext = await request.newContext();
-  try {
-    let localId = "";
-    await retryFetch(async () => {
-      const response = await apiContext.post(
-        "http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signUp?key=test-api-key",
-        { data: { email, password, returnSecureToken: true } },
-      );
-      const body = await response.json();
-      localId = body.localId as string;
-    });
-    return localId;
-  } finally {
-    await apiContext.dispose();
-  }
+  return emulatorFixture.createUser(email, password);
 }
 
 export { ensureEmulatorUser, clearEmulatorData };
@@ -293,7 +220,7 @@ export async function closeSettings(page: Page) {
   await page
     .locator(".rs-modal-backdrop")
     .waitFor({ state: "hidden", timeout: 5000 })
-    .catch(() => {});
+    .catch(() => undefined);
 }
 
 export async function selectViewMode(
@@ -426,11 +353,11 @@ const confirmationHandlers = new WeakSet<Page>();
 function acceptTimeCorrectionConfirmations(page: Page) {
   if (confirmationHandlers.has(page)) return;
   confirmationHandlers.add(page);
-  page.on("dialog", (dialog) => {
+  page.on("dialog", async (dialog) => {
     if (dialog.message().includes("leiðrétta")) {
-      dialog.accept();
+      await dialog.accept();
     } else {
-      dialog.dismiss();
+      await dialog.dismiss();
     }
   });
 }
