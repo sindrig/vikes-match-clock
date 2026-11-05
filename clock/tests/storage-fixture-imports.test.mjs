@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash, randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import http from "node:http";
 import https from "node:https";
@@ -14,7 +15,8 @@ import ts from "typescript";
 
 // These execute actual spec declarations with modeled Playwright/helper imports.
 // The negative initializer uses the actual rules-unit SDK and blocks its own
-// HTTP/socket transport. No browser, emulator, hooks or test bodies are run.
+// HTTP/socket transport. Image body controls stop at the actual filename oracle
+// with a modeled Page; no browser, emulator or compression is qualified here.
 const cases = {
   "perimeter-goal-scorer.spec.ts": [
     "selects a scorer, renders the semantic overlay, falls back, and clears",
@@ -29,10 +31,11 @@ const cases = {
   ],
 };
 
-async function declarations(t, source, file) {
+async function declarations(t, source, file, { helpers = {}, expect } = {}) {
   const effects = [];
   const registered = [];
   const pending = [];
+  const bodies = new Map();
   const forbidden = (name) => () => {
     effects.push(name);
     throw new Error(`Forbidden collection effect: ${name}`);
@@ -40,7 +43,10 @@ async function declarations(t, source, file) {
   t.mock.method(http, "request", forbidden("http.request"));
   t.mock.method(https, "request", forbidden("https.request"));
   t.mock.method(net.Socket.prototype, "connect", forbidden("socket.connect"));
-  const register = (title) => registered.push(title);
+  const register = (title, body) => {
+    registered.push(title);
+    bodies.set(title, body);
+  };
   register.describe = (_title, declare) => declare();
   register.beforeAll = () => {};
   register.beforeEach = () => {};
@@ -48,7 +54,12 @@ async function declarations(t, source, file) {
   register.afterEach = () => {};
   register.setTimeout = () => {};
   const dependencies = {
-    "node:fs": { readFileSync },
+    "node:crypto": { randomUUID },
+    "node:fs": {
+      readFileSync,
+      writeFileSync: forbidden("writeFileSync"),
+      unlinkSync: forbidden("unlinkSync"),
+    },
     "node:path": { resolve: (await import("node:path")).resolve },
     "node:zlib": zlib,
     "@playwright/test": { expect: forbidden("expect during collection") },
@@ -68,6 +79,8 @@ async function declarations(t, source, file) {
       ensureEmulatorUser: forbidden("ensureEmulatorUser"),
       loginWithEmulatorUser: forbidden("loginWithEmulatorUser"),
       emulatorFixture: { uploadStorage: forbidden("uploadStorage") },
+      expect: expect ?? forbidden("expect during collection"),
+      ...helpers,
     },
   };
   const module = { exports: {} };
@@ -94,6 +107,11 @@ async function declarations(t, source, file) {
         __dirname: dirname(file),
         __filename: file,
         Buffer,
+        Date: class extends Date {
+          static now() {
+            return 123;
+          }
+        },
         fetch: forbidden("vm.fetch"),
       },
       { filename: file, timeout: 1000 },
@@ -102,7 +120,7 @@ async function declarations(t, source, file) {
     evaluationError = error;
   }
   await Promise.allSettled(pending);
-  return { effects, registered, evaluationError };
+  return { effects, registered, evaluationError, bodies };
 }
 
 for (const [spec, expected] of Object.entries(cases)) {
@@ -155,4 +173,155 @@ test("Storage fixture declarations: a direct collection fetch is also detected",
   );
   assert.deepEqual(result.effects, ["vm.fetch"]);
   assert.deepEqual(result.registered, cases[spec]);
+});
+
+const imageFile = fileURLToPath(
+  new URL("../e2e/image-upload.spec.ts", import.meta.url),
+);
+const imageSource = readFileSync(imageFile, "utf8");
+const imageTitles = [
+  "uploads image with correct filename preserved",
+  "uploads image with compression enabled",
+];
+const imageHash =
+  "d6ad79754ddf8117ef07ae148ac239cf61d9ff537511a2b6f86e5d5b8de08d6b";
+
+test("Storage fixture declarations: image cases register unchanged without I/O", async (t) => {
+  const result = await declarations(t, imageSource, imageFile);
+  assert.equal(result.evaluationError, undefined);
+  assert.deepEqual(result.effects, []);
+  assert.deepEqual(result.registered, imageTitles);
+});
+
+// The modeled body executes only far enough to inspect the real setInputFiles
+// argument and the real listing filter. UI success/decoding is browser evidence.
+async function imageInputs(t, source) {
+  const fixture = { id: "owned-worker-a" };
+  const seen = new Set();
+  let payload;
+  let checked;
+  const reachedOracle = new Error("reached actual filename oracle");
+  const locator = {
+    async click() {},
+    async check() {
+      checked = true;
+    },
+    filter({ hasText }) {
+      if (typeof hasText === "string") {
+        assert.equal(
+          hasText,
+          payload.name,
+          "listing uses the actual uploaded filename",
+        );
+        throw reachedOracle;
+      }
+      return locator;
+    },
+    async setInputFiles(value) {
+      assert.equal(
+        typeof value,
+        "object",
+        "browser upload requires an in-memory payload",
+      );
+      assert(value && Buffer.isBuffer(value.buffer));
+      assert.equal(value.mimeType, "image/png");
+      assert.equal(value.buffer.length, 70);
+      assert.equal(
+        createHash("sha256").update(value.buffer).digest("hex"),
+        imageHash,
+      );
+      assert.match(value.name, /^[A-Za-z0-9_.-]+\.png$/);
+      assert(
+        value.name.includes(fixture.id),
+        "filename belongs to this fixture",
+      );
+      assert(!seen.has(value.name), "filename collision within the worker");
+      seen.add(value.name);
+      payload = value;
+    },
+  };
+  const page = {
+    getByRole: () => locator,
+    getByText: () => locator,
+    locator: () => locator,
+    async waitForTimeout(ms) {
+      assert.equal(ms, 1000);
+    },
+  };
+  const result = await declarations(t, source, imageFile, {
+    helpers: {
+      emulatorFixture: fixture,
+      loginWithEmulatorUser: async () => {},
+    },
+    expect: (value) => ({
+      async toBeVisible() {},
+      async toBeChecked() {
+        assert(checked);
+      },
+      async toContainText() {},
+      async toPass() {
+        await value();
+      },
+    }),
+  });
+  assert.equal(result.evaluationError, undefined);
+  assert.deepEqual(result.effects, []);
+  for (const id of ["owned-worker-a", "owned-worker-a", "owned-worker-b"]) {
+    fixture.id = id;
+    for (const title of imageTitles) {
+      checked = false;
+      const body = result.bodies.get(title);
+      assert.equal(typeof body, "function");
+      // Only this sentinel is success. Payload/FS failures propagate unchanged.
+      try {
+        await body({ page });
+        assert.fail("actual body did not reach its filename oracle");
+      } catch (error) {
+        if (error !== reachedOracle) throw error;
+      }
+    }
+  }
+  assert.equal(seen.size, 6);
+  assert.deepEqual(result.effects, []);
+}
+
+test("Image input source / Page model: exact bytes, filename oracle and fresh invocation ownership", async (t) => {
+  await imageInputs(t, imageSource);
+});
+
+for (const operation of ["writeFileSync", "unlinkSync"]) {
+  test(`Image input source / Page model: detects actual ${operation} regression`, async (t) => {
+    const mutation =
+      `import { ${operation} } from "node:fs";\n` +
+      imageSource.replace(
+        "  const pngBuffer = Buffer.from([",
+        `  ${operation}("forbidden-source-adjacent.png"${operation === "writeFileSync" ? ', "x"' : ""});\n  const pngBuffer = Buffer.from([`,
+      );
+    assert.notEqual(mutation, imageSource);
+    await assert.rejects(
+      imageInputs(t, mutation),
+      new RegExp(`Forbidden collection effect: ${operation}`),
+    );
+  });
+}
+
+test("Image input source / Page model: detects a string-path upload regression", async (t) => {
+  const mutation = imageSource.replaceAll(
+    "setInputFiles(testImage)",
+    "setInputFiles(testImage.name)",
+  );
+  assert.notEqual(mutation, imageSource);
+  await assert.rejects(
+    imageInputs(t, mutation),
+    /requires an in-memory payload/,
+  );
+});
+
+test("Image input source / Page model: detects timestamp-only collisions with Date frozen", async (t) => {
+  const mutation = imageSource.replaceAll("${randomUUID()}", "${Date.now()}");
+  assert.notEqual(mutation, imageSource);
+  await assert.rejects(
+    imageInputs(t, mutation),
+    /filename collision within the worker/,
+  );
 });

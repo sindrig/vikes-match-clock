@@ -1,15 +1,17 @@
-import {
-  test,
-  expect,
-  ensureEmulatorUser,
-  clearEmulatorData,
-  loginWithEmulatorUser,
-} from "./fixtures/test-helpers";
-import type { Page } from "@playwright/test";
-import path from "path";
-import fs from "fs";
+import { randomUUID } from "node:crypto";
 
-function createTestImage(filePath: string) {
+import type { Page } from "@playwright/test";
+
+import {
+  clearEmulatorData,
+  emulatorFixture,
+  ensureEmulatorUser,
+  expect,
+  loginWithEmulatorUser,
+  test,
+} from "./fixtures/test-helpers";
+
+function createTestImage(name: string) {
   const pngBuffer = Buffer.from([
     0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
     0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
@@ -18,7 +20,7 @@ function createTestImage(filePath: string) {
     0x00, 0x00, 0x03, 0x00, 0x01, 0x00, 0x05, 0xfe, 0xd4, 0xef, 0x00, 0x00,
     0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
   ]);
-  fs.writeFileSync(filePath, pngBuffer);
+  return { name, mimeType: "image/png", buffer: pngBuffer };
 }
 
 async function goToMediaTab(page: Page) {
@@ -43,85 +45,72 @@ test.describe("Image Upload", () => {
   });
 
   test("uploads image with correct filename preserved", async ({ page }) => {
-    const testImagePath = path.join(__dirname, `test-upload-${Date.now()}.png`);
-    createTestImage(testImagePath);
+    const testImage = createTestImage(
+      `test-upload-${emulatorFixture.id}-${randomUUID()}.png`,
+    );
 
-    try {
-      await loginWithEmulatorUser(page);
-      await goToMediaTab(page);
+    await loginWithEmulatorUser(page);
+    await goToMediaTab(page);
 
-      const uploadArea = page.locator("label").filter({
-        hasText: /Upload|drop a file/,
-      });
-      await expect(uploadArea).toBeVisible();
+    const uploadArea = page.locator("label").filter({
+      hasText: /Upload|drop a file/,
+    });
+    await expect(uploadArea).toBeVisible();
 
-      const fileInput = page.locator('.upload-manager input[type="file"]');
-      await fileInput.setInputFiles(testImagePath);
+    const fileInput = page.locator('.upload-manager input[type="file"]');
+    await fileInput.setInputFiles(testImage);
 
-      await expect(uploadArea).toContainText("Uploaded Successfully", {
-        timeout: 15000,
-      });
+    await expect(uploadArea).toContainText("Uploaded Successfully", {
+      timeout: 15000,
+    });
 
-      const expectedFilename = path.basename(testImagePath);
+    const expectedFilename = testImage.name;
 
-      await expect(async () => {
-        await page.locator(".upload-manager .reload").click();
-        await page.waitForTimeout(1000);
-        const imageItem = page
-          .locator(".asset-image")
-          .filter({ hasText: expectedFilename });
-        await expect(imageItem).toBeVisible({ timeout: 2000 });
-      }).toPass({ timeout: 20000 });
-    } finally {
-      if (fs.existsSync(testImagePath)) {
-        fs.unlinkSync(testImagePath);
-      }
-    }
+    await expect(async () => {
+      await page.locator(".upload-manager .reload").click();
+      await page.waitForTimeout(1000);
+      const imageItem = page
+        .locator(".asset-image")
+        .filter({ hasText: expectedFilename });
+      await expect(imageItem).toBeVisible({ timeout: 2000 });
+    }).toPass({ timeout: 20000 });
   });
 
   test("uploads image with compression enabled", async ({ page }) => {
-    const testImagePath = path.join(
-      __dirname,
-      `test-compressed-${Date.now()}.png`,
+    const testImage = createTestImage(
+      `test-compressed-${emulatorFixture.id}-${randomUUID()}.png`,
     );
-    createTestImage(testImagePath);
 
-    try {
-      await loginWithEmulatorUser(page);
-      await goToMediaTab(page);
+    await loginWithEmulatorUser(page);
+    await goToMediaTab(page);
 
-      await page
-        .getByRole("checkbox", { name: "Compress automatically" })
-        .check();
-      await expect(
-        page.getByRole("checkbox", { name: "Compress automatically" }),
-      ).toBeChecked();
+    await page
+      .getByRole("checkbox", { name: "Compress automatically" })
+      .check();
+    await expect(
+      page.getByRole("checkbox", { name: "Compress automatically" }),
+    ).toBeChecked();
 
-      const uploadArea = page.locator("label").filter({
-        hasText: /Upload|drop a file/,
-      });
+    const uploadArea = page.locator("label").filter({
+      hasText: /Upload|drop a file/,
+    });
 
-      const fileInput = page.locator('.upload-manager input[type="file"]');
-      await fileInput.setInputFiles(testImagePath);
+    const fileInput = page.locator('.upload-manager input[type="file"]');
+    await fileInput.setInputFiles(testImage);
 
-      await expect(uploadArea).toContainText("Uploaded Successfully", {
-        timeout: 15000,
-      });
+    await expect(uploadArea).toContainText("Uploaded Successfully", {
+      timeout: 15000,
+    });
 
-      const expectedFilename = path.basename(testImagePath);
+    const expectedFilename = testImage.name;
 
-      await expect(async () => {
-        await page.locator(".upload-manager .reload").click();
-        await page.waitForTimeout(1000);
-        const imageItem = page
-          .locator(".asset-image")
-          .filter({ hasText: expectedFilename });
-        await expect(imageItem).toBeVisible({ timeout: 2000 });
-      }).toPass({ timeout: 20000 });
-    } finally {
-      if (fs.existsSync(testImagePath)) {
-        fs.unlinkSync(testImagePath);
-      }
-    }
+    await expect(async () => {
+      await page.locator(".upload-manager .reload").click();
+      await page.waitForTimeout(1000);
+      const imageItem = page
+        .locator(".asset-image")
+        .filter({ hasText: expectedFilename });
+      await expect(imageItem).toBeVisible({ timeout: 2000 });
+    }).toPass({ timeout: 20000 });
   });
 });
