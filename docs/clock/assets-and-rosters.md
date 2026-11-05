@@ -306,6 +306,12 @@ useEffect(() => {
 
 ## Team ID System & Match Data Pipeline
 
+The [offline logo candidate workflow](../../utils/README.md#offline-logo-candidates)
+creates review-only TypeScript from local artwork filenames. Canonical maps
+remain curated: filename enumeration cannot preserve aliases such as
+`FC Malisheva` → `Malisheva.png`; adoption and club-ID changes require separate
+review.
+
 ### How Team IDs Work
 
 `club-ids.ts` is the canonical mapping of team display names to KSI Analyticom API IDs. These IDs were sourced from https://www.ksi.is/felagslid/adildarfelog/ (each team link has `felag?id=XXXX`).
