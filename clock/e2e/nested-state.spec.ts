@@ -1,16 +1,32 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { expect, test, type Page } from "@playwright/test";
+import {
+  expect,
+  test as base,
+  type Browser,
+  type BrowserContext,
+  type Page,
+} from "@playwright/test";
+import type {} from "./fixtures/emulator-target";
+import { beforeDeadline } from "./fixtures/fixture-sdk-producers";
+import {
+  assertBrowserEmulatorTarget,
+  assertLocalFixtureUrl,
+  EMULATOR_PROJECT,
+  initializeExecutionToken,
+  LocalFixture,
+  requireEmulatorSelection,
+} from "./fixtures/local-fixture";
+import {
+  assertNestedFixtureTarget,
+  nestedMediaPaths,
+  nestedPairId,
+  parseNestedFixtureInput,
+  type NestedFixtureInput,
+  type NestedFixtureRole,
+} from "./fixtures/nested-fixture-input";
 import type {} from "./fixtures/nested-state-harness";
 
-test.describe.configure({ mode: "serial", timeout: 60000 });
-const namespace = "vikes-match-clock-test";
-const venue = "audit246";
-const email = "audit246@example.test";
-const password = "audit246-emulator-only";
-const rules: unknown = JSON.parse(
-  readFileSync(resolve(__dirname, "../../firebase-rules.json"), "utf8"),
-);
 const pixel =
   "data:image/gif;base64,R0lGODlhAQABAIAAAP8AAAAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==";
 const photo = {
@@ -29,9 +45,8 @@ const noPhoto = {
   number: null,
   role: "Þjálfari",
 };
-const image = {
+const imageTemplate = {
   type: "IMAGE",
-  key: "audit246/images/sponsor.gif",
   url: pixel,
   name: "Sponsor.gif",
   metadata: { revision: 2 },
@@ -49,114 +64,385 @@ const incoming = {
   number: "11",
   show: false,
 };
-const pageErrors = new Map<Page, string[]>();
 
-async function rest(
-  method: string,
-  path: string,
-  data?: unknown,
-): Promise<unknown> {
-  const response = await fetch(
-    `http://127.0.0.1:9000/${path}.json?ns=${namespace}`,
-    {
-      method,
-      headers: {
-        Authorization: "Bearer owner",
-        "Content-Type": "application/json",
-      },
-      ...(data === undefined ? {} : { body: JSON.stringify(data) }),
+const namespace = EMULATOR_PROJECT;
+const password = "audit246-emulator-only";
+const rules: unknown = JSON.parse(
+  readFileSync(resolve(__dirname, "../../firebase-rules.json"), "utf8"),
+);
+
+// This installer is GLOBAL to the namespace. Owned venues do not isolate it;
+// the entire emulator/browser lifecycle remains externally serialized.
+async function canonicalRules(method: "GET" | "PUT") {
+  requireEmulatorSelection();
+  const url = `http://127.0.0.1:9000/.settings/rules.json?ns=${namespace}`;
+  assertLocalFixtureUrl(url);
+  const response = await fetch(url, {
+    method,
+    redirect: "manual",
+    signal: AbortSignal.timeout(5000),
+    headers: {
+      Authorization: "Bearer owner",
+      "Content-Type": "application/json",
     },
-  );
-  expect(response.ok, `${method} ${path}: ${response.status}`).toBe(true);
-  return response.json();
+    ...(method === "PUT" ? { body: JSON.stringify(rules) } : {}),
+  });
+  if (response.status !== 200)
+    throw new Error(`Canonical nested rules: HTTP ${response.status}.`);
+  const body = await response.text();
+  if (body.length > 1024 * 1024) throw new Error("Oversized rules response.");
+  const parsed: unknown = JSON.parse(body);
+  return parsed;
 }
-async function bootstrap(page: Page) {
-  const errors: string[] = [];
-  pageErrors.set(page, errors);
-  page.on("pageerror", (error) => errors.push(error.message));
-  await page.route(/^https?:\/\/(?!localhost[:/]|127\.0\.0\.1[:/])/, (route) =>
-    route.abort(),
+
+async function verifyServedTarget(page: Page, input: NestedFixtureInput) {
+  await page.route("**/*", (route) =>
+    ["localhost", "127.0.0.1"].includes(new URL(route.request().url()).hostname)
+      ? route.continue()
+      : route.abort(),
   );
-  await page.addInitScript(() =>
-    localStorage.setItem("clock_listenPrefix", "audit246"),
+  await page.goto("/e2e/fixtures/emulator-target.html");
+  await page.waitForFunction(() => Boolean(window.__e2eEmulatorTarget));
+  assertBrowserEmulatorTarget(
+    await page.evaluate(() => window.__e2eEmulatorTarget),
   );
-  await page.goto("/e2e/fixtures/nested-state.html");
+  const params = new URLSearchParams({
+    fixture: input.fixtureId,
+    prefix: input.venue,
+    denied: input.deniedVenue,
+    role: input.role,
+  });
+  const url = new URL(
+    `/e2e/fixtures/nested-state.html?${params}`,
+    base.info().project.use.baseURL,
+  );
+  expect(parseNestedFixtureInput(url)).toEqual(input);
+  await page.goto(url.href);
   await page.waitForFunction(() => Boolean(window.nestedHarness));
-  await page.evaluate(
-    ({ email, password }) => window.nestedHarness.login(email, password),
-    { email, password },
-  );
-  await expect
-    .poll(() => page.evaluate(() => window.nestedHarness.snapshot().eligible))
-    .toBe(true);
-  await page.evaluate(() => window.nestedHarness.resetAttempts());
+  const descriptor = await page.evaluate(() => ({
+    input: window.nestedHarness.input,
+    target: window.nestedHarness.target,
+  }));
+  assertNestedFixtureTarget(descriptor.target);
+  expect(descriptor.input).toEqual(input);
 }
-test.beforeAll(async () => {
-  await rest("PUT", ".settings/rules", rules);
-  expect(await rest("GET", ".settings/rules")).toEqual(rules);
-  const response = await fetch(
-    "http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signUp?key=test-api-key",
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password, returnSecureToken: true }),
-    },
+
+async function ownedNested(browser: Browser) {
+  requireEmulatorSelection();
+  const fixture = new LocalFixture(
+    initializeExecutionToken(),
+    process.env.PW_TEST_WORKER_INDEX ?? process.env.TEST_WORKER_INDEX ?? "0",
   );
-  expect(response.ok).toBe(true);
-  const account = (await response.json()) as { localId: string };
-  await rest("PUT", `auth/${account.localId}`, { [venue]: true });
-});
-test.beforeEach(async () => {
-  await rest("PUT", `states/${venue}`, {
-    match: {
-      homeTeam: "Víkingur R",
-      awayTeam: "Valur",
-      started: 0,
-      countdown: false,
-      timeElapsed: 100,
-      halfStops: [45, 90],
-      matchType: "football",
-    },
-    controller: {
-      playing: false,
-      assetView: "assets",
-      view: "match",
-      roster: {
-        home: { 7: outgoing, 10: { name: { bad: true } }, 25: incoming },
-        away: { 40: { name: "李 明", id: "foreign", number: "A7" } },
+  const venue = fixture.venue("nested");
+  const deniedVenue = fixture.venue("nested-denied");
+  const email = fixture.email("nested");
+  const image = { ...imageTemplate, key: `${venue}/images/sponsor.gif` };
+  const clients: {
+    context: BrowserContext;
+    page?: Page;
+    input?: NestedFixtureInput;
+    errors: string[];
+    finish?: () => void;
+    fail?: () => void;
+    producer?: Promise<void>;
+  }[] = [];
+  let uid = "";
+  let targetAdmitted = false;
+  const rest = (
+    method: "GET" | "PUT" | "DELETE",
+    path: string,
+    data?: unknown,
+  ) => fixture.database(method, path, data);
+  const client = async (role: NestedFixtureRole) => {
+    const context = await browser.newContext();
+    const entry: (typeof clients)[number] = { context, errors: [] };
+    clients.push(entry);
+    const page = await context.newPage();
+    entry.page = page;
+    page.on("pageerror", (error) => entry.errors.push(error.message));
+    const url = new URL(
+      "/e2e/fixtures/nested-state.html",
+      base.info().project.use.baseURL,
+    );
+    url.search = new URLSearchParams({
+      fixture: fixture.id,
+      prefix: venue,
+      denied: deniedVenue,
+      role,
+    }).toString();
+    entry.input = parseNestedFixtureInput(url);
+    await verifyServedTarget(page, entry.input);
+    return page;
+  };
+  const settle = async (...pages: Page[]) => {
+    for (const page of pages)
+      await expect
+        .poll(() => page.evaluate(() => window.nestedHarness.lifecycle()))
+        .toMatchObject({
+          pendingCommands: 0,
+          pendingAudits: 0,
+          pendingSdk: 0,
+          failures: [],
+        });
+  };
+  const bootstrap = async (page: Page) => {
+    const entry = clients.find((entry) => entry.page === page);
+    if (!entry?.input || entry.producer)
+      throw new Error("Unowned or already initialized nested page.");
+    const lifetime = new Promise<void>((resolve, reject) => {
+      entry.finish = resolve;
+      entry.fail = () => reject(new Error("Nested client outcome uncertain."));
+    });
+    entry.producer = fixture.trackMutation(() => lifetime);
+    void entry.producer.catch(() => {
+      /* LocalFixture retains the uncertain producer. */
+    });
+    await page.evaluate(
+      (input) => window.nestedHarness.initialize(input),
+      entry.input,
+    );
+    if (entry.input.role !== "anonymous")
+      await page.evaluate(
+        ({ email, password, uid }) =>
+          window.nestedHarness.login(email, password, uid),
+        { email, password, uid },
+      );
+    await expect
+      .poll(() => page.evaluate(() => window.nestedHarness.status().connected))
+      .toBe(true);
+    if (entry.input.role === "controller") {
+      await expect
+        .poll(() => page.evaluate(() => window.nestedHarness.status()))
+        .toMatchObject({ eligible: true, uid });
+      await settle(page);
+      await page.evaluate(() => window.nestedHarness.resetAttempts());
+    } else if (entry.input.role === "observer") {
+      await expect
+        .poll(() =>
+          page.evaluate(() => window.nestedHarness.status().stateDeliveries),
+        )
+        .toBeGreaterThan(0);
+      await expect
+        .poll(() =>
+          page.evaluate(() => window.nestedHarness.status().auditDeliveries),
+        )
+        .toBeGreaterThan(0);
+      expect(await page.evaluate(() => window.nestedHarness.status().uid)).toBe(
+        uid,
+      );
+    } else
+      expect(
+        await page.evaluate(() => window.nestedHarness.status().uid),
+      ).toBeNull();
+  };
+  const cleanup = async () => {
+    const deadline = Date.now() + 20000;
+    const failures: string[] = [];
+    for (const entry of [...clients].sort(
+      (a, b) =>
+        Number(a.input?.role === "observer") -
+        Number(b.input?.role === "observer"),
+    )) {
+      if (entry.producer && entry.page) {
+        try {
+          const disposal = entry.page.evaluate(
+            (timeout) => window.nestedHarness.dispose(timeout),
+            Math.max(1, deadline - Date.now()),
+          );
+          // A deadline may already have expired when the original promise rejects.
+          // Observe that rejection without treating it as successful completion.
+          void disposal.catch(() => undefined);
+          await beforeDeadline(disposal, deadline);
+          entry.finish?.();
+          await beforeDeadline(entry.producer, deadline);
+        } catch {
+          entry.fail?.();
+          failures.push("Nested client disposal incomplete.");
+        }
+      }
+      try {
+        const closing = entry.context.close();
+        void closing.catch(() => undefined);
+        await beforeDeadline(closing, deadline);
+      } catch {
+        failures.push("Nested context close incomplete.");
+      }
+      if (entry.errors.length) failures.push("Nested page error.");
+    }
+    if (targetAdmitted) {
+      try {
+        if (Date.now() >= deadline)
+          throw new Error("Nested cleanup deadline expired.");
+        const cleaning = fixture.cleanup(deadline - Date.now());
+        void cleaning.catch(() => undefined);
+        await beforeDeadline(cleaning, deadline);
+      } catch {
+        failures.push("Nested owned cleanup incomplete.");
+      }
+    }
+    if (failures.length) throw new Error(failures.join("\n"));
+  };
+  try {
+    const page = await client("controller");
+    targetAdmitted = true;
+    const invitations = await rest("GET", "invitations");
+    for (const value of Object.values(
+      invitations === null ? {} : record(invitations),
+    )) {
+      if (
+        value !== null &&
+        typeof value === "object" &&
+        "email" in value &&
+        typeof value.email === "string" &&
+        value.email.trim().toLowerCase() === email
+      )
+        throw new Error("Nested email already has an invitation.");
+    }
+    uid = await fixture.createUser(email, password);
+    await rest("PUT", `auth/${uid}/${venue}`, true);
+    expect(await rest("GET", `auth/${uid}/${venue}`)).toBe(true);
+    expect(await rest("GET", `auth/${uid}/${deniedVenue}`)).toBeNull();
+    await rest("PUT", `states/${venue}`, {
+      match: {
+        homeTeam: "Víkingur R",
+        awayTeam: "Valur",
+        started: 0,
+        countdown: false,
+        timeElapsed: 100,
+        halfStops: [45, 90],
+        matchType: "football",
       },
-      queues: {
-        q: {
-          id: "q",
-          name: "Saved",
-          items: {
-            4: image,
-            7: { ...photo, name: { invalid: true } },
-            15: noPhoto,
+      controller: {
+        playing: false,
+        assetView: "assets",
+        view: "match",
+        roster: {
+          home: { 7: outgoing, 10: { name: { bad: true } }, 25: incoming },
+          away: { 40: { name: "李 明", id: "foreign", number: "A7" } },
+        },
+        queues: {
+          q: {
+            id: "q",
+            name: "Saved",
+            items: {
+              4: image,
+              7: { ...photo, name: { invalid: true } },
+              15: noPhoto,
+            },
+            autoPlay: true,
+            imageSeconds: 30,
+            cycle: true,
+            order: 0,
+            note: { source: "archive" },
           },
-          autoPlay: true,
-          imageSeconds: 30,
-          cycle: true,
-          order: 0,
-          note: { source: "archive" },
         },
       },
-    },
-    view: {
-      vp: {
-        key: "insidebig",
-        name: "Indoor",
-        style: { width: "512", height: "400", calibration: { revision: 2 } },
-        fontSize: "100%",
+      view: {
+        vp: {
+          key: "insidebig",
+          name: "Indoor",
+          style: { width: "512", height: "400", calibration: { revision: 2 } },
+          fontSize: "100%",
+        },
+        background: "Default",
       },
-      background: "Default",
-    },
-    perimeter: { enabled: false, state: "off" },
-  });
-  await rest("PUT", `audit/${venue}`, null);
+      perimeter: { enabled: false, state: "off" },
+    });
+    await rest("PUT", `audit/${venue}`, null);
+    const seedMedia = async () => {
+      const input = clients[0]!.input!;
+      const paths = nestedMediaPaths(input);
+      const bytes = Uint8Array.from(
+        Buffer.from(
+          "R0lGODlhAQABAIAAAP8AAAAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==",
+          "base64",
+        ),
+      );
+      const generations: Record<string, string> = {};
+      for (const path of paths)
+        generations[`gs://${namespace}.appspot.com/${path}`] =
+          await fixture.uploadStorage(path, bytes);
+      return {
+        pairId: nestedPairId,
+        paths,
+        generations,
+        mainScreenUrl: await page.evaluate(() =>
+          window.nestedHarness.mediaUrl(),
+        ),
+      };
+    };
+    return {
+      fixture,
+      venue,
+      deniedVenue,
+      email,
+      uid,
+      image,
+      page,
+      client,
+      bootstrap,
+      rest,
+      settle,
+      seedMedia,
+      cleanup,
+    };
+  } catch (error: unknown) {
+    try {
+      await cleanup();
+    } catch {
+      throw new Error("Nested setup and owned cleanup failed.");
+    }
+    throw error;
+  }
+}
+
+type NestedCase = Awaited<ReturnType<typeof ownedNested>>;
+const test = base.extend<{ nested: NestedCase }>({
+  nested: async ({ browser }, provide, testInfo) => {
+    const nested = await ownedNested(browser);
+    try {
+      await testInfo.attach("nested-ownership", {
+        contentType: "application/json",
+        body: JSON.stringify({
+          fixture: nested.fixture.id,
+          venue: nested.venue,
+          deniedVenue: nested.deniedVenue,
+          worker: testInfo.workerIndex,
+          titlePath: testInfo.titlePath,
+          retry: testInfo.retry,
+          repeatEachIndex: testInfo.repeatEachIndex,
+        }),
+      });
+      await provide(nested);
+    } finally {
+      await nested.cleanup();
+    }
+  },
+  page: async ({ nested }, provide) => {
+    await provide(nested.page);
+  },
 });
-test.afterEach(async ({ page }) => {
-  expect(pageErrors.get(page) ?? []).toEqual([]);
+test.describe.configure({ mode: "serial", timeout: 60000 });
+test.beforeAll(async ({ browser }) => {
+  requireEmulatorSelection();
+  const fixture = new LocalFixture(
+    initializeExecutionToken(),
+    process.env.PW_TEST_WORKER_INDEX ?? process.env.TEST_WORKER_INDEX ?? "0",
+  );
+  const input = parseNestedFixtureInput(
+    new URL(
+      `/e2e/fixtures/nested-state.html?${new URLSearchParams({ fixture: fixture.id, prefix: fixture.venue("nested"), denied: fixture.venue("nested-denied"), role: "observer" })}`,
+      base.info().project.use.baseURL,
+    ),
+  );
+  const context = await browser.newContext();
+  try {
+    await verifyServedTarget(await context.newPage(), input);
+  } finally {
+    await context.close();
+  }
+  await canonicalRules("PUT");
+  expect(await canonicalRules("GET")).toEqual(rules);
 });
 
 // Compare Firebase children, irrespective of RTDB's density-dependent JSON
@@ -225,7 +511,9 @@ for (const layout of rosterLayouts) {
   for (const side of ["home", "away"] as const) {
     test(`ordinary roster raw child writes: ${layout.name} ${side}`, async ({
       page,
+      nested,
     }, testInfo) => {
+      const { rest, venue, bootstrap, settle } = nested;
       const rawRoster = {
         home: layout.raw,
         away: layout.raw,
@@ -233,6 +521,7 @@ for (const layout of rosterLayouts) {
       };
       await rest("PUT", `states/${venue}/controller/roster`, rawRoster);
       await bootstrap(page);
+      await settle(page);
       const evidence: unknown[] = [];
       for (const operation of ["edit", "delete", "add", "replace"] as const) {
         await rest("PUT", `states/${venue}/controller/roster`, rawRoster);
@@ -252,6 +541,7 @@ for (const layout of rosterLayouts) {
             { name: rosterStarter.name, show: true },
             { name: rosterCoach.name, show: false },
           ]);
+        await settle(page);
         await page.evaluate(() => window.nestedHarness.resetAttempts());
         const before = rawChildren(await rest("GET", `states/${venue}`));
         const replacement = [
@@ -380,13 +670,16 @@ for (const layout of rosterLayouts) {
 
 test("ordinary roster rapid SDK echoes and explicit two-side replacement/full clear", async ({
   page,
+  nested,
 }, testInfo) => {
+  const { rest, venue, bootstrap, settle } = nested;
   await rest("PUT", `states/${venue}/controller/roster`, {
     home: { 17: rosterStarter, 26: rosterRejected, 31: rosterCoach, 40: false },
     away: [rosterStarter, null, rosterCoach],
     provenance: { keep: "until full clear" },
   });
   await bootstrap(page);
+  await settle(page);
   const before = record(rawChildren(await rest("GET", `states/${venue}`)));
   await page.evaluate(() => {
     const retained = window.nestedHarness.commands;
@@ -454,6 +747,7 @@ test("ordinary roster rapid SDK echoes and explicit two-side replacement/full cl
   });
 
   await rest("PUT", `audit/${venue}`, null);
+  await settle(page);
   await page.evaluate(() => {
     window.nestedHarness.resetAttempts();
     window.nestedHarness.commands.setRoster({
@@ -485,6 +779,7 @@ test("ordinary roster rapid SDK echoes and explicit two-side replacement/full cl
   ).toBe(1);
 
   await rest("PUT", `audit/${venue}`, null);
+  await settle(page);
   await page.evaluate(() => {
     window.nestedHarness.resetAttempts();
     window.nestedHarness.commands.clearRoster();
@@ -510,8 +805,11 @@ test("ordinary roster rapid SDK echoes and explicit two-side replacement/full cl
 
 test("actual SDK/rules admit legacy malformed media while consumers stay safe and read-only", async ({
   page,
+  nested,
 }) => {
+  const { rest, venue, bootstrap, settle } = nested;
   await bootstrap(page);
+  await settle(page);
   await expect(page.getByText("Jón Jónsson")).toBeVisible();
   await expect(page.getByTestId("queue").getByText("Coach")).toBeVisible();
   for (const asset of [
@@ -546,6 +844,7 @@ test("actual SDK/rules admit legacy malformed media while consumers stay safe an
         ),
       )
       .toBeNull();
+    await settle(page);
     await page.evaluate(() => window.nestedHarness.resetAttempts());
     const before = await rest("GET", `states/${venue}`);
     await page.waitForTimeout(180);
@@ -567,7 +866,9 @@ test("actual SDK/rules admit legacy malformed media while consumers stay safe an
 
 test("mixed sparse penalties and rosters render without phantom lifecycle writes", async ({
   page,
+  nested,
 }) => {
+  const { rest, venue, bootstrap, settle } = nested;
   await rest("PUT", `states/${venue}/match/home2min`, {
     5: {
       key: "valid",
@@ -586,6 +887,7 @@ test("mixed sparse penalties and rosters render without phantom lifecycle writes
     fontSize: {},
   });
   await bootstrap(page);
+  await settle(page);
   await expect(page.getByTestId("current").getByText("Coach")).toBeVisible();
   const before = await rest("GET", `states/${venue}`);
   const snapshot = await page.evaluate(() => window.nestedHarness.snapshot());
@@ -603,8 +905,11 @@ test("mixed sparse penalties and rosters render without phantom lifecycle writes
 
 test("substitution writes original sparse child keys, then real lifecycle cycles preserved valid media", async ({
   page,
+  nested,
 }) => {
+  const { rest, venue, bootstrap, image, settle } = nested;
   await bootstrap(page);
+  await settle(page);
   const stateBefore = (await rest("GET", `states/${venue}`)) as {
     controller: { roster: unknown; queues: { q: unknown } };
   };
@@ -649,7 +954,9 @@ test("substitution writes original sparse child keys, then real lifecycle cycles
   );
   await page.evaluate(async () => {
     const api = window.nestedHarness.commands;
-    await api.updateQueueSettings("q", { imageSeconds: 0.5 });
+    api.updateQueueSettings("q", { imageSeconds: 0.5 });
+    // Preserve the original microtask boundary; this is not an SDK acknowledgement.
+    await Promise.resolve();
     api.playQueue("q");
   });
   await expect
@@ -694,24 +1001,29 @@ test("substitution writes original sparse child keys, then real lifecycle cycles
 
 test("legacy completion changes only current playback, and malformed present IDs remain ineligible", async ({
   page,
+  nested,
 }) => {
+  const { rest, venue, bootstrap, image, settle } = nested;
   await rest("PUT", `states/${venue}/controller/currentAsset`, {
     asset: image,
   });
   await bootstrap(page);
+  await settle(page);
   const before = (await rest("GET", `states/${venue}/controller`)) as Record<
     string,
     unknown
   >;
   expect(
-    await page.evaluate(() =>
-      window.nestedHarness.commands.completeAssetIfCurrent({
-        occurrenceId: null,
-        assetKey: "audit246/images/sponsor.gif",
-        time: null,
-        activeQueueId: null,
-        playing: false,
-      }),
+    await page.evaluate(
+      (assetKey) =>
+        window.nestedHarness.commands.completeAssetIfCurrent({
+          occurrenceId: null,
+          assetKey,
+          time: null,
+          activeQueueId: null,
+          playing: false,
+        }),
+      image.key,
     ),
   ).toBe(true);
   const { currentAsset, ...unchanged } = before;
@@ -735,6 +1047,10 @@ test("legacy completion changes only current playback, and malformed present IDs
         ),
       )
       .toBeNull();
+    // This current command must reject at the raw occurrence precondition.
+    await expect
+      .poll(() => page.evaluate(() => window.nestedHarness.snapshot().eligible))
+      .toBe(true);
     expect(
       await page.evaluate(() =>
         window.nestedHarness.commands.completeAssetIfCurrent({
@@ -752,34 +1068,68 @@ test("legacy completion changes only current playback, and malformed present IDs
 
 test("real Database and Storage SDK denials enforce the actual repository rules", async ({
   page,
+  nested,
 }) => {
+  const { rest, venue, bootstrap, settle, client, deniedVenue } = nested;
   await bootstrap(page);
-  expect(await rest("GET", ".settings/rules")).toEqual(rules);
-  const denied = await page.evaluate(async () => {
-    const errors: string[] = [];
-    for (const action of [
-      window.nestedHarness.denied,
-      window.nestedHarness.deniedStorage,
-    ]) {
-      try {
-        await action();
-        errors.push("allowed");
-      } catch (error) {
-        errors.push((error as { code: string }).code);
-      }
-    }
-    return errors;
-  });
+  await settle(page);
+  expect(await canonicalRules("GET")).toEqual(rules);
+  const allowed = await page.evaluate(() =>
+    window.nestedHarness.authorizedStorage(),
+  );
+  expect(allowed.bytes).toEqual([1]);
+  expect(allowed.generation).toMatch(/^[0-9]+$/);
+  const anonymous = await client("anonymous");
+  await bootstrap(anonymous);
+  const denied: string[] = [];
+  for (const action of [
+    { page, method: "denied" as const },
+    { page: anonymous, method: "deniedStorage" as const },
+  ]) {
+    denied.push(
+      await action.page.evaluate(async (method) => {
+        try {
+          await window.nestedHarness[method]();
+          return "allowed";
+        } catch (error) {
+          if (
+            error instanceof Error &&
+            "code" in error &&
+            typeof error.code === "string"
+          )
+            return error.code;
+          throw error;
+        }
+      }, action.method),
+    );
+  }
+  for (const method of ["privateRead", "privateList"] as const) {
+    expect(
+      await anonymous.evaluate(async (method) => {
+        try {
+          await window.nestedHarness[method]();
+          return "allowed";
+        } catch (error) {
+          if (error instanceof Error && "code" in error) return error.code;
+          throw error;
+        }
+      }, method),
+    ).toBe("storage/unauthorized");
+  }
+  await settle(page, anonymous);
   expect(denied).toEqual(["PERMISSION_DENIED", "storage/unauthorized"]);
-  expect(await rest("GET", "states/audit246-denied")).toBeNull();
+  expect(await rest("GET", `states/${deniedVenue}`)).toBeNull();
   expect(await rest("GET", `audit/${venue}`)).toBeNull();
 });
 
 test("legacy file pairs and ad layouts backfill actual Storage generations while semantic overlays stay intact", async ({
   page,
+  nested,
 }) => {
+  const { rest, venue, bootstrap, settle, seedMedia } = nested;
   await bootstrap(page);
-  const stored = await page.evaluate(() => window.nestedHarness.seedMedia());
+  await settle(page);
+  const stored = await seedMedia();
   const file = (index: number) => ({
     name: stored.paths[index]!.split("/").pop()!,
     source: `gs://${namespace}.appspot.com/${stored.paths[index]}`,
@@ -804,7 +1154,9 @@ test("legacy file pairs and ad layouts backfill actual Storage generations while
       url: stored.mainScreenUrl,
     },
   };
-  await rest("PATCH", `states/${venue}/perimeter`, {
+  const rawPerimeter = record(await rest("GET", `states/${venue}/perimeter`));
+  await rest("PUT", `states/${venue}/perimeter`, {
+    ...rawPerimeter,
     overlay,
     adLayout: layout,
     mediaPairs: { [stored.pairId]: pair },

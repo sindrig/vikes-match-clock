@@ -123,6 +123,27 @@ Storage-generation backfill for saved pairs/ad layouts. Semantic version-2
 overlays pass through without file-generation lookups; version-1 files and the
 optional main-screen link retain their identities.
 
+Its fifteen serial registrations allocate case-owned venues, account and an
+ungranted negative destination. The immutable input tuple and actual served
+emulator target are admitted before fixture mutations; the canonical Database
+installer remains global and externally serialized. Trusted Storage seeding
+uses LocalFixture.uploadStorage for the original GIF bytes, while actual browser
+SDK URL/metadata/backfill operations and explicit read/write authorization
+controls remain real. Only resource roots are namespaced: raw roster children,
+rejected neighbors, logical IDs, metadata and generation content are preserved.
+
+The original rendered consumers use the writer's own SDK echoes and rollbacks.
+Test-only completion accounting observes original put/merge callbacks and helper
+promises, including separate lifecycle CAS audits. Void commands retain their
+return behavior; diagnostic resets cannot acknowledge pending work. Independent
+observer/anonymous contexts are created when required. One twenty-second finally
+deadline covers client drain, closure and owned cleanup; unknown completion or
+failed cleanup remains failed. See [fixture ownership and evidence limits](clock/testing.md#shared-fixture-ownership-and-emulator-guards).
+
+The earlier #246 qualification described below is historical. Fixture ownership
+and retirement changes need their own evidence and do not complete the deferred
+#232 global isolation, failure recovery or benchmark work.
+
 Firebase prunes null children and empty objects. For example, `name: {}` is
 delivered as absence and is a supported partial card, not a malformed present
 name. Browser malformed fixtures therefore use non-empty objects; untrusted
