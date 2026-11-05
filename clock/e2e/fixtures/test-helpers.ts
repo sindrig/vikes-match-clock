@@ -90,6 +90,15 @@ async function ensureEmulatorUser(): Promise<void> {
   await emulatorFixture.createUser(TEST_EMAIL, TEST_PASSWORD);
 }
 
+export function getOwnedScreenButton(page: Page) {
+  return page.getByRole("button", {
+    // Presence can arrive between visibility and click; only its badge may vary.
+    name: new RegExp(
+      `^${TEST_LOCATION_LABEL.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} Display 1(?: \\d+ tengd)?$`,
+    ),
+  });
+}
+
 export async function loginWithEmulatorUser(page: Page): Promise<void> {
   if (!verifiedPages.has(page)) {
     throw new Error(
@@ -112,12 +121,7 @@ export async function loginWithEmulatorUser(page: Page): Promise<void> {
     `auth/${uid}/${TEST_LISTEN_PREFIX}`,
     true,
   );
-  const screenButton = page.getByRole("button", {
-    // Presence can arrive between visibility and click; only its badge may vary.
-    name: new RegExp(
-      `^${TEST_LOCATION_LABEL.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} Display 1(?: \\d+ tengd)?$`,
-    ),
-  });
+  const screenButton = getOwnedScreenButton(page);
   await screenButton.waitFor({ state: "visible", timeout: 15000 });
   await screenButton.click();
   await page

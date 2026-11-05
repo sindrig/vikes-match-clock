@@ -1,9 +1,10 @@
 import {
-  test,
-  expect,
-  ensureEmulatorUser,
   clearEmulatorData,
+  ensureEmulatorUser,
+  expect,
+  getOwnedScreenButton,
   loginWithEmulatorUser,
+  test,
 } from "./fixtures/test-helpers";
 
 test.describe("Disconnect and logout", () => {
@@ -38,11 +39,9 @@ test.describe("Disconnect and logout", () => {
     });
 
     // Select the screen again
-    const screenButton = page.getByRole("button", {
-      name: /Test Location/,
-    });
+    const screenButton = getOwnedScreenButton(page);
     await screenButton.waitFor({ state: "visible", timeout: 15000 });
-    await screenButton.click({ force: true });
+    await screenButton.click();
 
     // Verify controller is loaded again
     await page

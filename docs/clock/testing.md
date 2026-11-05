@@ -170,11 +170,22 @@ Repeated owned account removal accepts only HTTP 400 with the exact Auth error
 fail cleanup. UID ownership is retained after Auth deletion so a later cleanup
 can retry a failed grant or admin-flag removal.
 
-The shared login helper selects the owned venue's `Display 1` with an escaped,
+The shared login and disconnect/reconnect journey use `getOwnedScreenButton`
+to select the owned venue's `Display 1` with an escaped,
 anchored accessible name that permits only the optional numeric `tengd`
 connection badge. Presence can change between visibility and click. Perimeter,
 `Display 10` and other venues remain outside that locator; independent display
 and controller contexts remain required.
+
+The two image-upload cases pass the original PNG bytes directly to Playwright
+as `{ name, mimeType, buffer }`. Each invocation names its file with the shared
+fixture id and a fresh UUID, so it creates no temporary PNG beside the spec and
+cannot reuse an earlier invocation's filename. The actual browser file input,
+FileUploader, optional compress.js branch, Storage SDK upload and filename
+listing assertions remain in the path. The tiny image and checked compression
+option do not measure compression ratio or independently prove that branch ran.
+This changes input ownership, not Firebase fixture scope: the venue/account
+remain worker-owned and uploaded media remains until worker teardown.
 
 `seedInvitations` writes only registered owned child keys. It never replaces or
 clears the invitations collection. The real admin callable still creates its
@@ -318,10 +329,16 @@ Focused fixture safety controls use a transport model and actual
 `functions/src/adminWrite.ts` source with injected in-memory Firebase
 dependencies and browser request events. They cover committed signup response
 loss, repeated/partial cleanup and a held post-authorization invitation commit.
-Selector controls execute the actual login function and `ScreenSelectorButton`
+Selector controls execute the actual login/locator functions, reconnect callback
+and `ScreenSelectorButton`
 source with its stylesheet at zero, one and two connections, including badge
 arrival between visibility and click and unrelated button decoys. These use a
 native DOM and modeled Page/presence hook; they are not real browser integration.
+Their negative controls execute broad-selector and forced-click mutations of the
+actual source. Image input controls execute the actual registered bodies to the
+payload and filename oracle with a modeled Page; forbidden filesystem writes,
+string-path uploads and timestamp-only collisions fail those controls. These
+models do not prove browser decoding, compression or successful SDK upload.
 Binary transport controls cover exact bytes/generations, foreign prefixes,
 malformed metadata, held/lost responses and failed cleanup. Declaration controls
 execute the actual perimeter spec sources with modeled Playwright/helper imports;
