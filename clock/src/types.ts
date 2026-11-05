@@ -298,14 +298,6 @@ export interface ViewState {
   homeTeamRevealBackground?: string | null;
 }
 
-// Remote state type
-export interface RemoteState {
-  sync: boolean;
-  listenPrefix: string;
-  email?: string;
-  password?: string;
-}
-
 // Firebase auth state type
 export interface FirebaseAuthState {
   isLoaded: boolean;
@@ -669,14 +661,4 @@ export interface PerimeterBrightnessStatus {
   // parses as "manual" for backward compatibility.
   mode: PerimeterBrightnessAutoMode;
   predicted?: PerimeterBrightnessPredicted;
-}
-
-// Root state type
-export interface RootState {
-  match: Match;
-  controller: ControllerState;
-  view: ViewState;
-  remote: RemoteState;
-  auth: FirebaseAuthState;
-  listeners: ListenersState;
 }
