@@ -19,6 +19,7 @@ import {
 // fixture-finally code, not Firebase services, Chromium or production providers.
 const read = (file) => readFileSync(new URL(file, import.meta.url), "utf8");
 const harnessSource = read("../e2e/fixtures/playback-occurrence-harness.tsx");
+const producerSource = read("../e2e/fixtures/fixture-sdk-producers.ts");
 const specSource = read("../e2e/playback-occurrences.spec.ts");
 const fixtureId = "0123456789-0-0123456789abcdef";
 const venue = `playback-${fixtureId}`;
@@ -130,7 +131,14 @@ function harnessModel({
     document: { getElementById: () => ({}) },
   };
   sandbox.exports = sandbox.module.exports;
+  const context = vm.createContext(sandbox);
+  const producerModule = vm.runInContext(
+    `(function () { const module = { exports: {} }; const exports = module.exports;\n${compile(producerSource)}\nreturn module.exports; })()`,
+    context,
+    { timeout: 1000 },
+  );
   const dependencies = {
+    "./fixture-sdk-producers": producerModule,
     "firebase/app": {
       deleteApp: async () => {
         effects.push("deleteApp");
@@ -222,10 +230,10 @@ function harnessModel({
       "import.meta.env.VITE_USE_EMULATOR",
       JSON.stringify(selected.compiledEmulator ? "true" : "false"),
     );
-    vm.runInNewContext(
+    vm.runInContext(
       compile(actual) +
-        "\nexports.Producers=PlaybackProducers;exports.renderBridge=Screen;exports.beforeDeadline=beforeDeadline;",
-      sandbox,
+        "\nexports.Producers=require('./fixture-sdk-producers').PlaybackProducers;exports.renderBridge=Screen;exports.beforeDeadline=require('./fixture-sdk-producers').beforeDeadline;",
+      context,
       { timeout: 1000 },
     );
   } catch (caught) {

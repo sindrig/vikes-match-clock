@@ -232,8 +232,8 @@ The specs never silently repair a missing or incorrect rules setup. Their
 browser SDK reads, immutable generations, pixel/timing assertions and separate
 controller/display contexts remain real integration boundaries.
 
-This is the conservative fixture slice of #232. The bespoke session, queue,
-nested-state and subscription-domain fixtures still have fixed roots
+This is the conservative fixture slice of #232. The bespoke session, queue
+and subscription-domain fixtures still have fixed roots
 and/or namespace-wide rule installs/overlays. Per-test media isolation, exclusive
 overlay lifecycles and worker-crash recovery remain follow-up work.
 One worker is the default everywhere. No two-worker safety, sharding/report
@@ -257,7 +257,10 @@ calculation refs. Real SDK hashes, datastale retries, local echoes/rollback,
 current-command stale-observation rejection, the old tuple-only writer limitation
 and actual native/GIF/YouTube-double media oracles remain intact.
 
-Playback-only instrumentation tracks original put/merge callbacks, explicit
+Playback instrumentation uses a small test-only completion ledger shared with
+nested-state. Its original deadline and producer implementation was relocated
+without changing callback ordering, fields, timers or failure semantics. It tracks
+original put/merge callbacks, explicit
 command/transaction promises and the separate CAS audit promise. A known denied
 write is terminal only after the actual SDK acknowledgement. Fixture retirement
 unmounts producers, releases original held sends, drains acknowledgements/audits
@@ -275,6 +278,41 @@ must explicitly omit callable/trigger claims. Use the host guard for the entire
 lifecycle, one worker/zero retries, canonical rules readback and real allow/deny
 controls. Preserve all 166 registrations and keep #232 open for remaining B2/C,
 controlled repetition, topology benchmarks, attributable reports and gate work.
+
+Nested-state's fifteen serial cases also use case-owned LocalFixture venues,
+account and an ungranted denial destination. The fixture validates one immutable
+query tuple and the actual compiled/served emulator target before prefix changes,
+SDK interception, provider mounting or login. A read-only target/tuple probe also
+precedes its namespace-global canonical Database rule installer. That installer
+still requires the external serialized lifecycle; venue ownership does not make
+rules installations or other suites' overlays concurrent-safe.
+
+The controller retains the original media, Team, substitution and MatchLifecycle
+consumers. On-demand observer and anonymous clients have independent browser
+contexts and no writable provider. The observer reads raw state and audit without
+supplying writer calculation refs. Render-bound command wrappers retain the
+original origin and void/promise behavior; actual SDK callbacks and audited-helper
+promises establish completion. Resetting wire diagnostics never resets the
+completion ledger. Retirement drains submitted writes and separate CAS audit
+tails while clients remain open, then closes contexts and removes owned resources
+under one shared twenty-second deadline. Failed or unknown completion remains a
+failure after closure, deletion or apparent absence.
+
+Nested's four original GIFs use LocalFixture.uploadStorage for trusted seeding;
+their root alone is namespaced. Pair IDs, raw roster child keys, rejected
+neighbors, logical player IDs, metadata and returned immutable generations retain
+their original meanings. Browser SDK download-URL and metadata reads still drive
+the actual four-file/two-file generation-backfill oracles. Trusted uploads do not
+prove client authorization: explicit authenticated SDK write/read and anonymous
+private read/list/write controls retain that boundary. Canonical Storage rules
+remain the launcher's responsibility; the fixture never repairs them.
+
+Native nested controls execute actual admission/harness/registration source with
+modeled dependencies. Keep that evidence distinct from actual-SDK models, normal
+hosted browser cases and targeted real failure controls. The shared extraction
+retains the original playback controls, including the fake-Date deadline running
+in the same VM realm. Preserve all 166 registrations and the nested layout/side/
+operation matrices. #232 remains open for the other fixtures and global B2/C work.
 
 Focused fixture safety controls use a transport model and actual
 `functions/src/adminWrite.ts` source with injected in-memory Firebase

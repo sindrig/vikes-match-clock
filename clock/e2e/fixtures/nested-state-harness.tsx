@@ -1,21 +1,16 @@
 // Local emulator-only entrypoint. No fixture is included in the live bundle.
-import { useLayoutEffect } from "react";
-import { createRoot } from "react-dom/client";
-import { deleteApp, initializeApp } from "firebase/app";
+import { deleteApp } from "firebase/app";
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { ref, set } from "firebase/database";
+import { goOffline, onValue, ref, set } from "firebase/database";
 import {
-  connectStorageEmulator,
-  getStorage,
+  getBytes,
+  listAll,
   ref as storageRef,
   uploadBytes,
 } from "firebase/storage";
+import { useLayoutEffect } from "react";
+import { createRoot, type Root } from "react-dom/client";
 
-import { app, auth, database, storageHelpers } from "../../src/firebase";
-import {
-  backfillOverlayGenerations,
-  backfillStorageGenerations,
-} from "../../src/perimeter/media";
 import {
   FirebaseStateProvider,
   useFirebaseState,
@@ -28,119 +23,434 @@ import Asset, {
   PlaybackAsset,
   useDeferredAsset,
 } from "../../src/controller/asset/Asset";
-import Team from "../../src/controller/asset/team/Team";
 import SubstitutionInfo from "../../src/controller/asset/queue/SubstitutionInfo";
+import Team from "../../src/controller/asset/team/Team";
+import {
+  app,
+  auth,
+  database,
+  storage,
+  storageHelpers,
+} from "../../src/firebase";
+import { firebaseDatabase } from "../../src/firebaseDatabase";
 import MatchLifecycle from "../../src/match/MatchLifecycle";
-
-if (app.options.projectId !== "vikes-match-clock-test")
-  throw new Error("This fixture requires local emulators");
+import {
+  backfillOverlayGenerations,
+  backfillStorageGenerations,
+} from "../../src/perimeter/media";
+import { beforeDeadline, PlaybackProducers } from "./fixture-sdk-producers";
+import {
+  assertNestedFixtureTarget,
+  nestedMediaPaths,
+  parseNestedFixtureInput,
+  type NestedFixtureInput,
+} from "./nested-fixture-input";
 
 type Api = ReturnType<typeof useFirebaseState>;
-let api: Api;
-let attempts = 0;
+type ServerCallback = (status: string, data?: unknown) => void;
+type ServerMethod = (
+  path: string,
+  data: unknown,
+  callback?: ServerCallback,
+  hash?: string,
+) => void;
+
+// Import exposes only provenance. Admission precedes ref/patch/prefix/mount/login.
+const input = parseNestedFixtureInput(new URL(window.location.href));
+const target = Object.freeze({
+  compiledEmulator: import.meta.env.VITE_USE_EMULATOR === "true",
+  projectId: app.options.projectId,
+  databaseURL: app.options.databaseURL,
+  storageBucket: app.options.storageBucket,
+  auth: auth.emulatorConfig,
+});
+const producers = new PlaybackProducers();
 const transport: Array<{
   method: "put" | "merge";
-  path: unknown;
+  path: string;
   data: unknown;
 }> = [];
-type Server = Record<"put" | "merge", (...args: unknown[]) => unknown>;
-// Observe the actual SDK transport, without replacing its authorization,
-// local echoes, transaction validation or server acknowledgements.
-ref(database);
-const server = (database as unknown as { _repoInternal: { server_: Server } })
-  ._repoInternal.server_;
-for (const method of ["put", "merge"] as const) {
-  const original = server[method].bind(server);
-  server[method] = (...args) => {
-    attempts += 1;
-    transport.push({ method, path: args[0], data: structuredClone(args[1]) });
-    return original(...args);
+const subscriptions: (() => void)[] = [];
+let api: Api | undefined;
+let root: Root | undefined;
+let initialized = false;
+let retiring = false;
+let disposed = false;
+let attempts = 0;
+let connected = false;
+let rawState: unknown = null;
+let rawAudit: unknown = null;
+let stateDeliveries = 0;
+let auditDeliveries = 0;
+let restore: () => void = () => undefined;
+let disposePromise: Promise<void> | undefined;
+
+function requireActive() {
+  if (!initialized || retiring)
+    throw new Error("Nested fixture is not active.");
+}
+function commands() {
+  requireActive();
+  if (input.role !== "controller" || !api)
+    throw new Error("No writable nested provider.");
+  return api;
+}
+function readFailed() {
+  producers.failures.push("Nested subscription cancelled.");
+  producers.changed();
+}
+function interceptSdk() {
+  ref(database);
+  const server = (
+    database as unknown as {
+      _repoInternal: { server_: { put: ServerMethod; merge: ServerMethod } };
+    }
+  )._repoInternal.server_;
+  if (typeof server.put !== "function" || typeof server.merge !== "function")
+    throw new Error("Unsupported nested SDK transport.");
+  const originalPut = server.put;
+  const originalMerge = server.merge;
+  for (const method of ["put", "merge"] as const) {
+    const original = server[method];
+    server[method] = (path, data, callback, hash) => {
+      if (typeof callback !== "function") {
+        producers.failures.push("Unobservable SDK submission.");
+        throw new Error("Nested SDK callback is required.");
+      }
+      attempts++;
+      transport.push({ method, path, data: structuredClone(data) });
+      const send = producers.send(method, path);
+      const wrapped: ServerCallback = function (
+        this: unknown,
+        status,
+        response,
+      ) {
+        if (
+          status !== "ok" &&
+          status !== "datastale" &&
+          !(
+            status === "permission_denied" &&
+            path.replace(/^\//, "") ===
+              `states/${input.deniedVenue}/controller/playing`
+          )
+        )
+          producers.failures.push("Unexpected SDK acknowledgement.");
+        producers.acknowledge(send, status, () =>
+          Reflect.apply(callback, this, [status, response]),
+        );
+      };
+      return Reflect.apply(original, server, [path, data, wrapped, hash]);
+    };
+  }
+  const originalAudited = firebaseDatabase.writeAudited;
+  const originalAuditOnly = firebaseDatabase.writeAuditOnly;
+  firebaseDatabase.writeAudited = (...args) =>
+    producers.track(() =>
+      Reflect.apply(originalAudited, firebaseDatabase, args),
+    );
+  firebaseDatabase.writeAuditOnly = (...args) =>
+    producers.track(
+      () => Reflect.apply(originalAuditOnly, firebaseDatabase, args),
+      true,
+    );
+  restore = () => {
+    server.put = originalPut;
+    server.merge = originalMerge;
+    firebaseDatabase.writeAudited = originalAudited;
+    firebaseDatabase.writeAuditOnly = originalAuditOnly;
   };
 }
+function trackCommands(value: Api): Api {
+  // Keep this render's functions: a retained intention never borrows a new origin.
+  return {
+    ...value,
+    editPlayer: (...args) => producers.invoke(() => value.editPlayer(...args)),
+    deletePlayer: (...args) =>
+      producers.invoke(() => value.deletePlayer(...args)),
+    addPlayer: (...args) => producers.invoke(() => value.addPlayer(...args)),
+    setRoster: (...args) => producers.invoke(() => value.setRoster(...args)),
+    clearRoster: (...args) =>
+      producers.invoke(() => value.clearRoster(...args)),
+    appendSubstitutionAndActivate: (...args) =>
+      producers.track(() => value.appendSubstitutionAndActivate(...args)),
+    updateQueueSettings: (...args) =>
+      producers.invoke(() => value.updateQueueSettings(...args)),
+    playQueue: (...args) => producers.invoke(() => value.playQueue(...args)),
+    completeAssetIfCurrent: (...args) =>
+      producers.track(() => value.completeAssetIfCurrent(...args)),
+    setPerimeterOverlay: (...args) =>
+      producers.track(() => value.setPerimeterOverlay(...args)),
+  };
+}
+function unauthorized(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    "code" in error &&
+    error.code === "storage/unauthorized"
+  );
+}
+function requireStorageRole(role: "controller" | "anonymous") {
+  requireActive();
+  if (
+    input.role !== role ||
+    (role === "anonymous" && auth.currentUser !== null)
+  )
+    throw new Error("Invalid nested Storage role.");
+}
+
 const harness = {
-  get commands() {
-    return api;
+  input,
+  target,
+  initialize(expected: NestedFixtureInput) {
+    assertNestedFixtureTarget(target);
+    const parsed = parseNestedFixtureInput(new URL(window.location.href));
+    if (
+      initialized ||
+      retiring ||
+      Object.keys(expected).length !== 4 ||
+      expected.fixtureId !== input.fixtureId ||
+      expected.venue !== input.venue ||
+      expected.deniedVenue !== input.deniedVenue ||
+      expected.role !== input.role ||
+      parsed.fixtureId !== input.fixtureId ||
+      parsed.venue !== input.venue ||
+      parsed.deniedVenue !== input.deniedVenue ||
+      parsed.role !== input.role
+    )
+      throw new Error("Nested fixture initialization mismatch.");
+    localStorage.setItem("clock_listenPrefix", input.venue);
+    initialized = true;
+    if (input.role === "controller") interceptSdk();
+    subscriptions.push(
+      onValue(
+        ref(database, ".info/connected"),
+        (snapshot) => {
+          connected = snapshot.val() === true;
+        },
+        readFailed,
+      ),
+    );
+    if (input.role === "observer") {
+      subscriptions.push(
+        onValue(
+          ref(database, `states/${input.venue}`),
+          (snapshot) => {
+            rawState = snapshot.val() as unknown;
+            stateDeliveries++;
+          },
+          readFailed,
+        ),
+      );
+    } else if (input.role === "controller") {
+      const element = document.getElementById("root");
+      if (!element) throw new Error("Missing nested fixture root.");
+      root = createRoot(element);
+      root.render(
+        <LocalStateProvider>
+          <Bridge />
+        </LocalStateProvider>,
+      );
+    }
   },
-  snapshot: () => ({
-    controller: api.controller,
-    match: api.match,
-    view: api.view,
-    perimeterOverlay: api.perimeterOverlay,
-    perimeterAdLayout: api.perimeterAdLayout,
-    mediaPairs: api.mediaPairs,
-    eligible: api.writeEligible,
+  get commands() {
+    return commands();
+  },
+  status: () => ({
+    eligible: api?.writeEligible ?? false,
+    uid: auth.currentUser?.uid ?? null,
+    connected,
+    rawState,
+    rawAudit,
+    stateDeliveries,
+    auditDeliveries,
     attempts,
     transport,
   }),
-  resetAttempts: () => {
+  snapshot() {
+    const value = commands();
+    return {
+      controller: value.controller,
+      match: value.match,
+      view: value.view,
+      perimeterOverlay: value.perimeterOverlay,
+      perimeterAdLayout: value.perimeterAdLayout,
+      mediaPairs: value.mediaPairs,
+      eligible: value.writeEligible,
+      attempts,
+      transport,
+    };
+  },
+  lifecycle: () => ({ ...producers.snapshot(), disposed }),
+  resetAttempts() {
+    requireActive();
+    const pending = producers.snapshot();
+    if (pending.pendingCommands || pending.pendingAudits || pending.pendingSdk)
+      throw new Error("Nested diagnostics still have submitted producers.");
     attempts = 0;
     transport.length = 0;
   },
-  login: (email: string, password: string) =>
-    signInWithEmailAndPassword(auth, email, password).then(() => undefined),
-  denied: () =>
-    set(ref(database, "states/audit246-denied/controller/playing"), true),
-  seedCurrent: (current: unknown) =>
-    set(ref(database, "states/audit246/controller/currentAsset"), current),
-  seedMedia: async () => {
-    const pairId = "11111111-1111-4111-8111-111111111111";
-    const paths = [
-      "audit246/perimeter/base-left.gif",
-      "audit246/perimeter/base-right.gif",
-      `audit246/perimeter-overlays/${pairId}/48/pair-left.gif`,
-      `audit246/perimeter-overlays/${pairId}/40/pair-right.gif`,
-    ];
-    const bytes = Uint8Array.from(
-      atob("R0lGODlhAQABAIAAAP8AAAAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw=="),
-      (char) => char.charCodeAt(0),
+  login(email: string, password: string, uid: string) {
+    requireActive();
+    if (
+      input.role === "anonymous" ||
+      email !== `e2e-nested-${input.fixtureId}@example.test`
+    )
+      throw new Error("Nested account does not belong to this fixture.");
+    return producers.track(async () => {
+      const result = await signInWithEmailAndPassword(auth, email, password);
+      if (result.user.uid !== uid || auth.currentUser?.uid !== uid)
+        throw new Error("Nested Auth identity mismatch.");
+      if (input.role === "observer")
+        subscriptions.push(
+          onValue(
+            ref(database, `audit/${input.venue}`),
+            (snapshot) => {
+              rawAudit = snapshot.val() as unknown;
+              auditDeliveries++;
+            },
+            readFailed,
+          ),
+        );
+    });
+  },
+  denied() {
+    commands();
+    const first = producers.sends.length;
+    return producers.track(
+      () =>
+        set(
+          ref(database, `states/${input.deniedVenue}/controller/playing`),
+          true,
+        ),
+      false,
+      (error) =>
+        error instanceof Error &&
+        /permission_denied/i.test(error.message) &&
+        producers.sends
+          .slice(first)
+          .some(
+            (send) =>
+              send.delivered &&
+              send.status === "permission_denied" &&
+              send.path.replace(/^\//, "") ===
+                `states/${input.deniedVenue}/controller/playing`,
+          ),
     );
-    const generations: Record<string, string> = {};
-    for (const path of paths) {
-      const result = await storageHelpers.uploadBytes(path, bytes, {
-        contentType: "image/gif",
-      });
-      generations[`gs://${app.options.storageBucket}/${path}`] =
-        result.metadata.generation;
-    }
-    return {
-      pairId,
-      paths,
-      generations,
-      mainScreenUrl: await storageHelpers.getDownloadURL(paths[0]!),
-    };
   },
-  qualifyMedia: async () => {
-    if (!api.perimeterOverlay || !api.perimeterAdLayout)
-      throw new Error("Expected saved media");
-    const reads: string[] = [];
-    const generation = async (source: string) => {
-      reads.push(source);
-      return (await storageHelpers.getMetadata(source)).generation;
-    };
-    return {
-      overlay: await backfillOverlayGenerations(
-        api.perimeterOverlay,
-        generation,
+  seedCurrent(current: unknown) {
+    commands();
+    return producers.track(() =>
+      set(
+        ref(database, `states/${input.venue}/controller/currentAsset`),
+        current,
       ),
-      layout: await backfillStorageGenerations(
-        api.perimeterAdLayout,
-        generation,
-      ),
-      reads,
-    };
+    );
   },
-  deniedStorage: async () => {
-    const anonymous = initializeApp(app.options, "audit246-anonymous");
-    try {
-      const storage = getStorage(anonymous);
-      connectStorageEmulator(storage, "127.0.0.1", 9199);
-      await uploadBytes(
-        storageRef(storage, "audit246/private/denied.txt"),
-        new Uint8Array([1]),
+  mediaUrl() {
+    requireStorageRole("controller");
+    return producers.track(() =>
+      storageHelpers.getDownloadURL(nestedMediaPaths(input)[0]),
+    );
+  },
+  qualifyMedia() {
+    const value = commands();
+    return producers.track(async () => {
+      if (!value.perimeterOverlay || !value.perimeterAdLayout)
+        throw new Error("Expected saved media");
+      const reads: string[] = [];
+      const generation = async (source: string) => {
+        reads.push(source);
+        return (await storageHelpers.getMetadata(source)).generation;
+      };
+      return {
+        overlay: await backfillOverlayGenerations(
+          value.perimeterOverlay,
+          generation,
+        ),
+        layout: await backfillStorageGenerations(
+          value.perimeterAdLayout,
+          generation,
+        ),
+        reads,
+      };
+    });
+  },
+  authorizedStorage() {
+    requireStorageRole("controller");
+    return producers.track(async () => {
+      const reference = storageRef(
+        storage,
+        `${input.venue}/private/authorization.txt`,
       );
-    } finally {
-      await deleteApp(anonymous);
-    }
+      const bytes = new Uint8Array([1]);
+      const result = await uploadBytes(reference, bytes);
+      return {
+        generation: result.metadata.generation,
+        bytes: [...new Uint8Array(await getBytes(reference))],
+      };
+    });
+  },
+  deniedStorage() {
+    requireStorageRole("anonymous");
+    return producers.track(
+      () =>
+        uploadBytes(
+          storageRef(storage, `${input.venue}/private/denied.txt`),
+          new Uint8Array([1]),
+        ),
+      false,
+      unauthorized,
+    );
+  },
+  privateRead() {
+    requireStorageRole("anonymous");
+    return producers.track(
+      () =>
+        getBytes(
+          storageRef(storage, `${input.venue}/private/authorization.txt`),
+        ),
+      false,
+      unauthorized,
+    );
+  },
+  privateList() {
+    requireStorageRole("anonymous");
+    return producers.track(
+      () => listAll(storageRef(storage, `${input.venue}/private`)),
+      false,
+      unauthorized,
+    );
+  },
+  publicRead() {
+    requireStorageRole("anonymous");
+    return producers.track(async () => [
+      ...new Uint8Array(
+        await getBytes(storageRef(storage, nestedMediaPaths(input)[0])),
+      ),
+    ]);
+  },
+  dispose(timeoutMs: number) {
+    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > 20000)
+      return Promise.reject(new Error("Invalid nested disposal bound."));
+    if (disposePromise) return disposePromise;
+    retiring = true;
+    const deadline = Date.now() + timeoutMs;
+    disposePromise = (async () => {
+      try {
+        root?.unmount();
+      } catch {
+        producers.failures.push("Nested provider unmount failed.");
+      } finally {
+        root = undefined;
+      }
+      await producers.drain(deadline);
+      subscriptions.splice(0).forEach((unsubscribe) => unsubscribe());
+      restore();
+      goOffline(database);
+      await beforeDeadline(deleteApp(app), deadline);
+      disposed = true;
+    })();
+    return disposePromise;
   },
 };
 declare global {
@@ -153,7 +463,7 @@ window.nestedHarness = harness;
 function Consumers() {
   const value = useFirebaseState();
   useLayoutEffect(() => {
-    api = value;
+    api = trackCommands(value);
   }, [value]);
   const current = useDeferredAsset(value.controller.currentAsset);
   return (
@@ -188,8 +498,3 @@ function Bridge() {
     </FirebaseStateProvider>
   );
 }
-createRoot(document.getElementById("root")!).render(
-  <LocalStateProvider>
-    <Bridge />
-  </LocalStateProvider>,
-);
