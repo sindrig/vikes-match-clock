@@ -154,9 +154,16 @@ Fixture REST requests use literal loopback endpoints, an explicit test namespace
 and bucket, bounded requests, checked response shapes/statuses and no redirects.
 Errors omit payloads, response bodies and tokens. Signup only handles the exact
 expected `EMAIL_EXISTS` response by signing the owned account in; other errors
-fail. Owner-token requests are trusted local setup/cleanup, never evidence of
-client authorization. No Firebase runtime endpoint override or relaxed rule is
-needed for these fixtures.
+fail. The fixture registers pending email ownership before signup transport.
+It rejects another signup for that email until the first outcome is resolved.
+If signup commits but its response is lost or invalid, teardown looks up that
+exact email through the checked local Auth API, validates the returned email
+and UID, then removes its grants, admin flag and Auth account by UID. It retains
+no password or ID token for cleanup and never resets global Auth. An absent or
+invalid lookup cannot certify that an uncertain signup will never commit;
+cleanup fails explicitly. Owner-token requests are trusted local setup/cleanup,
+never evidence of client authorization. No Firebase runtime endpoint override
+or relaxed rule is needed for these fixtures.
 
 `seedInvitations` writes only registered owned child keys. It never replaces or
 clears the invitations collection. The real admin callable still creates its
@@ -167,7 +174,21 @@ persisted true grants with an unrelated venue ordered before it. Another
 fixture's invitation and venue must survive setup and invitation teardown,
 including test failure paths.
 
-Worker teardown closes its browser contexts, then retires only its registered
+Fixture writes and signup calls register producers before transport. Shared
+helper pages also observe the actual SDK `adminWrite` submissions, without
+replacing the real callable. Admin invitation teardown and page teardown wait
+for those responses while the page is still open. After closing worker browser
+contexts, final cleanup drains submitted producers before its owned invitation
+discovery, so a late authorized handler's generated ID is included. A lost,
+aborted or malformed callable response leaves completion uncertain and fails
+cleanup; context closure or removal of an admin flag cannot prove that a
+previously authorized handler has finished. New fixture writes are rejected
+once final retirement starts. Each REST request is bounded to five seconds and
+final cleanup, including producer completion, shares a twenty-second bound.
+An unresolved producer or an exceeded bound is incomplete cleanup, even if
+best-effort removal finds no records.
+
+Worker teardown retires only its registered
 venue/state/audit/telemetry/presence children, account grants/admin flags/Auth
 users, invitation IDs and Storage object prefixes. Cleanup failures fail the
 worker; they are not silently ignored. `clearEmulatorData` remains the legacy
@@ -182,12 +203,21 @@ One worker is the default everywhere. No two-worker safety, sharding/report
 aggregation, repeated performance result or complete deployment gate is claimed.
 Keep #232 open for that follow-up.
 
-Focused fixture safety controls use a transport model, not mocked browser
-integration. From `clock/`, with Node 22:
+Focused fixture safety controls use a transport model and actual
+`functions/src/adminWrite.ts` source with injected in-memory Firebase
+dependencies and browser request events. They cover committed signup response
+loss and a held post-authorization invitation commit. These are source/model
+controls, not real emulator or browser integration. From `clock/`, with Node 22
+and Clock dependencies prepared:
 
 ```bash
-node --experimental-transform-types --test --test-concurrency=1 tests/local-fixture.test.mjs
+node --experimental-transform-types --test --test-concurrency=1 tests/local-fixture.test.mjs tests/fixture-cleanup-source.test.mjs
 ```
+
+These native controls and focused E2E typed lint remain manual checks, outside
+the current CI gates. The E2E TypeScript project has existing diagnostics and
+is not a passing whole-project type gate; check focused repairs without claiming
+that unrelated E2E/source typing is clean.
 
 Actual admin/callable and full-suite qualification needs owned Auth, Database,
 Storage and Functions services, canonical rules in the app namespace, and the

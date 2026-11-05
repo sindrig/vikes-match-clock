@@ -82,7 +82,7 @@ export function assertLocalFixtureUrl(value: string) {
       throw new Error("Refusing a different fixture Storage bucket.");
     }
   } else if (
-    !/^\/identitytoolkit\.googleapis\.com\/v1\/accounts:(signUp|signInWithPassword|delete)$/.test(
+    !/^\/identitytoolkit\.googleapis\.com\/v1\/accounts:(signUp|signInWithPassword|lookup|delete)$/.test(
       url.pathname,
     ) ||
     url.search !== "?key=test-api-key"
@@ -92,7 +92,25 @@ export function assertLocalFixtureUrl(value: string) {
 }
 
 type Method = "DELETE" | "GET" | "PUT";
-type Account = { email: string; idToken: string };
+type Account = { email: string };
+type Producer = { finished: Promise<void>; accountEmail?: string };
+
+async function bounded<T>(operation: Promise<T>, deadline: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      operation,
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(
+          () => reject(new Error("Local fixture completion deadline expired.")),
+          Math.max(0, deadline - Date.now()),
+        );
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
 export type Invitation = {
   email: string;
   locations: Record<string, boolean>;
@@ -106,6 +124,9 @@ export class LocalFixture {
   private readonly emails = new Set<string>();
   private readonly accounts = new Map<string, Account>();
   private readonly invitationIds = new Set<string>();
+  private readonly pendingAccounts = new Set<string>();
+  private readonly producers = new Set<Producer>();
+  private retiring = false;
   private cleanupDeadline: number | undefined;
 
   constructor(
@@ -117,6 +138,7 @@ export class LocalFixture {
   }
 
   venue(label = "test-location") {
+    this.requireActive();
     if (!/^[A-Za-z0-9_-]{1,24}$/.test(label)) {
       throw new Error("Invalid fixture venue label.");
     }
@@ -126,6 +148,7 @@ export class LocalFixture {
   }
 
   email(role: string) {
+    this.requireActive();
     if (!/^[a-z0-9-]{1,24}$/.test(role)) {
       throw new Error("Invalid fixture account role.");
     }
@@ -135,12 +158,109 @@ export class LocalFixture {
   }
 
   invitationKey(role: string) {
+    this.requireActive();
     if (!/^[a-z0-9-]{1,24}$/.test(role)) {
       throw new Error("Invalid fixture invitation role.");
     }
     const id = `inv-${this.id}-${role}`;
     this.invitationIds.add(id);
     return id;
+  }
+
+  private requireActive() {
+    if (this.retiring) throw new Error("Local fixture is retiring.");
+  }
+
+  // Register before invoking transport. Rejection is ambiguous: the server can
+  // still commit after the caller loses its response. Only completion (or exact
+  // owned-account reconciliation) removes a producer from the barrier.
+  private async produce<T>(
+    action: () => Promise<T>,
+    accountEmail?: string,
+  ): Promise<T> {
+    this.requireActive();
+    let finish: (() => void) | undefined;
+    const producer: Producer = {
+      finished: new Promise<void>((resolve) => {
+        finish = resolve;
+      }),
+      accountEmail,
+    };
+    this.producers.add(producer);
+    try {
+      const result = await action();
+      this.producers.delete(producer);
+      return result;
+    } finally {
+      finish?.();
+    }
+  }
+
+  async trackMutation<T>(action: () => Promise<T>): Promise<T> {
+    if (this.retiring) {
+      // A browser request observed after retirement began is already submitted.
+      // Rejecting its observer cannot revoke it: retain an unresolved producer.
+      this.producers.add({ finished: Promise.resolve() });
+      throw new Error(
+        "Local fixture is retiring; submitted work is unresolved.",
+      );
+    }
+    return this.produce(action);
+  }
+
+  async settleMutations(timeoutMs = 20000) {
+    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > 20000)
+      throw new Error("Invalid local fixture completion bound.");
+    const deadline = Math.min(
+      Date.now() + timeoutMs,
+      this.cleanupDeadline ?? Infinity,
+    );
+    // Keep observing additions while the still-open page finishes submissions.
+    let observed: Producer[];
+    do {
+      observed = [...this.producers];
+      await bounded(
+        Promise.all(observed.map((item) => item.finished)),
+        deadline,
+      );
+    } while ([...this.producers].some((item) => !observed.includes(item)));
+    await bounded(this.reconcileAccounts(), deadline);
+    if (this.producers.size)
+      throw new Error(
+        "Local fixture cleanup incomplete: unresolved submitted mutation.",
+      );
+  }
+
+  private async reconcileAccounts() {
+    for (const email of this.pendingAccounts) {
+      const result = await this.send(
+        `${authOrigin}/identitytoolkit.googleapis.com/v1/accounts:lookup?key=test-api-key`,
+        "POST",
+        { email: [email] },
+        true,
+      );
+      if (result.status !== 200)
+        throw new Error(`Local fixture Auth lookup: HTTP ${result.status}.`);
+      const users = record(result.body).users ?? [];
+      if (!Array.isArray(users) || users.length > 1)
+        throw new Error("Invalid local fixture Auth lookup response.");
+      // Absence cannot prove a lost signup will never commit. Leave its producer
+      // unresolved and fail cleanup instead of declaring that no account exists.
+      if (users.length === 0) continue;
+      const account = record(users[0]);
+      if (
+        account.email !== email ||
+        typeof account.localId !== "string" ||
+        !keyPattern.test(account.localId) ||
+        (this.accounts.has(account.localId) &&
+          this.accounts.get(account.localId)?.email !== email)
+      )
+        throw new Error("Refusing an unowned fixture Auth lookup result.");
+      this.accounts.set(account.localId, { email });
+      this.pendingAccounts.delete(email);
+      for (const producer of this.producers)
+        if (producer.accountEmail === email) this.producers.delete(producer);
+    }
   }
 
   private async send(
@@ -159,25 +279,29 @@ export class LocalFixture {
     );
     if (timeout <= 0)
       throw new Error("Local fixture cleanup deadline expired.");
-    let response: Response;
     try {
-      response = await this.transport(url, {
-        method,
-        redirect: "manual",
-        signal: AbortSignal.timeout(timeout),
-        headers: {
-          "Content-Type": "application/json",
-          ...(owner ? { Authorization: "Bearer owner" } : {}),
-        },
-        ...(data === undefined ? {} : { body: JSON.stringify(data) }),
-      });
-      if (response.status >= 300 && response.status < 400) {
-        throw new Error("redirect");
-      }
-      const text = await response.text();
-      if (text.length > 1024 * 1024) throw new Error("oversized response");
-      const body: unknown = text ? JSON.parse(text) : null;
-      return { status: response.status, body };
+      return await bounded(
+        (async () => {
+          const response = await this.transport(url, {
+            method,
+            redirect: "manual",
+            signal: AbortSignal.timeout(timeout),
+            headers: {
+              "Content-Type": "application/json",
+              ...(owner ? { Authorization: "Bearer owner" } : {}),
+            },
+            ...(data === undefined ? {} : { body: JSON.stringify(data) }),
+          });
+          if (response.status >= 300 && response.status < 400) {
+            throw new Error("redirect");
+          }
+          const text = await response.text();
+          if (text.length > 1024 * 1024) throw new Error("oversized response");
+          const body: unknown = text ? JSON.parse(text) : null;
+          return { status: response.status, body };
+        })(),
+        Date.now() + timeout,
+      );
     } catch {
       // Never echo transport messages, response bodies, tokens or request payloads.
       throw new Error(`Local fixture ${method} transport/response failed.`);
@@ -189,6 +313,12 @@ export class LocalFixture {
     path: string,
     data?: unknown,
   ): Promise<unknown> {
+    this.assertDatabasePath(method, path);
+    if (method === "GET") return this.databaseRequest(method, path, data);
+    return this.produce(() => this.databaseRequest(method, path, data));
+  }
+
+  private assertDatabasePath(method: Method, path: string) {
     const [area, child, ...rest] = path.split("/");
     const globalInvitationRead = method === "GET" && path === "invitations";
     const owned =
@@ -206,6 +336,14 @@ export class LocalFixture {
         "Refusing a fixture database path outside owned children.",
       );
     }
+  }
+
+  private async databaseRequest(
+    method: Method,
+    path: string,
+    data?: unknown,
+  ): Promise<unknown> {
+    this.assertDatabasePath(method, path);
     const result = await this.send(
       `${databaseOrigin}/${path}.json?ns=${EMULATOR_PROJECT}`,
       method,
@@ -221,39 +359,48 @@ export class LocalFixture {
   }
 
   async createUser(email: string, password: string): Promise<string> {
+    this.requireActive();
     if (!this.emails.has(email)) {
       throw new Error("Refusing an account outside owned fixture emails.");
     }
-    const authUrl = (action: string) =>
-      `${authOrigin}/identitytoolkit.googleapis.com/v1/accounts:${action}?key=test-api-key`;
-    const data = { email, password, returnSecureToken: true };
-    let result = await this.send(authUrl("signUp"), "POST", data);
-    if (result.status === 400) {
-      const error = record(record(result.body).error);
-      if (error.message === "EMAIL_EXISTS") {
-        result = await this.send(authUrl("signInWithPassword"), "POST", data);
+    if (this.pendingAccounts.has(email)) {
+      throw new Error("Local fixture account creation is unresolved.");
+    }
+    this.pendingAccounts.add(email);
+    return this.produce(async () => {
+      const authUrl = (action: string) =>
+        `${authOrigin}/identitytoolkit.googleapis.com/v1/accounts:${action}?key=test-api-key`;
+      const data = { email, password, returnSecureToken: true };
+      let result = await this.send(authUrl("signUp"), "POST", data);
+      if (result.status === 400) {
+        const error = record(record(result.body).error);
+        if (error.message === "EMAIL_EXISTS") {
+          result = await this.send(authUrl("signInWithPassword"), "POST", data);
+        }
       }
-    }
-    if (result.status !== 200) {
-      throw new Error(
-        `Local fixture Auth signup/login: HTTP ${result.status}.`,
-      );
-    }
-    const account = record(result.body);
-    if (
-      typeof account.localId !== "string" ||
-      !keyPattern.test(account.localId) ||
-      typeof account.idToken !== "string" ||
-      !account.idToken ||
-      account.email !== email
-    ) {
-      throw new Error("Invalid local fixture Auth account response.");
-    }
-    this.accounts.set(account.localId, { email, idToken: account.idToken });
-    return account.localId;
+      if (result.status !== 200) {
+        throw new Error(
+          `Local fixture Auth signup/login: HTTP ${result.status}.`,
+        );
+      }
+      const account = record(result.body);
+      if (
+        typeof account.localId !== "string" ||
+        !keyPattern.test(account.localId) ||
+        typeof account.idToken !== "string" ||
+        !account.idToken ||
+        account.email !== email
+      ) {
+        throw new Error("Invalid local fixture Auth account response.");
+      }
+      this.accounts.set(account.localId, { email });
+      this.pendingAccounts.delete(email);
+      return account.localId;
+    }, email);
   }
 
   async seedInvitations(invitations: Record<string, Invitation>) {
+    this.requireActive();
     // Validate the whole batch before the first write; never PUT the collection.
     for (const [id, invitation] of Object.entries(invitations)) {
       if (
@@ -264,9 +411,11 @@ export class LocalFixture {
         throw new Error("Refusing an invitation outside fixture ownership.");
       }
     }
-    for (const [id, invitation] of Object.entries(invitations)) {
-      await this.database("PUT", `invitations/${id}`, invitation);
-    }
+    await this.produce(async () => {
+      for (const [id, invitation] of Object.entries(invitations)) {
+        await this.databaseRequest("PUT", `invitations/${id}`, invitation);
+      }
+    });
   }
 
   async invitations(): Promise<Record<string, Invitation>> {
@@ -351,8 +500,11 @@ export class LocalFixture {
     throw new Error("Local fixture Storage pagination exceeded its bound.");
   }
 
-  async cleanup() {
-    this.cleanupDeadline = Date.now() + 20000;
+  async cleanup(timeoutMs = 20000) {
+    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > 20000)
+      throw new Error("Invalid local fixture cleanup bound.");
+    this.retiring = true;
+    this.cleanupDeadline = Date.now() + timeoutMs;
     const failures: string[] = [];
     const attempt = async (action: () => Promise<unknown>) => {
       try {
@@ -363,9 +515,12 @@ export class LocalFixture {
         );
       }
     };
+    await attempt(() => this.settleMutations(timeoutMs));
+    // The final owned discovery follows producer completion, including generated
+    // invitation IDs. An unresolved producer above always makes cleanup fail.
     await attempt(() => this.invitations());
     for (const id of this.invitationIds)
-      await attempt(() => this.database("DELETE", `invitations/${id}`));
+      await attempt(() => this.databaseRequest("DELETE", `invitations/${id}`));
     for (const venue of this.venues) {
       for (const area of [
         "states",
@@ -374,22 +529,27 @@ export class LocalFixture {
         "perimeter",
         "presence",
       ])
-        await attempt(() => this.database("DELETE", `${area}/${venue}`));
+        await attempt(() => this.databaseRequest("DELETE", `${area}/${venue}`));
       await attempt(() => this.deleteStorage(venue));
     }
-    for (const [uid, account] of this.accounts) {
+    for (const uid of this.accounts.keys()) {
       for (const area of ["auth", "admins"])
-        await attempt(() => this.database("DELETE", `${area}/${uid}`));
+        await attempt(() => this.databaseRequest("DELETE", `${area}/${uid}`));
       await attempt(async () => {
         const result = await this.send(
           `${authOrigin}/identitytoolkit.googleapis.com/v1/accounts:delete?key=test-api-key`,
           "POST",
-          { idToken: account.idToken },
+          { localId: uid },
+          true,
         );
         if (result.status !== 200)
           throw new Error(`Local fixture Auth delete: HTTP ${result.status}.`);
       });
     }
+    if (this.producers.size)
+      failures.push(
+        "Local fixture cleanup incomplete: unresolved submitted mutation.",
+      );
     if (failures.length) throw new Error(failures.join("\n"));
   }
 }

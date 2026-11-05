@@ -1,5 +1,6 @@
 import { expect, test as base, type Page, type Route } from "@playwright/test";
 
+import { observeFixtureMutations } from "./fixture-mutations";
 import {
   assertBrowserEmulatorTarget,
   initializeExecutionToken,
@@ -172,8 +173,14 @@ export const test = base.extend<
   ],
   page: async ({ page, ownedResources }, provide) => {
     expect(ownedResources).toBe(emulatorFixture);
+    observeFixtureMutations(page, ownedResources);
     await verifyServedEmulators(page);
-    await provide(page);
+    try {
+      await provide(page);
+    } finally {
+      // Drain while the page can still receive the actual callable response.
+      await ownedResources.settleMutations();
+    }
   },
   clockPage: async ({ page }, provide) => {
     await page.addInitScript(() => {

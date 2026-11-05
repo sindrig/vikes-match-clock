@@ -67,9 +67,19 @@ function model() {
       objects.delete(name);
       return new Response(null, { status: 204 });
     }
+    if (url.pathname.endsWith(":lookup")) {
+      assert.equal(init.headers.Authorization, "Bearer owner");
+      assert.deepEqual(Object.keys(data), ["email"]);
+      return json({
+        users: [...accounts.values()].filter((account) =>
+          data.email.includes(account.email),
+        ),
+      });
+    }
     if (url.pathname.endsWith(":delete")) {
+      assert.equal(init.headers.Authorization, "Bearer owner");
       for (const [email, account] of accounts) {
-        if (account.idToken === data.idToken) accounts.delete(email);
+        if (account.localId === data.localId) accounts.delete(email);
       }
       return json({});
     }
@@ -403,4 +413,217 @@ test("Storage cleanup rejects a foreign object returned by a faulty listing", as
         new URL(request.url).port === "9199" && request.method === "DELETE",
     ),
   );
+});
+
+test("transport model: committed signup response loss reconciles UID, grants and admin records", async (t) => {
+  enableEmulator(t);
+  for (const loss of ["transport", "parse", "shape"]) {
+    const server = model();
+    const foreign = new LocalFixture(
+      "signup-loss-foreign",
+      "0",
+      server.transport,
+    );
+    const foreignEmail = foreign.email("operator");
+    const foreignUid = await foreign.createUser(foreignEmail, "synthetic");
+    await foreign.database("PUT", `admins/${foreignUid}`, true);
+    const fixture = new LocalFixture("signup-loss", "0", async (url, init) => {
+      const response = await server.transport(url, init);
+      if (url.includes(":signUp")) {
+        const account = server.accounts.get(JSON.parse(init.body).email);
+        server.database.set(`auth/${account.localId}`, { owned: true });
+        server.database.set(`admins/${account.localId}`, true);
+        if (loss === "transport") throw new Error("private-response-loss");
+        if (loss === "parse") return new Response("private-invalid-json");
+        return json({ email: account.email, localId: "invalid/uid" });
+      }
+      return response;
+    });
+    const email = fixture.email("operator");
+    await assert.rejects(fixture.createUser(email, "synthetic"), (error) => {
+      assert(!error.message.includes("private"));
+      return true;
+    });
+    assert(server.accounts.has(email), "signup committed before response loss");
+    await fixture.cleanup();
+    assert.deepEqual([...server.accounts.keys()], [foreignEmail]);
+    assert.deepEqual([...server.database], [[`admins/${foreignUid}`, true]]);
+    const lookups = server.requests.filter((request) =>
+      request.url.includes(":lookup"),
+    );
+    assert.deepEqual(
+      lookups.map((request) => request.data),
+      [{ email: [email] }],
+    );
+    assert(
+      !server.requests.some((request) => request.url.includes("/emulator/")),
+    );
+  }
+});
+
+test("transport model: an absent account cannot settle an ambiguous signup", async (t) => {
+  enableEmulator(t);
+  const server = model();
+  const fixture = new LocalFixture("signup-absent", "0", (url, init) => {
+    if (url.includes(":signUp")) return Promise.reject(new Error("private"));
+    return server.transport(url, init);
+  });
+  await assert.rejects(
+    fixture.createUser(fixture.email("operator"), "synthetic"),
+  );
+  await assert.rejects(
+    fixture.cleanup(),
+    /cleanup incomplete.*unresolved submitted mutation/,
+  );
+  assert.equal(server.accounts.size, 0);
+});
+
+test("transport model: uncertain signup lookup rejects foreign identities and checked API failures", async (t) => {
+  enableEmulator(t);
+  for (const lookup of [
+    json({ users: [{ email: "foreign@example.test", localId: "foreign" }] }),
+    json({ users: [{ email: "foreign@example.test", localId: "../foreign" }] }),
+    json({ users: [{}, {}] }),
+    json({ private: "private-response" }, 503),
+    new Response("private-invalid-json"),
+  ]) {
+    const server = model();
+    const fixture = new LocalFixture("bad-lookup", "0", (url, init) => {
+      if (url.includes(":signUp")) return Promise.reject(new Error("private"));
+      if (url.includes(":lookup")) return Promise.resolve(lookup);
+      return server.transport(url, init);
+    });
+    await assert.rejects(
+      fixture.createUser(fixture.email("operator"), "synthetic"),
+    );
+    await assert.rejects(fixture.cleanup(), (error) => {
+      assert(!error.message.includes("private"));
+      return /fixture/.test(error.message);
+    });
+    assert(!server.requests.some((request) => request.url.includes(":delete")));
+  }
+});
+
+test("transport model: teardown waits for a submitted signup before reconciling its lost response", async (t) => {
+  enableEmulator(t);
+  const server = model();
+  const committed = Promise.withResolvers();
+  const release = Promise.withResolvers();
+  const fixture = new LocalFixture(
+    "signup-late-loss",
+    "0",
+    async (url, init) => {
+      const response = await server.transport(url, init);
+      if (url.includes(":signUp")) {
+        committed.resolve();
+        await release.promise;
+        throw new Error("private-response-loss");
+      }
+      return response;
+    },
+  );
+  const email = fixture.email("operator");
+  const signup = assert.rejects(fixture.createUser(email, "synthetic"));
+  await committed.promise;
+  const cleanup = fixture.cleanup();
+  await new Promise(setImmediate);
+  const discoveredEarly = server.requests.some((request) =>
+    request.url.includes("/invitations.json"),
+  );
+  release.resolve();
+  await signup;
+  await cleanup;
+  assert.equal(
+    discoveredEarly,
+    false,
+    "discovery must follow submitted signup completion",
+  );
+  assert.equal(server.accounts.size, 0);
+});
+
+test("transport model: a submitted mutation that cannot finish fails the bounded teardown", async (t) => {
+  enableEmulator(t);
+  const server = model();
+  const fixture = new LocalFixture("unsettled", "0", server.transport);
+  const release = Promise.withResolvers();
+  const producer = fixture.trackMutation(() => release.promise);
+  const cleanup = fixture.cleanup(30);
+  await assert.rejects(cleanup, /completion deadline expired/);
+  release.resolve();
+  await producer;
+  const before = server.requests.length;
+  assert.throws(() => fixture.venue(), /retiring/);
+  await assert.rejects(fixture.database("PUT", "states/foreign", {}));
+  await assert.rejects(
+    fixture.trackMutation(() => server.transport("unused", {})),
+    /retiring/,
+  );
+  assert.equal(server.requests.length, before);
+});
+
+test("transport model: ambiguous mutation response fails cleanup even if discovery is empty", async (t) => {
+  enableEmulator(t);
+  const server = model();
+  const fixture = new LocalFixture("ambiguous", "0", server.transport);
+  await assert.rejects(
+    fixture.trackMutation(() => Promise.reject(new Error("private"))),
+  );
+  await assert.rejects(
+    fixture.cleanup(),
+    /cleanup incomplete.*unresolved submitted mutation/,
+  );
+});
+
+test("transport model: teardown drains an entire submitted seed batch before final discovery", async (t) => {
+  enableEmulator(t);
+  const server = model();
+  const entered = Promise.withResolvers();
+  const release = Promise.withResolvers();
+  let first = true;
+  const fixture = new LocalFixture("seed-late", "0", async (url, init) => {
+    if (init.method === "PUT" && first) {
+      first = false;
+      entered.resolve();
+      await release.promise;
+    }
+    return server.transport(url, init);
+  });
+  const invitation = {
+    email: fixture.email("invitee"),
+    createdBy: fixture.email("admin"),
+    createdAt: 1,
+    locations: {},
+  };
+  const batch = fixture.seedInvitations({
+    [fixture.invitationKey("first")]: invitation,
+    [fixture.invitationKey("last")]: invitation,
+  });
+  await entered.promise;
+  const cleanup = fixture.cleanup();
+  await new Promise(setImmediate);
+  assert.equal(server.requests.length, 0);
+  release.resolve();
+  await batch;
+  await cleanup;
+  assert.equal(server.database.size, 0);
+});
+
+test("transport model: an unresolved signup cannot start another producer for the same email", async (t) => {
+  enableEmulator(t);
+  const server = model();
+  const fixture = new LocalFixture("signup-retry", "0", async (url, init) => {
+    const response = await server.transport(url, init);
+    if (url.includes(":signUp")) throw new Error("private-response-loss");
+    return response;
+  });
+  const email = fixture.email("operator");
+  await assert.rejects(fixture.createUser(email, "synthetic"));
+  const before = server.requests.length;
+  await assert.rejects(
+    fixture.createUser(email, "synthetic"),
+    /creation is unresolved/,
+  );
+  assert.equal(server.requests.length, before);
+  await fixture.cleanup();
+  assert.equal(server.accounts.size, 0);
 });

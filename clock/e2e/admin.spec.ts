@@ -92,6 +92,7 @@ test.describe("Admin portal", () => {
 
   test.afterEach(async () => {
     try {
+      await emulatorFixture.settleMutations();
       for (const id of Object.keys(await emulatorFixture.invitations())) {
         await emulatorFixture.database("DELETE", `invitations/${id}`);
       }
