@@ -268,6 +268,7 @@ export class LocalFixture {
     method: string,
     data?: unknown,
     owner = false,
+    binary?: Uint8Array<ArrayBuffer>,
   ): Promise<{ status: number; body: unknown }> {
     requireEmulatorSelection();
     assertLocalFixtureUrl(url);
@@ -287,10 +288,15 @@ export class LocalFixture {
             redirect: "manual",
             signal: AbortSignal.timeout(timeout),
             headers: {
-              "Content-Type": "application/json",
+              "Content-Type":
+                binary === undefined
+                  ? "application/json"
+                  : "application/octet-stream",
               ...(owner ? { Authorization: "Bearer owner" } : {}),
             },
-            ...(data === undefined ? {} : { body: JSON.stringify(data) }),
+            ...(data === undefined && binary === undefined
+              ? {}
+              : { body: binary ?? JSON.stringify(data) }),
           });
           if (response.status >= 300 && response.status < 400) {
             throw new Error("redirect");
@@ -461,6 +467,60 @@ export class LocalFixture {
       });
     }
     return Object.fromEntries(owned);
+  }
+
+  // Trusted fixture seeding only; canonical rules belong to the launcher.
+  // Observe the actual acknowledgement before retiring this upload's producer.
+  async uploadStorage(path: string, bytes: Uint8Array): Promise<string> {
+    this.requireActive();
+    requireEmulatorSelection();
+    if (typeof path !== "string") {
+      throw new Error("Refusing a Storage upload outside owned children.");
+    }
+    const [venue, ...children] = path.split("/");
+    if (
+      !venue ||
+      !this.venues.has(venue) ||
+      children.length === 0 ||
+      path.length > 1024 ||
+      children.some(
+        (child) =>
+          child.length === 0 ||
+          /[^A-Za-z0-9_.-]/.test(child) ||
+          child === "." ||
+          child === "..",
+      )
+    ) {
+      throw new Error("Refusing a Storage upload outside owned children.");
+    }
+    if (!(bytes instanceof Uint8Array) || bytes.byteLength === 0) {
+      throw new Error("Invalid local fixture Storage bytes.");
+    }
+    const body = Uint8Array.from(bytes);
+    return this.produce(async () => {
+      const result = await this.send(
+        `${storageOrigin}/v0/b/${bucket}/o?name=${encodeURIComponent(path)}`,
+        "POST",
+        undefined,
+        true,
+        body,
+      );
+      if (result.status !== 200) {
+        throw new Error(`Local fixture Storage upload: HTTP ${result.status}.`);
+      }
+      const metadata = record(result.body);
+      if (
+        metadata.name !== path ||
+        metadata.bucket !== bucket ||
+        typeof metadata.generation !== "string" ||
+        metadata.generation.length === 0 ||
+        metadata.generation.length > 128 ||
+        /[^0-9]/.test(metadata.generation)
+      ) {
+        throw new Error("Invalid local fixture Storage upload metadata.");
+      }
+      return metadata.generation;
+    });
   }
 
   private async deleteStorage(venue: string) {

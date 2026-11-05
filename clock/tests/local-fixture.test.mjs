@@ -29,11 +29,17 @@ function model() {
   const objects = new Map();
   const accounts = new Map();
   const requests = [];
+  let generation = 1700000000000;
   const transport = async (value, init) => {
     assert.equal(init.redirect, "manual");
     assert(init.signal instanceof AbortSignal);
     const url = new URL(value);
-    const data = init.body === undefined ? undefined : JSON.parse(init.body);
+    const data =
+      init.body === undefined
+        ? undefined
+        : url.port === "9199" && init.method === "POST"
+          ? Uint8Array.from(init.body)
+          : JSON.parse(init.body);
     requests.push({ url: value, method: init.method, data });
     if (url.port === "9000") {
       assert.equal(init.headers.Authorization, "Bearer owner");
@@ -66,6 +72,18 @@ function model() {
       return json(null);
     }
     if (url.port === "9199") {
+      if (init.method === "POST") {
+        assert.equal(init.headers.Authorization, "Bearer owner");
+        assert.equal(init.headers["Content-Type"], "application/octet-stream");
+        const name = url.searchParams.get("name");
+        const metadata = {
+          name,
+          bucket: "vikes-match-clock-test.appspot.com",
+          generation: String(generation++),
+        };
+        objects.set(name, { ...metadata, bytes: [...data] });
+        return json(metadata);
+      }
       const prefix = url.searchParams.get("prefix");
       if (init.method === "GET")
         return json({
@@ -929,4 +947,276 @@ test("transport model: an unresolved signup cannot start another producer for th
   assert.equal(server.requests.length, before);
   await fixture.cleanup();
   assert.equal(server.accounts.size, 0);
+});
+
+// Binary upload controls use the same transport model, not real Storage/rules.
+test("Storage upload model: exact bytes and returned generation survive while foreign objects remain owned separately", async (t) => {
+  enableEmulator(t);
+  const server = model();
+  const fixture = new LocalFixture("binary-upload", "0", server.transport);
+  const foreign = new LocalFixture("binary-upload", "0", server.transport);
+  const venue = fixture.venue();
+  const other = foreign.venue();
+  const foreignPath = `${other}/perimeter/keep.png`;
+  const foreignGeneration = await foreign.uploadStorage(
+    foreignPath,
+    new Uint8Array([7, 8, 9]),
+  );
+  // A separate modeled owner holds this prefix neighbor, outside both ledgers.
+  const neighbor = `${venue}-neighbor/perimeter/keep.png`;
+  server.objects.set(neighbor, { bytes: [6], generation: "123" });
+  const foreignBefore = [...server.objects];
+  const path = `${venue}/perimeter/exact.png`;
+  const backing = new Uint8Array([99, 0, 255, 34, 10, 128, 77]);
+  const upload = fixture.uploadStorage(path, backing.subarray(1, -1));
+  backing.fill(4);
+  const generation = await upload;
+  assert.equal(generation, "1700000000001");
+  assert.deepEqual(server.objects.get(path), {
+    name: path,
+    bucket: "vikes-match-clock-test.appspot.com",
+    generation,
+    bytes: [0, 255, 34, 10, 128],
+  });
+  await fixture.cleanup();
+  await fixture.cleanup();
+  assert.deepEqual([...server.objects], foreignBefore);
+  assert.equal(server.objects.get(foreignPath).generation, foreignGeneration);
+  await foreign.cleanup();
+  assert.deepEqual(
+    [...server.objects],
+    [[neighbor, { bytes: [6], generation: "123" }]],
+  );
+});
+
+test("Storage upload model: invalid and foreign paths reject before transport or producer registration", async (t) => {
+  enableEmulator(t);
+  const server = model();
+  const fixture = new LocalFixture("upload-boundary", "0", server.transport);
+  const venue = fixture.venue();
+  for (const path of [
+    undefined,
+    null,
+    7,
+    "",
+    venue,
+    `${venue}/`,
+    `${venue}-neighbor/perimeter/a.png`,
+    `foreign/${venue}/a.png`,
+    `/${venue}/perimeter/a.png`,
+    `gs://vikes-match-clock-test.appspot.com/${venue}/a.png`,
+    `http://127.0.0.1:9199/${venue}/a.png`,
+    `${venue}/../foreign/a.png`,
+    `${venue}/./a.png`,
+    `${venue}//a.png`,
+    `${venue}/perimeter/a.png?name=foreign`,
+    `${venue}/perimeter/a.png#foreign`,
+    `${venue}%2fperimeter/a.png`,
+    `${venue}/%2e%2e/a.png`,
+    `${venue}/perimeter%2fa.png`,
+    `${venue}\\perimeter/a.png`,
+    `${venue}/perimeter/secret\n.png`,
+    `${venue}/perimeter/a.png\n`,
+    `${venue}/perimeter/é.png`,
+    `${venue}/${"a".repeat(1024)}`,
+  ])
+    await assert.rejects(
+      fixture.uploadStorage(path, new Uint8Array([1])),
+      /outside owned children/,
+    );
+  assert.equal(server.requests.length, 0);
+  await fixture.settleMutations();
+});
+
+test("Storage upload model: invalid binary values and missing selection cause zero I/O", async (t) => {
+  enableEmulator(t);
+  const server = model();
+  const fixture = new LocalFixture("upload-selection", "0", server.transport);
+  const path = `${fixture.venue()}/perimeter/a.png`;
+  for (const bytes of [undefined, null, [], [1], "private", new Uint8Array()])
+    await assert.rejects(fixture.uploadStorage(path, bytes), /Storage bytes/);
+  for (const flag of [undefined, "", "false", "TRUE"]) {
+    if (flag === undefined) delete process.env.VITE_USE_EMULATOR;
+    else process.env.VITE_USE_EMULATOR = flag;
+    await assert.rejects(
+      fixture.uploadStorage(path, new Uint8Array([1])),
+      /VITE_USE_EMULATOR=true/,
+    );
+  }
+  assert.equal(server.requests.length, 0);
+  await fixture.settleMutations();
+});
+
+function omitMetadata(metadata, key) {
+  const remaining = { ...metadata };
+  delete remaining[key];
+  return remaining;
+}
+
+const invalidUploadMetadata = [
+  ["absent body", () => null],
+  ["array body", () => []],
+  ["empty body", () => ({})],
+  ["foreign name", (metadata) => ({ ...metadata, name: "foreign/secret.png" })],
+  ["absent name", (metadata) => omitMetadata(metadata, "name")],
+  ["malformed name", (metadata) => ({ ...metadata, name: [metadata.name] })],
+  [
+    "foreign bucket",
+    (metadata) => ({ ...metadata, bucket: "foreign.appspot.com" }),
+  ],
+  ["absent bucket", (metadata) => omitMetadata(metadata, "bucket")],
+  ["absent generation", (metadata) => omitMetadata(metadata, "generation")],
+  ...[
+    null,
+    false,
+    7,
+    "",
+    " ",
+    "123\n",
+    "private-generation",
+    "1".repeat(129),
+  ].map((generation, index) => [
+    `malformed generation ${index}`,
+    (metadata) => ({ ...metadata, generation }),
+  ]),
+];
+for (const [label, invalidate] of invalidUploadMetadata) {
+  test(`Storage upload model: ${label} cannot certify a committed upload or its cleanup`, async (t) => {
+    enableEmulator(t);
+    const server = model();
+    const fixture = new LocalFixture(
+      "upload-metadata",
+      "0",
+      async (url, init) => {
+        const response = await server.transport(url, init);
+        if (init.method !== "POST") return response;
+        return json(invalidate(await response.json()));
+      },
+    );
+    const path = `${fixture.venue()}/perimeter/a.png`;
+    await assert.rejects(
+      fixture.uploadStorage(path, new Uint8Array([1])),
+      (error) => {
+        assert(!error.message.includes("secret"));
+        assert(!error.message.includes("private-generation"));
+        return /local fixture/i.test(error.message);
+      },
+    );
+    assert(
+      server.objects.has(path),
+      "the server committed before the invalid response",
+    );
+    await assert.rejects(fixture.cleanup(), /unresolved submitted mutation/);
+    assert.equal(
+      server.objects.size,
+      0,
+      "best-effort deletion does not establish quiescence",
+    );
+    await assert.rejects(fixture.cleanup(), /unresolved submitted mutation/);
+  });
+}
+
+for (const fault of ["transport", "json", "oversized", "http", "redirect"]) {
+  test(`Storage upload model: ${fault} response fails without leaking details or claiming cleanup`, async (t) => {
+    enableEmulator(t);
+    const server = model();
+    let posts = 0;
+    const fixture = new LocalFixture("upload-fault", "0", async (url, init) => {
+      const response = await server.transport(url, init);
+      if (init.method !== "POST") return response;
+      posts++;
+      if (fault === "transport") throw new Error("private-upload-token");
+      if (fault === "json")
+        return new Response("private-upload-token invalid JSON");
+      if (fault === "oversized")
+        return json({ secret: "x".repeat(1024 * 1024) });
+      if (fault === "http")
+        return json({ secret: "private-upload-token" }, 503);
+      return new Response(null, {
+        status: 307,
+        headers: { Location: "https://example.test/private-upload-token" },
+      });
+    });
+    const path = `${fixture.venue()}/perimeter/a.png`;
+    await assert.rejects(
+      fixture.uploadStorage(path, new Uint8Array([1])),
+      (error) => {
+        assert(!error.message.includes("private-upload-token"));
+        assert(!error.message.includes("secret"));
+        return /Local fixture/.test(error.message);
+      },
+    );
+    assert.equal(posts, 1, "no redirect, retry or rules-install fallback");
+    await assert.rejects(fixture.cleanup(), /unresolved submitted mutation/);
+    assert.equal(server.objects.size, 0);
+  });
+}
+
+for (const commitBeforeRelease of [false, true]) {
+  test(`Storage upload model: teardown waits for the real acknowledgement (committed before release=${commitBeforeRelease})`, async (t) => {
+    enableEmulator(t);
+    const server = model();
+    const entered = Promise.withResolvers();
+    const release = Promise.withResolvers();
+    const fixture = new LocalFixture("upload-held", "0", async (url, init) => {
+      if (init.method !== "POST") return server.transport(url, init);
+      const committed = commitBeforeRelease
+        ? await server.transport(url, init)
+        : null;
+      entered.resolve();
+      await release.promise;
+      return committed ?? server.transport(url, init);
+    });
+    const path = `${fixture.venue()}/perimeter/a.png`;
+    const upload = fixture.uploadStorage(path, new Uint8Array([1]));
+    await entered.promise;
+    const cleanup = fixture.cleanup();
+    await new Promise(setImmediate);
+    assert(!server.requests.some((request) => request.method === "DELETE"));
+    assert(
+      !server.requests.some((request) =>
+        request.url.includes("/invitations.json"),
+      ),
+    );
+    release.resolve();
+    assert.equal(await upload, "1700000000000");
+    await cleanup;
+    assert.equal(server.objects.size, 0);
+  });
+}
+
+test("Storage upload model: an unresponsive upload is bounded to five seconds and remains uncertain", async (t) => {
+  enableEmulator(t);
+  const server = model();
+  const fixture = new LocalFixture("upload-timeout", "0", (url, init) =>
+    init.method === "POST"
+      ? new Promise(() => {})
+      : server.transport(url, init),
+  );
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const upload = assert.rejects(
+    fixture.uploadStorage(
+      `${fixture.venue()}/perimeter/a.png`,
+      new Uint8Array([1]),
+    ),
+    /transport\/response failed/,
+  );
+  t.mock.timers.tick(5000);
+  await upload;
+  await assert.rejects(fixture.cleanup(), /unresolved submitted mutation/);
+});
+
+test("Storage upload model: retirement rejects new uploads without starting a producer", async (t) => {
+  enableEmulator(t);
+  const server = model();
+  const fixture = new LocalFixture("upload-retired", "0", server.transport);
+  const path = `${fixture.venue()}/perimeter/a.png`;
+  await fixture.cleanup();
+  const before = server.requests.length;
+  await assert.rejects(
+    fixture.uploadStorage(path, new Uint8Array([1])),
+    /retiring/,
+  );
+  assert.equal(server.requests.length, before);
+  await fixture.cleanup();
 });

@@ -1,14 +1,11 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import zlib from "node:zlib";
-import {
-  initializeTestEnvironment,
-  type RulesTestEnvironment,
-} from "@firebase/rules-unit-testing";
 import { expect, type Page } from "@playwright/test";
 import {
   TEST_LISTEN_PREFIX,
   clearEmulatorData,
+  emulatorFixture,
   ensureEmulatorUser,
   loginWithEmulatorUser,
   test,
@@ -17,11 +14,6 @@ import {
 const OWNER_HEADERS = { Authorization: "Bearer owner" };
 
 // -- Storage fixtures (portrait, crest, base ads) -----------------------------
-
-const storageRules = readFileSync(
-  resolve(__dirname, "../../storage.rules"),
-  "utf8",
-);
 
 const portraitBytes = readFileSync(
   resolve(__dirname, "../src/perimeter/__fixtures__/portrait-fagn.png"),
@@ -84,36 +76,6 @@ function pngBytes(
     chunk("IDAT", zlib.deflateSync(raw)),
     chunk("IEND", Buffer.alloc(0)),
   ]);
-}
-
-const testEnvPromise = initializeTestEnvironment({
-  projectId: "vikes-match-clock-test",
-  storage: {
-    host: "127.0.0.1",
-    port: 9199,
-    rules: storageRules,
-    // The app connects with the emulator config's bucket name.
-    bucket: "vikes-match-clock-test.appspot.com",
-  },
-});
-
-// Uploads a fixture into the emulator bucket the app connects with (rules
-// disabled) and returns the object's immutable generation.
-async function seedObject(
-  env: RulesTestEnvironment,
-  objectPath: string,
-  bytes: Buffer,
-): Promise<string> {
-  let generation = "";
-  await env.withSecurityRulesDisabled(async (context) => {
-    const file = context
-      .storage("gs://vikes-match-clock-test.appspot.com")
-      .ref(objectPath);
-    await file.put(bytes);
-    const metadata = await file.getMetadata();
-    generation = String(metadata.generation);
-  });
-  return generation;
 }
 
 // -- Perimeter test scaffolding ------------------------------------------------
@@ -295,35 +257,32 @@ async function holdScorerAcknowledgement(page: Page, playerId: string) {
 }
 
 test.describe("Web perimeter goal scorer", () => {
-  let storageEnv: RulesTestEnvironment;
-
   test.setTimeout(180_000);
 
   test.beforeAll(async () => {
     await ensureEmulatorUser();
-    storageEnv = await testEnvPromise;
   });
 
   test.beforeEach(async ({ clockPage }) => {
     await clearEmulatorData();
-    const redGeneration = await seedObject(
-      storageEnv,
+    const redGeneration = await emulatorFixture.uploadStorage(
       `${TEST_LISTEN_PREFIX}/perimeter/scorer-e2e-red.png`,
       pngBytes(64, 32, RED),
     );
-    const blueGeneration = await seedObject(
-      storageEnv,
+    const blueGeneration = await emulatorFixture.uploadStorage(
       `${TEST_LISTEN_PREFIX}/perimeter/scorer-e2e-blue.png`,
       pngBytes(64, 32, BLUE),
     );
     // Personalized celebration image for player 10; player 999 has none, so
     // selecting them exercises the crest fallback.
-    await seedObject(
-      storageEnv,
+    await emulatorFixture.uploadStorage(
       `${TEST_LISTEN_PREFIX}/players/10-fagn.png`,
       portraitBytes,
     );
-    await seedObject(storageEnv, `${TEST_LISTEN_PREFIX}/crest.png`, crestBytes);
+    await emulatorFixture.uploadStorage(
+      `${TEST_LISTEN_PREFIX}/crest.png`,
+      crestBytes,
+    );
 
     await patch(clockPage, `locations/${TEST_LISTEN_PREFIX}`, {
       label: `Test Location ${TEST_LISTEN_PREFIX.replace("test-location-", "")}`,
