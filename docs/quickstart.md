@@ -95,7 +95,11 @@ test -f lib/index.js
 ```
 
 Functions loads compiled `functions/lib/index.js`, not TypeScript source.
-Rebuild after editing Functions. Keep the retained scorer export, `sharp`,
+The one-shot build recreates `lib/`, typechecks source/tests without emitting,
+and emits only production modules/maps. It rejects arguments such as `--watch`;
+rerun it after edits, with owned compiler writers/emulators stopped, then restart
+the emulator. See the [Functions build caveats](../functions/AGENTS.md#commands-and-prerequisites)
+for IDE/direct-compiler and deployment boundaries. Keep the retained scorer export, `sharp`,
 rules and media under the [#241 rollout hold](web-only-perimeter-rollout.md).
 
 In the **emulator terminal, repository root**:
