@@ -57,6 +57,45 @@ schema byte for byte with the tracked contract. No AWS service is contacted.
 Dependency tests separately check regional client reuse, team/weather key
 caches, and recovery after failed construction or parameter lookups.
 
+## Python tooling
+
+The API runtime boundary is `clock-api/v3/requirements.txt`; local tests and
+Black use `clock-api/v3/requirements-dev.txt`, which includes it. Use **Python
+3.12** and an owned virtual environment as in the [quickstart](quickstart.md#5-start-the-local-api-and-frontend-on-different-ports).
+The API's `.python-version` selects 3.12 for tools that recognize it. Root and
+API Black configurations both target that version, with 79 columns and string
+normalization disabled. The root `pyproject.toml` contains formatting policy
+only; it does not define an installable application.
+
+With GNU Make installed, from the **repository root** after installing the API
+development requirements:
+
+```bash
+make api-format-check PYTHON=.venv/bin/python
+# Optional; requires Node 22.12+ and pnpm on PATH:
+make api-typecheck PYTHON=.venv/bin/python
+```
+
+Pass `PYTHON=/absolute/path/to/python` for another owned environment. The targets
+print the interpreter and reject versions other than 3.12. The format check
+covers API `app/`, `tests/` and the exporter. The typecheck uses the Makefile's
+pinned Pyright through `pnpm dlx` with one worker; its first invocation may need
+the package registry. Root `pyrightconfig.json` checks API runtime `app/` and
+`export-openapi.py` in basic mode, with unused-symbol errors. API tests remain
+covered by pytest and Black; utilities and kiosk release scripts are outside
+this typecheck. API tests, schema export and health do not require Node/pnpm.
+These local targets are separate from CI's existing schema/client generators.
+CI does not invoke the new targets.
+
+The former root `requirements.txt` was a mixed maintenance/API inventory and
+has been replaced by explicit [optional tool groups](../utils/README.md#dependency-inventories).
+Choose the API requirements above for API work. Frontend preparation needs
+neither Python group. The former root `uv.lock` contained only Python metadata
+and no resolved packages; it has been removed. The committed API requirements
+pin their listed direct dependencies, not all transitives. There is no claimed
+complete Python lock or supported root `uv sync` workflow. `uv venv`/`uv pip`
+below remain optional ways to select an interpreter and install requirements.
+
 ## Isolated tooling when Python/pnpm are absent from PATH
 
 This was verified with Node 22.23.3, Corepack 0.36.0, pnpm 10.34.9, and

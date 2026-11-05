@@ -1,0 +1,7 @@
+# Optional legacy photo tools only; not required by the API or frontend.
+# Installation and image output remain unqualified; see README.md.
+-r requirements-scraping.txt
+opencv-python
+scikit-image
+numpy
+Pillow

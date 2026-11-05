@@ -1,0 +1,4 @@
+# Optional legacy tool dependency inventory; see README.md before use.
+# Versions were historically unpinned; this is not a qualified lockfile.
+requests
+beautifulsoup4

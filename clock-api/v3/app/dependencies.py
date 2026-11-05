@@ -4,6 +4,7 @@ from collections.abc import AsyncIterator
 from functools import cache
 
 import anyio
+import anyio.lowlevel
 import boto3
 from botocore.config import Config
 from fastapi import Path, Request
@@ -82,7 +83,12 @@ class KsiKeyLookups:
                     raise asyncio.CancelledError
                 if self.loop.time() >= deadline:
                     raise TimeoutError
-                self.tasks[asyncio.current_task()] = True
+                task = asyncio.current_task()
+                if task is None:
+                    raise RuntimeError(
+                        "KSI key lookups require an asyncio task"
+                    )
+                self.tasks[task] = True
                 return await anyio.to_thread.run_sync(
                     get_ksi_api_key, team_id, limiter=anyio.CapacityLimiter(1)
                 )
