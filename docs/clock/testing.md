@@ -185,6 +185,13 @@ persisted true grants with an unrelated venue ordered before it. Another
 fixture's invitation and venue must survive setup and invitation teardown,
 including test failure paths.
 
+RTDB omits an empty invitation `locations` object on readback. The fixture
+returns an empty grant map for that absent child, while malformed present values
+still fail discovery and cleanup. Registered IDs still require an owned recipient;
+discovered generated IDs require both an owned recipient and creator. Transport
+controls model this empty-child omission for seeded and generated invitations,
+including later valid siblings and preservation of foreign records.
+
 Fixture writes and signup calls register producers before transport. Shared
 helper pages also observe the actual SDK `adminWrite` submissions, without
 replacing the real callable. Admin invitation teardown and page teardown wait

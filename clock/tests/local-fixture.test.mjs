@@ -48,8 +48,18 @@ function model() {
         );
       }
       if (init.method === "GET") return json(database.get(path) ?? null);
-      if (init.method === "PUT") database.set(path, data);
-      else
+      if (init.method === "PUT") {
+        // Model RTDB's omission of an empty invitation grant child on storage.
+        if (
+          path.startsWith("invitations/") &&
+          data?.locations !== null &&
+          typeof data?.locations === "object" &&
+          !Array.isArray(data.locations) &&
+          Object.keys(data.locations).length === 0
+        )
+          delete data.locations;
+        database.set(path, data);
+      } else
         for (const key of database.keys()) {
           if (key === path || key.startsWith(path + "/")) database.delete(key);
         }
@@ -286,6 +296,183 @@ test("owned setup and teardown preserve a separate fixture including after a fai
         new URL(request.url).pathname === "/invitations.json",
     ),
   );
+});
+
+test("RTDB canonicalization model: seeded empty grants read as an empty map and cleanup succeeds", async (t) => {
+  enableEmulator(t);
+  const server = model();
+  const fixture = new LocalFixture(
+    "seeded-empty-grants",
+    "0",
+    server.transport,
+  );
+  const id = fixture.invitationKey("empty");
+  const invitation = {
+    email: fixture.email("invitee"),
+    // A registered ID does not require an owned creator, unlike discovery.
+    createdBy: "seed-creator",
+    createdAt: 1,
+    locations: {},
+  };
+  await fixture.seedInvitations({ [id]: invitation });
+  const stored = { ...invitation };
+  delete stored.locations;
+  assert.deepEqual(server.database.get(`invitations/${id}`), stored);
+  assert.equal(Object.hasOwn(stored, "locations"), false);
+  const read = await fixture.invitations().then(
+    (value) => ({ value }),
+    (error) => ({ error: error.message }),
+  );
+  assert.deepEqual(read, { value: { [id]: invitation } });
+  await fixture.cleanup();
+  await fixture.cleanup();
+  assert.equal(server.database.size, 0);
+});
+
+test("RTDB canonicalization model: cleanup discovers generated empty grants and later valid siblings, preserving foreign records", async (t) => {
+  enableEmulator(t);
+  const server = model();
+  const fixture = new LocalFixture(
+    "generated-empty-grants",
+    "0",
+    server.transport,
+  );
+  const email = fixture.email("invitee");
+  const createdBy = fixture.email("admin");
+  const invitation = { email, createdBy, createdAt: 1, locations: {} };
+  const foreign = new Map([
+    [
+      "invitations/foreign-recipient",
+      { ...invitation, email: "foreign@example.test", locations: null },
+    ],
+    [
+      "invitations/foreign-creator",
+      { ...invitation, createdBy: "foreign@example.test", locations: [] },
+    ],
+    [
+      "invitations/foreign-both",
+      {
+        email: "foreign@example.test",
+        createdBy: "foreign@example.test",
+        metadata: { keep: true },
+      },
+    ],
+  ]);
+  // Model completed callable writes through the same canonicalizing transport;
+  // their IDs were never registered through invitationKey or seedInvitations.
+  const writeGenerated = (id, value) =>
+    server.transport(
+      `http://127.0.0.1:9000/invitations/${id}.json?ns=vikes-match-clock-test`,
+      {
+        method: "PUT",
+        redirect: "manual",
+        signal: AbortSignal.timeout(1000),
+        headers: { Authorization: "Bearer owner" },
+        body: JSON.stringify(value),
+      },
+    );
+  await writeGenerated("generated-empty", invitation);
+  for (const [path, value] of foreign) server.database.set(path, value);
+  await writeGenerated("generated-valid", {
+    ...invitation,
+    locations: { granted: true, denied: false },
+  });
+  await writeGenerated("generated-empty-later", invitation);
+  assert.equal(
+    Object.hasOwn(
+      server.database.get("invitations/generated-empty"),
+      "locations",
+    ),
+    false,
+  );
+  for (const id of [
+    "generated-empty",
+    "generated-valid",
+    "generated-empty-later",
+  ])
+    await assert.rejects(
+      fixture.database("DELETE", `invitations/${id}`),
+      /outside owned/,
+    );
+  const failure = await fixture.cleanup().then(
+    () => null,
+    (error) => error.message,
+  );
+  assert.deepEqual(
+    [...server.database],
+    [...foreign],
+    "cleanup must leave only foreign records, including after an omitted empty child",
+  );
+  assert.equal(failure, null);
+  await fixture.cleanup();
+  assert.deepEqual([...server.database], [...foreign]);
+  assert.deepEqual(
+    [
+      ...new Set(
+        server.requests
+          .filter((request) => request.method === "DELETE")
+          .map((request) => new URL(request.url).pathname),
+      ),
+    ].sort(),
+    [
+      "/invitations/generated-empty.json",
+      "/invitations/generated-empty-later.json",
+      "/invitations/generated-valid.json",
+    ].sort(),
+  );
+});
+
+test("RTDB canonicalization model: malformed present grants fail without acquiring generated ID ownership", async (t) => {
+  enableEmulator(t);
+  for (const locations of [
+    null,
+    [],
+    "",
+    0,
+    false,
+    { venue: "true" },
+    { venue: null },
+  ]) {
+    const server = model();
+    const fixture = new LocalFixture(
+      "malformed-present-grants",
+      "0",
+      server.transport,
+    );
+    const invitation = {
+      email: fixture.email("invitee"),
+      createdBy: fixture.email("admin"),
+      createdAt: 1,
+      locations,
+    };
+    server.database.set("invitations/generated-malformed", invitation);
+    const before = [...server.database];
+    await assert.rejects(fixture.invitations(), /Invalid .*fixture/);
+    await assert.rejects(
+      fixture.database("DELETE", "invitations/generated-malformed"),
+      /outside owned/,
+    );
+    await assert.rejects(fixture.cleanup(), /Invalid .*fixture/);
+    assert.deepEqual([...server.database], before);
+    assert(!server.requests.some((request) => request.method === "DELETE"));
+  }
+});
+
+test("invitation ownership: a registered ID still requires its owned recipient", async (t) => {
+  enableEmulator(t);
+  const server = model();
+  const fixture = new LocalFixture(
+    "registered-recipient",
+    "0",
+    server.transport,
+  );
+  const id = fixture.invitationKey("registered");
+  server.database.set(`invitations/${id}`, {
+    email: "foreign@example.test",
+    createdBy: fixture.email("admin"),
+    createdAt: 1,
+  });
+  assert.deepEqual(await fixture.invitations(), {});
 });
 
 test("unexpected HTTP and transport errors fail with sanitized diagnostics", async (t) => {

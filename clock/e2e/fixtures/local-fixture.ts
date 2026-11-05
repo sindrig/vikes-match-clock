@@ -444,7 +444,10 @@ export class LocalFixture {
         throw new Error("Invalid owned fixture invitation response.");
       }
       const locations = new Map<string, boolean>();
-      for (const [key, grant] of Object.entries(record(invitation.locations))) {
+      // RTDB omits empty objects; only absence is a canonical empty grant map.
+      const rawLocations =
+        invitation.locations === undefined ? {} : record(invitation.locations);
+      for (const [key, grant] of Object.entries(rawLocations)) {
         if (typeof grant !== "boolean")
           throw new Error("Invalid owned fixture invitation grant.");
         locations.set(key, grant);
