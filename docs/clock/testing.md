@@ -213,10 +213,29 @@ worker; they are not silently ignored. `clearEmulatorData` remains the legacy
 name for resetting that worker's state and location baseline before a case; it
 does not reset other data or provide per-test Storage isolation.
 
+The scorer and player-band specs seed their original binary objects through
+`LocalFixture.uploadStorage`, using the same owned venue ledger and completion
+barrier. The helper accepts nonempty bytes only below an exact registered venue
+root, with bounded ASCII filename segments (letters, digits, underscore, hyphen
+and dot; no traversal or encoded separators). It snapshots the bytes, uploads
+them as `application/octet-stream`, and validates the returned object name, test
+bucket and decimal generation string without coercing absent or malformed data.
+Invalid input fails before transport. Lost or invalid acknowledgements remain
+uncertain producers: best-effort object deletion cannot certify cleanup.
+
+These specs no longer initialize a rules-test environment or install Storage
+rules during collection or hooks. The owned emulator launcher must install the
+repository's canonical Storage rules before execution. Record the source and
+installation acknowledgement and verify actual public/private authorization
+controls; an owner upload or local source hash is not proof of active rules.
+The specs never silently repair a missing or incorrect rules setup. Their
+browser SDK reads, immutable generations, pixel/timing assertions and separate
+controller/display contexts remain real integration boundaries.
+
 This is the conservative fixture slice of #232. The bespoke session, queue,
 playback, nested-state and subscription-domain fixtures still have fixed roots
-and/or namespace-wide rule installs/overlays. The perimeter suites retain their
-import-time Storage rule setup, so collecting tests can contact the emulator.
+and/or namespace-wide rule installs/overlays. Per-test media isolation, exclusive
+overlay lifecycles and worker-crash recovery remain follow-up work.
 One worker is the default everywhere. No two-worker safety, sharding/report
 aggregation, repeated performance result or complete deployment gate is claimed.
 Keep #232 open for that follow-up.
@@ -229,11 +248,17 @@ Selector controls execute the actual login function and `ScreenSelectorButton`
 source with its stylesheet at zero, one and two connections, including badge
 arrival between visibility and click and unrelated button decoys. These use a
 native DOM and modeled Page/presence hook; they are not real browser integration.
+Binary transport controls cover exact bytes/generations, foreign prefixes,
+malformed metadata, held/lost responses and failed cleanup. Declaration controls
+execute the actual perimeter spec sources with modeled Playwright/helper imports;
+their negative initializer uses the real rules SDK behind blocked HTTP/socket
+transports. They do not execute hooks, browsers or emulators. Real collection
+without emulators is a separate check after these controls pass.
 These source/model controls do not qualify real emulator behavior. From
 `clock/`, with Node 22 and Clock dependencies prepared:
 
 ```bash
-node --experimental-transform-types --test --test-concurrency=1 tests/local-fixture.test.mjs tests/fixture-cleanup-source.test.mjs tests/fixture-selector.test.mjs
+node --experimental-transform-types --test --test-concurrency=1 tests/local-fixture.test.mjs tests/fixture-cleanup-source.test.mjs tests/fixture-selector.test.mjs tests/storage-fixture-imports.test.mjs
 ```
 
 These native controls and focused E2E typed lint remain manual checks, outside

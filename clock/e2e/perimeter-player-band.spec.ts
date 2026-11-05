@@ -1,25 +1,15 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import zlib from "node:zlib";
-import {
-  initializeTestEnvironment,
-  type RulesTestEnvironment,
-} from "@firebase/rules-unit-testing";
 import { expect, type Page } from "@playwright/test";
 import {
   TEST_LISTEN_PREFIX,
   clearEmulatorData,
+  emulatorFixture,
   test,
 } from "./fixtures/test-helpers";
 
 const OWNER_HEADERS = { Authorization: "Bearer owner" };
 
 // -- Storage fixtures (band photos, overlay media, base ads) ------------------
-
-const storageRules = readFileSync(
-  resolve(__dirname, "../../storage.rules"),
-  "utf8",
-);
 
 const RED = [255, 0, 0, 255] as const;
 const BLUE = [0, 90, 255, 255] as const;
@@ -82,36 +72,6 @@ function pngBytes(
     chunk("IDAT", zlib.deflateSync(raw)),
     chunk("IEND", Buffer.alloc(0)),
   ]);
-}
-
-const testEnvPromise = initializeTestEnvironment({
-  projectId: "vikes-match-clock-test",
-  storage: {
-    host: "127.0.0.1",
-    port: 9199,
-    rules: storageRules,
-    // The app connects with the emulator config's bucket name.
-    bucket: "vikes-match-clock-test.appspot.com",
-  },
-});
-
-// Uploads a fixture into the emulator bucket the app connects with (rules
-// disabled) and returns the object's immutable generation.
-async function seedObject(
-  env: RulesTestEnvironment,
-  objectPath: string,
-  bytes: Buffer,
-): Promise<string> {
-  let generation = "";
-  await env.withSecurityRulesDisabled(async (context) => {
-    const file = context
-      .storage("gs://vikes-match-clock-test.appspot.com")
-      .ref(objectPath);
-    await file.put(bytes);
-    const metadata = await file.getMetadata();
-    generation = String(metadata.generation);
-  });
-  return generation;
 }
 
 // -- Perimeter test scaffolding ------------------------------------------------
@@ -263,44 +223,34 @@ async function anyColor(
 }
 
 test.describe("Web perimeter player band", () => {
-  let storageEnv: RulesTestEnvironment;
   let redGeneration = "";
 
   test.setTimeout(180_000);
-
-  test.beforeAll(async () => {
-    storageEnv = await testEnvPromise;
-  });
 
   test.beforeEach(async ({ clockPage }) => {
     await clearEmulatorData();
     // Another spec may have used this worker's venue for audited controls.
     // Start the read-only display assertions with a clean emulator audit path.
     await patch(clockPage, `audit/${TEST_LISTEN_PREFIX}`, null);
-    redGeneration = await seedObject(
-      storageEnv,
+    redGeneration = await emulatorFixture.uploadStorage(
       `${TEST_LISTEN_PREFIX}/perimeter/band-e2e-red.png`,
       pngBytes(64, 32, RED),
     );
-    const blueGeneration = await seedObject(
-      storageEnv,
+    const blueGeneration = await emulatorFixture.uploadStorage(
       `${TEST_LISTEN_PREFIX}/perimeter/band-e2e-blue.png`,
       pngBytes(64, 32, BLUE),
     );
     // Lineup/substitution card photos: identifier-shaped `{id}.png` names
     // (no -fagn suffix), exercising the extended public-read rule.
-    await seedObject(
-      storageEnv,
+    await emulatorFixture.uploadStorage(
       `${TEST_LISTEN_PREFIX}/players/10.png`,
       pngBytes(128, 64, OFF_PHOTO_COLOR),
     );
-    await seedObject(
-      storageEnv,
+    await emulatorFixture.uploadStorage(
       `${TEST_LISTEN_PREFIX}/players/20.png`,
       pngBytes(128, 64, ON_PHOTO_COLOR),
     );
-    await seedObject(
-      storageEnv,
+    await emulatorFixture.uploadStorage(
       `${TEST_LISTEN_PREFIX}/players/30.png`,
       pngBytes(128, 64, SECOND_OFF_PHOTO_COLOR),
     );
@@ -372,18 +322,15 @@ test.describe("Web perimeter player band", () => {
   });
 
   test("anonymous reads follow the extended player media rules", async () => {
-    await seedObject(
-      storageEnv,
+    await emulatorFixture.uploadStorage(
       `${TEST_LISTEN_PREFIX}/players/30.png`,
       pngBytes(8, 8, RED),
     );
-    await seedObject(
-      storageEnv,
+    await emulatorFixture.uploadStorage(
       `${TEST_LISTEN_PREFIX}/players/private-notes.txt`,
       Buffer.from("secret"),
     );
-    await seedObject(
-      storageEnv,
+    await emulatorFixture.uploadStorage(
       `${TEST_LISTEN_PREFIX}/club-logos/custom.png`,
       pngBytes(8, 8, RED),
     );
@@ -405,13 +352,11 @@ test.describe("Web perimeter player band", () => {
     browser,
     clockPage,
   }) => {
-    await seedObject(
-      storageEnv,
+    await emulatorFixture.uploadStorage(
       `${TEST_LISTEN_PREFIX}/players/40.png`,
       pngBytes(128, 64, OFF_PHOTO_COLOR),
     );
-    await seedObject(
-      storageEnv,
+    await emulatorFixture.uploadStorage(
       `${TEST_LISTEN_PREFIX}/players/40-fagn.png`,
       pngBytes(64, 64, CELEBRATION_PHOTO_COLOR),
     );
