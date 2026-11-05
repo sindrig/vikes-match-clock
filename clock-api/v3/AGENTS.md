@@ -6,8 +6,9 @@ FastAPI application wrapping the Analyticom KSI REST API for match data and weat
 
 Use **Python 3.12** in an isolated virtual environment, with pip and
 `requirements-dev.txt` (which includes production dependencies). Frontend
-Node/pnpm is needed only when regenerating the TypeScript SDK; Docker is needed
-for the Terraform Lambda packaging path, not mocked API tests or schema export.
+Node/pnpm is needed for TypeScript SDK generation and the optional Pyright
+command below; API tests, schema export and health need only Python. Docker is
+needed for the Terraform Lambda packaging path, not mocked API tests or export.
 No AWS login is needed for schema export, health or mocked tests. Live upstream
 calls use the approved AWS credential chain and lazy SSM access described by the
 [environment contract](../../docs/environment.md#api-secrets).
@@ -48,7 +49,8 @@ clock-api/v3/
 ├── run.sh                 # uvicorn startup script for Lambda Web Adapter
 ├── export-openapi.py      # Generates openapi.json from app
 ├── requirements.txt       # Production deps
-├── requirements-dev.txt   # Test deps (includes production)
+├── requirements-dev.txt   # Test + formatter deps (includes production)
+├── .python-version        # Local Python 3.12 selector
 └── pyproject.toml         # Black config
 ```
 
@@ -136,11 +138,36 @@ Running tests:
 python -m pytest tests/ -v
 ```
 
-Formatting (always run before committing):
+Black is installed by `requirements-dev.txt`. Format changed Python files
+before committing, using this directory's Python 3.12 configuration:
 
 ```bash
-python -m black --line-length 79 --skip-string-normalization .
+python -m black --workers 1 --config pyproject.toml path/to/changed_file.py
 ```
+
+From the **repository root**, with the quickstart's `.venv`:
+
+```bash
+make api-format-check PYTHON=.venv/bin/python
+make api-typecheck PYTHON=.venv/bin/python
+```
+
+The targets require GNU Make. Both print and validate the selected Python 3.12
+interpreter. Pass `PYTHON="/absolute/path/to/python"` for another owned environment;
+quote paths containing spaces. Pyright resolves dependencies through that
+interpreter even if a different root `.venv` exists. Install the API requirements
+in the selected environment. Formatting
+checks `app/`, `tests/` and `export-openapi.py`. The optional typecheck needs
+**Node 22.12+ and pnpm** and uses the pinned Pyright version in the Makefile
+through `pnpm dlx`, with one worker. Its first run may download the tool.
+`pyrightconfig.json` checks API runtime `app/` and the exporter in basic mode,
+with unused-symbol errors. Tests are exercised by pytest and formatted by Black;
+utility and kiosk Python have separate ownership and are outside this type gate.
+
+The [API preparation guide](../../docs/api-client-preparation.md#python-tooling)
+owns install boundaries and lockfile limitations. Optional maintenance tools
+have separate [dependency inventories](../../utils/README.md); they are not
+API setup prerequisites.
 
 Generating OpenAPI spec:
 

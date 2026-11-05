@@ -41,18 +41,19 @@ document; entrypoints carry short safety rules and navigation.
 These links describe procedures for separately authorized work. Reading or
 editing them does not authorize deployment, state mutation or hardware I/O.
 
-| Task                                                            | Canonical entrypoint / procedure                                                                                                                          |
-| --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| API match/roster/weather behavior                               | [API guide](../clock-api/v3/AGENTS.md), [KSI lifetime and budgets](ksi-roster-lifecycle.md)                                                               |
-| Firebase admin callables, invitations, retention or rules tests | [Functions guide](../functions/AGENTS.md)                                                                                                                 |
-| Gateway installation, service configuration or weather recovery | [Gateway README](../perimeter-control/README.md), [environment access](environment.md#gateway-access)                                                     |
-| Vnnox protocol, smoke test and exact restoration                | [Protocol](../perimeter-control/vnnox-brightness.md), [single smoke/restoration procedure](../perimeter-control/BRIGHTNESS_SMOKE_TEST.md)                 |
-| Physical output mapping and Windows/Chromium qualification      | [Measurement](../perimeter-control/WEB_MAPPING_MEASUREMENT.md), [qualification](../perimeter-control/WEB_RENDERER_QUALIFICATION.md)                       |
-| Windows kiosk development, monitor/recovery behavior or release | [Kiosk guide](../kiosk/AGENTS.md), [operator and release README](../kiosk/README.md)                                                                      |
-| AWS infrastructure or deployment                                | [Infrastructure guide](../infra/AGENTS.md), [environment access](environment.md#manual-aws-staging-operations), [actual workflows](../.github/workflows/) |
-| Persistent local Vite server                                    | [Clock testing](clock/testing.md#port-configuration), [helper](../scripts/dev-server.sh)                                                                  |
-| PR screenshots and source artwork distinction                   | [Screenshot handling](screenshots.md)                                                                                                                     |
-| Asset maintenance utilities                                     | [Utility inventory](../utils/README.md)                                                                                                                   |
+| Task                                                                    | Canonical entrypoint / procedure                                                                                                                          |
+| ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| API match/roster/weather behavior                                       | [API guide](../clock-api/v3/AGENTS.md), [KSI lifetime and budgets](ksi-roster-lifecycle.md)                                                               |
+| Python API versions, formatting, typechecking and dependency boundaries | [Python tooling](api-client-preparation.md#python-tooling), [optional utility inventories](../utils/README.md)                                            |
+| Firebase admin callables, invitations, retention or rules tests         | [Functions guide](../functions/AGENTS.md)                                                                                                                 |
+| Gateway installation, service configuration or weather recovery         | [Gateway README](../perimeter-control/README.md), [environment access](environment.md#gateway-access)                                                     |
+| Vnnox protocol, smoke test and exact restoration                        | [Protocol](../perimeter-control/vnnox-brightness.md), [single smoke/restoration procedure](../perimeter-control/BRIGHTNESS_SMOKE_TEST.md)                 |
+| Physical output mapping and Windows/Chromium qualification              | [Measurement](../perimeter-control/WEB_MAPPING_MEASUREMENT.md), [qualification](../perimeter-control/WEB_RENDERER_QUALIFICATION.md)                       |
+| Windows kiosk development, monitor/recovery behavior or release         | [Kiosk guide](../kiosk/AGENTS.md), [operator and release README](../kiosk/README.md)                                                                      |
+| AWS infrastructure or deployment                                        | [Infrastructure guide](../infra/AGENTS.md), [environment access](environment.md#manual-aws-staging-operations), [actual workflows](../.github/workflows/) |
+| Persistent local Vite server                                            | [Clock testing](clock/testing.md#port-configuration), [helper](../scripts/dev-server.sh)                                                                  |
+| PR screenshots and source artwork distinction                           | [Screenshot handling](screenshots.md)                                                                                                                     |
+| Asset maintenance utilities                                             | [Utility inventory](../utils/README.md)                                                                                                                   |
 
 ## Historical evidence and separate follow-ups
 

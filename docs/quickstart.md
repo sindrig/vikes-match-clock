@@ -254,6 +254,15 @@ cd "$VIKES_REPO"
 .venv/bin/python -m pip install -r clock-api/v3/requirements-dev.txt
 ```
 
+This installs API runtime/test dependencies and Black, with no maintenance image
+or Firebase Admin stack. The former root `requirements.txt` has been replaced
+by [optional tool inventories](../utils/README.md#dependency-inventories);
+choose those only for a separately qualified maintenance task. The removed
+root `uv.lock` contained no resolved packages. API requirements pin listed
+dependencies but do not claim a complete transitive lock. See
+[Python tooling](api-client-preparation.md#python-tooling) for formatter and
+optional Pyright checks; only the latter needs Node/pnpm.
+
 In the **API terminal, `clock-api/v3/`**:
 
 ```bash

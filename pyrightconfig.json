@@ -1,9 +1,10 @@
 {
-    "venvPath": ".",
-    "venv": ".venv",
-    "reportUnusedVariable": "error",
-    "reportUnusedImport": "error",
-    "reportUnusedClass": "error",
-    "reportUnusedFunction": "error",
-    "include": ["src/", "lib/"]
+  "pythonVersion": "3.12",
+  "typeCheckingMode": "basic",
+  "extraPaths": ["clock-api/v3"],
+  "reportUnusedVariable": "error",
+  "reportUnusedImport": "error",
+  "reportUnusedClass": "error",
+  "reportUnusedFunction": "error",
+  "include": ["clock-api/v3/app", "clock-api/v3/export-openapi.py"]
 }

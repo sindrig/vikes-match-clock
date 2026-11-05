@@ -1,22 +1,113 @@
 # Asset maintenance utilities
 
-These are standalone operator/asset scripts, not another web app or deployment.
-Use the [root instructions](../AGENTS.md) and [task index](../docs/README.md).
-Review a script's inputs, working directory and outputs before running it;
-several older helpers assume layouts that no longer exist.
+These standalone operator scripts are retained while current usage and output
+contracts are confirmed under **#251**. Their dependency files are opt-in
+inventories; they do not qualify old commands, upstream selectors, image
+quality or remote writes. Review inputs, working directories and destinations
+before a separately authorized maintenance task. Use the
+[root instructions](../AGENTS.md) and [task index](../docs/README.md).
 
-| Tool                                                   | Role and prerequisites                                                                                                                                                                                           |
-| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `rebuild_club_logos.py`                                | Python standard-library logo-map generator; defaults to the old `.js` output, while the tracked map is now `clock/src/images/clubLogos.ts`; adapt/review output deliberately, not as a routine regeneration step |
-| `fetch_clubs.py`, `add_club.py`                        | Networked KSI HTML/logo importers using Requests/BeautifulSoup; old upstream URLs/selectors need verification before use; output can overwrite mappings/artwork                                                  |
-| `image-converter.py`                                   | Python image/player-photo processing, KSI lookup and output files; uses OpenCV, NumPy, scikit-image, Pillow, Requests and BeautifulSoup                                                                          |
-| `fit-image.sh`, `convert-images.sh`                    | ImageMagick `convert`; inspect paths first (`convert-images.sh` removes/recreates its current directory's `out/`)                                                                                                |
-| `copy-folder.py`, `extract.py`, `build_assets_file.py` | Legacy data/asset helpers; inspect hardcoded paths and old root `src/assets` assumptions before adapting, not checkout prerequisites                                                                             |
+## Dependency inventories
 
-The broad root [requirements.txt](../requirements.txt) and [format configuration](../pyproject.toml)
-(plus the historical `uv.lock`) are separate from the maintained API's requirements; this inventory does not
-certify fresh installation or the old scrapers. The [team-ID pipeline](../docs/clock/assets-and-rosters.md#team-id-system--match-data-pipeline)
-explains why imported IDs and normalized names must match API lineups.
+Normal API setup uses
+[`clock-api/v3/requirements-dev.txt`](../clock-api/v3/requirements-dev.txt),
+including runtime requirements and Black. Frontend setup needs no Python.
+The former mixed root `requirements.txt` has been replaced by these groups,
+to install only in a separate, owned Python 3.12 virtual environment:
 
-Bundled source artwork is reviewed product input. Captured proof belongs under
-ignored `screenshots/` and must not be committed; see [screenshot handling](../docs/screenshots.md).
+| Group                                                    | Imports supplied                                        | Intended consumers                                                                      |
+| -------------------------------------------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| [`requirements-scraping.txt`](requirements-scraping.txt) | Requests, BeautifulSoup                                 | `add_club.py`, `fetch_clubs.py`                                                         |
+| [`requirements-images.txt`](requirements-images.txt)     | Scraping group plus OpenCV, scikit-image, NumPy, Pillow | `image-converter.py`; currently imported eagerly, including for help, `pids` and `crop` |
+| [`requirements-firebase.txt`](requirements-firebase.txt) | Firebase Admin, Typer, google-cloud-storage             | `copy-folder.py`                                                                        |
+
+For example, from the **repository root**, with the separately selected tool
+environment's Python on PATH:
+
+```bash
+python -m pip install -r utils/requirements-scraping.txt
+```
+
+Choose the group needed for the task. Installing it does not authorize invoking
+a tool or accessing a live service. Typer 0.12.3 and Firebase Admin 6.5.0 retain
+the historical pins. Other versions were unpinned and remain so; NumPy, Pillow
+and google-cloud-storage are now explicit direct imports. Installer resolution
+alone does not verify command compatibility, including Typer/Click behavior.
+
+Standard-library helpers need no group; the two shell image tools need the
+ImageMagick `convert` executable. Root `pyproject.toml` is formatting policy
+only. The removed root `uv.lock` held no resolved packages and supplied no
+reproducibility. These inventories and API direct pins do not lock all
+transitives; no root `uv sync` setup is implied. See
+[Python tooling](../docs/api-client-preparation.md#python-tooling) for the
+maintained API's formatter/typecheck boundary.
+
+## Inputs, working directories and destinations
+
+All entries remain **legacy, pending operator qualification**. Paths describe
+existing source behavior, including its defects; they are not a regeneration or
+upload recipe. No script offers a general safe dry run today. Relative
+positional paths use the invocation's working directory (cwd) unless a
+script-relative base is stated.
+
+| Tool                    | Input and cwd                                                                                                                                          | Filesystem and external effects                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `rebuild_club_logos.py` | Standard library; script-relative `clock/src/images/club-logos`, independent of cwd. CLI uses defaults; `main()` accepts output/image subpaths.        | Opens/replaces `clock/src/images/clubLogos.js`, choosing SVG before PNG for equal stems. No network. The current canonical map is TypeScript and curated; this is not a safe rebuild command.                                                                                                                                                                                                                                                   |
+| `add_club.py`           | Scraping group; CLI club ID or name; old `ksi.is/mot/felag` and search HTML. Bases artwork/maps under script-relative `clock/`.                        | May download artwork into `clock/src/images/club-logos` before editing absent `clock/src/club-ids.js` and `clock/src/images/clubLogos.js`. Partial output is possible. Import insertion also needs repair; extension changes alone are insufficient.                                                                                                                                                                                            |
+| `fetch_clubs.py`        | Scraping group; old `ksi.is/mot/felog/adildarfelog/` table. `--out_folder` must be absolute; default is script-relative `clock/src/images/club-logos`. | Downloads artwork into the selected folder, then replaces `clock/src/club-ids.js` and `clock/src/images/clubLogos.js` regardless of `--out_folder`. Emits a CommonJS logo map. No timeout/dry-run contract or current selector qualification.                                                                                                                                                                                                   |
+| `build_assets_file.py`  | Standard library, then `npx prettier`; script-relative absent root `src/assets`.                                                                       | Writes CommonJS `src/assets/index.js` and formats through `npx`, potentially fetching a JS tool. Current `clock/src/assets` contains directly imported fonts; no current generic index consumer was found. Do not retarget it without a defined consumer.                                                                                                                                                                                       |
+| `image-converter.py`    | Image group; positional input/output folders, output must exist. Scans top-level `*.png` only.                                                         | `pids` searches `ksi.is/leit/` and copies to output `<pid>[-variant].png`. `crop` writes output `<original>.png` at 240x176. Both can overwrite output. `greenscreen` is broken on undefined `fname` and `frame_resized`, with no qualified image/alpha contract. No Firebase upload occurs here.                                                                                                                                               |
+| `copy-folder.py`        | Firebase group; positional source prefix, destination prefix and service-account-key path. A relative key path uses cwd.                               | **Writes Firebase Storage objects** with `Blob.rewrite` within the selected bucket. Case-sensitive `staging` anywhere in the full `service_account_key` argument selects `vikes-match-clock-staging.appspot.com`; every other argument selects **`vikes-match-clock-firebase.appspot.com` (production)**. Lists `<source>/`; key rewrite details below. No explicit bucket/dry-run option; overlap and rewrite continuation need qualification. |
+| `extract.py`            | Standard library; positional ZIP path uses cwd.                                                                                                        | Deletes/recreates script-relative `utils/extracted/`, then writes raw archive member names. Absolute/`..` names can escape that base; nested directories are not prepared. Do not use untrusted or real operator archives as a check.                                                                                                                                                                                                           |
+| `fit-image.sh`          | ImageMagick; positional input/output paths and optional background, relative to cwd.                                                                   | Writes resized/padded 238x177 output. Arguments are unquoted; spaces/globs need review. No network.                                                                                                                                                                                                                                                                                                                                             |
+| `convert-images.sh`     | ImageMagick; top-level `*.jpg` in **cwd**, independent of script location.                                                                             | Deletes/recreates **`./out/`**, even without matching input, then writes 174x116 images. Use a deliberately isolated temporary cwd for any future fixture verification.                                                                                                                                                                                                                                                                         |
+
+`copy-folder.py` tests the entire key-path argument, including directory names,
+without normalization: `/tmp/staging/service-account-prod.json` selects staging,
+while `Staging` does not match `staging`. For each listed object name, unrestricted
+`str.replace` removes **every** occurrence of `<source>/` before prepending
+`<destination>/`. For example, source `images` and destination `fotbolti` turn
+`images/archive/images/player.png` into `fotbolti/archive/player.png`.
+
+The utility contains historical production migration examples for
+`images`, `largeAds`, `smallAds` and `players` into `fotbolti`. They establish
+past operator intent, not current authorization. Credential path-argument inference
+must not be treated as environment validation. This inventory supplies no
+permission to read credentials, run Admin commands or write remote objects.
+
+## Canonical maps and pending decisions
+
+Current bundled assets use `clock/src/images/club-logos/`,
+`clock/src/images/clubLogos.ts` and `clock/src/club-ids.ts`. They moved to
+TypeScript in #113, while generators retained old destinations. The logo map
+includes curated aliases, such as `FC Malisheva` pointing to `Malisheva.png`;
+filename enumeration would lose that key. The
+[team-ID pipeline](../docs/clock/assets-and-rosters.md#team-id-system--match-data-pipeline)
+owns KSI identities, normalized names, override-first lookup and distinct
+`-1`/non-KSI and `0`/unknown meanings. Preserve manual/foreign clubs and artwork.
+
+History shows deliberate maintenance: July 2024's Egnatia addition changed
+`add_club.py` alongside maps, and April 2024 photo changes refined player-ID
+matching. Greenscreen variables date to 2023; later matching edits do not
+establish current greenscreen use. No automatic utility caller was found in
+current source/workflows; `.envrc` exposes this directory on PATH. This evidence
+does not establish retirement or reveal external operator callers.
+
+Before a later repair or retirement, confirm:
+
+- Which scripts, wrappers, root pip/uv commands and cwd conventions operators
+  still use, including extraction and the ImageMagick tools.
+- Whether bundled maps/artwork or Firebase club overrides are the current club
+  workflow, and which aliases/foreign additions a generator must retain.
+- Whether `pids`, `crop` and `greenscreen` are used independently, with required
+  dimensions, background/alpha behavior and a suitable fixture.
+- Whether Storage migration remains needed, with explicit bucket, overwrite,
+  prefix-overlap and rewrite-completion requirements.
+
+All utility sources and entrypoints are retained. Canonical generator repair,
+live scraper verification, image processing and Storage-tool changes remain
+separate follow-ups; **#251 remains open**. Future verification should use actual
+temporary output and synthetic inputs before any separately approved live work.
+
+Bundled artwork is reviewed product input. Captured proof belongs under ignored
+`screenshots/`; see [screenshot handling](../docs/screenshots.md).
