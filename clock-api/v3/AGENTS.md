@@ -153,7 +153,10 @@ make api-typecheck PYTHON=.venv/bin/python
 ```
 
 The targets require GNU Make. Both print and validate the selected Python 3.12
-interpreter. Pass `PYTHON=/absolute/path/to/python` for another owned environment. Formatting
+interpreter. Pass `PYTHON="/absolute/path/to/python"` for another owned environment;
+quote paths containing spaces. Pyright resolves dependencies through that
+interpreter even if a different root `.venv` exists. Install the API requirements
+in the selected environment. Formatting
 checks `app/`, `tests/` and `export-openapi.py`. The optional typecheck needs
 **Node 22.12+ and pnpm** and uses the pinned Pyright version in the Makefile
 through `pnpm dlx`, with one worker. Its first run may download the tool.

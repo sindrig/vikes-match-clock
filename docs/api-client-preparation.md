@@ -76,8 +76,12 @@ make api-format-check PYTHON=.venv/bin/python
 make api-typecheck PYTHON=.venv/bin/python
 ```
 
-Pass `PYTHON=/absolute/path/to/python` for another owned environment. The targets
-print the interpreter and reject versions other than 3.12. The format check
+Pass `PYTHON="/absolute/path/to/python"` for another owned environment; quote
+paths containing spaces. The targets print the interpreter and reject versions
+other than 3.12. Pyright resolves dependencies through that selected interpreter,
+including when a different root `.venv` exists. Install the API requirements in
+the selected environment; a different populated `.venv` does not supply them.
+The format check
 covers API `app/`, `tests/` and the exporter. The typecheck uses the Makefile's
 pinned Pyright through `pnpm dlx` with one worker; its first invocation may need
 the package registry. Root `pyrightconfig.json` checks API runtime `app/` and
