@@ -332,7 +332,7 @@ These source/model controls do not qualify real emulator behavior. From
 `clock/`, with Node 22 and Clock dependencies prepared:
 
 ```bash
-node --experimental-transform-types --test --test-concurrency=1 tests/local-fixture.test.mjs tests/fixture-cleanup-source.test.mjs tests/fixture-selector.test.mjs tests/storage-fixture-imports.test.mjs tests/playback-fixture.test.mjs
+node --experimental-transform-types --test --test-concurrency=1 tests/local-fixture.test.mjs tests/fixture-cleanup-source.test.mjs tests/fixture-selector.test.mjs tests/storage-fixture-imports.test.mjs tests/playback-fixture.test.mjs tests/nested-fixture.test.mjs
 ```
 
 These native controls and focused E2E typed lint remain manual checks, outside
